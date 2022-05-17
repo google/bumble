@@ -1,0 +1,7 @@
+{
+    "name": "Bumble",
+    "address": "F0:F1:F2:F3:F4:F5",
+    "advertising_interval": 2000,
+    "keystore": "JsonKeyStore",
+    "irk": "865F81FF5A8B486EAAE29A27AD9F77DC"
+}

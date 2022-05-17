@@ -1,0 +1,61 @@
+<html>
+    <head>
+    </head>
+    <body>
+        Server Port <input id="port" type="text" value="8989"></input> <button onclick="connect()">Connect</button><br>
+        <div id="socketState"></div>
+        <div id="mouseInfo"></div>
+        <div id="keyInfo"></div>
+        <br>
+        <div id="frame" style="border: 2px solid; height:300"></div>
+        <script>
+            let portInput = document.getElementById("port")
+            let mouseInfo = document.getElementById("mouseInfo")
+            let ketInfo = document.getElementById("keyInfo")
+            let frame = document.getElementById("frame")
+            let socketState = document.getElementById("socketState")
+            let socket
+
+            frame.addEventListener('mousemove', onMouseMove)
+            document.addEventListener('keydown', onKeyDown)
+            document.addEventListener('keyup', onKeyUp)
+
+            function connect() {
+                socket = new WebSocket(`ws://localhost:${portInput.value}`);
+                socket.onopen = _ => {
+                    socketState.innerText = 'OPEN'
+                }
+                socket.onclose = _ => {
+                    socketState.innerText = 'CLOSED'
+                }
+                socket.onerror = (error) => {
+                    socketState.innerText = 'ERROR'
+                    console.log(`ERROR: ${error}`)
+                }
+            }
+
+            function send(message) {
+                if (socket && socket.readyState == WebSocket.OPEN) {
+                    socket.send(JSON.stringify(message))
+                }
+            }
+            function onMouseMove(event) {
+                //console.log(event.clientX, event.clientY)
+                mouseInfo.innerText = `MOUSE: x=${event.clientX}, y=${event.clientY}`
+                send({ type:'mousemove', x: event.clientX, y: event.clientY })
+            }
+
+            function onKeyDown(event) {
+                //console.log(event)
+                keyInfo.innerText = `KEYDOWN: ${event.key}`
+                send({ type:'keydown', key: event.key })
+            }
+
+            function onKeyUp(event) {
+                //console.log(event)
+                keyInfo.innerText = `KEYUP: ${event.key}`
+                send({ type:'keyup', key: event.key })
+            }
+        </script>
+    </body>
+</html>

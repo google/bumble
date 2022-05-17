@@ -1,0 +1,79 @@
+<html>
+    <head>
+        <style>
+* {
+    font-family: sans-serif;
+}
+
+label {
+    display: block;
+}
+
+input, label {
+    margin: .4rem 0;
+}
+        </style>
+    </head>
+    <body>
+        Server Port <input id="port" type="text" value="8989"></input> <button onclick="connect()">Connect</button><br>
+        AT Command <input type="text" id="at_command" required size="10"> <button onclick="send_at_command()">Send</button><br>
+        Dial Phone Number <input type="text" id="dial_number" required size="10"> <button onclick="dial()">Dial</button><br>
+        <button onclick="answer()">Answer</button>
+        <button onclick="hangup()">Hang Up</button>
+        <button onclick="start_voice_assistant()">Start Voice Assistant</button>
+        <button onclick="stop_voice_assistant()">Stop Voice Assistant</button>
+        <hr>
+        <div id="socketState"></div>
+        <script>
+        let portInput = document.getElementById("port")
+        let atCommandInput = document.getElementById("at_command")
+        let dialNumberInput = document.getElementById("dial_number")
+        let socketState = document.getElementById("socketState")
+        let socket
+
+        function connect() {
+            socket = new WebSocket(`ws://localhost:${portInput.value}`);
+            socket.onopen = _ => {
+                socketState.innerText = 'OPEN'
+            }
+            socket.onclose = _ => {
+                socketState.innerText = 'CLOSED'
+            }
+            socket.onerror = (error) => {
+                socketState.innerText = 'ERROR'
+                console.log(`ERROR: ${error}`)
+            }
+        }
+
+        function send(message) {
+            if (socket && socket.readyState == WebSocket.OPEN) {
+                socket.send(JSON.stringify(message))
+            }
+        }
+
+        function send_at_command() {
+            send({ type:'at_command', command: atCommandInput.value })
+        }
+
+        function answer() {
+            send({ type:'at_command', command: 'ATA' })
+        }
+
+        function hangup() {
+            send({ type:'at_command', command: 'AT+CHUP' })
+        }
+
+        function dial() {
+            send({ type:'at_command', command: `ATD${dialNumberInput.value}` })
+        }
+
+        function start_voice_assistant() {
+            send(({ type:'at_command', command: 'AT+BVRA=1' }))
+        }
+
+        function stop_voice_assistant() {
+            send(({ type:'at_command', command: 'AT+BVRA=0' }))
+        }
+</script>
+    </body>
+</html>

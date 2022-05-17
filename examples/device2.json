@@ -1,0 +1,8 @@
+{
+    "name": "Bumble2",
+    "address": "F6:F7:F8:F9:FA:FB",
+    "keystore": "JsonKeyStore",
+    "irk": "43E96EC5C5DBD8D0F5204CFFDECE0096",
+    "advertising_interval": 2000,
+    "advertising_data": "0201061106ba5689a6fabfa2bd01467d6e00fbabad08160a181604659b03"
+}

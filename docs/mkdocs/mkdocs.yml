@@ -1,0 +1,88 @@
+site_name: Bumble
+
+use_directory_urls: true
+
+nav:
+  - Introduction: index.md
+  - Getting Started: getting_started.md
+  - Use Cases:
+    - Overview: use_cases/index.md
+    - Use Case 1: use_cases/use_case_1.md
+    - Use Case 2: use_cases/use_case_2.md
+    - Use Case 3: use_cases/use_case_3.md
+    - Use Case 4: use_cases/use_case_4.md
+    - Use Case 5: use_cases/use_case_5.md
+    - Use Case 6: use_cases/use_case_6.md
+  - Components:
+    - Controller: components/controller.md
+    - Host: components/host.md
+    - GATT: components/gatt.md
+    - Security Manager: components/security_manager.md
+  - Transports:
+    - Overview: transports/index.md
+    - Serial: transports/serial.md
+    - USB: transports/usb.md
+    - PTY: transports/pty.md
+    - UDP: transports/udp.md
+    - TCP Client: transports/tcp_client.md
+    - TCP Server: transports/tcp_server.md
+    - WebSocket Client: transports/ws_client.md
+    - WebSocket Server: transports/ws_server.md
+    - VHCI: transports/vhci.md
+    - HCI Socket: transports/hci_socket.md
+    - Android Emulator: transports/android_emulator.md
+    - File: transports/file.md
+  - API:
+    - Guide: api/guide.md
+    - Examples: api/examples.md
+    - Reference: api/reference.md
+  - Apps & Tools:
+    - Overview: apps_and_tools/index.md
+    - Console: apps_and_tools/console.md
+    - Link Relay: apps_and_tools/link_relay.md
+    - HCI Bridge: apps_and_tools/hci_bridge.md
+    - Golden Gate Bridge: apps_and_tools/gg_bridge.md
+    - Show: apps_and_tools/show.md
+  - Hardware:
+    - Overview: hardware/index.md
+  - Platforms:
+    - Overview: platforms/index.md
+    - macOS: platforms/macos.md
+    - Linux: platforms/linux.md
+    - Windows: platforms/windows.md
+    - Android: platforms/android.md
+  - Examples:
+    - Overview: examples/index.md
+
+copyright: Copyright 2021-2022 Google LLC
+
+theme:
+  name: 'material'
+  logo: 'images/logo.png'
+  favicon: 'images/favicon.ico'
+  custom_dir: 'theme'
+
+plugins:
+  - mkdocstrings
+
+docs_dir: 'src'
+
+edit_uri: ''
+
+# Repo info
+#repo_name: TBD
+#repo_url: https://github.com/TBD
+
+# Extensions
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - codehilite:
+      guess_lang: false
+  - toc:
+      permalink: true
