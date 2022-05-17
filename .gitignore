@@ -1,0 +1,10 @@
+.eggs/
+build/
+dist/
+*.egg-info/
+*~
+bumble/__pycache__
+docs/mkdocs/site
+tests/__pycache__
+test-results.xml
+bumble/transport/__pycache__

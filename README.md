@@ -13,7 +13,8 @@ Bluetooth Stack for Apps, Emulation, Test and Experimentation
 
 ## Documentation
 
-See the documentation under `docs/mkdocs/src`, or build the static HTML site from the markdown text with:
+Browse the pre-built [Online Documentation](https://google.github.io/bumble/), 
+or see the documentation source under `docs/mkdocs/src`, or build the static HTML site from the markdown text with:
 ```
 mkdocs build -f docs/mkdocs/mkdocs.yml 
 ```
