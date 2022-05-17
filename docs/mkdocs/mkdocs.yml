@@ -1,6 +1,6 @@
 site_name: Bumble
 
-use_directory_urls: true
+use_directory_urls: false
 
 nav:
   - Introduction: index.md
@@ -70,8 +70,8 @@ docs_dir: 'src'
 edit_uri: ''
 
 # Repo info
-#repo_name: TBD
-#repo_url: https://github.com/TBD
+repo_name: 'GitHub'
+repo_url: https://github.com/google/bumble
 
 # Extensions
 markdown_extensions:
