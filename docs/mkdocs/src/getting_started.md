@@ -75,6 +75,29 @@ Install with `pip`
 $ python -m pip install -e .
 ```
 
+### Install from GitHub
+
+You can install directly from GitHub without first downloading the repo.
+
+Install the latest commit from the main branch with `pip`:
+```
+$ python -m pip install git+https://github.com/google/bumble.git
+```
+
+You can specify a specific tag.
+
+Install tag `v0.0.1` with `pip`:
+```
+$ python -m pip install git+https://github.com/google/bumble.git@v0.0.1
+```
+
+You can also specify a specific commit.
+
+Install commit `27c0551` with `pip`:
+```
+$ python -m pip install git+https://github.com/google/bumble.git@27c0551
+```
+
 # Working On The Bumble Code
 When you work on the Bumble code itself, and run some of the tests or example apps, or import the
 module in your own code, you typically either install the package from source in "development mode" as described above, or you may choose to skip the install phase. 

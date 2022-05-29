@@ -37,14 +37,17 @@ async def open_usb_transport(spec):
     '''
     Open a USB transport.
     The parameter string has this syntax:
-    either <index> or <vendor>:<product>
+    either <index> or <vendor>:<product>[/<serial-number>]
     With <index> as the 0-based index to select amongst all the devices that appear
     to be supporting Bluetooth HCI (0 being the first one), or
-    Where <vendor> and <product> are the vendor ID and product ID in hexadecimal.
+    Where <vendor> and <product> are the vendor ID and product ID in hexadecimal. The
+    /<serial-number> suffix max be specified when more than one device with the same
+    vendor and product identifiers are present.
 
     Examples:
     0 --> the first BT USB dongle
     04b4:f901 --> the BT USB dongle with vendor=04b4 and product=f901
+    04b4:f901/00E04C239987 --> the BT USB dongle with vendor=04b4 and product=f901 and serial number 00E04C239987
     '''
 
     USB_RECIPIENT_DEVICE                             = 0x00
@@ -268,22 +271,32 @@ async def open_usb_transport(spec):
         found = None
         if ':' in spec:
             vendor_id, product_id = spec.split(':')
-            found = context.getByVendorIDAndProductID(int(vendor_id, 16), int(product_id, 16), skip_on_error=True)
+            if '/' in product_id:
+                product_id, serial_number = product_id.split('/')
+                for device in context.getDeviceIterator(skip_on_error=True):
+                    if (
+                        device.getVendorID() == int(vendor_id, 16) and
+                        device.getProductID() == int(product_id, 16) and
+                        device.getSerialNumber() == serial_number
+                    ):
+                        found = device
+                        break
+                device.close()
+            else:
+                found = context.getByVendorIDAndProductID(int(vendor_id, 16), int(product_id, 16), skip_on_error=True)
         else:
             device_index = int(spec)
-            device_iterator = context.getDeviceIterator(skip_on_error=True)
-            try:
-                for device in device_iterator:
-                    if device.getDeviceClass()    == USB_DEVICE_CLASS_WIRELESS_CONTROLLER and \
-                       device.getDeviceSubClass() == USB_DEVICE_SUBCLASS_RF_CONTROLLER and \
-                       device.getDeviceProtocol() == USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER:
-                        if device_index == 0:
-                            found = device
-                            break
-                        device_index -= 1
-                    device.close()
-            finally:
-                device_iterator.close()
+            for device in context.getDeviceIterator(skip_on_error=True):
+                if (
+                    device.getDeviceClass()    == USB_DEVICE_CLASS_WIRELESS_CONTROLLER and
+                    device.getDeviceSubClass() == USB_DEVICE_SUBCLASS_RF_CONTROLLER and
+                    device.getDeviceProtocol() == USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER
+                ):
+                    if device_index == 0:
+                        found = device
+                        break
+                    device_index -= 1
+                device.close()
 
         if found is None:
             context.close()
