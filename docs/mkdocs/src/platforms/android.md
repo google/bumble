@@ -46,7 +46,7 @@ through it with Android applications as well as system-managed profiles.
 To connect a Bumble host stack to a Root Canal virtual controller instance, use 
 the bumble `android-emulator` transport in `host` mode (the default).
 
-!!! example "Running the example GATT server connected to the emulator"
+!!! example "Run the example GATT server connected to the emulator"
     ``` shell
     $ python run_gatt_server.py device1.json android-emulator
     ```
@@ -57,7 +57,7 @@ This is an advanced use case, which may not be officially supported, but should 
 versions of the emulator.
 You will likely need to start the emulator from the command line, in order to specify the `-forward-vhci` option (unless the emulator offers a way to control that feature from a user/ui menu).
 
-!!! example "Launching the emulator with VHCI forwarding"
+!!! example "Launch the emulator with VHCI forwarding"
     In this example, we launch an emulator AVD named "Tiramisu"
     ```shell
     $ emulator -forward-vhci -avd Tiramisu
@@ -70,10 +70,20 @@ You will likely need to start the emulator from the command line, in order to sp
 
 To connect a virtual controller to the Android Bluetooth stack, use the bumble `android-emulator` transport in `controller` mode. For example, using the default gRPC port, the transport name would be: `android-emulator:mode=controller`.
 
-!!! example "connecting the Android emulator to the first USB Bluetooth dongle, using the `hci_bridge` application"
+!!! example "Connect the Android emulator to the first USB Bluetooth dongle, using the `hci_bridge` application"
     ```shell
     $ bumble-hci-bridge android-emulator:mode=controller usb:0
     ```
 
+## Other Tools
 
+The `show` application that's included with Bumble can be used to parse and pretty-print the HCI packets
+from an Android HCI "snoop log" (see [this page](https://source.android.com/devices/bluetooth/verifying_debugging) 
+for details on how to obtain HCI snoop logs from an Android device).
+Use the `--format snoop` option to specify that the file is in that specific format.
+
+!!! example "Analyze an Android HCI snoop log file"
+    ```shell
+    $ bumble-show --format snoop btsnoop_hci.log
+    ```
 
