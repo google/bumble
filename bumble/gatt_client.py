@@ -273,7 +273,7 @@ class Client:
             if response.op_code == ATT_ERROR_RESPONSE:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
-                    logger.waning(f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}')
+                    logger.warning(f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}')
                     # TODO raise appropriate exception
                     return
                 break
@@ -337,7 +337,7 @@ class Client:
             if response.op_code == ATT_ERROR_RESPONSE:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
-                    logger.waning(f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}')
+                    logger.warning(f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}')
                     # TODO raise appropriate exception
                     return
                 break

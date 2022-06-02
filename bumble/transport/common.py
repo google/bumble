@@ -274,7 +274,7 @@ class PumpedPacketSource(ParserSource):
                     self.terminated.set_result(error)
                     break
 
-        self.pump_task = asyncio.get_running_loop().create_task(pump_packets())
+        self.pump_task = asyncio.create_task(pump_packets())
 
     def close(self):
         if self.pump_task:
@@ -304,7 +304,7 @@ class PumpedPacketSink:
                     logger.warn(f'exception while sending packet: {error}')
                     break
 
-        self.pump_task = asyncio.get_running_loop().create_task(pump_packets())
+        self.pump_task = asyncio.create_task(pump_packets())
 
     def close(self):
         if self.pump_task:

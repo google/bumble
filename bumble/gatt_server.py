@@ -155,7 +155,7 @@ class Server(EventEmitter):
         return cccd or bytes([0, 0])
 
     def write_cccd(self, connection, characteristic, value):
-        logger.debug(f'Subscription update for connection={connection.handle:04X}, handle={characteristic.handle:04X}: {value.hex()}')
+        logger.debug(f'Subscription update for connection=0x{connection.handle:04X}, handle=0x{characteristic.handle:04X}: {value.hex()}')
 
         # Sanity check
         if len(value) != 2:
@@ -204,7 +204,7 @@ class Server(EventEmitter):
         logger.debug(f'GATT Notify from server: [0x{connection.handle:04X}] {notification}')
         self.send_gatt_pdu(connection.handle, bytes(notification))
 
-    async def indicate_subscriber(self, connection, attribute, value=None, force=False):
+    async def indicate_subscriber(self, connection, attribute, force=False):
         # Check if there's a subscriber
         if not force:
             subscribers = self.subscribers.get(connection.handle)

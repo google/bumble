@@ -98,6 +98,7 @@ async def list_rfcomm_channels(device, connection):
 
     await sdp_client.disconnect()
 
+
 # -----------------------------------------------------------------------------
 class TcpServerProtocol(asyncio.Protocol):
     def __init__(self, rfcomm_session):
@@ -173,7 +174,7 @@ async def main():
         print('*** Encryption on')
 
         # Create a client and start it
-        print('@@@ Starting to RFCOMM client...')
+        print('@@@ Starting RFCOMM client...')
         rfcomm_client = Client(device, connection)
         rfcomm_mux = await rfcomm_client.start()
         print('@@@ Started')
@@ -192,7 +193,7 @@ async def main():
         if len(sys.argv) == 6:
             # A TCP port was specified, start listening
             tcp_port = int(sys.argv[5])
-            asyncio.get_running_loop().create_task(tcp_server(tcp_port, session))
+            asyncio.create_task(tcp_server(tcp_port, session))
 
         await hci_source.wait_for_termination()
 

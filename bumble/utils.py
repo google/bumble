@@ -18,6 +18,7 @@
 import asyncio
 import logging
 import traceback
+import collections
 from functools import wraps
 from colors import color
 from pyee import EventEmitter
@@ -140,3 +141,95 @@ class AsyncRunner:
             return wrapper
 
         return decorator
+
+
+# -----------------------------------------------------------------------------
+class FlowControlAsyncPipe:
+    """
+    Asyncio pipe with flow control. When writing to the pipe, the source is
+    paused (by calling a function passed in when the pipe is created) if the
+    amount of queued data exceeds a specified threshold.
+    """
+    def __init__(self, pause_source, resume_source, write_to_sink=None, drain_sink=None, threshold=0):
+        self.pause_source  = pause_source
+        self.resume_source = resume_source
+        self.write_to_sink = write_to_sink
+        self.drain_sink    = drain_sink
+        self.threshold     = threshold
+        self.queue         = collections.deque()  # Queue of packets
+        self.queued_bytes  = 0                    # Number of bytes in the queue
+        self.ready_to_pump = asyncio.Event()
+        self.paused        = False
+        self.source_paused = False
+        self.pump_task     = None
+
+    def start(self):
+        if self.pump_task is None:
+            self.pump_task = asyncio.create_task(self.pump())
+
+        self.check_pump()
+
+    def stop(self):
+        if self.pump_task is not None:
+            self.pump_task.cancel()
+            self.pump_task = None
+
+    def write(self, packet):
+        self.queued_bytes += len(packet)
+        self.queue.append(packet)
+
+        # Pause the source if we're over the threshold
+        if self.queued_bytes > self.threshold and not self.source_paused:
+            logger.debug(f'pausing source (queued={self.queued_bytes})')
+            self.pause_source()
+            self.source_paused = True
+
+        self.check_pump()
+
+    def pause(self):
+        if not self.paused:
+            self.paused = True
+            if not self.source_paused:
+                self.pause_source()
+                self.source_paused = True
+            self.check_pump()
+
+    def resume(self):
+        if self.paused:
+            self.paused = False
+            if self.source_paused:
+                self.resume_source()
+                self.source_paused = False
+            self.check_pump()
+
+    def can_pump(self):
+        return self.queue and not self.paused and self.write_to_sink is not None
+
+    def check_pump(self):
+        if self.can_pump():
+            self.ready_to_pump.set()
+        else:
+            self.ready_to_pump.clear()
+
+    async def pump(self):
+        while True:
+            # Wait until we can try to pump packets
+            await self.ready_to_pump.wait()
+
+            # Try to pump a packet
+            if self.can_pump():
+                packet = self.queue.pop()
+                self.write_to_sink(packet)
+                self.queued_bytes -= len(packet)
+
+                # Drain the sink if we can
+                if self.drain_sink:
+                    await self.drain_sink()
+
+                # Check if we can accept more
+                if self.queued_bytes <= self.threshold and self.source_paused:
+                    logger.debug(f'resuming source (queued={self.queued_bytes})')
+                    self.source_paused = False
+                    self.resume_source()
+
+            self.check_pump()

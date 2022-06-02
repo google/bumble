@@ -50,10 +50,16 @@ class Listener(Device.Listener, Connection.Listener):
 
 
 # -----------------------------------------------------------------------------
+# Alternative way to listen for subscriptions
+# -----------------------------------------------------------------------------
+def on_my_characteristic_subscription(peer, enabled):
+    print(f'### My characteristic from {peer}: {"enabled" if enabled else "disabled"}')
+
+# -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 3:
-        print('Usage: run_gatt_server.py <device-config> <transport-spec>')
-        print('example: run_gatt_server.py device1.json usb:0')
+        print('Usage: run_notifier.py <device-config> <transport-spec>')
+        print('example: run_notifier.py device1.json usb:0')
         return
 
     print('<<< connecting to HCI...')
@@ -83,6 +89,7 @@ async def main():
             Characteristic.READABLE,
             bytes([0x42])
         )
+        characteristic3.on('subscription', on_my_characteristic_subscription)
         custom_service = Service(
             '50DB505C-8AC4-4738-8448-3B1D9CC09CC5',
             [characteristic1, characteristic2, characteristic3]
