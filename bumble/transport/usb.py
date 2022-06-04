@@ -281,7 +281,7 @@ async def open_usb_transport(spec):
                     ):
                         found = device
                         break
-                device.close()
+                    device.close()
             else:
                 found = context.getByVendorIDAndProductID(int(vendor_id, 16), int(product_id, 16), skip_on_error=True)
         else:
