@@ -13,7 +13,7 @@
     
     
       
-        <title>Overview - Bumble</title>
+        <title>Python Environments - Bumble</title>
       
     
     
@@ -61,7 +61,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#apps-tools" class="md-skip">
+        <a href="#python-environments" class="md-skip">
           Skip to content
         </a>
       
@@ -93,7 +93,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Overview
+              Python Environments
             
           </span>
         </div>
@@ -197,12 +197,14 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
       
       
       
@@ -223,11 +225,86 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../development/python_environments.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          Python Environments
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="python_environments.html" class="md-nav__link md-nav__link--active">
         Python Environments
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#venv" class="md-nav__link">
+    venv
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pyenv" class="md-nav__link">
+    Pyenv
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conda" class="md-nav__link">
+    Conda
+  </a>
+  
+    <nav class="md-nav" aria-label="Conda">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-new-bumble-conda-environment" class="md-nav__link">
+    Create a new bumble Conda environment
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-an-existing-bumble-environment" class="md-nav__link">
+    Update an existing bumble environment
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -759,14 +836,12 @@
 
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_8" type="checkbox" id="__nav_8" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_8" type="checkbox" id="__nav_8" >
       
       
       
@@ -787,21 +862,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../apps_and_tools/index.html" class="md-nav__link">
         Overview
       </a>
-      
     </li>
   
 
@@ -813,7 +878,7 @@
   
   
     <li class="md-nav__item">
-      <a href="console.html" class="md-nav__link">
+      <a href="../apps_and_tools/console.html" class="md-nav__link">
         Console
       </a>
     </li>
@@ -827,7 +892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="link_relay.html" class="md-nav__link">
+      <a href="../apps_and_tools/link_relay.html" class="md-nav__link">
         Link Relay
       </a>
     </li>
@@ -841,7 +906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="hci_bridge.html" class="md-nav__link">
+      <a href="../apps_and_tools/hci_bridge.html" class="md-nav__link">
         HCI Bridge
       </a>
     </li>
@@ -855,7 +920,7 @@
   
   
     <li class="md-nav__item">
-      <a href="gg_bridge.html" class="md-nav__link">
+      <a href="../apps_and_tools/gg_bridge.html" class="md-nav__link">
         Golden Gate Bridge
       </a>
     </li>
@@ -869,7 +934,7 @@
   
   
     <li class="md-nav__item">
-      <a href="show.html" class="md-nav__link">
+      <a href="../apps_and_tools/show.html" class="md-nav__link">
         Show
       </a>
     </li>
@@ -1103,6 +1168,55 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#venv" class="md-nav__link">
+    venv
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pyenv" class="md-nav__link">
+    Pyenv
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conda" class="md-nav__link">
+    Conda
+  </a>
+  
+    <nav class="md-nav" aria-label="Conda">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-new-bumble-conda-environment" class="md-nav__link">
+    Create a new bumble Conda environment
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-an-existing-bumble-environment" class="md-nav__link">
+    Update an existing bumble environment
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1115,16 +1229,36 @@
                 
 
 
-<h1 id="apps-tools">APPS &amp; TOOLS<a class="headerlink" href="#apps-tools" title="Permanent link">&para;</a></h1>
-<p>Included in the project are a few apps and tools, built on top of the core libraries.
-These include:</p>
-<ul>
-<li><a href="console.html">Console</a> - an interactive text-based console</li>
-<li><a href="hci_bridge.html">HCI Bridge</a> - a HCI transport bridge to connect two HCI transports and filter/snoop the HCI packets</li>
-<li><a href="gg_bridge.html">Golden Gate Bridge</a> - a bridge between GATT and UDP to use with the Golden Gate "stack tool"</li>
-<li><a href="show.html">Show</a> - Parse a file with HCI packets and print the details of each packet in a human readable form</li>
-<li><a href="link_relay.html">Link Relay</a> - WebSocket relay for virtual RemoteLink instances to communicate with each other.</li>
-</ul>
+<h1 id="python-environments">PYTHON ENVIRONMENTS<a class="headerlink" href="#python-environments" title="Permanent link">&para;</a></h1>
+<p>When you don't want to install Bumble in your main/default python environment, 
+using a virtual environment, where the package and its dependencies can be
+installed, isolated from the rest, may be useful.</p>
+<p>There are many flavors of python environments and dependency managers. 
+This page describes a few of the most common ones.</p>
+<h2 id="venv">venv<a class="headerlink" href="#venv" title="Permanent link">&para;</a></h2>
+<p><code>venv</code> is a standard module that is included with python.
+Visit the <a href="https://docs.python.org/3/library/venv.html"><code>venv</code> documentation</a> page for details.</p>
+<h2 id="pyenv">Pyenv<a class="headerlink" href="#pyenv" title="Permanent link">&para;</a></h2>
+<p><code>pyenv</code> lets you easily switch between multiple versions of Python. It's simple, unobtrusive, and follows the UNIX tradition of single-purpose tools that do one thing well.<br />
+Visit the <a href="https://github.com/pyenv/pyenv"><code>pyenv</code> site</a> for instructions on how to install
+and use <code>pyenv</code></p>
+<h2 id="conda">Conda<a class="headerlink" href="#conda" title="Permanent link">&para;</a></h2>
+<p>Conda is a convenient package manager and virtual environment.
+The file <code>environment.yml</code> is a Conda environment file that you can use to create
+a new Conda environment. Once created, you can simply activate this environment when
+working with Bumble.<br />
+Visit the <a href="https://docs.conda.io/en/latest/">Conda site</a> for instructions on how to install
+and use Conda.
+A few useful commands:  </p>
+<h3 id="create-a-new-bumble-conda-environment">Create a new <code>bumble</code> Conda environment<a class="headerlink" href="#create-a-new-bumble-conda-environment" title="Permanent link">&para;</a></h3>
+<p><div class="highlight"><pre><span></span><code>$ conda env create -f environment.yml
+</code></pre></div>
+This will create a new environment, named <code>bumble</code>, which you can then activate with:
+<div class="highlight"><pre><span></span><code>$ conda activate bumble
+</code></pre></div></p>
+<h3 id="update-an-existing-bumble-environment">Update an existing <code>bumble</code> environment<a class="headerlink" href="#update-an-existing-bumble-environment" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>$ conda env update -f environment.yml
+</code></pre></div>
 
               
             </article>
@@ -1139,7 +1273,7 @@ These include:</p>
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
         
-          <a href="../api/reference.html" title="Reference" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+          <a href="../getting_started.html" title="Getting Started" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
             <div class="md-flex__cell md-flex__cell--shrink">
               <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
             </div>
@@ -1148,19 +1282,19 @@ These include:</p>
                 <span class="md-footer-nav__direction">
                   Previous
                 </span>
-                Reference
+                Getting Started
               </span>
             </div>
           </a>
         
         
-          <a href="console.html" title="Console" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
+          <a href="../use_cases/index.html" title="Overview" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
               <span class="md-flex__ellipsis">
                 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                Console
+                Overview
               </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink">
