@@ -99,3 +99,8 @@ $ PYTHONPATH=. python examples/run_advertiser.py examples/device1.json serial:/d
 Once you've installed or downloaded Bumble, you can either start using some of the 
 [Bundled apps and tools](apps_and_tools/index.md), or look at the [examples](examples/index.md)
 to get a feel for how to use the APIs, and start writing your own applications.
+
+Depending on the use case you're interested in exploring, you may need to use a physical Bluetooth
+controller, like a USB dongle or a board with a Bluetooth radio. Visit the [Hardware page](hardware/index.md)
+for more information on using a physical radio, and/or the [Transports page](transports/index.md) for more 
+details on interfacing with either hardware modules or virtual controllers over various transports.
