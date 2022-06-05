@@ -11,6 +11,8 @@ Bluetooth Stack for Apps, Emulation, Test and Experimentation
 
 <img src="docs/mkdocs/src/images/logo_framed.png" alt="drawing" width="200" height="200"/>
 
+Bumble is a full-featured Bluetooth stack written entirely in Python. It supports most of the common Bluetooth Low Energy (BLE) and Bluetooth Classic (BR/EDR) protocols and profiles, including GAP, L2CAP, ATT, GATT, SMP, SDP, RFCOMM, HFP, HID and A2DP. The stack can be used with physical radios via HCI over USB, UART, or the Linux VHCI, as well as virtual radios, including the virtual Bluetooth support of the Android emulator.
+
 ## Documentation
 
 Browse the pre-built [Online Documentation](https://google.github.io/bumble/), 
