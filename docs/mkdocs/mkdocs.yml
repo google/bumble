@@ -5,6 +5,8 @@ use_directory_urls: false
 nav:
   - Introduction: index.md
   - Getting Started: getting_started.md
+  - Development:
+    - Python Environments: development/python_environments.md
   - Use Cases:
     - Overview: use_cases/index.md
     - Use Case 1: use_cases/use_case_1.md
@@ -63,7 +65,10 @@ theme:
   custom_dir: 'theme'
 
 plugins:
-  - mkdocstrings
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [../..]
 
 docs_dir: 'src'
 
