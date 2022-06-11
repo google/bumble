@@ -292,7 +292,18 @@ def with_connection_from_handle(function):
         if (connection := self.lookup_connection(connection_handle)) is None:
             logger.warn(f'no connection found for handle 0x{connection_handle:04X}')
             return
-        function(self, connection, *args, **kwargs)
+        return function(self, connection, *args, **kwargs)
+    return wrapper
+
+
+# Decorator that converts the first argument from a bluetooth address to a connection
+def with_connection_from_address(function):
+    @functools.wraps(function)
+    def wrapper(self, address, *args, **kwargs):
+        for connection in self.connections.values():
+            if connection.peer_address == address:
+                return function(self, connection, *args, **kwargs)
+        logger.warn(f'no connection found for address {address}')
     return wrapper
 
 
@@ -452,6 +463,11 @@ class Device(CompositeEventEmitter):
     def lookup_connection(self, connection_handle):
         if connection := self.connections.get(connection_handle):
             return connection
+
+    def find_connection_by_bd_addr(self, bd_addr):
+        for connection in self.connections.values():
+            if connection.peer_address == bd_addr:
+                return connection
 
     def register_l2cap_server(self, psm, server):
         self.l2cap_channel_manager.register_server(psm, server)
@@ -936,13 +952,13 @@ class Device(CompositeEventEmitter):
         # Set up event handlers
         pending_authentication = asyncio.get_running_loop().create_future()
 
-        def on_authentication_complete():
+        def on_authentication():
             pending_authentication.set_result(None)
 
-        def on_authentication_failure(error):
-            pending_authentication.set_exception(error)
+        def on_authentication_failure(error_code):
+            pending_authentication.set_exception(HCI_Error(error_code))
 
-        connection.on('connection_authentication_complete', on_authentication_complete)
+        connection.on('connection_authentication', on_authentication)
         connection.on('connection_authentication_failure',  on_authentication_failure)
 
         # Request the authentication
@@ -957,7 +973,7 @@ class Device(CompositeEventEmitter):
             # Wait for the authentication to complete
             await pending_authentication
         finally:
-            connection.remove_listener('connection_authentication_complete', on_authentication_complete)
+            connection.remove_listener('connection_authentication', on_authentication)
             connection.remove_listener('connection_authentication_failure',  on_authentication_failure)
 
     async def encrypt(self, connection):
@@ -1141,16 +1157,120 @@ class Device(CompositeEventEmitter):
 
     @host_event_handler
     @with_connection_from_handle
-    def on_connection_authentication_complete(self, connection):
-        logger.debug(f'*** Connection Authentication Complete: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}')
+    def on_connection_authentication(self, connection):
+        logger.debug(f'*** Connection Authentication: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}')
         connection.authenticated = True
-        connection.emit('connection_authentication_complete')
+        connection.emit('connection_authentication')
 
     @host_event_handler
     @with_connection_from_handle
     def on_connection_authentication_failure(self, connection, error):
         logger.debug(f'*** Connection Authentication Failure: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, error={error}')
         connection.emit('connection_authentication_failure', error)
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    def on_authentication_io_capability_request(self, connection):
+        # Ask what the pairing config should be for this connection
+        pairing_config = self.pairing_config_factory(connection)
+
+        # Map the SMP IO capability to a Classic IO capability
+        if (io_capability := {
+            smp.SMP_DISPLAY_ONLY_IO_CAPABILITY:       HCI_DISPLAY_ONLY_IO_CAPABILITY,
+            smp.SMP_DISPLAY_YES_NO_IO_CAPABILITY:     HCI_DISPLAY_YES_NO_IO_CAPABILITY,
+            smp.SMP_KEYBOARD_ONLY_IO_CAPABILITY:      HCI_KEYBOARD_ONLY_IO_CAPABILITY,
+            smp.SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
+            smp.SMP_KEYBOARD_DISPLAY_IO_CAPABILITY:   HCI_DISPLAY_YES_NO_IO_CAPABILITY
+        }.get(pairing_config.delegate.io_capability)) is None:
+            logger.warning(f'cannot map IO capability ({pairing_config.delegate.io_capability}')
+            io_capability = HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
+
+        # Compute the authentication requirements
+        authentication_requirements = (
+            (
+                HCI_MITM_NOT_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
+                HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS
+            ),
+            (
+                HCI_MITM_NOT_REQUIRED_DEDICATED_BONDING_AUTHENTICATION_REQUIREMENTS,
+                HCI_MITM_REQUIRED_DEDICATED_BONDING_AUTHENTICATION_REQUIREMENTS
+            )
+        )[1 if pairing_config.bonding else 0][1 if pairing_config.mitm else 0]
+
+        # Respond
+        self.host.send_command_sync(
+            HCI_IO_Capability_Request_Reply_Command(
+                bd_addr                     = connection.peer_address,
+                io_capability               = io_capability,
+                oob_data_present            = 0x00,
+                authentication_requirements = authentication_requirements
+            )
+        )
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    def on_authentication_user_confirmation_request(self, connection, code):
+        # Ask what the pairing config should be for this connection
+        pairing_config = self.pairing_config_factory(connection)
+
+        can_confirm = pairing_config.delegate.io_capability not in {
+            smp.SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
+            smp.SMP_DISPLAY_ONLY_IO_CAPABILITY
+        }
+
+        # Respond
+        if can_confirm and pairing_config.delegate:
+            async def compare_numbers():
+                numbers_match = await pairing_config.delegate.compare_numbers(code, digits=6)
+                if numbers_match:
+                    self.host.send_command_sync(
+                        HCI_User_Confirmation_Request_Reply_Command(bd_addr=connection.peer_address)
+                    )
+                else:
+                    self.host.send_command_sync(
+                        HCI_User_Confirmation_Request_Negative_Reply_Command(bd_addr=connection.peer_address)
+                    )
+
+            asyncio.create_task(compare_numbers())
+        else:
+            self.host.send_command_sync(
+                HCI_User_Confirmation_Request_Reply_Command(bd_addr=connection.peer_address)
+            )
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    def on_authentication_user_passkey_request(self, connection):
+        # Ask what the pairing config should be for this connection
+        pairing_config = self.pairing_config_factory(connection)
+
+        can_input = pairing_config.delegate.io_capability in {
+            smp.SMP_KEYBOARD_ONLY_IO_CAPABILITY,
+            smp.SMP_KEYBOARD_DISPLAY_IO_CAPABILITY
+        }
+
+        # Respond
+        if can_input and pairing_config.delegate:
+            async def get_number():
+                number = await pairing_config.delegate.get_number()
+                if number is not None:
+                    self.host.send_command_sync(
+                        HCI_User_Passkey_Request_Reply_Command(
+                            bd_addr       = connection.peer_address,
+                            numeric_value = number)
+                    )
+                else:
+                    self.host.send_command_sync(
+                        HCI_User_Passkey_Request_Negative_Reply_Command(bd_addr=connection.peer_address)
+                    )
+
+            asyncio.create_task(get_number())
+        else:
+            self.host.send_command_sync(
+                HCI_User_Passkey_Request_Negative_Reply_Command(bd_addr=connection.peer_address)
+            )
 
     @host_event_handler
     @with_connection_from_handle
