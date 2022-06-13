@@ -63,16 +63,12 @@ class Delegate(PairingDelegate):
             # We already asked the peer
             return
 
-        # For classic, just use the address
-        if self.mode == 'classic':
-            self.peer_name = str(self.peer.connection.peer_address)
+        # Try to get the peer's name
+        if self.peer:
+            peer_name = await get_peer_name(self.peer, self.mode)
+            self.peer_name = f'{peer_name or ""} [{self.peer.connection.peer_address}]'
         else:
-            # Try to get the peer's name
-            if self.peer:
-                peer_name = await get_peer_name(self.peer)
-                self.peer_name = f'{peer_name or ""} [{self.peer.connection.peer_address}]'
-            else:
-                self.peer_name = '[?]'
+            self.peer_name = '[?]'
 
     async def accept(self):
         if self.prompt:
@@ -107,7 +103,7 @@ class Delegate(PairingDelegate):
         print(color(f'### Pairing with {self.peer_name}', 'yellow'))
         print(color('###-----------------------------------', 'yellow'))
         while True:
-            response = await aioconsole.ainput(color(f'>>> Does the other device display {number:{digits}}? ', 'yellow'))
+            response = await aioconsole.ainput(color(f'>>> Does the other device display {number:0{digits}}? ', 'yellow'))
             response = response.lower().strip()
             if response == 'yes':
                 return True
@@ -144,14 +140,18 @@ class Delegate(PairingDelegate):
 
 
 # -----------------------------------------------------------------------------
-async def get_peer_name(peer):
-    services = await peer.discover_service(GATT_GENERIC_ACCESS_SERVICE)
-    if not services:
-        return None
+async def get_peer_name(peer, mode):
+    if mode == 'classic':
+        return await peer.request_name()
+    else:
+        # Try to get the peer name from GATT
+        services = await peer.discover_service(GATT_GENERIC_ACCESS_SERVICE)
+        if not services:
+            return None
 
-    values = await peer.read_characteristics_by_uuid(GATT_DEVICE_NAME_CHARACTERISTIC, services[0])
-    if values:
-        return values[0].decode('utf-8')
+        values = await peer.read_characteristics_by_uuid(GATT_DEVICE_NAME_CHARACTERISTIC, services[0])
+        if values:
+            return values[0].decode('utf-8')
 
 
 # -----------------------------------------------------------------------------

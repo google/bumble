@@ -1378,6 +1378,9 @@ class HCI_Remote_Name_Request_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.19 Remote Name Request Command
     '''
+    R0 = 0x00
+    R1 = 0x01
+    R2 = 0x02
 
 
 # -----------------------------------------------------------------------------

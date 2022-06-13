@@ -593,3 +593,9 @@ class Host(EventEmitter):
             event.extended_inquiry_response,
             event.rssi
         )
+
+    def on_hci_remote_name_request_complete_event(self, event):
+        if event.status != HCI_SUCCESS:
+            self.emit('remote_name_failure', event.bd_addr, event.status)
+        else:
+            self.emit('remote_name', event.bd_addr, event.remote_name)

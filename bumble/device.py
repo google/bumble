@@ -137,6 +137,10 @@ class Peer:
     def get_characteristics_by_uuid(self, uuid, service = None):
         return self.gatt_client.get_characteristics_by_uuid(uuid, service)
 
+    # [Classic only]
+    async def request_name(self):
+        return await self.connection.request_remote_name()
+
     def __str__(self):
         return f'{self.connection.peer_address} as {self.connection.role_name}'
 
@@ -176,6 +180,7 @@ class Connection(CompositeEventEmitter):
         self.transport               = transport
         self.peer_address            = peer_address
         self.peer_resolvable_address = peer_resolvable_address
+        self.peer_name               = None  # Classic only
         self.role                    = role
         self.parameters              = parameters
         self.encryption              = 0
@@ -230,6 +235,10 @@ class Connection(CompositeEventEmitter):
             conn_latency,
             supervision_timeout
         )
+
+    # [Classic only]
+    async def request_remote_name(self):
+        return await self.device.request_remote_name(self)
 
     def __str__(self):
         return f'Connection(handle=0x{self.handle:04X}, role={self.role_name}, address={self.peer_address})'
@@ -290,8 +299,7 @@ def with_connection_from_handle(function):
     @functools.wraps(function)
     def wrapper(self, connection_handle, *args, **kwargs):
         if (connection := self.lookup_connection(connection_handle)) is None:
-            logger.warn(f'no connection found for handle 0x{connection_handle:04X}')
-            return
+            raise ValueError('no connection for handle')
         return function(self, connection, *args, **kwargs)
     return wrapper
 
@@ -303,7 +311,7 @@ def with_connection_from_address(function):
         for connection in self.connections.values():
             if connection.peer_address == address:
                 return function(self, connection, *args, **kwargs)
-        logger.warn(f'no connection found for address {address}')
+        raise ValueError('no connection for address')
     return wrapper
 
 
@@ -1045,6 +1053,40 @@ class Device(CompositeEventEmitter):
             connection.remove_listener('connection_encryption_failure', on_encryption_failure)
 
     # [Classic only]
+    async def request_remote_name(self, connection):
+        # Set up event handlers
+        pending_name = asyncio.get_running_loop().create_future()
+
+        def on_remote_name():
+            pending_name.set_result(connection.peer_name)
+
+        def on_remote_name_failure(error_code):
+            pending_name.set_exception(HCI_Error(error_code))
+
+        connection.on('remote_name', on_remote_name)
+        connection.on('remote_name_failure', on_remote_name_failure)
+
+        try:
+            result = await self.send_command(
+                HCI_Remote_Name_Request_Command(
+                    bd_addr                   = connection.peer_address,
+                    page_scan_repetition_mode = HCI_Remote_Name_Request_Command.R0,  # TODO investigate other options
+                    reserved                  = 0,
+                    clock_offset              = 0  # TODO investigate non-0 values
+                )
+            )
+
+            if result.status != HCI_COMMAND_STATUS_PENDING:
+                logger.warn(f'HCI_Set_Connection_Encryption_Command failed: {HCI_Constant.error_name(result.status)}')
+                raise HCI_Error(result.status)
+
+            # Wait for the result
+            return await pending_name
+        finally:
+            connection.remove_listener('remote_name', on_remote_name)
+            connection.remove_listener('remote_name_failure', on_remote_name_failure)
+
+    # [Classic only]
     @host_event_handler
     def on_link_key(self, bd_addr, link_key, key_type):
         # Store the keys in the key store
@@ -1188,10 +1230,12 @@ class Device(CompositeEventEmitter):
 
         # Compute the authentication requirements
         authentication_requirements = (
+            # No Bonding
             (
                 HCI_MITM_NOT_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
                 HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS
             ),
+            # General Bonding
             (
                 HCI_MITM_NOT_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
                 HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS
@@ -1203,7 +1247,7 @@ class Device(CompositeEventEmitter):
             HCI_IO_Capability_Request_Reply_Command(
                 bd_addr                     = connection.peer_address,
                 io_capability               = io_capability,
-                oob_data_present            = 0x00,
+                oob_data_present            = 0x00,  # Not present
                 authentication_requirements = authentication_requirements
             )
         )
@@ -1271,6 +1315,24 @@ class Device(CompositeEventEmitter):
             self.host.send_command_sync(
                 HCI_User_Passkey_Request_Negative_Reply_Command(bd_addr=connection.peer_address)
             )
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    def on_remote_name(self, connection, remote_name):
+        # Try to decode the name
+        try:
+            connection.peer_name = remote_name.decode('utf-8')
+            connection.emit('remote_name')
+        except UnicodeDecodeError as error:
+            logger.warning('peer name is not valid UTF-8')
+            connection.emit('remote_name_failure', error)
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    def on_remote_name_failure(self, connection, error):
+        connection.emit('remote_name_failure', error)
 
     @host_event_handler
     @with_connection_from_handle
