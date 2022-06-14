@@ -1218,13 +1218,15 @@ class Device(CompositeEventEmitter):
         pairing_config = self.pairing_config_factory(connection)
 
         # Map the SMP IO capability to a Classic IO capability
-        if (io_capability := {
+        io_capability = {
             smp.SMP_DISPLAY_ONLY_IO_CAPABILITY:       HCI_DISPLAY_ONLY_IO_CAPABILITY,
             smp.SMP_DISPLAY_YES_NO_IO_CAPABILITY:     HCI_DISPLAY_YES_NO_IO_CAPABILITY,
             smp.SMP_KEYBOARD_ONLY_IO_CAPABILITY:      HCI_KEYBOARD_ONLY_IO_CAPABILITY,
             smp.SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
             smp.SMP_KEYBOARD_DISPLAY_IO_CAPABILITY:   HCI_DISPLAY_YES_NO_IO_CAPABILITY
-        }.get(pairing_config.delegate.io_capability)) is None:
+        }.get(pairing_config.delegate.io_capability)
+        
+        if io_capability is None:
             logger.warning(f'cannot map IO capability ({pairing_config.delegate.io_capability}')
             io_capability = HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
 
