@@ -208,11 +208,11 @@ async def test_self_smp():
             self.peer_delegate = None
             self.number = asyncio.get_running_loop().create_future()
 
-        async def compare_numbers(self, number):
+        async def compare_numbers(self, number, digits):
             if self.peer_delegate is None:
                 logger.warn(f'[{self.name}] no peer delegate')
                 return False
-            await self.display_number(number)
+            await self.display_number(number, digits=6)
             logger.debug(f'[{self.name}] waiting for peer number')
             peer_number = await self.peer_delegate.number
             logger.debug(f'[{self.name}] comparing numbers: {number} and {peer_number}')
@@ -231,7 +231,7 @@ async def test_self_smp():
                 logger.debug(f'[{self.name}] returning number: {peer_number}')
                 return peer_number
 
-        async def display_number(self, number):
+        async def display_number(self, number, digits):
             logger.debug(f'[{self.name}] displaying number: {number}')
             self.number.set_result(number)
 
@@ -293,7 +293,7 @@ async def test_self_smp_wrong_pin():
         def __init__(self):
             super().__init__(PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT)
 
-        async def compare_numbers(self, number):
+        async def compare_numbers(self, number, digits):
             return False
 
     wrong_pin_pairing_config = PairingConfig(delegate = WrongPinDelegate())

@@ -85,6 +85,7 @@ class Host(EventEmitter):
         self.command_semaphore                = asyncio.Semaphore(1)
         self.long_term_key_provider           = None
         self.link_key_provider                = None
+        self.pairing_io_capability_provider   = None  # Classic only
 
         # Connect to the source and sink if specified
         if controller_source:
@@ -495,7 +496,7 @@ class Host(EventEmitter):
     def on_hci_authentication_complete_event(self, event):
         # Notify the client
         if event.status == HCI_SUCCESS:
-            self.emit('connection_authentication_complete', event.connection_handle)
+            self.emit('connection_authentication', event.connection_handle)
         else:
             self.emit('connection_authentication_failure', event.connection_handle, event.status)
 
@@ -560,26 +561,16 @@ class Host(EventEmitter):
         asyncio.create_task(send_link_key())
 
     def on_hci_io_capability_request_event(self, event):
-        # For now, just return NoInputNoOutput and no MITM
-        # TODO: delegate the decision
-        self.send_command_sync(
-            HCI_IO_Capability_Request_Reply_Command(
-                bd_addr                     = event.bd_addr,
-                io_capability               = HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
-                oob_data_present            = 0x00,
-                authentication_requirements = 0x00  # 0x02  # FIXME: testing only
-            )
-        )
+        self.emit('authentication_io_capability_request', event.bd_addr)
 
     def on_hci_io_capability_response_event(self, event):
         pass
 
     def on_hci_user_confirmation_request_event(self, event):
-        # For now, just confirm everything
-        # TODO: delegate the decision
-        self.send_command_sync(
-            HCI_User_Confirmation_Request_Reply_Command(bd_addr = event.bd_addr)
-        )
+        self.emit('authentication_user_confirmation_request', event.bd_addr, event.numeric_value)
+
+    def on_hci_user_passkey_request_event(self, event):
+        self.emit('authentication_user_passkey_request', event.bd_addr)
 
     def on_hci_inquiry_complete_event(self, event):
         self.emit('inquiry_complete')
@@ -602,3 +593,9 @@ class Host(EventEmitter):
             event.extended_inquiry_response,
             event.rssi
         )
+
+    def on_hci_remote_name_request_complete_event(self, event):
+        if event.status != HCI_SUCCESS:
+            self.emit('remote_name_failure', event.bd_addr, event.status)
+        else:
+            self.emit('remote_name', event.bd_addr, event.remote_name)

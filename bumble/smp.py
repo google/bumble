@@ -464,13 +464,13 @@ class PairingDelegate:
     async def accept(self):
         return True
 
-    async def compare_numbers(self, number):
+    async def compare_numbers(self, number, digits=6):
         return True
 
     async def get_number(self):
         return 0
 
-    async def display_number(self, number):
+    async def display_number(self, number, digits=6):
         pass
 
 
@@ -699,7 +699,7 @@ class Session:
         async def prompt():
             logger.debug(f'verification code: {code}')
             try:
-                response = await self.pairing_config.delegate.compare_numbers(code)
+                response = await self.pairing_config.delegate.compare_numbers(code, digits=6)
                 if response:
                     next_steps()
                     return
@@ -733,7 +733,7 @@ class Session:
             self.tk = self.passkey.to_bytes(16, byteorder='little')
             logger.debug(f'TK from passkey = {self.tk.hex()}')
 
-        asyncio.create_task(self.pairing_config.delegate.display_number(self.passkey))
+        asyncio.create_task(self.pairing_config.delegate.display_number(self.passkey, digits=6))
 
     def input_passkey(self, next_steps=None):
         # Prompt the user for the passkey displayed on the peer
