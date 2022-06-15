@@ -816,8 +816,8 @@ class Device(CompositeEventEmitter):
     async def disconnect(self, connection, reason):
         # Create a future so that we can wait for the disconnection's result
         pending_disconnection = asyncio.get_running_loop().create_future()
-        self.on('disconnection', pending_disconnection.set_result)
-        self.on('disconnection_failure', pending_disconnection.set_exception)
+        connection.on('disconnection', pending_disconnection.set_result)
+        connection.on('disconnection_failure', pending_disconnection.set_exception)
 
         # Request a disconnection
         result = await self.send_command(HCI_Disconnect_Command(connection_handle = connection.handle, reason = reason))
@@ -830,8 +830,8 @@ class Device(CompositeEventEmitter):
             self.disconnecting = True
             return await pending_disconnection
         finally:
-            self.remove_listener('disconnection', pending_disconnection.set_result)
-            self.remove_listener('disconnection_failure', pending_disconnection.set_exception)
+            connection.remove_listener('disconnection', pending_disconnection.set_result)
+            connection.remove_listener('disconnection_failure', pending_disconnection.set_exception)
             self.disconnecting = False
 
     async def update_connection_parameters(
@@ -1181,14 +1181,15 @@ class Device(CompositeEventEmitter):
             asyncio.create_task(self.start_advertising(auto_restart=self.auto_restart_advertising))
 
     @host_event_handler
-    def on_disconnection_failure(self, error_code):
+    @with_connection_from_handle
+    def on_disconnection_failure(self, connection, error_code):
         logger.debug(f'*** Disconnection failed: {error_code}')
         error = ConnectionError(
             error_code,
             'hci',
             HCI_Constant.error_name(error_code)
         )
-        self.emit('disconnection_failure', error)
+        connection.emit('disconnection_failure', error)
 
     @host_event_handler
     @AsyncRunner.run_in_task()
@@ -1225,7 +1226,7 @@ class Device(CompositeEventEmitter):
             smp.SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
             smp.SMP_KEYBOARD_DISPLAY_IO_CAPABILITY:   HCI_DISPLAY_YES_NO_IO_CAPABILITY
         }.get(pairing_config.delegate.io_capability)
-        
+
         if io_capability is None:
             logger.warning(f'cannot map IO capability ({pairing_config.delegate.io_capability}')
             io_capability = HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY

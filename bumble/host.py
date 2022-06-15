@@ -364,7 +364,7 @@ class Host(EventEmitter):
             logger.debug(f'### BR/EDR CONNECTION FAILED: {event.status}')
 
             # Notify the client
-            self.emit('connection_failure', event.status)
+            self.emit('connection_failure', event.connection_handle, event.status)
 
     def on_hci_disconnection_complete_event(self, event):
         # Find the connection
