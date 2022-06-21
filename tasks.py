@@ -24,34 +24,48 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 ns = Collection()
 
 build_tasks = Collection()
-ns.add_collection(build_tasks, name='build')
+ns.add_collection(build_tasks, name="build")
 
 
 @task
 def build(ctx):
-    ctx.run('python -m build')
+    ctx.run("python -m build")
 
-build_tasks.add_task(build, default=True, name='build')
 
-test_tasks = Collection()
-ns.add_collection(test_tasks, name='test')
+build_tasks.add_task(build, default=True, name="build")
+
 
 @task
-def test(ctx, filter=None, junit=False):
+def release_build(ctx):
+    ctx.run('python -m pip install .[build]')
+    build(ctx)
+
+
+build_tasks.add_task(release_build, name="release")
+
+
+@task
+def mkdocs(ctx):
+    ctx.run("mkdocs build -f docs/mkdocs/mkdocs.yml")
+
+
+build_tasks.add_task(mkdocs, name="mkdocs")
+
+test_tasks = Collection()
+ns.add_collection(test_tasks, name="test")
+
+
+@task
+def test(ctx, filter=None, junit=False, install=False):
+    # Install the package before running the tests
+    if install:
+        ctx.run("python -m pip install .[test]")
     args = ""
     if junit:
         args += "--junit-xml test-results.xml"
     if filter is not None:
         args += " -k '{}'".format(filter)
-    ctx.run('python -m pytest {} {}'
-            .format(os.path.join(ROOT_DIR, "tests"), args))
-
-test_tasks.add_task(test, name='test', default=True)
+    ctx.run("python -m pytest {} {}".format(os.path.join(ROOT_DIR, "tests"), args))
 
 
-@task
-def mkdocs(ctx):
-    ctx.run('mkdocs build -f docs/mkdocs/mkdocs.yml')
-
-
-ns.add_task(mkdocs)
+test_tasks.add_task(test, name="test", default=True)
