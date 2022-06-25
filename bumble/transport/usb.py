@@ -221,7 +221,7 @@ async def open_usb_transport(spec):
                     pass
 
             logger.debug('USB event loop done')
-            self.event_loop_done.set_result(None)
+            self.loop.call_soon_threadsafe(self.event_loop_done.set_result, None)
 
         async def close(self):
             self.closed = True
