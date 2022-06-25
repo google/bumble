@@ -260,33 +260,33 @@ class DeviceConfiguration:
         self.irk      = bytes(16)  # This really must be changed for any level of security
         self.keystore = None
 
+    def load_from_dict(self, config):
+        # Load simple properties
+        self.name = config.get('name', self.name)
+        self.address = Address(config.get('address', self.address))
+        self.class_of_device = config.get('class_of_device', self.class_of_device)
+        self.advertising_interval_min = config.get('advertising_interval', self.advertising_interval_min)
+        self.advertising_interval_max = self.advertising_interval_min
+        self.keystore = config.get('keystore')
+
+        # Load or synthesize an IRK
+        irk = config.get('irk')
+        if irk:
+            self.irk = bytes.fromhex(irk)
+        else:
+            # Construct an IRK from the address bytes
+            # NOTE: this is not secure, but will always give the same IRK for the same address
+            address_bytes = bytes(self.address)
+            self.irk = (address_bytes * 3)[:16]
+
+        # Load advertising data
+        advertising_data = config.get('advertising_data')
+        if advertising_data:
+            self.advertising_data = bytes.fromhex(advertising_data)
+
     def load_from_file(self, filename):
         with open(filename, 'r') as file:
-            config = json.load(file)
-
-            # Load simple properties
-            self.name = config.get('name', self.name)
-            self.address = Address(config.get('address', self.address))
-            self.class_of_device = config.get('class_of_device', self.class_of_device)
-            self.advertising_interval_min = config.get('advertising_interval', self.advertising_interval_min)
-            self.advertising_interval_max = self.advertising_interval_min
-            self.keystore = config.get('keystore')
-
-            # Load or synthesize an IRK
-            irk = config.get('irk')
-            if irk:
-                self.irk = bytes.fromhex(irk)
-            else:
-                # Construct an IRK from the address bytes
-                # NOTE: this is not secure, but will always give the same IRK for the same address
-                address_bytes = bytes(self.address)
-                self.irk = (address_bytes * 3)[:16]
-
-            # Load advertising data
-            advertising_data = config.get('advertising_data')
-            if advertising_data:
-                self.advertising_data = bytes.fromhex(advertising_data)
-
+            self.load_from_dict(json.load(file))
 
 # -----------------------------------------------------------------------------
 # Decorators used with the following Device class
