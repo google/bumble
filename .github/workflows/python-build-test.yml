@@ -31,4 +31,4 @@ jobs:
     - name: Build
       run: |
         inv build
-        inv mkdocs
+        inv build.mkdocs

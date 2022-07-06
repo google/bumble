@@ -37,18 +37,29 @@ build_tasks.add_task(build, default=True, name="build")
 
 @task
 def release_build(ctx):
-    ctx.run('pip install "$(grep build setup.cfg | cut -f2 -d-)"')
+    ctx.run('python -m pip install "$(grep build setup.cfg | cut -f2 -d-)"')
     build(ctx)
 
 
 build_tasks.add_task(release_build, name="release")
+
+
+@task
+def mkdocs(ctx):
+    ctx.run("mkdocs build -f docs/mkdocs/mkdocs.yml")
+
+
+build_tasks.add_task(mkdocs, name="mkdocs")
 
 test_tasks = Collection()
 ns.add_collection(test_tasks, name="test")
 
 
 @task
-def test(ctx, filter=None, junit=False):
+def test(ctx, filter=None, junit=False, install=False):
+    # Install the package before running the tests
+    if install:
+        ctx.run("python -m pip install .[test]")
     args = ""
     if junit:
         args += "--junit-xml test-results.xml"
@@ -58,20 +69,3 @@ def test(ctx, filter=None, junit=False):
 
 
 test_tasks.add_task(test, name="test", default=True)
-
-
-@task
-def release_test(ctx):
-    ctx.run("pip install .[test]")
-    test(ctx, junit=True)
-
-
-test_tasks.add_task(release_test, name="release")
-
-
-@task
-def mkdocs(ctx):
-    ctx.run("mkdocs build -f docs/mkdocs/mkdocs.yml")
-
-
-ns.add_task(mkdocs)
