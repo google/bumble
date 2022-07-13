@@ -23,6 +23,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
+import struct
 from colors import color
 
 from .core import *
@@ -287,6 +288,35 @@ class CharacteristicValue:
     def write(self, connection, value):
         if self._write:
             self._write(connection, value)
+
+class PackedCharacteristicValue(CharacteristicValue):
+    def __init__(self, fmt, **kwargs):
+        super().__init__(**kwargs)
+        self.fmt = fmt
+        self.struct = struct.Struct(fmt)
+
+    def pack(self, *values):
+        return self.struct.pack(*values)
+
+    def unpack(self, buf):
+        return self.struct.unpack(buf)
+
+    def read(self, connection):
+        return self.pack(super().read(connection))
+
+    def write(self, connection, value):
+        super().write(connection, self.unpack(value))
+
+class MappedCharacteristicValue(PackedCharacteristicValue):
+    def __init__(self, fmt, tags, **kwargs):
+        super().__init__(fmt, **kwargs)
+        self.tags = tags
+
+    def pack(self, values):
+        return super().pack(*iter(values[key] for key in self.tags))
+
+    def unpack(self, buf):
+        return {key:value for (key, value) in zip(self.tags, super().unpack(buf))}
 
 
 # -----------------------------------------------------------------------------
