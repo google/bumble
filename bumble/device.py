@@ -254,6 +254,11 @@ class DeviceConfiguration:
         self.scan_response_data       = DEVICE_DEFAULT_SCAN_RESPONSE_DATA
         self.advertising_interval_min = DEVICE_DEFAULT_ADVERTISING_INTERVAL
         self.advertising_interval_max = DEVICE_DEFAULT_ADVERTISING_INTERVAL
+        self.le_enabled               = True
+        # LE host enable 2nd parameter
+        self.le_simultaneous_enabled  = True
+        self.classic_sc_enabled       = True
+        self.classic_ssp_enabled      = True
         self.advertising_data = bytes(
             AdvertisingData([(AdvertisingData.COMPLETE_LOCAL_NAME, bytes(self.name, 'utf-8'))])
         )
@@ -267,7 +272,11 @@ class DeviceConfiguration:
         self.class_of_device = config.get('class_of_device', self.class_of_device)
         self.advertising_interval_min = config.get('advertising_interval', self.advertising_interval_min)
         self.advertising_interval_max = self.advertising_interval_min
-        self.keystore = config.get('keystore')
+        self.keystore                 = config.get('keystore')
+        self.le_enabled               = config.get('le_enabled', self.le_enabled)
+        self.le_simultaneous_enabled  = config.get('le_simultaneous_enabled', self.le_simultaneous_enabled)
+        self.classic_sc_enabled       = config.get('classic_sc_enabled', self.classic_sc_enabled)
+        self.classic_ssp_enabled      = config.get('classic_ssp_enabled', self.classic_ssp_enabled)
 
         # Load or synthesize an IRK
         irk = config.get('irk')
@@ -387,7 +396,6 @@ class Device(CompositeEventEmitter):
         self.connecting               = False
         self.disconnecting            = False
         self.connections              = {}  # Connections, by connection handle
-        self.le_enabled               = True
         self.classic_enabled          = False
         self.discoverable             = False
         self.connectable              = False
@@ -407,6 +415,10 @@ class Device(CompositeEventEmitter):
         self.advertising_interval_max = config.advertising_interval_max
         self.keystore                 = keys.KeyStore.create_for_device(config)
         self.irk                      = config.irk
+        self.le_enabled               = config.le_enabled
+        self.le_simultaneous_enabled  = config.le_simultaneous_enabled
+        self.classic_ssp_enabled      = config.classic_ssp_enabled
+        self.classic_sc_enabled       = config.classic_sc_enabled
 
         # If a name is passed, override the name from the config
         if name:
@@ -504,6 +516,11 @@ class Device(CompositeEventEmitter):
             logger.debug(color(f'BD_ADDR: {response.return_parameters.bd_addr}', 'yellow'))
             self.public_address = response.return_parameters.bd_addr
 
+
+        await self.send_command(HCI_Write_LE_Host_Support_Command(
+            le_supported_host = int(self.le_enabled),
+            simultaneous_le_host = int(self.le_simultaneous_enabled),
+        ))
         if self.le_enabled:
             # Set the controller address
             await self.send_command(HCI_LE_Set_Random_Address_Command(
@@ -541,7 +558,12 @@ class Device(CompositeEventEmitter):
                 HCI_Write_Class_Of_Device_Command(class_of_device = self.class_of_device)
             )
             await self.send_command(
-                HCI_Write_Simple_Pairing_Mode_Command(simple_pairing_mode = 0x01)
+                HCI_Write_Simple_Pairing_Mode_Command(
+                    simple_pairing_mode=int(self.classic_ssp_enabled))
+            )
+            await self.send_command(
+                HCI_Write_Secure_Connections_Host_Support_Command(
+                    secure_connections_host_support=int(self.classic_sc_enabled))
             )
 
         # Let the SMP manager know about the address
