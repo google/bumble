@@ -197,6 +197,22 @@ class Service(Attribute):
         return f'Service(handle=0x{self.handle:04X}, end=0x{self.end_group_handle:04X}, uuid={self.uuid}){"" if self.primary else "*"}'
 
 
+class TemplateService(Service):
+    UUID = None
+    CHARACTERISTICS = []
+    PRIMARY = True
+
+    def __init__(self, characteristics=[]):
+        if not characteristics:
+            characteristics = [x() for x in self.CHARACTERISTICS]
+
+        super().__init__(
+            self.UUID,
+            characteristics,
+            self.PRIMARY
+            )
+
+
 # -----------------------------------------------------------------------------
 class Characteristic(Attribute):
     '''
@@ -276,18 +292,44 @@ class Characteristic(Attribute):
         return f'Characteristic(handle=0x{self.handle:04X}, end=0x{self.end_group_handle:04X}, uuid={self.uuid}, properties={self.get_properties_as_string()})'
 
 
+class TemplateCharacteristic(Characteristic):
+    UUID = None
+    PROPERTIES = None
+    PERMISSIONS = None
+    VALUE = b''
+
+    def __init__(self, value):
+        if value is None:
+            value = self.VALUE if type(self.VALUE) is bytes else self.VALUE()
+
+        super().__init__(self.UUID, self.PROPERTIES, self.PERMISSIONS, value)
+
+
+class UTF8Characteristic(TemplateCharacteristic):
+    def __init__(self, value):
+        super().__init__(UTF8CharacteristicValue(value=value))
+
+
 # -----------------------------------------------------------------------------
 class CharacteristicValue:
-    def __init__(self, read=None, write=None):
+    def __init__(self, read=None, write=None, value=None):
         self._read = read
         self._write = write
+        self._value = value
 
     def read(self, connection):
-        return self._read(connection) if self._read else b''
+        if self._read:
+            return self._read(connection)
+        elif self._value is not None:
+            return self._value
+        else:
+            return b''
 
     def write(self, connection, value):
         if self._write:
             self._write(connection, value)
+        elif self._value is not None:
+            self._value = value
 
 class PackedCharacteristicValue(CharacteristicValue):
     def __init__(self, fmt, **kwargs):
@@ -317,6 +359,17 @@ class MappedCharacteristicValue(PackedCharacteristicValue):
 
     def unpack(self, buf):
         return {key:value for (key, value) in zip(self.tags, super().unpack(buf))}
+
+
+class UTF8CharacteristicValue(PackedCharacteristicValue):
+    def __init__(self, **kwargs):
+        super().__init__('<s', **kwargs)
+
+    def pack(self, value):
+        return value.encode('UTF-8')
+
+    def unpack(self, buf):
+        return buf.decode()
 
 
 # -----------------------------------------------------------------------------
