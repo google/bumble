@@ -294,8 +294,8 @@ def test_HCI_LE_Create_Connection_Command():
 
 
 # -----------------------------------------------------------------------------
-def test_HCI_LE_Add_Device_To_White_List_Command():
-    command = HCI_LE_Add_Device_To_White_List_Command(
+def test_HCI_LE_Add_Device_To_Filter_Accept_List_Command():
+    command = HCI_LE_Add_Device_To_Filter_Accept_List_Command(
         address_type = 1,
         address      = Address('00:11:22:33:44:55')
     )
@@ -303,8 +303,8 @@ def test_HCI_LE_Add_Device_To_White_List_Command():
 
 
 # -----------------------------------------------------------------------------
-def test_HCI_LE_Remove_Device_From_White_List_Command():
-    command = HCI_LE_Remove_Device_From_White_List_Command(
+def test_HCI_LE_Remove_Device_From_Filter_Accept_List_Command():
+    command = HCI_LE_Remove_Device_From_Filter_Accept_List_Command(
         address_type = 1,
         address      = Address('00:11:22:33:44:55')
     )
@@ -339,6 +339,23 @@ def test_HCI_LE_Set_Default_PHY_Command():
         all_phys = 0,
         tx_phys  = 1,
         rx_phys  = 1
+    )
+    basic_check(command)
+
+
+# -----------------------------------------------------------------------------
+def test_HCI_LE_Set_Extended_Scan_Parameters_Command():
+    command = HCI_LE_Set_Extended_Scan_Parameters_Command(
+        own_address_type=Address.RANDOM_DEVICE_ADDRESS,
+        scanning_filter_policy=HCI_LE_Set_Extended_Scan_Parameters_Command.BASIC_FILTERED_POLICY,
+        scanning_phys=(1 << HCI_LE_Set_Extended_Scan_Parameters_Command.LE_1M_PHY | 1 << HCI_LE_Set_Extended_Scan_Parameters_Command.LE_CODED_PHY | 1 << 4),
+        scan_types=[
+            HCI_LE_Set_Extended_Scan_Parameters_Command.ACTIVE_SCANNING,
+            HCI_LE_Set_Extended_Scan_Parameters_Command.ACTIVE_SCANNING,
+            HCI_LE_Set_Extended_Scan_Parameters_Command.PASSIVE_SCANNING
+        ],
+        scan_intervals=[1, 2, 3],
+        scan_windows=[4, 5, 6]
     )
     basic_check(command)
 
@@ -391,11 +408,12 @@ def run_test_commands():
     test_HCI_LE_Set_Scan_Parameters_Command()
     test_HCI_LE_Set_Scan_Enable_Command()
     test_HCI_LE_Create_Connection_Command()
-    test_HCI_LE_Add_Device_To_White_List_Command()
-    test_HCI_LE_Remove_Device_From_White_List_Command()
+    test_HCI_LE_Add_Device_To_Filter_Accept_List_Command()
+    test_HCI_LE_Remove_Device_From_Filter_Accept_List_Command()
     test_HCI_LE_Connection_Update_Command()
     test_HCI_LE_Read_Remote_Features_Command()
     test_HCI_LE_Set_Default_PHY_Command()
+    test_HCI_LE_Set_Extended_Scan_Parameters_Command()
 
 
 # -----------------------------------------------------------------------------
