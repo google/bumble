@@ -459,9 +459,17 @@ class PairingDelegate:
     DISPLAY_OUTPUT_ONLY               = SMP_DISPLAY_ONLY_IO_CAPABILITY
     DISPLAY_OUTPUT_AND_YES_NO_INPUT   = SMP_DISPLAY_YES_NO_IO_CAPABILITY
     DISPLAY_OUTPUT_AND_KEYBOARD_INPUT = SMP_KEYBOARD_DISPLAY_IO_CAPABILITY
+    DEFAULT_KEY_DISTRIBUTION          = (SMP_ENC_KEY_DISTRIBUTION_FLAG | SMP_ID_KEY_DISTRIBUTION_FLAG)
 
-    def __init__(self, io_capability = NO_OUTPUT_NO_INPUT):
+    def __init__(
+        self,
+        io_capability=NO_OUTPUT_NO_INPUT,
+        local_initiator_key_distribution=DEFAULT_KEY_DISTRIBUTION,
+        local_responder_key_distribution=DEFAULT_KEY_DISTRIBUTION
+    ):
         self.io_capability = io_capability
+        self.local_initiator_key_distribution = local_initiator_key_distribution
+        self.local_responder_key_distribution = local_responder_key_distribution
 
     async def accept(self):
         return True
@@ -474,6 +482,14 @@ class PairingDelegate:
 
     async def display_number(self, number, digits=6):
         pass
+
+    async def key_distribution_response(self, peer_initiator_key_distribution, peer_responder_key_distribution):
+        return (
+            (peer_initiator_key_distribution &
+             self.local_initiator_key_distribution),
+            (peer_responder_key_distribution &
+             self.local_responder_key_distribution)
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -599,11 +615,8 @@ class Session:
             self.pairing_result = None
 
         # Key Distribution (default values before negotiation)
-        self.initiator_key_distribution = (
-            SMP_ENC_KEY_DISTRIBUTION_FLAG |
-            SMP_ID_KEY_DISTRIBUTION_FLAG   # |SMP_SIGN_KEY_DISTRIBUTION_FLAG
-        )
-        self.responder_key_distribution = self.initiator_key_distribution
+        self.initiator_key_distribution = pairing_config.delegate.local_initiator_key_distribution
+        self.responder_key_distribution = pairing_config.delegate.local_responder_key_distribution
 
         # Authentication Requirements Flags - Vol 3, Part H, Figure 3.3
         self.bonding  = pairing_config.bonding
@@ -873,17 +886,15 @@ class Session:
                     self.send_command(SMP_Encryption_Information_Command(long_term_key=self.ltk))
                     self.send_command(SMP_Master_Identification_Command(ediv=self.ltk_ediv, rand=self.ltk_rand))
 
-            # Distribute IRK
+            # Distribute IRK & BD ADDR
             if self.initiator_key_distribution & SMP_ID_KEY_DISTRIBUTION_FLAG:
                 self.send_command(
                     SMP_Identity_Information_Command(identity_resolving_key=self.manager.device.irk)
                 )
-
-            # Distribute BD ADDR
-            self.send_command(SMP_Identity_Address_Information_Command(
-                addr_type = self.manager.address.address_type,
-                bd_addr   = self.manager.address
-            ))
+                self.send_command(SMP_Identity_Address_Information_Command(
+                    addr_type = self.manager.address.address_type,
+                    bd_addr   = self.manager.address
+                ))
 
             # Distribute CSRK
             csrk = bytes(16)  # FIXME: testing
@@ -898,25 +909,21 @@ class Session:
                 self.link_key = crypto.h6(ilk, b'lebr')
 
         else:
-            # Distribute the LTK
+            # Distribute the LTK, EDIV and RAND
             if not self.sc:
                 if self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG:
                     self.send_command(SMP_Encryption_Information_Command(long_term_key=self.ltk))
+                    self.send_command(SMP_Master_Identification_Command(ediv=self.ltk_ediv, rand=self.ltk_rand))
 
-                # Distribute EDIV and RAND
-                self.send_command(SMP_Master_Identification_Command(ediv=self.ltk_ediv, rand=self.ltk_rand))
-
-            # Distribute IRK
+            # Distribute IRK & BD ADDR
             if self.responder_key_distribution & SMP_ID_KEY_DISTRIBUTION_FLAG:
                 self.send_command(
                     SMP_Identity_Information_Command(identity_resolving_key=self.manager.device.irk)
                 )
-
-            # Distribute BD ADDR
-            self.send_command(SMP_Identity_Address_Information_Command(
-                addr_type = self.manager.address.address_type,
-                bd_addr   = self.manager.address
-            ))
+                self.send_command(SMP_Identity_Address_Information_Command(
+                    addr_type = self.manager.address.address_type,
+                    bd_addr   = self.manager.address
+                ))
 
             # Distribute CSRK
             csrk = bytes(16)  # FIXME: testing
@@ -963,7 +970,7 @@ class Session:
                 # Nothing left to expect, we're done
                 self.on_pairing()
         else:
-            logger.warn(color('!!! unexpected key distribution command', 'red'))
+            logger.warn(color(f'!!! unexpected key distribution command: {command_class.__name__}', 'red'))
             self.send_pairing_failed(SMP_UNSPECIFIED_REASON_ERROR)
 
     async def pair(self):
@@ -1115,8 +1122,8 @@ class Session:
         logger.debug(f'pairing method: {self.PAIRING_METHOD_NAMES[self.pairing_method]}')
 
         # Key distribution
-        self.initiator_key_distribution &= command.initiator_key_distribution
-        self.responder_key_distribution &= command.responder_key_distribution
+        self.initiator_key_distribution, self.responder_key_distribution = await self.pairing_config.delegate.key_distribution_response(
+            command.initiator_key_distribution, command.responder_key_distribution)
         self.compute_peer_expected_distributions(self.initiator_key_distribution)
 
         # The pairing is now starting
