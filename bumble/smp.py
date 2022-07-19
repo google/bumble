@@ -150,6 +150,8 @@ SMP_SC_AUTHREQ       = 0b00001000
 SMP_KEYPRESS_AUTHREQ = 0b00010000
 SMP_CT2_AUTHREQ      = 0b00100000
 
+# Crypto salt
+SMP_CTKD_H7_LEBR_SALT = bytes.fromhex('00000000000000000000000000000000746D7031')
 
 # -----------------------------------------------------------------------------
 # Utils
@@ -559,6 +561,7 @@ class Session:
         self.ltk                         = None
         self.ltk_ediv                    = 0
         self.ltk_rand                    = bytes(8)
+        self.link_key                    = None
         self.initiator_key_distribution  = 0
         self.responder_key_distribution  = 0
         self.peer_random_value           = None
@@ -886,6 +889,14 @@ class Session:
             csrk = bytes(16)  # FIXME: testing
             if self.initiator_key_distribution & SMP_SIGN_KEY_DISTRIBUTION_FLAG:
                 self.send_command(SMP_Signing_Information_Command(signature_key=csrk))
+            
+            # CTKD, calculate BR/EDR link key
+            if self.initiator_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
+                ilk = crypto.h7(
+                    salt=SMP_CTKD_H7_LEBR_SALT,
+                    w=self.ltk) if self.ct2 else crypto.h6(self.ltk, b'tmp1')
+                self.link_key = crypto.h6(ilk, b'lebr')
+
         else:
             # Distribute the LTK
             if not self.sc:
@@ -911,6 +922,13 @@ class Session:
             csrk = bytes(16)  # FIXME: testing
             if self.responder_key_distribution & SMP_SIGN_KEY_DISTRIBUTION_FLAG:
                 self.send_command(SMP_Signing_Information_Command(signature_key=csrk))
+            
+            # CTKD, calculate BR/EDR link key
+            if self.responder_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
+                ilk = crypto.h7(
+                    salt=SMP_CTKD_H7_LEBR_SALT,
+                    w=self.ltk) if self.ct2 else crypto.h6(self.ltk, b'tmp1')
+                self.link_key = crypto.h6(ilk, b'lebr')
 
     def compute_peer_expected_distributions(self, key_distribution_flags):
         # Set our expectations for what to wait for in the key distribution phase
@@ -1029,6 +1047,11 @@ class Session:
                 value         = self.peer_signature_key,
                 authenticated = authenticated
             )
+        if self.link_key is not None:
+            keys.link_key = PairingKeys.Key(
+                value         = self.link_key,
+                authenticated = authenticated
+            )
 
         self.manager.on_pairing(self, peer_address, keys)
 
@@ -1076,6 +1099,7 @@ class Session:
         # Bonding and SC require both sides to request/support it
         self.bonding = self.bonding and (command.auth_req & SMP_BONDING_AUTHREQ != 0)
         self.sc      = self.sc and (command.auth_req & SMP_SC_AUTHREQ != 0)
+        self.ct2     = self.ct2 and (command.auth_req & SMP_CT2_AUTHREQ != 0)
 
         # Check for OOB
         if command.oob_data_flag != 0:
