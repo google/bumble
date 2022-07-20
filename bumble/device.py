@@ -484,10 +484,11 @@ class Device(CompositeEventEmitter):
         if connection := self.connections.get(connection_handle):
             return connection
 
-    def find_connection_by_bd_addr(self, bd_addr):
+    def find_connection_by_bd_addr(self, bd_addr, transport=None):
         for connection in self.connections.values():
-            if connection.peer_address == bd_addr:
-                return connection
+            if connection.peer_address.get_bytes() == bd_addr.get_bytes():
+                if transport is None or connection.transport == transport:
+                    return connection
 
     def register_l2cap_server(self, psm, server):
         self.l2cap_channel_manager.register_server(psm, server)
