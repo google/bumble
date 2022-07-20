@@ -25,7 +25,6 @@ from bumble.controller import Controller
 from bumble.device import Device, Peer
 from bumble.host import Host
 from bumble.link import LocalLink
-from bumble.utils import AsyncRunner
 from bumble.gatt import (
     Service,
     Characteristic,
@@ -35,43 +34,6 @@ from bumble.gatt import (
     GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
     GATT_DEVICE_INFORMATION_SERVICE
 )
-
-
-# -----------------------------------------------------------------------------
-class ClientListener(Device.Listener):
-    def __init__(self, device):
-        self.device = device
-
-    @AsyncRunner.run_in_task()
-    async def on_connection(self, connection):
-        print(f'=== Client: connected to {connection}')
-
-        # Discover all services
-        print('=== Discovering services')
-        peer = Peer(connection)
-        await peer.discover_services()
-        await peer.discover_characteristics()
-        for service in peer.services:
-            for characteristic in service.characteristics:
-                await peer.discover_descriptors(characteristic)
-
-        print('=== Services discovered')
-        show_services(peer.services)
-
-        # Discover all attributes
-        print('=== Discovering attributes')
-        attributes = await peer.discover_attributes()
-        for attribute in attributes:
-            print(attribute)
-        print('=== Attributes discovered')
-
-        # Read all attributes
-        for attribute in attributes:
-            try:
-                value = await peer.read_value(attribute)
-                print(color(f'0x{attribute.handle:04X} = {value.hex()}', 'green'))
-            except ProtocolError as error:
-                print(color(f'cannot read {attribute.handle:04X}:', 'red'), error)
 
 
 # -----------------------------------------------------------------------------
@@ -90,7 +52,6 @@ async def main():
     client_host = Host()
     client_host.controller = client_controller
     client_device = Device("client", address = 'F0:F1:F2:F3:F4:F5', host = client_host)
-    client_device.listener = ClientListener(client_device)
     await client_device.power_on()
 
     # Setup a stack for the server
@@ -116,7 +77,36 @@ async def main():
     server_device.add_service(device_info_service)
 
     # Connect the client to the server
-    await client_device.connect(server_device.address)
+    connection = await client_device.connect(server_device.random_address)
+    print(f'=== Client: connected to {connection}')
+
+    # Discover all services
+    print('=== Discovering services')
+    peer = Peer(connection)
+    await peer.discover_services()
+    for service in peer.services:
+        await service.discover_characteristics()
+        for characteristic in service.characteristics:
+            await characteristic.discover_descriptors()
+
+    print('=== Services discovered')
+    show_services(peer.services)
+
+    # Discover all attributes
+    print('=== Discovering attributes')
+    attributes = await peer.discover_attributes()
+    for attribute in attributes:
+        print(attribute)
+    print('=== Attributes discovered')
+
+    # Read all attributes
+    for attribute in attributes:
+        try:
+            value = await attribute.read_value()
+            print(color(f'0x{attribute.handle:04X} = {value.hex()}', 'green'))
+        except ProtocolError as error:
+            print(color(f'cannot read {attribute.handle:04X}:', 'red'), error)
+
     await asyncio.get_running_loop().create_future()
 
 # -----------------------------------------------------------------------------

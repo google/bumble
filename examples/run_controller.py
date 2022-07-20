@@ -45,8 +45,7 @@ async def main():
 
         # Create a first controller using the packet source/sink as its host interface
         controller1 = Controller('C1', host_source = hci_source, host_sink = hci_sink, link = link)
-        print("====", sys.argv)
-        controller1.address = sys.argv[1]
+        controller1.random_address = sys.argv[1]
 
         # Create a second controller using the same link
         controller2 = Controller('C2', link = link)

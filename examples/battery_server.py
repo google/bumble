@@ -25,59 +25,41 @@ import struct
 from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
-from bumble.gatt import (
-    Service,
-    Characteristic,
-    CharacteristicValue,
-    GATT_DEVICE_BATTERY_SERVICE,
-    GATT_BATTERY_LEVEL_CHARACTERISTIC
-)
-
-
-# -----------------------------------------------------------------------------
-def read_battery_level(connection):
-    return bytes([random.randint(0, 100)])
+from bumble.profiles.battery_service import BatteryService
 
 
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) != 3:
-        print('Usage: python battery_service.py <device-config> <transport-spec>')
-        print('example: python battery_service.py device1.json usb:0')
+        print('Usage: python battery_server.py <device-config> <transport-spec>')
+        print('example: python battery_server.py device1.json usb:0')
         return
 
     async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
-        # Create a device to manage the host
         device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
 
-        # Add a Battery Service to the GATT sever
-        device.add_services([
-            Service(
-                GATT_DEVICE_BATTERY_SERVICE,
-                [
-                    Characteristic(
-                        GATT_BATTERY_LEVEL_CHARACTERISTIC,
-                        Characteristic.READ,
-                        Characteristic.READABLE,
-                        CharacteristicValue(read=read_battery_level)
-                    )
-                ]
-            )
-        ])
+        # Add a Device Information Service and Battery Service to the GATT sever
+        battery_service = BatteryService(lambda _: random.randint(0, 100))
+        device.add_service(battery_service)
 
         # Set the advertising data
         device.advertising_data = bytes(
             AdvertisingData([
                 (AdvertisingData.COMPLETE_LOCAL_NAME, bytes('Bumble Battery', 'utf-8')),
-                (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, struct.pack('<H', 0x180F)),
+                (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, bytes(battery_service.uuid)),
                 (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340))
             ])
         )
 
         # Go!
         await device.power_on()
-        await device.start_advertising()
-        await hci_source.wait_for_termination()
+        await device.start_advertising(auto_restart=True)
+
+        # Notify every 3 seconds
+        while True:
+            await asyncio.sleep(3.0)
+            await device.notify_subscribers(battery_service.battery_level_characteristic)
+
 
 # -----------------------------------------------------------------------------
 logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())

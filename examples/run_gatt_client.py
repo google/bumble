@@ -41,10 +41,10 @@ class Listener(Device.Listener):
         print('=== Discovering services')
         peer = Peer(connection)
         await peer.discover_services()
-        await peer.discover_characteristics()
         for service in peer.services:
+            await service.discover_characteristics()
             for characteristic in service.characteristics:
-                await peer.discover_descriptors(characteristic)
+                await characteristic.discover_descriptors()
 
         print('=== Services discovered')
         show_services(peer.services)
