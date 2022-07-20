@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import itertools
 import logging
 import os
 import pytest
@@ -30,7 +31,8 @@ from bumble.smp import (
     PairingConfig,
     PairingDelegate,
     SMP_PAIRING_NOT_SUPPORTED_ERROR,
-    SMP_CONFIRM_VALUE_FAILED_ERROR
+    SMP_CONFIRM_VALUE_FAILED_ERROR,
+    SMP_ID_KEY_DISTRIBUTION_FLAG,
 )
 from bumble.core import ProtocolError
 
@@ -196,11 +198,28 @@ async def _test_self_smp_with_configs(pairing_config1, pairing_config2):
 
 
 # -----------------------------------------------------------------------------
+IO_CAP = [
+    PairingDelegate.NO_OUTPUT_NO_INPUT,
+    PairingDelegate.KEYBOARD_INPUT_ONLY,
+    PairingDelegate.DISPLAY_OUTPUT_ONLY,
+    PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT,
+    PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT
+]
+SC = [False, True]
+MITM = [False, True]
+# Key distribution is a 4-bit bitmask
+# IdKey is necessary for current SMP structure
+KEY_DIST = [i for i in range(16) if (i & SMP_ID_KEY_DISTRIBUTION_FLAG)]
+
 @pytest.mark.asyncio
-async def test_self_smp():
+@pytest.mark.parametrize('io_cap, sc, mitm, key_dist',
+    itertools.product(IO_CAP, SC, MITM, KEY_DIST)
+)
+async def test_self_smp(io_cap, sc, mitm, key_dist):
     class Delegate(PairingDelegate):
-        def __init__(self, name, io_capability):
-            super().__init__(io_capability)
+        def __init__(self, name, io_capability, local_initiator_key_distribution, local_responder_key_distribution):
+            super().__init__(io_capability, local_initiator_key_distribution,
+                             local_responder_key_distribution)
             self.name = name
             self.reset()
 
@@ -240,17 +259,8 @@ async def test_self_smp():
 
     pairing_config_sets = [('Initiator', [None]), ('Responder', [None])]
     for pairing_config_set in pairing_config_sets:
-        for io_capability in [
-            PairingDelegate.NO_OUTPUT_NO_INPUT,
-            PairingDelegate.KEYBOARD_INPUT_ONLY,
-            PairingDelegate.DISPLAY_OUTPUT_ONLY,
-            PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT,
-            PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT
-        ]:
-            for sc in [False, True]:
-                for mitm in [False, True]:
-                    delegate = Delegate(pairing_config_set[0], io_capability)
-                    pairing_config_set[1].append(PairingConfig(sc, mitm, True, delegate))
+        delegate = Delegate(pairing_config_set[0], io_cap, key_dist, key_dist)
+        pairing_config_set[1].append(PairingConfig(sc, mitm, True, delegate))
 
     for pairing_config1 in pairing_config_sets[0][1]:
         for pairing_config2 in pairing_config_sets[1][1]:
@@ -262,7 +272,9 @@ async def test_self_smp():
             if pairing_config1 and pairing_config2:
                 pairing_config1.delegate.peer_delegate = pairing_config2.delegate
                 pairing_config2.delegate.peer_delegate = pairing_config1.delegate
+
             await _test_self_smp_with_configs(pairing_config1, pairing_config2)
+            
 
 
 # -----------------------------------------------------------------------------

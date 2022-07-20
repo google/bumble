@@ -227,3 +227,17 @@ def g2(u, v, x, y):
         aes_cmac(bytes(reversed(u)) + bytes(reversed(v)) + bytes(reversed(y)), bytes(reversed(x)))[-4:],
         byteorder='big'
     )
+
+# -----------------------------------------------------------------------------
+def h6(w, key_id):
+    '''
+    See Bluetooth spec, Vol 3, Part H - 2.2.10 Link key conversion function h6
+    '''
+    return aes_cmac(key_id, w)
+
+# -----------------------------------------------------------------------------
+def h7(salt, w):
+    '''
+    See Bluetooth spec, Vol 3, Part H - 2.2.11 Link key conversion function h7
+    '''
+    return aes_cmac(w, salt)

@@ -177,6 +177,20 @@ def test_g2():
 
 
 # -----------------------------------------------------------------------------
+def test_h6():
+    KEY = bytes.fromhex('ec0234a3 57c8ad05 341010a6 0a397d9b')
+    KEY_ID = bytes.fromhex('6c656272')
+    assert(h6(KEY, KEY_ID) == bytes.fromhex('2d9ae102 e76dc91c e8d3a9e2 80b16399'))
+
+
+# -----------------------------------------------------------------------------
+def test_h7():
+    KEY = bytes.fromhex('ec0234a3 57c8ad05 341010a6 0a397d9b')
+    SALT = bytes.fromhex('00000000 00000000 00000000 746D7031')
+    assert(h7(SALT, KEY) == bytes.fromhex('fb173597 c6a3c0ec d2998c2a 75a57011'))
+
+
+# -----------------------------------------------------------------------------
 def test_ah():
     irk = bytes(reversed(bytes.fromhex('ec0234a3 57c8ad05 341010a6 0a397d9b')))
     prand = bytes(reversed(bytes.fromhex('708194')))
@@ -195,4 +209,6 @@ if __name__ == '__main__':
     test_f5()
     test_f6()
     test_g2()
+    test_h6()
+    test_h7()
     test_ah()
