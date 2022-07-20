@@ -259,12 +259,7 @@ class Host(EventEmitter):
 
     @property
     def supported_le_features(self):
-        features = []
-        for bit in range(64):
-            if self.local_le_features & (1 << bit):
-                features.append(bit)
-
-        return features
+        return [feature for feature in range(64) if self.local_le_features & (1 << feature)]
 
     # Packet Sink protocol (packets coming from the controller via HCI)
     def on_packet(self, packet):
