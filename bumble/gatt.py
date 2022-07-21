@@ -198,6 +198,18 @@ class Service(Attribute):
 
 
 # -----------------------------------------------------------------------------
+class TemplateService(Service):
+    '''
+    Convenience abstract class that can be used by profile-specific subclasses that want
+    to expose their UUID as a class property
+    '''
+    UUID = None
+
+    def __init__(self, characteristics, primary=True):
+        super().__init__(self.UUID, characteristics, primary)
+
+
+# -----------------------------------------------------------------------------
 class Characteristic(Attribute):
     '''
     See Vol 3, Part G - 3.3 CHARACTERISTIC DEFINITION

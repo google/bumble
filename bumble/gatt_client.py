@@ -35,6 +35,7 @@ from .gatt import (
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
     GATT_REQUEST_TIMEOUT,
     GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
+    GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     Characteristic
 )
@@ -49,12 +50,12 @@ logger = logging.getLogger(__name__)
 # Proxies
 # -----------------------------------------------------------------------------
 class AttributeProxy(EventEmitter):
-    def __init__(self, client, handle, end_group_handle, uuid):
+    def __init__(self, client, handle, end_group_handle, attribute_type):
         EventEmitter.__init__(self)
         self.client           = client
         self.handle           = handle
         self.end_group_handle = end_group_handle
-        self.uuid             = uuid
+        self.type             = attribute_type
 
     async def read_value(self, no_long_read=False):
         return await self.client.read_value(self.handle, no_long_read)
@@ -63,13 +64,22 @@ class AttributeProxy(EventEmitter):
         return await self.client.write_value(self.handle, value, with_response)
 
     def __str__(self):
-        return f'Attribute(handle=0x{self.handle:04X}, uuid={self.uuid})'
+        return f'Attribute(handle=0x{self.handle:04X}, type={self.uuid})'
 
 
 class ServiceProxy(AttributeProxy):
-    def __init__(self, client, handle, end_group_handle, uuid):
-        super().__init__(client, handle, end_group_handle, uuid)
-        self.characteristics  = []
+    @staticmethod
+    def from_client(cls, client, service_uuid):
+        # The service and its characteristics are considered to have already been discovered
+        services = client.get_services_by_uuid(service_uuid)
+        service = services[0] if services else None
+        return cls(service) if service else None
+
+    def __init__(self, client, handle, end_group_handle, uuid, primary=True):
+        attribute_type = GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE if primary else GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE
+        super().__init__(client, handle, end_group_handle, attribute_type)
+        self.uuid            = uuid
+        self.characteristics = []
 
     async def discover_characteristics(self, uuids=[]):
         return await self.client.discover_characteristics(uuids, self)
@@ -84,13 +94,14 @@ class ServiceProxy(AttributeProxy):
 class CharacteristicProxy(AttributeProxy):
     def __init__(self, client, handle, end_group_handle, uuid, properties):
         super().__init__(client, handle, end_group_handle, uuid)
+        self.uuid                   = uuid
         self.properties             = properties
         self.descriptors            = []
         self.descriptors_discovered = False
 
     def get_descriptor(self, descriptor_type):
         for descriptor in self.descriptors:
-            if descriptor.uuid == descriptor_type:
+            if descriptor.type == descriptor_type:
                 return descriptor
 
     async def discover_descriptors(self):
@@ -104,11 +115,20 @@ class CharacteristicProxy(AttributeProxy):
 
 
 class DescriptorProxy(AttributeProxy):
-    def __init__(self, client, handle, uuid):
-        super().__init__(client, handle, 0, uuid)
+    def __init__(self, client, handle, descriptor_type):
+        super().__init__(client, handle, 0, descriptor_type)
 
     def __str__(self):
-        return f'Descriptor(handle=0x{self.handle:04X}, uuid={self.uuid})'
+        return f'Descriptor(handle=0x{self.handle:04X}, type={self.type})'
+
+
+class ProfileServiceProxy:
+    '''
+    Base class for profile-specific service proxies
+    '''
+    @classmethod
+    def from_client(cls, client):
+        return ServiceProxy.from_client(cls, client, cls.SERVICE_CLASS.UUID)
 
 
 # -----------------------------------------------------------------------------
@@ -238,7 +258,13 @@ class Client:
                     return
 
                 # Create a service proxy for this service
-                service = ServiceProxy(self, attribute_handle, end_group_handle, UUID.from_bytes(attribute_value))
+                service = ServiceProxy(
+                    self,
+                    attribute_handle,
+                    end_group_handle,
+                    UUID.from_bytes(attribute_value),
+                    True
+                )
 
                 # Filter out returned services based on the given uuids list
                 if (not uuids) or (service.uuid in uuids):
@@ -296,7 +322,7 @@ class Client:
                     return
 
                 # Create a service proxy for this service
-                service = ServiceProxy(self, attribute_handle, end_group_handle, uuid)
+                service = ServiceProxy(self, attribute_handle, end_group_handle, uuid, True)
 
                 # Add the service to the peer's service list
                 services.append(service)

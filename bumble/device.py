@@ -137,6 +137,17 @@ class Peer:
     def get_characteristics_by_uuid(self, uuid, service = None):
         return self.gatt_client.get_characteristics_by_uuid(uuid, service)
 
+    def create_service_proxy(self, proxy_class):
+        return proxy_class.from_client(self.gatt_client)
+
+    async def discover_service_and_create_proxy(self, proxy_class):
+        # Discover the first matching service and its characteristics
+        services = await self.discover_service(proxy_class.SERVICE_CLASS.UUID)
+        if services:
+            service = services[0]
+            await service.discover_characteristics()
+            return self.create_service_proxy(proxy_class)
+
     # [Classic only]
     async def request_name(self):
         return await self.connection.request_remote_name()

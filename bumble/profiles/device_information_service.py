@@ -19,6 +19,7 @@
 import struct
 from typing import Tuple
 
+from ..gatt_client import ProfileServiceProxy
 from ..gatt import (
     GATT_DEVICE_INFORMATION_SERVICE,
     GATT_FIRMWARE_REVISION_STRING_CHARACTERISTIC,
@@ -29,7 +30,7 @@ from ..gatt import (
     GATT_SOFTWARE_REVISION_STRING_CHARACTERISTIC,
     GATT_SYSTEM_ID_CHARACTERISTIC,
     GATT_REGULATORY_CERTIFICATION_DATA_LIST_CHARACTERISTIC,
-    Service,
+    TemplateService,
     Characteristic,
     DelegatedCharacteristicAdapter,
     UTF8CharacteristicAdapter
@@ -37,7 +38,9 @@ from ..gatt import (
 
 
 # -----------------------------------------------------------------------------
-class DeviceInformationService(Service):
+class DeviceInformationService(TemplateService):
+    UUID = GATT_DEVICE_INFORMATION_SERVICE
+
     @staticmethod
     def pack_system_id(oui, manufacturer_id):
         return struct.pack('<Q', oui << 40 | manufacturer_id)
@@ -93,11 +96,13 @@ class DeviceInformationService(Service):
                 ieee_regulatory_certification_data_list
             ))
 
-        super().__init__(GATT_DEVICE_INFORMATION_SERVICE, characteristics)
+        super().__init__(characteristics)
 
 
 # -----------------------------------------------------------------------------
-class DeviceInformationServiceProxy:
+class DeviceInformationServiceProxy(ProfileServiceProxy):
+    SERVICE_CLASS = DeviceInformationService
+
     def __init__(self, service_proxy):
         self.service_proxy = service_proxy
 

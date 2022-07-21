@@ -21,9 +21,7 @@ import os
 import logging
 from colors import color
 from bumble.device import Device, Peer
-from bumble.host import Host
 from bumble.transport import open_transport
-from bumble import gatt
 from bumble.profiles.battery_service import BatteryServiceProxy
 
 
@@ -39,8 +37,7 @@ async def main():
         print('<<< connected')
 
         # Create and start a device
-        host = Host(controller_source=hci_source, controller_sink=hci_sink)
-        device = Device('Bumble', address = 'F0:F1:F2:F3:F4:F5', host = host)
+        device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
         await device.power_on()
 
         # Connect to the peer
@@ -52,25 +49,19 @@ async def main():
         # Discover the Battery Service
         peer = Peer(connection)
         print('=== Discovering Battery Service')
-        await peer.discover_services([gatt.GATT_BATTERY_SERVICE])
+        battery_service = await peer.discover_and_create_service_proxy(BatteryServiceProxy)
 
         # Check that the service was found
-        battery_services = peer.get_services_by_uuid(gatt.GATT_BATTERY_SERVICE)
-        if not battery_services:
+        if not battery_service:
             print('!!! Service not found')
             return
-        battery_service = battery_services[0]
-        await battery_service.discover_characteristics()
-
-        # Create a service-specific proxy to read and decode the values
-        battery_client = BatteryServiceProxy(battery_service)
 
         # Subscribe to and read the battery level
-        if battery_client.battery_level:
-            await battery_client.battery_level.subscribe(
+        if battery_service.battery_level:
+            await battery_service.battery_level.subscribe(
                 lambda value: print(f'{color("Battery Level Update:", "green")} {value}')
             )
-            value = await battery_client.battery_level.read_value()
+            value = await battery_service.battery_level.read_value()
             print(f'{color("Initial Battery Level:", "green")} {value}')
 
         await hci_source.wait_for_termination()
