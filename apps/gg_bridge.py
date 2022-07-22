@@ -73,7 +73,7 @@ class GattlinkHubBridge(Device.Listener):
         gattlink_service = services[0]
 
         # Discover all the characteristics for the service
-        characteristics = await self.peer.discover_characteristics(service = gattlink_service)
+        characteristics = await gattlink_service.discover_characteristics()
         print(color('=== Characteristics discovered', 'yellow'))
         for characteristic in characteristics:
             if characteristic.uuid == GG_GATTLINK_RX_CHARACTERISTIC_UUID:

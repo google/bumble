@@ -32,10 +32,10 @@ async def dump_gatt_db(peer, done):
     # Discover all services
     print(color('### Discovering Services and Characteristics', 'magenta'))
     await peer.discover_services()
-    await peer.discover_characteristics()
     for service in peer.services:
+        await service.discover_characteristics()
         for characteristic in service.characteristics:
-            await peer.discover_descriptors(characteristic)
+            await characteristic.discover_descriptors()
 
     print(color('=== Services ===', 'yellow'))
     show_services(peer.services)
@@ -47,7 +47,7 @@ async def dump_gatt_db(peer, done):
     for attribute in attributes:
         print(attribute)
         try:
-            value = await peer.read_value(attribute)
+            value = await attribute.read_value()
             print(color(f'{value.hex()}', 'green'))
         except ProtocolError as error:
             print(color(error, 'red'))

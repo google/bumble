@@ -35,16 +35,100 @@ from .gatt import (
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
     GATT_REQUEST_TIMEOUT,
     GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
+    GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
-    Service,
-    Characteristic,
-    Descriptor
+    Characteristic
 )
 
 # -----------------------------------------------------------------------------
 # Logging
 # -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
+
+
+# -----------------------------------------------------------------------------
+# Proxies
+# -----------------------------------------------------------------------------
+class AttributeProxy(EventEmitter):
+    def __init__(self, client, handle, end_group_handle, attribute_type):
+        EventEmitter.__init__(self)
+        self.client           = client
+        self.handle           = handle
+        self.end_group_handle = end_group_handle
+        self.type             = attribute_type
+
+    async def read_value(self, no_long_read=False):
+        return await self.client.read_value(self.handle, no_long_read)
+
+    async def write_value(self, value, with_response=False):
+        return await self.client.write_value(self.handle, value, with_response)
+
+    def __str__(self):
+        return f'Attribute(handle=0x{self.handle:04X}, type={self.uuid})'
+
+
+class ServiceProxy(AttributeProxy):
+    @staticmethod
+    def from_client(cls, client, service_uuid):
+        # The service and its characteristics are considered to have already been discovered
+        services = client.get_services_by_uuid(service_uuid)
+        service = services[0] if services else None
+        return cls(service) if service else None
+
+    def __init__(self, client, handle, end_group_handle, uuid, primary=True):
+        attribute_type = GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE if primary else GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE
+        super().__init__(client, handle, end_group_handle, attribute_type)
+        self.uuid            = uuid
+        self.characteristics = []
+
+    async def discover_characteristics(self, uuids=[]):
+        return await self.client.discover_characteristics(uuids, self)
+
+    def get_characteristics_by_uuid(self, uuid):
+        return self.client.get_characteristics_by_uuid(uuid, self)
+
+    def __str__(self):
+        return f'Service(handle=0x{self.handle:04X}, uuid={self.uuid})'
+
+
+class CharacteristicProxy(AttributeProxy):
+    def __init__(self, client, handle, end_group_handle, uuid, properties):
+        super().__init__(client, handle, end_group_handle, uuid)
+        self.uuid                   = uuid
+        self.properties             = properties
+        self.descriptors            = []
+        self.descriptors_discovered = False
+
+    def get_descriptor(self, descriptor_type):
+        for descriptor in self.descriptors:
+            if descriptor.type == descriptor_type:
+                return descriptor
+
+    async def discover_descriptors(self):
+        return await self.client.discover_descriptors(self)
+
+    async def subscribe(self, subscriber=None):
+        return await self.client.subscribe(self, subscriber)
+
+    def __str__(self):
+        return f'Characteristic(handle=0x{self.handle:04X}, uuid={self.uuid}, properties={Characteristic.properties_as_string(self.properties)})'
+
+
+class DescriptorProxy(AttributeProxy):
+    def __init__(self, client, handle, descriptor_type):
+        super().__init__(client, handle, 0, descriptor_type)
+
+    def __str__(self):
+        return f'Descriptor(handle=0x{self.handle:04X}, type={self.type})'
+
+
+class ProfileServiceProxy:
+    '''
+    Base class for profile-specific service proxies
+    '''
+    @classmethod
+    def from_client(cls, client):
+        return ServiceProxy.from_client(cls, client, cls.SERVICE_CLASS.UUID)
 
 
 # -----------------------------------------------------------------------------
@@ -173,10 +257,14 @@ class Client:
                     logger.warning(f'bogus handle values: {attribute_handle} {end_group_handle}')
                     return
 
-                # Create a primary service object
-                service = Service(UUID.from_bytes(attribute_value), [], True)
-                service.handle = attribute_handle
-                service.end_group_handle = end_group_handle
+                # Create a service proxy for this service
+                service = ServiceProxy(
+                    self,
+                    attribute_handle,
+                    end_group_handle,
+                    UUID.from_bytes(attribute_value),
+                    True
+                )
 
                 # Filter out returned services based on the given uuids list
                 if (not uuids) or (service.uuid in uuids):
@@ -233,10 +321,8 @@ class Client:
                     logger.warning(f'bogus handle values: {attribute_handle} {end_group_handle}')
                     return
 
-                # Create a primary service object
-                service = Service(uuid, [], True)
-                service.handle = attribute_handle
-                service.end_group_handle = end_group_handle
+                # Create a service proxy for this service
+                service = ServiceProxy(self, attribute_handle, end_group_handle, uuid, True)
 
                 # Add the service to the peer's service list
                 services.append(service)
@@ -314,8 +400,7 @@ class Client:
 
                     properties, handle = struct.unpack_from('<BH', attribute_value)
                     characteristic_uuid = UUID.from_bytes(attribute_value[3:])
-                    characteristic = Characteristic(characteristic_uuid, properties, 0)
-                    characteristic.handle = handle
+                    characteristic = CharacteristicProxy(self, handle, 0, characteristic_uuid, properties)
 
                     # Set the previous characteristic's end handle
                     if characteristics:
@@ -382,8 +467,7 @@ class Client:
                     logger.warning(f'bogus handle value: {attribute_handle}')
                     return []
 
-                descriptor = Descriptor(UUID.from_bytes(attribute_uuid), 0)
-                descriptor.handle = attribute_handle
+                descriptor = DescriptorProxy(self, attribute_handle, UUID.from_bytes(attribute_uuid))
                 descriptors.append(descriptor)
                 # TODO: read descriptor value
 
@@ -427,8 +511,7 @@ class Client:
                     logger.warning(f'bogus handle value: {attribute_handle}')
                     return []
 
-                attribute = Attribute(attribute_uuid, 0)
-                attribute.handle = attribute_handle
+                attribute = AttributeProxy(self, attribute_handle, 0, UUID.from_bytes(attribute_uuid))
                 attributes.append(attribute)
 
             # Move on to the next attributes

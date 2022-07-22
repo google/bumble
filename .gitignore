@@ -8,3 +8,4 @@ docs/mkdocs/site
 tests/__pycache__
 test-results.xml
 bumble/transport/__pycache__
+bumble/profiles/__pycache__

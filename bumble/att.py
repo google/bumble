@@ -682,11 +682,14 @@ class Attribute(EventEmitter):
 
     def __init__(self, attribute_type, permissions, value = b''):
         EventEmitter.__init__(self)
-        self.handle      = 0
-        self.permissions = permissions
+        self.handle           = 0
+        self.end_group_handle = 0
+        self.permissions      = permissions
 
-        # Convert the type to a UUID
-        if type(attribute_type) is bytes:
+        # Convert the type to a UUID object if it isn't already
+        if type(attribute_type) is str:
+            self.type = UUID(attribute_type)
+        elif type(attribute_type) is bytes:
             self.type = UUID.from_bytes(attribute_type)
         else:
             self.type = attribute_type
@@ -698,16 +701,13 @@ class Attribute(EventEmitter):
             self.value = value
 
     def read_value(self, connection):
-        if type(self.value) is bytes:
-            return self.value
+        if read := getattr(self.value, 'read', None):
+            try:
+                return read(connection)
+            except ATT_Error as error:
+                raise ATT_Error(error_code=error.error_code, att_handle=self.handle)
         else:
-            if read := getattr(self.value, 'read', None):
-                try:
-                    return read(connection)
-                except ATT_Error as error:
-                    raise ATT_Error(error_code=error.error_code, att_handle=self.handle)
-            else:
-                return bytes(self.value)
+            return self.value
 
     def write_value(self, connection, value):
         if write := getattr(self.value, 'write', None):
