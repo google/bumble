@@ -22,14 +22,14 @@ import logging
 from colors import color
 from bumble.device import Device, Peer
 from bumble.transport import open_transport
-from bumble.profiles.battery_service import BatteryServiceProxy
+from bumble.profiles.heart_rate_service import HeartRateServiceProxy
 
 
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) != 3:
-        print('Usage: battery_client.py <transport-spec> <bluetooth-address>')
-        print('example: battery_client.py usb:0 E1:CA:72:48:C4:E8')
+        print('Usage: heart_rate_client.py <transport-spec> <bluetooth-address>')
+        print('example: heart_rate_client.py usb:0 E1:CA:72:48:C4:E8')
         return
 
     print('<<< connecting to HCI...')
@@ -46,23 +46,26 @@ async def main():
         connection = await device.connect(target_address)
         print(f'=== Connected to {connection}')
 
-        # Discover the Battery Service
+        # Discover the Heart Rate Service
         peer = Peer(connection)
-        print('=== Discovering Battery Service')
-        battery_service = await peer.discover_service_and_create_proxy(BatteryServiceProxy)
+        print('=== Discovering Heart Rate Service')
+        heart_rate_service = await peer.discover_service_and_create_proxy(HeartRateServiceProxy)
 
         # Check that the service was found
-        if not battery_service:
+        if not heart_rate_service:
             print('!!! Service not found')
             return
 
-        # Subscribe to and read the battery level
-        if battery_service.battery_level:
-            await battery_service.battery_level.subscribe(
-                lambda value: print(f'{color("Battery Level Update:", "green")} {value}')
+        # Read the body sensor location
+        if heart_rate_service.body_sensor_location:
+            location = await heart_rate_service.body_sensor_location.read_value()
+            print(color('Sensor Location:', 'green'), location)
+
+        # Subscribe to the heart rate measurement
+        if heart_rate_service.heart_rate_measurement:
+            await heart_rate_service.heart_rate_measurement.subscribe(
+                lambda value: print(f'{color("Heart Rate Measurement:", "green")} {value}')
             )
-            value = await battery_service.battery_level.read_value()
-            print(f'{color("Initial Battery Level:", "green")} {value}')
 
         await hci_source.wait_for_termination()
 

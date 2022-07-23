@@ -38,7 +38,7 @@ async def main():
     async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
         device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
 
-        # Add a Device Information Service and Battery Service to the GATT sever
+        # Add a Battery Service to the GATT sever
         battery_service = BatteryService(lambda _: random.randint(0, 100))
         device.add_service(battery_service)
 

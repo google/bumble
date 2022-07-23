@@ -134,12 +134,20 @@ GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC           = UUID.from_16_bits(0x2A2
 GATT_REGULATORY_CERTIFICATION_DATA_LIST_CHARACTERISTIC = UUID.from_16_bits(0x2A2A, 'IEEE 11073-20601 Regulatory Certification Data List')
 GATT_PNP_ID_CHARACTERISTIC                             = UUID.from_16_bits(0x2A50, 'PnP ID')
 
-# Human Interface Device
+# Human Interface Device Service
 GATT_HID_INFORMATION_CHARACTERISTIC   = UUID.from_16_bits(0x2A4A, 'HID Information')
 GATT_REPORT_MAP_CHARACTERISTIC        = UUID.from_16_bits(0x2A4B, 'Report Map')
 GATT_HID_CONTROL_POINT_CHARACTERISTIC = UUID.from_16_bits(0x2A4C, 'HID Control Point')
 GATT_REPORT_CHARACTERISTIC            = UUID.from_16_bits(0x2A4D, 'Report')
 GATT_PROTOCOL_MODE_CHARACTERISTIC     = UUID.from_16_bits(0x2A4E, 'Protocol Mode')
+
+# Heart Rate Service
+GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC   = UUID.from_16_bits(0x2A37, 'Heart Rate Measurement')
+GATT_BODY_SENSOR_LOCATION_CHARACTERISTIC     = UUID.from_16_bits(0x2A38, 'Body Sensor Location')
+GATT_HEART_RATE_CONTROL_POINT_CHARACTERISTIC = UUID.from_16_bits(0x2A39, 'Heart Rate Control Point')
+
+# Battery Service
+GATT_BATTERY_LEVEL_CHARACTERISTIC = UUID.from_16_bits(0x2A19, 'Battery Level')
 
 # Misc
 GATT_DEVICE_NAME_CHARACTERISTIC                                = UUID.from_16_bits(0x2A00, 'Device Name')
@@ -150,7 +158,6 @@ GATT_PERIPHERAL_PREFERRED_CONNECTION_PARAMETERS_CHARACTERISTIC = UUID.from_16_bi
 GATT_SERVICE_CHANGED_CHARACTERISTIC                            = UUID.from_16_bits(0x2A05, 'Service Changed')
 GATT_ALERT_LEVEL_CHARACTERISTIC                                = UUID.from_16_bits(0x2A06, 'Alert Level')
 GATT_TX_POWER_LEVEL_CHARACTERISTIC                             = UUID.from_16_bits(0x2A07, 'Tx Power Level')
-GATT_BATTERY_LEVEL_CHARACTERISTIC                              = UUID.from_16_bits(0x2A19, 'Battery Level')
 GATT_BOOT_KEYBOARD_INPUT_REPORT_CHARACTERISTIC                 = UUID.from_16_bits(0x2A22, 'Boot Keyboard Input Report')
 GATT_CURRENT_TIME_CHARACTERISTIC                               = UUID.from_16_bits(0x2A2B, 'Current Time')
 GATT_BOOT_KEYBOARD_OUTPUT_REPORT_CHARACTERISTIC                = UUID.from_16_bits(0x2A32, 'Boot Keyboard Output Report')
@@ -339,16 +346,19 @@ class CharacteristicAdapter:
 
 # -----------------------------------------------------------------------------
 class DelegatedCharacteristicAdapter(CharacteristicAdapter):
-    def __init__(self, characteristic, encode, decode):
+    '''
+    Adapter that converts bytes values using an encode and a decode function.
+    '''
+    def __init__(self, characteristic, encode=None, decode=None):
         super().__init__(characteristic)
         self.encode = encode
         self.decode = decode
 
     def encode_value(self, value):
-        return self.encode(value)
+        return self.encode(value) if self.encode else value
 
     def decode_value(self, value):
-        return self.decode(value)
+        return self.decode(value) if self.decode else value
 
 
 # -----------------------------------------------------------------------------
