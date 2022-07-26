@@ -1373,6 +1373,13 @@ class HCI_Error(ProtocolError):
         super().__init__(error_code, 'hci', HCI_Constant.error_name(error_code))
 
 
+class HCI_StatusError(ProtocolError):
+    def __init__(self, response):
+        super().__init__(response.status,
+                error_namespace=HCI_Command.command_name(response.command_opcode),
+                error_name=HCI_Constant.status_name(response.status))
+
+
 # -----------------------------------------------------------------------------
 # Generic HCI object
 # -----------------------------------------------------------------------------
