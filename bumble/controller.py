@@ -77,7 +77,7 @@ class Controller:
         self.le_features                  = bytes.fromhex('ff49010000000000')
         self.le_states                    = bytes.fromhex('ffff3fffff030000')
         self.avertising_channel_tx_power  = 0
-        self.white_list_size              = 8
+        self.filter_accept_list_size      = 8
         self.resolving_list_size          = 8
         self.supported_max_tx_octets      = 27
         self.supported_max_tx_time        = 10000  # microseconds
@@ -731,27 +731,27 @@ class Controller:
         '''
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_read_white_list_size_command(self, command):
+    def on_hci_le_read_filter_accept_list_size_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.14 LE Read White List Size Command
+        See Bluetooth spec Vol 2, Part E - 7.8.14 LE Read Filter Accept List Size Command
         '''
-        return bytes([HCI_SUCCESS, self.white_list_size])
+        return bytes([HCI_SUCCESS, self.filter_accept_list_size])
 
-    def on_hci_le_clear_white_list_command(self, command):
+    def on_hci_le_clear_filter_accept_list_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.15 LE Clear White List Command
+        See Bluetooth spec Vol 2, Part E - 7.8.15 LE Clear Filter Accept List Command
         '''
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_add_device_to_white_list_command(self, command):
+    def on_hci_le_add_device_to_filter_accept_list_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.16 LE Add Device To White List Command
+        See Bluetooth spec Vol 2, Part E - 7.8.16 LE Add Device To Filter Accept List Command
         '''
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_remove_device_from_white_list_command(self, command):
+    def on_hci_le_remove_device_from_filter_accept_list_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.17 LE Remove Device From White List Command
+        See Bluetooth spec Vol 2, Part E - 7.8.17 LE Remove Device From Filter Accept List Command
         '''
         return bytes([HCI_SUCCESS])
 
@@ -780,9 +780,9 @@ class Controller:
         '''
         return bytes([HCI_SUCCESS]) + struct.pack('Q', random.randint(0, 1 << 64))
 
-    def on_hci_le_start_encryption_command(self, command):
+    def on_hci_le_enable_encryption_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.24 LE Start Encryption Command
+        See Bluetooth spec Vol 2, Part E - 7.8.24 LE Enable Encryption Command
         '''
 
         # Check the parameters

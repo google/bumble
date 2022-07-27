@@ -868,7 +868,7 @@ class Session:
         # distribute the long term and/or other keys over an encrypted connection
         asyncio.create_task(
             self.manager.device.host.send_command(
-                HCI_LE_Start_Encryption_Command(
+                HCI_LE_Enable_Encryption_Command(
                     connection_handle     = self.connection.handle,
                     random_number         = bytes(8),
                     encrypted_diversifier = 0,

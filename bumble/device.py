@@ -314,6 +314,7 @@ class DeviceConfiguration:
 #  within a class requires unnecessarily complicated acrobatics)
 # -----------------------------------------------------------------------------
 
+
 # Decorator that converts the first argument from a connection handle to a connection
 def with_connection_from_handle(function):
     @functools.wraps(function)
@@ -785,7 +786,7 @@ class Device(CompositeEventEmitter):
             try:
                 peer_address = Address(peer_address)
             except ValueError:
-                # If the address is not parssable, assume it is a name instead
+                # If the address is not parsable, assume it is a name instead
                 logger.debug('looking for peer by name')
                 peer_address = await self.find_peer_by_name(peer_address, transport)
 
@@ -1057,7 +1058,7 @@ class Device(CompositeEventEmitter):
                     raise InvalidStateError('only centrals can start encryption')
 
                 result = await self.send_command(
-                    HCI_LE_Start_Encryption_Command(
+                    HCI_LE_Enable_Encryption_Command(
                         connection_handle     = connection.handle,
                         random_number         = rand,
                         encrypted_diversifier = ediv,
@@ -1066,7 +1067,7 @@ class Device(CompositeEventEmitter):
                 )
 
                 if result.status != HCI_COMMAND_STATUS_PENDING:
-                    logger.warn(f'HCI_LE_Start_Encryption_Command failed: {HCI_Constant.error_name(result.status)}')
+                    logger.warn(f'HCI_LE_Enable_Encryption_Command failed: {HCI_Constant.error_name(result.status)}')
                     raise HCI_Error(result.status)
             else:
                 result = await self.send_command(
