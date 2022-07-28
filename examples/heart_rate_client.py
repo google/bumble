@@ -43,31 +43,28 @@ async def main():
         # Connect to the peer
         target_address = sys.argv[2]
         print(f'=== Connecting to {target_address}...')
-        connection = await device.connect(target_address)
-        print(f'=== Connected to {connection}')
+        async with device.connect_as_gatt(target_address) as peer:
+            print(f'=== Connected to {peer}')
 
-        # Discover the Heart Rate Service
-        peer = Peer(connection)
-        print('=== Discovering Heart Rate Service')
-        heart_rate_service = await peer.discover_service_and_create_proxy(HeartRateServiceProxy)
+            heart_rate_service = peer.create_service_proxy(HeartRateServiceProxy)
 
-        # Check that the service was found
-        if not heart_rate_service:
-            print('!!! Service not found')
-            return
+            # Check that the service was found
+            if not heart_rate_service:
+                print('!!! Service not found')
+                return
 
-        # Read the body sensor location
-        if heart_rate_service.body_sensor_location:
-            location = await heart_rate_service.body_sensor_location.read_value()
-            print(color('Sensor Location:', 'green'), location)
+            # Read the body sensor location
+            if heart_rate_service.body_sensor_location:
+                location = await heart_rate_service.body_sensor_location.read_value()
+                print(color('Sensor Location:', 'green'), location)
 
-        # Subscribe to the heart rate measurement
-        if heart_rate_service.heart_rate_measurement:
-            await heart_rate_service.heart_rate_measurement.subscribe(
-                lambda value: print(f'{color("Heart Rate Measurement:", "green")} {value}')
-            )
+            # Subscribe to the heart rate measurement
+            if heart_rate_service.heart_rate_measurement:
+                await heart_rate_service.heart_rate_measurement.subscribe(
+                    lambda value: print(f'{color("Heart Rate Measurement:", "green")} {value}')
+                )
 
-        await hci_source.wait_for_termination()
+            await peer.sustain()
 
 
 # -----------------------------------------------------------------------------
