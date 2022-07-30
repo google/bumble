@@ -21,6 +21,25 @@ or see the documentation source under `docs/mkdocs/src`, or build the static HTM
 mkdocs build -f docs/mkdocs/mkdocs.yml 
 ```
 
+## Usage
+
+### Getting Started
+
+For a quick start to using Bumble, see the [Getting Started](docs/mkdocs/src/getting_started.md) guide.
+
+### Dependencies
+
+To install package dependencies needed to run the bumble examples execute the following commands:
+
+```
+python -m pip install --upgrade pip
+python -m pip install ".[test,development,documentation]"
+```
+
+### Examples
+
+Refer to the [Example Documentation](examples/README.md) for details on the included example scripts and how to run them.
+
 ## License
 
 Licensed under the [Apache 2.0](LICENSE) License.
