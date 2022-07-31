@@ -545,13 +545,13 @@ class Server(EventEmitter):
             value = attribute.read_value(connection)
             if request.value_offset > len(value):
                 response = ATT_Error_Response(
-                    request_opcode_in_error = request.op_code,
+                    request_opcode_in_error   = request.op_code,
                     attribute_handle_in_error = request.attribute_handle,
                     error_code                = ATT_INVALID_OFFSET_ERROR
                 )
             elif len(value) <= mtu - 1:
                 response = ATT_Error_Response(
-                    request_opcode_in_error = request.op_code,
+                    request_opcode_in_error   = request.op_code,
                     attribute_handle_in_error = request.attribute_handle,
                     error_code                = ATT_ATTRIBUTE_NOT_LONG_ERROR
                 )

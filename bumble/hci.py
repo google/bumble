@@ -3276,6 +3276,9 @@ class HCI_Event(HCI_Packet):
         parameters = b'' if self.parameters is None else self.parameters
         return bytes([HCI_EVENT_PACKET, self.event_code, len(parameters)]) + parameters
 
+    def __bytes__(self):
+        return self.to_bytes()
+
     def __str__(self):
         result = color(self.name, 'magenta')
         if fields := getattr(self, 'fields', None):
