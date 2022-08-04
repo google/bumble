@@ -3089,6 +3089,42 @@ class HCI_LE_Set_Resolvable_Private_Address_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
+@HCI_Command.command(return_parameters_fields=[
+    ('status',                  STATUS_SPEC),
+    ('supported_max_tx_octets', 2),
+    ('supported_max_tx_time',   2),
+    ('supported_max_rx_octets', 2),
+    ('supported_max_rx_time',   2)
+])
+class HCI_LE_Read_Maximum_Data_Length_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.46 LE Read Maximum Data Length Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(return_parameters_fields=[
+    ('status',                      STATUS_SPEC),
+    ('max_advertising_data_length', 2)
+])
+class HCI_LE_Read_Maximum_Advertising_Data_Length_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.57 LE Read Maximum Advertising Data Length Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(return_parameters_fields=[
+    ('status',                         STATUS_SPEC),
+    ('num_supported_advertising_sets', 1)
+])
+class HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.58 LE Read Number of Supported Advertising Sets Command
+    '''
+
+
+# -----------------------------------------------------------------------------
 @HCI_Command.command(fields=None)
 class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
     '''
@@ -3116,9 +3152,9 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
         scan_intervals = []
         scan_windows   = []
         for i in range(phy_bits_set):
-            scan_types.append(parameters[3 + (3 * i)])
-            scan_intervals.append(parameters[3 + (3 * i) + 1])
-            scan_windows.append(parameters[3 + (3 * i) + 2])
+            scan_types.append(parameters[3 + (5 * i)])
+            scan_intervals.append(struct.unpack_from('<H', parameters, 3 + (5 * i) + 1)[0])
+            scan_windows.append(struct.unpack_from('<H', parameters, 3 + (5 * i) + 3)[0])
 
         return HCI_LE_Set_Extended_Scan_Parameters_Command(
             own_address_type       = own_address_type,
@@ -3149,7 +3185,7 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
         self.parameters = bytes([own_address_type, scanning_filter_policy, scanning_phys])
         phy_bits_set = bin(scanning_phys).count('1')
         for i in range(phy_bits_set):
-            self.parameters += bytes([scan_types[i], scan_intervals[i], scan_windows[i]])
+            self.parameters += struct.pack('<BHH', scan_types[i], scan_intervals[i], scan_windows[i])
 
     def __str__(self):
         scanning_phys_strs = []
@@ -3176,6 +3212,19 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
         return color(self.name, 'green') + ':\n' + '\n'.join(
             [color(field[0], 'cyan') + ' ' + str(field[1]) for field in fields]
         )
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([
+    ('enable',            1),
+    ('filter_duplicates', 1),
+    ('duration',          2),
+    ('period',            2)
+])
+class HCI_LE_Set_Extended_Scan_Enable_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.65 LE Set Extended Scan Enable Command
+    '''
 
 
 # -----------------------------------------------------------------------------

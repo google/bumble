@@ -644,6 +644,9 @@ class Device(CompositeEventEmitter):
         # Done
         self.powered_on = True
 
+    def supports_le_feature(self, feature):
+        return self.host.supports_le_feature(feature)
+
     async def start_advertising(self, auto_restart=False):
         self.auto_restart_advertising = auto_restart
 
@@ -710,21 +713,50 @@ class Device(CompositeEventEmitter):
         if scan_window < DEVICE_MIN_SCAN_WINDOW or scan_window > DEVICE_MAX_SCAN_WINDOW:
             raise ValueError('scan_interval out of range')
 
-        # Set the scanning parameters
-        scan_type = HCI_LE_Set_Scan_Parameters_Command.ACTIVE_SCANNING if active else HCI_LE_Set_Scan_Parameters_Command.PASSIVE_SCANNING
-        await self.send_command(HCI_LE_Set_Scan_Parameters_Command(
-            le_scan_type           = scan_type,
-            le_scan_interval       = int(scan_window / 0.625),
-            le_scan_window         = int(scan_window / 0.625),
-            own_address_type       = own_address_type,
-            scanning_filter_policy = HCI_LE_Set_Scan_Parameters_Command.BASIC_UNFILTERED_POLICY
-        ))
+        if self.supports_le_feature(HCI_LE_EXTENDED_ADVERTISING_LE_SUPPORTED_FEATURE):
+            # Set the scanning parameters
+            scan_type = HCI_LE_Set_Extended_Scan_Parameters_Command.ACTIVE_SCANNING if active else HCI_LE_Set_Extended_Scan_Parameters_Command.PASSIVE_SCANNING
+            scanning_filter_policy = HCI_LE_Set_Extended_Scan_Parameters_Command.BASIC_UNFILTERED_POLICY  # TODO: support other types
 
-        # Enable scanning
-        await self.send_command(HCI_LE_Set_Scan_Enable_Command(
-            le_scan_enable    = 1,
-            filter_duplicates = 1 if filter_duplicates else 0
-        ))
+            scanning_phys = 1 << HCI_LE_Set_Extended_Scan_Parameters_Command.LE_1M_PHY
+            scanning_phy_count = 1
+            # if self.supports_le_feature(HCI_LE_CODED_PHY_LE_SUPPORTED_FEATURE):
+            #     scanning_phys |= 1 << HCI_LE_Set_Extended_Scan_Parameters_Command.LE_CODED_PHY
+            #     scanning_phy_count += 1
+
+            await self.send_command(HCI_LE_Set_Extended_Scan_Parameters_Command(
+                own_address_type       = own_address_type,
+                scanning_filter_policy = scanning_filter_policy,
+                scanning_phys          = scanning_phys,
+                scan_types             = [scan_type] * scanning_phy_count,
+                scan_intervals         = [int(scan_window / 0.625)] * scanning_phy_count,
+                scan_windows           = [int(scan_window / 0.625)] * scanning_phy_count
+            ))
+
+            # Enable scanning
+            await self.send_command(HCI_LE_Set_Extended_Scan_Enable_Command(
+                enable            = 1,
+                filter_duplicates = 1 if filter_duplicates else 0,
+                duration          = 0,  # TODO allow other values
+                period            = 0   # TODO allow other values
+            ))
+        else:
+            # Set the scanning parameters
+            scan_type = HCI_LE_Set_Scan_Parameters_Command.ACTIVE_SCANNING if active else HCI_LE_Set_Scan_Parameters_Command.PASSIVE_SCANNING
+            await self.send_command(HCI_LE_Set_Scan_Parameters_Command(
+                le_scan_type           = scan_type,
+                le_scan_interval       = int(scan_window / 0.625),
+                le_scan_window         = int(scan_window / 0.625),
+                own_address_type       = own_address_type,
+                scanning_filter_policy = HCI_LE_Set_Scan_Parameters_Command.BASIC_UNFILTERED_POLICY
+            ))
+
+            # Enable scanning
+            await self.send_command(HCI_LE_Set_Scan_Enable_Command(
+                le_scan_enable    = 1,
+                filter_duplicates = 1 if filter_duplicates else 0
+            ))
+
         self.scanning = True
 
     async def stop_scanning(self):
