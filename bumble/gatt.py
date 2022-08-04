@@ -320,6 +320,12 @@ class CharacteristicAdapter:
     def __getattr__(self, name):
         return getattr(self.wrapped_characteristic, name)
 
+    def __setattr__(self, name, value):
+        if name in {'wrapped_characteristic', 'read_value', 'write_value', 'subscribe'}:
+            super().__setattr__(name, value)
+        else:
+            setattr(self.wrapped_characteristic, name, value)
+
     def read_encoded_value(self, connection):
         return self.encode_value(self.wrapped_characteristic.read_value(connection))
 
@@ -342,6 +348,10 @@ class CharacteristicAdapter:
         return self.wrapped_characteristic.subscribe(
             None if subscriber is None else lambda value: subscriber(self.decode_value(value))
         )
+
+    def __str__(self):
+        wrapped = str(self.wrapped_characteristic)
+        return f'{self.__class__.__name__}({wrapped})'
 
 
 # -----------------------------------------------------------------------------

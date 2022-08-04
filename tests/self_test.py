@@ -164,6 +164,44 @@ async def test_self_gatt():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_self_gatt_long_read():
+    # Create two devices, each with a controller, attached to the same link
+    two_devices = TwoDevices()
+
+    # Add some GATT characteristics to device 1
+    characteristics = [
+        Characteristic(
+            f'3A143AD7-D4A7-436B-97D6-5B62C315{i:04X}',
+            Characteristic.READ,
+            Characteristic.READABLE,
+            bytes([x & 255 for x in range(i)])
+        )
+        for i in range(0, 513)
+    ]
+
+    service = Service('8140E247-04F0-42C1-BC34-534C344DAFCA', characteristics)
+    two_devices.devices[1].add_service(service)
+
+    # Start
+    await two_devices.devices[0].power_on()
+    await two_devices.devices[1].power_on()
+
+    # Connect the two devices
+    connection = await two_devices.devices[0].connect(two_devices.devices[1].random_address)
+    peer = Peer(connection)
+
+    result = await peer.discover_service(service.uuid)
+    assert(len(result) == 1)
+    found_service = result[0]
+    found_characteristics = await found_service.discover_characteristics()
+    assert(len(found_characteristics) == 513)
+    for (i, characteristic) in enumerate(found_characteristics):
+        value = await characteristic.read_value()
+        assert(value == characteristics[i].value)
+
+
+# -----------------------------------------------------------------------------
 async def _test_self_smp_with_configs(pairing_config1, pairing_config2):
     # Create two devices, each with a controller, attached to the same link
     two_devices = TwoDevices()
@@ -274,7 +312,7 @@ async def test_self_smp(io_cap, sc, mitm, key_dist):
                 pairing_config2.delegate.peer_delegate = pairing_config1.delegate
 
             await _test_self_smp_with_configs(pairing_config1, pairing_config2)
-            
+
 
 
 # -----------------------------------------------------------------------------
@@ -323,6 +361,7 @@ async def test_self_smp_wrong_pin():
 async def run_test_self():
     await test_self_connection()
     await test_self_gatt()
+    await test_self_gatt_long_read()
     await test_self_smp()
     await test_self_smp_reject()
     await test_self_smp_wrong_pin()
