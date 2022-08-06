@@ -467,13 +467,11 @@ class Host(EventEmitter):
 
     def on_hci_le_advertising_report_event(self, event):
         for report in event.reports:
-            self.emit(
-                'advertising_report',
-                report.address,
-                report.data,
-                report.rssi,
-                report.event_type
-            )
+            self.emit('advertising_report', report)
+
+    def on_hci_le_extended_advertising_report_event(self, event):
+        # TODO
+        pass
 
     def on_hci_le_remote_connection_parameter_request_event(self, event):
         if event.connection_handle not in self.connections:

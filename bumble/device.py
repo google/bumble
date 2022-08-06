@@ -18,7 +18,7 @@
 import json
 import asyncio
 import logging
-from  contextlib import asynccontextmanager, AsyncExitStack
+from contextlib import asynccontextmanager, AsyncExitStack
 
 from .hci import *
 from .host import Host
@@ -62,28 +62,133 @@ DEVICE_MAX_SCAN_WINDOW              = 10240
 
 
 # -----------------------------------------------------------------------------
+class Advertisement:
+    TX_POWER_NOT_AVAILABLE = HCI_LE_Extended_Advertising_Report_Event.TX_POWER_INFORMATION_NOT_AVAILABLE
+    RSSI_NOT_AVAILABLE     = HCI_LE_Extended_Advertising_Report_Event.RSSI_NOT_AVAILABLE
+
+    @classmethod
+    def from_advertising_report(cls, report):
+        if isinstance(report, HCI_LE_Advertising_Report_Event.Report):
+            return LegacyAdvertisement.from_advertising_report(report)
+        elif isinstance(report, HCI_LE_Extended_Advertising_Report_Event.Report):
+            return ExtendedAdvertisement.from_advertising_report(report)
+
+    def __init__(
+        self,
+        address,
+        rssi             = HCI_LE_Extended_Advertising_Report_Event.RSSI_NOT_AVAILABLE,
+        is_legacy        = False,
+        is_anonymous     = False,
+        is_connectable   = False,
+        is_directed      = False,
+        is_scannable     = False,
+        is_scan_response = False,
+        primary_phy      = 0,
+        secondary_phy    = 0,
+        tx_power         = HCI_LE_Extended_Advertising_Report_Event.TX_POWER_INFORMATION_NOT_AVAILABLE,
+        sid              = 0,
+        data             = b''
+    ):
+        self.address          = address
+        self.rssi             = rssi
+        self.is_legacy        = is_legacy
+        self.is_anonymous     = is_anonymous
+        self.is_connectable   = is_connectable
+        self.is_directed      = is_directed
+        self.is_scannable     = is_scannable
+        self.is_scan_response = is_scan_response
+        self.primary_phy      = primary_phy
+        self.secondary_phy    = secondary_phy
+        self.tx_power         = tx_power
+        self.sid              = sid
+        self.data             = AdvertisingData.from_bytes(data)
+
+
+# -----------------------------------------------------------------------------
+class LegacyAdvertisement(Advertisement):
+    @classmethod
+    def from_advertising_report(cls, report):
+        return cls(
+            address          = report.address,
+            rssi             = report.rssi,
+            is_legacy        = True,
+            is_connectable   = report.event_type in {
+                HCI_LE_Advertising_Report_Event.ADV_IND,
+                HCI_LE_Advertising_Report_Event.ADV_DIRECT_IND
+            },
+            is_directed      = report.event_type == HCI_LE_Advertising_Report_Event.ADV_DIRECT_IND,
+            is_scannable     = report.event_type in {
+                HCI_LE_Advertising_Report_Event.ADV_IND,
+                HCI_LE_Advertising_Report_Event.ADV_SCAN_IND
+            },
+            is_scan_response = report.event_type == HCI_LE_Advertising_Report_Event.SCAN_RSP,
+            data             = report.data
+        )
+
+
+# -----------------------------------------------------------------------------
+class ExtendedAdvertisement(Advertisement):
+    @classmethod
+    def from_advertising_report(cls, report):
+        return cls(
+            address          = report.address,
+            rssi             = report.rssi,
+            is_legacy        = report.event_type & (1 << HCI_LE_Extended_Advertising_Report_Event.LEGACY_ADVERTISING_PDU_USED) != 0,
+            is_anonymous     = report.address.address_type == HCI_LE_Extended_Advertising_Report_Event.ANONYMOUS_ADDRESS_TYPE,
+            is_connectable   = report.event_type & (1 << HCI_LE_Extended_Advertising_Report_Event.CONNECTABLE_ADVERTISING) != 0,
+            is_directed      = report.event_type & (1 << HCI_LE_Extended_Advertising_Report_Event.DIRECTED_ADVERTISING) != 0,
+            is_scannable     = report.event_type & (1 << HCI_LE_Extended_Advertising_Report_Event.SCANNABLE_ADVERTISING) != 0,
+            is_scan_response = report.event_type & (1 << HCI_LE_Extended_Advertising_Report_Event.SCAN_RESPONSE) != 0,
+            primary_phy      = report.primary_phy,
+            secondary_phy    = report.secondary_phy,
+            tx_power         = report.tx_power,
+            sid              = report.advertising_sid,
+            data             = report.data
+        )
+
+
+# -----------------------------------------------------------------------------
 class AdvertisementDataAccumulator:
-    def __init__(self):
-        self.advertising_data = AdvertisingData()
-        self.last_advertisement_type = None
-        self.connectable = False
-        self.flushable = False
+    def __init__(self, passive=False):
+        self.passive         = passive
+        self.last_event_type = None
+        self.advertisement   = None
+        self.data            = b''
 
-    def update(self, data, advertisement_type):
-        if advertisement_type == HCI_LE_Advertising_Report_Event.SCAN_RSP:
-            if self.last_advertisement_type != HCI_LE_Advertising_Report_Event.SCAN_RSP:
-                self.advertising_data.append(data)
-                self.flushable = True
-        else:
-            self.advertising_data = AdvertisingData.from_bytes(data)
-            self.flushable = self.last_advertisement_type != HCI_LE_Advertising_Report_Event.SCAN_RSP
+    def update(self, report):
+        if isinstance(report, HCI_LE_Advertising_Report_Event.Report):
+            if report.event_type == HCI_LE_Advertising_Report_Event.SCAN_RSP:
+                if self.last_event_type in {
+                    HCI_LE_Advertising_Report_Event.ADV_IND,
+                    HCI_LE_Advertising_Report_Event.ADV_SCAN_IND
+                }:
+                    # This is the response to a scannable advertisement
+                    self.advertisement = Advertisement.from_advertising_report(report)
+                    self.advertisement.data = AdvertisingData.from_bytes(self.data + report.data)
+                    self.advertisement.is_connectable = (self.last_event_type == HCI_LE_Advertising_Report_Event.ADV_IND)
+                else:
+                    # Unexpected scan response
+                    self.advertisement = None
 
-        if advertisement_type == HCI_LE_Advertising_Report_Event.ADV_IND or advertisement_type == HCI_LE_Advertising_Report_Event.ADV_DIRECT_IND:
-            self.connectable = True
-        elif advertisement_type == HCI_LE_Advertising_Report_Event.ADV_SCAN_IND or advertisement_type == HCI_LE_Advertising_Report_Event.ADV_NONCONN_IND:
-            self.connectable = False
+                # Reset the data
+                self.data = b''
+            else:
+                self.data = report.data
 
-        self.last_advertisement_type = advertisement_type
+                if self.passive or report.event_type in {
+                    HCI_LE_Advertising_Report_Event.ADV_DIRECT_IND,
+                    HCI_LE_Advertising_Report_Event.ADV_NONCONN_IND
+                } or self.last_event_type not in {
+                    None,
+                    HCI_LE_Advertising_Report_Event.SCAN_RSP
+                }:
+                    # Don't wait for a scan response
+                    self.advertisement = Advertisement.from_advertising_report(report)
+                else:
+                    # Wait for a scan response
+                    self.advertisement = None
+
+            self.last_event_type = report.event_type
 
 
 # -----------------------------------------------------------------------------
@@ -403,7 +508,7 @@ class Device(CompositeEventEmitter):
 
     @composite_listener
     class Listener:
-        def on_advertisement(self, address, data, rssi, advertisement_type):
+        def on_advertisement(self, advertisement):
             pass
 
         def on_inquiry_result(self, address, class_of_device, data, rssi):
@@ -454,6 +559,7 @@ class Device(CompositeEventEmitter):
             [l2cap.L2CAP_Information_Request.EXTENDED_FEATURE_FIXED_CHANNELS])
         self.advertisement_data       = {}
         self.scanning                 = False
+        self.scanning_is_passive      = False
         self.discovering              = False
         self.connecting               = False
         self.disconnecting            = False
@@ -757,7 +863,8 @@ class Device(CompositeEventEmitter):
                 filter_duplicates = 1 if filter_duplicates else 0
             ))
 
-        self.scanning = True
+        self.scanning            = True
+        self.scanning_is_passive = not active
 
     async def stop_scanning(self):
         await self.send_command(HCI_LE_Set_Scan_Enable_Command(
@@ -771,19 +878,13 @@ class Device(CompositeEventEmitter):
         return self.scanning
 
     @host_event_handler
-    def on_advertising_report(self, address, data, rssi, advertisement_type):
-        if not (accumulator := self.advertisement_data.get(address)):
-            accumulator = AdvertisementDataAccumulator()
-            self.advertisement_data[address] = accumulator
-        accumulator.update(data, advertisement_type)
-        if accumulator.flushable:
-            self.emit(
-                'advertisement',
-                address,
-                accumulator.advertising_data,
-                rssi,
-                accumulator.connectable
-            )
+    def on_advertising_report(self, report):
+        if not (accumulator := self.advertisement_data.get(report.address)):
+            accumulator = AdvertisementDataAccumulator(passive=self.scanning_is_passive)
+            self.advertisement_data[report.address] = accumulator
+        accumulator.update(report)
+        if accumulator.advertisement is not None:
+            self.emit('advertisement', accumulator.advertisement)
 
     async def start_discovery(self):
         await self.host.send_command(HCI_Write_Inquiry_Mode_Command(inquiry_mode=HCI_EXTENDED_INQUIRY_MODE))

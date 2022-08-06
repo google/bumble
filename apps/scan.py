@@ -78,14 +78,14 @@ class AdvertisementPrinter:
         separator = '\n  '
         print(f'>>> {color(address, address_color)} [{color(address_type_string, type_color)}]{address_qualifier}{resolution_qualifier}:{separator}RSSI:{rssi:4} {rssi_bar}{separator}{ad_data.to_string(separator)}\n')
 
-    def on_advertisement(self, address, ad_data, rssi, connectable):
-        address_color = 'yellow' if connectable else 'red'
-        self.print_advertisement(address, address_color, ad_data, rssi)
+    def on_advertisement(self, advertisement):
+        address_color = 'yellow' if advertisement.is_connectable else 'red'
+        self.print_advertisement(advertisement.address, address_color, advertisement.data, advertisement.rssi)
 
-    def on_advertising_report(self, address, ad_data, rssi, event_type):
-        print(f'{color("EVENT", "green")}: {HCI_LE_Advertising_Report_Event.event_type_name(event_type)}')
-        ad_data = AdvertisingData.from_bytes(ad_data)
-        self.print_advertisement(address, 'yellow', ad_data, rssi)
+    def on_advertising_report(self, report):
+        print(f'{color("EVENT", "green")}: {HCI_LE_Advertising_Report_Event.event_type_name(report.event_type)}')
+        data = AdvertisingData.from_bytes(report.data)
+        self.print_advertisement(report.address, 'yellow', data, report.rssi)
 
 
 # -----------------------------------------------------------------------------

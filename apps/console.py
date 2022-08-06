@@ -570,16 +570,16 @@ class DeviceListener(Device.Listener, Connection.Listener):
     def on_connection_data_length_change(self):
         self.app.append_to_output(f'connection data length change: {self.app.connected_peer.connection.data_length}')
 
-    def on_advertisement(self, address, ad_data, rssi, connectable):
-        entry_key = f'{address}/{address.address_type}'
+    def on_advertisement(self, advertisement):
+        entry_key = f'{advertisement.address}/{advertisement.address.address_type}'
         entry = self.scan_results.get(entry_key)
         if entry:
-            entry.ad_data     = ad_data
-            entry.rssi        = rssi
-            entry.connectable = connectable
+            entry.ad_data     = advertisement.data
+            entry.rssi        = advertisement.rssi
+            entry.connectable = advertisement.connectable
         else:
-            self.app.add_known_address(str(address))
-            self.scan_results[entry_key] = ScanResult(address, address.address_type, ad_data, rssi, connectable)
+            self.app.add_known_address(str(advertisement.address))
+            self.scan_results[entry_key] = ScanResult(advertisement.address, advertisement.address.address_type, advertisement.data, advertisement.rssi, advertisement.is_connectable)
 
         self.app.show_scan_results(self.scan_results)
 
