@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # -----------------------------------------------------------------------------
 SMP_CID = 0x06
+SMP_BR_CID = 0x07
 
 SMP_PAIRING_REQUEST_COMMAND               = 0x01
 SMP_PAIRING_RESPONSE_COMMAND              = 0x02
@@ -1462,7 +1463,8 @@ class Manager(EventEmitter):
 
     def send_command(self, connection, command):
         logger.debug(f'>>> Sending SMP Command on connection [0x{connection.handle:04X}] {connection.peer_address}: {command}')
-        connection.send_l2cap_pdu(SMP_CID, command.to_bytes())
+        cid = SMP_BR_CID if connection.transport == BT_BR_EDR_TRANSPORT else SMP_CID
+        connection.send_l2cap_pdu(cid, command.to_bytes())
 
     def on_smp_pdu(self, connection, pdu):
         # Look for a session with this connection, and create one if none exists
