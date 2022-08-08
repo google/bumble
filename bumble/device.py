@@ -497,6 +497,8 @@ class Device(CompositeEventEmitter):
         self.smp_manager = smp.Manager(self, self.random_address)
         self.l2cap_channel_manager.register_fixed_channel(
             smp.SMP_CID, self.on_smp_pdu)
+        self.l2cap_channel_manager.register_fixed_channel(
+            smp.SMP_BR_CID, self.on_smp_pdu)
 
         # Register the SDP server with the L2CAP Channel Manager
         self.sdp_server.register(self.l2cap_channel_manager)
