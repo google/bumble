@@ -440,6 +440,10 @@ async def test_subscribe_notify():
     assert(c1._last_update is not None)
     assert(c1._last_update[1] == characteristic1.value)
 
+    assert(peer.gatt_client.notification_subscribers[c1.handle])
+    await peer.unsubscribe(c1)
+    assert(c1.handle not in peer.gatt_client.notification_subscribers)
+
     c2._last_update = None
 
     def on_c2_update(value):
@@ -454,6 +458,10 @@ async def test_subscribe_notify():
     await async_barrier()
     assert(c2._last_update is not None)
     assert(c2._last_update[1] == characteristic2.value)
+
+    assert(on_c2_update in peer.gatt_client.indication_subscribers[c2.handle])
+    await peer.unsubscribe(c2, on_c2_update)
+    assert(on_c2_update not in peer.gatt_client.indication_subscribers[c2.handle])
 
     c3._last_update = None
 
@@ -472,6 +480,12 @@ async def test_subscribe_notify():
     await async_barrier()
     assert(c3._last_update is not None)
     assert(c3._last_update[1] == characteristic3.value)
+
+    assert(peer.gatt_client.notification_subscribers[c3.handle])
+    assert(peer.gatt_client.indication_subscribers[c3.handle])
+    await peer.unsubscribe(c3)
+    assert(c3.handle not in peer.gatt_client.notification_subscribers)
+    assert(c3.handle not in peer.gatt_client.indication_subscribers)
 
 
 # -----------------------------------------------------------------------------

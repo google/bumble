@@ -123,6 +123,9 @@ class Peer:
     async def subscribe(self, characteristic, subscriber=None):
         return await self.gatt_client.subscribe(characteristic, subscriber)
 
+    async def unsubscribe(self, characteristic, subscriber=None):
+        return await self.gatt_client.unsubscribe(characteristic, subscriber)
+
     async def read_value(self, attribute):
         return await self.gatt_client.read_value(attribute)
 

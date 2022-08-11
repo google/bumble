@@ -110,6 +110,9 @@ class CharacteristicProxy(AttributeProxy):
     async def subscribe(self, subscriber=None):
         return await self.client.subscribe(self, subscriber)
 
+    async def unsubscribe(self, subscriber=None):
+        return await self.client.unsubscribe(self, subscriber)
+
     def __str__(self):
         return f'Characteristic(handle=0x{self.handle:04X}, uuid={self.uuid}, properties={Characteristic.properties_as_string(self.properties)})'
 
@@ -547,6 +550,30 @@ class Client:
             subscriber_set.add(lambda value: characteristic.emit('update', self.connection, value))
 
         await self.write_value(cccd, struct.pack('<H', bits), with_response=True)
+
+    async def unsubscribe(self, characteristic, subscriber=None):
+        # If we haven't already discovered the descriptors for this characteristic, do it now
+        if not characteristic.descriptors_discovered:
+            await self.discover_descriptors(characteristic)
+
+        # Look for the CCCD descriptor
+        cccd = characteristic.get_descriptor(GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR)
+        if not cccd:
+            logger.warning('unsubscribing from characteristic with no CCCD descriptor')
+            return
+
+        if subscriber is not None:
+            # Remove matching subscriber from subscriber sets
+            for subscriber_set in (self.notification_subscribers, self.indication_subscribers):
+                subscribers = subscriber_set.get(characteristic.handle, [])
+                if subscriber in subscribers:
+                    subscribers.remove(subscriber)
+        else:
+            # Remove all subscribers for this attribute from the sets!
+            self.notification_subscribers.pop(characteristic.handle, None)
+            self.indication_subscribers.pop(characteristic.handle, None)
+
+        await self.write_value(cccd, b'\x00\x00', with_response=True)
 
     async def read_value(self, attribute, no_long_read=False):
         '''
