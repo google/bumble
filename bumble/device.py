@@ -166,6 +166,7 @@ class AdvertisementDataAccumulator:
                     self.advertisement = Advertisement.from_advertising_report(report)
                     self.advertisement.data = AdvertisingData.from_bytes(self.data + report.data)
                     self.advertisement.is_connectable = (self.last_event_type == HCI_LE_Advertising_Report_Event.ADV_IND)
+                    self.advertisement.is_scannable = True
                 else:
                     # Unexpected scan response
                     self.advertisement = None
@@ -826,9 +827,9 @@ class Device(CompositeEventEmitter):
 
             scanning_phys = 1 << HCI_LE_Set_Extended_Scan_Parameters_Command.LE_1M_PHY
             scanning_phy_count = 1
-            # if self.supports_le_feature(HCI_LE_CODED_PHY_LE_SUPPORTED_FEATURE):
-            #     scanning_phys |= 1 << HCI_LE_Set_Extended_Scan_Parameters_Command.LE_CODED_PHY
-            #     scanning_phy_count += 1
+            if self.supports_le_feature(HCI_LE_CODED_PHY_LE_SUPPORTED_FEATURE):
+                scanning_phys |= 1 << HCI_LE_Set_Extended_Scan_Parameters_Command.LE_CODED_PHY
+                scanning_phy_count += 1
 
             await self.send_command(HCI_LE_Set_Extended_Scan_Parameters_Command(
                 own_address_type       = own_address_type,
@@ -863,8 +864,8 @@ class Device(CompositeEventEmitter):
                 filter_duplicates = 1 if filter_duplicates else 0
             ))
 
-        self.scanning            = True
         self.scanning_is_passive = not active
+        self.scanning            = True
 
     async def stop_scanning(self):
         await self.send_command(HCI_LE_Set_Scan_Enable_Command(
