@@ -547,7 +547,9 @@ class Client:
         for subscriber_set in subscriber_sets:
             if subscriber is not None:
                 subscriber_set.add(subscriber)
-            subscriber_set.add(lambda value: characteristic.emit('update', self.connection, value))
+            # Add the characteristic as a subscriber, which will result in the characteristic
+            # emitting an 'update' event when a notification or indication is received
+            subscriber_set.add(characteristic)
 
         await self.write_value(cccd, struct.pack('<H', bits), with_response=True)
 
@@ -741,7 +743,10 @@ class Client:
         if not subscribers:
             logger.warning('!!! received notification with no subscriber')
         for subscriber in subscribers:
-            subscriber(notification.attribute_value)
+            if callable(subscriber):
+                subscriber(notification.attribute_value)
+            else:
+                subscriber.emit('update', notification.attribute_value)
 
     def on_att_handle_value_indication(self, indication):
         # Call all subscribers
@@ -749,7 +754,10 @@ class Client:
         if not subscribers:
             logger.warning('!!! received indication with no subscriber')
         for subscriber in subscribers:
-            subscriber(indication.attribute_value)
+            if callable(subscriber):
+                subscriber(indication.attribute_value)
+            else:
+                subscriber.emit('update', indication.attribute_value)
 
         # Confirm that we received the indication
         self.send_confirmation(ATT_Handle_Value_Confirmation())

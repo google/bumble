@@ -419,10 +419,12 @@ async def test_subscribe_notify():
     assert(len(c) == 1)
     c3 = c[0]
 
+    c1._called = False
     c1._last_update = None
 
-    def on_c1_update(connection, value):
-        c1._last_update = (connection, value)
+    def on_c1_update(value):
+        c1._called = True
+        c1._last_update = value
 
     c1.on('update', on_c1_update)
     await peer.subscribe(c1)
@@ -434,58 +436,73 @@ async def test_subscribe_notify():
     assert(not characteristic1._last_subscription[2])
     await server.indicate_subscribers(characteristic1)
     await async_barrier()
-    assert(c1._last_update is None)
+    assert(not c1._called)
     await server.notify_subscribers(characteristic1)
     await async_barrier()
-    assert(c1._last_update is not None)
-    assert(c1._last_update[1] == characteristic1.value)
+    assert(c1._called)
+    assert(c1._last_update == characteristic1.value)
 
-    assert(peer.gatt_client.notification_subscribers[c1.handle])
+    c1._called = False
     await peer.unsubscribe(c1)
-    assert(c1.handle not in peer.gatt_client.notification_subscribers)
+    await server.notify_subscribers(characteristic1)
+    assert(not c1._called)
 
+    c2._called = False
     c2._last_update = None
 
     def on_c2_update(value):
-        c2._last_update = (connection, value)
+        c2._called = True
+        c2._last_update = value
 
     await peer.subscribe(c2, on_c2_update)
     await async_barrier()
     await server.notify_subscriber(characteristic2._last_subscription[0], characteristic2)
     await async_barrier()
-    assert(c2._last_update is None)
+    assert(not c2._called)
     await server.indicate_subscriber(characteristic2._last_subscription[0], characteristic2)
     await async_barrier()
-    assert(c2._last_update is not None)
-    assert(c2._last_update[1] == characteristic2.value)
+    assert(c2._called)
+    assert(c2._last_update == characteristic2.value)
 
-    assert(on_c2_update in peer.gatt_client.indication_subscribers[c2.handle])
+    c2._called = False
     await peer.unsubscribe(c2, on_c2_update)
-    assert(on_c2_update not in peer.gatt_client.indication_subscribers[c2.handle])
+    await server.indicate_subscriber(characteristic2._last_subscription[0], characteristic2)
+    await async_barrier()
+    assert(not c2._called)
 
-    c3._last_update = None
+    def on_c3_update(value):
+        c3._called = True
+        c3._last_update = value
 
-    def on_c3_update(connection, value):
-        c3._last_update = (connection, value)
+    def on_c3_update_2(value):
+        c3._called_2 = True
+        c3._last_update_2 = value
 
     c3.on('update', on_c3_update)
-    await peer.subscribe(c3)
+    await peer.subscribe(c3, on_c3_update_2)
     await async_barrier()
     await server.notify_subscriber(characteristic3._last_subscription[0], characteristic3)
     await async_barrier()
-    assert(c3._last_update is not None)
-    assert(c3._last_update[1] == characteristic3.value)
+    assert(c3._called)
+    assert(c3._last_update == characteristic3.value)
+    assert(c3._called_2)
+    assert(c3._last_update_2 == characteristic3.value)
     characteristic3.value = bytes([1, 2, 3])
     await server.indicate_subscriber(characteristic3._last_subscription[0], characteristic3)
     await async_barrier()
-    assert(c3._last_update is not None)
-    assert(c3._last_update[1] == characteristic3.value)
+    assert(c3._called)
+    assert(c3._last_update == characteristic3.value)
+    assert(c3._called_2)
+    assert(c3._last_update_2 == characteristic3.value)
 
-    assert(peer.gatt_client.notification_subscribers[c3.handle])
-    assert(peer.gatt_client.indication_subscribers[c3.handle])
+    c3._called = False
+    c3._called_2 = False
     await peer.unsubscribe(c3)
-    assert(c3.handle not in peer.gatt_client.notification_subscribers)
-    assert(c3.handle not in peer.gatt_client.indication_subscribers)
+    await server.notify_subscriber(characteristic3._last_subscription[0], characteristic3)
+    await server.indicate_subscriber(characteristic3._last_subscription[0], characteristic3)
+    await async_barrier()
+    assert(not c3._called)
+    assert(not c3._called_2)
 
 
 # -----------------------------------------------------------------------------
