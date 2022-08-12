@@ -421,8 +421,8 @@ async def test_subscribe_notify():
 
     c1._last_update = None
 
-    def on_c1_update(connection, value):
-        c1._last_update = (connection, value)
+    def on_c1_update(value):
+        c1._last_update = value
 
     c1.on('update', on_c1_update)
     await peer.subscribe(c1)
@@ -437,8 +437,7 @@ async def test_subscribe_notify():
     assert(c1._last_update is None)
     await server.notify_subscribers(characteristic1)
     await async_barrier()
-    assert(c1._last_update is not None)
-    assert(c1._last_update[1] == characteristic1.value)
+    assert(c1._last_update == characteristic1.value)
 
     assert(peer.gatt_client.notification_subscribers[c1.handle])
     await peer.unsubscribe(c1)
@@ -447,7 +446,7 @@ async def test_subscribe_notify():
     c2._last_update = None
 
     def on_c2_update(value):
-        c2._last_update = (connection, value)
+        c2._last_update = value
 
     await peer.subscribe(c2, on_c2_update)
     await async_barrier()
@@ -456,8 +455,7 @@ async def test_subscribe_notify():
     assert(c2._last_update is None)
     await server.indicate_subscriber(characteristic2._last_subscription[0], characteristic2)
     await async_barrier()
-    assert(c2._last_update is not None)
-    assert(c2._last_update[1] == characteristic2.value)
+    assert(c2._last_update == characteristic2.value)
 
     assert(on_c2_update in peer.gatt_client.indication_subscribers[c2.handle])
     await peer.unsubscribe(c2, on_c2_update)
@@ -465,21 +463,19 @@ async def test_subscribe_notify():
 
     c3._last_update = None
 
-    def on_c3_update(connection, value):
-        c3._last_update = (connection, value)
+    def on_c3_update(value):
+        c3._last_update = value
 
     c3.on('update', on_c3_update)
     await peer.subscribe(c3)
     await async_barrier()
     await server.notify_subscriber(characteristic3._last_subscription[0], characteristic3)
     await async_barrier()
-    assert(c3._last_update is not None)
-    assert(c3._last_update[1] == characteristic3.value)
+    assert(c3._last_update == characteristic3.value)
     characteristic3.value = bytes([1, 2, 3])
     await server.indicate_subscriber(characteristic3._last_subscription[0], characteristic3)
     await async_barrier()
-    assert(c3._last_update is not None)
-    assert(c3._last_update[1] == characteristic3.value)
+    assert(c3._last_update == characteristic3.value)
 
     assert(peer.gatt_client.notification_subscribers[c3.handle])
     assert(peer.gatt_client.indication_subscribers[c3.handle])
