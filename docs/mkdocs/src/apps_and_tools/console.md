@@ -7,10 +7,12 @@ The Console app is an interactive text user interface that offers a number of fu
 
   * scanning
   * advertising
-  * connecting to devices
+  * connecting to and disconnecting from devices
   * changing connection parameters
+  * enabling encryption
   * discovering GATT services and characteristics
-  * read & write GATT characteristics
+  * reading and writing GATT characteristics
+  * subscribing to and unsubscribing from GATT characteristics
 
 The console user interface has 3 main panes:
 
