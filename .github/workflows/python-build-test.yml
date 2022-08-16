@@ -29,11 +29,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install ".[test,development,documentation]"
+        python -m pip install ".[build,test,development,documentation]"
     - name: Test with pytest
       run: |
         pytest
     - name: Build
       run: |
         inv build
-        inv mkdocs
+        inv build.mkdocs
