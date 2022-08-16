@@ -17,9 +17,10 @@
 # -----------------------------------------------------------------------------
 import logging
 import asyncio
-from colors import color
 
-from .utils import EventEmitter
+from colors import color
+from pyee import EventEmitter
+
 from .core import InvalidStateError, ProtocolError, ConnectionError
 
 # -----------------------------------------------------------------------------
