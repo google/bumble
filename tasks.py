@@ -23,43 +23,41 @@ ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 ns = Collection()
 
+# Building
 build_tasks = Collection()
 ns.add_collection(build_tasks, name="build")
 
-
 @task
-def build(ctx):
+def build(ctx, install=False):
+    if install:
+        ctx.run('python -m pip install .[build]')
+
     ctx.run("python -m build")
 
-
-build_tasks.add_task(build, default=True, name="build")
-
+build_tasks.add_task(build, default=True)
 
 @task
 def release_build(ctx):
-    ctx.run('python -m pip install .[build]')
-    build(ctx)
-
+    build(ctx, install=True)
 
 build_tasks.add_task(release_build, name="release")
-
 
 @task
 def mkdocs(ctx):
     ctx.run("mkdocs build -f docs/mkdocs/mkdocs.yml")
 
-
 build_tasks.add_task(mkdocs, name="mkdocs")
 
+# Testing
 test_tasks = Collection()
 ns.add_collection(test_tasks, name="test")
-
 
 @task
 def test(ctx, filter=None, junit=False, install=False):
     # Install the package before running the tests
     if install:
         ctx.run("python -m pip install .[test]")
+
     args = ""
     if junit:
         args += "--junit-xml test-results.xml"
@@ -67,5 +65,10 @@ def test(ctx, filter=None, junit=False, install=False):
         args += " -k '{}'".format(filter)
     ctx.run("python -m pytest {} {}".format(os.path.join(ROOT_DIR, "tests"), args))
 
+test_tasks.add_task(test, default=True)
 
-test_tasks.add_task(test, name="test", default=True)
+@task
+def release_test(ctx):
+    test(ctx, install=True)
+
+test_tasks.add_task(release_test, name="release")
