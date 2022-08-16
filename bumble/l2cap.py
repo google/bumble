@@ -20,11 +20,11 @@ import logging
 import struct
 
 from colors import color
+from pyee import EventEmitter
 
 from .core import BT_CENTRAL_ROLE, InvalidStateError, ProtocolError
 from .hci import (HCI_LE_Connection_Update_Command, HCI_Object, key_with_value,
                   name_or_number)
-from .utils import EventEmitter
 
 # -----------------------------------------------------------------------------
 # Logging
