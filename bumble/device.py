@@ -312,6 +312,8 @@ class DeviceConfiguration:
         self.le_simultaneous_enabled  = True
         self.classic_sc_enabled       = True
         self.classic_ssp_enabled      = True
+        self.connectable              = True
+        self.discoverable             = True
         self.advertising_data = bytes(
             AdvertisingData([(AdvertisingData.COMPLETE_LOCAL_NAME, bytes(self.name, 'utf-8'))])
         )
@@ -330,6 +332,8 @@ class DeviceConfiguration:
         self.le_simultaneous_enabled  = config.get('le_simultaneous_enabled', self.le_simultaneous_enabled)
         self.classic_sc_enabled       = config.get('classic_sc_enabled', self.classic_sc_enabled)
         self.classic_ssp_enabled      = config.get('classic_ssp_enabled', self.classic_ssp_enabled)
+        self.connectable              = config.get('connectable', self.connectable)
+        self.discoverable             = config.get('discoverable', self.discoverable)
 
         # Load or synthesize an IRK
         irk = config.get('irk')
@@ -451,8 +455,6 @@ class Device(CompositeEventEmitter):
         self.disconnecting            = False
         self.connections              = {}  # Connections, by connection handle
         self.classic_enabled          = False
-        self.discoverable             = False
-        self.connectable              = False
         self.inquiry_response         = None
         self.address_resolver         = None
 
@@ -473,6 +475,8 @@ class Device(CompositeEventEmitter):
         self.le_simultaneous_enabled  = config.le_simultaneous_enabled
         self.classic_ssp_enabled      = config.classic_ssp_enabled
         self.classic_sc_enabled       = config.classic_sc_enabled
+        self.discoverable             = config.discoverable
+        self.connectable              = config.connectable
 
         # If a name is passed, override the name from the config
         if name:
@@ -620,6 +624,8 @@ class Device(CompositeEventEmitter):
                 HCI_Write_Secure_Connections_Host_Support_Command(
                     secure_connections_host_support=int(self.classic_sc_enabled))
             )
+            await self.set_connectable(self.connectable)
+            await self.set_discoverable(self.discoverable)
 
         # Let the SMP manager know about the address
         # TODO: allow using a public address
