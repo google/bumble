@@ -56,13 +56,7 @@ class Connection:
 
     def on_acl_pdu(self, pdu):
         l2cap_pdu = L2CAP_PDU.from_bytes(pdu)
-
-        if l2cap_pdu.cid == ATT_CID:
-            self.host.on_gatt_pdu(self, l2cap_pdu.payload)
-        elif l2cap_pdu.cid == SMP_CID:
-            self.host.on_smp_pdu(self, l2cap_pdu.payload)
-        else:
-            self.host.on_l2cap_pdu(self, l2cap_pdu.cid, l2cap_pdu.payload)
+        self.host.on_l2cap_pdu(self, l2cap_pdu.cid, l2cap_pdu.payload)
 
 
 # -----------------------------------------------------------------------------
@@ -298,12 +292,6 @@ class Host(EventEmitter):
         # Look for the connection to which this data belongs
         if connection := self.connections.get(packet.connection_handle):
             connection.on_hci_acl_data_packet(packet)
-
-    def on_gatt_pdu(self, connection, pdu):
-        self.emit('gatt_pdu', connection.handle, pdu)
-
-    def on_smp_pdu(self, connection, pdu):
-        self.emit('smp_pdu', connection.handle, pdu)
 
     def on_l2cap_pdu(self, connection, cid, pdu):
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
