@@ -26,13 +26,12 @@ import csv
 
 # -----------------------------------------------------------------------------
 with open(sys.argv[1], newline='') as csvfile:
+    
     reader = csv.reader(csvfile, delimiter=',', quotechar='"')
     lines = []
+    
     for row in reader:
         if len(row) == 3 and row[1].startswith('0x'):
-            company_id = row[1]
-            company_name = row[2]
-            escaped_company_name = company_name.replace('"', '\\"')
-            lines.append(f'    {company_id}: "{escaped_company_name}"')
+            lines.append(f'    {row[1]}: "{company_name.replace('"', '\\"')}"')
 
     print(',\n'.join(reversed(lines)))
