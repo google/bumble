@@ -582,11 +582,12 @@ class Device(CompositeEventEmitter):
             logger.debug(color(f'BD_ADDR: {response.return_parameters.bd_addr}', 'yellow'))
             self.public_address = response.return_parameters.bd_addr
 
+        if self.host.supports_command(HCI_WRITE_LE_HOST_SUPPORT_COMMAND):
+            await self.send_command(HCI_Write_LE_Host_Support_Command(
+                le_supported_host    = int(self.le_enabled),
+                simultaneous_le_host = int(self.le_simultaneous_enabled),
+            ))
 
-        await self.send_command(HCI_Write_LE_Host_Support_Command(
-            le_supported_host = int(self.le_enabled),
-            simultaneous_le_host = int(self.le_simultaneous_enabled),
-        ))
         if self.le_enabled:
             # Set the controller address
             await self.send_command(HCI_LE_Set_Random_Address_Command(
