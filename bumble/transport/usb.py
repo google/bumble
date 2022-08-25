@@ -287,7 +287,7 @@ async def open_usb_transport(spec):
                 if (
                     device.getVendorID() == int(vendor_id, 16) and
                     device.getProductID() == int(product_id, 16) and
-                    serial_number is None or device.getSerialNumber() == serial_number
+                    (serial_number is None or device.getSerialNumber() == serial_number)
                 ):
                     if device_index == 0:
                         found = device
