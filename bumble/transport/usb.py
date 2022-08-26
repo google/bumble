@@ -37,16 +37,20 @@ async def open_usb_transport(spec):
     '''
     Open a USB transport.
     The parameter string has this syntax:
-    either <index> or <vendor>:<product>[/<serial-number>]
+    either <index> or
+    <vendor>:<product> or
+    <vendor>:<product>/<serial-number>] or
+    <vendor>:<product>#<index>
     With <index> as the 0-based index to select amongst all the devices that appear
     to be supporting Bluetooth HCI (0 being the first one), or
     Where <vendor> and <product> are the vendor ID and product ID in hexadecimal. The
-    /<serial-number> suffix max be specified when more than one device with the same
-    vendor and product identifiers are present.
+    /<serial-number> suffix or #<index> suffix max be specified when more than one device with
+    the same vendor and product identifiers are present.
 
     Examples:
     0 --> the first BT USB dongle
     04b4:f901 --> the BT USB dongle with vendor=04b4 and product=f901
+    04b4:f901#2 --> the third USB device with vendor=04b4 and product=f901
     04b4:f901/00E04C239987 --> the BT USB dongle with vendor=04b4 and product=f901 and serial number 00E04C239987
     '''
 
@@ -190,7 +194,7 @@ async def open_usb_transport(spec):
         def on_packet_received(self, transfer):
             packet_type = transfer.getUserData()
             status = transfer.getStatus()
-            # logger.debug(f'<<< USB IN transfer callback: status={status} packet_type={packet_type}')
+            # logger.debug(f'<<< USB IN transfer callback: status={status} packet_type={packet_type} length={transfer.getActualLength()}')
 
             if status == usb1.TRANSFER_COMPLETED:
                 packet = bytes([packet_type]) + transfer.getBuffer()[:transfer.getActualLength()]
@@ -271,19 +275,25 @@ async def open_usb_transport(spec):
         found = None
         if ':' in spec:
             vendor_id, product_id = spec.split(':')
+            serial_number = None
+            device_index = 0
             if '/' in product_id:
                 product_id, serial_number = product_id.split('/')
-                for device in context.getDeviceIterator(skip_on_error=True):
-                    if (
-                        device.getVendorID() == int(vendor_id, 16) and
-                        device.getProductID() == int(product_id, 16) and
-                        device.getSerialNumber() == serial_number
-                    ):
+            elif '#' in product_id:
+                product_id, device_index_str = product_id.split('#')
+                device_index = int(device_index_str)
+
+            for device in context.getDeviceIterator(skip_on_error=True):
+                if (
+                    device.getVendorID() == int(vendor_id, 16) and
+                    device.getProductID() == int(product_id, 16) and
+                    (serial_number is None or device.getSerialNumber() == serial_number)
+                ):
+                    if device_index == 0:
                         found = device
                         break
-                    device.close()
-            else:
-                found = context.getByVendorIDAndProductID(int(vendor_id, 16), int(product_id, 16), skip_on_error=True)
+                    device_index -= 1
+                device.close()
         else:
             device_index = int(spec)
             for device in context.getDeviceIterator(skip_on_error=True):
@@ -305,17 +315,6 @@ async def open_usb_transport(spec):
         logger.debug(f'USB Device: {found}')
         device = found.open()
 
-        # Set the configuration if needed
-        try:
-            configuration = device.getConfiguration()
-            logger.debug(f'current configuration = {configuration}')
-        except usb1.USBError:
-            try:
-                logger.debug('setting configuration 1')
-                device.setConfiguration(1)
-            except usb1.USBError:
-                logger.debug('failed to set configuration 1')
-
         # Use the first interface
         interface = 0
 
@@ -327,6 +326,20 @@ async def open_usb_transport(spec):
                     device.detachKernelDriver(interface)
             except usb1.USBError:
                 pass
+
+        # Set the configuration if needed
+        try:
+            configuration = device.getConfiguration()
+            logger.debug(f'current configuration = {configuration}')
+        except usb1.USBError:
+            configuration = 0
+
+        if configuration != 1:
+            try:
+                logger.debug('setting configuration 1')
+                device.setConfiguration(1)
+            except usb1.USBError:
+                logger.warning('failed to set configuration 1')
 
         source = UsbPacketSource(context, device)
         sink   = UsbPacketSink(device)

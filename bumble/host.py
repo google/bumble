@@ -75,7 +75,7 @@ class Host(EventEmitter):
         self.hc_total_num_acl_data_packets    = HOST_HC_TOTAL_NUM_ACL_DATA_PACKETS
         self.acl_packet_queue                 = collections.deque()
         self.acl_packets_in_flight            = 0
-        self.local_version                    = None
+        self.local_version                    = HCI_VERSION_BLUETOOTH_CORE_4_0
         self.local_supported_commands         = bytes(64)
         self.local_le_features                = 0
         self.command_semaphore                = asyncio.Semaphore(1)
@@ -93,17 +93,18 @@ class Host(EventEmitter):
         await self.send_command(HCI_Reset_Command())
         self.ready = True
 
-        await self.send_command(HCI_Set_Event_Mask_Command(event_mask = bytes.fromhex('FFFFFFFFFFFFFFFF')))
-        await self.send_command(HCI_LE_Set_Event_Mask_Command(le_event_mask = bytes.fromhex('FFFFF00000000000')))
-
         response = await self.send_command(HCI_Read_Local_Supported_Commands_Command())
         if response.return_parameters.status == HCI_SUCCESS:
             self.local_supported_commands = response.return_parameters.supported_commands
         else:
             logger.warn(f'HCI_Read_Local_Supported_Commands_Command failed: {response.return_parameters.status}')
 
-        if self.supports_command(HCI_WRITE_LE_HOST_SUPPORT_COMMAND):
-            await self.send_command(HCI_Write_LE_Host_Support_Command(le_supported_host = 1, simultaneous_le_host = 0))
+        if self.supports_command(HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND):
+            response = await self.send_command(HCI_LE_Read_Local_Supported_Features_Command())
+            if response.return_parameters.status == HCI_SUCCESS:
+                self.local_le_features = struct.unpack('<Q', response.return_parameters.le_features)[0]
+            else:
+                logger.warn(f'HCI_LE_Read_Supported_Features_Command failed: {response.return_parameters.status}')
 
         if self.supports_command(HCI_READ_LOCAL_VERSION_INFORMATION_COMMAND):
             response = await self.send_command(HCI_Read_Local_Version_Information_Command())
@@ -112,32 +113,44 @@ class Host(EventEmitter):
             else:
                 logger.warn(f'HCI_Read_Local_Version_Information_Command failed: {response.return_parameters.status}')
 
+        await self.send_command(HCI_Set_Event_Mask_Command(event_mask = bytes.fromhex('FFFFFFFFFFFFFF3F')))
+
+        if self.local_version.hci_version <= HCI_VERSION_BLUETOOTH_CORE_4_0:
+            # Some older controllers don't like event masks with bits they don't understand
+            le_event_mask = bytes.fromhex('1F00000000000000')
+        else:
+            le_event_mask = bytes.fromhex('FFFFF00000000000')
+        await self.send_command(HCI_LE_Set_Event_Mask_Command(le_event_mask = le_event_mask))
+
+        if self.supports_command(HCI_READ_BUFFER_SIZE_COMMAND):
+            response = await self.send_command(HCI_Read_Buffer_Size_Command())
+            if response.return_parameters.status == HCI_SUCCESS:
+                self.hc_acl_data_packet_length     = response.return_parameters.hc_acl_data_packet_length
+                self.hc_total_num_acl_data_packets = response.return_parameters.hc_total_num_acl_data_packets
+            else:
+                logger.warn(f'HCI_Read_Buffer_Size_Command failed: {response.return_parameters.status}')
+
         if self.supports_command(HCI_LE_READ_BUFFER_SIZE_COMMAND):
             response = await self.send_command(HCI_LE_Read_Buffer_Size_Command())
             if response.return_parameters.status == HCI_SUCCESS:
-                self.hc_le_acl_data_packet_length = response.return_parameters.hc_le_acl_data_packet_length
+                self.hc_le_acl_data_packet_length     = response.return_parameters.hc_le_acl_data_packet_length
                 self.hc_total_num_le_acl_data_packets = response.return_parameters.hc_total_num_le_acl_data_packets
-                logger.debug(f'HCI LE ACL flow control: hc_le_acl_data_packet_length={response.return_parameters.hc_le_acl_data_packet_length}, hc_total_num_le_acl_data_packets={response.return_parameters.hc_total_num_le_acl_data_packets}')
             else:
                 logger.warn(f'HCI_LE_Read_Buffer_Size_Command failed: {response.return_parameters.status}')
-            if response.return_parameters.hc_le_acl_data_packet_length == 0 or response.return_parameters.hc_total_num_le_acl_data_packets == 0:
-                # Read the non-LE-specific values
-                response = await self.send_command(HCI_Read_Buffer_Size_Command())
-                if response.return_parameters.status == HCI_SUCCESS:
-                    self.hc_acl_data_packet_length        = response.return_parameters.hc_le_acl_data_packet_length
-                    self.hc_le_acl_data_packet_length     = self.hc_le_acl_data_packet_length or self.hc_acl_data_packet_length
-                    self.hc_total_num_acl_data_packets    = response.return_parameters.hc_total_num_le_acl_data_packets
-                    self.hc_total_num_le_acl_data_packets = self.hc_total_num_le_acl_data_packets or self.hc_total_num_acl_data_packets
-                    logger.debug(f'HCI LE ACL flow control: hc_le_acl_data_packet_length={self.hc_le_acl_data_packet_length}, hc_total_num_le_acl_data_packets={self.hc_total_num_le_acl_data_packets}')
-                else:
-                    logger.warn(f'HCI_Read_Buffer_Size_Command failed: {response.return_parameters.status}')
 
-        if self.supports_command(HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND):
-            response = await self.send_command(HCI_LE_Read_Local_Supported_Features_Command())
-            if response.return_parameters.status == HCI_SUCCESS:
-                self.local_le_features = struct.unpack('<Q', response.return_parameters.le_features)[0]
-            else:
-                logger.warn(f'HCI_LE_Read_Supported_Features_Command failed: {response.return_parameters.status}')
+        if response.return_parameters.hc_le_acl_data_packet_length == 0 or response.return_parameters.hc_total_num_le_acl_data_packets == 0:
+            # LE and Classic share the same values
+            self.hc_le_acl_data_packet_length     = self.hc_acl_data_packet_length
+            self.hc_total_num_le_acl_data_packets = self.hc_total_num_acl_data_packets
+
+        logger.debug(
+            f'HCI ACL flow control: hc_acl_data_packet_length={self.hc_acl_data_packet_length},'
+            f'hc_total_num_acl_data_packets={self.hc_total_num_acl_data_packets}'
+        )
+        logger.debug(
+            f'HCI LE ACL flow control: hc_le_acl_data_packet_length={self.hc_le_acl_data_packet_length},'
+            f'hc_total_num_le_acl_data_packets={self.hc_total_num_le_acl_data_packets}'
+        )
 
         self.reset_done = True
 
@@ -162,8 +175,8 @@ class Host(EventEmitter):
 
         # Wait until we can send (only one pending command at a time)
         async with self.command_semaphore:
-            assert(self.pending_command is None)
-            assert(self.pending_response is None)
+            assert self.pending_command is None
+            assert self.pending_response is None
 
             # Create a future value to hold the eventual response
             self.pending_response = asyncio.get_running_loop().create_future()
@@ -196,6 +209,7 @@ class Host(EventEmitter):
         offset = 0
         pb_flag = 0
         while bytes_remaining:
+            # TODO: support different LE/Classic lengths
             data_total_length = min(bytes_remaining, self.hc_le_acl_data_packet_length)
             acl_packet = HCI_AclDataPacket(
                 connection_handle  = connection_handle,
@@ -218,7 +232,7 @@ class Host(EventEmitter):
             logger.debug(f'{self.acl_packets_in_flight} ACL packets in flight, {len(self.acl_packet_queue)} in queue')
 
     def check_acl_packet_queue(self):
-        # Send all we can
+        # Send all we can (TODO: support different LE/Classic limits)
         while len(self.acl_packet_queue) > 0 and self.acl_packets_in_flight < self.hc_total_num_le_acl_data_packets:
             packet = self.acl_packet_queue.pop()
             self.send_hci_packet(packet)

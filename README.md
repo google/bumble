@@ -9,7 +9,7 @@
 Bluetooth Stack for Apps, Emulation, Test and Experimentation
 =============================================================
 
-<img src="docs/mkdocs/src/images/logo_framed.png" alt="drawing" width="200" height="200"/>
+<img src="docs/mkdocs/src/images/logo_framed.png" alt="Logo" width="200" height="200"/>
 
 Bumble is a full-featured Bluetooth stack written entirely in Python. It supports most of the common Bluetooth Low Energy (BLE) and Bluetooth Classic (BR/EDR) protocols and profiles, including GAP, L2CAP, ATT, GATT, SMP, SDP, RFCOMM, HFP, HID and A2DP. The stack can be used with physical radios via HCI over USB, UART, or the Linux VHCI, as well as virtual radios, including the virtual Bluetooth support of the Android emulator.
 
@@ -38,11 +38,19 @@ python -m pip install ".[test,development,documentation]"
 
 ### Examples
 
-Refer to the [Example Documentation](examples/README.md) for details on the included example scripts and how to run them.
+Refer to the [Examples Documentation](examples/README.md) for details on the included example scripts and how to run them.
 
 The complete [list of Examples](/docs/mkdocs/src/examples/index.md), and what they are designed to do is here.
 
 There are also a set of [Apps and Tools](docs/mkdocs/src/apps_and_tools/index.md) that show the utility of Bumble.
+
+### Using Bumble With a USB Dongle
+
+Bumble is easiest to use with a dedicated USB dongle.
+This is because internal Bluetooth interfaces tend to be locked down by the operating system.
+You can use the [usb_probe](/docs/mkdocs/src/apps_and_tools/usb_probe.md) tool (all platforms) or `lsusb` (Linux or macOS) to list the available USB devices on your system.
+
+See the [USB Transport](/docs/mkdocs/src/transports/usb.md) page for details on how to refer to USB devices.
 
 ## License
 
