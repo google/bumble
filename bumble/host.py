@@ -44,12 +44,13 @@ HOST_HC_TOTAL_NUM_ACL_DATA_PACKETS        = 1
 
 # -----------------------------------------------------------------------------
 class Connection:
-    def __init__(self, host, handle, role, peer_address):
+    def __init__(self, host, handle, role, peer_address, transport):
         self.host                  = host
         self.handle                = handle
         self.role                  = role
         self.peer_address          = peer_address
         self.assembler             = HCI_AclDataPacketAssembler(self.on_acl_pdu)
+        self.transport             = transport
 
     def on_hci_acl_data_packet(self, packet):
         self.assembler.feed_packet(packet)
@@ -364,7 +365,7 @@ class Host(EventEmitter):
 
             connection = self.connections.get(event.connection_handle)
             if connection is None:
-                connection = Connection(self, event.connection_handle, event.role, event.peer_address)
+                connection = Connection(self, event.connection_handle, event.role, event.peer_address, BT_LE_TRANSPORT)
                 self.connections[event.connection_handle] = connection
 
             # Notify the client
@@ -399,7 +400,7 @@ class Host(EventEmitter):
 
             connection = self.connections.get(event.connection_handle)
             if connection is None:
-                connection = Connection(self, event.connection_handle, BT_CENTRAL_ROLE, event.bd_addr)
+                connection = Connection(self, event.connection_handle, BT_CENTRAL_ROLE, event.bd_addr, BT_BR_EDR_TRANSPORT)
                 self.connections[event.connection_handle] = connection
 
             # Notify the client
