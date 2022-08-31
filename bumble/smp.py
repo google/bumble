@@ -1014,10 +1014,10 @@ class Session:
             if self.is_responder:
                 # The responder distributes its keys first, the initiator later
                 self.distribute_keys()
-            else:
-                # If we're not expecting key distributions from the peer, we're done
-                if not self.peer_expected_distributions:
-                    self.on_peer_key_distribution_complete()
+
+            # If we're not expecting key distributions from the peer, we're done
+            if not self.peer_expected_distributions:
+                self.on_peer_key_distribution_complete()
 
     def on_connection_encryption_key_refresh(self):
         # Do as if the connection had just been encrypted
