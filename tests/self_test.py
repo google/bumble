@@ -246,8 +246,7 @@ IO_CAP = [
 SC = [False, True]
 MITM = [False, True]
 # Key distribution is a 4-bit bitmask
-# IdKey is necessary for current SMP structure
-KEY_DIST = [i for i in range(16) if (i & SMP_ID_KEY_DISTRIBUTION_FLAG)]
+KEY_DIST = range(16)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('io_cap, sc, mitm, key_dist',

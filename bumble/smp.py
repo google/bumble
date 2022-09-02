@@ -155,6 +155,7 @@ SMP_CT2_AUTHREQ      = 0b00100000
 SMP_CTKD_H7_LEBR_SALT = bytes.fromhex('00000000000000000000000000000000746D7031')
 SMP_CTKD_H7_BRLE_SALT = bytes.fromhex('00000000000000000000000000000000746D7032')
 
+
 # -----------------------------------------------------------------------------
 # Utils
 # -----------------------------------------------------------------------------
@@ -879,7 +880,7 @@ class Session:
                 )
             )
         )
-    
+
     async def derive_ltk(self):
         link_key = await self.manager.device.get_link_key(self.connection.peer_address)
         assert link_key is not None
@@ -914,7 +915,7 @@ class Session:
             csrk = bytes(16)  # FIXME: testing
             if self.initiator_key_distribution & SMP_SIGN_KEY_DISTRIBUTION_FLAG:
                 self.send_command(SMP_Signing_Information_Command(signature_key=csrk))
-            
+
             # CTKD, calculate BR/EDR link key
             if self.initiator_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
                 ilk = crypto.h7(
@@ -946,7 +947,7 @@ class Session:
             csrk = bytes(16)  # FIXME: testing
             if self.responder_key_distribution & SMP_SIGN_KEY_DISTRIBUTION_FLAG:
                 self.send_command(SMP_Signing_Information_Command(signature_key=csrk))
-            
+
             # CTKD, calculate BR/EDR link key
             if self.responder_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
                 ilk = crypto.h7(
@@ -980,12 +981,7 @@ class Session:
             self.peer_expected_distributions.remove(command_class)
             logger.debug(f'remaining distributions: {[c.__name__ for c in self.peer_expected_distributions]}')
             if not self.peer_expected_distributions:
-                # The initiator can now send its keys
-                if self.is_initiator:
-                    self.distribute_keys()
-
-                # Nothing left to expect, we're done
-                asyncio.create_task(self.on_pairing())
+                self.on_peer_key_distribution_complete()
         else:
             logger.warn(color(f'!!! unexpected key distribution command: {command_class.__name__}', 'red'))
             self.send_pairing_failed(SMP_UNSPECIFIED_REASON_ERROR)
@@ -1006,11 +1002,22 @@ class Session:
         self.connection.remove_listener('connection_encryption_key_refresh', self.on_connection_encryption_key_refresh)
         self.manager.on_session_end(self)
 
+    def on_peer_key_distribution_complete(self):
+        # The initiator can now send its keys
+        if self.is_initiator:
+            self.distribute_keys()
+
+        asyncio.create_task(self.on_pairing())
+
     def on_connection_encryption_change(self):
         if self.connection.is_encrypted:
             if self.is_responder:
                 # The responder distributes its keys first, the initiator later
                 self.distribute_keys()
+
+            # If we're not expecting key distributions from the peer, we're done
+            if not self.peer_expected_distributions:
+                self.on_peer_key_distribution_complete()
 
     def on_connection_encryption_key_refresh(self):
         # Do as if the connection had just been encrypted

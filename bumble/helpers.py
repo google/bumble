@@ -18,6 +18,8 @@
 import logging
 from colors import color
 
+from bumble.smp import SMP_CID, SMP_Command
+
 from .core import name_or_number
 from .gatt import ATT_PDU, ATT_CID
 from .l2cap import (
@@ -73,6 +75,9 @@ class PacketTracer:
             if l2cap_pdu.cid == ATT_CID:
                 att_pdu = ATT_PDU.from_bytes(l2cap_pdu.payload)
                 self.analyzer.emit(att_pdu)
+            elif l2cap_pdu.cid == SMP_CID:
+                smp_command = SMP_Command.from_bytes(l2cap_pdu.payload)
+                self.analyzer.emit(smp_command)
             elif l2cap_pdu.cid == L2CAP_SIGNALING_CID or l2cap_pdu.cid == L2CAP_LE_SIGNALING_CID:
                 control_frame = L2CAP_Control_Frame.from_bytes(l2cap_pdu.payload)
                 self.analyzer.emit(control_frame)
