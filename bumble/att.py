@@ -700,16 +700,26 @@ class Attribute(EventEmitter):
         else:
             self.value = value
 
+    def encode_value(self, value):
+        return value
+
+    def decode_value(self, value_bytes):
+        return value_bytes
+
     def read_value(self, connection):
         if read := getattr(self.value, 'read', None):
             try:
-                return read(connection)
+                value = read(connection)
             except ATT_Error as error:
                 raise ATT_Error(error_code=error.error_code, att_handle=self.handle)
         else:
-            return self.value
+            value = self.value
 
-    def write_value(self, connection, value):
+        return self.encode_value(value)
+
+    def write_value(self, connection, value_bytes):
+        value = self.decode_value(value_bytes)
+
         if write := getattr(self.value, 'write', None):
             try:
                 write(connection, value)
@@ -721,7 +731,11 @@ class Attribute(EventEmitter):
         self.emit('write', connection, value)
 
     def __repr__(self):
-        if len(self.value) > 0:
+        if type(self.value) is bytes:
+            value_str = self.value.hex()
+        else:
+            value_str = str(self.value)
+        if value_str:
             value_string = f', value={self.value.hex()}'
         else:
             value_string = ''

@@ -58,10 +58,16 @@ class AttributeProxy(EventEmitter):
         self.type             = attribute_type
 
     async def read_value(self, no_long_read=False):
-        return await self.client.read_value(self.handle, no_long_read)
+        return self.decode_value(await self.client.read_value(self.handle, no_long_read))
 
     async def write_value(self, value, with_response=False):
-        return await self.client.write_value(self.handle, value, with_response)
+        return await self.client.write_value(self.handle, self.encode_value(value), with_response)
+
+    def encode_value(self, value):
+        return value
+
+    def decode_value(self, value_bytes):
+        return value_bytes
 
     def __str__(self):
         return f'Attribute(handle=0x{self.handle:04X}, type={self.uuid})'
@@ -98,6 +104,7 @@ class CharacteristicProxy(AttributeProxy):
         self.properties             = properties
         self.descriptors            = []
         self.descriptors_discovered = False
+        self.subscribers            = {}  # Map from subscriber to proxy subscriber
 
     def get_descriptor(self, descriptor_type):
         for descriptor in self.descriptors:
@@ -108,9 +115,25 @@ class CharacteristicProxy(AttributeProxy):
         return await self.client.discover_descriptors(self)
 
     async def subscribe(self, subscriber=None):
+        if subscriber is not None:
+            if subscriber in self.subscribers:
+                # We already have a proxy subscriber
+                subscriber = self.subscribers[subscriber]
+            else:
+                # Create and register a proxy that will decode the value
+                original_subscriber = subscriber
+
+                def on_change(value):
+                    original_subscriber(self.decode_value(value))
+                self.subscribers[subscriber] = on_change
+                subscriber = on_change
+
         return await self.client.subscribe(self, subscriber)
 
     async def unsubscribe(self, subscriber=None):
+        if subscriber in self.subscribers:
+            subscriber = self.subscribers.pop(subscriber)
+
         return await self.client.unsubscribe(self, subscriber)
 
     def __str__(self):
@@ -570,12 +593,18 @@ class Client:
                 subscribers = subscriber_set.get(characteristic.handle, [])
                 if subscriber in subscribers:
                     subscribers.remove(subscriber)
+
+                    # Cleanup if we removed the last one
+                    if not subscribers:
+                        subscriber_set.remove(characteristic.handle)
         else:
             # Remove all subscribers for this attribute from the sets!
             self.notification_subscribers.pop(characteristic.handle, None)
             self.indication_subscribers.pop(characteristic.handle, None)
 
-        await self.write_value(cccd, b'\x00\x00', with_response=True)
+        if not self.notification_subscribers and not self.indication_subscribers:
+            # No more subscribers left
+            await self.write_value(cccd, b'\x00\x00', with_response=True)
 
     async def read_value(self, attribute, no_long_read=False):
         '''

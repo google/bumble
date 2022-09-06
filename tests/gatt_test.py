@@ -22,6 +22,7 @@ import struct
 import pytest
 
 from bumble.controller import Controller
+from bumble.gatt_client import CharacteristicProxy
 from bumble.link import LocalLink
 from bumble.device import Device, Peer
 from bumble.host import Host
@@ -53,29 +54,29 @@ def basic_check(x):
     parsed = ATT_PDU.from_bytes(pdu)
     x_str = str(x)
     parsed_str = str(parsed)
-    assert(x_str == parsed_str)
+    assert x_str == parsed_str
 
 
 # -----------------------------------------------------------------------------
 def test_UUID():
     u = UUID.from_16_bits(0x7788)
-    assert(str(u) == 'UUID-16:7788')
+    assert str(u) == 'UUID-16:7788'
     u = UUID.from_32_bits(0x11223344)
-    assert(str(u) == 'UUID-32:11223344')
+    assert str(u) == 'UUID-32:11223344'
     u = UUID('61A3512C-09BE-4DDC-A6A6-0B03667AAFC6')
-    assert(str(u) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6')
+    assert str(u) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6'
     v = UUID(str(u))
-    assert(str(v) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6')
+    assert str(v) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6'
     w = UUID.from_bytes(v.to_bytes())
-    assert(str(w) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6')
+    assert str(w) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6'
 
     u1 = UUID.from_16_bits(0x1234)
     b1 = u1.to_bytes(force_128 = True)
     u2 = UUID.from_bytes(b1)
-    assert(u1 == u2)
+    assert u1 == u2
 
     u3 = UUID.from_16_bits(0x180a)
-    assert(str(u3) == 'UUID-16:180A (Device Information)')
+    assert str(u3) == 'UUID-16:180A (Device Information)'
 
 
 # -----------------------------------------------------------------------------
@@ -99,6 +100,122 @@ def test_ATT_Read_By_Group_Type_Request():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_characteristic_encoding():
+    class Foo(Characteristic):
+        def encode_value(self, value):
+            return bytes([value])
+
+        def decode_value(self, value_bytes):
+            return value_bytes[0]
+
+    c = Foo(GATT_BATTERY_LEVEL_CHARACTERISTIC, Characteristic.READ, Characteristic.READABLE, 123)
+    x = c.read_value(None)
+    assert x == bytes([123])
+    c.write_value(None, bytes([122]))
+    assert c.value == 122
+
+    class FooProxy(CharacteristicProxy):
+        def __init__(self, characteristic):
+            super().__init__(
+                characteristic.client,
+                characteristic.handle,
+                characteristic.end_group_handle,
+                characteristic.uuid,
+                characteristic.properties
+            )
+
+        def encode_value(self, value):
+            return bytes([value])
+
+        def decode_value(self, value_bytes):
+            return value_bytes[0]
+
+    [client, server] = TwoDevices().devices
+
+    characteristic = Characteristic(
+        'FDB159DB-036C-49E3-B3DB-6325AC750806',
+        Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
+        Characteristic.READABLE | Characteristic.WRITEABLE,
+        bytes([123])
+    )
+
+    service = Service(
+        '3A657F47-D34F-46B3-B1EC-698E29B6B829',
+        [characteristic]
+    )
+    server.add_service(service)
+
+    await client.power_on()
+    await server.power_on()
+    connection = await client.connect(server.random_address)
+    peer = Peer(connection)
+
+    await peer.discover_services()
+    await peer.discover_characteristics()
+    c = peer.get_characteristics_by_uuid(characteristic.uuid)
+    assert len(c) == 1
+    c = c[0]
+    cp = FooProxy(c)
+
+    v = await cp.read_value()
+    assert v == 123
+    await cp.write_value(124)
+    await async_barrier()
+    assert characteristic.value == bytes([124])
+
+    last_change = None
+
+    def on_change(value):
+        nonlocal last_change
+        last_change = value
+
+    await c.subscribe(on_change)
+    await server.notify_subscribers(characteristic)
+    await async_barrier()
+    assert last_change == characteristic.value
+    last_change = None
+
+    await server.notify_subscribers(characteristic, value=bytes([125]))
+    await async_barrier()
+    assert last_change == bytes([125])
+    last_change = None
+
+    await c.unsubscribe(on_change)
+    await server.notify_subscribers(characteristic)
+    await async_barrier()
+    assert last_change is None
+
+    await cp.subscribe(on_change)
+    await server.notify_subscribers(characteristic)
+    await async_barrier()
+    assert last_change == characteristic.value[0]
+    last_change = None
+
+    await server.notify_subscribers(characteristic, value=bytes([126]))
+    await async_barrier()
+    assert last_change == 126
+    last_change = None
+
+    await cp.unsubscribe(on_change)
+    await server.notify_subscribers(characteristic)
+    await async_barrier()
+    assert last_change is None
+
+    cd = DelegatedCharacteristicAdapter(c, decode=lambda x: x[0])
+    await cd.subscribe(on_change)
+    await server.notify_subscribers(characteristic)
+    await async_barrier()
+    assert last_change == characteristic.value[0]
+    last_change = None
+
+    await cd.unsubscribe(on_change)
+    await server.notify_subscribers(characteristic)
+    await async_barrier()
+    assert last_change is None
+
+
+# -----------------------------------------------------------------------------
 def test_CharacteristicAdapter():
     # Check that the CharacteristicAdapter base class is transparent
     v = bytes([1, 2, 3])
@@ -106,21 +223,21 @@ def test_CharacteristicAdapter():
     a = CharacteristicAdapter(c)
 
     value = a.read_value(None)
-    assert(value == v)
+    assert value == v
 
     v = bytes([3, 4, 5])
     a.write_value(None, v)
-    assert(c.value == v)
+    assert c.value == v
 
     # Simple delegated adapter
     a = DelegatedCharacteristicAdapter(c, lambda x: bytes(reversed(x)), lambda x: bytes(reversed(x)))
 
     value = a.read_value(None)
-    assert(value == bytes(reversed(v)))
+    assert value == bytes(reversed(v))
 
     v = bytes([3, 4, 5])
     a.write_value(None, v)
-    assert(a.value == bytes(reversed(v)))
+    assert a.value == bytes(reversed(v))
 
     # Packed adapter with single element format
     v = 1234
@@ -129,10 +246,10 @@ def test_CharacteristicAdapter():
     a = PackedCharacteristicAdapter(c, '>H')
 
     value = a.read_value(None)
-    assert(value == pv)
+    assert value == pv
     c.value = None
     a.write_value(None, pv)
-    assert(a.value == v)
+    assert a.value == v
 
     # Packed adapter with multi-element format
     v1 = 1234
@@ -142,10 +259,10 @@ def test_CharacteristicAdapter():
     a = PackedCharacteristicAdapter(c, '>HH')
 
     value = a.read_value(None)
-    assert(value == pv)
+    assert value == pv
     c.value = None
     a.write_value(None, pv)
-    assert(a.value == (v1, v2))
+    assert a.value == (v1, v2)
 
     # Mapped adapter
     v1 = 1234
@@ -156,10 +273,10 @@ def test_CharacteristicAdapter():
     a = MappedCharacteristicAdapter(c, '>HH', ('v1', 'v2'))
 
     value = a.read_value(None)
-    assert(value == pv)
+    assert value == pv
     c.value = None
     a.write_value(None, pv)
-    assert(a.value == mapped)
+    assert a.value == mapped
 
     # UTF-8 adapter
     v = 'Hello π'
@@ -168,10 +285,10 @@ def test_CharacteristicAdapter():
     a = UTF8CharacteristicAdapter(c)
 
     value = a.read_value(None)
-    assert(value == ev)
+    assert value == ev
     c.value = None
     a.write_value(None, ev)
-    assert(a.value == v)
+    assert a.value == v
 
 
 # -----------------------------------------------------------------------------
@@ -179,13 +296,13 @@ def test_CharacteristicValue():
     b = bytes([1, 2, 3])
     c = CharacteristicValue(read=lambda _: b)
     x = c.read(None)
-    assert(x == b)
+    assert x == b
 
     result = []
     c = CharacteristicValue(write=lambda connection, value: result.append((connection, value)))
     z = object()
     c.write(z, b)
-    assert(result == [(z, b)])
+    assert result == [(z, b)]
 
 
 # -----------------------------------------------------------------------------
@@ -265,35 +382,35 @@ async def test_read_write():
     await peer.discover_services()
     await peer.discover_characteristics()
     c = peer.get_characteristics_by_uuid(characteristic1.uuid)
-    assert(len(c) == 1)
+    assert len(c) == 1
     c1 = c[0]
     c = peer.get_characteristics_by_uuid(characteristic2.uuid)
-    assert(len(c) == 1)
+    assert len(c) == 1
     c2 = c[0]
 
     v1 = await peer.read_value(c1)
-    assert(v1 == b'')
+    assert v1 == b''
     b = bytes([1, 2, 3])
     await peer.write_value(c1, b)
     await async_barrier()
-    assert(characteristic1.value == b)
+    assert characteristic1.value == b
     v1 = await peer.read_value(c1)
-    assert(v1 == b)
-    assert(type(characteristic1._last_value) is tuple)
-    assert(len(characteristic1._last_value) == 2)
-    assert(str(characteristic1._last_value[0].peer_address) == str(client.random_address))
-    assert(characteristic1._last_value[1] == b)
+    assert v1 == b
+    assert type(characteristic1._last_value is tuple)
+    assert len(characteristic1._last_value) == 2
+    assert str(characteristic1._last_value[0].peer_address) == str(client.random_address)
+    assert characteristic1._last_value[1] == b
     bb = bytes([3, 4, 5, 6])
     characteristic1.value = bb
     v1 = await peer.read_value(c1)
-    assert(v1 == bb)
+    assert v1 == bb
 
     await peer.write_value(c2, b)
     await async_barrier()
-    assert(type(characteristic2._last_value) is tuple)
-    assert(len(characteristic2._last_value) == 2)
-    assert(str(characteristic2._last_value[0].peer_address) == str(client.random_address))
-    assert(characteristic2._last_value[1] == b)
+    assert type(characteristic2._last_value is tuple)
+    assert len(characteristic2._last_value) == 2
+    assert str(characteristic2._last_value[0].peer_address) == str(client.random_address)
+    assert characteristic2._last_value[1] == b
 
 
 # -----------------------------------------------------------------------------
@@ -324,26 +441,26 @@ async def test_read_write2():
 
     await peer.discover_services()
     c = peer.get_services_by_uuid(service1.uuid)
-    assert(len(c) == 1)
+    assert len(c) == 1
     s = c[0]
     await s.discover_characteristics()
     c = s.get_characteristics_by_uuid(characteristic1.uuid)
-    assert(len(c) == 1)
+    assert len(c) == 1
     c1 = c[0]
 
     v1 = await c1.read_value()
-    assert(v1 == v)
+    assert v1 == v
 
     a1 = PackedCharacteristicAdapter(c1, '>I')
     v1 = await a1.read_value()
-    assert(v1 == struct.unpack('>I', v)[0])
+    assert v1 == struct.unpack('>I', v)[0]
 
     b = bytes([0x55, 0x66, 0x77, 0x88])
     await a1.write_value(struct.unpack('>I', b)[0])
     await async_barrier()
-    assert(characteristic1.value == b)
+    assert characteristic1.value == b
     v1 = await a1.read_value()
-    assert(v1 == struct.unpack('>I', b)[0])
+    assert v1 == struct.unpack('>I', b)[0]
 
 
 # -----------------------------------------------------------------------------
@@ -410,13 +527,13 @@ async def test_subscribe_notify():
     await peer.discover_services()
     await peer.discover_characteristics()
     c = peer.get_characteristics_by_uuid(characteristic1.uuid)
-    assert(len(c) == 1)
+    assert len(c) == 1
     c1 = c[0]
     c = peer.get_characteristics_by_uuid(characteristic2.uuid)
-    assert(len(c) == 1)
+    assert len(c) == 1
     c2 = c[0]
     c = peer.get_characteristics_by_uuid(characteristic3.uuid)
-    assert(len(c) == 1)
+    assert len(c) == 1
     c3 = c[0]
 
     c1._called = False
@@ -429,23 +546,32 @@ async def test_subscribe_notify():
     c1.on('update', on_c1_update)
     await peer.subscribe(c1)
     await async_barrier()
-    assert(server._last_subscription[1] == characteristic1)
-    assert(server._last_subscription[2])
-    assert(not server._last_subscription[3])
-    assert(characteristic1._last_subscription[1])
-    assert(not characteristic1._last_subscription[2])
+    assert server._last_subscription[1] == characteristic1
+    assert server._last_subscription[2]
+    assert not server._last_subscription[3]
+    assert characteristic1._last_subscription[1]
+    assert not characteristic1._last_subscription[2]
     await server.indicate_subscribers(characteristic1)
     await async_barrier()
-    assert(not c1._called)
+    assert not c1._called
     await server.notify_subscribers(characteristic1)
     await async_barrier()
-    assert(c1._called)
-    assert(c1._last_update == characteristic1.value)
+    assert c1._called
+    assert c1._last_update == characteristic1.value
+
+    c1._called = False
+    c1._last_update = None
+    c1_value = characteristic1.value
+    await server.notify_subscribers(characteristic1, bytes([0, 1, 2]))
+    await async_barrier()
+    assert c1._called
+    assert c1._last_update == bytes([0, 1, 2])
+    assert characteristic1.value == c1_value
 
     c1._called = False
     await peer.unsubscribe(c1)
     await server.notify_subscribers(characteristic1)
-    assert(not c1._called)
+    assert not c1._called
 
     c2._called = False
     c2._last_update = None
@@ -458,17 +584,17 @@ async def test_subscribe_notify():
     await async_barrier()
     await server.notify_subscriber(characteristic2._last_subscription[0], characteristic2)
     await async_barrier()
-    assert(not c2._called)
+    assert not c2._called
     await server.indicate_subscriber(characteristic2._last_subscription[0], characteristic2)
     await async_barrier()
-    assert(c2._called)
-    assert(c2._last_update == characteristic2.value)
+    assert c2._called
+    assert c2._last_update == characteristic2.value
 
     c2._called = False
     await peer.unsubscribe(c2, on_c2_update)
     await server.indicate_subscriber(characteristic2._last_subscription[0], characteristic2)
     await async_barrier()
-    assert(not c2._called)
+    assert not c2._called
 
     def on_c3_update(value):
         c3._called = True
@@ -483,17 +609,17 @@ async def test_subscribe_notify():
     await async_barrier()
     await server.notify_subscriber(characteristic3._last_subscription[0], characteristic3)
     await async_barrier()
-    assert(c3._called)
-    assert(c3._last_update == characteristic3.value)
-    assert(c3._called_2)
-    assert(c3._last_update_2 == characteristic3.value)
+    assert c3._called
+    assert c3._last_update == characteristic3.value
+    assert c3._called_2
+    assert c3._last_update_2 == characteristic3.value
     characteristic3.value = bytes([1, 2, 3])
     await server.indicate_subscriber(characteristic3._last_subscription[0], characteristic3)
     await async_barrier()
-    assert(c3._called)
-    assert(c3._last_update == characteristic3.value)
-    assert(c3._called_2)
-    assert(c3._last_update_2 == characteristic3.value)
+    assert c3._called
+    assert c3._last_update == characteristic3.value
+    assert c3._called_2
+    assert c3._last_update_2 == characteristic3.value
 
     c3._called = False
     c3._called_2 = False
@@ -501,8 +627,8 @@ async def test_subscribe_notify():
     await server.notify_subscriber(characteristic3._last_subscription[0], characteristic3)
     await server.indicate_subscriber(characteristic3._last_subscription[0], characteristic3)
     await async_barrier()
-    assert(not c3._called)
-    assert(not c3._called_2)
+    assert not c3._called
+    assert not c3._called_2
 
 
 # -----------------------------------------------------------------------------
@@ -510,6 +636,8 @@ async def async_main():
     await test_read_write()
     await test_read_write2()
     await test_subscribe_notify()
+    await test_characteristic_encoding()
+
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
