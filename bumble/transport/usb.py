@@ -56,18 +56,19 @@ async def open_usb_transport(spec):
 
     USB_RECIPIENT_DEVICE                             = 0x00
     USB_REQUEST_TYPE_CLASS                           = 0x01 << 5
-    USB_ENDPOINT_EVENTS_IN                           = 0x81
-    USB_ENDPOINT_ACL_IN                              = 0x82
-    USB_ENDPOINT_ACL_OUT                             = 0x02
     USB_DEVICE_CLASS_WIRELESS_CONTROLLER             = 0xE0
     USB_DEVICE_SUBCLASS_RF_CONTROLLER                = 0x01
     USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER = 0x01
+    USB_ENDPOINT_TRANSFER_TYPE_BULK                  = 0x02
+    USB_ENDPOINT_TRANSFER_TYPE_INTERRUPT             = 0x03
+    USB_ENDPOINT_IN                                  = 0x80
 
     READ_SIZE = 1024
 
     class UsbPacketSink:
-        def __init__(self, device):
+        def __init__(self, device, acl_out):
             self.device      = device
+            self.acl_out     = acl_out
             self.transfer    = device.getTransfer()
             self.packets     = collections.deque()  # Queue of packets waiting to be sent
             self.loop        = asyncio.get_running_loop()
@@ -116,7 +117,7 @@ async def open_usb_transport(spec):
             packet_type = packet[0]
             if packet_type == hci.HCI_ACL_DATA_PACKET:
                 self.transfer.setBulk(
-                    USB_ENDPOINT_ACL_OUT,
+                    self.acl_out,
                     packet[1:],
                     callback=self.on_packet_sent
                 )
@@ -152,10 +153,12 @@ async def open_usb_transport(spec):
                     logger.debug('OUT transfer likely already completed')
 
     class UsbPacketSource(asyncio.Protocol, ParserSource):
-        def __init__(self, context, device):
+        def __init__(self, context, device, acl_in, events_in):
             super().__init__()
             self.context         = context
             self.device          = device
+            self.acl_in          = acl_in
+            self.events_in       = events_in
             self.loop            = asyncio.get_running_loop()
             self.queue           = asyncio.Queue()
             self.closed          = False
@@ -172,7 +175,7 @@ async def open_usb_transport(spec):
             # Set up transfer objects for input
             self.events_in_transfer = device.getTransfer()
             self.events_in_transfer.setInterrupt(
-                USB_ENDPOINT_EVENTS_IN,
+                self.events_in,
                 READ_SIZE,
                 callback=self.on_packet_received,
                 user_data=hci.HCI_EVENT_PACKET
@@ -181,7 +184,7 @@ async def open_usb_transport(spec):
 
             self.acl_in_transfer = device.getTransfer()
             self.acl_in_transfer.setBulk(
-                USB_ENDPOINT_ACL_IN,
+                self.acl_in,
                 READ_SIZE,
                 callback=self.on_packet_received,
                 user_data=hci.HCI_ACL_DATA_PACKET
@@ -313,10 +316,49 @@ async def open_usb_transport(spec):
             raise ValueError('device not found')
 
         logger.debug(f'USB Device: {found}')
-        device = found.open()
 
-        # Use the first interface
-        interface = 0
+        # Look for an interface and setting with the right types of endpoints
+        def find_endpoints(device):
+            for (configuration_index, configuration) in enumerate(device):
+                interface = None
+                for interface in configuration:
+                    setting = None
+                    for setting in interface:
+                        events_in = None
+                        acl_in    = None
+                        acl_out   = None
+                        for endpoint in setting:
+                            attributes = endpoint.getAttributes()
+                            address    = endpoint.getAddress()
+                            if attributes & 0x03 == USB_ENDPOINT_TRANSFER_TYPE_BULK:
+                                if address & USB_ENDPOINT_IN and acl_in is None:
+                                    acl_in = address
+                                elif acl_out is None:
+                                    acl_out = address
+                            elif attributes & 0x03 == USB_ENDPOINT_TRANSFER_TYPE_INTERRUPT:
+                                if address & USB_ENDPOINT_IN and events_in is None:
+                                    events_in = address
+
+                        # Return if we found all 3 endpoints
+                        if acl_in is not None and acl_out is not None and events_in is not None:
+                            return (configuration_index + 1, setting.getNumber(), acl_in, acl_out, events_in)
+                        else:
+                            logger.debug(f'skipping configuration {configuration_index + 1} / interface {setting.getNumber()}')
+
+        endpoints = find_endpoints(found)
+        if endpoints is None:
+            logger.warning('no compatible interface found')
+            raise ValueError('no compatible interface found for device')
+        (configuration, interface, acl_in, acl_out, events_in) = endpoints
+        logger.debug(
+            f'selected endpoints: configuration={configuration}, '
+            f'interface={interface}, '
+            f'acl_in=0x{acl_in:02X}, '
+            f'acl_out=0x{acl_out:02X}, '
+            f'events_in=0x{events_in:02X}, '
+        )
+
+        device = found.open()
 
         # Detach the kernel driver if supported and needed
         if usb1.hasCapability(usb1.CAP_SUPPORTS_DETACH_KERNEL_DRIVER):
@@ -329,20 +371,20 @@ async def open_usb_transport(spec):
 
         # Set the configuration if needed
         try:
-            configuration = device.getConfiguration()
-            logger.debug(f'current configuration = {configuration}')
+            current_configuration = device.getConfiguration()
+            logger.debug(f'current configuration = {current_configuration}')
         except usb1.USBError:
-            configuration = 0
+            current_configuration = 0
 
-        if configuration != 1:
+        if current_configuration != configuration:
             try:
-                logger.debug('setting configuration 1')
-                device.setConfiguration(1)
+                logger.debug(f'setting configuration {configuration}')
+                device.setConfiguration(configuration)
             except usb1.USBError:
-                logger.warning('failed to set configuration 1')
+                logger.warning('failed to set configuration')
 
-        source = UsbPacketSource(context, device)
-        sink   = UsbPacketSink(device)
+        source = UsbPacketSource(context, device, acl_in, events_in)
+        sink   = UsbPacketSink(device, acl_out)
         return UsbTransport(context, device, interface, source, sink)
     except usb1.USBError as error:
         logger.warning(color(f'!!! failed to open USB device: {error}', 'red'))
