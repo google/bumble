@@ -1375,9 +1375,11 @@ class HCI_Error(ProtocolError):
 
 class HCI_StatusError(ProtocolError):
     def __init__(self, response):
-        super().__init__(response.status,
-                error_namespace=HCI_Command.command_name(response.command_opcode),
-                error_name=HCI_Constant.status_name(response.status))
+        super().__init__(
+            response.status,
+            error_namespace=HCI_Command.command_name(response.command_opcode),
+            error_name=HCI_Constant.status_name(response.status)
+        )
 
 
 # -----------------------------------------------------------------------------

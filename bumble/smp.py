@@ -638,13 +638,13 @@ class Session:
         # Set up addresses
         peer_address = connection.peer_resolvable_address or connection.peer_address
         if self.is_initiator:
-            self.ia  = bytes(manager.address)
-            self.iat = 1 if manager.address.is_random else 0
+            self.ia  = bytes(connection.local_address)
+            self.iat = 1 if connection.local_address.is_random else 0
             self.ra  = bytes(peer_address)
             self.rat = 1 if peer_address.is_random else 0
         else:
-            self.ra  = bytes(manager.address)
-            self.rat = 1 if manager.address.is_random else 0
+            self.ra  = bytes(connection.local_address)
+            self.rat = 1 if connection.local_address.is_random else 0
             self.ia  = bytes(peer_address)
             self.iat = 1 if peer_address.is_random else 0
 
@@ -879,7 +879,7 @@ class Session:
                 )
             )
         )
-    
+
     async def derive_ltk(self):
         link_key = await self.manager.device.get_link_key(self.connection.peer_address)
         assert link_key is not None
@@ -906,15 +906,15 @@ class Session:
                     SMP_Identity_Information_Command(identity_resolving_key=self.manager.device.irk)
                 )
                 self.send_command(SMP_Identity_Address_Information_Command(
-                    addr_type = self.manager.address.address_type,
-                    bd_addr   = self.manager.address
+                    addr_type = self.manager.identity_address.address_type,
+                    bd_addr   = self.manager.identity_address
                 ))
 
             # Distribute CSRK
             csrk = bytes(16)  # FIXME: testing
             if self.initiator_key_distribution & SMP_SIGN_KEY_DISTRIBUTION_FLAG:
                 self.send_command(SMP_Signing_Information_Command(signature_key=csrk))
-            
+
             # CTKD, calculate BR/EDR link key
             if self.initiator_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
                 ilk = crypto.h7(
@@ -938,15 +938,15 @@ class Session:
                     SMP_Identity_Information_Command(identity_resolving_key=self.manager.device.irk)
                 )
                 self.send_command(SMP_Identity_Address_Information_Command(
-                    addr_type = self.manager.address.address_type,
-                    bd_addr   = self.manager.address
+                    addr_type = self.manager.identity_address.address_type,
+                    bd_addr   = self.manager.identity_address
                 ))
 
             # Distribute CSRK
             csrk = bytes(16)  # FIXME: testing
             if self.responder_key_distribution & SMP_SIGN_KEY_DISTRIBUTION_FLAG:
                 self.send_command(SMP_Signing_Information_Command(signature_key=csrk))
-            
+
             # CTKD, calculate BR/EDR link key
             if self.responder_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
                 ilk = crypto.h7(
@@ -1479,10 +1479,10 @@ class Manager(EventEmitter):
     Implements the Initiator and Responder roles of the Security Manager Protocol
     '''
 
-    def __init__(self, device, address):
+    def __init__(self, device, address, identity_address):
         super().__init__()
         self.device                 = device
-        self.address                = address
+        self.identity_address       = identity_address
         self.sessions               = {}
         self._ecc_key               = None
         self.pairing_config_factory = lambda connection: PairingConfig()
