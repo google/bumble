@@ -76,7 +76,7 @@ class Host(EventEmitter):
         self.hc_total_num_acl_data_packets    = HOST_HC_TOTAL_NUM_ACL_DATA_PACKETS
         self.acl_packet_queue                 = collections.deque()
         self.acl_packets_in_flight            = 0
-        self.local_version                    = HCI_VERSION_BLUETOOTH_CORE_4_0
+        self.local_version                    = None
         self.local_supported_commands         = bytes(64)
         self.local_le_features                = 0
         self.command_semaphore                = asyncio.Semaphore(1)
@@ -91,32 +91,23 @@ class Host(EventEmitter):
             self.set_packet_sink(controller_sink)
 
     async def reset(self):
-        await self.send_command(HCI_Reset_Command())
+        await self.send_command(HCI_Reset_Command(), check_result=True)
         self.ready = True
 
-        response = await self.send_command(HCI_Read_Local_Supported_Commands_Command())
-        if response.return_parameters.status == HCI_SUCCESS:
-            self.local_supported_commands = response.return_parameters.supported_commands
-        else:
-            logger.warn(f'HCI_Read_Local_Supported_Commands_Command failed: {response.return_parameters.status}')
+        response = await self.send_command(HCI_Read_Local_Supported_Commands_Command(), check_result=True)
+        self.local_supported_commands = response.return_parameters.supported_commands
 
         if self.supports_command(HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND):
-            response = await self.send_command(HCI_LE_Read_Local_Supported_Features_Command())
-            if response.return_parameters.status == HCI_SUCCESS:
-                self.local_le_features = struct.unpack('<Q', response.return_parameters.le_features)[0]
-            else:
-                logger.warn(f'HCI_LE_Read_Supported_Features_Command failed: {response.return_parameters.status}')
+            response = await self.send_command(HCI_LE_Read_Local_Supported_Features_Command(), check_result=True)
+            self.local_le_features = struct.unpack('<Q', response.return_parameters.le_features)[0]
 
         if self.supports_command(HCI_READ_LOCAL_VERSION_INFORMATION_COMMAND):
-            response = await self.send_command(HCI_Read_Local_Version_Information_Command())
-            if response.return_parameters.status == HCI_SUCCESS:
-                self.local_version = response.return_parameters
-            else:
-                logger.warn(f'HCI_Read_Local_Version_Information_Command failed: {response.return_parameters.status}')
+            response = await self.send_command(HCI_Read_Local_Version_Information_Command(), check_result=True)
+            self.local_version = response.return_parameters
 
         await self.send_command(HCI_Set_Event_Mask_Command(event_mask = bytes.fromhex('FFFFFFFFFFFFFF3F')))
 
-        if self.local_version.hci_version <= HCI_VERSION_BLUETOOTH_CORE_4_0:
+        if self.local_version is not None and self.local_version.hci_version <= HCI_VERSION_BLUETOOTH_CORE_4_0:
             # Some older controllers don't like event masks with bits they don't understand
             le_event_mask = bytes.fromhex('1F00000000000000')
         else:
@@ -124,20 +115,14 @@ class Host(EventEmitter):
         await self.send_command(HCI_LE_Set_Event_Mask_Command(le_event_mask = le_event_mask))
 
         if self.supports_command(HCI_READ_BUFFER_SIZE_COMMAND):
-            response = await self.send_command(HCI_Read_Buffer_Size_Command())
-            if response.return_parameters.status == HCI_SUCCESS:
-                self.hc_acl_data_packet_length     = response.return_parameters.hc_acl_data_packet_length
-                self.hc_total_num_acl_data_packets = response.return_parameters.hc_total_num_acl_data_packets
-            else:
-                logger.warn(f'HCI_Read_Buffer_Size_Command failed: {response.return_parameters.status}')
+            response = await self.send_command(HCI_Read_Buffer_Size_Command(), check_result=True)
+            self.hc_acl_data_packet_length     = response.return_parameters.hc_acl_data_packet_length
+            self.hc_total_num_acl_data_packets = response.return_parameters.hc_total_num_acl_data_packets
 
         if self.supports_command(HCI_LE_READ_BUFFER_SIZE_COMMAND):
-            response = await self.send_command(HCI_LE_Read_Buffer_Size_Command())
-            if response.return_parameters.status == HCI_SUCCESS:
-                self.hc_le_acl_data_packet_length     = response.return_parameters.hc_le_acl_data_packet_length
-                self.hc_total_num_le_acl_data_packets = response.return_parameters.hc_total_num_le_acl_data_packets
-            else:
-                logger.warn(f'HCI_LE_Read_Buffer_Size_Command failed: {response.return_parameters.status}')
+            response = await self.send_command(HCI_LE_Read_Buffer_Size_Command(), check_result=True)
+            self.hc_le_acl_data_packet_length     = response.return_parameters.hc_le_acl_data_packet_length
+            self.hc_total_num_le_acl_data_packets = response.return_parameters.hc_total_num_le_acl_data_packets
 
         if response.return_parameters.hc_le_acl_data_packet_length == 0 or response.return_parameters.hc_total_num_le_acl_data_packets == 0:
             # LE and Classic share the same values
@@ -171,7 +156,7 @@ class Host(EventEmitter):
     def send_hci_packet(self, packet):
         self.hci_sink.on_packet(packet.to_bytes())
 
-    async def send_command(self, command):
+    async def send_command(self, command, check_result=False):
         logger.debug(f'{color("### HOST -> CONTROLLER", "blue")}: {command}')
 
         # Wait until we can send (only one pending command at a time)
@@ -186,11 +171,22 @@ class Host(EventEmitter):
             try:
                 self.send_hci_packet(command)
                 response = await self.pending_response
-                # TODO: check error values
+
+                # Check the return parameters if required
+                if check_result:
+                    if type(response.return_parameters) is int:
+                        status = response.return_parameters
+                    else:
+                        status = response.return_parameters.status
+
+                    if status != HCI_SUCCESS:
+                        logger.warning(f'{command.name} failed ({HCI_Constant.error_name(status)})')
+                        raise HCI_Error(status)
+
                 return response
             except Exception as error:
                 logger.warning(f'{color("!!! Exception while sending HCI packet:", "red")} {error}')
-                # raise error
+                raise error
             finally:
                 self.pending_command = None
                 self.pending_response = None
@@ -370,8 +366,8 @@ class Host(EventEmitter):
 
             # Notify the client
             connection_parameters = ConnectionParameters(
-                event.conn_interval,
-                event.conn_latency,
+                event.connection_interval,
+                event.peripheral_latency,
                 event.supervision_timeout
             )
             self.emit(
@@ -387,7 +383,7 @@ class Host(EventEmitter):
             logger.debug(f'### CONNECTION FAILED: {event.status}')
 
             # Notify the listeners
-            self.emit('connection_failure', event.status)
+            self.emit('connection_failure', event.connection_handle, event.status)
 
     def on_hci_le_enhanced_connection_complete_event(self, event):
         # Just use the same implementation as for the non-enhanced event for now
@@ -435,7 +431,7 @@ class Host(EventEmitter):
             logger.debug(f'### DISCONNECTION FAILED: {event.status}')
 
             # Notify the listeners
-            self.emit('disconnection_failure', event.status)
+            self.emit('disconnection_failure', event.connection_handle, event.status)
 
     def on_hci_le_connection_update_complete_event(self, event):
         if (connection := self.connections.get(event.connection_handle)) is None:
@@ -445,8 +441,8 @@ class Host(EventEmitter):
         # Notify the client
         if event.status == HCI_SUCCESS:
             connection_parameters = ConnectionParameters(
-                event.conn_interval,
-                event.conn_latency,
+                event.connection_interval,
+                event.peripheral_latency,
                 event.supervision_timeout
             )
             self.emit('connection_parameters_update', connection.handle, connection_parameters)
@@ -470,8 +466,7 @@ class Host(EventEmitter):
             self.emit('advertising_report', report)
 
     def on_hci_le_extended_advertising_report_event(self, event):
-        # TODO
-        pass
+        self.on_hci_le_advertising_report_event(event)
 
     def on_hci_le_remote_connection_parameter_request_event(self, event):
         if event.connection_handle not in self.connections:
@@ -487,8 +482,8 @@ class Host(EventEmitter):
                 interval_max      = event.interval_max,
                 latency           = event.latency,
                 timeout           = event.timeout,
-                minimum_ce_length = 0,
-                maximum_ce_length = 0
+                min_ce_length     = 0,
+                max_ce_length     = 0
             )
         )
 

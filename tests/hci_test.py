@@ -49,10 +49,10 @@ def test_HCI_LE_Connection_Complete_Event():
         role = 1,
         peer_address_type = 1,
         peer_address = address,
-        conn_interval = 3,
-        conn_latency = 4,
+        connection_interval = 3,
+        peripheral_latency = 4,
         supervision_timeout = 5,
-        master_clock_accuracy = 6
+        central_clock_accuracy = 6
     )
     basic_check(event)
 
@@ -60,8 +60,8 @@ def test_HCI_LE_Connection_Complete_Event():
 # -----------------------------------------------------------------------------
 def test_HCI_LE_Advertising_Report_Event():
     address = Address('00:11:22:33:44:55')
-    report = HCI_Object(
-        HCI_LE_Advertising_Report_Event.REPORT_FIELDS,
+    report = HCI_LE_Advertising_Report_Event.Report(
+        HCI_LE_Advertising_Report_Event.Report.FIELDS,
         event_type   = HCI_LE_Advertising_Report_Event.ADV_IND,
         address_type = Address.PUBLIC_DEVICE_ADDRESS,
         address      = address,
@@ -87,8 +87,8 @@ def test_HCI_LE_Connection_Update_Complete_Event():
     event = HCI_LE_Connection_Update_Complete_Event(
         status              = HCI_SUCCESS,
         connection_handle   = 0x007,
-        conn_interval       = 10,
-        conn_latency        = 3,
+        connection_interval = 10,
+        peripheral_latency  = 3,
         supervision_timeout = 5
     )
     basic_check(event)
@@ -283,12 +283,32 @@ def test_HCI_LE_Create_Connection_Command():
         peer_address_type       = 1,
         peer_address            = Address('00:11:22:33:44:55'),
         own_address_type        = 2,
-        conn_interval_min       = 7,
-        conn_interval_max       = 8,
-        conn_latency            = 9,
+        connection_interval_min = 7,
+        connection_interval_max = 8,
+        max_latency             = 9,
         supervision_timeout     = 10,
-        minimum_ce_length       = 11,
-        maximum_ce_length       = 12
+        min_ce_length           = 11,
+        max_ce_length           = 12
+    )
+    basic_check(command)
+
+
+# -----------------------------------------------------------------------------
+def test_HCI_LE_Extended_Create_Connection_Command():
+    command = HCI_LE_Extended_Create_Connection_Command(
+        initiator_filter_policy  = 0,
+        own_address_type         = 0,
+        peer_address_type        = 1,
+        peer_address             = Address('00:11:22:33:44:55'),
+        initiating_phys          = 3,
+        scan_intervals           = (10, 11),
+        scan_windows             = (12, 13),
+        connection_interval_mins = (14, 15),
+        connection_interval_maxs = (16, 17),
+        max_latencies            = (18, 19),
+        supervision_timeouts     = (20, 21),
+        min_ce_lengths           = (100, 101),
+        max_ce_lengths           = (102, 103)
     )
     basic_check(command)
 
@@ -314,13 +334,13 @@ def test_HCI_LE_Remove_Device_From_Filter_Accept_List_Command():
 # -----------------------------------------------------------------------------
 def test_HCI_LE_Connection_Update_Command():
     command = HCI_LE_Connection_Update_Command(
-        connection_handle   = 0x0002,
-        conn_interval_min   = 10,
-        conn_interval_max   = 20,
-        conn_latency        = 7,
-        supervision_timeout = 3,
-        minimum_ce_length   = 100,
-        maximum_ce_length   = 200
+        connection_handle       = 0x0002,
+        connection_interval_min = 10,
+        connection_interval_max = 20,
+        max_latency             = 7,
+        supervision_timeout     = 3,
+        min_ce_length           = 100,
+        max_ce_length           = 200
     )
     basic_check(command)
 
@@ -348,7 +368,7 @@ def test_HCI_LE_Set_Extended_Scan_Parameters_Command():
     command = HCI_LE_Set_Extended_Scan_Parameters_Command(
         own_address_type=Address.RANDOM_DEVICE_ADDRESS,
         scanning_filter_policy=HCI_LE_Set_Extended_Scan_Parameters_Command.BASIC_FILTERED_POLICY,
-        scanning_phys=(1 << HCI_LE_Set_Extended_Scan_Parameters_Command.LE_1M_PHY | 1 << HCI_LE_Set_Extended_Scan_Parameters_Command.LE_CODED_PHY | 1 << 4),
+        scanning_phys=(1 << HCI_LE_1M_PHY_BIT | 1 << HCI_LE_CODED_PHY_BIT | 1 << 4),
         scan_types=[
             HCI_LE_Set_Extended_Scan_Parameters_Command.ACTIVE_SCANNING,
             HCI_LE_Set_Extended_Scan_Parameters_Command.ACTIVE_SCANNING,
@@ -408,6 +428,7 @@ def run_test_commands():
     test_HCI_LE_Set_Scan_Parameters_Command()
     test_HCI_LE_Set_Scan_Enable_Command()
     test_HCI_LE_Create_Connection_Command()
+    test_HCI_LE_Extended_Create_Connection_Command()
     test_HCI_LE_Add_Device_To_Filter_Accept_List_Command()
     test_HCI_LE_Remove_Device_From_Filter_Accept_List_Command()
     test_HCI_LE_Connection_Update_Command()

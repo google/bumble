@@ -462,10 +462,10 @@ class L2CAP_Information_Response(L2CAP_Control_Frame):
 
 # -----------------------------------------------------------------------------
 @L2CAP_Control_Frame.subclass([
-    ('interval_min',       2),
-    ('interval_max',       2),
-    ('slave_latency',      2),
-    ('timeout_multiplier', 2)
+    ('interval_min', 2),
+    ('interval_max', 2),
+    ('latency',      2),
+    ('timeout',      2)
 ])
 class L2CAP_Connection_Parameter_Update_Request(L2CAP_Control_Frame):
     '''
@@ -857,10 +857,10 @@ class ChannelManager:
         identifier = (self.identifiers.setdefault(connection.handle, 0) + 1) % 256
         self.identifiers[connection.handle] = identifier
         return identifier
-    
+
     def register_fixed_channel(self, cid, handler):
         self.fixed_channels[cid] = handler
-    
+
     def deregister_fixed_channel(self, cid):
         if cid in self.fixed_channels:
             del self.fixed_channels[cid]
@@ -1057,13 +1057,13 @@ class ChannelManager:
                 )
             )
             self.host.send_command_sync(HCI_LE_Connection_Update_Command(
-                connection_handle   = connection.handle,
-                conn_interval_min   = request.interval_min,
-                conn_interval_max   = request.interval_max,
-                conn_latency        = request.slave_latency,
-                supervision_timeout = request.timeout_multiplier,
-                minimum_ce_length   = 0,
-                maximum_ce_length   = 0
+                connection_handle       = connection.handle,
+                connection_interval_min = request.interval_min,
+                connection_interval_max = request.interval_max,
+                max_latency             = request.latency,
+                supervision_timeout     = request.timeout,
+                min_ce_length           = 0,
+                max_ce_length           = 0
             ))
         else:
             self.send_control_frame(

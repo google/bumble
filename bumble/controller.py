@@ -259,15 +259,15 @@ class Controller:
 
         # Then say that the connection has completed
         self.send_hci_packet(HCI_LE_Connection_Complete_Event(
-            status                = HCI_SUCCESS,
-            connection_handle     = connection.handle,
-            role                  = connection.role,
-            peer_address_type     = peer_address_type,
-            peer_address          = peer_address,
-            conn_interval         = 10,  # FIXME
-            conn_latency          = 0,   # FIXME
-            supervision_timeout   = 10,  # FIXME
-            master_clock_accuracy = 7    # FIXME
+            status                 = HCI_SUCCESS,
+            connection_handle      = connection.handle,
+            role                   = connection.role,
+            peer_address_type      = peer_address_type,
+            peer_address           = peer_address,
+            connection_interval    = 10,  # FIXME
+            peripheral_latency     = 0,   # FIXME
+            supervision_timeout    = 10,  # FIXME
+            central_clock_accuracy = 7    # FIXME
         ))
 
     def on_link_central_disconnected(self, peer_address, reason):
@@ -313,15 +313,15 @@ class Controller:
 
         # Say that the connection has completed
         self.send_hci_packet(HCI_LE_Connection_Complete_Event(
-            status                = status,
-            connection_handle     = connection.handle if connection else 0,
-            role                  = BT_CENTRAL_ROLE,
-            peer_address_type     = le_create_connection_command.peer_address_type,
-            peer_address          = le_create_connection_command.peer_address,
-            conn_interval         = le_create_connection_command.conn_interval_min,
-            conn_latency          = le_create_connection_command.conn_latency,
-            supervision_timeout   = le_create_connection_command.supervision_timeout,
-            master_clock_accuracy = 0
+            status                 = status,
+            connection_handle      = connection.handle if connection else 0,
+            role                   = BT_CENTRAL_ROLE,
+            peer_address_type      = le_create_connection_command.peer_address_type,
+            peer_address           = le_create_connection_command.peer_address,
+            connection_interval    = le_create_connection_command.connection_interval_min,
+            peripheral_latency     = le_create_connection_command.max_latency,
+            supervision_timeout    = le_create_connection_command.supervision_timeout,
+            central_clock_accuracy = 0
         ))
 
     def on_link_peripheral_disconnection_complete(self, disconnection_command, status):
