@@ -303,6 +303,7 @@ class CharacteristicAdapter:
     '''
     def __init__(self, characteristic):
         self.wrapped_characteristic = characteristic
+        self.subscribers = {}  # Map from subscriber to proxy subscriber
 
         if (
             asyncio.iscoroutinefunction(characteristic.read_value) and
@@ -317,11 +318,21 @@ class CharacteristicAdapter:
         if hasattr(self.wrapped_characteristic, 'subscribe'):
             self.subscribe = self.wrapped_subscribe
 
+        if hasattr(self.wrapped_characteristic, 'unsubscribe'):
+            self.unsubscribe = self.wrapped_unsubscribe
+
     def __getattr__(self, name):
         return getattr(self.wrapped_characteristic, name)
 
     def __setattr__(self, name, value):
-        if name in {'wrapped_characteristic', 'read_value', 'write_value', 'subscribe'}:
+        if name in {
+            'wrapped_characteristic',
+            'subscribers',
+            'read_value',
+            'write_value',
+            'subscribe',
+            'unsubscribe'
+        }:
             super().__setattr__(name, value)
         else:
             setattr(self.wrapped_characteristic, name, value)
@@ -345,9 +356,26 @@ class CharacteristicAdapter:
         return value
 
     def wrapped_subscribe(self, subscriber=None):
-        return self.wrapped_characteristic.subscribe(
-            None if subscriber is None else lambda value: subscriber(self.decode_value(value))
-        )
+        if subscriber is not None:
+            if subscriber in self.subscribers:
+                # We already have a proxy subscriber
+                subscriber = self.subscribers[subscriber]
+            else:
+                # Create and register a proxy that will decode the value
+                original_subscriber = subscriber
+
+                def on_change(value):
+                    original_subscriber(self.decode_value(value))
+                self.subscribers[subscriber] = on_change
+                subscriber = on_change
+
+        return self.wrapped_characteristic.subscribe(subscriber)
+
+    def wrapped_unsubscribe(self, subscriber=None):
+        if subscriber in self.subscribers:
+            subscriber = self.subscribers.pop(subscriber)
+
+        return self.wrapped_characteristic.unsubscribe(subscriber)
 
     def __str__(self):
         wrapped = str(self.wrapped_characteristic)

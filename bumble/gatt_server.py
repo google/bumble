@@ -169,7 +169,7 @@ class Server(EventEmitter):
         logger.debug(f'GATT Response from server: [0x{connection.handle:04X}] {response}')
         self.send_gatt_pdu(connection.handle, response.to_bytes())
 
-    async def notify_subscriber(self, connection, attribute, force=False):
+    async def notify_subscriber(self, connection, attribute, value=None, force=False):
         # Check if there's a subscriber
         if not force:
             subscribers = self.subscribers.get(connection.handle)
@@ -184,8 +184,8 @@ class Server(EventEmitter):
                 logger.debug(f'not notifying, cccd={cccd.hex()}')
                 return
 
-        # Get the value
-        value = attribute.read_value(connection)
+        # Get or encode the value
+        value = attribute.read_value(connection) if value is None else attribute.encode_value(value)
 
         # Truncate if needed
         mtu = self.get_mtu(connection)
@@ -198,27 +198,9 @@ class Server(EventEmitter):
             attribute_value  = value
         )
         logger.debug(f'GATT Notify from server: [0x{connection.handle:04X}] {notification}')
-        self.send_gatt_pdu(connection.handle, notification.to_bytes())
+        self.send_gatt_pdu(connection.handle, bytes(notification))
 
-    async def notify_subscribers(self, attribute, force=False):
-        # Get all the connections for which there's at least one subscription
-        connections = [
-            connection for connection in [
-                self.device.lookup_connection(connection_handle)
-                for (connection_handle, subscribers) in self.subscribers.items()
-                if force or subscribers.get(attribute.handle)
-            ]
-            if connection is not None
-        ]
-
-        # Notify for each connection
-        if connections:
-            await asyncio.wait([
-                self.notify_subscriber(connection, attribute, force)
-                for connection in connections
-            ])
-
-    async def indicate_subscriber(self, connection, attribute, force=False):
+    async def indicate_subscriber(self, connection, attribute, value=None, force=False):
         # Check if there's a subscriber
         if not force:
             subscribers = self.subscribers.get(connection.handle)
@@ -233,8 +215,8 @@ class Server(EventEmitter):
                 logger.debug(f'not indicating, cccd={cccd.hex()}')
                 return
 
-        # Get the value
-        value = attribute.read_value(connection)
+        # Get or encode the value
+        value = attribute.read_value(connection) if value is None else attribute.encode_value(value)
 
         # Truncate if needed
         mtu = self.get_mtu(connection)
@@ -264,23 +246,30 @@ class Server(EventEmitter):
             finally:
                 self.pending_confirmations[connection.handle] = None
 
-    async def indicate_subscribers(self, attribute):
+    async def notify_or_indicate_subscribers(self, indicate, attribute, value=None, force=False):
         # Get all the connections for which there's at least one subscription
         connections = [
             connection for connection in [
                 self.device.lookup_connection(connection_handle)
                 for (connection_handle, subscribers) in self.subscribers.items()
-                if subscribers.get(attribute.handle)
+                if force or subscribers.get(attribute.handle)
             ]
             if connection is not None
         ]
 
-        # Indicate for each connection
+        # Indicate or notify for each connection
         if connections:
+            coroutine = self.indicate_subscriber if indicate else self.notify_subscriber
             await asyncio.wait([
-                self.indicate_subscriber(connection, attribute)
+                asyncio.create_task(coroutine(connection, attribute, value, force))
                 for connection in connections
             ])
+
+    async def notify_subscribers(self, attribute, value=None, force=False):
+        return await self.notify_or_indicate_subscribers(False, attribute, value, force)
+
+    async def indicate_subscribers(self, attribute, value=None, force=False):
+        return await self.notify_or_indicate_subscribers(True, attribute, value, force)
 
     def on_disconnection(self, connection):
         if connection.handle in self.mtus:

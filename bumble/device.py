@@ -1210,17 +1210,17 @@ class Device(CompositeEventEmitter):
     def add_services(self, services):
         self.gatt_server.add_services(services)
 
-    async def notify_subscriber(self, connection, attribute, force=False):
-        await self.gatt_server.notify_subscriber(connection, attribute, force)
+    async def notify_subscriber(self, connection, attribute, value=None, force=False):
+        await self.gatt_server.notify_subscriber(connection, attribute, value, force)
 
-    async def notify_subscribers(self, attribute, force=False):
-        await self.gatt_server.notify_subscribers(attribute, force)
+    async def notify_subscribers(self, attribute, value=None, force=False):
+        await self.gatt_server.notify_subscribers(attribute, value, force)
 
-    async def indicate_subscriber(self, connection, attribute, force=False):
-        await self.gatt_server.indicate_subscriber(connection, attribute, force)
+    async def indicate_subscriber(self, connection, attribute, value=None, force=False):
+        await self.gatt_server.indicate_subscriber(connection, attribute, value, force)
 
-    async def indicate_subscribers(self, attribute):
-        await self.gatt_server.indicate_subscribers(attribute)
+    async def indicate_subscribers(self, attribute, value=None, force=False):
+        await self.gatt_server.indicate_subscribers(attribute, value, force)
 
     @host_event_handler
     def on_connection(self, connection_handle, transport, peer_address, peer_resolvable_address, role, connection_parameters):
