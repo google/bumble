@@ -28,6 +28,7 @@
 # -----------------------------------------------------------------------------
 import os
 import logging
+import sys
 import usb1
 from colors import color
 
@@ -35,6 +36,7 @@ from colors import color
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
+USB_DEVICE_CLASS_DEVICE                          = 0x00
 USB_DEVICE_CLASS_WIRELESS_CONTROLLER             = 0xE0
 USB_DEVICE_SUBCLASS_RF_CONTROLLER                = 0x01
 USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER = 0x01
@@ -75,9 +77,79 @@ USB_DEVICE_CLASSES = {
     0xFF: 'Vendor Specific'
 }
 
+USB_ENDPOINT_IN    = 0x80
+USB_ENDPOINT_TYPES = ['CONTROL', 'ISOCHRONOUS', 'BULK', 'INTERRUPT']
+
+USB_BT_HCI_CLASS_TUPLE = (
+    USB_DEVICE_CLASS_WIRELESS_CONTROLLER,
+    USB_DEVICE_SUBCLASS_RF_CONTROLLER,
+    USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER
+)
+
 
 # -----------------------------------------------------------------------------
-def main():
+def show_device_details(device):
+    for configuration in device:
+        print(f'  Configuration {configuration.getConfigurationValue()}')
+        for interface in configuration:
+            for setting in interface:
+                alternateSetting = setting.getAlternateSetting()
+                suffix = f'/{alternateSetting}' if interface.getNumSettings() > 1 else ''
+                (class_string, subclass_string) = get_class_info(
+                    setting.getClass(),
+                    setting.getSubClass(),
+                    setting.getProtocol()
+                )
+                details = f'({class_string}, {subclass_string})'
+                print(f'      Interface: {setting.getNumber()}{suffix} {details}')
+                for endpoint in setting:
+                    endpoint_type = USB_ENDPOINT_TYPES[endpoint.getAttributes() & 3]
+                    endpoint_direction = 'OUT' if (endpoint.getAddress() & USB_ENDPOINT_IN == 0) else 'IN'
+                    print(f'        Endpoint 0x{endpoint.getAddress():02X}: {endpoint_type} {endpoint_direction}')
+
+
+# -----------------------------------------------------------------------------
+def get_class_info(cls, subclass, protocol):
+    class_info = USB_DEVICE_CLASSES.get(cls)
+    protocol_string = ''
+    if class_info is None:
+        class_string = f'0x{cls:02X}'
+    else:
+        if type(class_info) is tuple:
+            class_string = class_info[0]
+            subclass_info = class_info[1].get(subclass)
+            if subclass_info:
+                protocol_string = subclass_info.get(protocol)
+                if protocol_string is not None:
+                    protocol_string = f' [{protocol_string}]'
+
+        else:
+            class_string = class_info
+
+    subclass_string = f'{subclass}/{protocol}{protocol_string}'
+
+    return (class_string, subclass_string)
+
+
+# -----------------------------------------------------------------------------
+def is_bluetooth_hci(device):
+    # Check if the device class indicates a match
+    if (device.getDeviceClass(), device.getDeviceSubClass(), device.getDeviceProtocol()) == USB_BT_HCI_CLASS_TUPLE:
+        return True
+
+    # If the device class is 'Device', look for a matching interface
+    if device.getDeviceClass() == USB_DEVICE_CLASS_DEVICE:
+        for configuration in device:
+            for interface in configuration:
+                for setting in interface:
+                    if (setting.getClass(), setting.getSubClass(), setting.getProtocol()) == USB_BT_HCI_CLASS_TUPLE:
+                        return True
+
+    return False
+
+
+# -----------------------------------------------------------------------------
+def main(verbose):
     logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
 
     with usb1.USBContext() as context:
@@ -91,23 +163,13 @@ def main():
 
             device_id = (device.getVendorID(), device.getProductID())
 
-            device_is_bluetooth_hci = (
-                device_class    == USB_DEVICE_CLASS_WIRELESS_CONTROLLER and
-                device_subclass == USB_DEVICE_SUBCLASS_RF_CONTROLLER and
-                device_protocol == USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER
+            (device_class_string, device_subclass_string) = get_class_info(
+                device_class,
+                device_subclass,
+                device_protocol
             )
 
-            device_class_details = ''
-            device_class_info    = USB_DEVICE_CLASSES.get(device_class)
-            if device_class_info is not None:
-                if type(device_class_info) is tuple:
-                    device_class = device_class_info[0]
-                    device_subclass_info = device_class_info[1].get(device_subclass)
-                    if device_subclass_info:
-                        device_class_details = f' [{device_subclass_info.get(device_protocol)}]'
-                else:
-                    device_class = device_class_info
-
+            device_is_bluetooth_hci = is_bluetooth_hci(device)
             if device_is_bluetooth_hci:
                 bluetooth_device_count += 1
                 fg_color = 'black'
@@ -143,10 +205,14 @@ def main():
             print(color('  Bus/Device:            ', 'green'), f'{device.getBusNumber():03}/{device.getDeviceAddress():03}')
             if device.getSerialNumber():
                 print(color('  Serial:                ', 'green'), device.getSerialNumber())
-            print(color('  Class:                 ', 'green'), device_class)
-            print(color('  Subclass/Protocol:     ', 'green'), f'{device_subclass}/{device_protocol}{device_class_details}')
+            print(color('  Class:                 ', 'green'), device_class_string)
+            print(color('  Subclass/Protocol:     ', 'green'), device_subclass_string)
             print(color('  Manufacturer:          ', 'green'), device.getManufacturer())
             print(color('  Product:               ', 'green'), device.getProduct())
+
+            if verbose:
+                show_device_details(device)
+
             print()
 
             devices.setdefault(device_id, []).append(device.getSerialNumber())
@@ -154,4 +220,9 @@ def main():
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) == 2 and sys.argv[1] == '--verbose':
+        verbose = True
+    else:
+        verbose = False
+
+    main(verbose)

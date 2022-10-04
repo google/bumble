@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 async def open_usb_transport(spec):
     '''
     Open a USB transport.
-    The parameter string has this syntax:
+    The moniker string has this syntax:
     either <index> or
     <vendor>:<product> or
     <vendor>:<product>/<serial-number>] or
@@ -47,21 +47,33 @@ async def open_usb_transport(spec):
     /<serial-number> suffix or #<index> suffix max be specified when more than one device with
     the same vendor and product identifiers are present.
 
+    In addition, if the moniker ends with the symbol "!", the device will be used in "forced" mode:
+    the first USB interface of the device will be used, regardless of the interface class/subclass.
+    This may be useful for some devices that use a custom class/subclass but may nonetheless work as-is.
+
     Examples:
     0 --> the first BT USB dongle
     04b4:f901 --> the BT USB dongle with vendor=04b4 and product=f901
     04b4:f901#2 --> the third USB device with vendor=04b4 and product=f901
     04b4:f901/00E04C239987 --> the BT USB dongle with vendor=04b4 and product=f901 and serial number 00E04C239987
+    usb:0B05:17CB! --> the BT USB dongle vendor=0B05 and product=17CB, in "forced" mode.
     '''
 
     USB_RECIPIENT_DEVICE                             = 0x00
     USB_REQUEST_TYPE_CLASS                           = 0x01 << 5
+    USB_DEVICE_CLASS_DEVICE                          = 0x00
     USB_DEVICE_CLASS_WIRELESS_CONTROLLER             = 0xE0
     USB_DEVICE_SUBCLASS_RF_CONTROLLER                = 0x01
     USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER = 0x01
     USB_ENDPOINT_TRANSFER_TYPE_BULK                  = 0x02
     USB_ENDPOINT_TRANSFER_TYPE_INTERRUPT             = 0x03
     USB_ENDPOINT_IN                                  = 0x80
+
+    USB_BT_HCI_CLASS_TUPLE = (
+        USB_DEVICE_CLASS_WIRELESS_CONTROLLER,
+        USB_DEVICE_SUBCLASS_RF_CONTROLLER,
+        USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER
+    )
 
     READ_SIZE = 1024
 
@@ -280,6 +292,13 @@ async def open_usb_transport(spec):
     context.open()
     try:
         found = None
+
+        if spec.endswith('!'):
+            spec = spec[:-1]
+            forced_mode = True
+        else:
+            forced_mode = False
+
         if ':' in spec:
             vendor_id, product_id = spec.split(':')
             serial_number = None
@@ -302,13 +321,27 @@ async def open_usb_transport(spec):
                     device_index -= 1
                 device.close()
         else:
+            # Look for a compatible device by index
+            def device_is_bluetooth_hci(device):
+                # Check if the device class indicates a match
+                if (device.getDeviceClass(), device.getDeviceSubClass(), device.getDeviceProtocol()) == \
+                        USB_BT_HCI_CLASS_TUPLE:
+                    return True
+
+                # If the device class is 'Device', look for a matching interface
+                if device.getDeviceClass() == USB_DEVICE_CLASS_DEVICE:
+                    for configuration in device:
+                        for interface in configuration:
+                            for setting in interface:
+                                if (setting.getClass(), setting.getSubClass(), setting.getProtocol()) == \
+                                        USB_BT_HCI_CLASS_TUPLE:
+                                    return True
+
+                return False
+
             device_index = int(spec)
             for device in context.getDeviceIterator(skip_on_error=True):
-                if (
-                    device.getDeviceClass()    == USB_DEVICE_CLASS_WIRELESS_CONTROLLER and
-                    device.getDeviceSubClass() == USB_DEVICE_SUBCLASS_RF_CONTROLLER and
-                    device.getDeviceProtocol() == USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER
-                ):
+                if device_is_bluetooth_hci(device):
                     if device_index == 0:
                         found = device
                         break
@@ -329,9 +362,8 @@ async def open_usb_transport(spec):
                     setting = None
                     for setting in interface:
                         if (
-                            setting.getClass() != USB_DEVICE_CLASS_WIRELESS_CONTROLLER or
-                            setting.getSubClass() != USB_DEVICE_SUBCLASS_RF_CONTROLLER or
-                            setting.getProtocol() != USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER
+                            not forced_mode and
+                            (setting.getClass(), setting.getSubClass(), setting.getProtocol()) != USB_BT_HCI_CLASS_TUPLE
                         ):
                             continue
 
