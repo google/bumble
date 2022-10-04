@@ -185,37 +185,43 @@ def main(verbose):
             if device_is_bluetooth_hci:
                 bumble_transport_names.append(f'usb:{bluetooth_device_count - 1}')
 
-            serial_number_collision = False
-            if device_id in devices:
-                for device_serial in devices[device_id]:
-                    if device_serial == device.getSerialNumber():
-                        serial_number_collision = True
-
-            if device_id not in devices:
-                bumble_transport_names.append(basic_transport_name)
-            else:
-                bumble_transport_names.append(f'{basic_transport_name}#{len(devices[device_id])}')
-
-            if device.getSerialNumber() and not serial_number_collision:
-                bumble_transport_names.append(f'{basic_transport_name}/{device.getSerialNumber()}')
 
             print(color(f'ID {device.getVendorID():04X}:{device.getProductID():04X}', fg=fg_color, bg=bg_color))
-            if bumble_transport_names:
-                print(color('  Bumble Transport Names:', 'blue'), ' or '.join(color(x, 'cyan' if device_is_bluetooth_hci else 'red') for x in bumble_transport_names))
             print(color('  Bus/Device:            ', 'green'), f'{device.getBusNumber():03}/{device.getDeviceAddress():03}')
-            if device.getSerialNumber():
-                print(color('  Serial:                ', 'green'), device.getSerialNumber())
             print(color('  Class:                 ', 'green'), device_class_string)
             print(color('  Subclass/Protocol:     ', 'green'), device_subclass_string)
-            print(color('  Manufacturer:          ', 'green'), device.getManufacturer())
-            print(color('  Product:               ', 'green'), device.getProduct())
 
-            if verbose:
-                show_device_details(device)
+            try:
+                serial_number_collision = False
+                if device_id in devices:
+                    for device_serial in devices[device_id]:
+                        if device_serial == device.getSerialNumber():
+                            serial_number_collision = True
 
-            print()
+                if device_id not in devices:
+                    bumble_transport_names.append(basic_transport_name)
+                else:
+                    bumble_transport_names.append(f'{basic_transport_name}#{len(devices[device_id])}')
 
-            devices.setdefault(device_id, []).append(device.getSerialNumber())
+                if device.getSerialNumber() and not serial_number_collision:
+                    bumble_transport_names.append(f'{basic_transport_name}/{device.getSerialNumber()}')
+
+                if bumble_transport_names:
+                    print(color('  Bumble Transport Names:', 'blue'), ' or '.join(color(x, 'cyan' if device_is_bluetooth_hci else 'red') for x in bumble_transport_names))
+                if device.getSerialNumber():
+                    print(color('  Serial:                ', 'green'), device.getSerialNumber())
+                print(color('  Manufacturer:          ', 'green'), device.getManufacturer())
+                print(color('  Product:               ', 'green'), device.getProduct())
+
+                if verbose:
+                    show_device_details(device)
+
+                print()
+
+                devices.setdefault(device_id, []).append(device.getSerialNumber())
+
+            except usb1.USBError as e:
+                print(color(f'  {e}', 'red'))
 
 
 # -----------------------------------------------------------------------------
