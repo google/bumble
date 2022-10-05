@@ -131,7 +131,7 @@ async def test_characteristic_encoding():
         def decode_value(self, value_bytes):
             return value_bytes[0]
 
-    [client, server] = TwoDevices().devices
+    [client, server] = LinkedDevices().devices[:2]
 
     characteristic = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
@@ -306,14 +306,15 @@ def test_CharacteristicValue():
 
 
 # -----------------------------------------------------------------------------
-class TwoDevices:
+class LinkedDevices:
     def __init__(self):
-        self.connections = [None, None]
+        self.connections = [None, None, None]
 
         self.link = LocalLink()
         self.controllers = [
             Controller('C1', link = self.link),
-            Controller('C2', link = self.link)
+            Controller('C2', link = self.link),
+            Controller('C3', link = self.link)
         ]
         self.devices = [
             Device(
@@ -321,12 +322,16 @@ class TwoDevices:
                 host    = Host(self.controllers[0], AsyncPipeSink(self.controllers[0]))
             ),
             Device(
-                address = 'F5:F4:F3:F2:F1:F0',
+                address = 'F1:F2:F3:F4:F5:F6',
                 host    = Host(self.controllers[1], AsyncPipeSink(self.controllers[1]))
+            ),
+            Device(
+                address = 'F2:F3:F4:F5:F6:F7',
+                host    = Host(self.controllers[2], AsyncPipeSink(self.controllers[2]))
             )
         ]
 
-        self.paired = [None, None]
+        self.paired = [None, None, None]
 
 
 # -----------------------------------------------------------------------------
@@ -339,7 +344,7 @@ async def async_barrier():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_read_write():
-    [client, server] = TwoDevices().devices
+    [client, server] = LinkedDevices().devices[:2]
 
     characteristic1 = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
@@ -416,7 +421,7 @@ async def test_read_write():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_read_write2():
-    [client, server] = TwoDevices().devices
+    [client, server] = LinkedDevices().devices[:2]
 
     v = bytes([0x11, 0x22, 0x33, 0x44])
     characteristic1 = Characteristic(
@@ -466,7 +471,7 @@ async def test_read_write2():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_subscribe_notify():
-    [client, server] = TwoDevices().devices
+    [client, server] = LinkedDevices().devices[:2]
 
     characteristic1 = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
@@ -632,11 +637,48 @@ async def test_subscribe_notify():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_mtu_exchange():
+    [d1, d2, d3] = LinkedDevices().devices[:3]
+
+    d3.gatt_server.max_mtu = 100
+
+    d3_connections = []
+    @d3.on('connection')
+    def on_d3_connection(connection):
+        d3_connections.append(connection)
+
+    await d1.power_on()
+    await d2.power_on()
+    await d3.power_on()
+
+    d1_connection = await d1.connect(d3.random_address)
+    assert len(d3_connections) == 1
+    assert d3_connections[0] is not None
+
+    d2_connection = await d2.connect(d3.random_address)
+    assert len(d3_connections) == 2
+    assert d3_connections[1] is not None
+
+    d1_peer = Peer(d1_connection)
+    d2_peer = Peer(d2_connection)
+
+    d1_client_mtu = await d1_peer.request_mtu(220)
+    assert d1_client_mtu == 100
+    assert d1_connection.att_mtu == 100
+
+    d2_client_mtu = await d2_peer.request_mtu(50)
+    assert d2_client_mtu == 50
+    assert d2_connection.att_mtu == 50
+
+
+# -----------------------------------------------------------------------------
 async def async_main():
     await test_read_write()
     await test_read_write2()
     await test_subscribe_notify()
     await test_characteristic_encoding()
+    await test_mtu_exchange()
 
 
 # -----------------------------------------------------------------------------
