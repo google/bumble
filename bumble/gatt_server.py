@@ -41,6 +41,12 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
+# Constants
+# -----------------------------------------------------------------------------
+GATT_SERVER_DEFAULT_MAX_MTU = 517
+
+
+# -----------------------------------------------------------------------------
 # GATT Server
 # -----------------------------------------------------------------------------
 class Server(EventEmitter):
@@ -49,9 +55,8 @@ class Server(EventEmitter):
         self.device                = device
         self.attributes            = []  # Attributes, ordered by increasing handle values
         self.attributes_by_handle  = {}  # Map for fast attribute access by handle
-        self.max_mtu               = 23  # FIXME: 517  # The max MTU we're willing to negotiate
+        self.max_mtu               = GATT_SERVER_DEFAULT_MAX_MTU  # The max MTU we're willing to negotiate
         self.subscribers           = {}  # Map of subscriber states by connection handle and attribute handle
-        self.mtus                  = {}  # Map of ATT MTU values by connection handle
         self.indication_semaphores = defaultdict(lambda: asyncio.Semaphore(1))
         self.pending_confirmations = defaultdict(lambda: None)
 
@@ -188,9 +193,8 @@ class Server(EventEmitter):
         value = attribute.read_value(connection) if value is None else attribute.encode_value(value)
 
         # Truncate if needed
-        mtu = self.get_mtu(connection)
-        if len(value) > mtu - 3:
-            value = value[:mtu - 3]
+        if len(value) > connection.att_mtu - 3:
+            value = value[:connection.att_mtu - 3]
 
         # Notify
         notification = ATT_Handle_Value_Notification(
@@ -219,9 +223,8 @@ class Server(EventEmitter):
         value = attribute.read_value(connection) if value is None else attribute.encode_value(value)
 
         # Truncate if needed
-        mtu = self.get_mtu(connection)
-        if len(value) > mtu - 3:
-            value = value[:mtu - 3]
+        if len(value) > connection.att_mtu - 3:
+            value = value[:connection.att_mtu - 3]
 
         # Indicate
         indication = ATT_Handle_Value_Indication(
@@ -272,8 +275,6 @@ class Server(EventEmitter):
         return await self.notify_or_indicate_subscribers(True, attribute, value, force)
 
     def on_disconnection(self, connection):
-        if connection.handle in self.mtus:
-            del self.mtus[connection.handle]
         if connection.handle in self.subscribers:
             del self.subscribers[connection.handle]
         if connection.handle in self.indication_semaphores:
@@ -314,9 +315,6 @@ class Server(EventEmitter):
                 # Just ignore
                 logger.warning(f'{color("--- Ignoring GATT Request from [0x{connection.handle:04X}]:", "red")}  {att_pdu}')
 
-    def get_mtu(self, connection):
-        return self.mtus.get(connection.handle, ATT_DEFAULT_MTU)
-
     #######################################################
     # ATT handlers
     #######################################################
@@ -336,12 +334,16 @@ class Server(EventEmitter):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.2.1 Exchange MTU Request
         '''
-        mtu = max(ATT_DEFAULT_MTU, min(self.max_mtu, request.client_rx_mtu))
-        self.mtus[connection.handle] = mtu
-        self.send_response(connection, ATT_Exchange_MTU_Response(server_rx_mtu = mtu))
+        self.send_response(connection, ATT_Exchange_MTU_Response(server_rx_mtu = self.max_mtu))
 
-        # Notify the device
-        self.device.on_connection_att_mtu_update(connection.handle, mtu)
+        # Compute the final MTU
+        if request.client_rx_mtu >= ATT_DEFAULT_MTU:
+            mtu = min(self.max_mtu, request.client_rx_mtu)
+
+            # Notify the device
+            self.device.on_connection_att_mtu_update(connection.handle, mtu)
+        else:
+            logger.warning('invalid client_rx_mtu received, MTU not changed')
 
     def on_att_find_information_request(self, connection, request):
         '''
@@ -358,7 +360,7 @@ class Server(EventEmitter):
             return
 
         # Build list of returned attributes
-        pdu_space_available = self.get_mtu(connection) - 2
+        pdu_space_available = connection.att_mtu - 2
         attributes = []
         uuid_size = 0
         for attribute in (
@@ -409,7 +411,7 @@ class Server(EventEmitter):
         '''
 
         # Build list of returned attributes
-        pdu_space_available = self.get_mtu(connection) - 2
+        pdu_space_available = connection.att_mtu - 2
         attributes = []
         for attribute in (
             attribute for attribute in self.attributes if
@@ -457,8 +459,7 @@ class Server(EventEmitter):
         See Bluetooth spec Vol 3, Part F - 3.4.4.1 Read By Type Request
         '''
 
-        mtu = self.get_mtu(connection)
-        pdu_space_available = mtu - 2
+        pdu_space_available = connection.att_mtu - 2
         attributes = []
         for attribute in (
             attribute for attribute in self.attributes if
@@ -471,7 +472,7 @@ class Server(EventEmitter):
 
             # Check the attribute value size
             attribute_value = attribute.read_value(connection)
-            max_attribute_size = min(mtu - 4, 253)
+            max_attribute_size = min(connection.att_mtu - 4, 253)
             if len(attribute_value) > max_attribute_size:
                 # We need to truncate
                 attribute_value = attribute_value[:max_attribute_size]
@@ -511,7 +512,7 @@ class Server(EventEmitter):
         if attribute := self.get_attribute(request.attribute_handle):
             # TODO: check permissions
             value = attribute.read_value(connection)
-            value_size = min(self.get_mtu(connection) - 1, len(value))
+            value_size = min(connection.att_mtu - 1, len(value))
             response = ATT_Read_Response(
                 attribute_value = value[:value_size]
             )
@@ -530,7 +531,6 @@ class Server(EventEmitter):
 
         if attribute := self.get_attribute(request.attribute_handle):
             # TODO: check permissions
-            mtu = self.get_mtu(connection)
             value = attribute.read_value(connection)
             if request.value_offset > len(value):
                 response = ATT_Error_Response(
@@ -538,14 +538,14 @@ class Server(EventEmitter):
                     attribute_handle_in_error = request.attribute_handle,
                     error_code                = ATT_INVALID_OFFSET_ERROR
                 )
-            elif len(value) <= mtu - 1:
+            elif len(value) <= connection.att_mtu - 1:
                 response = ATT_Error_Response(
                     request_opcode_in_error   = request.op_code,
                     attribute_handle_in_error = request.attribute_handle,
                     error_code                = ATT_ATTRIBUTE_NOT_LONG_ERROR
                 )
             else:
-                part_size = min(mtu - 1, len(value) - request.value_offset)
+                part_size = min(connection.att_mtu - 1, len(value) - request.value_offset)
                 response = ATT_Read_Blob_Response(
                     part_attribute_value = value[request.value_offset:request.value_offset + part_size]
                 )
@@ -574,8 +574,7 @@ class Server(EventEmitter):
             self.send_response(connection, response)
             return
 
-        mtu = self.get_mtu(connection)
-        pdu_space_available = mtu - 2
+        pdu_space_available = connection.att_mtu - 2
         attributes = []
         for attribute in (
             attribute for attribute in self.attributes if
@@ -586,7 +585,7 @@ class Server(EventEmitter):
         ):
             # Check the attribute value size
             attribute_value = attribute.read_value(connection)
-            max_attribute_size = min(mtu - 6, 251)
+            max_attribute_size = min(connection.att_mtu - 6, 251)
             if len(attribute_value) > max_attribute_size:
                 # We need to truncate
                 attribute_value = attribute_value[:max_attribute_size]

@@ -163,7 +163,6 @@ class ProfileServiceProxy:
 class Client:
     def __init__(self, connection):
         self.connection               = connection
-        self.mtu                      = ATT_DEFAULT_MTU
         self.mtu_exchange_done        = False
         self.request_semaphore        = asyncio.Semaphore(1)
         self.pending_request          = None
@@ -217,7 +216,7 @@ class Client:
 
         # We can only send one request per connection
         if self.mtu_exchange_done:
-            return
+            return self.connection.att_mtu
 
         # Send the request
         self.mtu_exchange_done = True
@@ -230,8 +229,10 @@ class Client:
                 response
             )
 
-        self.mtu = max(ATT_DEFAULT_MTU, response.server_rx_mtu)
-        return self.mtu
+        # Compute the final MTU
+        self.connection.att_mtu = min(mtu, response.server_rx_mtu)
+
+        return self.connection.att_mtu
 
     def get_services_by_uuid(self, uuid):
         return [service for service in self.services if service.uuid == uuid]
@@ -629,7 +630,7 @@ class Client:
         # If the value is the max size for the MTU, try to read more unless the caller
         # specifically asked not to do that
         attribute_value = response.attribute_value
-        if not no_long_read and len(attribute_value) == self.mtu - 1:
+        if not no_long_read and len(attribute_value) == self.connection.att_mtu - 1:
             logger.debug('using READ BLOB to get the rest of the value')
             offset = len(attribute_value)
             while True:
@@ -651,7 +652,7 @@ class Client:
                 part = response.part_attribute_value
                 attribute_value += part
 
-                if len(part) < self.mtu - 1:
+                if len(part) < self.connection.att_mtu - 1:
                     break
 
                 offset += len(part)
