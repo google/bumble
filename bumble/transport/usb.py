@@ -310,10 +310,14 @@ async def open_usb_transport(spec):
                 device_index = int(device_index_str)
 
             for device in context.getDeviceIterator(skip_on_error=True):
+                try:
+                    device_serial_number = device.getSerialNumber()
+                except usb1.USBError:
+                    device_serial_number = None
                 if (
                     device.getVendorID() == int(vendor_id, 16) and
                     device.getProductID() == int(product_id, 16) and
-                    (serial_number is None or device.getSerialNumber() == serial_number)
+                    (serial_number is None or serial_number == device_serial_number)
                 ):
                     if device_index == 0:
                         found = device

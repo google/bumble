@@ -169,6 +169,21 @@ def main(verbose):
                 device_protocol
             )
 
+            try:
+                device_serial_number = device.getSerialNumber()
+            except usb1.USBError:
+                device_serial_number = None
+
+            try:
+                device_manufacturer = device.getManufacturer()
+            except usb1.USBError:
+                device_manufacturer = None
+
+            try:
+                device_product = device.getProduct()
+            except usb1.USBError:
+                device_product = None
+
             device_is_bluetooth_hci = is_bluetooth_hci(device)
             if device_is_bluetooth_hci:
                 bluetooth_device_count += 1
@@ -185,43 +200,35 @@ def main(verbose):
             if device_is_bluetooth_hci:
                 bumble_transport_names.append(f'usb:{bluetooth_device_count - 1}')
 
+            if device_id not in devices:
+                bumble_transport_names.append(basic_transport_name)
+            else:
+                bumble_transport_names.append(f'{basic_transport_name}#{len(devices[device_id])}')
 
+            if device_serial_number is not None:
+                if device_id not in devices or device_serial_number not in devices[device_id]:
+                    bumble_transport_names.append(f'{basic_transport_name}/{device_serial_number}')
+
+            # Print the results
             print(color(f'ID {device.getVendorID():04X}:{device.getProductID():04X}', fg=fg_color, bg=bg_color))
+            if bumble_transport_names:
+                print(color('  Bumble Transport Names:', 'blue'), ' or '.join(color(x, 'cyan' if device_is_bluetooth_hci else 'red') for x in bumble_transport_names))
             print(color('  Bus/Device:            ', 'green'), f'{device.getBusNumber():03}/{device.getDeviceAddress():03}')
             print(color('  Class:                 ', 'green'), device_class_string)
             print(color('  Subclass/Protocol:     ', 'green'), device_subclass_string)
+            if device_serial_number is not None:
+                print(color('  Serial:                ', 'green'), device_serial_number)
+            if device_manufacturer is not None:
+                print(color('  Manufacturer:          ', 'green'), device_manufacturer)
+            if device_product is not None:
+                print(color('  Product:               ', 'green'), device_product)
 
-            try:
-                serial_number_collision = False
-                if device_id in devices:
-                    for device_serial in devices[device_id]:
-                        if device_serial == device.getSerialNumber():
-                            serial_number_collision = True
+            if verbose:
+                show_device_details(device)
 
-                if device_id not in devices:
-                    bumble_transport_names.append(basic_transport_name)
-                else:
-                    bumble_transport_names.append(f'{basic_transport_name}#{len(devices[device_id])}')
+            print()
 
-                if device.getSerialNumber() and not serial_number_collision:
-                    bumble_transport_names.append(f'{basic_transport_name}/{device.getSerialNumber()}')
-
-                if bumble_transport_names:
-                    print(color('  Bumble Transport Names:', 'blue'), ' or '.join(color(x, 'cyan' if device_is_bluetooth_hci else 'red') for x in bumble_transport_names))
-                if device.getSerialNumber():
-                    print(color('  Serial:                ', 'green'), device.getSerialNumber())
-                print(color('  Manufacturer:          ', 'green'), device.getManufacturer())
-                print(color('  Product:               ', 'green'), device.getProduct())
-
-                if verbose:
-                    show_device_details(device)
-
-                print()
-
-                devices.setdefault(device_id, []).append(device.getSerialNumber())
-
-            except usb1.USBError as e:
-                print(color(f'  {e}', 'red'))
+            devices.setdefault(device_id, []).append(device_serial_number)
 
 
 # -----------------------------------------------------------------------------
