@@ -13,7 +13,7 @@
     
     
       
-        <title>Show - Bumble</title>
+        <title>USB Probe - Bumble</title>
       
     
     
@@ -62,7 +62,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#show-tool" class="md-skip">
+        <a href="#usb-probe-tool" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +94,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Show
+              USB Probe
             
           </span>
         </div>
@@ -858,21 +858,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="show.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="show.html" class="md-nav__link">
         Show
       </a>
-      
     </li>
   
 
@@ -924,11 +914,52 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="usb_probe.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          USB Probe
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="usb_probe.html" class="md-nav__link md-nav__link--active">
         USB Probe
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    Usage
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1160,6 +1191,21 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    Usage
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1172,7 +1218,44 @@
                 
 
 
-<h1 id="show-tool">SHOW TOOL<a class="headerlink" href="#show-tool" title="Permanent link">&para;</a></h1>
+<h1 id="usb-probe-tool">USB PROBE TOOL<a class="headerlink" href="#usb-probe-tool" title="Permanent link">&para;</a></h1>
+<p>This tool lists all the USB devices, with details about each device.
+For each device, the different possible Bumble transport strings that can
+refer to it are listed. 
+If the device is known to be a Bluetooth HCI device, its identifier is printed 
+in reverse colors, and the transport names in cyan color.
+For other devices, regardless of their type, the transport names are printed
+in red. Whether that device is actually a Bluetooth device or not depends on
+whether it is a Bluetooth device that uses a non-standard Class, or some other
+type of device (there's no way to tell).</p>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<p>This command line tool may be invoked with no arguments, or with <code>--verbose</code>
+for extra details.
+When installed from PyPI, run as
+<div class="highlight"><pre><span></span><code>$ bumble-usb-probe
+</code></pre></div></p>
+<p>or, for extra details, with the <code>--verbose</code> argument
+<div class="highlight"><pre><span></span><code>$ bumble-usb-probe --v
+</code></pre></div></p>
+<p>When running from the source distribution:
+<div class="highlight"><pre><span></span><code>$ python3 apps/usb-probe.py
+</code></pre></div></p>
+<p>or </p>
+<div class="highlight"><pre><span></span><code>$ python3 apps/usb-probe.py --verbose
+</code></pre></div>
+<div class="admonition example">
+<p class="admonition-title">Example</p>
+<div class="highlight"><pre><span></span><code>$ python3 apps/usb_probe.py 
+
+ID 0A12:0001
+Bumble Transport Names: usb:0 or usb:0A12:0001
+Bus/Device:             020/034
+Class:                  Wireless Controller
+Subclass/Protocol:      1/1 [Bluetooth]
+Manufacturer:           None
+Product:                USB2.0-BT
+</code></pre></div>
+</div>
 
 
 
@@ -1191,7 +1274,7 @@
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
         
-          <a href="gg_bridge.html" title="Golden Gate Bridge" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+          <a href="unbond.html" title="Unbond" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
             <div class="md-flex__cell md-flex__cell--shrink">
               <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
             </div>
@@ -1200,19 +1283,19 @@
                 <span class="md-footer-nav__direction">
                   Previous
                 </span>
-                Golden Gate Bridge
+                Unbond
               </span>
             </div>
           </a>
         
         
-          <a href="gatt_dump.html" title="GATT Dump" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
+          <a href="../hardware/index.html" title="Overview" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
               <span class="md-flex__ellipsis">
                 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                GATT Dump
+                Overview
               </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink">
