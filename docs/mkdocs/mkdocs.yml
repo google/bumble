@@ -45,6 +45,10 @@ nav:
     - HCI Bridge: apps_and_tools/hci_bridge.md
     - Golden Gate Bridge: apps_and_tools/gg_bridge.md
     - Show: apps_and_tools/show.md
+    - GATT Dump: apps_and_tools/gatt_dump.md
+    - Pair: apps_and_tools/pair.md
+    - Unbond: apps_and_tools/unbond.md
+    - USB Probe: apps_and_tools/usb_probe.md
   - Hardware:
     - Overview: hardware/index.md
   - Platforms:

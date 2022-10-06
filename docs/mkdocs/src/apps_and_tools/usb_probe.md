@@ -13,15 +13,27 @@ type of device (there's no way to tell).
 
 ## Usage
 
-This command line tool takes no arguments.
+This command line tool may be invoked with no arguments, or with `--verbose`
+for extra details.
 When installed from PyPI, run as
 ```
 $ bumble-usb-probe
 ```
 
+or, for extra details, with the `--verbose` argument
+```
+$ bumble-usb-probe --v
+```
+
 When running from the source distribution:
 ```
 $ python3 apps/usb-probe.py
+```
+
+or 
+
+```
+$ python3 apps/usb-probe.py --verbose
 ```
 
 !!! example

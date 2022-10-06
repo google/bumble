@@ -5,6 +5,7 @@ The USB transport interfaces with a local Bluetooth USB dongle.
 
 ## Moniker
 The moniker for a USB transport is either:
+
   * `usb:<index>`
   * `usb:<vendor>:<product>`
   * `usb:<vendor>:<product>/<serial-number>`
@@ -15,6 +16,10 @@ In the `usb:<index>` form, matching devices are the ones supporting Bluetooth HC
 In the `usb:<vendor>:<product>#<index>` form, matching devices are the ones with the specified `<vendor>` and `<product>` identification.
 
 `<vendor>` and `<product>` are a vendor ID and product ID in hexadecimal.
+
+In addition, if the moniker ends with the symbol "!", the device will be used in "forced" mode:
+the first USB interface of the device will be used, regardless of the interface class/subclass.
+This may be useful for some devices that use a custom class/subclass but may nonetheless work as-is.
 
 !!! examples
     `usb:04b4:f901`  
@@ -28,6 +33,10 @@ In the `usb:<vendor>:<product>#<index>` form, matching devices are the ones with
 
     `usb:04b4:f901/#1`
     The second USB dongle with `<vendor>` equal to `04b4` and `<product>` equal to `f901`
+
+    `usb:0B05:17CB!`
+    The BT USB dongle vendor=0B05 and product=17CB, in "forced" mode.
+
 
 ## Alternative
 The library includes two different implementations of the USB transport, implemented using different python bindings for `libusb`.
