@@ -29,6 +29,7 @@
 import os
 import logging
 import sys
+import click
 import usb1
 from colors import color
 
@@ -149,6 +150,8 @@ def is_bluetooth_hci(device):
 
 
 # -----------------------------------------------------------------------------
+@click.command()
+@click.option('--verbose', is_flag=True, default=False, help='Print more details')
 def main(verbose):
     logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
 
@@ -233,9 +236,4 @@ def main(verbose):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    if len(sys.argv) == 2 and sys.argv[1] == '--verbose':
-        verbose = True
-    else:
-        verbose = False
-
-    main(verbose)
+    main()
