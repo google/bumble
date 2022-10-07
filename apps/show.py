@@ -90,7 +90,7 @@ class SnoopPacketReader:
 @click.command()
 @click.option('--format', type=click.Choice(['h4', 'snoop']), default='h4', help='Format of the input file')
 @click.argument('filename')
-def show(format, filename):
+def main(format, filename):
     input = open(filename, 'rb')
     if format == 'h4':
         packet_reader = PacketReader(input)
@@ -117,4 +117,4 @@ def show(format, filename):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    show()
+    main()
