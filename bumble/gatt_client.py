@@ -184,8 +184,8 @@ class Client:
         # Wait until we can send (only one pending command at a time for the connection)
         response = None
         async with self.request_semaphore:
-            assert(self.pending_request is None)
-            assert(self.pending_response is None)
+            assert self.pending_request is None
+            assert self.pending_response is None
 
             # Create a future value to hold the eventual response
             self.pending_response = asyncio.get_running_loop().create_future()

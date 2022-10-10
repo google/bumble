@@ -346,8 +346,11 @@ class CharacteristicAdapter:
     async def read_decoded_value(self):
         return self.decode_value(await self.wrapped_characteristic.read_value())
 
-    async def write_decoded_value(self, value):
-        return await self.wrapped_characteristic.write_value(self.encode_value(value))
+    async def write_decoded_value(self, value, with_response=False):
+        return await self.wrapped_characteristic.write_value(
+            self.encode_value(value),
+            with_response
+        )
 
     def encode_value(self, value):
         return value
