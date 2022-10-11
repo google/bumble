@@ -857,9 +857,9 @@ class Controller:
         See Bluetooth spec Vol 2, Part E - 7.8.44 LE Set Address Resolution Enable Command
         '''
         ret = HCI_SUCCESS
-        if command.address_resolution == 1:
+        if command.address_resolution_enable == 1:
             self.le_address_resolution = True
-        elif command.address_resolution == 0:
+        elif command.address_resolution_enable == 0:
             self.le_address_resolution = False
         else:
             ret = HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR
