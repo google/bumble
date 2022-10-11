@@ -164,6 +164,17 @@ async def test_characteristic_encoding():
     await async_barrier()
     assert characteristic.value == bytes([124])
 
+    v = await cp.read_value()
+    assert v == 124
+    await cp.write_value(125, with_response=True)
+    await async_barrier()
+    assert characteristic.value == bytes([125])
+
+    cd = DelegatedCharacteristicAdapter(c, encode=lambda x: bytes([x // 2]))
+    await cd.write_value(100, with_response=True)
+    await async_barrier()
+    assert characteristic.value == bytes([50])
+
     last_change = None
 
     def on_change(value):
