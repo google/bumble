@@ -69,11 +69,17 @@ You can bring a HCI controller `UP` or `DOWN` with `hciconfig hci<X> up` and `hc
     By default, when running as a regular user, you won't have the permission to use
     an HCI socket to a Bluetooth controller (you may see an exception like `PermissionError: [Errno 1] Operation not permitted`).
 
-    If you want to run without using `sudo`, you can use the `setcap` command to grant your python runtime the permissions required for raw HCI sockets:
+    If you want to run without using `sudo`, you need to manage the capabilities by adding the appropriate entries in `/etc/security/capability.conf` to grant a user or group the `cap_net_admin` capability.  
+    See [this manpage](https://manpages.ubuntu.com/manpages/bionic/man5/capability.conf.5.html) for details.
+    
+    Alternatively, if you are just experimenting temporarily, the `capsh` command may be useful in order
+    to execute a single command with enhanced permissions, as in this example:
+
+
     ```
-    $ sudo setcap 'cap_net_raw,cap_net_admin=eip' <path/to/python3>'
+    $ sudo capsh --caps="cap_net_admin+eip cap_setpcap,cap_setuid,cap_setgid+ep" --keep=1 --user=$USER --addamb=cap_net_admin  -- -c "<path/to/executable> <executable-args>"
     ```
-    Where `<path/to/python3>` on your system (ex: `/usr/bin/python3.10`)
+    Where `<path/to/executable>` is the path to your `python3` executable or to one of the Bumble bundled command-line applications.
     
 !!! tip "List all available controllers"
     The command
