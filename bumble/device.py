@@ -15,6 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from enum import IntEnum
 import json
 import asyncio
 import logging
@@ -66,6 +67,9 @@ DEVICE_MIN_SCAN_INTERVAL                      = 25
 DEVICE_MAX_SCAN_INTERVAL                      = 10240
 DEVICE_MIN_SCAN_WINDOW                        = 25
 DEVICE_MAX_SCAN_WINDOW                        = 10240
+DEVICE_MIN_LE_RSSI                            = -127
+DEVICE_MAX_LE_RSSI                            = 20
+
 
 # -----------------------------------------------------------------------------
 # Classes
@@ -200,6 +204,45 @@ class AdvertisementDataAccumulator:
 
 
 # -----------------------------------------------------------------------------
+class AdvertisingType(IntEnum):
+    UNDIRECTED_CONNECTABLE_SCANNABLE = 0x00  # Undirected, connectable,     scannable
+    DIRECTED_CONNECTABLE_HIGH_DUTY   = 0x01  # Directed,   connectable,     non-scannable
+    UNDIRECTED_SCANNABLE             = 0x02  # Undirected, non-connectable, scannable
+    UNDIRECTED                       = 0x03  # Undirected, non-connectable, non-scannable
+    DIRECTED_CONNECTABLE_LOW_DUTY    = 0x04  # Directed,   connectable,     non-scannable
+
+    @property
+    def has_data(self):
+        return self in {
+            AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
+            AdvertisingType.UNDIRECTED_SCANNABLE,
+            AdvertisingType.UNDIRECTED
+        }
+
+    @property
+    def is_connectable(self):
+        return self in {
+            AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
+            AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY,
+            AdvertisingType.DIRECTED_CONNECTABLE_LOW_DUTY
+        }
+
+    @property
+    def is_scannable(self):
+        return self in {
+            AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
+            AdvertisingType.UNDIRECTED_SCANNABLE
+        }
+
+    @property
+    def is_directed(self):
+        return self in {
+            AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY,
+            AdvertisingType.DIRECTED_CONNECTABLE_LOW_DUTY
+        }
+
+
+# -----------------------------------------------------------------------------
 class Peer:
     def __init__(self, connection):
         self.connection = connection
@@ -298,7 +341,8 @@ class ConnectionParametersPreferences:
     min_ce_length:           int = DEVICE_DEFAULT_CONNECTION_MIN_CE_LENGTH
     max_ce_length:           int = DEVICE_DEFAULT_CONNECTION_MAX_CE_LENGTH
 
-DEVICE_DEFAULT_CONNECTION_PARAMETER_PREFERENCES = ConnectionParametersPreferences()
+
+ConnectionParametersPreferences.default = ConnectionParametersPreferences()
 
 
 # -----------------------------------------------------------------------------
@@ -592,6 +636,7 @@ class Device(CompositeEventEmitter):
         self._host                      = None
         self.powered_on                 = False
         self.advertising                = False
+        self.advertising_type           = None
         self.auto_restart_advertising   = False
         self.command_timeout            = 10  # seconds
         self.gatt_server                = gatt_server.Server(self)
@@ -811,32 +856,48 @@ class Device(CompositeEventEmitter):
 
         return self.host.supports_le_feature(feature_map[phy])
 
-    async def start_advertising(self, auto_restart=False):
-        self.auto_restart_advertising = auto_restart
-
+    async def start_advertising(
+        self,
+        advertising_type=AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
+        target=None,
+        auto_restart=False
+    ):
         # If we're advertising, stop first
         if self.advertising:
             await self.stop_advertising()
 
-        # Set/update the advertising data
-        await self.send_command(HCI_LE_Set_Advertising_Data_Command(
-            advertising_data = self.advertising_data
-        ), check_result=True)
+        # Set/update the advertising data if the advertising type allows it
+        if advertising_type.has_data:
+            await self.send_command(HCI_LE_Set_Advertising_Data_Command(
+                advertising_data = self.advertising_data
+            ), check_result=True)
 
-        # Set/update the scan response data
-        await self.send_command(HCI_LE_Set_Scan_Response_Data_Command(
-            scan_response_data = self.scan_response_data
-        ), check_result=True)
+        # Set/update the scan response data if the advertising is scannable
+        if advertising_type.is_scannable:
+            await self.send_command(HCI_LE_Set_Scan_Response_Data_Command(
+                scan_response_data = self.scan_response_data
+            ), check_result=True)
+
+        # Decide what peer address to use
+        if advertising_type.is_directed:
+            if target is None:
+                raise ValueError('directed advertising requires a target address')
+
+            peer_address      = target
+            peer_address_type = target.address_type
+        else:
+            peer_address      = Address('00:00:00:00:00:00')
+            peer_address_type = Address.PUBLIC_DEVICE_ADDRESS
 
         # Set the advertising parameters
         await self.send_command(HCI_LE_Set_Advertising_Parameters_Command(
             # TODO: use real values, not fixed ones
             advertising_interval_min  = self.advertising_interval_min,
             advertising_interval_max  = self.advertising_interval_max,
-            advertising_type          = HCI_LE_Set_Advertising_Parameters_Command.ADV_IND,
+            advertising_type          = int(advertising_type),
             own_address_type          = Address.RANDOM_DEVICE_ADDRESS,  # TODO: allow using the public address
-            peer_address_type         = Address.PUBLIC_DEVICE_ADDRESS,
-            peer_address              = Address('00:00:00:00:00:00'),
+            peer_address_type         = peer_address_type,
+            peer_address              = peer_address,
             advertising_channel_map   = 7,
             advertising_filter_policy = 0
         ), check_result=True)
@@ -846,7 +907,9 @@ class Device(CompositeEventEmitter):
             advertising_enable = 1
         ), check_result=True)
 
-        self.advertising = True
+        self.auto_restart_advertising = auto_restart
+        self.advertising_type         = advertising_type
+        self.advertising              = True
 
     async def stop_advertising(self):
         # Disable advertising
@@ -855,7 +918,9 @@ class Device(CompositeEventEmitter):
                 advertising_enable = 0
             ), check_result=True)
 
-            self.advertising = False
+            self.advertising              = False
+            self.advertising_type         = None
+            self.auto_restart_advertising = False
 
     @property
     def is_advertising(self):
@@ -1088,9 +1153,9 @@ class Device(CompositeEventEmitter):
                 if connection_parameters_preferences is None:
                     if connection_parameters_preferences is None:
                         connection_parameters_preferences = {
-                            HCI_LE_1M_PHY:    DEVICE_DEFAULT_CONNECTION_PARAMETER_PREFERENCES,
-                            HCI_LE_2M_PHY:    DEVICE_DEFAULT_CONNECTION_PARAMETER_PREFERENCES,
-                            HCI_LE_CODED_PHY: DEVICE_DEFAULT_CONNECTION_PARAMETER_PREFERENCES
+                            HCI_LE_1M_PHY:    ConnectionParametersPreferences.default,
+                            HCI_LE_2M_PHY:    ConnectionParametersPreferences.default,
+                            HCI_LE_CODED_PHY: ConnectionParametersPreferences.default
                         }
 
                 if self.host.supports_command(HCI_LE_EXTENDED_CREATE_CONNECTION_COMMAND):
@@ -1610,7 +1675,13 @@ class Device(CompositeEventEmitter):
 
     @host_event_handler
     def on_connection_failure(self, connection_handle, error_code):
-        logger.debug(f'*** Connection failed: {error_code}')
+        logger.debug(f'*** Connection failed: {HCI_Constant.error_name(error_code)}')
+
+        # For directed advertising, this means a timeout
+        if self.advertising and self.advertising_type.is_directed:
+            self.advertising = False
+
+        # Notify listeners
         error = ConnectionError(
             error_code,
             'hci',
@@ -1633,7 +1704,10 @@ class Device(CompositeEventEmitter):
         # Restart advertising if auto-restart is enabled
         if self.auto_restart_advertising:
             logger.debug('restarting advertising')
-            asyncio.create_task(self.start_advertising(auto_restart=self.auto_restart_advertising))
+            asyncio.create_task(self.start_advertising(
+                advertising_type = self.advertising_type,
+                auto_restart     = True
+            ))
 
     @host_event_handler
     @with_connection_from_handle

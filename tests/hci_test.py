@@ -27,8 +27,8 @@ def basic_check(x):
     parsed_str = str(parsed)
     print(x_str)
     parsed_bytes = parsed.to_bytes()
-    assert(x_str == parsed_str)
-    assert(packet == parsed_bytes)
+    assert x_str == parsed_str
+    assert packet == parsed_bytes
 
 
 # -----------------------------------------------------------------------------
@@ -133,7 +133,7 @@ def test_HCI_Command_Complete_Event():
     )
     basic_check(event)
     event = HCI_Packet.from_bytes(event.to_bytes())
-    assert(event.return_parameters == 7)
+    assert event.return_parameters == 7
 
     # With a simple status as an integer status
     event = HCI_Command_Complete_Event(
@@ -142,7 +142,7 @@ def test_HCI_Command_Complete_Event():
         return_parameters = 9
     )
     basic_check(event)
-    assert(event.return_parameters == 9)
+    assert event.return_parameters == 9
 
 
 # -----------------------------------------------------------------------------
@@ -383,20 +383,20 @@ def test_HCI_LE_Set_Extended_Scan_Parameters_Command():
 # -----------------------------------------------------------------------------
 def test_address():
     a = Address('C4:F2:17:1A:1D:BB')
-    assert(not a.is_public)
-    assert(a.is_random)
-    assert(a.address_type == Address.RANDOM_DEVICE_ADDRESS)
-    assert(not a.is_resolvable)
-    assert(not a.is_resolved)
-    assert(a.is_static)
+    assert not a.is_public
+    assert a.is_random
+    assert a.address_type == Address.RANDOM_DEVICE_ADDRESS
+    assert not a.is_resolvable
+    assert not a.is_resolved
+    assert a.is_static
 
 
 # -----------------------------------------------------------------------------
 def test_custom():
     data = bytes([0x77, 0x02, 0x01, 0x03])
     packet = HCI_CustomPacket(data)
-    assert(packet.hci_packet_type == 0x77)
-    assert(packet.payload == data)
+    assert packet.hci_packet_type == 0x77
+    assert packet.payload == data
 
 
 # -----------------------------------------------------------------------------

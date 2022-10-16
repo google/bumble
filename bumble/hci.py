@@ -1491,7 +1491,7 @@ class HCI_Object:
     def dict_to_bytes(object, fields):
         result = bytearray()
         for (field_name, field_type) in fields:
-            # The field_type may be a dictionnary with a mapper, parser, serializer, and/or size
+            # The field_type may be a dictionary with a mapper, parser, serializer, and/or size
             serializer = None
             if type(field_type) is dict:
                 if 'serializer' in field_type:
@@ -2826,18 +2826,18 @@ class HCI_LE_Set_Advertising_Parameters_Command(HCI_Command):
     See Bluetooth spec @ 7.8.5 LE Set Advertising Parameters Command
     '''
 
-    ADV_IND         = 0x00
-    ADV_DIRECT_IND  = 0x01
-    ADV_SCAN_IND    = 0x02
-    ADV_NONCONN_IND = 0x03
-    ADV_DIRECT_IND  = 0x04
+    ADV_IND                 = 0x00
+    ADV_DIRECT_IND          = 0x01
+    ADV_SCAN_IND            = 0x02
+    ADV_NONCONN_IND         = 0x03
+    ADV_DIRECT_IND_LOW_DUTY = 0x04
 
     ADVERTISING_TYPE_NAMES = {
-        ADV_IND:         'ADV_IND',
-        ADV_DIRECT_IND:  'ADV_DIRECT_IND',
-        ADV_SCAN_IND:    'ADV_SCAN_IND',
-        ADV_NONCONN_IND: 'ADV_NONCONN_IND',
-        ADV_DIRECT_IND:  'ADV_DIRECT_IND'
+        ADV_IND:                 'ADV_IND',
+        ADV_DIRECT_IND:          'ADV_DIRECT_IND',
+        ADV_SCAN_IND:            'ADV_SCAN_IND',
+        ADV_NONCONN_IND:         'ADV_NONCONN_IND',
+        ADV_DIRECT_IND_LOW_DUTY: 'ADV_DIRECT_IND_LOW_DUTY'
     }
 
     @classmethod
@@ -4346,7 +4346,7 @@ class HCI_Encryption_Change_Event(HCI_Event):
     E0_OR_AES_CCM = 0x01
     AES_CCM       = 0x02
 
-    ENCYRPTION_ENABLED_NAMES = {
+    ENCRYPTION_ENABLED_NAMES = {
         OFF:           'OFF',
         E0_OR_AES_CCM: 'E0_OR_AES_CCM',
         AES_CCM:       'AES_CCM'
@@ -4354,7 +4354,7 @@ class HCI_Encryption_Change_Event(HCI_Event):
 
     @staticmethod
     def encryption_enabled_name(encryption_enabled):
-        return name_or_number(HCI_Encryption_Change_Event.ENCYRPTION_ENABLED_NAMES, encryption_enabled)
+        return name_or_number(HCI_Encryption_Change_Event.ENCRYPTION_ENABLED_NAMES, encryption_enabled)
 
 
 # -----------------------------------------------------------------------------
@@ -4701,7 +4701,7 @@ class HCI_Synchronous_Connection_Complete_Event(HCI_Event):
         U_LAW_LOG_AIR_MODE:        'u-law log',
         A_LAW_LOG_AIR_MORE:        'A-law log',
         CVSD_AIR_MODE:             'CVSD',
-        TRANSPARENT_DATA_AIR_MODE: 'Transparend Data'
+        TRANSPARENT_DATA_AIR_MODE: 'Transparent Data'
     }
 
     @staticmethod

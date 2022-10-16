@@ -76,7 +76,7 @@ class Controller:
         self.supported_commands           = bytes.fromhex('2000800000c000000000e40000002822000000000000040000f7ffff7f00000030f0f9ff01008004000000000000000000000000000000000000000000000000')
         self.le_features                  = bytes.fromhex('ff49010000000000')
         self.le_states                    = bytes.fromhex('ffff3fffff030000')
-        self.avertising_channel_tx_power  = 0
+        self.advertising_channel_tx_power = 0
         self.filter_accept_list_size      = 8
         self.resolving_list_size          = 8
         self.supported_max_tx_octets      = 27
@@ -650,7 +650,7 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.6 LE Read Advertising Channel Tx Power Command
         '''
-        return bytes([HCI_SUCCESS, self.avertising_channel_tx_power])
+        return bytes([HCI_SUCCESS, self.advertising_channel_tx_power])
 
     def on_hci_le_set_advertising_data_command(self, command):
         '''
