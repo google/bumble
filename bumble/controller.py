@@ -583,13 +583,15 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.4.1 Read Local Version Information Command
         '''
-        return struct.pack('<BBHBHH',
-                           HCI_SUCCESS,
-                           self.hci_version,
-                           self.hci_revision,
-                           self.lmp_version,
-                           self.manufacturer_name,
-                           self.lmp_subversion)
+        return struct.pack(
+            '<BBHBHH',
+            HCI_SUCCESS,
+            self.hci_version,
+            self.hci_revision,
+            self.lmp_version,
+            self.manufacturer_name,
+            self.lmp_subversion
+        )
 
     def on_hci_read_local_supported_commands_command(self, command):
         '''
@@ -876,12 +878,26 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.46 LE Read Maximum Data Length Command
         '''
-        return struct.pack('<BHHHH',
-                           HCI_SUCCESS,
-                           self.supported_max_tx_octets,
-                           self.supported_max_tx_time,
-                           self.supported_max_rx_octets,
-                           self.supported_max_rx_time)
+        return struct.pack(
+            '<BHHHH',
+            HCI_SUCCESS,
+            self.supported_max_tx_octets,
+            self.supported_max_tx_time,
+            self.supported_max_rx_octets,
+            self.supported_max_rx_time
+        )
+
+    def on_hci_le_read_phy_command(self, command):
+        '''
+        See Bluetooth spec Vol 2, Part E - 7.8.47 LE Read PHY command
+        '''
+        return struct.pack(
+            '<BHBB',
+            HCI_SUCCESS,
+            command.connection_handle,
+            HCI_LE_1M_PHY,
+            HCI_LE_1M_PHY
+        )
 
     def on_hci_le_set_default_phy_command(self, command):
         '''
@@ -893,3 +909,4 @@ class Controller:
             'rx_phys':  command.rx_phys
         }
         return bytes([HCI_SUCCESS])
+

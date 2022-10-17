@@ -271,8 +271,8 @@ class Peer:
 
     async def request_mtu(self, mtu):
         mtu = await self.gatt_client.request_mtu(mtu)
-        self.connection.att_mtu = mtu
         self.connection.emit('connection_att_mtu_update')
+        return mtu
 
     async def discover_service(self, uuid):
         return await self.gatt_client.discover_service(uuid)
@@ -1052,7 +1052,7 @@ class Device(CompositeEventEmitter):
             lap            = HCI_GENERAL_INQUIRY_LAP,
             inquiry_length = DEVICE_DEFAULT_INQUIRY_LENGTH,
             num_responses  = 0  # Unlimited number of responses.
-        ), check_result=True)
+        ))
         if response.status != HCI_Command_Status_Event.PENDING:
             self.discovering = False
             raise HCI_StatusError(response)
@@ -1644,30 +1644,7 @@ class Device(CompositeEventEmitter):
         if connection_handle in self.connections:
             logger.warn('new connection reuses the same handle as a previous connection')
 
-        # Resolve the peer address if we can
-        if self.address_resolver:
-            if peer_address.is_resolvable:
-                resolved_address = self.address_resolver.resolve(peer_address)
-                if resolved_address is not None:
-                    logger.debug(f'*** Address resolved as {resolved_address}')
-                    peer_resolvable_address = peer_address
-                    peer_address = resolved_address
-
-        # We are no longer advertising
-        self.advertising = False
-
-        # Create and notify of the new connection asynchronously
-        async def new_connection():
-            # Figure out which PHY we're connected with
-            if self.host.supports_command(HCI_LE_READ_PHY_COMMAND):
-                result = await self.send_command(
-                    HCI_LE_Read_PHY_Command(connection_handle=connection_handle),
-                    check_result=True
-                )
-                phy = ConnectionPHY(result.return_parameters.tx_phy, result.return_parameters.rx_phy)
-            else:
-                phy = ConnectionPHY(HCI_LE_1M_PHY, HCI_LE_1M_PHY)
-
+        if transport == BT_BR_EDR_TRANSPORT:
             # Create a new connection
             connection = Connection(
                 self,
@@ -1677,14 +1654,54 @@ class Device(CompositeEventEmitter):
                 peer_resolvable_address,
                 role,
                 connection_parameters,
-                phy
+                phy=None
             )
             self.connections[connection_handle] = connection
 
             # Emit an event to notify listeners of the new connection
             self.emit('connection', connection)
+        else:
+            # Resolve the peer address if we can
+            if self.address_resolver:
+                if peer_address.is_resolvable:
+                    resolved_address = self.address_resolver.resolve(peer_address)
+                    if resolved_address is not None:
+                        logger.debug(f'*** Address resolved as {resolved_address}')
+                        peer_resolvable_address = peer_address
+                        peer_address = resolved_address
 
-        asyncio.create_task(new_connection())
+            # We are no longer advertising
+            self.advertising = False
+
+            # Create and notify of the new connection asynchronously
+            async def new_connection():
+                # Figure out which PHY we're connected with
+                if self.host.supports_command(HCI_LE_READ_PHY_COMMAND):
+                    result = await self.send_command(
+                        HCI_LE_Read_PHY_Command(connection_handle=connection_handle),
+                        check_result=True
+                    )
+                    phy = ConnectionPHY(result.return_parameters.tx_phy, result.return_parameters.rx_phy)
+                else:
+                    phy = ConnectionPHY(HCI_LE_1M_PHY, HCI_LE_1M_PHY)
+
+                # Create a new connection
+                connection = Connection(
+                    self,
+                    connection_handle,
+                    transport,
+                    peer_address,
+                    peer_resolvable_address,
+                    role,
+                    connection_parameters,
+                    phy
+                )
+                self.connections[connection_handle] = connection
+
+                # Emit an event to notify listeners of the new connection
+                self.emit('connection', connection)
+
+            asyncio.create_task(new_connection())
 
     @host_event_handler
     def on_connection_failure(self, connection_handle, error_code):
