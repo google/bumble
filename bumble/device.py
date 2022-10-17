@@ -243,6 +243,20 @@ class AdvertisingType(IntEnum):
 
 
 # -----------------------------------------------------------------------------
+class LePhyOptions:
+    # Coded PHY preference
+    ANY_CODED_PHY        = 0
+    PREFER_S_2_CODED_PHY = 1
+    PREFER_S_8_CODED_PHY = 2
+
+    def __init__(self, coded_phy_preference=0):
+        self.coded_phy_preference = coded_phy_preference
+
+    def __int__(self):
+        return self.coded_phy_preference & 3
+
+
+# -----------------------------------------------------------------------------
 class Peer:
     def __init__(self, connection):
         self.connection = connection
@@ -891,7 +905,6 @@ class Device(CompositeEventEmitter):
 
         # Set the advertising parameters
         await self.send_command(HCI_LE_Set_Advertising_Parameters_Command(
-            # TODO: use real values, not fixed ones
             advertising_interval_min  = self.advertising_interval_min,
             advertising_interval_max  = self.advertising_interval_max,
             advertising_type          = int(advertising_type),
@@ -1349,8 +1362,8 @@ class Device(CompositeEventEmitter):
                 all_phys          = all_phys_bits,
                 tx_phys           = phy_list_to_bits(tx_phys),
                 rx_phys           = phy_list_to_bits(rx_phys),
-                phy_options       = 0  # TODO: parse from function argument
-            )
+                phy_options       = 0 if phy_options is None else int(phy_options)
+            ), check_result=True
         )
 
     async def set_default_phy(self, tx_phys=None, rx_phys=None):
