@@ -21,9 +21,9 @@ from bumble.transport import PacketParser
 
 # -----------------------------------------------------------------------------
 class ScannerListener(Device.Listener):
-    def on_advertisement(self, address, ad_data, rssi, connectable):
-        address_type_string = ('P', 'R', 'PI', 'RI')[address.address_type]
-        print(f'>>> {address} [{address_type_string}]: RSSI={rssi}, {ad_data}')
+    def on_advertisement(self, advertisement):
+        address_type_string = ('P', 'R', 'PI', 'RI')[advertisement.address.address_type]
+        print(f'>>> {advertisement.address} [{address_type_string}]: RSSI={advertisement.rssi}, {advertisement.ad_data}')
 
 
 class HciSource:

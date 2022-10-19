@@ -25,8 +25,8 @@ from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.keys import JsonKeyStore
 from bumble.smp import AddressResolver
-from bumble.hci import HCI_LE_Advertising_Report_Event
-from bumble.core import AdvertisingData
+from bumble.device import Advertisement
+from bumble.hci import HCI_Constant, HCI_LE_1M_PHY, HCI_LE_CODED_PHY
 
 
 # -----------------------------------------------------------------------------
@@ -48,16 +48,19 @@ class AdvertisementPrinter:
         self.min_rssi = min_rssi
         self.resolver = resolver
 
-    def print_advertisement(self, address, address_color, ad_data, rssi):
-        if self.min_rssi is not None and rssi < self.min_rssi:
+    def print_advertisement(self, advertisement):
+        address = advertisement.address
+        address_color = 'yellow' if advertisement.is_connectable else 'red'
+
+        if self.min_rssi is not None and advertisement.rssi < self.min_rssi:
             return
 
         address_qualifier = ''
         resolution_qualifier = ''
-        if self.resolver and address.is_resolvable:
-            resolved = self.resolver.resolve(address)
+        if self.resolver and advertisement.address.is_resolvable:
+            resolved = self.resolver.resolve(advertisement.address)
             if resolved is not None:
-                resolution_qualifier = f'(resolved from {address})'
+                resolution_qualifier = f'(resolved from {advertisement.address})'
                 address = resolved
 
         address_type_string = ('PUBLIC', 'RANDOM', 'PUBLIC_ID', 'RANDOM_ID')[address.address_type]
@@ -74,18 +77,30 @@ class AdvertisementPrinter:
                 type_color = 'blue'
                 address_qualifier = '(non-resolvable)'
 
-        rssi_bar = make_rssi_bar(rssi)
         separator = '\n  '
-        print(f'>>> {color(address, address_color)} [{color(address_type_string, type_color)}]{address_qualifier}{resolution_qualifier}:{separator}RSSI:{rssi:4} {rssi_bar}{separator}{ad_data.to_string(separator)}\n')
+        rssi_bar = make_rssi_bar(advertisement.rssi)
+        if not advertisement.is_legacy:
+            phy_info = (
+                f'PHY: {HCI_Constant.le_phy_name(advertisement.primary_phy)}/'
+                f'{HCI_Constant.le_phy_name(advertisement.secondary_phy)} '
+                f'{separator}'
+            )
+        else:
+            phy_info = ''
 
-    def on_advertisement(self, address, ad_data, rssi, connectable):
-        address_color = 'yellow' if connectable else 'red'
-        self.print_advertisement(address, address_color, ad_data, rssi)
+        print(
+            f'>>> {color(address, address_color)} '
+            f'[{color(address_type_string, type_color)}]{address_qualifier}{resolution_qualifier}:{separator}'
+            f'{phy_info}'
+            f'RSSI:{advertisement.rssi:4} {rssi_bar}{separator}'
+            f'{advertisement.data.to_string(separator)}\n')
 
-    def on_advertising_report(self, address, ad_data, rssi, event_type):
-        print(f'{color("EVENT", "green")}: {HCI_LE_Advertising_Report_Event.event_type_name(event_type)}')
-        ad_data = AdvertisingData.from_bytes(ad_data)
-        self.print_advertisement(address, 'yellow', ad_data, rssi)
+    def on_advertisement(self, advertisement):
+        self.print_advertisement(advertisement)
+
+    def on_advertising_report(self, report):
+        print(f'{color("EVENT", "green")}: {report.event_type_string()}')
+        self.print_advertisement(Advertisement.from_advertising_report(report))
 
 
 # -----------------------------------------------------------------------------
@@ -94,6 +109,7 @@ async def scan(
     passive,
     scan_interval,
     scan_window,
+    phy,
     filter_duplicates,
     raw,
     keystore_file,
@@ -126,11 +142,18 @@ async def scan(
             device.on('advertisement', printer.on_advertisement)
 
         await device.power_on()
+
+        if phy is None:
+            scanning_phys = [HCI_LE_1M_PHY, HCI_LE_CODED_PHY]
+        else:
+            scanning_phys = [{'1m': HCI_LE_1M_PHY, 'coded': HCI_LE_CODED_PHY}[phy]]
+
         await device.start_scanning(
             active=(not passive),
             scan_interval=scan_interval,
             scan_window=scan_window,
-            filter_duplicates=filter_duplicates
+            filter_duplicates=filter_duplicates,
+            scanning_phys=scanning_phys
         )
 
         await hci_source.wait_for_termination()
@@ -142,14 +165,15 @@ async def scan(
 @click.option('--passive', is_flag=True, default=False, help='Perform passive scanning')
 @click.option('--scan-interval', type=int, default=60, help='Scan interval')
 @click.option('--scan-window', type=int, default=60, help='Scan window')
+@click.option('--phy', type=click.Choice(['1m', 'coded']), help='Only scan on the specified PHY')
 @click.option('--filter-duplicates', type=bool, default=True, help='Filter duplicates at the controller level')
 @click.option('--raw', is_flag=True, default=False, help='Listen for raw advertising reports instead of processed ones')
 @click.option('--keystore-file', help='Keystore file to use when resolving addresses')
 @click.option('--device-config', help='Device config file for the scanning device')
 @click.argument('transport')
-def main(min_rssi, passive, scan_interval, scan_window, filter_duplicates, raw, keystore_file, device_config, transport):
+def main(min_rssi, passive, scan_interval, scan_window, phy, filter_duplicates, raw, keystore_file, device_config, transport):
     logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
-    asyncio.run(scan(min_rssi, passive, scan_interval, scan_window, filter_duplicates, raw, keystore_file, device_config, transport))
+    asyncio.run(scan(min_rssi, passive, scan_interval, scan_window, phy, filter_duplicates, raw, keystore_file, device_config, transport))
 
 
 # -----------------------------------------------------------------------------

@@ -76,7 +76,7 @@ class Controller:
         self.supported_commands           = bytes.fromhex('2000800000c000000000e40000002822000000000000040000f7ffff7f00000030f0f9ff01008004000000000000000000000000000000000000000000000000')
         self.le_features                  = bytes.fromhex('ff49010000000000')
         self.le_states                    = bytes.fromhex('ffff3fffff030000')
-        self.avertising_channel_tx_power  = 0
+        self.advertising_channel_tx_power = 0
         self.filter_accept_list_size      = 8
         self.resolving_list_size          = 8
         self.supported_max_tx_octets      = 27
@@ -259,15 +259,15 @@ class Controller:
 
         # Then say that the connection has completed
         self.send_hci_packet(HCI_LE_Connection_Complete_Event(
-            status                = HCI_SUCCESS,
-            connection_handle     = connection.handle,
-            role                  = connection.role,
-            peer_address_type     = peer_address_type,
-            peer_address          = peer_address,
-            conn_interval         = 10,  # FIXME
-            conn_latency          = 0,   # FIXME
-            supervision_timeout   = 10,  # FIXME
-            master_clock_accuracy = 7    # FIXME
+            status                 = HCI_SUCCESS,
+            connection_handle      = connection.handle,
+            role                   = connection.role,
+            peer_address_type      = peer_address_type,
+            peer_address           = peer_address,
+            connection_interval    = 10,  # FIXME
+            peripheral_latency     = 0,   # FIXME
+            supervision_timeout    = 10,  # FIXME
+            central_clock_accuracy = 7    # FIXME
         ))
 
     def on_link_central_disconnected(self, peer_address, reason):
@@ -313,15 +313,15 @@ class Controller:
 
         # Say that the connection has completed
         self.send_hci_packet(HCI_LE_Connection_Complete_Event(
-            status                = status,
-            connection_handle     = connection.handle if connection else 0,
-            role                  = BT_CENTRAL_ROLE,
-            peer_address_type     = le_create_connection_command.peer_address_type,
-            peer_address          = le_create_connection_command.peer_address,
-            conn_interval         = le_create_connection_command.conn_interval_min,
-            conn_latency          = le_create_connection_command.conn_latency,
-            supervision_timeout   = le_create_connection_command.supervision_timeout,
-            master_clock_accuracy = 0
+            status                 = status,
+            connection_handle      = connection.handle if connection else 0,
+            role                   = BT_CENTRAL_ROLE,
+            peer_address_type      = le_create_connection_command.peer_address_type,
+            peer_address           = le_create_connection_command.peer_address,
+            connection_interval    = le_create_connection_command.connection_interval_min,
+            peripheral_latency     = le_create_connection_command.max_latency,
+            supervision_timeout    = le_create_connection_command.supervision_timeout,
+            central_clock_accuracy = 0
         ))
 
     def on_link_peripheral_disconnection_complete(self, disconnection_command, status):
@@ -583,13 +583,15 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.4.1 Read Local Version Information Command
         '''
-        return struct.pack('<BBHBHH',
-                           HCI_SUCCESS,
-                           self.hci_version,
-                           self.hci_revision,
-                           self.lmp_version,
-                           self.manufacturer_name,
-                           self.lmp_subversion)
+        return struct.pack(
+            '<BBHBHH',
+            HCI_SUCCESS,
+            self.hci_version,
+            self.hci_revision,
+            self.lmp_version,
+            self.manufacturer_name,
+            self.lmp_subversion
+        )
 
     def on_hci_read_local_supported_commands_command(self, command):
         '''
@@ -650,7 +652,7 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.6 LE Read Advertising Channel Tx Power Command
         '''
-        return bytes([HCI_SUCCESS, self.avertising_channel_tx_power])
+        return bytes([HCI_SUCCESS, self.advertising_channel_tx_power])
 
     def on_hci_le_set_advertising_data_command(self, command):
         '''
@@ -876,12 +878,26 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.46 LE Read Maximum Data Length Command
         '''
-        return struct.pack('<BHHHH',
-                           HCI_SUCCESS,
-                           self.supported_max_tx_octets,
-                           self.supported_max_tx_time,
-                           self.supported_max_rx_octets,
-                           self.supported_max_rx_time)
+        return struct.pack(
+            '<BHHHH',
+            HCI_SUCCESS,
+            self.supported_max_tx_octets,
+            self.supported_max_tx_time,
+            self.supported_max_rx_octets,
+            self.supported_max_rx_time
+        )
+
+    def on_hci_le_read_phy_command(self, command):
+        '''
+        See Bluetooth spec Vol 2, Part E - 7.8.47 LE Read PHY command
+        '''
+        return struct.pack(
+            '<BHBB',
+            HCI_SUCCESS,
+            command.connection_handle,
+            HCI_LE_1M_PHY,
+            HCI_LE_1M_PHY
+        )
 
     def on_hci_le_set_default_phy_command(self, command):
         '''
@@ -893,3 +909,4 @@ class Controller:
             'rx_phys':  command.rx_phys
         }
         return bytes([HCI_SUCCESS])
+

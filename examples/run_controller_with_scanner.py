@@ -29,15 +29,15 @@ from bumble.transport import open_transport_or_link
 
 # -----------------------------------------------------------------------------
 class ScannerListener(Device.Listener):
-    def on_advertisement(self, address, ad_data, rssi, connectable):
-        address_type_string = ('P', 'R', 'PI', 'RI')[address.address_type]
-        address_color = 'yellow' if connectable else 'red'
+    def on_advertisement(self, advertisement):
+        address_type_string = ('P', 'R', 'PI', 'RI')[advertisement.address.address_type]
+        address_color = 'yellow' if advertisement.is_connectable else 'red'
         if address_type_string.startswith('P'):
             type_color = 'green'
         else:
             type_color = 'cyan'
 
-        print(f'>>> {color(address, address_color)} [{color(address_type_string, type_color)}]: RSSI={rssi}, {ad_data}')
+        print(f'>>> {color(advertisement.address, address_color)} [{color(address_type_string, type_color)}]: RSSI={advertisement.rssi}, {advertisement.data}')
 
 
 # -----------------------------------------------------------------------------
