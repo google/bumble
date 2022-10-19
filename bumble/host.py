@@ -383,7 +383,7 @@ class Host(EventEmitter):
             logger.debug(f'### CONNECTION FAILED: {event.status}')
 
             # Notify the listeners
-            self.emit('connection_failure', event.connection_handle, event.status)
+            self.emit('connection_failure', BT_LE_TRANSPORT, event.connection_handle, event.peer_address, event.status)
 
     def on_hci_le_enhanced_connection_complete_event(self, event):
         # Just use the same implementation as for the non-enhanced event for now
@@ -413,7 +413,7 @@ class Host(EventEmitter):
             logger.debug(f'### BR/EDR CONNECTION FAILED: {event.status}')
 
             # Notify the client
-            self.emit('connection_failure', event.connection_handle, event.status)
+            self.emit('connection_failure', BT_BR_EDR_TRANSPORT, event.connection_handle, event.bd_addr, event.status)
 
     def on_hci_disconnection_complete_event(self, event):
         # Find the connection
