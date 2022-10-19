@@ -1316,10 +1316,25 @@ class Device(CompositeEventEmitter):
     def is_disconnecting(self):
         return self.disconnecting
 
-    async def cancel_connection(self):
-        if not self.is_le_connecting:
-            return
-        await self.send_command(HCI_LE_Create_Connection_Cancel_Command(), check_result=True)
+    async def cancel_connection(self, peer_address=None):
+        # Low-energy: cancel ongoing connection
+        if peer_address is None:
+            if not self.is_le_connecting:
+                return
+            await self.send_command(HCI_LE_Create_Connection_Cancel_Command(), check_result=True)
+
+        # BR/EDR: try to cancel to ongoing connection
+        # NOTE: This API does not prevent from trying to cancel a connection which is not currently being created
+        else:
+            if type(peer_address) is str:
+                try:
+                    peer_address = Address(peer_address)
+                except ValueError:
+                    # If the address is not parsable, assume it is a name instead
+                    logger.debug('looking for peer by name')
+                    peer_address = await self.find_peer_by_name(peer_address, BT_BR_EDR_TRANSPORT)  # TODO: timeout
+
+            await self.send_command(HCI_Create_Connection_Cancel_Command(bd_addr=peer_address), check_result=True)
 
     async def disconnect(self, connection, reason):
         # Create a future so that we can wait for the disconnection's result
