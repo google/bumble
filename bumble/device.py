@@ -674,7 +674,7 @@ class Device(CompositeEventEmitter):
         self.scanning                   = False
         self.scanning_is_passive        = False
         self.discovering                = False
-        self.connecting                 = False
+        self.le_connecting              = False
         self.disconnecting              = False
         self.connections                = {}  # Connections, by connection handle
         self.classic_enabled            = False
@@ -1160,7 +1160,7 @@ class Device(CompositeEventEmitter):
             transport = BT_LE_TRANSPORT
 
         # Check that there isn't already a pending connection
-        if transport == BT_LE_TRANSPORT and self.is_connecting:
+        if transport == BT_LE_TRANSPORT and self.is_le_connecting:
             raise InvalidStateError('connection already pending')
 
         if type(peer_address) is str:
@@ -1277,7 +1277,7 @@ class Device(CompositeEventEmitter):
 
             # Wait for the connection process to complete
             if transport == BT_LE_TRANSPORT:
-                self.connecting = True
+                self.le_connecting = True
             if timeout is None:
                 return await pending_connection
             else:
@@ -1297,7 +1297,7 @@ class Device(CompositeEventEmitter):
             self.remove_listener('connection', on_connection)
             self.remove_listener('connection_failure', on_connection_failure)
             if transport == BT_LE_TRANSPORT:
-                self.connecting = False
+                self.le_connecting = False
 
     @asynccontextmanager
     async def connect_as_gatt(self, peer_address):
@@ -1308,15 +1308,15 @@ class Device(CompositeEventEmitter):
             yield peer
 
     @property
-    def is_connecting(self):
-        return self.connecting
+    def is_le_connecting(self):
+        return self.le_connecting
 
     @property
     def is_disconnecting(self):
         return self.disconnecting
 
     async def cancel_connection(self):
-        if not self.is_connecting:
+        if not self.is_le_connecting:
             return
         await self.send_command(HCI_LE_Create_Connection_Cancel_Command(), check_result=True)
 
