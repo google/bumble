@@ -347,13 +347,12 @@ class Host(EventEmitter):
 
     # Classic only
     def on_hci_connection_request_event(self, event):
-        # For now, just accept everything
-        # TODO: delegate the decision
-        self.send_command_sync(
-            HCI_Accept_Connection_Request_Command(
-                bd_addr = event.bd_addr,
-                role    = 0x01  # Remain the peripheral
-            )
+        # Notify the listeners
+        self.emit(
+            'connection_request',
+            event.bd_addr,
+            event.class_of_device,
+            event.link_type,
         )
 
     def on_hci_le_connection_complete_event(self, event):

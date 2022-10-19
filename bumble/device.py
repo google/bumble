@@ -519,6 +519,7 @@ class DeviceConfiguration:
         self.le_simultaneous_enabled  = True
         self.classic_sc_enabled       = True
         self.classic_ssp_enabled      = True
+        self.classic_accept_any       = True
         self.connectable              = True
         self.discoverable             = True
         self.advertising_data = bytes(
@@ -539,6 +540,7 @@ class DeviceConfiguration:
         self.le_simultaneous_enabled  = config.get('le_simultaneous_enabled', self.le_simultaneous_enabled)
         self.classic_sc_enabled       = config.get('classic_sc_enabled', self.classic_sc_enabled)
         self.classic_ssp_enabled      = config.get('classic_ssp_enabled', self.classic_ssp_enabled)
+        self.classic_accept_any       = config.get('classic_accept_any', self.classic_accept_any)
         self.connectable              = config.get('connectable', self.connectable)
         self.discoverable             = config.get('discoverable', self.discoverable)
 
@@ -630,6 +632,9 @@ class Device(CompositeEventEmitter):
         def on_connection_failure(self, error):
             pass
 
+        def on_connection_request(self, bd_addr, class_of_device, link_type):
+            pass
+
         def on_characteristic_subscription(self, connection, characteristic, notify_enabled, indicate_enabled):
             pass
 
@@ -680,6 +685,7 @@ class Device(CompositeEventEmitter):
         self.classic_enabled            = False
         self.inquiry_response           = None
         self.address_resolver           = None
+        self.classic_pending_accepts    = { Address.ANY: [] }  # Futures, by BD address OR [Futures] for Address.ANY
 
         # Use the initial config or a default
         self.public_address = Address('00:00:00:00:00:00')
@@ -700,6 +706,7 @@ class Device(CompositeEventEmitter):
         self.classic_sc_enabled       = config.classic_sc_enabled
         self.discoverable             = config.discoverable
         self.connectable              = config.connectable
+        self.classic_accept_any       = config.classic_accept_any
 
         # If a name is passed, override the name from the config
         if name:
@@ -1300,6 +1307,89 @@ class Device(CompositeEventEmitter):
             if transport == BT_LE_TRANSPORT:
                 self.le_connecting = False
 
+    async def accept(
+        self,
+        peer_address=Address.ANY,
+        role=BT_PERIPHERAL_ROLE,
+        timeout=DEVICE_DEFAULT_CONNECT_TIMEOUT
+    ):
+        '''
+        Wait and accept any incoming connection or a connection from `peer_address` when set.
+
+        Notes:
+          * A `connect` to the same peer will also complete this call.
+          * The `timeout` parameter is only handled while waiting for the connection request,
+            once received and accepeted, the controller shall issue a connection complete event.
+        '''
+
+        if type(peer_address) is str:
+            try:
+                peer_address = Address(peer_address)
+            except ValueError:
+                # If the address is not parsable, assume it is a name instead
+                logger.debug('looking for peer by name')
+                peer_address = await self.find_peer_by_name(peer_address, BT_BR_EDR_TRANSPORT)  # TODO: timeout
+
+        if peer_address == Address.NIL:
+            raise ValueError('accept on nil address')
+
+         # Create a future so that we can wait for the request
+        pending_request = asyncio.get_running_loop().create_future()
+
+        if peer_address == Address.ANY:
+            self.classic_pending_accepts[Address.ANY].append(pending_request)
+        elif peer_address in self.classic_pending_accepts:
+            raise InvalidStateError('accept connection already pending')
+        else:
+            self.classic_pending_accepts[peer_address] = pending_request
+
+        try:
+            # Wait for a request or a completed connection
+            result = await (asyncio.wait_for(pending_request, timeout) if timeout else pending_request)
+
+        except:
+            # Remove future from device context
+            if peer_address == Address.ANY:
+                self.classic_pending_accepts[Address.ANY].remove(pending_request)
+            else:
+                self.classic_pending_accepts.pop(peer_address)
+            raise
+
+        # Result may already be a completed connection,
+        # see `on_connection` for details
+        if isinstance(result, Connection):
+            return result
+
+        # Otherwise, result came from `on_connection_request`
+        peer_address, class_of_device, link_type = result
+
+        def on_connection(connection):
+            if connection.transport == BT_BR_EDR_TRANSPORT and connection.peer_address == peer_address:
+                pending_connection.set_result(connection)
+
+        def on_connection_failure(error):
+            if error.transport == BT_BR_EDR_TRANSPORT and error.peer_address == peer_address:
+                pending_connection.set_exception(error)
+
+        # Create a future so that we can wait for the connection's result
+        pending_connection = asyncio.get_running_loop().create_future()
+        self.on('connection', on_connection)
+        self.on('connection_failure', on_connection_failure)
+
+        try:
+            # Accept connection request
+            await self.send_command(HCI_Accept_Connection_Request_Command(
+                bd_addr = peer_address,
+                role    = role
+            ))
+
+            # Wait for connection complete
+            return await pending_connection
+
+        finally:
+            self.remove_listener('connection', on_connection)
+            self.remove_listener('connection_failure', on_connection_failure)
+
     @asynccontextmanager
     async def connect_as_gatt(self, peer_address):
         async with AsyncExitStack() as stack:
@@ -1716,6 +1806,14 @@ class Device(CompositeEventEmitter):
             )
             self.connections[connection_handle] = connection
 
+            # We may have an accept ongoing waiting for a connection request for `peer_address`.
+            # Typicaly happen when using `connect` to the same `peer_address` we are waiting with
+            # an `accept` for.
+            # In this case, set the completed `connection` to the `accept` future result.
+            if peer_address in self.classic_pending_accepts:
+                future = self.classic_pending_accepts.pop(peer_address)
+                future.set_result(connection)
+
             # Emit an event to notify listeners of the new connection
             self.emit('connection', connection)
         else:
@@ -1778,6 +1876,39 @@ class Device(CompositeEventEmitter):
             HCI_Constant.error_name(error_code)
         )
         self.emit('connection_failure', error)
+
+    # FIXME: Explore a delegate-model for BR/EDR wait connection #56.
+    @host_event_handler
+    def on_connection_request(self, bd_addr, class_of_device, link_type):
+        logger.debug(f'*** Connection request: {bd_addr}')
+
+        # match a pending future using `bd_addr`
+        if bd_addr in self.classic_pending_accepts:
+            future = self.classic_pending_accepts.pop(bd_addr)
+            future.set_result((bd_addr, class_of_device, link_type))
+
+        # match first pending future for ANY address
+        elif len(self.classic_pending_accepts[Address.ANY]) > 0:
+            future = self.classic_pending_accepts[Address.ANY].pop(0)
+            future.set_result((bd_addr, class_of_device, link_type))
+
+        # device configuration is set to accept any incoming connection
+        elif self.classic_accept_any:
+            self.host.send_command_sync(
+                HCI_Accept_Connection_Request_Command(
+                    bd_addr = bd_addr,
+                    role    = 0x01  # Remain the peripheral
+                )
+            )
+
+        # reject incoming connection
+        else:
+            self.host.send_command_sync(
+                HCI_Reject_Connection_Request_Command(
+                    bd_addr = bd_addr,
+                    reason  = HCI_CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR
+                )
+            )
 
     @host_event_handler
     @with_connection_from_handle
