@@ -21,7 +21,7 @@ import asyncio
 from colors import color
 from pyee import EventEmitter
 
-from .core import InvalidStateError, ProtocolError, ConnectionError
+from .core import BT_BR_EDR_TRANSPORT, InvalidStateError, ProtocolError, ConnectionError
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -634,7 +634,12 @@ class Multiplexer(EventEmitter):
         if self.state == Multiplexer.OPENING:
             self.change_state(Multiplexer.CONNECTED)
             if self.open_result:
-                self.open_result.set_exception(ConnectionError(ConnectionError.CONNECTION_REFUSED))
+                self.open_result.set_exception(ConnectionError(
+                    ConnectionError.CONNECTION_REFUSED,
+                    self.l2cap_channel.connection.peer_address,
+                    BT_BR_EDR_TRANSPORT,
+                    'rfcomm'
+                ))
         else:
             logger.warn(f'unexpected state for DM: {self}')
 

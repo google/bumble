@@ -1728,12 +1728,11 @@ class Device(CompositeEventEmitter):
         # Notify listeners
         error = ConnectionError(
             error_code,
+            transport,
+            peer_address,
             'hci',
             HCI_Constant.error_name(error_code)
         )
-        error.transport = transport
-        error.connection_handle = connection_handle # FIXME: Connection handle sounds to be a dummy value here
-        error.peer_address = peer_address
         self.emit('connection_failure', error)
 
     @host_event_handler
@@ -1762,6 +1761,8 @@ class Device(CompositeEventEmitter):
         logger.debug(f'*** Disconnection failed: {error_code}')
         error = ConnectionError(
             error_code,
+            connection.transport,
+            connection.peer_address,
             'hci',
             HCI_Constant.error_name(error_code)
         )
