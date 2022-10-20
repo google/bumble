@@ -91,6 +91,10 @@ class TimeoutError(Exception):
     """ Timeout Error """
 
 
+class CommandTimeoutError(Exception):
+    """ Command Timeout Error """
+
+
 class InvalidStateError(Exception):
     """ Invalid State Error """
 

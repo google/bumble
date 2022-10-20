@@ -784,6 +784,7 @@ class Device(CompositeEventEmitter):
             )
         except asyncio.TimeoutError:
             logger.warning('!!! Command timed out')
+            raise CommandTimeoutError()
 
     async def power_on(self):
         # Reset the controller
