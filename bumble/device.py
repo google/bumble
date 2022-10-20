@@ -1718,7 +1718,7 @@ class Device(CompositeEventEmitter):
             asyncio.create_task(new_connection())
 
     @host_event_handler
-    def on_connection_failure(self, transport, connection_handle, peer_address, error_code):
+    def on_connection_failure(self, transport, peer_address, error_code):
         logger.debug(f'*** Connection failed: {HCI_Constant.error_name(error_code)}')
 
         # For directed advertising, this means a timeout

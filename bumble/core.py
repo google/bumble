@@ -101,9 +101,9 @@ class ConnectionError(BaseError):
     CONNECTION_REFUSED = 0x02
 
     def __init__(self, error_code, transport, peer_address, error_namespace='', error_name='', details=''):
+        super().__init__(error_code, error_namespace, error_name, details)
         self.transport = transport
         self.peer_address = peer_address
-        super().__init__(error_code, error_namespace, error_name, details)
 
 
 # -----------------------------------------------------------------------------
