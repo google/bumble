@@ -20,14 +20,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-from bumble.hci import HCI_Constant
-import os
-import os.path
 import logging
-import click
-from collections import OrderedDict
-import colors
+import os
+import random
 import re
+from collections import OrderedDict
+
+import click
+import colors
 
 from bumble.core import UUID, AdvertisingData, TimeoutError, BT_LE_TRANSPORT
 from bumble.device import ConnectionParametersPreferences, Device, Connection, Peer
@@ -35,6 +35,7 @@ from bumble.utils import AsyncRunner
 from bumble.transport import open_transport_or_link
 from bumble.gatt import Characteristic
 from bumble.hci import (
+    HCI_Constant,
     HCI_LE_1M_PHY,
     HCI_LE_2M_PHY,
     HCI_LE_CODED_PHY,
@@ -271,7 +272,11 @@ class ConsoleApp:
             if device_config:
                 self.device = Device.from_config_file_with_hci(device_config, hci_source, hci_sink)
             else:
-                self.device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
+                random_address = f"{random.randint(192,255):02X}"  # address is static random
+                for c in random.sample(range(255), 5):
+                    random_address += f":{c:02X}"
+                self.append_to_log(f"Setting random address: {random_address}")
+                self.device = Device.with_hci('Bumble', random_address, hci_source, hci_sink)
             self.device.listener = DeviceListener(self)
             await self.device.power_on()
 
