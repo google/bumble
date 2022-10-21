@@ -151,7 +151,8 @@ class ConsoleApp:
             return NestedCompleter.from_nested_dict({
                 'scan': {
                     'on': None,
-                    'off': None
+                    'off': None,
+                    'clear': None
                 },
                 'advertise': {
                     'on': None,
@@ -472,6 +473,10 @@ class ConsoleApp:
             self.top_tab = 'scan'
         elif params[0] == 'off':
             await self.device.stop_scanning()
+        elif params[0] == 'clear':
+            self.device.listener.scan_results.clear()
+            self.known_addresses.clear()
+            self.show_scan_results(self.device.listener.scan_results)
         else:
             self.show_error('unsupported arguments for scan command')
 
@@ -502,6 +507,9 @@ class ConsoleApp:
                 phy: ConnectionParametersPreferences()
                 for phy in phys
             }
+
+        if self.device.is_scanning:
+            await self.device.stop_scanning()
 
         self.append_to_output('connecting...')
 
