@@ -34,8 +34,8 @@ from bumble.gatt import (
     Characteristic,
     CharacteristicValue,
     GATT_DEVICE_INFORMATION_SERVICE,
-    GATT_DEVICE_HUMAN_INTERFACE_DEVICE_SERVICE,
-    GATT_DEVICE_BATTERY_SERVICE,
+    GATT_HUMAN_INTERFACE_DEVICE_SERVICE,
+    GATT_BATTERY_SERVICE,
     GATT_BATTERY_LEVEL_CHARACTERISTIC,
     GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
     GATT_REPORT_CHARACTERISTIC,
@@ -126,8 +126,8 @@ async def keyboard_host(device, peer_address):
     connection = await device.connect(peer_address)
     await connection.pair()
     peer = Peer(connection)
-    await peer.discover_service(GATT_DEVICE_HUMAN_INTERFACE_DEVICE_SERVICE)
-    hid_services = peer.get_services_by_uuid(GATT_DEVICE_HUMAN_INTERFACE_DEVICE_SERVICE)
+    await peer.discover_service(GATT_HUMAN_INTERFACE_DEVICE_SERVICE)
+    hid_services = peer.get_services_by_uuid(GATT_HUMAN_INTERFACE_DEVICE_SERVICE)
     if not hid_services:
         print(color('!!! No HID service', 'red'))
         return
@@ -221,7 +221,7 @@ async def keyboard_device(device, command):
             ]
         ),
         Service(
-            GATT_DEVICE_HUMAN_INTERFACE_DEVICE_SERVICE,
+            GATT_HUMAN_INTERFACE_DEVICE_SERVICE,
             [
                 Characteristic(
                     GATT_PROTOCOL_MODE_CHARACTERISTIC,
@@ -252,7 +252,7 @@ async def keyboard_device(device, command):
             ]
         ),
         Service(
-            GATT_DEVICE_BATTERY_SERVICE,
+            GATT_BATTERY_SERVICE,
             [
                 Characteristic(
                     GATT_BATTERY_LEVEL_CHARACTERISTIC,
@@ -273,7 +273,7 @@ async def keyboard_device(device, command):
         AdvertisingData([
             (AdvertisingData.COMPLETE_LOCAL_NAME, bytes('Bumble Keyboard', 'utf-8')),
             (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                bytes(GATT_DEVICE_HUMAN_INTERFACE_DEVICE_SERVICE)),
+                bytes(GATT_HUMAN_INTERFACE_DEVICE_SERVICE)),
             (AdvertisingData.APPEARANCE, struct.pack('<H', 0x03C1)),
             (AdvertisingData.FLAGS, bytes([0x05]))
         ])

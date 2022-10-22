@@ -262,7 +262,7 @@ class Characteristic(Attribute):
 
     def get_descriptor(self, descriptor_type):
         for descriptor in self.descriptors:
-            if descriptor.uuid == descriptor_type:
+            if descriptor.type == descriptor_type:
                 return descriptor
 
     def __str__(self):
