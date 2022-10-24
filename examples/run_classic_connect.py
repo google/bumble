@@ -30,7 +30,7 @@ from bumble.sdp import Client as SDP_Client, SDP_PUBLIC_BROWSE_ROOT, SDP_ALL_ATT
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 3:
-        print('Usage: run_classic_connect.py <device-config> <transport-spec> <bluetooth-address>')
+        print('Usage: run_classic_connect.py <device-config> <transport-spec> <bluetooth-addresses..>')
         print('example: run_classic_connect.py classic1.json usb:04b4:f901 E1:CA:72:48:C4:E8')
         return
 
@@ -43,8 +43,7 @@ async def main():
         device.classic_enabled = True
         await device.power_on()
 
-        # Connect to a peer
-        target_address = sys.argv[3]
+    async def connect(target_address):
         print(f'=== Connecting to {target_address}...')
         connection = await device.connect(target_address, transport=BT_BR_EDR_TRANSPORT)
         print(f'=== Connected to {connection.peer_address}!')
@@ -75,6 +74,10 @@ async def main():
 
         await sdp_client.disconnect()
         await hci_source.wait_for_termination()
+
+    # Connect to a peer
+    target_addresses = sys.argv[3:]
+    await asyncio.wait([asyncio.create_task(connect(target_address)) for target_address in target_addresses])
 
 # -----------------------------------------------------------------------------
 logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())

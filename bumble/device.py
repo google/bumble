@@ -1145,7 +1145,7 @@ class Device(CompositeEventEmitter):
             transport = BT_LE_TRANSPORT
 
         # Check that there isn't already a pending connection
-        if self.is_connecting:
+        if transport == BT_LE_TRANSPORT and self.is_connecting:
             raise InvalidStateError('connection already pending')
 
         if type(peer_address) is str:
@@ -1156,10 +1156,22 @@ class Device(CompositeEventEmitter):
                 logger.debug('looking for peer by name')
                 peer_address = await self.find_peer_by_name(peer_address, transport)  # TODO: timeout
 
+        def on_connection(connection):
+            if transport == BT_LE_TRANSPORT or (
+                # match BR/EDR connection event against peer address
+                connection.transport == transport and connection.peer_address == peer_address):
+                pending_connection.set_result(connection)
+
+        def on_connection_failure(error):
+            if transport == BT_LE_TRANSPORT or (
+                # match BR/EDR connection failure event against peer address
+                error.transport == transport and error.peer_address == peer_address):
+                pending_connection.set_exception(error)
+
         # Create a future so that we can wait for the connection's result
         pending_connection = asyncio.get_running_loop().create_future()
-        self.on('connection', pending_connection.set_result)
-        self.on('connection_failure', pending_connection.set_exception)
+        self.on('connection', on_connection)
+        self.on('connection_failure', on_connection_failure)
 
         try:
             # Tell the controller to connect
@@ -1249,7 +1261,8 @@ class Device(CompositeEventEmitter):
                 raise HCI_StatusError(result)
 
             # Wait for the connection process to complete
-            self.connecting = True
+            if transport == BT_LE_TRANSPORT:
+                self.connecting = True
             if timeout is None:
                 return await pending_connection
             else:
@@ -1266,9 +1279,10 @@ class Device(CompositeEventEmitter):
                     except ConnectionError:
                         raise TimeoutError()
         finally:
-            self.remove_listener('connection', pending_connection.set_result)
-            self.remove_listener('connection_failure', pending_connection.set_exception)
-            self.connecting = False
+            self.remove_listener('connection', on_connection)
+            self.remove_listener('connection_failure', on_connection_failure)
+            if transport == BT_LE_TRANSPORT:
+                self.connecting = False
 
     @asynccontextmanager
     async def connect_as_gatt(self, peer_address):
@@ -1705,16 +1719,18 @@ class Device(CompositeEventEmitter):
             asyncio.create_task(new_connection())
 
     @host_event_handler
-    def on_connection_failure(self, connection_handle, error_code):
+    def on_connection_failure(self, transport, peer_address, error_code):
         logger.debug(f'*** Connection failed: {HCI_Constant.error_name(error_code)}')
 
         # For directed advertising, this means a timeout
-        if self.advertising and self.advertising_type.is_directed:
+        if transport == BT_LE_TRANSPORT and self.advertising and self.advertising_type.is_directed:
             self.advertising = False
 
         # Notify listeners
         error = ConnectionError(
             error_code,
+            transport,
+            peer_address,
             'hci',
             HCI_Constant.error_name(error_code)
         )
@@ -1746,6 +1762,8 @@ class Device(CompositeEventEmitter):
         logger.debug(f'*** Disconnection failed: {error_code}')
         error = ConnectionError(
             error_code,
+            connection.transport,
+            connection.peer_address,
             'hci',
             HCI_Constant.error_name(error_code)
         )
