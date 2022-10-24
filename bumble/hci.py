@@ -3970,7 +3970,7 @@ class HCI_LE_Advertising_Report_Event(HCI_LE_Meta_Event):
         super().__init__(self.subevent_code, parameters)
 
     def __str__(self):
-        reports = '\n'.join([report.to_string('  ') for report in self.reports])
+        reports = '\n'.join([f'{i}:\n{report.to_string("  ")}' for i, report in enumerate(self.reports)])
         return f'{color(self.subevent_name(self.subevent_code), "magenta")}:\n{reports}'
 
 
@@ -4187,7 +4187,7 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
         super().__init__(self.subevent_code, parameters)
 
     def __str__(self):
-        reports = '\n'.join([report.to_string('  ') for report in self.reports])
+        reports = '\n'.join([f'{i}:\n{report.to_string("  ")}' for i, report in enumerate(self.reports)])
         return f'{color(self.subevent_name(self.subevent_code), "magenta")}:\n{reports}'
 
 
