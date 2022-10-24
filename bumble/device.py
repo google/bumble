@@ -887,6 +887,7 @@ class Device(CompositeEventEmitter):
         self,
         advertising_type=AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
         target=None,
+        own_address_type=Address.RANDOM_DEVICE_ADDRESS,
         auto_restart=False
     ):
         # If we're advertising, stop first
@@ -921,7 +922,7 @@ class Device(CompositeEventEmitter):
             advertising_interval_min  = self.advertising_interval_min,
             advertising_interval_max  = self.advertising_interval_max,
             advertising_type          = int(advertising_type),
-            own_address_type          = Address.RANDOM_DEVICE_ADDRESS,  # TODO: allow using the public address
+            own_address_type          = own_address_type,
             peer_address_type         = peer_address_type,
             peer_address              = peer_address,
             advertising_channel_map   = 7,
