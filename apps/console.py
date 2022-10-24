@@ -128,7 +128,7 @@ class ConsoleApp:
         self.known_attributes = []
         self.device           = None
         self.connected_peer   = None
-        self.top_tab          = 'scan'
+        self.top_tab          = 'device'
         self.monitor_rssi     = False
         self.connection_rssi  = None
 
@@ -167,7 +167,8 @@ class ConsoleApp:
                     'scan': None,
                     'services': None,
                     'attributes': None,
-                    'log': None
+                    'log': None,
+                    'device': None
                 },
                 'filter': {
                     'address': None,
@@ -213,6 +214,7 @@ class ConsoleApp:
         self.scan_results_text = FormattedTextControl()
         self.services_text = FormattedTextControl()
         self.attributes_text = FormattedTextControl()
+        self.device_text = FormattedTextControl()
         self.log_text = FormattedTextControl(get_cursor_position=lambda: Point(0, max(0, len(self.log_lines) - 1)))
         self.log_height = Dimension(min=7, weight=4)
         self.log_max_lines = 100
@@ -234,6 +236,10 @@ class ConsoleApp:
             ConditionalContainer(
                 Frame(Window(self.log_text, height=self.log_height), title='Log'),
                 filter=Condition(lambda: self.top_tab == 'log')
+            ),
+            ConditionalContainer(
+                Frame(Window(self.device_text), title='Device'),
+                filter=Condition(lambda: self.top_tab == 'device')
             ),
             Frame(Window(self.output, height=self.output_height)),
             FormattedTextToolbar(text=self.get_status_bar_text, style='reverse'),
@@ -280,6 +286,7 @@ class ConsoleApp:
                 self.device = Device.with_hci('Bumble', random_address, hci_source, hci_sink)
             self.device.listener = DeviceListener(self)
             await self.device.power_on()
+            self.show_device(self.device)
 
             # Run the UI
             await self.ui.run_async()
@@ -361,13 +368,51 @@ class ConsoleApp:
         self.services_text.text = lines
         self.ui.invalidate()
 
-    async def show_attributes(self, attributes):
+    def show_attributes(self, attributes):
         lines = []
 
         for attribute in attributes:
             lines.append(('ansicyan', f'{attribute}\n'))
 
         self.attributes_text.text = lines
+        self.ui.invalidate()
+
+    def show_device(self, device):
+        lines = []
+
+        lines.append(('ansicyan', 'Name:                 '))
+        lines.append(('', f'{device.name}\n'))
+        lines.append(('ansicyan', 'Public Address:       '))
+        lines.append(('', f'{device.public_address}\n'))
+        lines.append(('ansicyan', 'Random Address:       '))
+        lines.append(('', f'{device.random_address}\n'))
+        lines.append(('ansicyan', 'LE Enabled:           '))
+        lines.append(('', f'{device.le_enabled}\n'))
+        lines.append(('ansicyan', 'Classic Enabled:      '))
+        lines.append(('', f'{device.classic_enabled}\n'))
+        lines.append(('ansicyan', 'Classic SC Enabled:   '))
+        lines.append(('', f'{device.classic_sc_enabled}\n'))
+        lines.append(('ansicyan', 'Classic SSP Enabled:  '))
+        lines.append(('', f'{device.classic_ssp_enabled}\n'))
+        lines.append(('ansicyan', 'Classic Class:        '))
+        lines.append(('', f'{device.class_of_device}\n'))
+        lines.append(('ansicyan', 'Discoverable:         '))
+        lines.append(('', f'{device.discoverable}\n'))
+        lines.append(('ansicyan', 'Connectable:          '))
+        lines.append(('', f'{device.connectable}\n'))
+        lines.append(('ansicyan', 'Advertising Data:     '))
+        lines.append(('', f'{device.advertising_data}\n'))
+        lines.append(('ansicyan', 'Scan Response Data:   '))
+        lines.append(('', f'{device.scan_response_data}\n'))
+        advertising_interval = (
+            device.advertising_interval_min
+            if device.advertising_interval_min == device.advertising_interval_max
+            else f"{device.advertising_interval_min} to {device.advertising_interval_max}"
+        )
+        lines.append(('ansicyan', 'Advertising Interval: '))
+        lines.append(('', f'{advertising_interval}\n'))
+
+        self.device_text.text = lines
         self.ui.invalidate()
 
     def append_to_output(self, line, invalidate=True):
@@ -418,7 +463,7 @@ class ConsoleApp:
         attributes = await self.connected_peer.discover_attributes()
         self.append_to_output(f'discovered {len(attributes)} attributes...')
 
-        await self.show_attributes(attributes)
+        self.show_attributes(attributes)
 
     def find_characteristic(self, param):
         parts = param.split('.')
@@ -581,7 +626,7 @@ class ConsoleApp:
 
     async def do_show(self, params):
         if params:
-            if params[0] in {'scan', 'services', 'attributes', 'log'}:
+            if params[0] in {'scan', 'services', 'attributes', 'log', 'device'}:
                 self.top_tab = params[0]
                 self.ui.invalidate()
 
