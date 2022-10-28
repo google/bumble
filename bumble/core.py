@@ -769,17 +769,20 @@ class AdvertisingData:
     def ad_data_to_object(ad_type, ad_data):
         if ad_type in {
             AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-            AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS
+            AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS
         }:
             return AdvertisingData.uuid_list_to_objects(ad_data, 2)
         elif ad_type in {
             AdvertisingData.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
-            AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS
+            AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS
         }:
             return AdvertisingData.uuid_list_to_objects(ad_data, 4)
         elif ad_type in {
             AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
-            AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS
+            AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS
         }:
             return AdvertisingData.uuid_list_to_objects(ad_data, 16)
         elif ad_type == AdvertisingData.SERVICE_DATA_16_BIT_UUID:
@@ -790,11 +793,24 @@ class AdvertisingData:
             return (UUID.from_bytes(ad_data[:16]), ad_data[16:])
         elif ad_type in {
             AdvertisingData.SHORTENED_LOCAL_NAME,
-            AdvertisingData.COMPLETE_LOCAL_NAME
+            AdvertisingData.COMPLETE_LOCAL_NAME,
+            AdvertisingData.URI
         }:
             return ad_data.decode("utf-8")
-        elif ad_type == AdvertisingData.TX_POWER_LEVEL:
+        elif ad_type in {
+            AdvertisingData.TX_POWER_LEVEL,
+            AdvertisingData.FLAGS
+        }:
             return ad_data[0]
+        elif ad_type in {
+            AdvertisingData.APPEARANCE,
+            AdvertisingData.ADVERTISING_INTERVAL
+        }:
+            return struct.unpack('<H', ad_data)[0]
+        elif ad_type == AdvertisingData.CLASS_OF_DEVICE:
+            return struct.unpack('<I', bytes([*ad_data, 0]))[0]
+        elif ad_type == AdvertisingData.PERIPHERAL_CONNECTION_INTERVAL_RANGE:
+            return struct.unpack('<HH', ad_data)
         elif ad_type == AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
             return (struct.unpack_from('<H', ad_data, 0)[0], ad_data[2:])
         else:
