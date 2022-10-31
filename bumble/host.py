@@ -648,3 +648,6 @@ class Host(EventEmitter):
             self.emit('remote_name_failure', event.bd_addr, event.status)
         else:
             self.emit('remote_name', event.bd_addr, event.remote_name)
+
+    def on_hci_remote_host_supported_features_notification_event(self, event):
+        self.emit('remote_host_supported_features', event.bd_addr, event.host_supported_features)
