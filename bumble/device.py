@@ -1402,9 +1402,9 @@ class Device(CompositeEventEmitter):
 
         # Scan/inquire with event handlers to handle scan/inquiry results
         def on_peer_found(address, ad_data):
-            local_name = ad_data.get(AdvertisingData.COMPLETE_LOCAL_NAME)
+            local_name = ad_data.get(AdvertisingData.COMPLETE_LOCAL_NAME, raw=True)
             if local_name is None:
-                local_name = ad_data.get(AdvertisingData.SHORTENED_LOCAL_NAME)
+                local_name = ad_data.get(AdvertisingData.SHORTENED_LOCAL_NAME, raw=True)
             if local_name is not None:
                 if local_name.decode('utf-8') == name:
                     peer_address.set_result(address)

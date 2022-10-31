@@ -827,7 +827,7 @@ class AdvertisingData:
                 self.ad_structures.append((ad_type, ad_data))
             offset += length
 
-    def get(self, type_id, return_all=False, raw=True):
+    def get(self, type_id, return_all=False, raw=False):
         '''
         Get Advertising Data Structure(s) with a given type
 

@@ -877,9 +877,9 @@ class ScanResult:
         else:
             type_color = colors.cyan
 
-        name = self.ad_data.get(AdvertisingData.COMPLETE_LOCAL_NAME)
+        name = self.ad_data.get(AdvertisingData.COMPLETE_LOCAL_NAME, raw=True)
         if name is None:
-            name = self.ad_data.get(AdvertisingData.SHORTENED_LOCAL_NAME)
+            name = self.ad_data.get(AdvertisingData.SHORTENED_LOCAL_NAME, raw=True)
         if name:
             # Convert to string
             try:
