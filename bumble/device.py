@@ -662,6 +662,7 @@ class Device(CompositeEventEmitter):
         self.powered_on                 = False
         self.advertising                = False
         self.advertising_type           = None
+        self.auto_restart_inquiry       = True
         self.auto_restart_advertising   = False
         self.command_timeout            = 10  # seconds
         self.gatt_server                = gatt_server.Server(self)
@@ -1055,7 +1056,7 @@ class Device(CompositeEventEmitter):
         if advertisement := accumulator.update(report):
             self.emit('advertisement', advertisement)
 
-    async def start_discovery(self):
+    async def start_discovery(self, auto_restart=True):
         await self.send_command(HCI_Write_Inquiry_Mode_Command(
             inquiry_mode=HCI_EXTENDED_INQUIRY_MODE
         ), check_result=True)
@@ -1069,11 +1070,14 @@ class Device(CompositeEventEmitter):
             self.discovering = False
             raise HCI_StatusError(response)
 
-        self.discovering = True
+        self.auto_restart_inquiry = auto_restart
+        self.discovering          = True
 
     async def stop_discovery(self):
-        await self.send_command(HCI_Inquiry_Cancel_Command(), check_result=True)
-        self.discovering = False
+        if self.discovering:
+            await self.send_command(HCI_Inquiry_Cancel_Command(), check_result=True)
+        self.auto_restart_inquiry = True
+        self.discovering          = False
 
     @host_event_handler
     def on_inquiry_result(self, address, class_of_device, data, rssi):
@@ -1795,9 +1799,13 @@ class Device(CompositeEventEmitter):
     @host_event_handler
     @AsyncRunner.run_in_task()
     async def on_inquiry_complete(self):
-        if self.discovering:
+        if self.auto_restart_inquiry:
             # Inquire again
-            await self.start_discovery()
+            await self.start_discovery(auto_restart=True)
+        else:
+            self.auto_restart_inquiry = True
+            self.discovering          = False
+            self.emit('inquiry_complete')
 
     @host_event_handler
     @with_connection_from_handle
