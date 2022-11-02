@@ -1142,7 +1142,7 @@ class Device(CompositeEventEmitter):
     ):
         '''
         Request a connection to a peer.
-        This method cannot be called if there is already a pending connection.
+        When transport is BLE, this method cannot be called if there is already a pending connection.
 
         connection_parameters_preferences: (BLE only, ignored for BR/EDR)
           * None: use all PHYs with default parameters
