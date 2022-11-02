@@ -176,6 +176,9 @@ class Host(EventEmitter):
                 if check_result:
                     if type(response.return_parameters) is int:
                         status = response.return_parameters
+                    elif type(response.return_parameters) is bytes:
+                        # return parameters first field is a one byte status code
+                        status = response.return_parameters[0]
                     else:
                         status = response.return_parameters.status
 
