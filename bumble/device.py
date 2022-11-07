@@ -777,9 +777,11 @@ class Device(CompositeEventEmitter):
         if connection := self.connections.get(connection_handle):
             return connection
 
-    def find_connection_by_bd_addr(self, bd_addr, transport=None):
+    def find_connection_by_bd_addr(self, bd_addr, transport=None, check_address_type=False):
         for connection in self.connections.values():
             if connection.peer_address.get_bytes() == bd_addr.get_bytes():
+                if check_address_type and connection.peer_address.address_type != bd_addr.address_type:
+                    continue
                 if transport is None or connection.transport == transport:
                     return connection
 
