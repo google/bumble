@@ -962,6 +962,7 @@ class Device(CompositeEventEmitter):
 
     async def start_scanning(
         self,
+        legacy=False,
         active=True,
         scan_interval=DEVICE_DEFAULT_SCAN_INTERVAL,  # Scan interval in ms
         scan_window=DEVICE_DEFAULT_SCAN_WINDOW,      # Scan window in ms
@@ -981,7 +982,7 @@ class Device(CompositeEventEmitter):
         self.advertisement_accumulator = {}
 
         # Enable scanning
-        if self.supports_le_feature(HCI_LE_EXTENDED_ADVERTISING_LE_SUPPORTED_FEATURE):
+        if not legacy and self.supports_le_feature(HCI_LE_EXTENDED_ADVERTISING_LE_SUPPORTED_FEATURE):
             # Set the scanning parameters
             scan_type = HCI_LE_Set_Extended_Scan_Parameters_Command.ACTIVE_SCANNING if active else HCI_LE_Set_Extended_Scan_Parameters_Command.PASSIVE_SCANNING
             scanning_filter_policy = HCI_LE_Set_Extended_Scan_Parameters_Command.BASIC_UNFILTERED_POLICY  # TODO: support other types
