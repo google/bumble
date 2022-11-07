@@ -311,7 +311,7 @@ class ConsoleApp:
         rssi = '' if self.connection_rssi is None else rssi_bar(self.connection_rssi)
 
         if self.device:
-            if self.device.is_connecting:
+            if self.device.is_le_connecting:
                 connection_state = 'CONNECTING'
             elif self.connected_peer:
                 connection = self.connected_peer.connection
@@ -574,7 +574,7 @@ class ConsoleApp:
             self.show_error('connection timed out')
 
     async def do_disconnect(self, params):
-        if self.device.connecting:
+        if self.device.is_le_connecting:
             await self.device.cancel_connection()
         else:
             if not self.connected_peer:
@@ -877,9 +877,9 @@ class ScanResult:
         else:
             type_color = colors.cyan
 
-        name = self.ad_data.get(AdvertisingData.COMPLETE_LOCAL_NAME)
+        name = self.ad_data.get(AdvertisingData.COMPLETE_LOCAL_NAME, raw=True)
         if name is None:
-            name = self.ad_data.get(AdvertisingData.SHORTENED_LOCAL_NAME)
+            name = self.ad_data.get(AdvertisingData.SHORTENED_LOCAL_NAME, raw=True)
         if name:
             # Convert to string
             try:

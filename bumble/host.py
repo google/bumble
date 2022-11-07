@@ -176,6 +176,9 @@ class Host(EventEmitter):
                 if check_result:
                     if type(response.return_parameters) is int:
                         status = response.return_parameters
+                    elif type(response.return_parameters) is bytes:
+                        # return parameters first field is a one byte status code
+                        status = response.return_parameters[0]
                     else:
                         status = response.return_parameters.status
 
@@ -344,13 +347,12 @@ class Host(EventEmitter):
 
     # Classic only
     def on_hci_connection_request_event(self, event):
-        # For now, just accept everything
-        # TODO: delegate the decision
-        self.send_command_sync(
-            HCI_Accept_Connection_Request_Command(
-                bd_addr = event.bd_addr,
-                role    = 0x01  # Remain the peripheral
-            )
+        # Notify the listeners
+        self.emit(
+            'connection_request',
+            event.bd_addr,
+            event.class_of_device,
+            event.link_type,
         )
 
     def on_hci_le_connection_complete_event(self, event):
@@ -645,3 +647,6 @@ class Host(EventEmitter):
             self.emit('remote_name_failure', event.bd_addr, event.status)
         else:
             self.emit('remote_name', event.bd_addr, event.remote_name)
+
+    def on_hci_remote_host_supported_features_notification_event(self, event):
+        self.emit('remote_host_supported_features', event.bd_addr, event.host_supported_features)

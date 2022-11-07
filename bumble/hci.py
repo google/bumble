@@ -1652,6 +1652,16 @@ class Address:
 
     ADDRESS_TYPE_SPEC = {'size': 1, 'mapper': lambda x: Address.address_type_name(x)}
 
+    @classmethod
+    @property
+    def ANY(cls):
+        return cls(b"\xff\xff\xff\xff\xff\xff", cls.PUBLIC_DEVICE_ADDRESS)
+
+    @classmethod
+    @property
+    def NIL(cls):
+        return cls(b"\x00\x00\x00\x00\x00\x00", cls.PUBLIC_DEVICE_ADDRESS)
+
     @staticmethod
     def address_type_name(address_type):
         return name_or_number(Address.ADDRESS_TYPE_NAMES, address_type)
@@ -1932,6 +1942,17 @@ class HCI_Create_Connection_Cancel_Command(HCI_Command):
 class HCI_Accept_Connection_Request_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.8 Accept Connection Request Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([
+    ('bd_addr', Address.parse_address),
+    ('reason',  {'size': 1, 'mapper': HCI_Constant.error_name})
+])
+class HCI_Reject_Connection_Request_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.9 Reject Connection Request Command
     '''
 
 
