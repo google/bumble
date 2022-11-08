@@ -902,7 +902,7 @@ class LogHandler(logging.Handler):
     def __init__(self, app):
         super().__init__()
         self.app = app
-        self.setFormatter("[%(asctime)s][%(pathname)s:%(lineno)d][%(levelname)s] %(message)s")
+        self.setFormatter(logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s'))
 
     def emit(self, record):
         message = self.format(record)
