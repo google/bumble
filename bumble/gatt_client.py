@@ -37,7 +37,8 @@ from .gatt import (
     GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
     GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
-    Characteristic
+    Characteristic,
+    ClientCharacteristicConfigurationBits
 )
 
 # -----------------------------------------------------------------------------
@@ -558,13 +559,13 @@ class Client:
             return
 
         # Set the subscription bits and select the subscriber set
-        bits = 0
+        bits = ClientCharacteristicConfigurationBits.DEFAULT
         subscriber_sets = []
         if characteristic.properties & Characteristic.NOTIFY:
-            bits |= 0x0001
+            bits |= ClientCharacteristicConfigurationBits.NOTIFICATION
             subscriber_sets.append(self.notification_subscribers.setdefault(characteristic.handle, set()))
         if characteristic.properties & Characteristic.INDICATE:
-            bits |= 0x0002
+            bits |= ClientCharacteristicConfigurationBits.INDICATION
             subscriber_sets.append(self.indication_subscribers.setdefault(characteristic.handle, set()))
 
         # Add subscribers to the sets

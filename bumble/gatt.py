@@ -23,6 +23,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import enum
 import types
 import logging
 from pyee import EventEmitter
@@ -474,3 +475,12 @@ class Descriptor(Attribute):
 
     def __str__(self):
         return f'Descriptor(handle=0x{self.handle:04X}, type={self.type}, value={self.read_value(None).hex()})'
+
+
+class ClientCharacteristicConfigurationBits(enum.IntFlag):
+    '''
+    See Vol 3, Part G - 3.3.3.3 - Table 3.11 Client Characteristic Configuration bit field definition
+    '''
+    DEFAULT = 0x0000
+    NOTIFICATION = 0x0001
+    INDICATION = 0x0002
