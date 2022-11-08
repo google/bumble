@@ -1181,6 +1181,7 @@ class Device(CompositeEventEmitter):
         peer_address,
         transport=BT_LE_TRANSPORT,
         connection_parameters_preferences=None,
+        own_address_type=Address.RANDOM_DEVICE_ADDRESS,
         timeout=DEVICE_DEFAULT_CONNECT_TIMEOUT
     ):
         '''
@@ -1190,6 +1191,8 @@ class Device(CompositeEventEmitter):
         connection_parameters_preferences: (BLE only, ignored for BR/EDR)
           * None: use all PHYs with default parameters
           * map: each entry has a PHY as key and a ConnectionParametersPreferences object as value
+
+        own_address_type: (BLE only)
         '''
 
         # Check parameters
@@ -1274,7 +1277,7 @@ class Device(CompositeEventEmitter):
 
                     result = await self.send_command(HCI_LE_Extended_Create_Connection_Command(
                         initiator_filter_policy  = 0,
-                        own_address_type         = Address.RANDOM_DEVICE_ADDRESS,
+                        own_address_type         = own_address_type,
                         peer_address_type        = peer_address.address_type,
                         peer_address             = peer_address,
                         initiating_phys          = initiating_phys,
@@ -1298,7 +1301,7 @@ class Device(CompositeEventEmitter):
                         initiator_filter_policy = 0,
                         peer_address_type       = peer_address.address_type,
                         peer_address            = peer_address,
-                        own_address_type        = Address.RANDOM_DEVICE_ADDRESS,
+                        own_address_type        = own_address_type,
                         connection_interval_min = int(prefs.connection_interval_min / 1.25),
                         connection_interval_max = int(prefs.connection_interval_max / 1.25),
                         max_latency             = prefs.max_latency,
