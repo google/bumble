@@ -2466,9 +2466,10 @@ class HCI_Write_Voice_Setting_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
+@HCI_Command.command()
 class HCI_Read_Synchronous_Flow_Control_Enable_Command(HCI_Command):
     '''
-    See Bluetooth spec @ 7.3.36 Write Synchronous Flow Control Enable Command
+    See Bluetooth spec @ 7.3.36 Read Synchronous Flow Control Enable Command
     '''
 
 

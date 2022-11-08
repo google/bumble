@@ -43,6 +43,13 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
+DEVICE_MIN_SCAN_INTERVAL                      = 25
+DEVICE_MAX_SCAN_INTERVAL                      = 10240
+DEVICE_MIN_SCAN_WINDOW                        = 25
+DEVICE_MAX_SCAN_WINDOW                        = 10240
+DEVICE_MIN_LE_RSSI                            = -127
+DEVICE_MAX_LE_RSSI                            = 20
+
 DEVICE_DEFAULT_ADDRESS                        = '00:00:00:00:00:00'
 DEVICE_DEFAULT_ADVERTISING_INTERVAL           = 1000  # ms
 DEVICE_DEFAULT_ADVERTISING_DATA               = ''
@@ -62,19 +69,14 @@ DEVICE_DEFAULT_CONNECTION_MAX_LATENCY         = 0
 DEVICE_DEFAULT_CONNECTION_SUPERVISION_TIMEOUT = 720  # ms
 DEVICE_DEFAULT_CONNECTION_MIN_CE_LENGTH       = 0   # ms
 DEVICE_DEFAULT_CONNECTION_MAX_CE_LENGTH       = 0   # ms
-
-DEVICE_MIN_SCAN_INTERVAL                      = 25
-DEVICE_MAX_SCAN_INTERVAL                      = 10240
-DEVICE_MIN_SCAN_WINDOW                        = 25
-DEVICE_MAX_SCAN_WINDOW                        = 10240
-DEVICE_MIN_LE_RSSI                            = -127
-DEVICE_MAX_LE_RSSI                            = 20
+DEVICE_DEFAULT_L2CAP_COC_MTU                  = l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MTU
+DEVICE_DEFAULT_L2CAP_COC_MPS                  = l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS
+DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS          = l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_INITIAL_CREDITS
 
 
 # -----------------------------------------------------------------------------
 # Classes
 # -----------------------------------------------------------------------------
-
 
 # -----------------------------------------------------------------------------
 class Advertisement:
@@ -429,7 +431,16 @@ class Connection(CompositeEventEmitter):
     def create_l2cap_connector(self, psm):
         return self.device.create_l2cap_connector(self, psm)
 
-    async def disconnect(self, reason = HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR):
+    async def open_l2cap_channel(
+        self,
+        psm,
+        max_credits=DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
+        mtu=DEVICE_DEFAULT_L2CAP_COC_MTU,
+        mps=DEVICE_DEFAULT_L2CAP_COC_MPS
+    ):
+        return await self.device.open_l2cap_channel(self, psm, max_credits, mtu, mps)
+
+    async def disconnect(self, reason=HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR):
         return await self.device.disconnect(self, reason)
 
     async def pair(self):
@@ -563,6 +574,7 @@ class DeviceConfiguration:
         with open(filename, 'r') as file:
             self.load_from_dict(json.load(file))
 
+
 # -----------------------------------------------------------------------------
 # Decorators used with the following Device class
 # (we define them outside of the Device class, because defining decorators
@@ -685,7 +697,7 @@ class Device(CompositeEventEmitter):
         self.classic_enabled            = False
         self.inquiry_response           = None
         self.address_resolver           = None
-        self.classic_pending_accepts    = { Address.ANY: [] }  # Futures, by BD address OR [Futures] for Address.ANY
+        self.classic_pending_accepts    = {Address.ANY: []}  # Futures, by BD address OR [Futures] for Address.ANY
 
         # Use the initial config or a default
         self.public_address = Address('00:00:00:00:00:00')
@@ -785,14 +797,34 @@ class Device(CompositeEventEmitter):
                 if transport is None or connection.transport == transport:
                     return connection
 
-    def register_l2cap_server(self, psm, server):
-        self.l2cap_channel_manager.register_server(psm, server)
-
     def create_l2cap_connector(self, connection, psm):
         return lambda: self.l2cap_channel_manager.connect(connection, psm)
 
     def create_l2cap_registrar(self, psm):
         return lambda handler: self.register_l2cap_server(psm, handler)
+
+    def register_l2cap_server(self, psm, server):
+        self.l2cap_channel_manager.register_server(psm, server)
+
+    def register_l2cap_channel_server(
+        self,
+        psm,
+        server,
+        max_credits=DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
+        mtu=DEVICE_DEFAULT_L2CAP_COC_MTU,
+        mps=DEVICE_DEFAULT_L2CAP_COC_MPS
+    ):
+        return self.l2cap_channel_manager.register_le_coc_server(psm, server, max_credits, mtu, mps)
+
+    async def open_l2cap_channel(
+        self,
+        connection,
+        psm,
+        max_credits=DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
+        mtu=DEVICE_DEFAULT_L2CAP_COC_MTU,
+        mps=DEVICE_DEFAULT_L2CAP_COC_MPS
+    ):
+        return await self.l2cap_channel_manager.open_le_coc(connection, psm, max_credits, mtu, mps)
 
     def send_l2cap_pdu(self, connection_handle, cid, pdu):
         self.host.send_l2cap_pdu(connection_handle, cid, pdu)
@@ -1185,13 +1217,15 @@ class Device(CompositeEventEmitter):
         def on_connection(connection):
             if transport == BT_LE_TRANSPORT or (
                 # match BR/EDR connection event against peer address
-                connection.transport == transport and connection.peer_address == peer_address):
+                connection.transport == transport and connection.peer_address == peer_address
+            ):
                 pending_connection.set_result(connection)
 
         def on_connection_failure(error):
             if transport == BT_LE_TRANSPORT or (
                 # match BR/EDR connection failure event against peer address
-                error.transport == transport and error.peer_address == peer_address):
+                error.transport == transport and error.peer_address == peer_address
+            ):
                 pending_connection.set_exception(error)
 
         # Create a future so that we can wait for the connection's result
@@ -1336,7 +1370,7 @@ class Device(CompositeEventEmitter):
         if peer_address == Address.NIL:
             raise ValueError('accept on nil address')
 
-         # Create a future so that we can wait for the request
+        # Create a future so that we can wait for the request
         pending_request = asyncio.get_running_loop().create_future()
 
         if peer_address == Address.ANY:
@@ -1349,8 +1383,7 @@ class Device(CompositeEventEmitter):
         try:
             # Wait for a request or a completed connection
             result = await (asyncio.wait_for(pending_request, timeout) if timeout else pending_request)
-
-        except:
+        except Exception:
             # Remove future from device context
             if peer_address == Address.ANY:
                 self.classic_pending_accepts[Address.ANY].remove(pending_request)
@@ -1710,26 +1743,32 @@ class Device(CompositeEventEmitter):
             connection.remove_listener('connection_encryption_failure', on_encryption_failure)
 
     # [Classic only]
-    async def request_remote_name(self, remote: Connection | Address):
+    async def request_remote_name(self, remote):  # remote: Connection | Address
         # Set up event handlers
         pending_name = asyncio.get_running_loop().create_future()
 
         if type(remote) == Address:
             peer_address = remote
-            handler = self.on('remote_name',
+            handler = self.on(
+                'remote_name',
                 lambda address, remote_name:
-                    pending_name.set_result(remote_name) if address == remote else None)
-            failure_handler = self.on('remote_name_failure',
+                    pending_name.set_result(remote_name) if address == remote else None
+            )
+            failure_handler = self.on(
+                'remote_name_failure',
                 lambda address, error_code:
-                    pending_name.set_exception(HCI_Error(error_code)) if address == remote else None)
+                    pending_name.set_exception(HCI_Error(error_code)) if address == remote else None
+            )
         else:
             peer_address = remote.peer_address
-            handler = remote.on('remote_name',
-                lambda:
-                    pending_name.set_result(remote.peer_name))
-            failure_handler = remote.on('remote_name_failure',
-                lambda error_code:
-                    pending_name.set_exception(HCI_Error(error_code)))
+            handler = remote.on(
+                'remote_name',
+                lambda: pending_name.set_result(remote.peer_name)
+            )
+            failure_handler = remote.on(
+                'remote_name_failure',
+                lambda error_code: pending_name.set_exception(HCI_Error(error_code))
+            )
 
         try:
             result = await self.send_command(
@@ -2096,7 +2135,6 @@ class Device(CompositeEventEmitter):
                 connection.emit('remote_name_failure', error)
             else:
                 self.emit('remote_name_failure', address, error)
-
 
     # [Classic only]
     @host_event_handler

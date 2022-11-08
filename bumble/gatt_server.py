@@ -155,7 +155,7 @@ class Server(EventEmitter):
         return cccd or bytes([0, 0])
 
     def write_cccd(self, connection, characteristic, value):
-        logger.debug(f'Subscription update for connection={connection.handle:04X}, handle={characteristic.handle:04X}: {value.hex()}')
+        logger.debug(f'Subscription update for connection=0x{connection.handle:04X}, handle=0x{characteristic.handle:04X}: {value.hex()}')
 
         # Sanity check
         if len(value) != 2:

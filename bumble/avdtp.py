@@ -351,7 +351,7 @@ class MediaPacketPump:
                 logger.debug('pump canceled')
 
         # Pump packets
-        self.pump_task = asyncio.get_running_loop().create_task(pump_packets())
+        self.pump_task = asyncio.create_task(pump_packets())
 
     async def stop(self):
         # Stop the pump
@@ -1890,10 +1890,10 @@ class LocalSource(LocalStreamEndPoint, EventEmitter):
         self.configuration = configuration
 
     def on_start_command(self):
-        asyncio.get_running_loop().create_task(self.start())
+        asyncio.create_task(self.start())
 
     def on_suspend_command(self):
-        asyncio.get_running_loop().create_task(self.stop())
+        asyncio.create_task(self.stop())
 
 
 # -----------------------------------------------------------------------------
