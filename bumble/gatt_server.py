@@ -204,7 +204,7 @@ class Server(EventEmitter):
         logger.debug(f'GATT Notify from server: [0x{connection.handle:04X}] {notification}')
         self.send_gatt_pdu(connection.handle, bytes(notification))
 
-    async def indicate_subscriber(self, connection, attribute, force=False):
+    async def indicate_subscriber(self, connection, attribute, value=None, force=False):
         # Check if there's a subscriber
         if not force:
             subscribers = self.subscribers.get(connection.handle)
