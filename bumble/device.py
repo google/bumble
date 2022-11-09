@@ -1211,9 +1211,7 @@ class Device(CompositeEventEmitter):
 
         if type(peer_address) is str:
             try:
-                peer_address = Address(peer_address)
-                if transport == BT_BR_EDR_TRANSPORT:
-                    peer_address.address_type = Address.PUBLIC_DEVICE_ADDRESS
+                peer_address = Address.from_string_for_transport(peer_address, transport)
             except ValueError:
                 # If the address is not parsable, assume it is a name instead
                 logger.debug('looking for peer by name')
