@@ -1706,6 +1706,9 @@ class Address:
 
         self.address_type = address_type
 
+    def clone(self):
+        return Address(self.address_bytes, self.address_type)
+
     @property
     def is_public(self):
         return self.address_type == self.PUBLIC_DEVICE_ADDRESS or self.address_type == self.PUBLIC_IDENTITY_ADDRESS

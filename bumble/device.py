@@ -1217,6 +1217,11 @@ class Device(CompositeEventEmitter):
                 logger.debug('looking for peer by name')
                 peer_address = await self.find_peer_by_name(peer_address, transport)  # TODO: timeout
 
+        # All BR/EDR addresses should be public addresses
+        if transport == BT_BR_EDR_TRANSPORT and peer_address.address_type != Address.PUBLIC_DEVICE_ADDRESS:
+            peer_address = peer_address.clone()
+            peer_address.address_type = Address.PUBLIC_DEVICE_ADDRESS
+
         def on_connection(connection):
             if transport == BT_LE_TRANSPORT or (
                 # match BR/EDR connection event against peer address
