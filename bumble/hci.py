@@ -1667,6 +1667,14 @@ class Address:
         return name_or_number(Address.ADDRESS_TYPE_NAMES, address_type)
 
     @staticmethod
+    def from_string_for_transport(string, transport):
+        if transport == BT_BR_EDR_TRANSPORT:
+            address_type = Address.PUBLIC_DEVICE_ADDRESS
+        else:
+            address_type = Address.RANDOM_DEVICE_ADDRESS
+        return Address(string, address_type)
+
+    @staticmethod
     def parse_address(data, offset):
         # Fix the type to a default value. This is used for parsing type-less Classic addresses
         return Address.parse_address_with_type(data, offset, Address.PUBLIC_DEVICE_ADDRESS)
@@ -1705,6 +1713,9 @@ class Address:
             raise ValueError('invalid address length')
 
         self.address_type = address_type
+
+    def clone(self):
+        return Address(self.address_bytes, self.address_type)
 
     @property
     def is_public(self):
