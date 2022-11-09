@@ -1212,15 +1212,16 @@ class Device(CompositeEventEmitter):
         if type(peer_address) is str:
             try:
                 peer_address = Address(peer_address)
+                if transport == BT_BR_EDR_TRANSPORT:
+                    peer_address.address_type = Address.PUBLIC_DEVICE_ADDRESS
             except ValueError:
                 # If the address is not parsable, assume it is a name instead
                 logger.debug('looking for peer by name')
                 peer_address = await self.find_peer_by_name(peer_address, transport)  # TODO: timeout
-
-        # All BR/EDR addresses should be public addresses
-        if transport == BT_BR_EDR_TRANSPORT and peer_address.address_type != Address.PUBLIC_DEVICE_ADDRESS:
-            peer_address = peer_address.clone()
-            peer_address.address_type = Address.PUBLIC_DEVICE_ADDRESS
+        else:
+            # All BR/EDR addresses should be public addresses
+            if transport == BT_BR_EDR_TRANSPORT and peer_address.address_type != Address.PUBLIC_DEVICE_ADDRESS:
+                raise ValueError('BR/EDR addresses must be PUBLIC')
 
         def on_connection(connection):
             if transport == BT_LE_TRANSPORT or (
