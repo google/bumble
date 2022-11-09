@@ -2067,13 +2067,13 @@ class Device(CompositeEventEmitter):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
 
-        can_confirm = pairing_config.delegate.io_capability not in {
+        can_compare = pairing_config.delegate.io_capability not in {
             smp.SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
             smp.SMP_DISPLAY_ONLY_IO_CAPABILITY
         }
 
         # Respond
-        if can_confirm and pairing_config.delegate:
+        if can_compare:
             async def compare_numbers():
                 numbers_match = await pairing_config.delegate.compare_numbers(code, digits=6)
                 if numbers_match:
@@ -2087,9 +2087,18 @@ class Device(CompositeEventEmitter):
 
             asyncio.create_task(compare_numbers())
         else:
-            self.host.send_command_sync(
-                HCI_User_Confirmation_Request_Reply_Command(bd_addr=connection.peer_address)
-            )
+            async def confirm():
+                confirm = await pairing_config.delegate.confirm()
+                if confirm:
+                    self.host.send_command_sync(
+                        HCI_User_Confirmation_Request_Reply_Command(bd_addr=connection.peer_address)
+                    )
+                else:
+                    self.host.send_command_sync(
+                        HCI_User_Confirmation_Request_Negative_Reply_Command(bd_addr=connection.peer_address)
+                    )
+
+            asyncio.create_task(confirm())
 
     # [Classic only]
     @host_event_handler
@@ -2104,7 +2113,7 @@ class Device(CompositeEventEmitter):
         }
 
         # Respond
-        if can_input and pairing_config.delegate:
+        if can_input:
             async def get_number():
                 number = await pairing_config.delegate.get_number()
                 if number is not None:

@@ -477,6 +477,9 @@ class PairingDelegate:
     async def accept(self):
         return True
 
+    async def confirm(self):
+        return True
+
     async def compare_numbers(self, number, digits=6):
         return True
 
@@ -714,6 +717,21 @@ class Session:
             self.send_pairing_failed(error)
             return False
         return True
+
+    def prompt_user_for_confirmation(self, next_steps):
+        async def prompt():
+            logger.debug('ask for confirmation')
+            try:
+                response = await self.pairing_config.delegate.confirm()
+                if response:
+                    next_steps()
+                    return
+            except Exception as error:
+                logger.warn(f'exception while confirm: {error}')
+
+            self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
+
+        asyncio.create_task(prompt())
 
     def prompt_user_for_numeric_comparison(self, code, next_steps):
         async def prompt():
@@ -1387,12 +1405,12 @@ class Session:
             # Compute the 6-digit code
             code = crypto.g2(self.pka, self.pkb, self.na, self.nb) % 1000000
 
-            if self.pairing_method == self.NUMERIC_COMPARISON:
-                # Ask for user confirmation
-                self.wait_before_continuing = asyncio.get_running_loop().create_future()
-                self.prompt_user_for_numeric_comparison(code, next_steps)
+            # Ask for user confirmation
+            self.wait_before_continuing = asyncio.get_running_loop().create_future()
+            if self.pairing_method == self.JUST_WORKS:
+                self.prompt_user_for_confirmation(next_steps)
             else:
-                next_steps()
+                self.prompt_user_for_numeric_comparison(code, next_steps)
         else:
             next_steps()
 
