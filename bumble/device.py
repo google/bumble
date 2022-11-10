@@ -394,6 +394,7 @@ class Connection(CompositeEventEmitter):
         device,
         handle,
         transport,
+        self_address,
         peer_address,
         peer_resolvable_address,
         role,
@@ -404,6 +405,7 @@ class Connection(CompositeEventEmitter):
         self.device                  = device
         self.handle                  = handle
         self.transport               = transport
+        self.self_address            = self_address
         self.peer_address            = peer_address
         self.peer_resolvable_address = peer_resolvable_address
         self.peer_name               = None  # Classic only
@@ -699,6 +701,10 @@ class Device(CompositeEventEmitter):
         self.address_resolver           = None
         self.classic_pending_accepts    = {Address.ANY: []}  # Futures, by BD address OR [Futures] for Address.ANY
 
+        # Own address type cache
+        self.advertising_own_address_type = None
+        self.connect_own_address_type     = None
+
         # Use the initial config or a default
         self.public_address = Address('00:00:00:00:00:00')
         if config is None:
@@ -731,8 +737,7 @@ class Device(CompositeEventEmitter):
             self.random_address = address
 
         # Setup SMP
-        # TODO: allow using a public address
-        self.smp_manager = smp.Manager(self, self.random_address)
+        self.smp_manager = smp.Manager(self)
         self.l2cap_channel_manager.register_fixed_channel(
             smp.SMP_CID, self.on_smp_pdu)
         self.l2cap_channel_manager.register_fixed_channel(
@@ -928,7 +933,7 @@ class Device(CompositeEventEmitter):
         self,
         advertising_type=AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
         target=None,
-        own_address_type=Address.RANDOM_DEVICE_ADDRESS,
+        own_address_type=OwnAddressType.RANDOM,
         auto_restart=False
     ):
         # If we're advertising, stop first
@@ -975,9 +980,10 @@ class Device(CompositeEventEmitter):
             advertising_enable = 1
         ), check_result=True)
 
-        self.auto_restart_advertising = auto_restart
-        self.advertising_type         = advertising_type
-        self.advertising              = True
+        self.advertising_own_address_type = own_address_type
+        self.auto_restart_advertising     = auto_restart
+        self.advertising_type             = advertising_type
+        self.advertising                  = True
 
     async def stop_advertising(self):
         # Disable advertising
@@ -986,9 +992,10 @@ class Device(CompositeEventEmitter):
                 advertising_enable = 0
             ), check_result=True)
 
-            self.advertising              = False
-            self.advertising_type         = None
-            self.auto_restart_advertising = False
+            self.advertising_own_address_type = None
+            self.advertising                  = False
+            self.advertising_type             = None
+            self.auto_restart_advertising     = False
 
     @property
     def is_advertising(self):
@@ -1000,7 +1007,7 @@ class Device(CompositeEventEmitter):
         active=True,
         scan_interval=DEVICE_DEFAULT_SCAN_INTERVAL,  # Scan interval in ms
         scan_window=DEVICE_DEFAULT_SCAN_WINDOW,      # Scan window in ms
-        own_address_type=Address.RANDOM_DEVICE_ADDRESS,
+        own_address_type=OwnAddressType.RANDOM,
         filter_duplicates=False,
         scanning_phys=(HCI_LE_1M_PHY, HCI_LE_CODED_PHY)
     ):
@@ -1181,7 +1188,7 @@ class Device(CompositeEventEmitter):
         peer_address,
         transport=BT_LE_TRANSPORT,
         connection_parameters_preferences=None,
-        own_address_type=Address.RANDOM_DEVICE_ADDRESS,
+        own_address_type=OwnAddressType.RANDOM,
         timeout=DEVICE_DEFAULT_CONNECT_TIMEOUT
     ):
         '''
@@ -1250,6 +1257,8 @@ class Device(CompositeEventEmitter):
                             HCI_LE_2M_PHY:    ConnectionParametersPreferences.default,
                             HCI_LE_CODED_PHY: ConnectionParametersPreferences.default
                         }
+
+                self.connect_own_address_type = own_address_type
 
                 if self.host.supports_command(HCI_LE_EXTENDED_CREATE_CONNECTION_COMMAND):
                     # Only keep supported PHYs
@@ -1350,6 +1359,7 @@ class Device(CompositeEventEmitter):
             self.remove_listener('connection_failure', on_connection_failure)
             if transport == BT_LE_TRANSPORT:
                 self.le_connecting = False
+                self.connect_own_address_type = None
 
     async def accept(
         self,
@@ -1847,6 +1857,7 @@ class Device(CompositeEventEmitter):
                 self,
                 connection_handle,
                 transport,
+                self.public_address,
                 peer_address,
                 peer_resolvable_address,
                 role,
@@ -1875,8 +1886,17 @@ class Device(CompositeEventEmitter):
                         peer_resolvable_address = peer_address
                         peer_address = resolved_address
 
+            # Guess which own address type is used for this connection.
+            # This logic is somewhat correct but may need to be improved
+            # when multiple advertising are run simultaneously.
+            if self.connect_own_address_type is not None:
+                own_address_type = self.connect_own_address_type
+            else:
+                own_address_type = self.advertising_own_address_type
+
             # We are no longer advertising
-            self.advertising = False
+            self.advertising_own_address_type = None
+            self.advertising                  = False
 
             # Create and notify of the new connection asynchronously
             async def new_connection():
@@ -1890,11 +1910,16 @@ class Device(CompositeEventEmitter):
                 else:
                     phy = ConnectionPHY(HCI_LE_1M_PHY, HCI_LE_1M_PHY)
 
+                self_address = self.random_address
+                if own_address_type in (OwnAddressType.PUBLIC, OwnAddressType.RESOLVABLE_OR_PUBLIC):
+                     self_address = self.public_address
+
                 # Create a new connection
                 connection = Connection(
                     self,
                     connection_handle,
                     transport,
+                    self_address,
                     peer_address,
                     peer_resolvable_address,
                     role,
@@ -1914,7 +1939,8 @@ class Device(CompositeEventEmitter):
 
         # For directed advertising, this means a timeout
         if transport == BT_LE_TRANSPORT and self.advertising and self.advertising_type.is_directed:
-            self.advertising = False
+            self.advertising_own_address_type = None
+            self.advertising                  = False
 
         # Notify listeners
         error = ConnectionError(

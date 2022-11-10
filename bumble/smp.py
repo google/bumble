@@ -640,15 +640,16 @@ class Session:
         self.oob = False
 
         # Set up addresses
+        self_address = connection.self_address
         peer_address = connection.peer_resolvable_address or connection.peer_address
         if self.is_initiator:
-            self.ia  = bytes(manager.address)
-            self.iat = 1 if manager.address.is_random else 0
+            self.ia  = bytes(self_address)
+            self.iat = 1 if self_address.is_random else 0
             self.ra  = bytes(peer_address)
             self.rat = 1 if peer_address.is_random else 0
         else:
-            self.ra  = bytes(manager.address)
-            self.rat = 1 if manager.address.is_random else 0
+            self.ra  = bytes(self_address)
+            self.rat = 1 if self_address.is_random else 0
             self.ia  = bytes(peer_address)
             self.iat = 1 if peer_address.is_random else 0
 
@@ -925,8 +926,8 @@ class Session:
                     SMP_Identity_Information_Command(identity_resolving_key=self.manager.device.irk)
                 )
                 self.send_command(SMP_Identity_Address_Information_Command(
-                    addr_type = self.manager.address.address_type,
-                    bd_addr   = self.manager.address
+                    addr_type = self.connection.self_address.address_type,
+                    bd_addr   = self.connection.self_address
                 ))
 
             # Distribute CSRK
@@ -957,8 +958,8 @@ class Session:
                     SMP_Identity_Information_Command(identity_resolving_key=self.manager.device.irk)
                 )
                 self.send_command(SMP_Identity_Address_Information_Command(
-                    addr_type = self.manager.address.address_type,
-                    bd_addr   = self.manager.address
+                    addr_type = self.connection.self_address.address_type,
+                    bd_addr   = self.connection.self_address
                 ))
 
             # Distribute CSRK
@@ -1504,10 +1505,9 @@ class Manager(EventEmitter):
     Implements the Initiator and Responder roles of the Security Manager Protocol
     '''
 
-    def __init__(self, device, address):
+    def __init__(self, device):
         super().__init__()
         self.device                 = device
-        self.address                = address
         self.sessions               = {}
         self._ecc_key               = None
         self.pairing_config_factory = lambda connection: PairingConfig()
