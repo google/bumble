@@ -294,8 +294,8 @@ class Peer:
     async def discover_attributes(self):
         return await self.gatt_client.discover_attributes()
 
-    async def subscribe(self, characteristic, subscriber=None):
-        return await self.gatt_client.subscribe(characteristic, subscriber)
+    async def subscribe(self, characteristic, subscriber=None, prefer_notify=True):
+        return await self.gatt_client.subscribe(characteristic, subscriber, prefer_notify)
 
     async def unsubscribe(self, characteristic, subscriber=None):
         return await self.gatt_client.unsubscribe(characteristic, subscriber)

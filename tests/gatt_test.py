@@ -612,13 +612,24 @@ async def test_subscribe_notify():
     await async_barrier()
     assert not c2._called
 
+    c3._called = False
+    c3._called_2 = False
+    c3._called_3 = False
+    c3._last_update = None
+    c3._last_update_2 = None
+    c3._last_update_3 = None
+
     def on_c3_update(value):
         c3._called = True
         c3._last_update = value
 
-    def on_c3_update_2(value):
+    def on_c3_update_2(value):  # for notify
         c3._called_2 = True
         c3._last_update_2 = value
+
+    def on_c3_update_3(value):  # for indicate
+        c3._called_3 = True
+        c3._last_update_3 = value
 
     c3.on('update', on_c3_update)
     await peer.subscribe(c3, on_c3_update_2)
@@ -629,22 +640,33 @@ async def test_subscribe_notify():
     assert c3._last_update == characteristic3.value
     assert c3._called_2
     assert c3._last_update_2 == characteristic3.value
+    assert not c3._called_3
+
+    c3._called = False
+    c3._called_2 = False
+    c3._called_3 = False
+    await peer.unsubscribe(c3)
+    await peer.subscribe(c3, on_c3_update_3, prefer_notify=False)
+    await async_barrier()
     characteristic3.value = bytes([1, 2, 3])
     await server.indicate_subscriber(characteristic3._last_subscription[0], characteristic3)
     await async_barrier()
     assert c3._called
     assert c3._last_update == characteristic3.value
-    assert c3._called_2
-    assert c3._last_update_2 == characteristic3.value
+    assert not c3._called_2
+    assert c3._called_3
+    assert c3._last_update_3 == characteristic3.value
 
     c3._called = False
     c3._called_2 = False
+    c3._called_3 = False
     await peer.unsubscribe(c3)
     await server.notify_subscriber(characteristic3._last_subscription[0], characteristic3)
     await server.indicate_subscriber(characteristic3._last_subscription[0], characteristic3)
     await async_barrier()
     assert not c3._called
     assert not c3._called_2
+    assert not c3._called_3
 
 
 # -----------------------------------------------------------------------------
