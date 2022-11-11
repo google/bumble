@@ -2161,6 +2161,15 @@ class Device(CompositeEventEmitter):
 
     # [Classic only]
     @host_event_handler
+    @with_connection_from_address
+    def on_authentication_user_passkey_notification(self, connection, passkey):
+        # Ask what the pairing config should be for this connection
+        pairing_config = self.pairing_config_factory(connection)
+
+        asyncio.create_task(pairing_config.delegate.display_number(passkey))
+
+    # [Classic only]
+    @host_event_handler
     @try_with_connection_from_address
     def on_remote_name(self, connection, address, remote_name):
         # Try to decode the name

@@ -638,6 +638,9 @@ class Host(EventEmitter):
     def on_hci_user_passkey_request_event(self, event):
         self.emit('authentication_user_passkey_request', event.bd_addr)
 
+    def on_hci_user_passkey_notification_event(self, event):
+        self.emit('authentication_user_passkey_notification', event.bd_addr, event.passkey)
+
     def on_hci_inquiry_complete_event(self, event):
         self.emit('inquiry_complete')
 

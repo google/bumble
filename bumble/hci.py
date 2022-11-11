@@ -4877,6 +4877,17 @@ class HCI_Link_Supervision_Timeout_Changed_Event(HCI_Event):
 
 # -----------------------------------------------------------------------------
 @HCI_Event.event([
+    ('bd_addr', Address.parse_address),
+    ('passkey', 4)
+])
+class HCI_User_Passkey_Notification_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 7.7.48 User Passkey Notification Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Event.event([
     ('bd_addr',                 Address.parse_address),
     ('host_supported_features', 8)
 ])
