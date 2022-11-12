@@ -477,6 +477,9 @@ class PairingDelegate:
     async def accept(self):
         return True
 
+    async def confirm(self):
+        return True
+
     async def compare_numbers(self, number, digits=6):
         return True
 
@@ -637,15 +640,16 @@ class Session:
         self.oob = False
 
         # Set up addresses
+        self_address = connection.self_address
         peer_address = connection.peer_resolvable_address or connection.peer_address
         if self.is_initiator:
-            self.ia  = bytes(manager.address)
-            self.iat = 1 if manager.address.is_random else 0
+            self.ia  = bytes(self_address)
+            self.iat = 1 if self_address.is_random else 0
             self.ra  = bytes(peer_address)
             self.rat = 1 if peer_address.is_random else 0
         else:
-            self.ra  = bytes(manager.address)
-            self.rat = 1 if manager.address.is_random else 0
+            self.ra  = bytes(self_address)
+            self.rat = 1 if self_address.is_random else 0
             self.ia  = bytes(peer_address)
             self.iat = 1 if peer_address.is_random else 0
 
@@ -714,6 +718,21 @@ class Session:
             self.send_pairing_failed(error)
             return False
         return True
+
+    def prompt_user_for_confirmation(self, next_steps):
+        async def prompt():
+            logger.debug('ask for confirmation')
+            try:
+                response = await self.pairing_config.delegate.confirm()
+                if response:
+                    next_steps()
+                    return
+            except Exception as error:
+                logger.warn(f'exception while confirm: {error}')
+
+            self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
+
+        asyncio.create_task(prompt())
 
     def prompt_user_for_numeric_comparison(self, code, next_steps):
         async def prompt():
@@ -907,8 +926,8 @@ class Session:
                     SMP_Identity_Information_Command(identity_resolving_key=self.manager.device.irk)
                 )
                 self.send_command(SMP_Identity_Address_Information_Command(
-                    addr_type = self.manager.address.address_type,
-                    bd_addr   = self.manager.address
+                    addr_type = self.connection.self_address.address_type,
+                    bd_addr   = self.connection.self_address
                 ))
 
             # Distribute CSRK
@@ -939,8 +958,8 @@ class Session:
                     SMP_Identity_Information_Command(identity_resolving_key=self.manager.device.irk)
                 )
                 self.send_command(SMP_Identity_Address_Information_Command(
-                    addr_type = self.manager.address.address_type,
-                    bd_addr   = self.manager.address
+                    addr_type = self.connection.self_address.address_type,
+                    bd_addr   = self.connection.self_address
                 ))
 
             # Distribute CSRK
@@ -1387,12 +1406,12 @@ class Session:
             # Compute the 6-digit code
             code = crypto.g2(self.pka, self.pkb, self.na, self.nb) % 1000000
 
-            if self.pairing_method == self.NUMERIC_COMPARISON:
-                # Ask for user confirmation
-                self.wait_before_continuing = asyncio.get_running_loop().create_future()
-                self.prompt_user_for_numeric_comparison(code, next_steps)
+            # Ask for user confirmation
+            self.wait_before_continuing = asyncio.get_running_loop().create_future()
+            if self.pairing_method == self.JUST_WORKS:
+                self.prompt_user_for_confirmation(next_steps)
             else:
-                next_steps()
+                self.prompt_user_for_numeric_comparison(code, next_steps)
         else:
             next_steps()
 
@@ -1486,10 +1505,9 @@ class Manager(EventEmitter):
     Implements the Initiator and Responder roles of the Security Manager Protocol
     '''
 
-    def __init__(self, device, address):
+    def __init__(self, device):
         super().__init__()
         self.device                 = device
-        self.address                = address
         self.sessions               = {}
         self._ecc_key               = None
         self.pairing_config_factory = lambda connection: PairingConfig()

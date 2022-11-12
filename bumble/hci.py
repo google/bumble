@@ -1757,6 +1757,26 @@ class Address:
 
 
 # -----------------------------------------------------------------------------
+class OwnAddressType:
+    PUBLIC = 0
+    RANDOM = 1
+    RESOLVABLE_OR_PUBLIC = 2
+    RESOLVABLE_OR_RANDOM = 3
+
+    TYPE_NAMES = {
+        PUBLIC:               'PUBLIC',
+        RANDOM:               'RANDOM',
+        RESOLVABLE_OR_PUBLIC: 'RESOLVABLE_OR_PUBLIC',
+        RESOLVABLE_OR_RANDOM: 'RESOLVABLE_OR_RANDOM'
+    }
+
+    @staticmethod
+    def type_name(type):
+        return name_or_number(OwnAddressType.TYPE_NAMES, type)
+
+    TYPE_SPEC = {'size': 1, 'mapper': lambda x: OwnAddressType.type_name(x)}
+
+# -----------------------------------------------------------------------------
 class HCI_Packet:
     '''
     Abstract Base class for HCI packets
@@ -2848,7 +2868,7 @@ class HCI_LE_Set_Random_Address_Command(HCI_Command):
     ('advertising_interval_min',  2),
     ('advertising_interval_max',  2),
     ('advertising_type',          {'size': 1, 'mapper': lambda x: HCI_LE_Set_Advertising_Parameters_Command.advertising_type_name(x)}),
-    ('own_address_type',          Address.ADDRESS_TYPE_SPEC),
+    ('own_address_type',          OwnAddressType.TYPE_SPEC),
     ('peer_address_type',         Address.ADDRESS_TYPE_SPEC),
     ('peer_address',              Address.parse_address_preceded_by_type),
     ('advertising_channel_map',   1),
@@ -2927,7 +2947,7 @@ class HCI_LE_Set_Advertising_Enable_Command(HCI_Command):
     ('le_scan_type',           1),
     ('le_scan_interval',       2),
     ('le_scan_window',         2),
-    ('own_address_type',       Address.ADDRESS_TYPE_SPEC),
+    ('own_address_type',       OwnAddressType.TYPE_SPEC),
     ('scanning_filter_policy', 1)
 ])
 class HCI_LE_Set_Scan_Parameters_Command(HCI_Command):
@@ -2961,7 +2981,7 @@ class HCI_LE_Set_Scan_Enable_Command(HCI_Command):
     ('initiator_filter_policy', 1),
     ('peer_address_type',       Address.ADDRESS_TYPE_SPEC),
     ('peer_address',            Address.parse_address_preceded_by_type),
-    ('own_address_type',        Address.ADDRESS_TYPE_SPEC),
+    ('own_address_type',        OwnAddressType.TYPE_SPEC),
     ('connection_interval_min', 2),
     ('connection_interval_max', 2),
     ('max_latency',             2),
@@ -3283,7 +3303,7 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
         ('primary_advertising_interval_min', 3),
         ('primary_advertising_interval_max', 3),
         ('primary_advertising_channel_map',  {'size': 1, 'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.channel_map_string(x)}),
-        ('own_address_type',                 Address.ADDRESS_TYPE_SPEC),
+        ('own_address_type',                 OwnAddressType.TYPE_SPEC),
         ('peer_address_type',                Address.ADDRESS_TYPE_SPEC),
         ('peer_address',                     Address.parse_address_preceded_by_type),
         ('advertising_filter_policy',        1),
@@ -3687,7 +3707,7 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
         initiating_phys_strs = bit_flags_to_strings(self.initiating_phys, HCI_LE_PHY_BIT_NAMES)
         fields = [
             ('initiator_filter_policy:', self.initiator_filter_policy),
-            ('own_address_type:       ', Address.address_type_name(self.own_address_type)),
+            ('own_address_type:       ', OwnAddressType.type_name(self.own_address_type)),
             ('peer_address_type:      ', Address.address_type_name(self.peer_address_type)),
             ('peer_address:           ', str(self.peer_address)),
             ('initiating_phys:        ', ','.join(initiating_phys_strs)),
@@ -4852,6 +4872,17 @@ class HCI_Simple_Pairing_Complete_Event(HCI_Event):
 class HCI_Link_Supervision_Timeout_Changed_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.46 Link Supervision Timeout Changed Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Event.event([
+    ('bd_addr', Address.parse_address),
+    ('passkey', 4)
+])
+class HCI_User_Passkey_Notification_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 7.7.48 User Passkey Notification Event
     '''
 
 
