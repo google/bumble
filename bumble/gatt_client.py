@@ -26,20 +26,17 @@
 import asyncio
 import logging
 import struct
+
 from colors import color
 
-from .core import ProtocolError, TimeoutError
-from .hci import *
 from .att import *
-from .gatt import (
-    GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
-    GATT_REQUEST_TIMEOUT,
-    GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
-    GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
-    GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
-    Characteristic,
-    ClientCharacteristicConfigurationBits
-)
+from .core import InvalidStateError, ProtocolError, TimeoutError
+from .gatt import (GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
+                   GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
+                   GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE, GATT_REQUEST_TIMEOUT,
+                   GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE, Characteristic,
+                   ClientCharacteristicConfigurationBits)
+from .hci import *
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -115,7 +112,7 @@ class CharacteristicProxy(AttributeProxy):
     async def discover_descriptors(self):
         return await self.client.discover_descriptors(self)
 
-    async def subscribe(self, subscriber=None):
+    async def subscribe(self, subscriber=None, prefer_notify=True):
         if subscriber is not None:
             if subscriber in self.subscribers:
                 # We already have a proxy subscriber
@@ -129,7 +126,7 @@ class CharacteristicProxy(AttributeProxy):
                 self.subscribers[subscriber] = on_change
                 subscriber = on_change
 
-        return await self.client.subscribe(self, subscriber)
+        return await self.client.subscribe(self, subscriber, prefer_notify)
 
     async def unsubscribe(self, subscriber=None):
         if subscriber in self.subscribers:
@@ -547,7 +544,7 @@ class Client:
 
         return attributes
 
-    async def subscribe(self, characteristic, subscriber=None):
+    async def subscribe(self, characteristic, subscriber=None, prefer_notify=True):
         # If we haven't already discovered the descriptors for this characteristic, do it now
         if not characteristic.descriptors_discovered:
             await self.discover_descriptors(characteristic)
@@ -558,23 +555,32 @@ class Client:
             logger.warning('subscribing to characteristic with no CCCD descriptor')
             return
 
-        # Set the subscription bits and select the subscriber set
-        bits = ClientCharacteristicConfigurationBits.DEFAULT
-        subscriber_sets = []
-        if characteristic.properties & Characteristic.NOTIFY:
-            bits |= ClientCharacteristicConfigurationBits.NOTIFICATION
-            subscriber_sets.append(self.notification_subscribers.setdefault(characteristic.handle, set()))
-        if characteristic.properties & Characteristic.INDICATE:
-            bits |= ClientCharacteristicConfigurationBits.INDICATION
-            subscriber_sets.append(self.indication_subscribers.setdefault(characteristic.handle, set()))
+        if (
+            characteristic.properties & Characteristic.NOTIFY
+            and characteristic.properties & Characteristic.INDICATE
+        ):
+            if prefer_notify:
+                bits = ClientCharacteristicConfigurationBits.NOTIFICATION
+                subscribers = self.notification_subscribers
+            else:
+                bits = ClientCharacteristicConfigurationBits.INDICATION
+                subscribers = self.indication_subscribers
+        elif characteristic.properties & Characteristic.NOTIFY:
+            bits = ClientCharacteristicConfigurationBits.NOTIFICATION
+            subscribers = self.notification_subscribers
+        elif characteristic.properties & Characteristic.INDICATE:
+            bits = ClientCharacteristicConfigurationBits.INDICATION
+            subscribers = self.indication_subscribers
+        else:
+            raise InvalidStateError("characteristic is not notify or indicate")
 
         # Add subscribers to the sets
-        for subscriber_set in subscriber_sets:
-            if subscriber is not None:
-                subscriber_set.add(subscriber)
-            # Add the characteristic as a subscriber, which will result in the characteristic
-            # emitting an 'update' event when a notification or indication is received
-            subscriber_set.add(characteristic)
+        subscriber_set = subscribers.setdefault(characteristic.handle, set())
+        if subscriber is not None:
+            subscriber_set.add(subscriber)
+        # Add the characteristic as a subscriber, which will result in the characteristic
+        # emitting an 'update' event when a notification or indication is received
+        subscriber_set.add(characteristic)
 
         await self.write_value(cccd, struct.pack('<H', bits), with_response=True)
 
