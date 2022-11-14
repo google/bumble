@@ -1753,7 +1753,10 @@ class Address:
         '''
         String representation of the address, MSB first
         '''
-        return ':'.join([f'{x:02X}' for x in reversed(self.address_bytes)])
+        str = ':'.join([f'{x:02X}' for x in reversed(self.address_bytes)])
+        if not self.is_public:
+            return str
+        return str + '/P'
 
 
 # -----------------------------------------------------------------------------
