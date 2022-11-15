@@ -59,7 +59,7 @@ def test_HCI_LE_Connection_Complete_Event():
 
 # -----------------------------------------------------------------------------
 def test_HCI_LE_Advertising_Report_Event():
-    address = Address('00:11:22:33:44:55')
+    address = Address('00:11:22:33:44:55/P')
     report = HCI_LE_Advertising_Report_Event.Report(
         HCI_LE_Advertising_Report_Event.Report.FIELDS,
         event_type   = HCI_LE_Advertising_Report_Event.ADV_IND,
