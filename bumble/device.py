@@ -1764,28 +1764,18 @@ class Device(CompositeEventEmitter):
         # Set up event handlers
         pending_name = asyncio.get_running_loop().create_future()
 
-        if type(remote) == Address:
-            peer_address = remote
-            handler = self.on(
-                'remote_name',
-                lambda address, remote_name:
-                    pending_name.set_result(remote_name) if address == remote else None
-            )
-            failure_handler = self.on(
-                'remote_name_failure',
-                lambda address, error_code:
-                    pending_name.set_exception(HCI_Error(error_code)) if address == remote else None
-            )
-        else:
-            peer_address = remote.peer_address
-            handler = remote.on(
-                'remote_name',
-                lambda: pending_name.set_result(remote.peer_name)
-            )
-            failure_handler = remote.on(
-                'remote_name_failure',
-                lambda error_code: pending_name.set_exception(HCI_Error(error_code))
-            )
+        peer_address = remote if type(remote) == Address else remote.peer_address
+
+        handler = self.on(
+            'remote_name',
+            lambda address, remote_name:
+                pending_name.set_result(remote_name) if address == peer_address else None
+        )
+        failure_handler = self.on(
+            'remote_name_failure',
+            lambda address, error_code:
+                pending_name.set_exception(HCI_Error(error_code)) if address == peer_address else None
+        )
 
         try:
             result = await self.send_command(
@@ -1804,12 +1794,8 @@ class Device(CompositeEventEmitter):
             # Wait for the result
             return await pending_name
         finally:
-            if type(remote) == Address:
-                self.remove_listener('remote_name', handler)
-                self.remove_listener('remote_name_failure', failure_handler)
-            else:
-                remote.remove_listener('remote_name', handler)
-                remote.remove_listener('remote_name_failure', failure_handler)
+            self.remove_listener('remote_name', handler)
+            self.remove_listener('remote_name_failure', failure_handler)
 
     # [Classic only]
     @host_event_handler
@@ -2178,8 +2164,7 @@ class Device(CompositeEventEmitter):
             if connection:
                 connection.peer_name = remote_name
                 connection.emit('remote_name')
-            else:
-                self.emit('remote_name', address, remote_name)
+            self.emit('remote_name', address, remote_name)
         except UnicodeDecodeError as error:
             logger.warning('peer name is not valid UTF-8')
             if connection:
@@ -2193,8 +2178,7 @@ class Device(CompositeEventEmitter):
     def on_remote_name_failure(self, connection, address, error):
         if connection:
             connection.emit('remote_name_failure', error)
-        else:
-            self.emit('remote_name_failure', address, error)
+        self.emit('remote_name_failure', address, error)
 
     @host_event_handler
     @with_connection_from_handle
