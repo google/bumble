@@ -636,8 +636,8 @@ class Multiplexer(EventEmitter):
             if self.open_result:
                 self.open_result.set_exception(ConnectionError(
                     ConnectionError.CONNECTION_REFUSED,
-                    self.l2cap_channel.connection.peer_address,
                     BT_BR_EDR_TRANSPORT,
+                    self.l2cap_channel.connection.peer_address,
                     'rfcomm'
                 ))
         else:
