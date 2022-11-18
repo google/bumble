@@ -419,6 +419,27 @@ class Connection(CompositeEventEmitter):
         self.gatt_client             = None  # Per-connection client
         self.gatt_server             = device.gatt_server  # By default, use the device's shared server
 
+    # [Classic only]
+    @classmethod
+    def incomplete(cls, device, peer_address):
+        """
+        Instantiate an incomplete connection (ie. one waiting for a HCI Connection Complete event).
+        Once received it shall be completed using the `.complete` method.
+        """
+        return cls(device, None, BT_BR_EDR_TRANSPORT, device.public_address, peer_address, None, None, None, None)
+
+    # [Classic only]
+    def complete(self, handle, peer_resolvable_address, role, parameters):
+        """
+        Finish an incomplete connection upon completion.
+        """
+        assert self.handle is None
+        assert self.transport == BT_BR_EDR_TRANSPORT
+        self.handle                  = handle
+        self.peer_resolvable_address = peer_resolvable_address
+        self.role                    = role
+        self.parameters              = parameters
+
     @property
     def role_name(self):
         return 'CENTRAL' if self.role == BT_CENTRAL_ROLE else 'PERIPHERAL'
@@ -598,6 +619,8 @@ def with_connection_from_handle(function):
 def with_connection_from_address(function):
     @functools.wraps(function)
     def wrapper(self, address, *args, **kwargs):
+        if (connection := self.pending_connections.get(address, False)):
+            return function(self, connection, *args, **kwargs)
         for connection in self.connections.values():
             if connection.peer_address == address:
                 return function(self, connection, *args, **kwargs)
@@ -609,6 +632,8 @@ def with_connection_from_address(function):
 def try_with_connection_from_address(function):
     @functools.wraps(function)
     def wrapper(self, address, *args, **kwargs):
+        if (connection := self.pending_connections.get(address, False)):
+            return function(self, connection, address, *args, **kwargs)
         for connection in self.connections.values():
             if connection.peer_address == address:
                 return function(self, connection, address, *args, **kwargs)
@@ -696,6 +721,7 @@ class Device(CompositeEventEmitter):
         self.le_connecting              = False
         self.disconnecting              = False
         self.connections                = {}  # Connections, by connection handle
+        self.pending_connections        = {}  # Connections, by BD address (BR/EDR only)
         self.classic_enabled            = False
         self.inquiry_response           = None
         self.address_resolver           = None
@@ -1323,6 +1349,9 @@ class Device(CompositeEventEmitter):
                         max_ce_length           = int(prefs.max_ce_length / 0.625),
                     ))
             else:
+                # Save pending connection
+                self.pending_connections[peer_address] = Connection.incomplete(self, peer_address)
+
                 # TODO: allow passing other settings
                 result = await self.send_command(HCI_Create_Connection_Command(
                     bd_addr                   = peer_address,
@@ -1360,6 +1389,8 @@ class Device(CompositeEventEmitter):
             if transport == BT_LE_TRANSPORT:
                 self.le_connecting = False
                 self.connect_own_address_type = None
+            else:
+                self.pending_connections.pop(peer_address, None)
 
     async def accept(
         self,
@@ -1429,6 +1460,9 @@ class Device(CompositeEventEmitter):
         self.on('connection', on_connection)
         self.on('connection_failure', on_connection_failure)
 
+        # Save pending connection
+        self.pending_connections[peer_address] = Connection.incomplete(self, peer_address)
+
         try:
             # Accept connection request
             await self.send_command(HCI_Accept_Connection_Request_Command(
@@ -1442,6 +1476,7 @@ class Device(CompositeEventEmitter):
         finally:
             self.remove_listener('connection', on_connection)
             self.remove_listener('connection_failure', on_connection_failure)
+            self.pending_connections.pop(peer_address, None)
 
     @asynccontextmanager
     async def connect_as_gatt(self, peer_address):
@@ -1839,17 +1874,8 @@ class Device(CompositeEventEmitter):
 
         if transport == BT_BR_EDR_TRANSPORT:
             # Create a new connection
-            connection = Connection(
-                self,
-                connection_handle,
-                transport,
-                self.public_address,
-                peer_address,
-                peer_resolvable_address,
-                role,
-                connection_parameters,
-                phy=None
-            )
+            connection: Connection = self.pending_connections.pop(peer_address)
+            connection.complete(connection_handle, peer_resolvable_address, role, connection_parameters)
             self.connections[connection_handle] = connection
 
             # We may have an accept ongoing waiting for a connection request for `peer_address`.
@@ -1955,6 +1981,9 @@ class Device(CompositeEventEmitter):
 
         # device configuration is set to accept any incoming connection
         elif self.classic_accept_any:
+            # Save pending connection
+            self.pending_connections[bd_addr] = Connection.incomplete(self, bd_addr)
+
             self.host.send_command_sync(
                 HCI_Accept_Connection_Request_Command(
                     bd_addr = bd_addr,
