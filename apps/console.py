@@ -443,7 +443,10 @@ class ConsoleApp:
         # Discover all services, characteristics and descriptors
         self.append_to_output('discovering services...')
         await self.connected_peer.discover_services()
-        self.append_to_output(f'found {len(self.connected_peer.services)} services, discovering charateristics...')
+        self.append_to_output(
+            f'found {len(self.connected_peer.services)} services,'
+            ' discovering characteristics...'
+        )
         await self.connected_peer.discover_characteristics()
         self.append_to_output('found characteristics, discovering descriptors...')
         for service in self.connected_peer.services:

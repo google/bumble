@@ -1224,7 +1224,7 @@ class ChannelManager:
             self._host.remove_listener('disconnection', self.on_disconnection)
         self._host = host
         if host is not None:
-            host.add_listener('disconnection', self.on_disconnection)
+            host.on('disconnection', self.on_disconnection)
 
     def find_channel(self, connection_handle, cid):
         if connection_channels := self.channels.get(connection_handle):
