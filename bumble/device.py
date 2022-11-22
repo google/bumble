@@ -413,6 +413,8 @@ class Connection(CompositeEventEmitter):
         self.parameters              = parameters
         self.encryption              = 0
         self.authenticated           = False
+        self.sc                      = False
+        self.link_key_type           = None
         self.phy                     = phy
         self.att_mtu                 = ATT_DEFAULT_MTU
         self.data_length             = DEVICE_DEFAULT_DATA_LENGTH
@@ -1404,7 +1406,7 @@ class Device(CompositeEventEmitter):
         Notes:
           * A `connect` to the same peer will also complete this call.
           * The `timeout` parameter is only handled while waiting for the connection request,
-            once received and accepeted, the controller shall issue a connection complete event.
+            once received and accepted, the controller shall issue a connection complete event.
         '''
 
         if type(peer_address) is str:
@@ -1848,6 +1850,9 @@ class Device(CompositeEventEmitter):
 
             asyncio.create_task(store_keys())
 
+        if (connection := self.find_connection_by_bd_addr(bd_addr, transport=BT_BR_EDR_TRANSPORT)):
+            connection.link_key_type = key_type
+
     def add_service(self, service):
         self.gatt_server.add_service(service)
 
@@ -2273,7 +2278,9 @@ class Device(CompositeEventEmitter):
         connection.emit('pairing_start')
 
     @with_connection_from_handle
-    def on_pairing(self, connection, keys):
+    def on_pairing(self, connection, keys, sc):
+        connection.sc = sc
+        connection.authenticated = True
         connection.emit('pairing', keys)
 
     @with_connection_from_handle
