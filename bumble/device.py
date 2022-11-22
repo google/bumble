@@ -415,6 +415,7 @@ class Connection(CompositeEventEmitter):
         self.authenticated           = False
         self.sc                      = False
         self.link_key_type           = None
+        self.authenticating          = False
         self.phy                     = phy
         self.att_mtu                 = ATT_DEFAULT_MTU
         self.data_length             = DEVICE_DEFAULT_DATA_LENGTH
@@ -1722,9 +1723,13 @@ class Device(CompositeEventEmitter):
                 logger.warn(f'HCI_Authentication_Requested_Command failed: {HCI_Constant.error_name(result.status)}')
                 raise HCI_StatusError(result)
 
+            # Save in connection we are trying to authenticate
+            connection.authenticating = True
+
             # Wait for the authentication to complete
             await pending_authentication
         finally:
+            connection.authenticating = False
             connection.remove_listener('connection_authentication', on_authentication)
             connection.remove_listener('connection_authentication_failure',  on_authentication_failure)
 
@@ -2061,6 +2066,17 @@ class Device(CompositeEventEmitter):
     def on_connection_authentication_failure(self, connection, error):
         logger.debug(f'*** Connection Authentication Failure: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, error={error}')
         connection.emit('connection_authentication_failure', error)
+
+    @host_event_handler
+    @with_connection_from_address
+    def on_ssp_complete(self, connection):
+        # On Secure Simple Pairing complete, in case:
+        # - Connection isn't already authenticated
+        # - AND We are not the initiator of the authentication
+        # We must trigger authentication to known if we are truly authenticated
+        if not connection.authenticating and not connection.authenticated:
+            logger.debug(f'*** Trigger Connection Authentication: [0x{connection.handle:04X}] {connection.peer_address}')
+            asyncio.create_task(connection.authenticate())
 
     # [Classic only]
     @host_event_handler
