@@ -121,24 +121,28 @@ class Host(EventEmitter):
             self.hc_acl_data_packet_length     = response.return_parameters.hc_acl_data_packet_length
             self.hc_total_num_acl_data_packets = response.return_parameters.hc_total_num_acl_data_packets
 
+            logger.debug(
+                f'HCI ACL flow control: hc_acl_data_packet_length={self.hc_acl_data_packet_length},'
+                f'hc_total_num_acl_data_packets={self.hc_total_num_acl_data_packets}'
+            )
+
         if self.supports_command(HCI_LE_READ_BUFFER_SIZE_COMMAND):
             response = await self.send_command(HCI_LE_Read_Buffer_Size_Command(), check_result=True)
             self.hc_le_acl_data_packet_length     = response.return_parameters.hc_le_acl_data_packet_length
             self.hc_total_num_le_acl_data_packets = response.return_parameters.hc_total_num_le_acl_data_packets
 
-        if response.return_parameters.hc_le_acl_data_packet_length == 0 or response.return_parameters.hc_total_num_le_acl_data_packets == 0:
-            # LE and Classic share the same values
-            self.hc_le_acl_data_packet_length     = self.hc_acl_data_packet_length
-            self.hc_total_num_le_acl_data_packets = self.hc_total_num_acl_data_packets
+            logger.debug(
+                f'HCI LE ACL flow control: hc_le_acl_data_packet_length={self.hc_le_acl_data_packet_length},'
+                f'hc_total_num_le_acl_data_packets={self.hc_total_num_le_acl_data_packets}'
+            )
 
-        logger.debug(
-            f'HCI ACL flow control: hc_acl_data_packet_length={self.hc_acl_data_packet_length},'
-            f'hc_total_num_acl_data_packets={self.hc_total_num_acl_data_packets}'
-        )
-        logger.debug(
-            f'HCI LE ACL flow control: hc_le_acl_data_packet_length={self.hc_le_acl_data_packet_length},'
-            f'hc_total_num_le_acl_data_packets={self.hc_total_num_le_acl_data_packets}'
-        )
+            if (
+                response.return_parameters.hc_le_acl_data_packet_length == 0 or
+                response.return_parameters.hc_total_num_le_acl_data_packets == 0
+            ):
+                # LE and Classic share the same values
+                self.hc_le_acl_data_packet_length     = self.hc_acl_data_packet_length
+                self.hc_total_num_le_acl_data_packets = self.hc_total_num_acl_data_packets
 
         if (
             self.supports_command(HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND) and
