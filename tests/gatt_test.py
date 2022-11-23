@@ -28,6 +28,7 @@ from bumble.device import Device, Peer
 from bumble.host import Host
 from bumble.gatt import (
     GATT_BATTERY_LEVEL_CHARACTERISTIC,
+    GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
     CharacteristicAdapter,
     DelegatedCharacteristicAdapter,
     PackedCharacteristicAdapter,
@@ -225,6 +226,37 @@ async def test_characteristic_encoding():
     await async_barrier()
     assert last_change is None
 
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_attribute_getters():
+    [client, server] = LinkedDevices().devices[:2]
+
+    characteristic_uuid = UUID('FDB159DB-036C-49E3-B3DB-6325AC750806')
+    characteristic = Characteristic(
+        characteristic_uuid,
+        Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
+        Characteristic.READABLE | Characteristic.WRITEABLE,
+        bytes([123])
+    )
+
+    service_uuid = UUID('3A657F47-D34F-46B3-B1EC-698E29B6B829')
+    service = Service(service_uuid, [characteristic])
+    server.add_service(service)
+
+    service_attr = server.gatt_server.get_service_attribute(service_uuid)
+    assert service_attr
+
+    (char_decl_attr, char_value_attr) = server.gatt_server.get_characteristic_attributes(service_uuid, characteristic_uuid)
+    assert char_decl_attr and char_value_attr
+
+    desc_attr = server.gatt_server.get_descriptor_attribute(service_uuid, characteristic_uuid, GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR)
+    assert desc_attr
+
+    # assert all handles are in expected order
+    assert service_attr.handle < char_decl_attr.handle < char_value_attr.handle < desc_attr.handle == service_attr.end_group_handle
+    # assert characteristic declarations attribute is followed by characteristic value attribute
+    assert char_decl_attr.handle + 1 == char_value_attr.handle
 
 # -----------------------------------------------------------------------------
 def test_CharacteristicAdapter():

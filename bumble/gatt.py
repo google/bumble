@@ -272,6 +272,23 @@ class Characteristic(Attribute):
 
 
 # -----------------------------------------------------------------------------
+class CharacteristicDeclaration(Attribute):
+    '''
+    See Vol 3, Part G - 3.3.1 CHARACTERISTIC DECLARATION
+    '''
+    def __init__(self, characteristic, value_handle):
+        declaration_bytes = struct.pack(
+            '<BH',
+            characteristic.properties,
+            value_handle
+        ) + characteristic.uuid.to_pdu_bytes()
+        super().__init__(GATT_CHARACTERISTIC_ATTRIBUTE_TYPE, Attribute.READABLE, declaration_bytes)
+        self.characteristic = characteristic
+
+    def __str__(self):
+        return f'CharacteristicDeclaration(handle=0x{self.handle:04X}, value_handle=0x{self.value_handle:04X}, uuid={self.uuid}, properties={Characteristic.properties_as_string(self.properties)})'
+
+# -----------------------------------------------------------------------------
 class CharacteristicValue:
     '''
     Characteristic value where reading and/or writing is delegated to functions
