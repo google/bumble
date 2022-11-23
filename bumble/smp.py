@@ -1110,7 +1110,7 @@ class Session:
         self.manager.on_pairing(self, peer_address, keys)
 
     def on_pairing_failure(self, reason):
-        logger.warn(f'pairing failure ({error_name(reason)})')
+        logger.warning(f'pairing failure ({error_name(reason)})')
 
         if self.completed:
             return

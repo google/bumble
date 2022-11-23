@@ -64,37 +64,37 @@ def test_import():
 
 # -----------------------------------------------------------------------------
 def test_app_imports():
-    from bumble.apps.console import main
+    from apps.console import main
     assert main
 
-    from bumble.apps.controller_info import main
+    from apps.controller_info import main
     assert main
 
-    from bumble.apps.controllers import main
+    from apps.controllers import main
     assert main
 
-    from bumble.apps.gatt_dump import main
+    from apps.gatt_dump import main
     assert main
 
-    from bumble.apps.gg_bridge import main
+    from apps.gg_bridge import main
     assert main
 
-    from bumble.apps.hci_bridge import main
+    from apps.hci_bridge import main
     assert main
 
-    from bumble.apps.pair import main
+    from apps.pair import main
     assert main
 
-    from bumble.apps.scan import main
+    from apps.scan import main
     assert main
 
-    from bumble.apps.show import main
+    from apps.show import main
     assert main
 
-    from bumble.apps.unbond import main
+    from apps.unbond import main
     assert main
 
-    from bumble.apps.usb_probe import main
+    from apps.usb_probe import main
     assert main
 
 
