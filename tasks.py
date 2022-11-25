@@ -53,7 +53,7 @@ test_tasks = Collection()
 ns.add_collection(test_tasks, name="test")
 
 @task
-def test(ctx, filter=None, junit=False, install=False):
+def test(ctx, filter=None, junit=False, install=False, html=False):
     # Install the package before running the tests
     if install:
         ctx.run("python -m pip install .[test]")
@@ -63,6 +63,8 @@ def test(ctx, filter=None, junit=False, install=False):
         args += "--junit-xml test-results.xml"
     if filter is not None:
         args += " -k '{}'".format(filter)
+    if html:
+        args += "--html results.html"
     ctx.run("python -m pytest {} {}".format(os.path.join(ROOT_DIR, "tests"), args))
 
 test_tasks.add_task(test, default=True)

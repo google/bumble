@@ -21,7 +21,7 @@ jobs:
     - name: Get history and tags for SCM versioning to work
       run: |
         git fetch --prune --unshallow
-        git fetch --depth=1 origin +refs/tags/*:refs/tags/*      
+        git fetch --depth=1 origin +refs/tags/*:refs/tags/*
     - name: Set up Python 3.10
       uses: actions/setup-python@v3
       with:
@@ -30,9 +30,9 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install ".[build,test,development,documentation]"
-    - name: Test with pytest
+    - name: Test
       run: |
-        pytest
+        invoke test
     - name: Build
       run: |
         inv build
