@@ -414,14 +414,13 @@ async def open_usb_transport(spec):
 
         device = found.open()
 
-        # Detach the kernel driver if supported and needed
+        # Auto-detach the kernel driver if supported
         if usb1.hasCapability(usb1.CAP_SUPPORTS_DETACH_KERNEL_DRIVER):
             try:
-                if device.kernelDriverActive(interface):
-                    logger.debug("detaching kernel driver")
-                    device.detachKernelDriver(interface)
-            except usb1.USBError:
-                pass
+                logger.debug('auto-detaching kernel driver')
+                device.setAutoDetachKernelDriver(True)
+            except usb1.USBError as error:
+                logger.warning(f'unable to auto-detach kernel driver: {error}')
 
         # Set the configuration if needed
         try:
