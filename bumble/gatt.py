@@ -22,6 +22,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import asyncio
 import enum
 import types
@@ -187,7 +188,7 @@ class Service(Attribute):
     See Vol 3, Part G - 3.1 SERVICE DEFINITION
     '''
 
-    def __init__(self, uuid, characteristics, primary=True):
+    def __init__(self, uuid, characteristics: list[Characteristic], primary=True):
         # Convert the uuid to a UUID object if it isn't already
         if type(uuid) is str:
             uuid = UUID(uuid)
@@ -256,10 +257,21 @@ class Characteristic(Attribute):
             if properties & p
         ])
 
-    def __init__(self, uuid, properties, permissions, value = b'', descriptors = []):
+    @staticmethod
+    def string_to_properties(properties_str: str):
+        return functools.reduce(
+            lambda x, y: x | get_dict_key_by_value(Characteristic.PROPERTY_NAMES, y),
+            properties_str.split(","),
+            0,
+        )
+
+    def __init__(self, uuid, properties, permissions, value = b'', descriptors: list[Descriptor] = []):
         super().__init__(uuid, permissions, value)
         self.uuid        = self.type
-        self.properties  = properties
+        if type(properties) is str:
+            self.properties = Characteristic.string_to_properties(properties)
+        else:
+            self.properties = properties
         self.descriptors = descriptors
 
     def get_descriptor(self, descriptor_type):

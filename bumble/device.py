@@ -540,6 +540,7 @@ class DeviceConfiguration:
         )
         self.irk      = bytes(16)  # This really must be changed for any level of security
         self.keystore = None
+        self.gatt_services = []
 
     def load_from_dict(self, config):
         # Load simple properties
@@ -556,6 +557,7 @@ class DeviceConfiguration:
         self.classic_accept_any       = config.get('classic_accept_any', self.classic_accept_any)
         self.connectable              = config.get('connectable', self.connectable)
         self.discoverable             = config.get('discoverable', self.discoverable)
+        self.gatt_services            = config.get('gatt_services', self.gatt_services)
 
         # Load or synthesize an IRK
         irk = config.get('irk')
@@ -589,7 +591,7 @@ def with_connection_from_handle(function):
     @functools.wraps(function)
     def wrapper(self, connection_handle, *args, **kwargs):
         if (connection := self.lookup_connection(connection_handle)) is None:
-            raise ValueError('no connection for handle')
+            raise ValueError(f"no connection for handle: 0x{connection_handle:04x}")
         return function(self, connection, *args, **kwargs)
     return wrapper
 
@@ -725,6 +727,26 @@ class Device(CompositeEventEmitter):
         self.discoverable             = config.discoverable
         self.connectable              = config.connectable
         self.classic_accept_any       = config.classic_accept_any
+
+        for service in config.gatt_services:
+            characteristics = []
+            for characteristic in service.get("characteristics", []):
+                descriptors = []
+                for descriptor in characteristic.get("descriptors", []):
+                    new_descriptor = Descriptor(
+                        descriptor_type=descriptor["descriptor_type"],
+                        permissions=descriptor["permission"],
+                    )
+                    descriptors.append(new_descriptor)
+                new_characteristic = Characteristic(
+                    uuid=characteristic["uuid"],
+                    properties=characteristic["properties"],
+                    permissions=int(characteristic["permissions"], 0),
+                    descriptors=descriptors,
+                )
+                characteristics.append(new_characteristic)
+            new_service = Service(uuid=service["uuid"], characteristics=characteristics)
+            self.gatt_server.add_service(new_service)
 
         # If a name is passed, override the name from the config
         if name:

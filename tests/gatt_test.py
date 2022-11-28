@@ -706,6 +706,55 @@ async def test_mtu_exchange():
 
 
 # -----------------------------------------------------------------------------
+def test_char_property_to_string():
+    # single
+    assert Characteristic.property_name(0x01) == "BROADCAST"
+    assert Characteristic.property_name(Characteristic.BROADCAST) == "BROADCAST"
+
+    # double
+    assert Characteristic.properties_as_string(0x03) == "BROADCAST,READ"
+    assert Characteristic.properties_as_string(Characteristic.BROADCAST | Characteristic.READ) == "BROADCAST,READ"
+
+
+# -----------------------------------------------------------------------------
+def test_char_property_string_to_type():
+    # single
+    assert Characteristic.string_to_properties("BROADCAST") == Characteristic.BROADCAST
+
+    # double
+    assert Characteristic.string_to_properties("BROADCAST,READ") == Characteristic.BROADCAST | Characteristic.READ
+    assert Characteristic.string_to_properties("READ,BROADCAST") == Characteristic.BROADCAST | Characteristic.READ
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_server_string():
+    [_, server] = LinkedDevices().devices[:2]
+
+    characteristic = Characteristic(
+        'FDB159DB-036C-49E3-B3DB-6325AC750806',
+        Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
+        Characteristic.READABLE | Characteristic.WRITEABLE,
+        bytes([123])
+    )
+
+    service = Service(
+        '3A657F47-D34F-46B3-B1EC-698E29B6B829',
+        [characteristic]
+    )
+    server.add_service(service)
+
+    assert str(server.gatt_server) == """Service(handle=0x0001, end=0x0005, uuid=UUID-16:1800 (Generic Access))
+Attribute(handle=0x0002, type=UUID-16:2803 (Characteristic), permissions=1, value=020300002a)
+Characteristic(handle=0x0003, end=0x0003, uuid=UUID-16:2A00 (Device Name), properties=READ)
+Attribute(handle=0x0004, type=UUID-16:2803 (Characteristic), permissions=1, value=020500012a)
+Characteristic(handle=0x0005, end=0x0005, uuid=UUID-16:2A01 (Appearance), properties=READ)
+Service(handle=0x0006, end=0x0009, uuid=3A657F47-D34F-46B3-B1EC-698E29B6B829)
+Attribute(handle=0x0007, type=UUID-16:2803 (Characteristic), permissions=1, value=1a0800060875ac2563dbb3e3496c03db59b1fd)
+Characteristic(handle=0x0008, end=0x0009, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, properties=READ,WRITE,NOTIFY)
+Descriptor(handle=0x0009, type=UUID-16:2902 (Client Characteristic Configuration), value=0000)"""
+
+# -----------------------------------------------------------------------------
 async def async_main():
     await test_read_write()
     await test_read_write2()
