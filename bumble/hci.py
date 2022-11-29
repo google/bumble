@@ -1652,16 +1652,6 @@ class Address:
 
     ADDRESS_TYPE_SPEC = {'size': 1, 'mapper': lambda x: Address.address_type_name(x)}
 
-    @classmethod
-    @property
-    def ANY(cls):
-        return cls(b"\xff\xff\xff\xff\xff\xff", cls.PUBLIC_DEVICE_ADDRESS)
-
-    @classmethod
-    @property
-    def NIL(cls):
-        return cls(b"\x00\x00\x00\x00\x00\x00", cls.PUBLIC_DEVICE_ADDRESS)
-
     @staticmethod
     def address_type_name(address_type):
         return name_or_number(Address.ADDRESS_TYPE_NAMES, address_type)
@@ -1758,6 +1748,10 @@ class Address:
             return str
         return str + '/P'
 
+
+# Predefined address values
+Address.NIL = Address(b"\xff\xff\xff\xff\xff\xff", Address.PUBLIC_DEVICE_ADDRESS)
+Address.ANY = Address(b"\x00\x00\x00\x00\x00\x00", Address.PUBLIC_DEVICE_ADDRESS)
 
 # -----------------------------------------------------------------------------
 class OwnAddressType:

@@ -295,10 +295,11 @@ class CharacteristicDeclaration(Attribute):
             value_handle
         ) + characteristic.uuid.to_pdu_bytes()
         super().__init__(GATT_CHARACTERISTIC_ATTRIBUTE_TYPE, Attribute.READABLE, declaration_bytes)
+        self.value_handle = value_handle
         self.characteristic = characteristic
 
     def __str__(self):
-        return f'CharacteristicDeclaration(handle=0x{self.handle:04X}, value_handle=0x{self.value_handle:04X}, uuid={self.uuid}, properties={Characteristic.properties_as_string(self.properties)})'
+        return f'CharacteristicDeclaration(handle=0x{self.handle:04X}, value_handle=0x{self.value_handle:04X}, uuid={self.characteristic.uuid}, properties={Characteristic.properties_as_string(self.characteristic.properties)})'
 
 # -----------------------------------------------------------------------------
 class CharacteristicValue:

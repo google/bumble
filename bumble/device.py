@@ -1911,7 +1911,7 @@ class Device(CompositeEventEmitter):
             self.connections[connection_handle] = connection
 
             # We may have an accept ongoing waiting for a connection request for `peer_address`.
-            # Typicaly happen when using `connect` to the same `peer_address` we are waiting with
+            # Typically happen when using `connect` to the same `peer_address` we are waiting with
             # an `accept` for.
             # In this case, set the completed `connection` to the `accept` future result.
             if peer_address in self.classic_pending_accepts:
@@ -2094,7 +2094,7 @@ class Device(CompositeEventEmitter):
     def on_ssp_complete(self, connection):
         # On Secure Simple Pairing complete, in case:
         # - Connection isn't already authenticated
-        # - AND We are not the initiator of the authentication
+        # - AND we are not the initiator of the authentication
         # We must trigger authentication to known if we are truly authenticated
         if not connection.authenticating and not connection.authenticated:
             logger.debug(f'*** Trigger Connection Authentication: [0x{connection.handle:04X}] {connection.peer_address}')
