@@ -58,6 +58,12 @@ def padded_bytes(buffer, size):
     return buffer + bytes(padding_size)
 
 
+def get_dict_key_by_value(dictionary, value):
+    for key, val in dictionary.items():
+        if val == value:
+            return key
+    return None
+
 # -----------------------------------------------------------------------------
 # Exceptions
 # -----------------------------------------------------------------------------
@@ -135,7 +141,7 @@ class UUID:
             else:
                 uuid_str = uuid_str_or_int
             if len(uuid_str) != 32 and len(uuid_str) != 8 and len(uuid_str) != 4:
-                raise ValueError('invalid UUID format')
+                raise ValueError(f"invalid UUID format: {uuid_str}")
             self.uuid_bytes = bytes(reversed(bytes.fromhex(uuid_str)))
         self.name = name
 

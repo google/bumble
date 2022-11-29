@@ -15,8 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from bumble.core import AdvertisingData
-
+from bumble.core import AdvertisingData, get_dict_key_by_value
 
 # -----------------------------------------------------------------------------
 def test_ad_data():
@@ -38,6 +37,16 @@ def test_ad_data():
     assert(ad.get(AdvertisingData.COMPLETE_LOCAL_NAME, return_all=True, raw=True) == [])
     assert(ad.get(AdvertisingData.TX_POWER_LEVEL, return_all=True, raw=True) == [bytes([123]), bytes([234])])
 
+
+# -----------------------------------------------------------------------------
+def test_get_dict_key_by_value():
+    dictionary = {
+        "A": 1,
+        "B": 2
+    }
+    assert get_dict_key_by_value(dictionary, 1) == "A"
+    assert get_dict_key_by_value(dictionary, 2) == "B"
+    assert get_dict_key_by_value(dictionary, 3) is None
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':

@@ -60,6 +60,9 @@ class Server(EventEmitter):
         self.indication_semaphores = defaultdict(lambda: asyncio.Semaphore(1))
         self.pending_confirmations = defaultdict(lambda: None)
 
+    def __str__(self):
+        return "\n".join(map(str, self.attributes))
+
     def send_gatt_pdu(self, connection_handle, pdu):
         self.device.send_l2cap_pdu(connection_handle, ATT_CID, pdu)
 
@@ -87,7 +90,7 @@ class Server(EventEmitter):
         # Add this attribute to the list
         self.attributes.append(attribute)
 
-    def add_service(self, service):
+    def add_service(self, service: Service):
         # Add the service attribute to the DB
         self.add_attribute(service)
 
