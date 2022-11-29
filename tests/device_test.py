@@ -223,8 +223,16 @@ async def test_device_connect_parallel():
 
 
 # -----------------------------------------------------------------------------
-async def run_test_device():
-    await test_device_connect_parallel()
+@pytest.mark.asyncio
+async def test_flush():
+    d0 = Device(host=Host(None, None))
+    task = d0.abort_on('flush', asyncio.sleep(10000))
+    await d0.host.flush()
+    try:
+        await task
+        assert False
+    except asyncio.CancelledError:
+        pass
 
 
 # -----------------------------------------------------------------------------
@@ -246,6 +254,14 @@ def test_gatt_services_without_gas():
 
     # there should be no services
     assert len(device.gatt_server.attributes) == 0
+
+
+# -----------------------------------------------------------------------------
+async def run_test_device():
+    await test_device_connect_parallel()
+    await test_flush()
+    await test_gatt_services_with_gas()
+    await test_gatt_services_without_gas()
 
 
 # -----------------------------------------------------------------------------

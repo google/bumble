@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import logging
-from pyee import EventEmitter
 from colors import color
 
 from .hci import *
@@ -26,6 +25,7 @@ from .att import *
 from .gatt import *
 from .smp import *
 from .core import ConnectionParameters
+from .utils import AbortableEventEmitter
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -65,7 +65,7 @@ class Connection:
 
 
 # -----------------------------------------------------------------------------
-class Host(EventEmitter):
+class Host(AbortableEventEmitter):
     def __init__(self, controller_source=None, controller_sink=None):
         super().__init__()
 
@@ -96,7 +96,19 @@ class Host(EventEmitter):
         if controller_sink:
             self.set_packet_sink(controller_sink)
 
+    async def flush(self):
+        # Make sure no command is pending
+        await self.command_semaphore.acquire()
+
+        # Flush current host state, then release command semaphore
+        self.emit('flush')
+        self.command_semaphore.release()
+
     async def reset(self):
+        if self.ready:
+            self.ready = False
+            await self.flush()
+
         await self.send_command(HCI_Reset_Command(), check_result=True)
         self.ready = True
 
@@ -604,9 +616,9 @@ class Host(EventEmitter):
                 logger.debug('no long term key provider')
                 long_term_key = None
             else:
-                long_term_key = await self.long_term_key_provider(
+                long_term_key = await self.abort_on('flush', self.long_term_key_provider(
                     connection.handle, event.random_number, event.encryption_diversifier
-                )
+                ))
             if long_term_key:
                 response = HCI_LE_Long_Term_Key_Request_Reply_Command(
                     connection_handle=event.connection_handle,
@@ -719,7 +731,7 @@ class Host(EventEmitter):
                 logger.debug('no link key provider')
                 link_key = None
             else:
-                link_key = await self.link_key_provider(event.bd_addr)
+                link_key = await self.abort_on('flush', self.link_key_provider(event.bd_addr))
             if link_key:
                 response = HCI_Link_Key_Request_Reply_Command(
                     bd_addr=event.bd_addr, link_key=link_key

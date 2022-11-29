@@ -766,7 +766,7 @@ class Session:
 
             self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
 
-        asyncio.create_task(prompt())
+        self.connection.abort_on('disconnection', prompt())
 
     def prompt_user_for_numeric_comparison(self, code, next_steps):
         async def prompt():
@@ -783,7 +783,7 @@ class Session:
 
             self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
 
-        asyncio.create_task(prompt())
+        self.connection.abort_on('disconnection', prompt())
 
     def prompt_user_for_number(self, next_steps):
         async def prompt():
@@ -796,7 +796,7 @@ class Session:
                 logger.warn(f'exception while prompting: {error}')
                 self.send_pairing_failed(SMP_PASSKEY_ENTRY_FAILED_ERROR)
 
-        asyncio.create_task(prompt())
+        self.connection.abort_on('disconnection', prompt())
 
     def display_passkey(self):
         # Generate random Passkey/PIN code
@@ -808,7 +808,7 @@ class Session:
             self.tk = self.passkey.to_bytes(16, byteorder='little')
             logger.debug(f'TK from passkey = {self.tk.hex()}')
 
-        asyncio.create_task(
+        self.connection.abort_on('disconnection',
             self.pairing_config.delegate.display_number(self.passkey, digits=6)
         )
 
@@ -921,14 +921,12 @@ class Session:
     def start_encryption(self, key):
         # We can now encrypt the connection with the short term key, so that we can
         # distribute the long term and/or other keys over an encrypted connection
-        asyncio.create_task(
-            self.manager.device.host.send_command(
-                HCI_LE_Enable_Encryption_Command(
-                    connection_handle=self.connection.handle,
-                    random_number=bytes(8),
-                    encrypted_diversifier=0,
-                    long_term_key=key,
-                )
+        self.manager.device.host.send_command_sync(
+            HCI_LE_Enable_Encryption_Command(
+                connection_handle=self.connection.handle,
+                random_number=bytes(8),
+                encrypted_diversifier=0,
+                long_term_key=key
             )
         )
 
@@ -950,7 +948,7 @@ class Session:
                 self.connection.transport == BT_BR_EDR_TRANSPORT
                 and self.initiator_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
-                self.ctkd_task = asyncio.create_task(self.derive_ltk())
+                self.ctkd_task = self.connection.abort_on('disconnection', self.derive_ltk())
             elif not self.sc:
                 # Distribute the LTK, EDIV and RAND
                 if self.initiator_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG:
@@ -997,7 +995,7 @@ class Session:
                 self.connection.transport == BT_BR_EDR_TRANSPORT
                 and self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
-                self.ctkd_task = asyncio.create_task(self.derive_ltk())
+                self.ctkd_task = self.connection.abort_on('disconnection', self.derive_ltk())
             # Distribute the LTK, EDIV and RAND
             elif not self.sc:
                 if self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG:
@@ -1094,7 +1092,7 @@ class Session:
         self.send_pairing_request_command()
 
         # Wait for the pairing process to finish
-        await self.pairing_result
+        await self.connection.abort_on('disconnection', self.pairing_result)
 
     def on_disconnection(self, reason):
         self.connection.remove_listener('disconnection', self.on_disconnection)
@@ -1112,7 +1110,7 @@ class Session:
         if self.is_initiator:
             self.distribute_keys()
 
-        asyncio.create_task(self.on_pairing())
+        self.connection.abort_on('disconnection', self.on_pairing())
 
     def on_connection_encryption_change(self):
         if self.connection.is_encrypted:
@@ -1219,7 +1217,7 @@ class Session:
             logger.error(color('SMP command not handled???', 'red'))
 
     def on_smp_pairing_request_command(self, command):
-        asyncio.create_task(self.on_smp_pairing_request_command_async(command))
+        self.connection.abort_on('disconnection', self.on_smp_pairing_request_command_async(command))
 
     async def on_smp_pairing_request_command_async(self, command):
         # Check if the request should proceed
@@ -1572,7 +1570,7 @@ class Session:
                     self.wait_before_continuing = None
                     self.send_pairing_dhkey_check_command()
 
-                asyncio.create_task(next_steps())
+                self.connection.abort_on('disconnection', next_steps())
             else:
                 self.send_pairing_dhkey_check_command()
         else:
@@ -1688,7 +1686,7 @@ class Manager(EventEmitter):
                 except Exception as error:
                     logger.warn(f'!!! error while storing keys: {error}')
 
-            asyncio.create_task(store_keys())
+            self.device.abort_on('flush', store_keys())
 
         # Notify the device
         self.device.on_pairing(session.connection.handle, keys, session.sc)
