@@ -712,7 +712,7 @@ class Client:
                     logger.warning(f'bogus handle value: {attribute_handle}')
                     return []
 
-                characteristics_values.append(attribute_value)
+                characteristics_values.append((attribute_handle, attribute_value))
 
             # Move on to the next characteristics
             starting_handle = response.attributes[-1][0] + 1
