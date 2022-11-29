@@ -20,6 +20,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+import asyncio
 import logging
 import os
 import json
@@ -143,6 +144,10 @@ class KeyStore:
     async def get_all(self):
         return []
 
+    async def delete_all(self):
+        all_keys = await self.get_all()
+        await asyncio.gather(*(self.delete(name) for (name, _) in all_keys))
+
     async def get_resolving_keys(self):
         all_keys = await self.get_all()
         resolving_keys = []
@@ -258,6 +263,13 @@ class JsonKeyStore(KeyStore):
             return []
 
         return [(name, PairingKeys.from_dict(keys)) for (name, keys) in namespace.items()]
+
+    async def delete_all(self):
+        db = await self.load()
+
+        db.pop(self.namespace, None)
+
+        await self.save(db)
 
     async def get(self, name):
         db = await self.load()

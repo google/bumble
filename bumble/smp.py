@@ -1583,7 +1583,7 @@ class Manager(EventEmitter):
             asyncio.create_task(store_keys())
 
         # Notify the device
-        self.device.on_pairing(session.connection.handle, keys)
+        self.device.on_pairing(session.connection.handle, keys, session.sc)
 
     def on_pairing_failure(self, session, reason):
         self.device.on_pairing_failure(session.connection.handle, reason)
