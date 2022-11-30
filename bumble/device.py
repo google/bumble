@@ -797,9 +797,7 @@ class Device(CompositeEventEmitter):
         # Register the SDP server with the L2CAP Channel Manager
         self.sdp_server.register(self.l2cap_channel_manager)
 
-        # Add a GAP Service if requested
-        if generic_access_service:
-            self.gatt_server.add_service(GenericAccessService(self.name))
+        self.add_default_services(generic_access_service)
         self.l2cap_channel_manager.register_fixed_channel(ATT_CID, self.on_gatt_pdu)
 
         # Forward some events
@@ -1885,6 +1883,11 @@ class Device(CompositeEventEmitter):
 
     def add_services(self, services):
         self.gatt_server.add_services(services)
+
+    def add_default_services(self, generic_access_service=True):
+        # Add a GAP Service if requested
+        if generic_access_service:
+            self.gatt_server.add_service(GenericAccessService(self.name))
 
     async def notify_subscriber(self, connection, attribute, value=None, force=False):
         await self.gatt_server.notify_subscriber(connection, attribute, value, force)

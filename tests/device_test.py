@@ -28,7 +28,7 @@ from bumble.hci import (
     HCI_ACCEPT_CONNECTION_REQUEST_COMMAND, HCI_COMMAND_STATUS_PENDING, HCI_CREATE_CONNECTION_COMMAND, HCI_SUCCESS,
     Address, HCI_Command_Complete_Event, HCI_Command_Status_Event, HCI_Connection_Complete_Event, HCI_Connection_Request_Event, HCI_Packet
 )
-
+from bumble.gatt import GATT_GENERIC_ACCESS_SERVICE, GATT_CHARACTERISTIC_ATTRIBUTE_TYPE, GATT_DEVICE_NAME_CHARACTERISTIC, GATT_APPEARANCE_CHARACTERISTIC
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -180,6 +180,27 @@ async def test_device_connect_parallel():
 # -----------------------------------------------------------------------------
 async def run_test_device():
     await test_device_connect_parallel()
+
+
+# -----------------------------------------------------------------------------
+def test_gatt_services_with_gas():
+    device = Device(host=Host(None, None))
+
+    # there should be one service and two chars, therefore 5 attributes
+    assert len(device.gatt_server.attributes) == 5
+    assert device.gatt_server.attributes[0].uuid == GATT_GENERIC_ACCESS_SERVICE
+    assert device.gatt_server.attributes[1].type == GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+    assert device.gatt_server.attributes[2].uuid == GATT_DEVICE_NAME_CHARACTERISTIC
+    assert device.gatt_server.attributes[3].type == GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+    assert device.gatt_server.attributes[4].uuid == GATT_APPEARANCE_CHARACTERISTIC
+
+
+# -----------------------------------------------------------------------------
+def test_gatt_services_without_gas():
+    device = Device(host=Host(None, None), generic_access_service=False)
+
+    # there should be no services
+    assert len(device.gatt_server.attributes) == 0
 
 
 # -----------------------------------------------------------------------------
