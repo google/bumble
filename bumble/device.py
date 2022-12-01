@@ -523,8 +523,8 @@ class Connection(CompositeEventEmitter):
     async def authenticate(self):
         return await self.device.authenticate(self)
 
-    async def encrypt(self):
-        return await self.device.encrypt(self)
+    async def encrypt(self, enable=True):
+        return await self.device.encrypt(self, enable)
 
     async def sustain(self, timeout=None):
         """Idles the current task waiting for a disconnect or timeout"""
@@ -1999,7 +1999,10 @@ class Device(CompositeEventEmitter):
                 'connection_authentication_failure', on_authentication_failure
             )
 
-    async def encrypt(self, connection):
+    async def encrypt(self, connection, enable=True):
+        if not enable and connection.transport == BT_LE_TRANSPORT:
+            raise ValueError('`enable` parameter is classic only.')
+
         # Set up event handlers
         pending_encryption = asyncio.get_running_loop().create_future()
 
@@ -2054,7 +2057,7 @@ class Device(CompositeEventEmitter):
             else:
                 result = await self.send_command(
                     HCI_Set_Connection_Encryption_Command(
-                        connection_handle=connection.handle, encryption_enable=0x01
+                        connection_handle=connection.handle, encryption_enable=0x01 if enable else 0x00
                     )
                 )
 
