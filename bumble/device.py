@@ -945,7 +945,6 @@ class Device(CompositeEventEmitter):
             if isinstance(attribute, Service):
                 self.advertising_data += attribute.get_service_advertising_data()
 
-
         # Set/update the advertising data if the advertising type allows it
         if advertising_type.has_data:
             await self.send_command(HCI_LE_Set_Advertising_Data_Command(
