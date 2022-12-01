@@ -210,6 +210,15 @@ class Service(Attribute):
         self.characteristics   = characteristics[:]
         self.primary           = primary
 
+
+    def get_service_advertising_data(self):
+        """
+        Get Service specific advertising data
+        Defined by each Service, default value is empty
+        """
+        return b''
+
+
     def __str__(self):
         return f'Service(handle=0x{self.handle:04X}, end=0x{self.end_group_handle:04X}, uuid={self.uuid}){"" if self.primary else "*"}'
 

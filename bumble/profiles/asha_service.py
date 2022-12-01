@@ -17,122 +17,129 @@
 # Imports
 # -----------------------------------------------------------------------------
 import struct
-from ..device import (
-  Device, AdvertisingType
-)
+import logging
 from ..core import AdvertisingData
 from ..gatt import (
-  GATT_ASHA_SERVICE,
-  GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
-  GATT_ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC,
-  GATT_ASHA_AUDIO_STATUS_CHARACTERISTIC,
-  GATT_ASHA_VOLUME_CHARACTERISTIC,
-  GATT_ASHA_LE_PSM_OUT_CHARACTERISTIC,
-  TemplateService,
-  Characteristic,
-  CharacteristicValue,
-  PackedCharacteristicAdapter
+    GATT_ASHA_SERVICE,
+    GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
+    GATT_ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC,
+    GATT_ASHA_AUDIO_STATUS_CHARACTERISTIC,
+    GATT_ASHA_VOLUME_CHARACTERISTIC,
+    GATT_ASHA_LE_PSM_OUT_CHARACTERISTIC,
+    TemplateService,
+    Characteristic,
+    CharacteristicValue,
+    PackedCharacteristicAdapter
 )
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
 class AshaService(TemplateService):
-  UUID = GATT_ASHA_SERVICE
+    UUID = GATT_ASHA_SERVICE
+    OPCODE_START = 1
+    OPCODE_STOP = 2
+    OPCODE_STATUS = 3
+    PROTOCOL_VERSION = 0x01
+    RESERVED_FOR_FUTURE_USE = [00, 00]
+    FEATURE_MAP = [0x01]  # [LE CoC audio output streaming supported]
+    SUPPORTED_CODEDC_ID = [0x02, 0x01]  # Codec IDs [G.722 at 16 kHz]
 
-  def __init__(self,device:Device):
-    self.device=device
+    def __init__(self, capability: int, hisyncid: []):
+        self.hisyncid = hisyncid
+        self.capability = capability  # Device Capabilities [Left, Monaural]
+        self.render_delay = [00, 00]
+        self.reserved_for_future_use = [00, 00]
 
-    # Handler for volume control
-    def on_volume_write(connection, value):
-      print('--- VOLUME Write:', value[0])
+        # Four least significant bytes of the HiSyncId.
+        self.truncated_hisyncid = self.hisyncid[:4]
 
-    # Handler for audio control commands
-    def on_audio_control_point_write(connection, value):
-      print('--- AUDIO CONTROL POINT Write:', value.hex())
-      opcode = value[0]
-      if opcode == 1:
-        # Start
-        audio_type = ('Unknown', 'Ringtone', 'Phone Call', 'Media')[value[2]]
-        print(
-            f'### START: codec={value[1]}, audio_type={audio_type}, volume={value[3]}, otherstate={value[4]}')
-      elif opcode == 2:
-        print('### STOP')
-      elif opcode == 3:
-        print(f'### STATUS: connected={value[1]}')
+        # Handler for volume control
+        def on_volume_write(connection, value):
+            logger.info(f'--- VOLUME Write:{value[0]}')
 
-      # TODO Respond with a status
-      # asyncio.create_task(device.notify_subscribers(audio_status_characteristic, force=True))
+        # Handler for audio control commands
+        def on_audio_control_point_write(connection, value):
+            logger.info(f'--- AUDIO CONTROL POINT Write:{value.hex()}')
+            opcode = value[0]
+            if opcode == AshaService.OPCODE_START:
+                # Start
+                audio_type = ('Unknown', 'Ringtone', 'Phone Call', 'Media')[value[2]]
+                logger.info(
+                    f'### START: codec={value[1]}, audio_type={audio_type}, volume={value[3]}, otherstate={value[4]}')
+            elif opcode == AshaService.OPCODE_STOP:
+                logger.info('### STOP')
+            elif opcode == AshaService.OPCODE_STATUS:
+                logger.info(f'### STATUS: connected={value[1]}')
 
-    self.read_only_properties_characteristic = Characteristic(
-        GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
-        Characteristic.READ,
-        Characteristic.READABLE,
-        bytes([
-            0x01,  # Version
-            0x00,  # Device Capabilities [Left, Monaural]
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,  # HiSyncId
-            0x01,  # Feature Map [LE CoC audio output streaming supported]
-            0x00, 0x00,  # Render Delay
-            0x00, 0x00,  # RFU
-            0x02, 0x00  # Codec IDs [G.722 at 16 kHz]
-        ])
-    )
+            # TODO Respond with a status
+            # asyncio.create_task(device.notify_subscribers(audio_status_characteristic, force=True))
 
-    self.audio_control_point_characteristic = Characteristic(
-        GATT_ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC,
-        Characteristic.WRITE | Characteristic.WRITE_WITHOUT_RESPONSE,
-        Characteristic.WRITEABLE,
-        CharacteristicValue(write=on_audio_control_point_write)
-    )
-    self.audio_status_characteristic = Characteristic(
-        GATT_ASHA_AUDIO_STATUS_CHARACTERISTIC,
-        Characteristic.READ | Characteristic.NOTIFY,
-        Characteristic.READABLE,
-        bytes([0])
-    )
-    self.volume_characteristic = Characteristic(
-        GATT_ASHA_VOLUME_CHARACTERISTIC,
-        Characteristic.WRITE_WITHOUT_RESPONSE,
-        Characteristic.WRITEABLE,
-        CharacteristicValue(write=on_volume_write)
-    )
+        self.read_only_properties_characteristic = Characteristic(
+            GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
+            Characteristic.READ,
+            Characteristic.READABLE,
+            bytes([
+                AshaService.PROTOCOL_VERSION,  # Version
+                self.capability,
+            ]) +
+            bytes(self.hisyncid) +
+            bytes(AshaService.FEATURE_MAP)+
+            bytes(self.render_delay)+
+            bytes(AshaService.RESERVED_FOR_FUTURE_USE)+
+            bytes(AshaService.SUPPORTED_CODEDC_ID)
+        )
 
-    # TODO add real psm value
-    self.psm=0x0080
-    # self.psm = device.register_l2cap_channel_server(0, on_coc, 8)
-    self.le_psm_out_characteristic = Characteristic(
-        GATT_ASHA_LE_PSM_OUT_CHARACTERISTIC,
-        Characteristic.READ,
-        Characteristic.READABLE,
-        struct.pack('<H', self.psm)
-    )
+        self.audio_control_point_characteristic = Characteristic(
+            GATT_ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC,
+            Characteristic.WRITE | Characteristic.WRITE_WITHOUT_RESPONSE,
+            Characteristic.WRITEABLE,
+            CharacteristicValue(write=on_audio_control_point_write)
+        )
+        self.audio_status_characteristic = Characteristic(
+            GATT_ASHA_AUDIO_STATUS_CHARACTERISTIC,
+            Characteristic.READ | Characteristic.NOTIFY,
+            Characteristic.READABLE,
+            bytes([0])
+        )
+        self.volume_characteristic = Characteristic(
+            GATT_ASHA_VOLUME_CHARACTERISTIC,
+            Characteristic.WRITE_WITHOUT_RESPONSE,
+            Characteristic.WRITEABLE,
+            CharacteristicValue(write=on_volume_write)
+        )
 
-    characteristics = [self.read_only_properties_characteristic,
-                       self.audio_control_point_characteristic,
-                       self.audio_status_characteristic,
-                       self.volume_characteristic,
-                       self.le_psm_out_characteristic]
+        # TODO add real psm value
+        self.psm = 0x0080
+        # self.psm = device.register_l2cap_channel_server(0, on_coc, 8)
+        self.le_psm_out_characteristic = Characteristic(
+            GATT_ASHA_LE_PSM_OUT_CHARACTERISTIC,
+            Characteristic.READ,
+            Characteristic.READABLE,
+            struct.pack('<H', self.psm)
+        )
 
-    super().__init__(characteristics)
+        characteristics = [self.read_only_properties_characteristic,
+                           self.audio_control_point_characteristic,
+                           self.audio_status_characteristic,
+                           self.volume_characteristic,
+                           self.le_psm_out_characteristic]
 
-  async def start_advertising(self, capability: int,
-      truncated_hisyncid: []):
-    assert self.device
-    self.device.advertising_data = bytes(
-        AdvertisingData([
-            (AdvertisingData.COMPLETE_LOCAL_NAME, bytes(self.device.name, 'utf-8')),
-            (AdvertisingData.FLAGS, bytes([0x06])),
-            (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, bytes(GATT_ASHA_SERVICE)),
-            (AdvertisingData.SERVICE_DATA_16_BIT_UUID, bytes(GATT_ASHA_SERVICE) + bytes([
-                0x01,  # Protocol Version
-                capability,  # Capability
-            ]) + bytes(truncated_hisyncid))
-        ])
-    )
+        super().__init__(characteristics)
 
-    # TODO enable more advertising_type and own_address_type
-    advertising_type = AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE
 
-    await self.device.start_advertising(
-        advertising_type=advertising_type
-    )
+    def get_service_advertising_data(self):
+        return bytes(
+            AdvertisingData([
+                (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, bytes(GATT_ASHA_SERVICE)),
+                (AdvertisingData.SERVICE_DATA_16_BIT_UUID, bytes(GATT_ASHA_SERVICE) + bytes([
+                    AshaService.PROTOCOL_VERSION,
+                    self.capability,
+                ]) + bytes(self.truncated_hisyncid))
+            ])
+        )
+
