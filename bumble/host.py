@@ -714,9 +714,6 @@ class Host(AbortableEventEmitter):
         logger.debug(
             f'simple pairing complete for {event.bd_addr}: status={HCI_Constant.status_name(event.status)}'
         )
-        # Notify the client
-        if event.status == HCI_SUCCESS:
-            self.emit('ssp_complete', event.bd_addr)
 
     def on_hci_pin_code_request_event(self, event):
         # For now, just refuse all requests
