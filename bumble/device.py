@@ -2574,6 +2574,9 @@ class Device(CompositeEventEmitter):
             f'*** Connection Encryption Change: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, encryption={encryption}'
         )
         connection.encryption = encryption
+        if not connection.authenticated and encryption == HCI_Encryption_Change_Event.AES_CCM:
+            connection.authenticated = True
+            connection.sc = True
         connection.emit('connection_encryption_change')
 
     @host_event_handler
