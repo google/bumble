@@ -66,6 +66,15 @@ class Server(EventEmitter):
     def next_handle(self):
         return 1 + len(self.attributes)
 
+    def get_advertising_service_data(self):
+        service_advertising_data_map = dict[Service, bytes]()
+        for attribute in self.attributes:
+            if isinstance(attribute, Service):
+                if not attribute.get_advertising_data():
+                    continue
+                service_advertising_data_map[attribute] = attribute.get_advertising_data()
+        return service_advertising_data_map
+
     def get_attribute(self, handle):
         attribute = self.attributes_by_handle.get(handle)
         if attribute:

@@ -49,7 +49,7 @@ class AshaService(TemplateService):
     FEATURE_MAP = [0x01]  # [LE CoC audio output streaming supported]
     SUPPORTED_CODEDC_ID = [0x02, 0x01]  # Codec IDs [G.722 at 16 kHz]
 
-    def __init__(self, capability: int, hisyncid: []):
+    def __init__(self, capability: int, hisyncid: [int]):
         self.hisyncid = hisyncid
         self.capability = capability  # Device Capabilities [Left, Monaural]
         self.render_delay = [00, 00]
@@ -131,8 +131,7 @@ class AshaService(TemplateService):
 
         super().__init__(characteristics)
 
-
-    def get_service_advertising_data(self):
+    def get_advertising_data(self):
         return bytes(
             AdvertisingData([
                 (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, bytes(GATT_ASHA_SERVICE)),
