@@ -47,16 +47,12 @@ class AshaService(TemplateService):
     PROTOCOL_VERSION = 0x01
     RESERVED_FOR_FUTURE_USE = [00, 00]
     FEATURE_MAP = [0x01]  # [LE CoC audio output streaming supported]
-    SUPPORTED_CODEDC_ID = [0x02, 0x01]  # Codec IDs [G.722 at 16 kHz]
+    SUPPORTED_CODEC_ID = [0x02, 0x01]  # Codec IDs [G.722 at 16 kHz]
+    RENDER_DELAY = [00, 00]
 
     def __init__(self, capability: int, hisyncid: [int]):
         self.hisyncid = hisyncid
         self.capability = capability  # Device Capabilities [Left, Monaural]
-        self.render_delay = [00, 00]
-        self.reserved_for_future_use = [00, 00]
-
-        # Four least significant bytes of the HiSyncId.
-        self.truncated_hisyncid = self.hisyncid[:4]
 
         # Handler for volume control
         def on_volume_write(connection, value):
@@ -88,10 +84,10 @@ class AshaService(TemplateService):
                 self.capability,
             ]) +
             bytes(self.hisyncid) +
-            bytes(AshaService.FEATURE_MAP)+
-            bytes(self.render_delay)+
-            bytes(AshaService.RESERVED_FOR_FUTURE_USE)+
-            bytes(AshaService.SUPPORTED_CODEDC_ID)
+            bytes(AshaService.FEATURE_MAP) +
+            bytes(AshaService.RENDER_DELAY) +
+            bytes(AshaService.RESERVED_FOR_FUTURE_USE) +
+            bytes(AshaService.SUPPORTED_CODEC_ID)
         )
 
         self.audio_control_point_characteristic = Characteristic(
@@ -132,13 +128,14 @@ class AshaService(TemplateService):
         super().__init__(characteristics)
 
     def get_advertising_data(self):
+        # Advertisement only uses 4 least significant bytes of the HiSyncId.
         return bytes(
             AdvertisingData([
                 (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, bytes(GATT_ASHA_SERVICE)),
                 (AdvertisingData.SERVICE_DATA_16_BIT_UUID, bytes(GATT_ASHA_SERVICE) + bytes([
                     AshaService.PROTOCOL_VERSION,
                     self.capability,
-                ]) + bytes(self.truncated_hisyncid))
+                ]) + bytes(self.hisyncid[:4]))
             ])
         )
 
