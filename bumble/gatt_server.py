@@ -70,6 +70,12 @@ class Server(EventEmitter):
     def next_handle(self):
         return 1 + len(self.attributes)
 
+    def get_advertising_service_data(self):
+        return {
+            attribute: data for attribute in self.attributes
+            if isinstance(attribute, Service) and (data := attribute.get_advertising_data())
+        }
+
     def get_attribute(self, handle):
         attribute = self.attributes_by_handle.get(handle)
         if attribute:
