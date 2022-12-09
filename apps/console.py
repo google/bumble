@@ -29,6 +29,7 @@ from collections import OrderedDict
 import click
 import colors
 
+from bumble import __version__
 from bumble.core import UUID, AdvertisingData, TimeoutError, BT_LE_TRANSPORT
 from bumble.device import ConnectionParametersPreferences, Device, Connection, Peer
 from bumble.utils import AsyncRunner
@@ -380,6 +381,8 @@ class ConsoleApp:
     def show_device(self, device):
         lines = []
 
+        lines.append(('ansicyan', 'Bumble Version:       '))
+        lines.append(('', f'{__version__}\n'))
         lines.append(('ansicyan', 'Name:                 '))
         lines.append(('', f'{device.name}\n'))
         lines.append(('ansicyan', 'Public Address:       '))
