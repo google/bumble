@@ -29,6 +29,18 @@ from collections import OrderedDict
 import click
 import colors
 
+from bumble.core import UUID, AdvertisingData, TimeoutError, BT_LE_TRANSPORT
+from bumble.device import ConnectionParametersPreferences, Device, Connection, Peer
+from bumble.utils import AsyncRunner
+from bumble.transport import open_transport_or_link
+from bumble.gatt import Characteristic, Service, CharacteristicDeclaration, Descriptor
+from bumble.hci import (
+    HCI_Constant,
+    HCI_LE_1M_PHY,
+    HCI_LE_2M_PHY,
+    HCI_LE_CODED_PHY,
+)
+
 from prompt_toolkit import Application
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.completion import Completer, Completion, NestedCompleter
@@ -281,6 +293,7 @@ class ConsoleApp:
             self.device.listener = DeviceListener(self)
             await self.device.power_on()
             self.show_device(self.device)
+            self.show_attributes(self.device.gatt_server.attributes)
 
             # Run the UI
             await self.ui.run_async()
@@ -380,9 +393,13 @@ class ConsoleApp:
 
     def show_attributes(self, attributes):
         lines = []
-
         for attribute in attributes:
-            lines.append(('ansicyan', f'{attribute}\n'))
+            if type(attribute) is Service:
+                lines.append(('ansicyan', str(attribute) + '\n'))
+            if type(attribute) in (Characteristic, CharacteristicDeclaration):
+                lines.append(('ansimagenta', '  ' + str(attribute) + '\n'))
+            if type(attribute) is Descriptor:
+                lines.append(('ansigreen', '    ' + str(attribute) + '\n'))
 
         self.attributes_text.text = lines
         self.ui.invalidate()
