@@ -54,7 +54,8 @@ def sdp_records():
 
 # -----------------------------------------------------------------------------
 def codec_capabilities():
-    # NOTE: this shouldn't be hardcoded, but should be inferred from the input file instead
+    # NOTE: this shouldn't be hardcoded, but should be inferred from the input file
+    # instead
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
         media_codec_type=A2DP_SBC_CODEC_TYPE,
@@ -116,7 +117,8 @@ async def stream_packets(read_function, protocol):
 async def main():
     if len(sys.argv) < 4:
         print(
-            'Usage: run_a2dp_source.py <device-config> <transport-spec> <sbc-file> [<bluetooth-address>]'
+            'Usage: run_a2dp_source.py <device-config> <transport-spec> <sbc-file> '
+            '[<bluetooth-address>]'
         )
         print(
             'example: run_a2dp_source.py classic1.json usb:0 test.sbc E1:CA:72:48:C4:E8'
@@ -138,7 +140,8 @@ async def main():
         await device.power_on()
 
         with open(sys.argv[3], 'rb') as sbc_file:
-            # NOTE: this should be using asyncio file reading, but blocking reads are good enough for testing
+            # NOTE: this should be using asyncio file reading, but blocking reads are
+            # good enough for testing
             async def read(byte_count):
                 return sbc_file.read(byte_count)
 

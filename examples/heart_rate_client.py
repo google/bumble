@@ -20,7 +20,7 @@ import sys
 import os
 import logging
 from colors import color
-from bumble.device import Device, Peer
+from bumble.device import Device
 from bumble.transport import open_transport
 from bumble.profiles.heart_rate_service import HeartRateServiceProxy
 

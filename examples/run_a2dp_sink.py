@@ -20,7 +20,6 @@ import sys
 import os
 import logging
 
-from colors import color
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.core import BT_BR_EDR_TRANSPORT
@@ -92,8 +91,8 @@ def on_avdtp_connection(server):
 def on_rtp_packet(packet):
     header = packet.payload[0]
     fragmented = header >> 7
-    start = (header >> 6) & 0x01
-    last = (header >> 5) & 0x01
+    # start = (header >> 6) & 0x01
+    # last = (header >> 5) & 0x01
     number_of_frames = header & 0x0F
 
     if fragmented:
@@ -108,7 +107,8 @@ def on_rtp_packet(packet):
 async def main():
     if len(sys.argv) < 4:
         print(
-            'Usage: run_a2dp_sink.py <device-config> <transport-spec> <sbc-file> [<bt-addr>]'
+            'Usage: run_a2dp_sink.py <device-config> <transport-spec> <sbc-file> '
+            '[<bt-addr>]'
         )
         print('example: run_a2dp_sink.py classic1.json usb:0 output.sbc')
         return

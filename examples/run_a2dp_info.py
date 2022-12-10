@@ -29,7 +29,7 @@ from bumble.core import (
     BT_AUDIO_SINK_SERVICE,
     BT_L2CAP_PROTOCOL_ID,
 )
-from bumble.avdtp import Protocol as AVDTP_Protocol, find_avdtp_service_with_connection
+from bumble.avdtp import Protocol as AVDTP_Protocol
 from bumble.a2dp import make_audio_source_service_sdp_records
 from bumble.sdp import (
     Client as SDP_Client,
@@ -52,6 +52,7 @@ def sdp_records():
 
 
 # -----------------------------------------------------------------------------
+# pylint: disable-next=too-many-nested-blocks
 async def find_a2dp_service(device, connection):
     # Connect to the SDP Server
     sdp_client = SDP_Client(device)
@@ -101,7 +102,8 @@ async def find_a2dp_service(device, connection):
                         avdtp_version_major = protocol_descriptor.value[1].value >> 8
                         avdtp_version_minor = protocol_descriptor.value[1].value & 0xFF
                         print(
-                            f'{color("    AVDTP Version:", "cyan")} {avdtp_version_major}.{avdtp_version_minor}'
+                            f'{color("    AVDTP Version:", "cyan")} '
+                            f'{avdtp_version_major}.{avdtp_version_minor}'
                         )
                         service_version = (avdtp_version_major, avdtp_version_minor)
 
@@ -119,7 +121,8 @@ async def find_a2dp_service(device, connection):
                         bluetooth_profile_descriptor_list.value
                     )
                 else:
-                    # Sometimes, instead of a list of lists, we just find a list. Fix that
+                    # Sometimes, instead of a list of lists, we just find a list.
+                    # Fix that.
                     bluetooth_profile_descriptors = [bluetooth_profile_descriptor_list]
 
                 print(color('  Profiles:', 'green'))
@@ -127,7 +130,8 @@ async def find_a2dp_service(device, connection):
                     version_major = bluetooth_profile_descriptor.value[1].value >> 8
                     version_minor = bluetooth_profile_descriptor.value[1].value & 0xFF
                     print(
-                        f'    {bluetooth_profile_descriptor.value[0].value} - version {version_major}.{version_minor}'
+                        f'    {bluetooth_profile_descriptor.value[0].value}'
+                        f' - version {version_major}.{version_minor}'
                     )
 
     await sdp_client.disconnect()
@@ -152,7 +156,8 @@ async def main():
         # Start the controller
         await device.power_on()
 
-        # Setup the SDP to expose a SRC service, in case the remote device queries us back
+        # Setup the SDP to expose a SRC service, in case the remote device queries us
+        # back
         device.sdp_service_records = sdp_records()
 
         # Connect to a peer

@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # -----------------------------------------------------------------------------
 # fmt: off
+# pylint: disable=line-too-long
 
 AVDTP_PSM = 0x0019
 
@@ -198,6 +199,8 @@ AVDTP_STATE_NAMES = {
 }
 
 # fmt: on
+# pylint: enable=line-too-long
+# pylint: disable=invalid-name
 
 
 # -----------------------------------------------------------------------------
@@ -318,7 +321,18 @@ class MediaPacket:
         return header + self.payload
 
     def __str__(self):
-        return f'RTP(v={self.version},p={self.padding},x={self.extension},m={self.marker},pt={self.payload_type},sn={self.sequence_number},ts={self.timestamp},ssrc={self.ssrc},csrcs={self.csrc_list},payload_size={len(self.payload)})'
+        return (
+            f'RTP(v={self.version},'
+            f'p={self.padding},'
+            f'x={self.extension},'
+            f'm={self.marker},'
+            f'pt={self.payload_type},'
+            f'sn={self.sequence_number},'
+            f'ts={self.timestamp},'
+            f'ssrc={self.ssrc},'
+            f'csrcs={self.csrc_list},'
+            f'payload_size={len(self.payload)})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -369,7 +383,7 @@ class MediaPacketPump:
 
 
 # -----------------------------------------------------------------------------
-class MessageAssembler:
+class MessageAssembler:  # pylint: disable=attribute-defined-outside-init
     def __init__(self, callback):
         self.callback = callback
         self.reset()
@@ -390,16 +404,16 @@ class MessageAssembler:
         message_type = pdu[0] & 3
 
         logger.debug(
-            f'transaction_label={transaction_label}, packet_type={Protocol.packet_type_name(packet_type)}, message_type={Message.message_type_name(message_type)}'
+            f'transaction_label={transaction_label}, '
+            f'packet_type={Protocol.packet_type_name(packet_type)}, '
+            f'message_type={Message.message_type_name(message_type)}'
         )
-        if (
-            packet_type == Protocol.SINGLE_PACKET
-            or packet_type == Protocol.START_PACKET
-        ):
+        if packet_type in (Protocol.SINGLE_PACKET, Protocol.START_PACKET):
             if self.message is not None:
                 # The previous message has not been terminated
                 logger.warning(
-                    'received a start or single packet when expecting an end or continuation'
+                    'received a start or single packet when expecting an end or '
+                    'continuation'
                 )
                 self.reset()
 
@@ -413,23 +427,22 @@ class MessageAssembler:
             else:
                 self.number_of_signal_packets = pdu[2]
                 self.message = pdu[3:]
-        elif (
-            packet_type == Protocol.CONTINUE_PACKET
-            or packet_type == Protocol.END_PACKET
-        ):
+        elif packet_type in (Protocol.CONTINUE_PACKET, Protocol.END_PACKET):
             if self.packet_count == 0:
                 logger.warning('unexpected continuation')
                 return
 
             if transaction_label != self.transaction_label:
                 logger.warning(
-                    f'transaction label mismatch: expected {self.transaction_label}, received {transaction_label}'
+                    f'transaction label mismatch: expected {self.transaction_label}, '
+                    f'received {transaction_label}'
                 )
                 return
 
             if message_type != self.message_type:
                 logger.warning(
-                    f'message type mismatch: expected {self.message_type}, received {message_type}'
+                    f'message type mismatch: expected {self.message_type}, '
+                    f'received {message_type}'
                 )
                 return
 
@@ -438,7 +451,9 @@ class MessageAssembler:
             if packet_type == Protocol.END_PACKET:
                 if self.packet_count != self.number_of_signal_packets:
                     logger.warning(
-                        f'incomplete fragmented message: expected {self.number_of_signal_packets} packets, received {self.packet_count}'
+                        'incomplete fragmented message: '
+                        f'expected {self.number_of_signal_packets} packets, '
+                        f'received {self.packet_count}'
                     )
                     self.reset()
                     return
@@ -447,7 +462,9 @@ class MessageAssembler:
             else:
                 if self.packet_count > self.number_of_signal_packets:
                     logger.warning(
-                        f'too many packets: expected {self.number_of_signal_packets}, received {self.packet_count}'
+                        'too many packets: '
+                        f'expected {self.number_of_signal_packets}, '
+                        f'received {self.packet_count}'
                     )
                     self.reset()
                     return
@@ -515,7 +532,7 @@ class ServiceCapabilities:
         self.service_category = service_category
         self.service_capabilities_bytes = service_capabilities_bytes
 
-    def to_string(self, details=[]):
+    def to_string(self, details=[]):  # pylint: disable=dangerous-default-value
         attributes = ','.join(
             [name_or_number(AVDTP_SERVICE_CATEGORY_NAMES, self.service_category)]
             + details
@@ -562,10 +579,16 @@ class MediaCodecCapabilities(ServiceCapabilities):
         self.media_codec_information = media_codec_information
 
     def __str__(self):
+        codec_info = (
+            self.media_codec_information.hex()
+            if isinstance(self.media_codec_information, bytes)
+            else str(self.media_codec_information)
+        )
+
         details = [
             f'media_type={name_or_number(AVDTP_MEDIA_TYPE_NAMES, self.media_type)}',
             f'codec={name_or_number(A2DP_CODEC_TYPE_NAMES, self.media_codec_type)}',
-            f'codec_info={self.media_codec_information.hex() if type(self.media_codec_information) is bytes else str(self.media_codec_information)}',
+            f'codec_info={codec_info}',
         ]
         return self.to_string(details)
 
@@ -591,7 +614,7 @@ class EndPointInfo:
 
 
 # -----------------------------------------------------------------------------
-class Message:
+class Message:  # pylint:disable=attribute-defined-outside-init
     COMMAND = 0
     GENERAL_REJECT = 1
     RESPONSE_ACCEPT = 2
@@ -611,11 +634,11 @@ class Message:
         return name_or_number(Message.MESSAGE_TYPE_NAMES, message_type)
 
     @staticmethod
-    def subclass(cls):
+    def subclass(subclass):
         # Infer the signal identifier and message subtype from the class name
-        name = cls.__name__
+        name = subclass.__name__
         if name == 'General_Reject':
-            cls.signal_identifier = 0
+            subclass.signal_identifier = 0
             signal_identifier_str = None
             message_type = Message.COMMAND
         elif name.endswith('_Command'):
@@ -630,22 +653,23 @@ class Message:
         else:
             raise ValueError('invalid class name')
 
-        cls.message_type = message_type
+        subclass.message_type = message_type
 
         if signal_identifier_str is not None:
             for (name, signal_identifier) in AVDTP_SIGNAL_IDENTIFIERS.items():
                 if name.lower().endswith(signal_identifier_str.lower()):
-                    cls.signal_identifier = signal_identifier
+                    subclass.signal_identifier = signal_identifier
                     break
 
             # Register the subclass
-            Message.subclasses.setdefault(cls.signal_identifier, {})[
-                cls.message_type
-            ] = cls
+            Message.subclasses.setdefault(subclass.signal_identifier, {})[
+                subclass.message_type
+            ] = subclass
 
-        return cls
+        return subclass
 
-    # Factory method to create a subclass based on the signal identifier and message type
+    # Factory method to create a subclass based on the signal identifier and message
+    # type
     @staticmethod
     def create(signal_identifier, message_type, payload):
         # Look for a registered subclass
@@ -676,18 +700,23 @@ class Message:
         self.payload = payload
 
     def to_string(self, details):
-        base = f'{color(f"{name_or_number(AVDTP_SIGNAL_NAMES, self.signal_identifier)}_{Message.message_type_name(self.message_type)}", "yellow")}'
+        base = color(
+            f'{name_or_number(AVDTP_SIGNAL_NAMES, self.signal_identifier)}_'
+            f'{Message.message_type_name(self.message_type)}',
+            'yellow',
+        )
+
         if details:
-            if type(details) is str:
+            if isinstance(details, str):
                 return f'{base}: {details}'
-            else:
-                return (
-                    base
-                    + ':\n'
-                    + '\n'.join(['  ' + color(detail, 'cyan') for detail in details])
-                )
-        else:
-            return base
+
+            return (
+                base
+                + ':\n'
+                + '\n'.join(['  ' + color(detail, 'cyan') for detail in details])
+            )
+
+        return base
 
     def __str__(self):
         return self.to_string(self.payload.hex())
@@ -703,8 +732,8 @@ class Simple_Command(Message):
         self.acp_seid = self.payload[0] >> 2
 
     def __init__(self, seid):
+        super().__init__(payload=bytes([seid << 2]))
         self.acp_seid = seid
-        self.payload = bytes([seid << 2])
 
     def __str__(self):
         return self.to_string([f'ACP SEID: {self.acp_seid}'])
@@ -720,8 +749,8 @@ class Simple_Reject(Message):
         self.error_code = self.payload[0]
 
     def __init__(self, error_code):
+        super().__init__(payload=bytes([error_code]))
         self.error_code = error_code
-        self.payload = bytes([self.error_code])
 
     def __str__(self):
         details = [f'error_code: {name_or_number(AVDTP_ERROR_NAMES, self.error_code)}']
@@ -752,13 +781,14 @@ class Discover_Response(Message):
             )
 
     def __init__(self, endpoints):
+        super().__init__(payload=b''.join([bytes(endpoint) for endpoint in endpoints]))
         self.endpoints = endpoints
-        self.payload = b''.join([bytes(endpoint) for endpoint in endpoints])
 
     def __str__(self):
         details = []
         for endpoint in self.endpoints:
             details.extend(
+                # pylint: disable=line-too-long
                 [
                     f'ACP SEID: {endpoint.seid}',
                     f'  in_use:     {endpoint.in_use}',
@@ -788,8 +818,10 @@ class Get_Capabilities_Response(Message):
         self.capabilities = ServiceCapabilities.parse_capabilities(self.payload)
 
     def __init__(self, capabilities):
+        super().__init__(
+            payload=ServiceCapabilities.serialize_capabilities(capabilities)
+        )
         self.capabilities = capabilities
-        self.payload = ServiceCapabilities.serialize_capabilities(capabilities)
 
     def __str__(self):
         details = [str(capability) for capability in self.capabilities]
@@ -841,12 +873,13 @@ class Set_Configuration_Command(Message):
         self.capabilities = ServiceCapabilities.parse_capabilities(self.payload[2:])
 
     def __init__(self, acp_seid, int_seid, capabilities):
+        super().__init__(
+            payload=bytes([acp_seid << 2, int_seid << 2])
+            + ServiceCapabilities.serialize_capabilities(capabilities)
+        )
         self.acp_seid = acp_seid
         self.int_seid = int_seid
         self.capabilities = capabilities
-        self.payload = bytes(
-            [acp_seid << 2, int_seid << 2]
-        ) + ServiceCapabilities.serialize_capabilities(capabilities)
 
     def __str__(self):
         details = [f'ACP SEID: {self.acp_seid}', f'INT SEID: {self.int_seid}'] + [
@@ -875,14 +908,20 @@ class Set_Configuration_Reject(Message):
         self.error_code = self.payload[1]
 
     def __init__(self, service_category, error_code):
+        super().__init__(payload=bytes([service_category, error_code]))
         self.service_category = service_category
         self.error_code = error_code
-        self.payload = bytes([service_category, self.error_code])
 
     def __str__(self):
         details = [
-            f'service_category: {name_or_number(AVDTP_SERVICE_CATEGORY_NAMES, self.service_category)}',
-            f'error_code:       {name_or_number(AVDTP_ERROR_NAMES, self.error_code)}',
+            (
+                'service_category: '
+                f'{name_or_number(AVDTP_SERVICE_CATEGORY_NAMES, self.service_category)}'
+            ),
+            (
+                'error_code:       '
+                f'{name_or_number(AVDTP_ERROR_NAMES, self.error_code)}'
+            ),
         ]
         return self.to_string(details)
 
@@ -906,8 +945,10 @@ class Get_Configuration_Response(Message):
         self.capabilities = ServiceCapabilities.parse_capabilities(self.payload)
 
     def __init__(self, capabilities):
+        super().__init__(
+            payload=ServiceCapabilities.serialize_capabilities(capabilities)
+        )
         self.capabilities = capabilities
-        self.payload = ServiceCapabilities.serialize_capabilities(capabilities)
 
     def __str__(self):
         details = [str(capability) for capability in self.capabilities]
@@ -930,6 +971,7 @@ class Reconfigure_Command(Message):
     '''
 
     def init_from_payload(self):
+        # pylint: disable=attribute-defined-outside-init
         self.acp_seid = self.payload[0] >> 2
         self.capabilities = ServiceCapabilities.parse_capabilities(self.payload[1:])
 
@@ -991,8 +1033,8 @@ class Start_Command(Message):
         self.acp_seids = [x >> 2 for x in self.payload]
 
     def __init__(self, seids):
+        super().__init__(payload=bytes([seid << 2 for seid in seids]))
         self.acp_seids = seids
-        self.payload = bytes([seid << 2 for seid in self.acp_seids])
 
     def __str__(self):
         return self.to_string([f'ACP SEIDs: {self.acp_seids}'])
@@ -1018,9 +1060,9 @@ class Start_Reject(Message):
         self.error_code = self.payload[1]
 
     def __init__(self, acp_seid, error_code):
+        super().__init__(payload=bytes([acp_seid << 2, error_code]))
         self.acp_seid = acp_seid
         self.error_code = error_code
-        self.payload = bytes([self.acp_seid << 2, self.error_code])
 
     def __str__(self):
         details = [
@@ -1126,7 +1168,7 @@ class General_Reject(Message):
     '''
 
     def to_string(self, details):
-        return f'{color(f"GENERAL_REJECT", "yellow")}'
+        return color('GENERAL_REJECT', 'yellow')
 
 
 # -----------------------------------------------------------------------------
@@ -1137,6 +1179,7 @@ class DelayReport_Command(Message):
     '''
 
     def init_from_payload(self):
+        # pylint: disable=attribute-defined-outside-init
         self.acp_seid = self.payload[0] >> 2
         self.delay = (self.payload[1] << 8) | (self.payload[2])
 
@@ -1206,8 +1249,10 @@ class Protocol:
         l2cap_channel.on('open', self.on_l2cap_channel_open)
 
     def get_local_endpoint_by_seid(self, seid):
-        if seid > 0 and seid <= len(self.local_endpoints):
+        if 0 < seid <= len(self.local_endpoints):
             return self.local_endpoints[seid - 1]
+
+        return None
 
     def add_source(self, codec_capabilities, packet_pump):
         seid = len(self.local_endpoints) + 1
@@ -1288,12 +1333,15 @@ class Protocol:
                 if has_media_transport and has_codec:
                     return endpoint
 
+        return None
+
     def on_pdu(self, pdu):
         self.message_assembler.on_pdu(pdu)
 
     def on_message(self, transaction_label, message):
         logger.debug(
-            f'{color("<<< Received AVDTP message", "magenta")}: [{transaction_label}] {message}'
+            f'{color("<<< Received AVDTP message", "magenta")}: '
+            f'[{transaction_label}] {message}'
         )
 
         # Check that the identifier is not reserved
@@ -1311,7 +1359,12 @@ class Protocol:
 
         if message.message_type == Message.COMMAND:
             # Command
-            handler_name = f'on_{AVDTP_SIGNAL_NAMES.get(message.signal_identifier,"").replace("AVDTP_","").lower()}_command'
+            signal_name = (
+                AVDTP_SIGNAL_NAMES.get(message.signal_identifier, "")
+                .replace("AVDTP_", "")
+                .lower()
+            )
+            handler_name = f'on_{signal_name}_command'
             handler = getattr(self, handler_name, None)
             if handler:
                 try:
@@ -1344,7 +1397,8 @@ class Protocol:
 
     def send_message(self, transaction_label, message):
         logger.debug(
-            f'{color(">>> Sending AVDTP message", "magenta")}: [{transaction_label}] {message}'
+            f'{color(">>> Sending AVDTP message", "magenta")}: '
+            f'[{transaction_label}] {message}'
         )
         max_fragment_size = (
             self.l2cap_channel.mtu - 3
@@ -1398,10 +1452,7 @@ class Protocol:
         response = await transaction_result
 
         # Check for errors
-        if (
-            response.message_type == Message.GENERAL_REJECT
-            or response.message_type == Message.RESPONSE_REJECT
-        ):
+        if response.message_type in (Message.GENERAL_REJECT, Message.RESPONSE_REJECT):
             raise ProtocolError(response.error_code, 'avdtp')
 
         return response
@@ -1424,8 +1475,8 @@ class Protocol:
     async def get_capabilities(self, seid):
         if self.version > (1, 2):
             return await self.send_command(Get_All_Capabilities_Command(seid))
-        else:
-            return await self.send_command(Get_Capabilities_Command(seid))
+
+        return await self.send_command(Get_Capabilities_Command(seid))
 
     async def set_configuration(self, acp_seid, int_seid, capabilities):
         return await self.send_command(
@@ -1451,7 +1502,7 @@ class Protocol:
     async def abort(self, seid):
         return await self.send_command(Abort_Command(seid))
 
-    def on_discover_command(self, command):
+    def on_discover_command(self, _command):
         endpoint_infos = [
             EndPointInfo(endpoint.seid, 0, endpoint.media_type, endpoint.tsep)
             for endpoint in self.local_endpoints
@@ -1689,7 +1740,7 @@ class Stream:
         self.change_state(AVDTP_OPEN_STATE)
 
     async def close(self):
-        if self.state not in {AVDTP_OPEN_STATE, AVDTP_STREAMING_STATE}:
+        if self.state not in (AVDTP_OPEN_STATE, AVDTP_STREAMING_STATE):
             raise InvalidStateError('current state is not OPEN or STREAMING')
 
         logger.debug('closing local endpoint')
@@ -1718,13 +1769,14 @@ class Stream:
             return result
 
         self.change_state(AVDTP_CONFIGURED_STATE)
+        return None
 
     def on_get_configuration_command(self, configuration):
-        if self.state not in {
+        if self.state not in (
             AVDTP_CONFIGURED_STATE,
             AVDTP_OPEN_STATE,
             AVDTP_STREAMING_STATE,
-        }:
+        ):
             return Get_Configuration_Reject(AVDTP_BAD_STATE_ERROR)
 
         return self.local_endpoint.on_get_configuration_command(configuration)
@@ -1736,6 +1788,8 @@ class Stream:
         result = self.local_endpoint.on_reconfigure_command(configuration)
         if result is not None:
             return result
+
+        return None
 
     def on_open_command(self):
         if self.state != AVDTP_CONFIGURED_STATE:
@@ -1749,6 +1803,7 @@ class Stream:
         self.protocol.channel_acceptor = self
 
         self.change_state(AVDTP_OPEN_STATE)
+        return None
 
     def on_start_command(self):
         if self.state != AVDTP_OPEN_STATE:
@@ -1764,6 +1819,7 @@ class Stream:
             return result
 
         self.change_state(AVDTP_STREAMING_STATE)
+        return None
 
     def on_suspend_command(self):
         if self.state != AVDTP_STREAMING_STATE:
@@ -1774,9 +1830,10 @@ class Stream:
             return result
 
         self.change_state(AVDTP_OPEN_STATE)
+        return None
 
     def on_close_command(self):
-        if self.state not in {AVDTP_OPEN_STATE, AVDTP_STREAMING_STATE}:
+        if self.state not in (AVDTP_OPEN_STATE, AVDTP_STREAMING_STATE):
             return Open_Reject(AVDTP_BAD_STATE_ERROR)
 
         result = self.local_endpoint.on_close_command()
@@ -1791,6 +1848,8 @@ class Stream:
         else:
             # TODO: set a timer as we wait for the RTP channel to be closed
             pass
+
+        return None
 
     def on_abort_command(self):
         if self.rtp_channel is None:
@@ -1819,7 +1878,7 @@ class Stream:
         self.local_endpoint.in_use = 0
         self.rtp_channel = None
 
-        if self.state in {AVDTP_CLOSING_STATE, AVDTP_ABORTING_STATE}:
+        if self.state in (AVDTP_CLOSING_STATE, AVDTP_ABORTING_STATE):
             self.change_state(AVDTP_IDLE_STATE)
         else:
             logger.warning('unexpected channel close while not CLOSING or ABORTING')
@@ -1839,7 +1898,10 @@ class Stream:
         local_endpoint.in_use = 1
 
     def __str__(self):
-        return f'Stream({self.local_endpoint.seid} -> {self.remote_endpoint.seid} {self.state_name(self.state)})'
+        return (
+            f'Stream({self.local_endpoint.seid} -> '
+            f'{self.remote_endpoint.seid} {self.state_name(self.state)})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -1852,12 +1914,14 @@ class StreamEndPoint:
         self.capabilities = capabilities
 
     def __str__(self):
+        media_type = f'{name_or_number(AVDTP_MEDIA_TYPE_NAMES, self.media_type)}'
+        tsep = f'{name_or_number(AVDTP_TSEP_NAMES, self.tsep)}'
         return '\n'.join(
             [
                 'SEP(',
                 f'  seid={self.seid}',
-                f'  media_type={name_or_number(AVDTP_MEDIA_TYPE_NAMES, self.media_type)}',
-                f'  tsep={name_or_number(AVDTP_TSEP_NAMES, self.tsep)}',
+                f'  media_type={media_type}',
+                f'  tsep={tsep}',
                 f'  in_use={self.in_use}',
                 '  capabilities=[',
                 '\n'.join([f'    {x}' for x in self.capabilities]),
@@ -1902,11 +1966,11 @@ class DiscoveredStreamEndPoint(StreamEndPoint, StreamEndPointProxy):
 # -----------------------------------------------------------------------------
 class LocalStreamEndPoint(StreamEndPoint):
     def __init__(
-        self, protocol, seid, media_type, tsep, capabilities, configuration=[]
+        self, protocol, seid, media_type, tsep, capabilities, configuration=None
     ):
         super().__init__(seid, media_type, tsep, 0, capabilities)
         self.protocol = protocol
-        self.configuration = configuration
+        self.configuration = configuration if configuration is not None else []
         self.stream = None
 
     async def start(self):
@@ -1968,14 +2032,14 @@ class LocalSource(LocalStreamEndPoint, EventEmitter):
     async def start(self):
         if self.packet_pump:
             return await self.packet_pump.start(self.stream.rtp_channel)
-        else:
-            self.emit('start', self.stream.rtp_channel)
+
+        self.emit('start', self.stream.rtp_channel)
 
     async def stop(self):
         if self.packet_pump:
             return await self.packet_pump.stop()
-        else:
-            self.emit('stop')
+
+        self.emit('stop')
 
     def on_set_configuration_command(self, configuration):
         # For now, blindly accept the configuration
@@ -2018,6 +2082,7 @@ class LocalSink(LocalStreamEndPoint, EventEmitter):
     def on_avdtp_packet(self, packet):
         rtp_packet = MediaPacket.from_bytes(packet)
         logger.debug(
-            f'{color("<<< RTP Packet:", "green")} {rtp_packet} {rtp_packet.payload[:16].hex()}'
+            f'{color("<<< RTP Packet:", "green")} '
+            f'{rtp_packet} {rtp_packet.payload[:16].hex()}'
         )
         self.emit('rtp_packet', rtp_packet)

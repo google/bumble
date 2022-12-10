@@ -19,13 +19,13 @@ import asyncio
 import sys
 import os
 import logging
-import websockets
 import json
+import websockets
 
 
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
-from bumble.rfcomm import Server as RfommServer
+from bumble.rfcomm import Server as RfcommServer
 from bumble.sdp import (
     DataElement,
     ServiceAttribute,
@@ -97,7 +97,7 @@ class UiServer:
 
     async def start(self):
         # Start a Websocket server to receive events from a web page
-        async def serve(websocket, path):
+        async def serve(websocket, _path):
             while True:
                 try:
                     message = await websocket.recv()
@@ -112,6 +112,7 @@ class UiServer:
                 except websockets.exceptions.ConnectionClosedOK:
                     pass
 
+        # pylint: disable=no-member
         await websockets.serve(serve, 'localhost', 8989)
 
 
@@ -147,7 +148,7 @@ async def main():
         device.classic_enabled = True
 
         # Create and register a server
-        rfcomm_server = RfommServer(device)
+        rfcomm_server = RfcommServer(device)
 
         # Listen for incoming DLC connections
         channel_number = rfcomm_server.listen(on_dlc)

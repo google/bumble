@@ -99,6 +99,7 @@ class GattlinkHubBridge(GattlinkL2capEndpoint, Device.Listener):
             print(color(f'!!! Connection failed: {error}', 'red'))
 
     @AsyncRunner.run_in_task()
+    # pylint: disable=invalid-overridden-method
     async def on_connection(self, connection):
         print(f'=== Connected to {connection}')
         self.peer = Peer(connection)
@@ -158,7 +159,8 @@ class GattlinkHubBridge(GattlinkL2capEndpoint, Device.Listener):
     def on_disconnection(self, reason):
         print(
             color(
-                f'!!! Disconnected from {self.peer}, reason={HCI_Constant.error_name(reason)}',
+                f'!!! Disconnected from {self.peer}, '
+                f'reason={HCI_Constant.error_name(reason)}',
                 'red',
             )
         )
@@ -189,7 +191,7 @@ class GattlinkHubBridge(GattlinkL2capEndpoint, Device.Listener):
         pass
 
     # Called by asyncio when a UDP datagram is received
-    def datagram_received(self, data, address):
+    def datagram_received(self, data, _address):
         print(color(f'<<< [UDP]: {len(data)} bytes', 'green'))
 
         if self.l2cap_channel:
@@ -209,6 +211,7 @@ class GattlinkNodeBridge(GattlinkL2capEndpoint, Device.Listener):
         self.tx_socket = None
         self.tx_subscriber = None
         self.rx_characteristic = None
+        self.transport = None
 
         # Register as a listener
         device.listener = self
@@ -264,7 +267,7 @@ class GattlinkNodeBridge(GattlinkL2capEndpoint, Device.Listener):
         self.transport = transport
 
     # Called by asyncio when a UDP datagram is received
-    def datagram_received(self, data, address):
+    def datagram_received(self, data, _address):
         print(color(f'<<< [UDP]: {len(data)} bytes', 'green'))
 
         if self.l2cap_channel:
@@ -276,7 +279,7 @@ class GattlinkNodeBridge(GattlinkL2capEndpoint, Device.Listener):
             asyncio.create_task(self.device.notify_subscribers(self.tx_characteristic))
 
     # Called when a write to the RX characteristic has been received
-    def on_rx_write(self, connection, data):
+    def on_rx_write(self, _connection, data):
         print(color(f'<<< [GATT RX]: {len(data)} bytes', 'cyan'))
         print(color('>>> [UDP]', 'magenta'))
         self.tx_socket.sendto(data)
@@ -284,7 +287,8 @@ class GattlinkNodeBridge(GattlinkL2capEndpoint, Device.Listener):
     # Called when the subscription to the TX characteristic has changed
     def on_tx_subscription(self, peer, enabled):
         print(
-            f'### [GATT TX] subscription from {peer}: {"enabled" if enabled else "disabled"}'
+            f'### [GATT TX] subscription from {peer}: '
+            f'{"enabled" if enabled else "disabled"}'
         )
         if enabled:
             self.tx_subscriber = peer
@@ -335,7 +339,9 @@ async def run(
 
         # Create a UDP to TX bridge (receive from TX, send to UDP)
         bridge.tx_socket, _ = await loop.create_datagram_endpoint(
-            lambda: asyncio.DatagramProtocol(), remote_addr=(send_host, send_port)
+            # pylint: disable-next=unnecessary-lambda
+            lambda: asyncio.DatagramProtocol(),
+            remote_addr=(send_host, send_port),
         )
 
         await device.power_on()

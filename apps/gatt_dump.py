@@ -21,7 +21,7 @@ import logging
 import click
 from colors import color
 
-from bumble.core import ProtocolError, TimeoutError
+import bumble.core
 from bumble.device import Device, Peer
 from bumble.gatt import show_services
 from bumble.transport import open_transport_or_link
@@ -49,9 +49,9 @@ async def dump_gatt_db(peer, done):
         try:
             value = await attribute.read_value()
             print(color(f'{value.hex()}', 'green'))
-        except ProtocolError as error:
+        except bumble.core.ProtocolError as error:
             print(color(error, 'red'))
-        except TimeoutError:
+        except bumble.core.TimeoutError:
             print(color('read timeout', 'red'))
 
     if done is not None:

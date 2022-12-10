@@ -38,7 +38,9 @@ class ScannerListener(Device.Listener):
             type_color = 'cyan'
 
         print(
-            f'>>> {color(advertisement.address, address_color)} [{color(address_type_string, type_color)}]: RSSI={advertisement.rssi}, {advertisement.data}'
+            f'>>> {color(advertisement.address, address_color)} '
+            f'[{color(address_type_string, type_color)}]: '
+            f'RSSI={advertisement.rssi}, {advertisement.data}'
         )
 
 

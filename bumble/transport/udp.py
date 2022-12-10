@@ -57,7 +57,7 @@ async def open_udp_transport(spec):
         udp_transport,
         packet_source,
     ) = await asyncio.get_running_loop().create_datagram_endpoint(
-        lambda: UdpPacketSource(),
+        UdpPacketSource,
         local_addr=(local_host, int(local_port)),
         remote_addr=(remote_host, int(remote_port)),
     )

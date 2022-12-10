@@ -92,7 +92,8 @@ class AdvertisementPrinter:
 
         print(
             f'>>> {color(address, address_color)} '
-            f'[{color(address_type_string, type_color)}]{address_qualifier}{resolution_qualifier}:{separator}'
+            f'[{color(address_type_string, type_color)}]{address_qualifier}'
+            f'{resolution_qualifier}:{separator}'
             f'{phy_info}'
             f'RSSI:{advertisement.rssi:4} {rssi_bar}{separator}'
             f'{advertisement.data.to_string(separator)}\n'

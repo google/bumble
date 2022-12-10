@@ -8,5 +8,5 @@ This is typically used to open a PTY, or unix driver, not for real files.
 The moniker for a File transport is `file:<path>`
 
 !!! example
-    `file:/dev/ttys001`  
+    `file:/dev/ttys001`
     Opens the pseudo terminal `/dev/ttys001` as a transport

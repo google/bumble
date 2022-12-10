@@ -4,3 +4,49 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 write_to = "bumble/_version.py"
+
+[tool.pytest.ini_options]
+pythonpath = "."
+testpaths = [
+    "tests"
+]
+
+[tool.pylint.master]
+init-hook = 'import sys; sys.path.append(".")'
+
+[tool.pylint.messages_control]
+max-line-length = "88"
+
+disable = [
+    "broad-except",
+    "fixme",
+    "logging-fstring-interpolation",
+    "logging-not-lazy",
+    "no-member", # Temporary until pylint works better with class/method decorators
+    "no-value-for-parameter", # Temporary until pylint works better with class/method decorators
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-lines",
+    "too-many-locals",
+    "too-many-public-methods",
+    "too-many-statements",
+]
+
+ignore = [
+    "emulated_bluetooth_pb2.py",
+    "emulated_bluetooth_pb2_grpc.py",
+    "emulated_bluetooth_vhci_pb2_grpc.py",
+    "emulated_bluetooth_packets_pb2.py",
+    "emulated_bluetooth_vhci_pb2.py"
+]
+
+[tool.pylint.typecheck]
+signature-mutators="AsyncRunner.run_in_task"
+
+[tool.black]
+skip-string-normalization = true

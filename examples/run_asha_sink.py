@@ -24,7 +24,7 @@ import logging
 from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
-from bumble.hci import UUID
+from bumble.core import UUID
 from bumble.gatt import Service, Characteristic, CharacteristicValue
 
 
@@ -51,7 +51,8 @@ ASHA_LE_PSM_OUT_CHARACTERISTIC = UUID(
 async def main():
     if len(sys.argv) != 4:
         print(
-            'Usage: python run_asha_sink.py <device-config> <transport-spec> <audio-file>'
+            'Usage: python run_asha_sink.py <device-config> <transport-spec> '
+            '<audio-file>'
         )
         print('example: python run_asha_sink.py device1.json usb:0 audio_out.g722')
         return
@@ -62,14 +63,15 @@ async def main():
         device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
 
         # Handler for audio control commands
-        def on_audio_control_point_write(connection, value):
+        def on_audio_control_point_write(_connection, value):
             print('--- AUDIO CONTROL POINT Write:', value.hex())
             opcode = value[0]
             if opcode == 1:
                 # Start
                 audio_type = ('Unknown', 'Ringtone', 'Phone Call', 'Media')[value[2]]
                 print(
-                    f'### START: codec={value[1]}, audio_type={audio_type}, volume={value[3]}, otherstate={value[4]}'
+                    f'### START: codec={value[1]}, audio_type={audio_type}, '
+                    f'volume={value[3]}, otherstate={value[4]}'
                 )
             elif opcode == 2:
                 print('### STOP')
@@ -82,7 +84,7 @@ async def main():
             )
 
         # Handler for volume control
-        def on_volume_write(connection, value):
+        def on_volume_write(_connection, value):
             print('--- VOLUME Write:', value[0])
 
         # Register an L2CAP CoC server

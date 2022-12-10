@@ -44,11 +44,13 @@ async def open_ws_server_transport(spec):
             source = ParserSource()
             sink = PumpedPacketSink(self.send_packet)
             self.connection = asyncio.get_running_loop().create_future()
+            self.server = None
 
             super().__init__(source, sink)
 
         async def serve(self, local_host, local_port):
             self.sink.start()
+            # pylint: disable-next=no-member
             self.server = await websockets.serve(
                 ws_handler=self.on_connection,
                 host=local_host if local_host != '_' else None,
@@ -58,15 +60,17 @@ async def open_ws_server_transport(spec):
 
         async def on_connection(self, connection):
             logger.debug(
-                f'new connection on {connection.local_address} from {connection.remote_address}'
+                f'new connection on {connection.local_address} '
+                f'from {connection.remote_address}'
             )
             self.connection.set_result(connection)
+            # pylint: disable=no-member
             try:
                 async for packet in connection:
-                    if type(packet) is bytes:
+                    if isinstance(packet, bytes):
                         self.source.parser.feed_data(packet)
                     else:
-                        logger.warn('discarding packet: not a BINARY frame')
+                        logger.warning('discarding packet: not a BINARY frame')
             except websockets.WebSocketException as error:
                 logger.debug(f'exception while receiving packet: {error}')
 

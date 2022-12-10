@@ -47,6 +47,7 @@ def composite_listener(cls):
     registers/deregisters all methods named `on_<event_name>` as a listener for
     the <event_name> event with an emitter.
     """
+    # pylint: disable=protected-access
 
     def register(self, emitter):
         for method_name in dir(cls):
@@ -65,7 +66,6 @@ def composite_listener(cls):
 
 # -----------------------------------------------------------------------------
 class AbortableEventEmitter(EventEmitter):
-
     def abort_on(self, event: str, awaitable: Awaitable):
         """
         Set a coroutine or future to abort when an event occur.
@@ -77,7 +77,7 @@ class AbortableEventEmitter(EventEmitter):
         def on_event(*_):
             msg = f'abort: {event} event occurred.'
             if isinstance(future, asyncio.Task):
-                # python prior to 3.9 does not support passing a message on `Task.cancel`
+                # python < 3.9 does not support passing a message on `Task.cancel`
                 if sys.version_info < (3, 9, 0):
                     future.cancel()
                 else:
@@ -105,6 +105,7 @@ class CompositeEventEmitter(AbortableEventEmitter):
 
     @listener.setter
     def listener(self, listener):
+        # pylint: disable=protected-access
         if self._listener:
             # Call the deregistration methods for each base class that has them
             for cls in self._listener.__class__.mro():
@@ -168,7 +169,8 @@ class AsyncRunner:
                             await coroutine
                         except Exception:
                             logger.warning(
-                                f'{color("!!! Exception in wrapper:", "red")} {traceback.format_exc()}'
+                                f'{color("!!! Exception in wrapper:", "red")} '
+                                f'{traceback.format_exc()}'
                             )
 
                     asyncio.create_task(run())

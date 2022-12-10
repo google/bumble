@@ -21,7 +21,8 @@ import asyncio
 from colors import color
 from pyee import EventEmitter
 
-from .core import BT_BR_EDR_TRANSPORT, InvalidStateError, ProtocolError, ConnectionError
+from . import core
+from .core import BT_BR_EDR_TRANSPORT, InvalidStateError, ProtocolError
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -104,17 +105,17 @@ RFCOMM_DYNAMIC_CHANNEL_NUMBER_END   = 30
 
 
 # -----------------------------------------------------------------------------
-def fcs(buffer):
-    fcs = 0xFF
+def compute_fcs(buffer):
+    result = 0xFF
     for byte in buffer:
-        fcs = CRC_TABLE[fcs ^ byte]
-    return 0xFF - fcs
+        result = CRC_TABLE[result ^ byte]
+    return 0xFF - result
 
 
 # -----------------------------------------------------------------------------
 class RFCOMM_Frame:
-    def __init__(self, type, c_r, dlci, p_f, information=b'', with_credits=False):
-        self.type = type
+    def __init__(self, frame_type, c_r, dlci, p_f, information=b'', with_credits=False):
+        self.type = frame_type
         self.c_r = c_r
         self.dlci = dlci
         self.p_f = p_f
@@ -129,18 +130,18 @@ class RFCOMM_Frame:
             # 1-byte length indicator
             self.length = bytes([(length << 1) | 1])
         self.address = (dlci << 2) | (c_r << 1) | 1
-        self.control = type | (p_f << 4)
-        if type == RFCOMM_UIH_FRAME:
-            self.fcs = fcs(bytes([self.address, self.control]))
+        self.control = frame_type | (p_f << 4)
+        if frame_type == RFCOMM_UIH_FRAME:
+            self.fcs = compute_fcs(bytes([self.address, self.control]))
         else:
-            self.fcs = fcs(bytes([self.address, self.control]) + self.length)
+            self.fcs = compute_fcs(bytes([self.address, self.control]) + self.length)
 
     def type_name(self):
         return RFCOMM_FRAME_TYPE_NAMES[self.type]
 
     @staticmethod
     def parse_mcc(data):
-        type = data[0] >> 2
+        mcc_type = data[0] >> 2
         c_r = (data[0] >> 1) & 1
         length = data[1]
         if data[1] & 1:
@@ -150,12 +151,12 @@ class RFCOMM_Frame:
             length = (data[3] << 7) & (length >> 1)
             value = data[3 : 3 + length]
 
-        return (type, c_r, value)
+        return (mcc_type, c_r, value)
 
     @staticmethod
-    def make_mcc(type, c_r, data):
+    def make_mcc(mcc_type, c_r, data):
         return (
-            bytes([(type << 2 | c_r << 1 | 1) & 0xFF, (len(data) & 0x7F) << 1 | 1])
+            bytes([(mcc_type << 2 | c_r << 1 | 1) & 0xFF, (len(data) & 0x7F) << 1 | 1])
             + data
         )
 
@@ -186,7 +187,7 @@ class RFCOMM_Frame:
         # Extract fields
         dlci = (data[0] >> 2) & 0x3F
         c_r = (data[0] >> 1) & 0x01
-        type = data[1] & 0xEF
+        frame_type = data[1] & 0xEF
         p_f = (data[1] >> 4) & 0x01
         length = data[2]
         if length & 0x01:
@@ -198,9 +199,9 @@ class RFCOMM_Frame:
         fcs = data[-1]
 
         # Construct the frame and check the CRC
-        frame = RFCOMM_Frame(type, c_r, dlci, p_f, information)
+        frame = RFCOMM_Frame(frame_type, c_r, dlci, p_f, information)
         if frame.fcs != fcs:
-            logger.warn(f'FCS mismatch: got {fcs:02X}, expected {frame.fcs:02X}')
+            logger.warning(f'FCS mismatch: got {fcs:02X}, expected {frame.fcs:02X}')
             raise ValueError('fcs mismatch')
 
         return frame
@@ -214,7 +215,14 @@ class RFCOMM_Frame:
         )
 
     def __str__(self):
-        return f'{color(self.type_name(), "yellow")}(c/r={self.c_r},dlci={self.dlci},p/f={self.p_f},length={len(self.information)},fcs=0x{self.fcs:02X})'
+        return (
+            f'{color(self.type_name(), "yellow")}'
+            f'(c/r={self.c_r},'
+            f'dlci={self.dlci},'
+            f'p/f={self.p_f},'
+            f'length={len(self.information)},'
+            f'fcs=0x{self.fcs:02X})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -264,7 +272,15 @@ class RFCOMM_MCC_PN:
         )
 
     def __str__(self):
-        return f'PN(dlci={self.dlci},cl={self.cl},priority={self.priority},ack_timer={self.ack_timer},max_frame_size={self.max_frame_size},max_retransmissions={self.max_retransmissions},window_size={self.window_size})'
+        return (
+            f'PN(dlci={self.dlci},'
+            f'cl={self.cl},'
+            f'priority={self.priority},'
+            f'ack_timer={self.ack_timer},'
+            f'max_frame_size={self.max_frame_size},'
+            f'max_retransmissions={self.max_retransmissions},'
+            f'window_size={self.window_size})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -302,7 +318,14 @@ class RFCOMM_MCC_MSC:
         )
 
     def __str__(self):
-        return f'MSC(dlci={self.dlci},fc={self.fc},rtc={self.rtc},rtr={self.rtr},ic={self.ic},dv={self.dv})'
+        return (
+            f'MSC(dlci={self.dlci},'
+            f'fc={self.fc},'
+            f'rtc={self.rtc},'
+            f'rtr={self.rtr},'
+            f'ic={self.ic},'
+            f'dv={self.dv})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -336,6 +359,7 @@ class DLC(EventEmitter):
         self.role = multiplexer.role
         self.c_r = 1 if self.role == Multiplexer.INITIATOR else 0
         self.sink = None
+        self.connection_result = None
 
         # Compute the MTU
         max_overhead = 4 + 1  # header with 2-byte length + fcs
@@ -360,30 +384,38 @@ class DLC(EventEmitter):
         handler = getattr(self, f'on_{frame.type_name()}_frame'.lower())
         handler(frame)
 
-    def on_sabm_frame(self, frame):
+    def on_sabm_frame(self, _frame):
         if self.state != DLC.CONNECTING:
-            logger.warn(color('!!! received SABM when not in CONNECTING state', 'red'))
+            logger.warning(
+                color('!!! received SABM when not in CONNECTING state', 'red')
+            )
             return
 
         self.send_frame(RFCOMM_Frame.ua(c_r=1 - self.c_r, dlci=self.dlci))
 
         # Exchange the modem status with the peer
         msc = RFCOMM_MCC_MSC(dlci=self.dlci, fc=0, rtc=1, rtr=1, ic=0, dv=1)
-        mcc = RFCOMM_Frame.make_mcc(type=RFCOMM_MCC_MSC_TYPE, c_r=1, data=bytes(msc))
+        mcc = RFCOMM_Frame.make_mcc(
+            mcc_type=RFCOMM_MCC_MSC_TYPE, c_r=1, data=bytes(msc)
+        )
         logger.debug(f'>>> MCC MSC Command: {msc}')
         self.send_frame(RFCOMM_Frame.uih(c_r=self.c_r, dlci=0, information=mcc))
 
         self.change_state(DLC.CONNECTED)
         self.emit('open')
 
-    def on_ua_frame(self, frame):
+    def on_ua_frame(self, _frame):
         if self.state != DLC.CONNECTING:
-            logger.warn(color('!!! received SABM when not in CONNECTING state', 'red'))
+            logger.warning(
+                color('!!! received SABM when not in CONNECTING state', 'red')
+            )
             return
 
         # Exchange the modem status with the peer
         msc = RFCOMM_MCC_MSC(dlci=self.dlci, fc=0, rtc=1, rtr=1, ic=0, dv=1)
-        mcc = RFCOMM_Frame.make_mcc(type=RFCOMM_MCC_MSC_TYPE, c_r=1, data=bytes(msc))
+        mcc = RFCOMM_Frame.make_mcc(
+            mcc_type=RFCOMM_MCC_MSC_TYPE, c_r=1, data=bytes(msc)
+        )
         logger.debug(f'>>> MCC MSC Command: {msc}')
         self.send_frame(RFCOMM_Frame.uih(c_r=self.c_r, dlci=0, information=mcc))
 
@@ -394,7 +426,7 @@ class DLC(EventEmitter):
         # TODO: handle all states
         pass
 
-    def on_disc_frame(self, frame):
+    def on_disc_frame(self, _frame):
         # TODO: handle all states
         self.send_frame(RFCOMM_Frame.ua(c_r=1 - self.c_r, dlci=self.dlci))
 
@@ -402,25 +434,28 @@ class DLC(EventEmitter):
         data = frame.information
         if frame.p_f == 1:
             # With credits
-            credits = frame.information[0]
-            self.tx_credits += credits
+            received_credits = frame.information[0]
+            self.tx_credits += received_credits
 
             logger.debug(
-                f'<<< Credits [{self.dlci}]: received {credits}, total={self.tx_credits}'
+                f'<<< Credits [{self.dlci}]: '
+                f'received {credits}, total={self.tx_credits}'
             )
             data = data[1:]
 
         logger.debug(
-            f'{color("<<< Data", "yellow")} [{self.dlci}] {len(data)} bytes, rx_credits={self.rx_credits}: {data.hex()}'
+            f'{color("<<< Data", "yellow")} '
+            f'[{self.dlci}] {len(data)} bytes, '
+            f'rx_credits={self.rx_credits}: {data.hex()}'
         )
         if len(data) and self.sink:
-            self.sink(data)
+            self.sink(data)  # pylint: disable=not-callable
 
         # Update the credits
         if self.rx_credits > 0:
             self.rx_credits -= 1
         else:
-            logger.warn(color('!!! received frame with no rx credits', 'red'))
+            logger.warning(color('!!! received frame with no rx credits', 'red'))
 
         # Check if there's anything to send (including credits)
         self.process_tx()
@@ -434,7 +469,7 @@ class DLC(EventEmitter):
             logger.debug(f'<<< MCC MSC Command: {msc}')
             msc = RFCOMM_MCC_MSC(dlci=self.dlci, fc=0, rtc=1, rtr=1, ic=0, dv=1)
             mcc = RFCOMM_Frame.make_mcc(
-                type=RFCOMM_MCC_MSC_TYPE, c_r=0, data=bytes(msc)
+                mcc_type=RFCOMM_MCC_MSC_TYPE, c_r=0, data=bytes(msc)
             )
             logger.debug(f'>>> MCC MSC Response: {msc}')
             self.send_frame(RFCOMM_Frame.uih(c_r=self.c_r, dlci=0, information=mcc))
@@ -443,7 +478,7 @@ class DLC(EventEmitter):
             logger.debug(f'<<< MCC MSC Response: {msc}')
 
     def connect(self):
-        if not self.state == DLC.INIT:
+        if self.state != DLC.INIT:
             raise InvalidStateError('invalid state')
 
         self.change_state(DLC.CONNECTING)
@@ -451,7 +486,7 @@ class DLC(EventEmitter):
         self.send_frame(RFCOMM_Frame.sabm(c_r=self.c_r, dlci=self.dlci))
 
     def accept(self):
-        if not self.state == DLC.INIT:
+        if self.state != DLC.INIT:
             raise InvalidStateError('invalid state')
 
         pn = RFCOMM_MCC_PN(
@@ -463,7 +498,7 @@ class DLC(EventEmitter):
             max_retransmissions=0,
             window_size=RFCOMM_DEFAULT_INITIAL_RX_CREDITS,
         )
-        mcc = RFCOMM_Frame.make_mcc(type=RFCOMM_MCC_PN_TYPE, c_r=0, data=bytes(pn))
+        mcc = RFCOMM_Frame.make_mcc(mcc_type=RFCOMM_MCC_PN_TYPE, c_r=0, data=bytes(pn))
         logger.debug(f'>>> PN Response: {pn}')
         self.send_frame(RFCOMM_Frame.uih(c_r=self.c_r, dlci=0, information=mcc))
         self.change_state(DLC.CONNECTING)
@@ -471,8 +506,8 @@ class DLC(EventEmitter):
     def rx_credits_needed(self):
         if self.rx_credits <= self.rx_threshold:
             return RFCOMM_DEFAULT_INITIAL_RX_CREDITS - self.rx_credits
-        else:
-            return 0
+
+        return 0
 
     def process_tx(self):
         # Send anything we can (or an empty frame if we need to send rx credits)
@@ -496,7 +531,9 @@ class DLC(EventEmitter):
 
             # Send the frame
             logger.debug(
-                f'>>> sending {len(chunk)} bytes with {rx_credits_needed} credits, rx_credits={self.rx_credits}, tx_credits={self.tx_credits}'
+                f'>>> sending {len(chunk)} bytes with {rx_credits_needed} credits, '
+                f'rx_credits={self.rx_credits}, '
+                f'tx_credits={self.tx_credits}'
             )
             self.send_frame(
                 RFCOMM_Frame.uih(
@@ -512,8 +549,8 @@ class DLC(EventEmitter):
     # Stream protocol
     def write(self, data):
         # We can only send bytes
-        if type(data) != bytes:
-            if type(data) == str:
+        if not isinstance(data, bytes):
+            if isinstance(data, str):
                 # Automatically convert strings to bytes using UTF-8
                 data = data.encode('utf-8')
             else:
@@ -592,14 +629,14 @@ class Multiplexer(EventEmitter):
             self.on_frame(frame)
         else:
             if frame.type == RFCOMM_DM_FRAME:
-                # DM responses are for a DLCI, but since we only create the dlc when we receive
-                # a PN response (because we need the parameters), we handle DM frames at the Multiplexer
-                # level
+                # DM responses are for a DLCI, but since we only create the dlc when we
+                # receive a PN response (because we need the parameters), we handle DM
+                # frames at the Multiplexer level
                 self.on_dm_frame(frame)
             else:
                 dlc = self.dlcs.get(frame.dlci)
                 if dlc is None:
-                    logger.warn(f'no dlc for DLCI {frame.dlci}')
+                    logger.warning(f'no dlc for DLCI {frame.dlci}')
                     return
                 dlc.on_frame(frame)
 
@@ -607,14 +644,14 @@ class Multiplexer(EventEmitter):
         handler = getattr(self, f'on_{frame.type_name()}_frame'.lower())
         handler(frame)
 
-    def on_sabm_frame(self, frame):
+    def on_sabm_frame(self, _frame):
         if self.state != Multiplexer.INIT:
             logger.debug('not in INIT state, ignoring SABM')
             return
         self.change_state(Multiplexer.CONNECTED)
         self.send_frame(RFCOMM_Frame.ua(c_r=1, dlci=0))
 
-    def on_ua_frame(self, frame):
+    def on_ua_frame(self, _frame):
         if self.state == Multiplexer.CONNECTING:
             self.change_state(Multiplexer.CONNECTED)
             if self.connection_result:
@@ -626,34 +663,34 @@ class Multiplexer(EventEmitter):
                 self.disconnection_result.set_result(None)
                 self.disconnection_result = None
 
-    def on_dm_frame(self, frame):
+    def on_dm_frame(self, _frame):
         if self.state == Multiplexer.OPENING:
             self.change_state(Multiplexer.CONNECTED)
             if self.open_result:
                 self.open_result.set_exception(
-                    ConnectionError(
-                        ConnectionError.CONNECTION_REFUSED,
+                    core.ConnectionError(
+                        core.ConnectionError.CONNECTION_REFUSED,
                         BT_BR_EDR_TRANSPORT,
                         self.l2cap_channel.connection.peer_address,
                         'rfcomm',
                     )
                 )
         else:
-            logger.warn(f'unexpected state for DM: {self}')
+            logger.warning(f'unexpected state for DM: {self}')
 
-    def on_disc_frame(self, frame):
+    def on_disc_frame(self, _frame):
         self.change_state(Multiplexer.DISCONNECTED)
         self.send_frame(
             RFCOMM_Frame.ua(c_r=0 if self.role == Multiplexer.INITIATOR else 1, dlci=0)
         )
 
     def on_uih_frame(self, frame):
-        (type, c_r, value) = RFCOMM_Frame.parse_mcc(frame.information)
+        (mcc_type, c_r, value) = RFCOMM_Frame.parse_mcc(frame.information)
 
-        if type == RFCOMM_MCC_PN_TYPE:
+        if mcc_type == RFCOMM_MCC_PN_TYPE:
             pn = RFCOMM_MCC_PN.from_bytes(value)
             self.on_mcc_pn(c_r, pn)
-        elif type == RFCOMM_MCC_MSC_TYPE:
+        elif mcc_type == RFCOMM_MCC_MSC_TYPE:
             mcs = RFCOMM_MCC_MSC.from_bytes(value)
             self.on_mcc_msc(c_r, mcs)
 
@@ -669,7 +706,7 @@ class Multiplexer(EventEmitter):
             if pn.dlci & 1:
                 # Not expected, this is an initiator-side number
                 # TODO: error out
-                logger.warn(f'invalid DLCI: {pn.dlci}')
+                logger.warning(f'invalid DLCI: {pn.dlci}')
             else:
                 if self.acceptor:
                     channel_number = pn.dlci >> 1
@@ -688,7 +725,7 @@ class Multiplexer(EventEmitter):
                         self.send_frame(RFCOMM_Frame.dm(c_r=1, dlci=pn.dlci))
                 else:
                     # No acceptor?? shouldn't happen
-                    logger.warn(color('!!! no acceptor registered', 'red'))
+                    logger.warning(color('!!! no acceptor registered', 'red'))
         else:
             # Response
             logger.debug(f'>>> PN Response: {pn}')
@@ -697,12 +734,12 @@ class Multiplexer(EventEmitter):
                 self.dlcs[pn.dlci] = dlc
                 dlc.connect()
             else:
-                logger.warn('ignoring PN response')
+                logger.warning('ignoring PN response')
 
     def on_mcc_msc(self, c_r, msc):
         dlc = self.dlcs.get(msc.dlci)
         if dlc is None:
-            logger.warn(f'no dlc for DLCI {msc.dlci}')
+            logger.warning(f'no dlc for DLCI {msc.dlci}')
             return
         dlc.on_mcc_msc(c_r, msc)
 
@@ -732,8 +769,8 @@ class Multiplexer(EventEmitter):
         if self.state != Multiplexer.CONNECTED:
             if self.state == Multiplexer.OPENING:
                 raise InvalidStateError('open already in progress')
-            else:
-                raise InvalidStateError('not connected')
+
+            raise InvalidStateError('not connected')
 
         pn = RFCOMM_MCC_PN(
             dlci=channel << 1,
@@ -744,7 +781,7 @@ class Multiplexer(EventEmitter):
             max_retransmissions=0,
             window_size=RFCOMM_DEFAULT_INITIAL_RX_CREDITS,
         )
-        mcc = RFCOMM_Frame.make_mcc(type=RFCOMM_MCC_PN_TYPE, c_r=1, data=bytes(pn))
+        mcc = RFCOMM_Frame.make_mcc(mcc_type=RFCOMM_MCC_PN_TYPE, c_r=1, data=bytes(pn))
         logger.debug(f'>>> Sending MCC: {pn}')
         self.open_result = asyncio.get_running_loop().create_future()
         self.change_state(Multiplexer.OPENING)
@@ -784,7 +821,7 @@ class Client:
                 self.connection, RFCOMM_PSM
             )
         except ProtocolError as error:
-            logger.warn(f'L2CAP connection failed: {error}')
+            logger.warning(f'L2CAP connection failed: {error}')
             raise
 
         # Create a mutliplexer to manage DLCs with the server

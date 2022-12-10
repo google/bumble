@@ -21,7 +21,16 @@ import logging
 import functools
 from colors import color
 
-from .core import *
+from .core import (
+    BT_BR_EDR_TRANSPORT,
+    AdvertisingData,
+    DeviceClass,
+    ProtocolError,
+    bit_flags_to_strings,
+    name_or_number,
+    padded_bytes,
+)
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -43,8 +52,8 @@ def key_with_value(dictionary, target_value):
     return None
 
 
-def indent_lines(str):
-    return '\n'.join(['  ' + line for line in str.split('\n')])
+def indent_lines(string):
+    return '\n'.join(['  ' + line for line in string.split('\n')])
 
 
 def map_null_terminated_utf8_string(utf8_bytes):
@@ -63,25 +72,32 @@ def map_class_of_device(class_of_device):
         major_device_class,
         minor_device_class,
     ) = DeviceClass.split_class_of_device(class_of_device)
-    return f'[{class_of_device:06X}] Services({",".join(DeviceClass.service_class_labels(service_classes))}),Class({DeviceClass.major_device_class_name(major_device_class)}|{DeviceClass.minor_device_class_name(major_device_class, minor_device_class)})'
+    return (
+        f'[{class_of_device:06X}] Services('
+        f'{",".join(DeviceClass.service_class_labels(service_classes))}),'
+        f'Class({DeviceClass.major_device_class_name(major_device_class)}|'
+        f'{DeviceClass.minor_device_class_name(major_device_class, minor_device_class)}'
+        ')'
+    )
 
 
 def phy_list_to_bits(phys):
     if phys is None:
         return 0
-    else:
-        phy_bits = 0
-        for phy in phys:
-            if phy not in HCI_LE_PHY_TYPE_TO_BIT:
-                raise ValueError('invalid PHY')
-            phy_bits |= 1 << HCI_LE_PHY_TYPE_TO_BIT[phy]
-        return phy_bits
+
+    phy_bits = 0
+    for phy in phys:
+        if phy not in HCI_LE_PHY_TYPE_TO_BIT:
+            raise ValueError('invalid PHY')
+        phy_bits |= 1 << HCI_LE_PHY_TYPE_TO_BIT[phy]
+    return phy_bits
 
 
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
 # fmt: off
+# pylint: disable=line-too-long
 
 # HCI Version
 HCI_VERSION_BLUETOOTH_CORE_1_0B    = 0
@@ -1355,8 +1371,11 @@ HCI_LE_SUPPORTED_FEATURES_NAMES = {
 }
 
 # fmt: on
+# pylint: enable=line-too-long
+# pylint: disable=invalid-name
 
 # -----------------------------------------------------------------------------
+# pylint: disable-next=unnecessary-lambda
 STATUS_SPEC = {'size': 1, 'mapper': lambda x: HCI_Constant.status_name(x)}
 
 
@@ -1418,25 +1437,25 @@ class HCI_StatusError(ProtocolError):
 # -----------------------------------------------------------------------------
 class HCI_Object:
     @staticmethod
-    def init_from_fields(object, fields, values):
-        if type(values) is dict:
+    def init_from_fields(hci_object, fields, values):
+        if isinstance(values, dict):
             for field_name, _ in fields:
-                setattr(object, field_name, values[field_name])
+                setattr(hci_object, field_name, values[field_name])
         else:
             for field_name, field_value in zip(fields, values):
-                setattr(object, field_name, field_value)
+                setattr(hci_object, field_name, field_value)
 
     @staticmethod
-    def init_from_bytes(object, data, offset, fields):
+    def init_from_bytes(hci_object, data, offset, fields):
         parsed = HCI_Object.dict_from_bytes(data, offset, fields)
-        HCI_Object.init_from_fields(object, parsed.keys(), parsed.values())
+        HCI_Object.init_from_fields(hci_object, parsed.keys(), parsed.values())
 
     @staticmethod
     def dict_from_bytes(data, offset, fields):
         result = collections.OrderedDict()
         for (field_name, field_type) in fields:
             # The field_type may be a dictionary with a mapper, parser, and/or size
-            if type(field_type) is dict:
+            if isinstance(field_type, dict):
                 if 'size' in field_type:
                     field_type = field_type['size']
                 elif 'parser' in field_type:
@@ -1480,7 +1499,7 @@ class HCI_Object:
                 # 32-bit unsigned big-endian
                 field_value = struct.unpack_from('>I', data, offset)[0]
                 offset += 4
-            elif type(field_type) is int and field_type > 4 and field_type <= 256:
+            elif isinstance(field_type, int) and 4 < field_type <= 256:
                 # Byte array (from 5 up to 256 bytes)
                 field_value = data[offset : offset + field_type]
                 offset += field_type
@@ -1494,19 +1513,20 @@ class HCI_Object:
         return result
 
     @staticmethod
-    def dict_to_bytes(object, fields):
+    def dict_to_bytes(hci_object, fields):
         result = bytearray()
         for (field_name, field_type) in fields:
-            # The field_type may be a dictionary with a mapper, parser, serializer, and/or size
+            # The field_type may be a dictionary with a mapper, parser, serializer,
+            # and/or size
             serializer = None
-            if type(field_type) is dict:
+            if isinstance(field_type, dict):
                 if 'serializer' in field_type:
                     serializer = field_type['serializer']
                 if 'size' in field_type:
                     field_type = field_type['size']
 
             # Serialize the field
-            field_value = object[field_name]
+            field_value = hci_object[field_name]
             if serializer:
                 field_bytes = serializer(field_value)
             elif field_type == 1:
@@ -1534,20 +1554,18 @@ class HCI_Object:
                 # 32-bit unsigned big-endian
                 field_bytes = struct.pack('>I', field_value)
             elif field_type == '*':
-                if type(field_value) is int:
-                    if field_value >= 0 and field_value <= 255:
+                if isinstance(field_value, int):
+                    if 0 <= field_value <= 255:
                         field_bytes = bytes([field_value])
                     else:
                         raise ValueError('value too large for *-typed field')
                 else:
                     field_bytes = bytes(field_value)
-            elif (
-                type(field_value) is bytes
-                or type(field_value) is bytearray
-                or hasattr(field_value, 'to_bytes')
+            elif isinstance(field_value, (bytes, bytearray)) or hasattr(
+                field_value, 'to_bytes'
             ):
                 field_bytes = bytes(field_value)
-                if type(field_type) is int and field_type > 4 and field_type <= 256:
+                if isinstance(field_type, int) and 4 < field_type <= 256:
                     # Truncate or Pad with zeros if the field is too long or too short
                     if len(field_bytes) < field_type:
                         field_bytes += bytes(field_type - len(field_bytes))
@@ -1584,42 +1602,44 @@ class HCI_Object:
 
     @staticmethod
     def format_field_value(value, indentation):
-        if type(value) is bytes:
+        if isinstance(value, bytes):
             return value.hex()
-        elif isinstance(value, HCI_Object):
+
+        if isinstance(value, HCI_Object):
             return '\n' + value.to_string(indentation)
-        else:
-            return str(value)
+
+        return str(value)
 
     @staticmethod
-    def format_fields(object, keys, indentation='', value_mappers={}):
+    def format_fields(hci_object, keys, indentation='', value_mappers=None):
         if not keys:
             return ''
 
         # Measure the widest field name
         max_field_name_length = max(
-            [len(key[0] if type(key) is tuple else key) for key in keys]
+            (len(key[0] if isinstance(key, tuple) else key) for key in keys)
         )
 
         # Build array of formatted key:value pairs
         fields = []
         for key in keys:
             value_mapper = None
-            if type(key) is tuple:
+            if isinstance(key, tuple):
                 # The key has an associated specifier
                 key, specifier = key
 
                 # Get the value mapper from the specifier
-                if type(specifier) is dict:
+                if isinstance(specifier, dict):
                     value_mapper = specifier.get('mapper')
 
             # Get the value for the field
-            value = object[key]
+            value = hci_object[key]
 
             # Map the value if needed
-            value_mapper = value_mappers.get(key, value_mapper)
-            if value_mapper is not None:
-                value = value_mapper(value)
+            if value_mappers:
+                value_mapper = value_mappers.get(key, value_mapper)
+                if value_mapper is not None:
+                    value = value_mapper(value)
 
             # Get the string representation of the value
             value_str = HCI_Object.format_field_value(
@@ -1639,7 +1659,7 @@ class HCI_Object:
         self.fields = fields
         self.init_from_fields(self, fields, kwargs)
 
-    def to_string(self, indentation='', value_mappers={}):
+    def to_string(self, indentation='', value_mappers=None):
         return HCI_Object.format_fields(
             self.__dict__, self.fields, indentation, value_mappers
         )
@@ -1670,6 +1690,7 @@ class Address:
         RANDOM_IDENTITY_ADDRESS: 'RANDOM_IDENTITY_ADDRESS',
     }
 
+    # pylint: disable-next=unnecessary-lambda
     ADDRESS_TYPE_SPEC = {'size': 1, 'mapper': lambda x: Address.address_type_name(x)}
 
     @staticmethod
@@ -1686,7 +1707,8 @@ class Address:
 
     @staticmethod
     def parse_address(data, offset):
-        # Fix the type to a default value. This is used for parsing type-less Classic addresses
+        # Fix the type to a default value. This is used for parsing type-less Classic
+        # addresses
         return Address.parse_address_with_type(
             data, offset, Address.PUBLIC_DEVICE_ADDRESS
         )
@@ -1705,10 +1727,10 @@ class Address:
         Initialize an instance. `address` may be a byte array in little-endian
         format, or a hex string in big-endian format (with optional ':'
         separators between the bytes).
-        If the address is a string suffixed with '/P', `address_type` is ignored and the type
-        is set to PUBLIC_DEVICE_ADDRESS.
+        If the address is a string suffixed with '/P', `address_type` is ignored and
+        the type is set to PUBLIC_DEVICE_ADDRESS.
         '''
-        if type(address) is bytes:
+        if isinstance(address, bytes):
             self.address_bytes = address
         else:
             # Check if there's a '/P' type specifier
@@ -1731,9 +1753,9 @@ class Address:
 
     @property
     def is_public(self):
-        return (
-            self.address_type == self.PUBLIC_DEVICE_ADDRESS
-            or self.address_type == self.PUBLIC_IDENTITY_ADDRESS
+        return self.address_type in (
+            self.PUBLIC_DEVICE_ADDRESS,
+            self.PUBLIC_IDENTITY_ADDRESS,
         )
 
     @property
@@ -1742,9 +1764,9 @@ class Address:
 
     @property
     def is_resolved(self):
-        return (
-            self.address_type == self.PUBLIC_IDENTITY_ADDRESS
-            or self.address_type == self.RANDOM_IDENTITY_ADDRESS
+        return self.address_type in (
+            self.PUBLIC_IDENTITY_ADDRESS,
+            self.RANDOM_IDENTITY_ADDRESS,
         )
 
     @property
@@ -1776,10 +1798,10 @@ class Address:
         '''
         String representation of the address, MSB first
         '''
-        str = ':'.join([f'{x:02X}' for x in reversed(self.address_bytes)])
+        result = ':'.join([f'{x:02X}' for x in reversed(self.address_bytes)])
         if not self.is_public:
-            return str
-        return str + '/P'
+            return result
+        return result + '/P'
 
 
 # Predefined address values
@@ -1801,9 +1823,10 @@ class OwnAddressType:
     }
 
     @staticmethod
-    def type_name(type):
-        return name_or_number(OwnAddressType.TYPE_NAMES, type)
+    def type_name(type_id):
+        return name_or_number(OwnAddressType.TYPE_NAMES, type_id)
 
+    # pylint: disable-next=unnecessary-lambda
     TYPE_SPEC = {'size': 1, 'mapper': lambda x: OwnAddressType.type_name(x)}
 
 
@@ -1816,14 +1839,17 @@ class HCI_Packet:
     @staticmethod
     def from_bytes(packet):
         packet_type = packet[0]
+
         if packet_type == HCI_COMMAND_PACKET:
             return HCI_Command.from_bytes(packet)
-        elif packet_type == HCI_ACL_DATA_PACKET:
+
+        if packet_type == HCI_ACL_DATA_PACKET:
             return HCI_AclDataPacket.from_bytes(packet)
-        elif packet_type == HCI_EVENT_PACKET:
+
+        if packet_type == HCI_EVENT_PACKET:
             return HCI_Event.from_bytes(packet)
-        else:
-            return HCI_CustomPacket(packet)
+
+        return HCI_CustomPacket(packet)
 
     def __init__(self, name):
         self.name = name
@@ -1850,7 +1876,7 @@ class HCI_Command(HCI_Packet):
     command_classes = {}
 
     @staticmethod
-    def command(fields=[], return_parameters_fields=[]):
+    def command(fields=(), return_parameters_fields=()):
         '''
         Decorator used to declare and register subclasses
         '''
@@ -1897,8 +1923,8 @@ class HCI_Command(HCI_Packet):
             HCI_Command.__init__(self, op_code, parameters)
             HCI_Object.init_from_bytes(self, parameters, 0, fields)
             return self
-        else:
-            return cls.from_parameters(parameters)
+
+        return cls.from_parameters(parameters)
 
     @staticmethod
     def command_name(op_code):
@@ -2842,6 +2868,7 @@ class HCI_LE_Set_Random_Address_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
+    # pylint: disable=line-too-long,unnecessary-lambda
     [
         ('advertising_interval_min', 2),
         ('advertising_interval_max', 2),
@@ -3089,7 +3116,8 @@ class HCI_LE_Read_Remote_Features_Command(HCI_Command):
 class HCI_LE_Enable_Encryption_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.24 LE Enable Encryption Command
-    (renamed from "LE Start Encryption Command" in version prior to 5.2 of the specification)
+    (renamed from "LE Start Encryption Command" in version prior to 5.2 of the
+    specification)
     '''
 
 
@@ -3144,7 +3172,8 @@ class HCI_LE_Remote_Connection_Parameter_Request_Reply_Command(HCI_Command):
 )
 class HCI_LE_Remote_Connection_Parameter_Request_Negative_Reply_Command(HCI_Command):
     '''
-    See Bluetooth spec @ 7.8.32 LE Remote Connection Parameter Request Negative Reply Command
+    See Bluetooth spec @ 7.8.32 LE Remote Connection Parameter Request Negative Reply
+    Command
     '''
 
 
@@ -3356,6 +3385,7 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
+    # pylint: disable=line-too-long,unnecessary-lambda
     fields=[
         ('advertising_handle', 1),
         (
@@ -3422,6 +3452,7 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
 
     @classmethod
     def advertising_properties_string(cls, properties):
+        # pylint: disable=line-too-long
         return f'[{",".join(bit_flags_to_strings(properties, cls.ADVERTISING_PROPERTIES_NAMES))}]'
 
     @classmethod
@@ -3431,6 +3462,7 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
+    # pylint: disable=line-too-long,unnecessary-lambda
     [
         ('advertising_handle', 1),
         (
@@ -3480,6 +3512,7 @@ class HCI_LE_Set_Extended_Advertising_Data_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
+    # pylint: disable=line-too-long,unnecessary-lambda
     [
         ('advertising_handle', 1),
         (
@@ -3573,9 +3606,9 @@ class HCI_LE_Set_Extended_Advertising_Enable_Command(HCI_Command):
 
     def __str__(self):
         fields = [('enable:', self.enable)]
-        for i in range(len(self.advertising_handles)):
+        for i, advertising_handle in enumerate(self.advertising_handles):
             fields.append(
-                (f'advertising_handle[{i}]:             ', self.advertising_handles[i])
+                (f'advertising_handle[{i}]:             ', advertising_handle)
             )
             fields.append((f'duration[{i}]:                       ', self.durations[i]))
             fields.append(
@@ -3736,7 +3769,7 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
             )
             fields.append(
                 (f'{scanning_phy_str}.scan_interval:', self.scan_intervals[i])
-            ),
+            )
             fields.append((f'{scanning_phy_str}.scan_window:  ', self.scan_windows[i]))
 
         return (
@@ -3871,43 +3904,43 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
                     f'{initiating_phys_str}.scan_interval:          ',
                     self.scan_intervals[i],
                 )
-            ),
+            )
             fields.append(
                 (
                     f'{initiating_phys_str}.scan_window:            ',
                     self.scan_windows[i],
                 )
-            ),
+            )
             fields.append(
                 (
                     f'{initiating_phys_str}.connection_interval_min:',
                     self.connection_interval_mins[i],
                 )
-            ),
+            )
             fields.append(
                 (
                     f'{initiating_phys_str}.connection_interval_max:',
                     self.connection_interval_maxs[i],
                 )
-            ),
+            )
             fields.append(
                 (
                     f'{initiating_phys_str}.max_latency:            ',
                     self.max_latencies[i],
                 )
-            ),
+            )
             fields.append(
                 (
                     f'{initiating_phys_str}.supervision_timeout:    ',
                     self.supervision_timeouts[i],
                 )
-            ),
+            )
             fields.append(
                 (
                     f'{initiating_phys_str}.min_ce_length:          ',
                     self.min_ce_lengths[i],
                 )
-            ),
+            )
             fields.append(
                 (
                     f'{initiating_phys_str}.max_ce_length:          ',
@@ -3933,6 +3966,7 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
             'privacy_mode',
             {
                 'size': 1,
+                # pylint: disable-next=unnecessary-lambda
                 'mapper': lambda x: HCI_LE_Set_Privacy_Mode_Command.privacy_mode_name(
                     x
                 ),
@@ -3979,7 +4013,7 @@ class HCI_Event(HCI_Packet):
     meta_event_classes = {}
 
     @staticmethod
-    def event(fields=[]):
+    def event(fields=()):
         '''
         Decorator used to declare and register subclasses
         '''
@@ -4005,16 +4039,16 @@ class HCI_Event(HCI_Packet):
         return inner
 
     @staticmethod
-    def registered(cls):
-        cls.name = cls.__name__.upper()
-        cls.event_code = key_with_value(HCI_EVENT_NAMES, cls.name)
-        if cls.event_code is None:
+    def registered(event_class):
+        event_class.name = event_class.__name__.upper()
+        event_class.event_code = key_with_value(HCI_EVENT_NAMES, event_class.name)
+        if event_class.event_code is None:
             raise KeyError('event not found in HCI_EVENT_NAMES')
 
         # Register a factory for this class
-        HCI_Event.event_classes[cls.event_code] = cls
+        HCI_Event.event_classes[event_class.event_code] = event_class
 
-        return cls
+        return event_class
 
     @staticmethod
     def from_bytes(packet):
@@ -4025,7 +4059,8 @@ class HCI_Event(HCI_Packet):
             raise ValueError('invalid packet length')
 
         if event_code == HCI_LE_META_EVENT:
-            # We do this dispatch here and not in the subclass in order to avoid call loops
+            # We do this dispatch here and not in the subclass in order to avoid call
+            # loops
             subevent_code = parameters[0]
             cls = HCI_Event.meta_event_classes.get(subevent_code)
             if cls is None:
@@ -4086,7 +4121,7 @@ class HCI_LE_Meta_Event(HCI_Event):
     '''
 
     @staticmethod
-    def event(fields=[]):
+    def event(fields=()):
         '''
         Decorator used to declare and register subclasses
         '''
@@ -4214,9 +4249,9 @@ class HCI_LE_Advertising_Report_Event(HCI_LE_Meta_Event):
         def event_type_string(self):
             return HCI_LE_Advertising_Report_Event.event_type_name(self.event_type)
 
-        def to_string(self, prefix):
+        def to_string(self, indentation='', _=None):
             return super().to_string(
-                prefix,
+                indentation,
                 {
                     'event_type': HCI_LE_Advertising_Report_Event.event_type_name,
                     'address_type': Address.address_type_name,
@@ -4443,9 +4478,10 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
                 self.event_type
             )
 
-        def to_string(self, prefix):
+        def to_string(self, indentation='', _=None):
+            # pylint: disable=line-too-long
             return super().to_string(
-                prefix,
+                indentation,
                 {
                     'event_type': HCI_LE_Extended_Advertising_Report_Event.event_type_string,
                     'address_type': Address.address_type_name,
@@ -4472,6 +4508,7 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
                 )
             )
             if legacy_pdu_type is not None:
+                # pylint: disable=line-too-long
                 legacy_info_string = f'({HCI_LE_Advertising_Report_Event.event_type_name(legacy_pdu_type)})'
             else:
                 legacy_info_string = ''
@@ -4587,6 +4624,7 @@ class HCI_Inquiry_Result_Event(HCI_Event):
             'link_type',
             {
                 'size': 1,
+                # pylint: disable-next=unnecessary-lambda
                 'mapper': lambda x: HCI_Connection_Complete_Event.link_type_name(x),
             },
         ),
@@ -4622,6 +4660,7 @@ class HCI_Connection_Complete_Event(HCI_Event):
             'link_type',
             {
                 'size': 1,
+                # pylint: disable-next=unnecessary-lambda
                 'mapper': lambda x: HCI_Connection_Complete_Event.link_type_name(x),
             },
         ),
@@ -4678,6 +4717,7 @@ class HCI_Remote_Name_Request_Complete_Event(HCI_Event):
             'encryption_enabled',
             {
                 'size': 1,
+                # pylint: disable-next=unnecessary-lambda
                 'mapper': lambda x: HCI_Encryption_Change_Event.encryption_enabled_name(
                     x
                 ),
@@ -4746,16 +4786,20 @@ class HCI_Command_Complete_Event(HCI_Event):
     See Bluetooth spec @ 7.7.14 Command Complete Event
     '''
 
+    return_parameters = b''
+
     def map_return_parameters(self, return_parameters):
-        # Map simple 'status' return parameters to their named constant form
-        if type(return_parameters) is bytes and len(return_parameters) == 1:
+        '''Map simple 'status' return parameters to their named constant form'''
+
+        if isinstance(return_parameters, bytes) and len(return_parameters) == 1:
             # Byte-array form
             return HCI_Constant.status_name(return_parameters[0])
-        elif type(return_parameters) is int:
+
+        if isinstance(return_parameters, int):
             # Already converted to an integer status code
             return HCI_Constant.status_name(return_parameters)
-        else:
-            return return_parameters
+
+        return return_parameters
 
     @staticmethod
     def from_parameters(parameters):
@@ -4766,8 +4810,12 @@ class HCI_Command_Complete_Event(HCI_Event):
         )
 
         # Parse the return parameters
-        if type(self.return_parameters) is bytes and len(self.return_parameters) == 1:
-            # All commands with 1-byte return parameters return a 'status' field, convert it to an integer
+        if (
+            isinstance(self.return_parameters, bytes)
+            and len(self.return_parameters) == 1
+        ):
+            # All commands with 1-byte return parameters return a 'status' field,
+            # convert it to an integer
             self.return_parameters = self.return_parameters[0]
         else:
             cls = HCI_Command.command_classes.get(self.command_opcode)
@@ -4793,6 +4841,7 @@ class HCI_Command_Complete_Event(HCI_Event):
     [
         (
             'status',
+            # pylint: disable-next=unnecessary-lambda
             {'size': 1, 'mapper': lambda x: HCI_Command_Status_Event.status_name(x)},
         ),
         ('num_hci_command_packets', 1),
@@ -4810,8 +4859,8 @@ class HCI_Command_Status_Event(HCI_Event):
     def status_name(status):
         if status == HCI_Command_Status_Event.PENDING:
             return 'PENDING'
-        else:
-            return HCI_Constant.error_name(status)
+
+        return HCI_Constant.error_name(status)
 
 
 # -----------------------------------------------------------------------------
@@ -4869,10 +4918,10 @@ class HCI_Number_Of_Completed_Packets_Event(HCI_Event):
             color('  number_of_handles:         ', 'cyan')
             + f'{len(self.connection_handles)}',
         ]
-        for i in range(len(self.connection_handles)):
+        for i, connection_handle in enumerate(self.connection_handles):
             lines.append(
                 color(f'  connection_handle[{i}]:     ', 'cyan')
-                + f'{self.connection_handles[i]}'
+                + f'{connection_handle}'
             )
             lines.append(
                 color(f'  num_completed_packets[{i}]: ', 'cyan')
@@ -4888,6 +4937,7 @@ class HCI_Number_Of_Completed_Packets_Event(HCI_Event):
         ('connection_handle', 2),
         (
             'current_mode',
+            # pylint: disable-next=unnecessary-lambda
             {'size': 1, 'mapper': lambda x: HCI_Mode_Change_Event.mode_name(x)},
         ),
         ('interval', 2),
@@ -5044,6 +5094,7 @@ class HCI_Read_Remote_Extended_Features_Complete_Event(HCI_Event):
 
 # -----------------------------------------------------------------------------
 @HCI_Event.event(
+    # pylint: disable=line-too-long
     [
         ('status', STATUS_SPEC),
         ('connection_handle', 2),
@@ -5052,6 +5103,7 @@ class HCI_Read_Remote_Extended_Features_Complete_Event(HCI_Event):
             'link_type',
             {
                 'size': 1,
+                # pylint: disable-next=unnecessary-lambda
                 'mapper': lambda x: HCI_Synchronous_Connection_Complete_Event.link_type_name(
                     x
                 ),
@@ -5065,6 +5117,7 @@ class HCI_Read_Remote_Extended_Features_Complete_Event(HCI_Event):
             'air_mode',
             {
                 'size': 1,
+                # pylint: disable-next=unnecessary-lambda
                 'mapper': lambda x: HCI_Synchronous_Connection_Complete_Event.air_mode_name(
                     x
                 ),
@@ -5229,7 +5282,7 @@ class HCI_Remote_Host_Supported_Features_Notification_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-class HCI_AclDataPacket(HCI_Packet):
+class HCI_AclDataPacket:
     '''
     See Bluetooth spec @ 5.4.2 HCI ACL Data Packets
     '''
@@ -5268,7 +5321,13 @@ class HCI_AclDataPacket(HCI_Packet):
         return self.to_bytes()
 
     def __str__(self):
-        return f'{color("ACL", "blue")}: handle=0x{self.connection_handle:04x}, pb={self.pb_flag}, bc={self.bc_flag}, data_total_length={self.data_total_length}, data={self.data.hex()}'
+        return (
+            f'{color("ACL", "blue")}: '
+            f'handle=0x{self.connection_handle:04x}'
+            f'pb={self.pb_flag}, bc={self.bc_flag}, '
+            f'data_total_length={self.data_total_length}, '
+            f'data={self.data.hex()}'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -5279,9 +5338,9 @@ class HCI_AclDataPacketAssembler:
         self.l2cap_pdu_length = 0
 
     def feed_packet(self, packet):
-        if (
-            packet.pb_flag == HCI_ACL_PB_FIRST_NON_FLUSHABLE
-            or packet.pb_flag == HCI_ACL_PB_FIRST_FLUSHABLE
+        if packet.pb_flag in (
+            HCI_ACL_PB_FIRST_NON_FLUSHABLE,
+            HCI_ACL_PB_FIRST_FLUSHABLE,
         ):
             (l2cap_pdu_length,) = struct.unpack_from('<H', packet.data, 0)
             self.current_data = packet.data

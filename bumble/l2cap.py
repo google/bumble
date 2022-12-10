@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # -----------------------------------------------------------------------------
 # fmt: off
+# pylint: disable=line-too-long
 
 L2CAP_SIGNALING_CID    = 0x01
 L2CAP_LE_SIGNALING_CID = 0x05
@@ -137,11 +138,15 @@ L2CAP_MAXIMUM_TRANSMISSION_UNIT_CONFIGURATION_OPTION_TYPE = 0x01
 L2CAP_MTU_CONFIGURATION_PARAMETER_TYPE = 0x01
 
 # fmt: on
+# pylint: enable=line-too-long
 
 
 # -----------------------------------------------------------------------------
 # Classes
 # -----------------------------------------------------------------------------
+# pylint: disable=invalid-name
+
+
 class L2CAP_PDU:
     '''
     See Bluetooth spec @ Vol 3, Part A - 3 DATA PACKET FORMAT
@@ -181,6 +186,7 @@ class L2CAP_Control_Frame:
 
     classes = {}
     code = 0
+    name = None
 
     @staticmethod
     def from_bytes(pdu):
@@ -215,11 +221,11 @@ class L2CAP_Control_Frame:
     def decode_configuration_options(data):
         options = []
         while len(data) >= 2:
-            type = data[0]
+            value_type = data[0]
             length = data[1]
             value = data[2 : 2 + length]
             data = data[2 + length :]
-            options.append((type, value))
+            options.append((value_type, value))
 
         return options
 
@@ -236,7 +242,8 @@ class L2CAP_Control_Frame:
             cls.code = key_with_value(L2CAP_CONTROL_FRAME_NAMES, cls.name)
             if cls.code is None:
                 raise KeyError(
-                    f'Control Frame name {cls.name} not found in L2CAP_CONTROL_FRAME_NAMES'
+                    f'Control Frame name {cls.name} '
+                    'not found in L2CAP_CONTROL_FRAME_NAMES'
                 )
             cls.fields = fields
 
@@ -281,6 +288,7 @@ class L2CAP_Control_Frame:
 
 # -----------------------------------------------------------------------------
 @L2CAP_Control_Frame.subclass(
+    # pylint: disable=unnecessary-lambda
     [
         (
             'reason',
@@ -311,6 +319,7 @@ class L2CAP_Command_Reject(L2CAP_Control_Frame):
 
 # -----------------------------------------------------------------------------
 @L2CAP_Control_Frame.subclass(
+    # pylint: disable=unnecessary-lambda
     [
         (
             'psm',
@@ -356,6 +365,7 @@ class L2CAP_Connection_Request(L2CAP_Control_Frame):
 
 # -----------------------------------------------------------------------------
 @L2CAP_Control_Frame.subclass(
+    # pylint: disable=unnecessary-lambda
     [
         ('destination_cid', 2),
         ('source_cid', 2),
@@ -380,6 +390,7 @@ class L2CAP_Connection_Response(L2CAP_Control_Frame):
     CONNECTION_REFUSED_SOURCE_CID_ALREADY_ALLOCATED = 0x0007
     CONNECTION_REFUSED_UNACCEPTABLE_PARAMETERS = 0x000B
 
+    # pylint: disable=line-too-long
     RESULT_NAMES = {
         CONNECTION_SUCCESSFUL: 'CONNECTION_SUCCESSFUL',
         CONNECTION_PENDING: 'CONNECTION_PENDING',
@@ -406,6 +417,7 @@ class L2CAP_Configure_Request(L2CAP_Control_Frame):
 
 # -----------------------------------------------------------------------------
 @L2CAP_Control_Frame.subclass(
+    # pylint: disable=unnecessary-lambda
     [
         ('source_cid', 2),
         ('flags', 2),
@@ -481,6 +493,7 @@ class L2CAP_Echo_Response(L2CAP_Control_Frame):
             'info_type',
             {
                 'size': 2,
+                # pylint: disable-next=unnecessary-lambda
                 'mapper': lambda x: L2CAP_Information_Request.info_type_name(x),
             },
         )
@@ -524,6 +537,7 @@ class L2CAP_Information_Request(L2CAP_Control_Frame):
         ('info_type', {'size': 2, 'mapper': L2CAP_Information_Request.info_type_name}),
         (
             'result',
+            # pylint: disable-next=unnecessary-lambda
             {'size': 2, 'mapper': lambda x: L2CAP_Information_Response.result_name(x)},
         ),
         ('data', '*'),
@@ -568,12 +582,14 @@ class L2CAP_Connection_Parameter_Update_Response(L2CAP_Control_Frame):
 )
 class L2CAP_LE_Credit_Based_Connection_Request(L2CAP_Control_Frame):
     '''
-    See Bluetooth spec @ Vol 3, Part A - 4.22 LE CREDIT BASED CONNECTION REQUEST (CODE 0x14)
+    See Bluetooth spec @ Vol 3, Part A - 4.22 LE CREDIT BASED CONNECTION REQUEST
+    (CODE 0x14)
     '''
 
 
 # -----------------------------------------------------------------------------
 @L2CAP_Control_Frame.subclass(
+    # pylint: disable=unnecessary-lambda,line-too-long
     [
         ('destination_cid', 2),
         ('mtu', 2),
@@ -592,7 +608,8 @@ class L2CAP_LE_Credit_Based_Connection_Request(L2CAP_Control_Frame):
 )
 class L2CAP_LE_Credit_Based_Connection_Response(L2CAP_Control_Frame):
     '''
-    See Bluetooth spec @ Vol 3, Part A - 4.23 LE CREDIT BASED CONNECTION RESPONSE (CODE 0x15)
+    See Bluetooth spec @ Vol 3, Part A - 4.23 LE CREDIT BASED CONNECTION RESPONSE
+    (CODE 0x15)
     '''
 
     CONNECTION_SUCCESSFUL = 0x0000
@@ -606,6 +623,7 @@ class L2CAP_LE_Credit_Based_Connection_Response(L2CAP_Control_Frame):
     CONNECTION_REFUSED_SOURCE_CID_ALREADY_ALLOCATED = 0x000A
     CONNECTION_REFUSED_UNACCEPTABLE_PARAMETERS = 0x000B
 
+    # pylint: disable=line-too-long
     RESULT_NAMES = {
         CONNECTION_SUCCESSFUL: 'CONNECTION_SUCCESSFUL',
         CONNECTION_REFUSED_LE_PSM_NOT_SUPPORTED: 'CONNECTION_REFUSED_LE_PSM_NOT_SUPPORTED',
@@ -693,6 +711,7 @@ class Channel(EventEmitter):
         self.destination_cid = 0
         self.response = None
         self.connection_result = None
+        self.disconnection_result = None
         self.sink = None
 
     def change_state(self, new_state):
@@ -723,6 +742,7 @@ class Channel(EventEmitter):
             self.response.set_result(pdu)
             self.response = None
         elif self.sink:
+            # pylint: disable=not-callable
             self.sink(pdu)
         else:
             logger.warning(
@@ -746,7 +766,8 @@ class Channel(EventEmitter):
             )
         )
 
-        # Create a future to wait for the state machine to get to a success or error state
+        # Create a future to wait for the state machine to get to a success or error
+        # state
         self.connection_result = asyncio.get_running_loop().create_future()
 
         # Wait for the connection to succeed or fail
@@ -768,7 +789,8 @@ class Channel(EventEmitter):
             )
         )
 
-        # Create a future to wait for the state machine to get to a success or error state
+        # Create a future to wait for the state machine to get to a success or error
+        # state
         self.disconnection_result = asyncio.get_running_loop().create_future()
         return await self.disconnection_result
 
@@ -830,10 +852,10 @@ class Channel(EventEmitter):
             self.connection_result = None
 
     def on_configure_request(self, request):
-        if (
-            self.state != Channel.WAIT_CONFIG
-            and self.state != Channel.WAIT_CONFIG_REQ
-            and self.state != Channel.WAIT_CONFIG_REQ_RSP
+        if self.state not in (
+            Channel.WAIT_CONFIG,
+            Channel.WAIT_CONFIG_REQ,
+            Channel.WAIT_CONFIG_REQ_RSP,
         ):
             logger.warning(color('invalid state', 'red'))
             return
@@ -871,10 +893,7 @@ class Channel(EventEmitter):
         if response.result == L2CAP_Configure_Response.SUCCESS:
             if self.state == Channel.WAIT_CONFIG_REQ_RSP:
                 self.change_state(Channel.WAIT_CONFIG_REQ)
-            elif (
-                self.state == Channel.WAIT_CONFIG_RSP
-                or self.state == Channel.WAIT_CONTROL_IND
-            ):
+            elif self.state in (Channel.WAIT_CONFIG_RSP, Channel.WAIT_CONTROL_IND):
                 self.change_state(Channel.OPEN)
                 if self.connection_result:
                     self.connection_result.set_result(None)
@@ -897,14 +916,15 @@ class Channel(EventEmitter):
         else:
             logger.warning(
                 color(
-                    f'!!! configuration rejected: {L2CAP_Configure_Response.result_name(response.result)}',
+                    '!!! configuration rejected: '
+                    f'{L2CAP_Configure_Response.result_name(response.result)}',
                     'red',
                 )
             )
             # TODO: decide how to fail gracefully
 
     def on_disconnection_request(self, request):
-        if self.state == Channel.OPEN or self.state == Channel.WAIT_DISCONNECT:
+        if self.state in (Channel.OPEN, Channel.WAIT_DISCONNECT):
             self.send_control_frame(
                 L2CAP_Disconnection_Response(
                     identifier=request.identifier,
@@ -938,7 +958,12 @@ class Channel(EventEmitter):
         self.manager.on_channel_closed(self)
 
     def __str__(self):
-        return f'Channel({self.source_cid}->{self.destination_cid}, PSM={self.psm}, MTU={self.mtu}, state={Channel.STATE_NAMES[self.state]})'
+        return (
+            f'Channel({self.source_cid}->{self.destination_cid}, '
+            f'PSM={self.psm}, '
+            f'MTU={self.mtu}, '
+            f'state={Channel.STATE_NAMES[self.state]})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -976,7 +1001,7 @@ class LeConnectionOrientedChannel(EventEmitter):
         destination_cid,
         mtu,
         mps,
-        credits,
+        credits,  # pylint: disable=redefined-builtin
         peer_mtu,
         peer_mps,
         peer_credits,
@@ -1001,6 +1026,7 @@ class LeConnectionOrientedChannel(EventEmitter):
         self.out_queue = deque()
         self.out_sdu = None
         self.sink = None
+        self.connected = False
         self.connection_result = None
         self.disconnection_result = None
         self.drained = asyncio.Event()
@@ -1072,7 +1098,8 @@ class LeConnectionOrientedChannel(EventEmitter):
             )
         )
 
-        # Create a future to wait for the state machine to get to a success or error state
+        # Create a future to wait for the state machine to get to a success or error
+        # state
         self.disconnection_result = asyncio.get_running_loop().create_future()
         return await self.disconnection_result
 
@@ -1110,7 +1137,8 @@ class LeConnectionOrientedChannel(EventEmitter):
 
         # Check if the SDU is complete
         if self.in_sdu_length == 0:
-            # We don't know the size yet, check if we have received the header to compute it
+            # We don't know the size yet, check if we have received the header to
+            # compute it
             if len(self.in_sdu) >= 2:
                 self.in_sdu_length = struct.unpack_from('<H', self.in_sdu, 0)[0]
         if self.in_sdu_length == 0:
@@ -1125,7 +1153,8 @@ class LeConnectionOrientedChannel(EventEmitter):
         if len(self.in_sdu) != 2 + self.in_sdu_length:
             # Overflow
             logger.warning(
-                f'SDU overflow: sdu_length={self.in_sdu_length}, received {len(self.in_sdu) - 2}'
+                f'SDU overflow: sdu_length={self.in_sdu_length}, '
+                f'received {len(self.in_sdu) - 2}'
             )
             # TODO: we should disconnect
             self.in_sdu = None
@@ -1134,7 +1163,7 @@ class LeConnectionOrientedChannel(EventEmitter):
 
         # Send the SDU to the sink
         logger.debug(f'SDU complete: 2+{len(self.in_sdu) - 2} bytes')
-        self.sink(self.in_sdu[2:])
+        self.sink(self.in_sdu[2:])  # pylint: disable=not-callable
 
         # Prepare for a new SDU
         self.in_sdu = None
@@ -1174,7 +1203,7 @@ class LeConnectionOrientedChannel(EventEmitter):
         # Cleanup
         self.connection_result = None
 
-    def on_credits(self, credits):
+    def on_credits(self, credits):  # pylint: disable=redefined-builtin
         self.credits += credits
         logger.debug(f'received {credits} credits, total = {self.credits}')
 
@@ -1228,7 +1257,8 @@ class LeConnectionOrientedChannel(EventEmitter):
                     # Keep what's still left to send
                     self.out_sdu = self.out_sdu[len(packet) :]
                 continue
-            elif self.out_queue:
+
+            if self.out_queue:
                 # Create the next SDU (2 bytes header plus up to MTU bytes payload)
                 logger.debug(
                     f'assembling SDU from {len(self.out_queue)} packets in output queue'
@@ -1282,13 +1312,20 @@ class LeConnectionOrientedChannel(EventEmitter):
         pass
 
     def __str__(self):
-        return f'CoC({self.source_cid}->{self.destination_cid}, State={self.state_name(self.state)}, PSM={self.le_psm}, MTU={self.mtu}/{self.peer_mtu}, MPS={self.mps}/{self.peer_mps}, credits={self.credits}/{self.peer_credits})'
+        return (
+            f'CoC({self.source_cid}->{self.destination_cid}, '
+            f'State={self.state_name(self.state)}, '
+            f'PSM={self.le_psm}, '
+            f'MTU={self.mtu}/{self.peer_mtu}, '
+            f'MPS={self.mps}/{self.peer_mps}, '
+            f'credits={self.credits}/{self.peer_credits})'
+        )
 
 
 # -----------------------------------------------------------------------------
 class ChannelManager:
     def __init__(
-        self, extended_features=[], connectionless_mtu=L2CAP_DEFAULT_CONNECTIONLESS_MTU
+        self, extended_features=(), connectionless_mtu=L2CAP_DEFAULT_CONNECTIONLESS_MTU
     ):
         self._host = None
         self.identifiers = {}  # Incrementing identifier values by connection
@@ -1322,9 +1359,13 @@ class ChannelManager:
         if connection_channels := self.channels.get(connection_handle):
             return connection_channels.get(cid)
 
+        return None
+
     def find_le_coc_channel(self, connection_handle, cid):
         if connection_channels := self.le_coc_channels.get(connection_handle):
             return connection_channels.get(cid)
+
+        return None
 
     @staticmethod
     def find_free_br_edr_cid(channels):
@@ -1337,6 +1378,8 @@ class ChannelManager:
             if cid not in channels:
                 return cid
 
+        raise RuntimeError('no free CID available')
+
     @staticmethod
     def find_free_le_cid(channels):
         # Pick the smallest valid CID that's not already in the list
@@ -1347,6 +1390,8 @@ class ChannelManager:
         ):
             if cid not in channels:
                 return cid
+
+        raise RuntimeError('no free CID')
 
     @staticmethod
     def check_le_coc_parameters(max_credits, mtu, mps):
@@ -1442,7 +1487,7 @@ class ChannelManager:
 
         return psm
 
-    def on_disconnection(self, connection_handle, reason):
+    def on_disconnection(self, connection_handle, _reason):
         logger.debug(f'disconnection from {connection_handle}, cleaning up channels')
         if connection_handle in self.channels:
             del self.channels[connection_handle]
@@ -1452,14 +1497,16 @@ class ChannelManager:
             del self.identifiers[connection_handle]
 
     def send_pdu(self, connection, cid, pdu):
-        pdu_str = pdu.hex() if type(pdu) is bytes else str(pdu)
+        pdu_str = pdu.hex() if isinstance(pdu, bytes) else str(pdu)
         logger.debug(
-            f'{color(">>> Sending L2CAP PDU", "blue")} on connection [0x{connection.handle:04X}] (CID={cid}) {connection.peer_address}: {pdu_str}'
+            f'{color(">>> Sending L2CAP PDU", "blue")} '
+            f'on connection [0x{connection.handle:04X}] (CID={cid}) '
+            f'{connection.peer_address}: {pdu_str}'
         )
         self.host.send_l2cap_pdu(connection.handle, cid, bytes(pdu))
 
     def on_pdu(self, connection, cid, pdu):
-        if cid == L2CAP_SIGNALING_CID or cid == L2CAP_LE_SIGNALING_CID:
+        if cid in (L2CAP_SIGNALING_CID, L2CAP_LE_SIGNALING_CID):
             # Parse the L2CAP payload into a Control Frame object
             control_frame = L2CAP_Control_Frame.from_bytes(pdu)
 
@@ -1479,13 +1526,17 @@ class ChannelManager:
 
     def send_control_frame(self, connection, cid, control_frame):
         logger.debug(
-            f'{color(">>> Sending L2CAP Signaling Control Frame", "blue")} on connection [0x{connection.handle:04X}] (CID={cid}) {connection.peer_address}:\n{control_frame}'
+            f'{color(">>> Sending L2CAP Signaling Control Frame", "blue")} '
+            f'on connection [0x{connection.handle:04X}] (CID={cid}) '
+            f'{connection.peer_address}:\n{control_frame}'
         )
         self.host.send_l2cap_pdu(connection.handle, cid, bytes(control_frame))
 
     def on_control_frame(self, connection, cid, control_frame):
         logger.debug(
-            f'{color("<<< Received L2CAP Signaling Control Frame", "green")} on connection [0x{connection.handle:04X}] (CID={cid}) {connection.peer_address}:\n{control_frame}'
+            f'{color("<<< Received L2CAP Signaling Control Frame", "green")} '
+            f'on connection [0x{connection.handle:04X}] (CID={cid}) '
+            f'{connection.peer_address}:\n{control_frame}'
         )
 
         # Find the handler method
@@ -1518,7 +1569,7 @@ class ChannelManager:
                 ),
             )
 
-    def on_l2cap_command_reject(self, connection, cid, packet):
+    def on_l2cap_command_reject(self, _connection, _cid, packet):
         logger.warning(f'{color("!!! Command rejected:", "red")} {packet.reason}')
 
     def on_l2cap_connection_request(self, connection, cid, request):
@@ -1536,6 +1587,7 @@ class ChannelManager:
                         identifier=request.identifier,
                         destination_cid=request.source_cid,
                         source_cid=0,
+                        # pylint: disable=line-too-long
                         result=L2CAP_Connection_Response.CONNECTION_REFUSED_NO_RESOURCES_AVAILABLE,
                         status=0x0000,
                     ),
@@ -1556,7 +1608,8 @@ class ChannelManager:
             channel.on_connection_request(request)
         else:
             logger.warning(
-                f'No server for connection 0x{connection.handle:04X} on PSM {request.psm}'
+                f'No server for connection 0x{connection.handle:04X} '
+                f'on PSM {request.psm}'
             )
             self.send_control_frame(
                 connection,
@@ -1565,6 +1618,7 @@ class ChannelManager:
                     identifier=request.identifier,
                     destination_cid=request.source_cid,
                     source_cid=0,
+                    # pylint: disable=line-too-long
                     result=L2CAP_Connection_Response.CONNECTION_REFUSED_LE_PSM_NOT_SUPPORTED,
                     status=0x0000,
                 ),
@@ -1576,7 +1630,8 @@ class ChannelManager:
         ) is None:
             logger.warning(
                 color(
-                    f'channel {response.source_cid} not found for 0x{connection.handle:04X}:{cid}',
+                    f'channel {response.source_cid} not found for '
+                    f'0x{connection.handle:04X}:{cid}',
                     'red',
                 )
             )
@@ -1590,7 +1645,8 @@ class ChannelManager:
         ) is None:
             logger.warning(
                 color(
-                    f'channel {request.destination_cid} not found for 0x{connection.handle:04X}:{cid}',
+                    f'channel {request.destination_cid} not found for '
+                    f'0x{connection.handle:04X}:{cid}',
                     'red',
                 )
             )
@@ -1604,7 +1660,8 @@ class ChannelManager:
         ) is None:
             logger.warning(
                 color(
-                    f'channel {response.source_cid} not found for 0x{connection.handle:04X}:{cid}',
+                    f'channel {response.source_cid} not found for '
+                    f'0x{connection.handle:04X}:{cid}',
                     'red',
                 )
             )
@@ -1618,7 +1675,8 @@ class ChannelManager:
         ) is None:
             logger.warning(
                 color(
-                    f'channel {request.destination_cid} not found for 0x{connection.handle:04X}:{cid}',
+                    f'channel {request.destination_cid} not found for '
+                    f'0x{connection.handle:04X}:{cid}',
                     'red',
                 )
             )
@@ -1632,7 +1690,8 @@ class ChannelManager:
         ) is None:
             logger.warning(
                 color(
-                    f'channel {response.source_cid} not found for 0x{connection.handle:04X}:{cid}',
+                    f'channel {response.source_cid} not found for '
+                    f'0x{connection.handle:04X}:{cid}',
                     'red',
                 )
             )
@@ -1648,7 +1707,7 @@ class ChannelManager:
             L2CAP_Echo_Response(identifier=request.identifier, data=request.data),
         )
 
-    def on_l2cap_echo_response(self, connection, cid, response):
+    def on_l2cap_echo_response(self, _connection, _cid, response):
         logger.debug(f'<<< Echo response: data={response.data.hex()}')
         # TODO notify listeners
 
@@ -1663,7 +1722,7 @@ class ChannelManager:
             result = L2CAP_Information_Response.SUCCESS
             data = sum(1 << cid for cid in self.fixed_channels).to_bytes(8, 'little')
         else:
-            result = L2CAP_Information_Request.NO_SUPPORTED
+            result = L2CAP_Information_Response.NOT_SUPPORTED
 
         self.send_control_frame(
             connection,
@@ -1730,6 +1789,7 @@ class ChannelManager:
                         mtu=mtu,
                         mps=mps,
                         initial_credits=0,
+                        # pylint: disable=line-too-long
                         result=L2CAP_LE_Credit_Based_Connection_Response.CONNECTION_REFUSED_SOURCE_CID_ALREADY_ALLOCATED,
                     ),
                 )
@@ -1748,6 +1808,7 @@ class ChannelManager:
                         mtu=mtu,
                         mps=mps,
                         initial_credits=0,
+                        # pylint: disable=line-too-long
                         result=L2CAP_LE_Credit_Based_Connection_Response.CONNECTION_REFUSED_NO_RESOURCES_AVAILABLE,
                     ),
                 )
@@ -1755,7 +1816,8 @@ class ChannelManager:
 
             # Create a new channel
             logger.debug(
-                f'creating LE CoC server channel with cid={source_cid} for psm {request.le_psm}'
+                f'creating LE CoC server channel with cid={source_cid} for psm '
+                f'{request.le_psm}'
             )
             channel = LeConnectionOrientedChannel(
                 self,
@@ -1784,6 +1846,7 @@ class ChannelManager:
                     mtu=mtu,
                     mps=mps,
                     initial_credits=max_credits,
+                    # pylint: disable=line-too-long
                     result=L2CAP_LE_Credit_Based_Connection_Response.CONNECTION_SUCCESSFUL,
                 ),
             )
@@ -1792,7 +1855,8 @@ class ChannelManager:
             server(channel)
         else:
             logger.info(
-                f'No LE server for connection 0x{connection.handle:04X} on PSM {request.le_psm}'
+                f'No LE server for connection 0x{connection.handle:04X} '
+                f'on PSM {request.le_psm}'
             )
             self.send_control_frame(
                 connection,
@@ -1803,11 +1867,12 @@ class ChannelManager:
                     mtu=L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MTU,
                     mps=L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS,
                     initial_credits=0,
+                    # pylint: disable=line-too-long
                     result=L2CAP_LE_Credit_Based_Connection_Response.CONNECTION_REFUSED_LE_PSM_NOT_SUPPORTED,
                 ),
             )
 
-    def on_l2cap_le_credit_based_connection_response(self, connection, cid, response):
+    def on_l2cap_le_credit_based_connection_response(self, connection, _cid, response):
         # Find the pending request by identifier
         request = self.le_coc_requests.get(response.identifier)
         if request is None:
@@ -1820,7 +1885,8 @@ class ChannelManager:
         if channel is None:
             logger.warning(
                 color(
-                    f'received connection response for an unknown channel (cid={request.source_cid})',
+                    'received connection response for an unknown channel '
+                    f'(cid={request.source_cid})',
                     'red',
                 )
             )
@@ -1829,7 +1895,7 @@ class ChannelManager:
         # Process the response
         channel.on_connection_response(response)
 
-    def on_l2cap_le_flow_control_credit(self, connection, cid, credit):
+    def on_l2cap_le_flow_control_credit(self, connection, _cid, credit):
         channel = self.find_le_coc_channel(connection.handle, credit.cid)
         if channel is None:
             logger.warning(f'received credits for an unknown channel (cid={credit.cid}')

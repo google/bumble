@@ -22,7 +22,7 @@ import logging
 
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
-from bumble.core import UUID
+from bumble.core import BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID, UUID
 from bumble.rfcomm import Server
 from bumble.sdp import (
     DataElement,
@@ -33,7 +33,6 @@ from bumble.sdp import (
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
 )
-from bumble.hci import BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID
 
 
 # -----------------------------------------------------------------------------

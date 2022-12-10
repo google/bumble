@@ -17,9 +17,10 @@
 # -----------------------------------------------------------------------------
 import logging
 import asyncio
-import websockets
 from functools import partial
+
 from colors import color
+import websockets
 
 from bumble.hci import (
     Address,
@@ -47,7 +48,8 @@ def parse_parameters(params_str):
 
 
 # -----------------------------------------------------------------------------
-# TODO: add more support for various LL exchanges (see Vol 6, Part B - 2.4 DATA CHANNEL PDU)
+# TODO: add more support for various LL exchanges
+# (see Vol 6, Part B - 2.4 DATA CHANNEL PDU)
 # -----------------------------------------------------------------------------
 class LocalLink:
     '''
@@ -119,7 +121,8 @@ class LocalLink:
 
     def connect(self, central_address, le_create_connection_command):
         logger.debug(
-            f'$$$ CONNECTION {central_address} -> {le_create_connection_command.peer_address}'
+            f'$$$ CONNECTION {central_address} -> '
+            f'{le_create_connection_command.peer_address}'
         )
         self.pending_connection = (central_address, le_create_connection_command)
         asyncio.get_running_loop().call_soon(self.on_connection_complete)
@@ -144,11 +147,13 @@ class LocalLink:
 
     def disconnect(self, central_address, peripheral_address, disconnect_command):
         logger.debug(
-            f'$$$ DISCONNECTION {central_address} -> {peripheral_address}: reason = {disconnect_command.reason}'
+            f'$$$ DISCONNECTION {central_address} -> '
+            f'{peripheral_address}: reason = {disconnect_command.reason}'
         )
         args = [central_address, peripheral_address, disconnect_command]
         asyncio.get_running_loop().call_soon(self.on_disconnection_complete, *args)
 
+    # pylint: disable=too-many-arguments
     def on_connection_encrypted(
         self, central_address, peripheral_address, rand, ediv, ltk
     ):
@@ -217,6 +222,7 @@ class RemoteLink:
     async def run_connection(self):
         # Connect to the relay
         logger.debug(f'connecting to {self.uri}')
+        # pylint: disable-next=no-member
         websocket = await websockets.connect(self.uri)
         self.websocket.set_result(websocket)
         logger.debug(f'connected to {self.uri}')
@@ -287,11 +293,11 @@ class RemoteLink:
         self.controller.on_link_central_connected(Address(sender))
 
         # Accept the connection by responding to it
-        await self.send_targetted_message(sender, 'connected')
+        await self.send_targeted_message(sender, 'connected')
 
     async def on_connected_message_received(self, sender, _):
         if not self.pending_connection:
-            logger.warn('received a connection ack, but no connection is pending')
+            logger.warning('received a connection ack, but no connection is pending')
             return
 
         # Remember the connection
@@ -313,7 +319,7 @@ class RemoteLink:
         if sender in self.peripheral_connections:
             self.peripheral_connections.remove(sender)
 
-    async def on_encrypted_message_received(self, sender, message):
+    async def on_encrypted_message_received(self, sender, _):
         # TODO parse params to get real args
         self.controller.on_link_encrypted(Address(sender), bytes(8), 0, bytes(16))
 
@@ -335,7 +341,7 @@ class RemoteLink:
 
         # TODO: parse the result
 
-    async def send_targetted_message(self, target, message):
+    async def send_targeted_message(self, target, message):
         # Ensure we have a connection
         websocket = await self.websocket
 
@@ -352,23 +358,23 @@ class RemoteLink:
         self.execute(self.notify_address_changed)
 
     async def send_advertising_data_to_relay(self, data):
-        await self.send_targetted_message('*', f'advertisement:{data.hex()}')
+        await self.send_targeted_message('*', f'advertisement:{data.hex()}')
 
-    def send_advertising_data(self, sender_address, data):
+    def send_advertising_data(self, _, data):
         self.execute(partial(self.send_advertising_data_to_relay, data))
 
     async def send_acl_data_to_relay(self, peer_address, data):
-        await self.send_targetted_message(peer_address, f'acl:{data.hex()}')
+        await self.send_targeted_message(peer_address, f'acl:{data.hex()}')
 
-    def send_acl_data(self, sender_address, peer_address, data):
+    def send_acl_data(self, _, peer_address, data):
         self.execute(partial(self.send_acl_data_to_relay, peer_address, data))
 
     async def send_connection_request_to_relay(self, peer_address):
-        await self.send_targetted_message(peer_address, 'connect')
+        await self.send_targeted_message(peer_address, 'connect')
 
-    def connect(self, central_address, le_create_connection_command):
+    def connect(self, _, le_create_connection_command):
         if self.pending_connection:
-            logger.warn('connection already pending')
+            logger.warning('connection already pending')
             return
         self.pending_connection = le_create_connection_command
         self.execute(
@@ -385,11 +391,12 @@ class RemoteLink:
 
     def disconnect(self, central_address, peripheral_address, disconnect_command):
         logger.debug(
-            f'disconnect {central_address} -> {peripheral_address}: reason = {disconnect_command.reason}'
+            f'disconnect {central_address} -> '
+            f'{peripheral_address}: reason = {disconnect_command.reason}'
         )
         self.execute(
             partial(
-                self.send_targetted_message,
+                self.send_targeted_message,
                 peripheral_address,
                 f'disconnect:reason={disconnect_command.reason}',
             )
@@ -398,15 +405,13 @@ class RemoteLink:
             self.on_disconnection_complete, disconnect_command
         )
 
-    def on_connection_encrypted(
-        self, central_address, peripheral_address, rand, ediv, ltk
-    ):
+    def on_connection_encrypted(self, _, peripheral_address, rand, ediv, ltk):
         asyncio.get_running_loop().call_soon(
             self.controller.on_link_encrypted, peripheral_address, rand, ediv, ltk
         )
         self.execute(
             partial(
-                self.send_targetted_message,
+                self.send_targeted_message,
                 peripheral_address,
                 f'encrypted:ltk={ltk.hex()}',
             )

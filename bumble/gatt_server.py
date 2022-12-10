@@ -26,14 +26,53 @@
 import asyncio
 import logging
 from collections import defaultdict
+import struct
 from typing import Tuple, Optional
 from pyee import EventEmitter
 from colors import color
 
-from .core import *
-from .hci import *
-from .att import *
-from .gatt import *
+from .core import UUID
+from .att import (
+    ATT_ATTRIBUTE_NOT_FOUND_ERROR,
+    ATT_ATTRIBUTE_NOT_LONG_ERROR,
+    ATT_CID,
+    ATT_DEFAULT_MTU,
+    ATT_INVALID_ATTRIBUTE_LENGTH_ERROR,
+    ATT_INVALID_HANDLE_ERROR,
+    ATT_INVALID_OFFSET_ERROR,
+    ATT_REQUEST_NOT_SUPPORTED_ERROR,
+    ATT_REQUESTS,
+    ATT_UNLIKELY_ERROR_ERROR,
+    ATT_UNSUPPORTED_GROUP_TYPE_ERROR,
+    ATT_Error,
+    ATT_Error_Response,
+    ATT_Exchange_MTU_Response,
+    ATT_Find_By_Type_Value_Response,
+    ATT_Find_Information_Response,
+    ATT_Handle_Value_Indication,
+    ATT_Handle_Value_Notification,
+    ATT_Read_Blob_Response,
+    ATT_Read_By_Group_Type_Response,
+    ATT_Read_By_Type_Response,
+    ATT_Read_Response,
+    ATT_Write_Response,
+    Attribute,
+)
+from .gatt import (
+    GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
+    GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
+    GATT_INCLUDE_ATTRIBUTE_TYPE,
+    GATT_MAX_ATTRIBUTE_VALUE_SIZE,
+    GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
+    GATT_REQUEST_TIMEOUT,
+    GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
+    Characteristic,
+    CharacteristicDeclaration,
+    CharacteristicValue,
+    Descriptor,
+    Service,
+)
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -194,6 +233,7 @@ class Server(EventEmitter):
                 is None
             ):
                 self.add_attribute(
+                    # pylint: disable=line-too-long
                     Descriptor(
                         GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
                         Attribute.READABLE | Attribute.WRITEABLE,
@@ -232,12 +272,13 @@ class Server(EventEmitter):
 
     def write_cccd(self, connection, characteristic, value):
         logger.debug(
-            f'Subscription update for connection=0x{connection.handle:04X}, handle=0x{characteristic.handle:04X}: {value.hex()}'
+            f'Subscription update for connection=0x{connection.handle:04X}, '
+            f'handle=0x{characteristic.handle:04X}: {value.hex()}'
         )
 
         # Sanity check
         if len(value) != 2:
-            logger.warn('CCCD value not 2 bytes long')
+            logger.warning('CCCD value not 2 bytes long')
             return
 
         cccds = self.subscribers.setdefault(connection.handle, {})
@@ -349,9 +390,9 @@ class Server(EventEmitter):
                 await asyncio.wait_for(
                     self.pending_confirmations[connection.handle], GATT_REQUEST_TIMEOUT
                 )
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError as error:
                 logger.warning(color('!!! GATT Indicate timeout', 'red'))
-                raise TimeoutError(f'GATT timeout for {indication.name}')
+                raise TimeoutError(f'GATT timeout for {indication.name}') from error
             finally:
                 self.pending_confirmations[connection.handle] = None
 
@@ -425,7 +466,11 @@ class Server(EventEmitter):
             else:
                 # Just ignore
                 logger.warning(
-                    f'{color("--- Ignoring GATT Request from [0x{connection.handle:04X}]:", "red")}  {att_pdu}'
+                    color(
+                        f'--- Ignoring GATT Request from [0x{connection.handle:04X}]: ',
+                        'red',
+                    )
+                    + str(att_pdu)
                 )
 
     #######################################################
@@ -436,7 +481,10 @@ class Server(EventEmitter):
         Handler for requests without a more specific handler
         '''
         logger.warning(
-            f'{color(f"--- Unsupported ATT Request from [0x{connection.handle:04X}]:", "red")} {pdu}'
+            color(
+                f'--- Unsupported ATT Request from [0x{connection.handle:04X}]: ', 'red'
+            )
+            + str(pdu)
         )
         response = ATT_Error_Response(
             request_opcode_in_error=pdu.op_code,
@@ -556,11 +604,11 @@ class Server(EventEmitter):
         if attributes:
             handles_information_list = []
             for attribute in attributes:
-                if attribute.type in {
+                if attribute.type in (
                     GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
                     GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
                     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
-                }:
+                ):
                     # Part of a group
                     group_end_handle = attribute.end_group_handle
                 else:
@@ -692,11 +740,11 @@ class Server(EventEmitter):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.9 Read by Group Type Request
         '''
-        if request.attribute_group_type not in {
+        if request.attribute_group_type not in (
             GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
             GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
             GATT_INCLUDE_ATTRIBUTE_TYPE,
-        }:
+        ):
             response = ATT_Error_Response(
                 request_opcode_in_error=request.op_code,
                 attribute_handle_in_error=request.starting_handle,
@@ -814,7 +862,7 @@ class Server(EventEmitter):
         except Exception as error:
             logger.warning(f'!!! ignoring exception: {error}')
 
-    def on_att_handle_value_confirmation(self, connection, confirmation):
+    def on_att_handle_value_confirmation(self, connection, _confirmation):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.7.3 Handle Value Confirmation
         '''

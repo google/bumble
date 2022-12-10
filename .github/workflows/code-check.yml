@@ -1,0 +1,35 @@
+# Check the code against the formatter and linter
+name: Code format and lint check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check Code
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out from Git
+      uses: actions/checkout@v3
+    - name: Get history and tags for SCM versioning to work
+      run: |
+        git fetch --prune --unshallow
+        git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install ".[build,test,development]"
+    - name: Check
+      run: |
+        invoke project.pre-commit

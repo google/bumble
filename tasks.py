@@ -15,19 +15,30 @@
 """
 Invoke tasks
 """
+
+# -----------------------------------------------------------------------------
+# Imports
+# -----------------------------------------------------------------------------
 import os
 
-from invoke import task, Collection
+from invoke import task, call, Collection
+from invoke.exceptions import UnexpectedExit
 
+
+# -----------------------------------------------------------------------------
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 ns = Collection()
 
-# Building
+
+# -----------------------------------------------------------------------------
+# Build
+# -----------------------------------------------------------------------------
 build_tasks = Collection()
 ns.add_collection(build_tasks, name="build")
 
 
+# -----------------------------------------------------------------------------
 @task
 def build(ctx, install=False):
     if install:
@@ -36,31 +47,34 @@ def build(ctx, install=False):
     ctx.run("python -m build")
 
 
-build_tasks.add_task(build, default=True)
-
-
+# -----------------------------------------------------------------------------
 @task
 def release_build(ctx):
     build(ctx, install=True)
 
 
-build_tasks.add_task(release_build, name="release")
-
-
+# -----------------------------------------------------------------------------
 @task
 def mkdocs(ctx):
     ctx.run("mkdocs build -f docs/mkdocs/mkdocs.yml")
 
 
+# -----------------------------------------------------------------------------
+build_tasks.add_task(build, default=True)
+build_tasks.add_task(release_build, name="release")
 build_tasks.add_task(mkdocs, name="mkdocs")
 
-# Testing
+
+# -----------------------------------------------------------------------------
+# Test
+# -----------------------------------------------------------------------------
 test_tasks = Collection()
 ns.add_collection(test_tasks, name="test")
 
 
+# -----------------------------------------------------------------------------
 @task(incrementable=["verbose"])
-def test(ctx, filter=None, junit=False, install=False, html=False, verbose=0):
+def test(ctx, match=None, junit=False, install=False, html=False, verbose=0):
     # Install the package before running the tests
     if install:
         ctx.run("python -m pip install .[test]")
@@ -68,8 +82,8 @@ def test(ctx, filter=None, junit=False, install=False, html=False, verbose=0):
     args = ""
     if junit:
         args += "--junit-xml test-results.xml"
-    if filter is not None:
-        args += f" -k '{filter}'"
+    if match is not None:
+        args += f" -k '{match}'"
     if html:
         args += " --html results.html"
     if verbose > 0:
@@ -77,12 +91,70 @@ def test(ctx, filter=None, junit=False, install=False, html=False, verbose=0):
     ctx.run(f"python -m pytest {os.path.join(ROOT_DIR, 'tests')} {args}")
 
 
-test_tasks.add_task(test, default=True)
-
-
+# -----------------------------------------------------------------------------
 @task
 def release_test(ctx):
     test(ctx, install=True)
 
 
+# -----------------------------------------------------------------------------
+test_tasks.add_task(test, default=True)
 test_tasks.add_task(release_test, name="release")
+
+# -----------------------------------------------------------------------------
+# Project
+# -----------------------------------------------------------------------------
+project_tasks = Collection()
+ns.add_collection(project_tasks, name="project")
+
+
+# -----------------------------------------------------------------------------
+@task
+def lint(ctx, disable='C,R', errors_only=False):
+    options = []
+    if disable:
+        options.append(f"--disable={disable}")
+    if errors_only:
+        options.append("-E")
+
+    if errors_only:
+        qualifier = ' (errors only)'
+    else:
+        qualifier = f' (disabled: {disable})' if disable else ''
+
+    print(f">>> Running the linter{qualifier}...")
+    try:
+        ctx.run(f"pylint {' '.join(options)} bumble apps examples tasks.py")
+        print("The linter is happy. ✅ 😊 🐝'")
+    except UnexpectedExit:
+        print("Please check your code against the linter messages. ❌")
+    print(">>> Linter done.")
+
+
+# -----------------------------------------------------------------------------
+@task
+def format_code(ctx, check=False, diff=False):
+    options = []
+    if check:
+        options.append("--check")
+    if diff:
+        options.append("--diff")
+
+    print(">>> Running the formatter...")
+    try:
+        ctx.run(f"black -S {' '.join(options)} .")
+    except UnexpectedExit:
+        print("Please run 'invoke project.format' or 'black .' to format the code. ❌")
+    print(">>> formatter done.")
+
+
+# -----------------------------------------------------------------------------
+@task(pre=[call(format_code, check=True), call(lint, errors_only=True), test])
+def pre_commit(_ctx):
+    print("All good!")
+
+
+# -----------------------------------------------------------------------------
+project_tasks.add_task(lint)
+project_tasks.add_task(format_code, name="format")
+project_tasks.add_task(pre_commit)

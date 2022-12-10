@@ -29,19 +29,6 @@ from collections import OrderedDict
 import click
 import colors
 
-from bumble import __version__
-from bumble.core import UUID, AdvertisingData, TimeoutError, BT_LE_TRANSPORT
-from bumble.device import ConnectionParametersPreferences, Device, Connection, Peer
-from bumble.utils import AsyncRunner
-from bumble.transport import open_transport_or_link
-from bumble.gatt import Characteristic
-from bumble.hci import (
-    HCI_Constant,
-    HCI_LE_1M_PHY,
-    HCI_LE_2M_PHY,
-    HCI_LE_CODED_PHY,
-)
-
 from prompt_toolkit import Application
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.completion import Completer, Completion, NestedCompleter
@@ -64,6 +51,21 @@ from prompt_toolkit.layout import (
     Dimension,
 )
 
+from bumble import __version__
+import bumble.core
+from bumble.core import UUID, AdvertisingData, BT_LE_TRANSPORT
+from bumble.device import ConnectionParametersPreferences, Device, Connection, Peer
+from bumble.utils import AsyncRunner
+from bumble.transport import open_transport_or_link
+from bumble.gatt import Characteristic
+from bumble.hci import (
+    HCI_Constant,
+    HCI_LE_1M_PHY,
+    HCI_LE_2M_PHY,
+    HCI_LE_CODED_PHY,
+)
+
+
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
@@ -73,12 +75,6 @@ DEFAULT_CONNECTION_TIMEOUT = 30.0
 DISPLAY_MIN_RSSI = -100
 DISPLAY_MAX_RSSI = -30
 RSSI_MONITOR_INTERVAL = 5.0  # Seconds
-
-
-# -----------------------------------------------------------------------------
-# Globals
-# -----------------------------------------------------------------------------
-App = None
 
 
 # -----------------------------------------------------------------------------
@@ -104,19 +100,19 @@ def rssi_bar(rssi):
 def parse_phys(phys):
     if phys.lower() == '*':
         return None
-    else:
-        phy_list = []
-        elements = phys.lower().split(',')
-        for element in elements:
-            if element == '1m':
-                phy_list.append(HCI_LE_1M_PHY)
-            elif element == '2m':
-                phy_list.append(HCI_LE_2M_PHY)
-            elif element == 'coded':
-                phy_list.append(HCI_LE_CODED_PHY)
-            else:
-                raise ValueError('invalid PHY name')
-        return phy_list
+
+    phy_list = []
+    elements = phys.lower().split(',')
+    for element in elements:
+        if element == '1m':
+            phy_list.append(HCI_LE_1M_PHY)
+        elif element == '2m':
+            phy_list.append(HCI_LE_2M_PHY)
+        elif element == 'coded':
+            phy_list.append(HCI_LE_CODED_PHY)
+        else:
+            raise ValueError('invalid PHY name')
+    return phy_list
 
 
 # -----------------------------------------------------------------------------
@@ -252,15 +248,16 @@ class ConsoleApp:
 
         layout = Layout(container, focused_element=self.input_field)
 
-        kb = KeyBindings()
+        key_bindings = KeyBindings()
 
-        @kb.add("c-c")
-        @kb.add("c-q")
+        @key_bindings.add("c-c")
+        @key_bindings.add("c-q")
         def _(event):
             event.app.exit()
 
+        # pylint: disable=invalid-name
         self.ui = Application(
-            layout=layout, style=style, key_bindings=kb, full_screen=True
+            layout=layout, style=style, key_bindings=key_bindings, full_screen=True
         )
 
     async def run_async(self, device_config, transport):
@@ -275,8 +272,8 @@ class ConsoleApp:
                 random_address = (
                     f"{random.randint(192,255):02X}"  # address is static random
                 )
-                for c in random.sample(range(255), 5):
-                    random_address += f":{c:02X}"
+                for random_byte in random.sample(range(255), 5):
+                    random_address += f":{random_byte:02X}"
                 self.append_to_log(f"Setting random address: {random_address}")
                 self.device = Device.with_hci(
                     'Bumble', random_address, hci_source, hci_sink
@@ -293,7 +290,7 @@ class ConsoleApp:
     def add_known_address(self, address):
         self.known_addresses.add(address)
 
-    def accept_input(self, buff):
+    def accept_input(self, _):
         if len(self.input_field.text) == 0:
             return
         self.append_to_output([('', '* '), ('ansicyan', self.input_field.text)], False)
@@ -312,12 +309,24 @@ class ConsoleApp:
                 connection_state = 'CONNECTING'
             elif self.connected_peer:
                 connection = self.connected_peer.connection
-                connection_parameters = f'{connection.parameters.connection_interval}/{connection.parameters.peripheral_latency}/{connection.parameters.supervision_timeout}'
+                connection_parameters = (
+                    f'{connection.parameters.connection_interval}/'
+                    f'{connection.parameters.peripheral_latency}/'
+                    f'{connection.parameters.supervision_timeout}'
+                )
                 if connection.transport == BT_LE_TRANSPORT:
-                    phy_state = f' RX={le_phy_name(connection.phy.rx_phy)}/TX={le_phy_name(connection.phy.tx_phy)}'
+                    phy_state = (
+                        f' RX={le_phy_name(connection.phy.rx_phy)}/'
+                        f'TX={le_phy_name(connection.phy.tx_phy)}'
+                    )
                 else:
                     phy_state = ''
-                connection_state = f'{connection.peer_address} {connection_parameters} {connection.data_length}{phy_state}'
+                connection_state = (
+                    f'{connection.peer_address} '
+                    f'{connection_parameters} '
+                    f'{connection.data_length}'
+                    f'{phy_state}'
+                )
                 encryption_state = (
                     'ENCRYPTED' if connection.is_encrypted else 'NOT ENCRYPTED'
                 )
@@ -410,7 +419,10 @@ class ConsoleApp:
         advertising_interval = (
             device.advertising_interval_min
             if device.advertising_interval_min == device.advertising_interval_max
-            else f"{device.advertising_interval_min} to {device.advertising_interval_max}"
+            else (
+                f'{device.advertising_interval_min} to '
+                f'{device.advertising_interval_max}'
+            )
         )
         lines.append(('ansicyan', 'Advertising Interval: '))
         lines.append(('', f'{advertising_interval}\n'))
@@ -419,7 +431,7 @@ class ConsoleApp:
         self.ui.invalidate()
 
     def append_to_output(self, line, invalidate=True):
-        if type(line) is str:
+        if isinstance(line, str):
             line = [('', line)]
         self.output_lines = self.output_lines[-self.output_max_lines :]
         self.output_lines.append(line)
@@ -489,6 +501,8 @@ class ConsoleApp:
                         if characteristic.handle == attribute_handle:
                             return characteristic
 
+        return None
+
     async def rssi_monitor_loop(self):
         while True:
             if self.monitor_rssi and self.connected_peer:
@@ -520,7 +534,8 @@ class ConsoleApp:
                 if not params[1].startswith("filter="):
                     self.show_error(
                         'invalid syntax',
-                        'expected address filter=key1:value1,key2:value,... available filters: address',
+                        'expected address filter=key1:value1,key2:value,... '
+                        'available filters: address',
                     )
                 # regex: (word):(any char except ,)
                 matches = re.findall(r"(\w+):([^,]+)", params[1])
@@ -578,10 +593,10 @@ class ConsoleApp:
                 timeout=DEFAULT_CONNECTION_TIMEOUT,
             )
             self.top_tab = 'services'
-        except TimeoutError:
+        except bumble.core.TimeoutError:
             self.show_error('connection timed out')
 
-    async def do_disconnect(self, params):
+    async def do_disconnect(self, _):
         if self.device.is_le_connecting:
             await self.device.cancel_connection()
         else:
@@ -595,7 +610,8 @@ class ConsoleApp:
         if len(params) != 1 or len(params[0].split('/')) != 3:
             self.show_error(
                 'invalid syntax',
-                'expected update-parameters <interval-min>-<interval-max>/<max-latency>/<supervision>',
+                'expected update-parameters <interval-min>-<interval-max>'
+                '/<max-latency>/<supervision>',
             )
             return
 
@@ -616,7 +632,7 @@ class ConsoleApp:
             supervision_timeout,
         )
 
-    async def do_encrypt(self, params):
+    async def do_encrypt(self, _):
         if not self.connected_peer:
             self.show_error('not connected')
             return
@@ -643,14 +659,15 @@ class ConsoleApp:
                 self.top_tab = params[0]
                 self.ui.invalidate()
 
-    async def do_get_phy(self, params):
+    async def do_get_phy(self, _):
         if not self.connected_peer:
             self.show_error('not connected')
             return
 
         phy = await self.connected_peer.connection.get_phy()
         self.append_to_output(
-            f'PHY: RX={HCI_Constant.le_phy_name(phy[0])}, TX={HCI_Constant.le_phy_name(phy[1])}'
+            f'PHY: RX={HCI_Constant.le_phy_name(phy[0])}, '
+            f'TX={HCI_Constant.le_phy_name(phy[1])}'
         )
 
     async def do_request_mtu(self, params):
@@ -793,10 +810,10 @@ class ConsoleApp:
             tx_phys=parse_phys(tx_phys), rx_phys=parse_phys(rx_phys)
         )
 
-    async def do_exit(self, params):
+    async def do_exit(self, _):
         self.ui.exit()
 
-    async def do_quit(self, params):
+    async def do_quit(self, _):
         self.ui.exit()
 
     async def do_filter(self, params):
@@ -827,7 +844,7 @@ class DeviceListener(Device.Listener, Connection.Listener):
         else:
             self._address_filter = re.compile(filter_addr)
         self.scan_results = OrderedDict(
-            filter(lambda x: self.filter_address_match(x), self.scan_results)
+            filter(self.filter_address_match, self.scan_results)
         )
         self.app.show_scan_results(self.scan_results)
 
@@ -838,6 +855,7 @@ class DeviceListener(Device.Listener, Connection.Listener):
         return bool(self.address_filter.match(address))
 
     @AsyncRunner.run_in_task()
+    # pylint: disable=invalid-overridden-method
     async def on_connection(self, connection):
         self.app.connected_peer = Peer(connection)
         self.app.connection_rssi = None
@@ -846,14 +864,16 @@ class DeviceListener(Device.Listener, Connection.Listener):
 
     def on_disconnection(self, reason):
         self.app.append_to_output(
-            f'disconnected from {self.app.connected_peer}, reason: {HCI_Constant.error_name(reason)}'
+            f'disconnected from {self.app.connected_peer}, '
+            f'reason: {HCI_Constant.error_name(reason)}'
         )
         self.app.connected_peer = None
         self.app.connection_rssi = None
 
     def on_connection_parameters_update(self):
         self.app.append_to_output(
-            f'connection parameters update: {self.app.connected_peer.connection.parameters}'
+            f'connection parameters update: '
+            f'{self.app.connected_peer.connection.parameters}'
         )
 
     def on_connection_phy_update(self):
@@ -867,13 +887,19 @@ class DeviceListener(Device.Listener, Connection.Listener):
         )
 
     def on_connection_encryption_change(self):
+        encryption_state = (
+            'encrypted'
+            if self.app.connected_peer.connection.is_encrypted
+            else 'not encrypted'
+        )
         self.app.append_to_output(
-            f'connection encryption change: {"encrypted" if self.app.connected_peer.connection.is_encrypted else "not encrypted"}'
+            'connection encryption change: ' f'{encryption_state}'
         )
 
     def on_connection_data_length_change(self):
         self.app.append_to_output(
-            f'connection data length change: {self.app.connected_peer.connection.data_length}'
+            'connection data length change: '
+            f'{self.app.connected_peer.connection.data_length}'
         )
 
     def on_advertisement(self, advertisement):
@@ -930,10 +956,16 @@ class ScanResult:
         else:
             name = ''
 
+        # Remove any '/P' qualifier suffix from the address string
+        address_str = str(self.address).replace('/P', '')
+
         # RSSI bar
         bar_string = rssi_bar(self.rssi)
         bar_padding = ' ' * (DEFAULT_RSSI_BAR_WIDTH + 5 - len(bar_string))
-        return f'{address_color(str(self.address))} [{type_color(address_type_string)}] {bar_string} {bar_padding} {name}'
+        return (
+            f'{address_color(address_str)} [{type_color(address_type_string)}] '
+            f'{bar_string} {bar_padding} {name}'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -961,7 +993,7 @@ def main(device_config, transport):
     if not os.path.isdir(BUMBLE_USER_DIR):
         os.mkdir(BUMBLE_USER_DIR)
 
-    # Create an instane of the app
+    # Create an instance of the app
     app = ConsoleApp()
 
     # Setup logging
@@ -978,4 +1010,4 @@ def main(device_config, transport):
 
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    main()
+    main()  # pylint: disable=no-value-for-parameter

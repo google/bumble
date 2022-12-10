@@ -29,12 +29,13 @@ from bumble.transport import open_transport_or_link
 async def async_main():
     if len(sys.argv) != 3:
         print(
-            'Usage: controllers.py <hci-transport-1> <hci-transport-2> [<hci-transport-3> ...]'
+            'Usage: controllers.py <hci-transport-1> <hci-transport-2> '
+            '[<hci-transport-3> ...]'
         )
         print('example: python controllers.py pty:ble1 pty:ble2')
         return
 
-    # Create a loccal link to attach the controllers to
+    # Create a local link to attach the controllers to
     link = LocalLink()
 
     # Create a transport and controller for all requested names

@@ -40,7 +40,7 @@ class BatteryService(TemplateService):
                 Characteristic.READABLE,
                 CharacteristicValue(read=read_battery_level),
             ),
-            format=BatteryService.BATTERY_LEVEL_FORMAT,
+            pack_format=BatteryService.BATTERY_LEVEL_FORMAT,
         )
         super().__init__([self.battery_level_characteristic])
 
@@ -56,7 +56,7 @@ class BatteryServiceProxy(ProfileServiceProxy):
             GATT_BATTERY_LEVEL_CHARACTERISTIC
         ):
             self.battery_level = PackedCharacteristicAdapter(
-                characteristics[0], format=BatteryService.BATTERY_LEVEL_FORMAT
+                characteristics[0], pack_format=BatteryService.BATTERY_LEVEL_FORMAT
             )
         else:
             self.battery_level = None

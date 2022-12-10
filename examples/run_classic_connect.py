@@ -35,11 +35,10 @@ from bumble.sdp import (
 async def main():
     if len(sys.argv) < 3:
         print(
-            'Usage: run_classic_connect.py <device-config> <transport-spec> <bluetooth-addresses..>'
+            'Usage: run_classic_connect.py <device-config> <transport-spec> '
+            '<bluetooth-addresses..>'
         )
-        print(
-            'example: run_classic_connect.py classic1.json usb:04b4:f901 E1:CA:72:48:C4:E8'
-        )
+        print('example: run_classic_connect.py classic1.json usb:0 E1:CA:72:48:C4:E8')
         return
 
     print('<<< connecting to HCI...')
@@ -74,7 +73,7 @@ async def main():
             )
             print(color(f'SERVICE {service_record_handle:04X} attributes:', 'yellow'))
             for attribute in attributes:
-                print('  ', attribute.to_string(color=True))
+                print('  ', attribute.to_string(with_colors=True))
 
         # Search for services with an L2CAP service attribute
         search_result = await sdp_client.search_attributes(
@@ -87,7 +86,10 @@ async def main():
             print(
                 '  '
                 + '\n  '.join(
-                    [attribute.to_string(color=True) for attribute in attribute_list]
+                    [
+                        attribute.to_string(with_colors=True)
+                        for attribute in attribute_list
+                    ]
                 )
             )
 

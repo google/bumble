@@ -28,5 +28,3 @@ a host that send custom HCI commands that the controller may not understand.
     (through which the communication with other virtual controllers will be mediated).
 
     NOTE: this assumes you're running a Link Relay on port `10723`.
-
-

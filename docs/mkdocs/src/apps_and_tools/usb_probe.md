@@ -3,8 +3,8 @@ USB PROBE TOOL
 
 This tool lists all the USB devices, with details about each device.
 For each device, the different possible Bumble transport strings that can
-refer to it are listed. 
-If the device is known to be a Bluetooth HCI device, its identifier is printed 
+refer to it are listed.
+If the device is known to be a Bluetooth HCI device, its identifier is printed
 in reverse colors, and the transport names in cyan color.
 For other devices, regardless of their type, the transport names are printed
 in red. Whether that device is actually a Bluetooth device or not depends on
@@ -30,7 +30,7 @@ When running from the source distribution:
 $ python3 apps/usb-probe.py
 ```
 
-or 
+or
 
 ```
 $ python3 apps/usb-probe.py --verbose
@@ -38,7 +38,7 @@ $ python3 apps/usb-probe.py --verbose
 
 !!! example
     ```
-    $ python3 apps/usb_probe.py 
+    $ python3 apps/usb_probe.py
 
     ID 0A12:0001
     Bumble Transport Names: usb:0 or usb:0A12:0001

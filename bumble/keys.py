@@ -76,8 +76,10 @@ class PairingKeys:
     @staticmethod
     def key_from_dict(keys_dict, key_name):
         key_dict = keys_dict.get(key_name)
-        if key_dict is not None:
-            return PairingKeys.Key.from_dict(key_dict)
+        if key_dict is None:
+            return None
+
+        return PairingKeys.Key.from_dict(key_dict)
 
     @staticmethod
     def from_dict(keys_dict):
@@ -121,9 +123,9 @@ class PairingKeys:
 
     def print(self, prefix=''):
         keys_dict = self.to_dict()
-        for (property, value) in keys_dict.items():
-            if type(value) is dict:
-                print(f'{prefix}{color(property, "cyan")}:')
+        for (container_property, value) in keys_dict.items():
+            if isinstance(value, dict):
+                print(f'{prefix}{color(container_property, "cyan")}:')
                 for (key_property, key_value) in value.items():
                     print(f'{prefix}  {color(key_property, "green")}: {key_value}')
             else:
@@ -138,7 +140,7 @@ class KeyStore:
     async def update(self, name, keys):
         pass
 
-    async def get(self, name):
+    async def get(self, _name):
         return PairingKeys()
 
     async def get_all(self):
@@ -193,6 +195,9 @@ class JsonKeyStore(KeyStore):
 
         if filename is None:
             # Use a default for the current user
+
+            # Import here because this may not exist on all platforms
+            # pylint: disable=import-outside-toplevel
             import appdirs
 
             self.directory_name = os.path.join(
@@ -219,7 +224,7 @@ class JsonKeyStore(KeyStore):
 
     async def load(self):
         try:
-            with open(self.filename, 'r') as json_file:
+            with open(self.filename, 'r', encoding='utf-8') as json_file:
                 return json.load(json_file)
         except FileNotFoundError:
             return {}
@@ -231,7 +236,7 @@ class JsonKeyStore(KeyStore):
 
         # Save to a temporary file
         temp_filename = self.filename + '.tmp'
-        with open(temp_filename, 'w') as output:
+        with open(temp_filename, 'w', encoding='utf-8') as output:
             json.dump(db, output, sort_keys=True, indent=4)
 
         # Atomically replace the previous file

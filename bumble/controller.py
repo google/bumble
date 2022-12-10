@@ -19,9 +19,37 @@ import logging
 import asyncio
 import itertools
 import random
+import struct
+from colors import color
+from bumble.core import BT_CENTRAL_ROLE, BT_PERIPHERAL_ROLE
 
-from .hci import *
-from .l2cap import *
+from bumble.hci import (
+    HCI_ACL_DATA_PACKET,
+    HCI_COMMAND_DISALLOWED_ERROR,
+    HCI_COMMAND_PACKET,
+    HCI_COMMAND_STATUS_PENDING,
+    HCI_CONNECTION_TIMEOUT_ERROR,
+    HCI_EVENT_PACKET,
+    HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR,
+    HCI_LE_1M_PHY,
+    HCI_SUCCESS,
+    HCI_UNKNOWN_HCI_COMMAND_ERROR,
+    HCI_VERSION_BLUETOOTH_CORE_5_0,
+    Address,
+    HCI_AclDataPacket,
+    HCI_AclDataPacketAssembler,
+    HCI_Command_Complete_Event,
+    HCI_Command_Status_Event,
+    HCI_Disconnection_Complete_Event,
+    HCI_Encryption_Change_Event,
+    HCI_LE_Advertising_Report_Event,
+    HCI_LE_Connection_Complete_Event,
+    HCI_LE_Read_Remote_Features_Complete_Event,
+    HCI_Number_Of_Completed_Packets_Event,
+    HCI_Object,
+    HCI_Packet,
+)
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -83,13 +111,19 @@ class Controller:
         self.manufacturer_name = 0xFFFF
         self.hc_le_data_packet_length = 27
         self.hc_total_num_le_data_packets = 64
+        self.event_mask = 0
+        self.event_mask_page_2 = 0
         self.supported_commands = bytes.fromhex(
-            '2000800000c000000000e40000002822000000000000040000f7ffff7f00000030f0f9ff01008004000000000000000000000000000000000000000000000000'
+            '2000800000c000000000e40000002822000000000000040000f7ffff7f000000'
+            '30f0f9ff01008004000000000000000000000000000000000000000000000000'
         )
+        self.le_event_mask = 0
+        self.advertising_parameters = None
         self.le_features = bytes.fromhex('ff49010000000000')
         self.le_states = bytes.fromhex('ffff3fffff030000')
         self.advertising_channel_tx_power = 0
         self.filter_accept_list_size = 8
+        self.filter_duplicates = False
         self.resolving_list_size = 8
         self.supported_max_tx_octets = 27
         self.supported_max_tx_time = 10000  # microseconds
@@ -133,7 +167,8 @@ class Controller:
     @host.setter
     def host(self, host):
         '''
-        Sets the host (sink) for this controller, and set this controller as the controller (sink) for the host
+        Sets the host (sink) for this controller, and set this controller as the
+        controller (sink) for the host
         '''
         self.set_packet_sink(host)
         if host:
@@ -151,7 +186,7 @@ class Controller:
 
     @public_address.setter
     def public_address(self, address):
-        if type(address) is str:
+        if isinstance(address, str):
             address = Address(address)
         self._public_address = address
 
@@ -161,7 +196,7 @@ class Controller:
 
     @random_address.setter
     def random_address(self, address):
-        if type(address) is str:
+        if isinstance(address, str):
             address = Address(address)
         self._random_address = address
         logger.debug(f'new random address: {address}')
@@ -175,7 +210,8 @@ class Controller:
 
     def on_hci_packet(self, packet):
         logger.debug(
-            f'{color("<<<", "blue")} [{self.name}] {color("HOST -> CONTROLLER", "blue")}: {packet}'
+            f'{color("<<<", "blue")} [{self.name}] '
+            f'{color("HOST -> CONTROLLER", "blue")}: {packet}'
         )
 
         # If the packet is a command, invoke the handler for this packet
@@ -192,7 +228,7 @@ class Controller:
         handler_name = f'on_{command.name.lower()}'
         handler = getattr(self, handler_name, self.on_hci_command)
         result = handler(command)
-        if type(result) is bytes:
+        if isinstance(result, bytes):
             self.send_hci_packet(
                 HCI_Command_Complete_Event(
                     num_hci_command_packets=1,
@@ -201,7 +237,7 @@ class Controller:
                 )
             )
 
-    def on_hci_event_packet(self, event):
+    def on_hci_event_packet(self, _event):
         logger.warning('!!! unexpected event packet')
 
     def on_hci_acl_data_packet(self, packet):
@@ -218,7 +254,8 @@ class Controller:
 
     def send_hci_packet(self, packet):
         logger.debug(
-            f'{color(">>>", "green")} [{self.name}] {color("CONTROLLER -> HOST", "green")}: {packet}'
+            f'{color(">>>", "green")} [{self.name}] '
+            f'{color("CONTROLLER -> HOST", "green")}: {packet}'
         )
         if self.host:
             self.host.on_packet(packet.to_bytes())
@@ -312,7 +349,7 @@ class Controller:
             # Remove the connection
             del self.peripheral_connections[peer_address]
         else:
-            logger.warn(f'!!! No peripheral connection found for {peer_address}')
+            logger.warning(f'!!! No peripheral connection found for {peer_address}')
 
     def on_link_peripheral_connection_complete(
         self, le_create_connection_command, status
@@ -339,6 +376,7 @@ class Controller:
 
         # Say that the connection has completed
         self.send_hci_packet(
+            # pylint: disable=line-too-long
             HCI_LE_Connection_Complete_Event(
                 status=status,
                 connection_handle=connection.handle if connection else 0,
@@ -391,9 +429,9 @@ class Controller:
             # Remove the connection
             del self.central_connections[peer_address]
         else:
-            logger.warn(f'!!! No central connection found for {peer_address}')
+            logger.warning(f'!!! No central connection found for {peer_address}')
 
-    def on_link_encrypted(self, peer_address, rand, ediv, ltk):
+    def on_link_encrypted(self, peer_address, _rand, _ediv, _ltk):
         # For now, just setup the encryption without asking the host
         if connection := self.find_connection_by_address(peer_address):
             self.send_hci_packet(
@@ -505,7 +543,7 @@ class Controller:
                 command.connection_handle
             )
         ):
-            logger.warn('connection not found')
+            logger.warning('connection not found')
             return
 
         if self.link:
@@ -521,7 +559,7 @@ class Controller:
         self.event_mask = command.event_mask
         return bytes([HCI_SUCCESS])
 
-    def on_hci_reset_command(self, command):
+    def on_hci_reset_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.3.2 Reset Command
         '''
@@ -543,7 +581,7 @@ class Controller:
                 pass
         return bytes([HCI_SUCCESS])
 
-    def on_hci_read_local_name_command(self, command):
+    def on_hci_read_local_name_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.3.12 Read Local Name Command
         '''
@@ -553,21 +591,22 @@ class Controller:
 
         return bytes([HCI_SUCCESS]) + local_name
 
-    def on_hci_read_class_of_device_command(self, command):
+    def on_hci_read_class_of_device_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.3.25 Read Class of Device Command
         '''
         return bytes([HCI_SUCCESS, 0, 0, 0])
 
-    def on_hci_write_class_of_device_command(self, command):
+    def on_hci_write_class_of_device_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.3.26 Write Class of Device Command
         '''
         return bytes([HCI_SUCCESS])
 
-    def on_hci_read_synchronous_flow_control_enable_command(self, command):
+    def on_hci_read_synchronous_flow_control_enable_command(self, _command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.3.36 Read Synchronous Flow Control Enable Command
+        See Bluetooth spec Vol 2, Part E - 7.3.36 Read Synchronous Flow Control Enable
+        Command
         '''
         if self.sync_flow_control:
             ret = 1
@@ -577,7 +616,8 @@ class Controller:
 
     def on_hci_write_synchronous_flow_control_enable_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.3.37 Write Synchronous Flow Control Enable Command
+        See Bluetooth spec Vol 2, Part E - 7.3.37 Write Synchronous Flow Control Enable
+        Command
         '''
         ret = HCI_SUCCESS
         if command.synchronous_flow_control_enable == 1:
@@ -588,7 +628,7 @@ class Controller:
             ret = HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR
         return bytes([ret])
 
-    def on_hci_write_simple_pairing_mode_command(self, command):
+    def on_hci_write_simple_pairing_mode_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.3.59 Write Simple Pairing Mode Command
         '''
@@ -601,13 +641,13 @@ class Controller:
         self.event_mask_page_2 = command.event_mask_page_2
         return bytes([HCI_SUCCESS])
 
-    def on_hci_read_le_host_support_command(self, command):
+    def on_hci_read_le_host_support_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.3.78 Write LE Host Support Command
         '''
         return bytes([HCI_SUCCESS, 1, 0])
 
-    def on_hci_write_le_host_support_command(self, command):
+    def on_hci_write_le_host_support_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.3.79 Write LE Host Support Command
         '''
@@ -616,12 +656,13 @@ class Controller:
 
     def on_hci_write_authenticated_payload_timeout_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.3.94 Write Authenticated Payload Timeout Command
+        See Bluetooth spec Vol 2, Part E - 7.3.94 Write Authenticated Payload Timeout
+        Command
         '''
         # TODO
         return struct.pack('<BH', HCI_SUCCESS, command.connection_handle)
 
-    def on_hci_read_local_version_information_command(self, command):
+    def on_hci_read_local_version_information_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.4.1 Read Local Version Information Command
         '''
@@ -635,19 +676,19 @@ class Controller:
             self.lmp_subversion,
         )
 
-    def on_hci_read_local_supported_commands_command(self, command):
+    def on_hci_read_local_supported_commands_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.4.2 Read Local Supported Commands Command
         '''
         return bytes([HCI_SUCCESS]) + self.supported_commands
 
-    def on_hci_read_local_supported_features_command(self, command):
+    def on_hci_read_local_supported_features_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.4.3 Read Local Supported Features Command
         '''
         return bytes([HCI_SUCCESS]) + self.lmp_features
 
-    def on_hci_read_bd_addr_command(self, command):
+    def on_hci_read_bd_addr_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.4.6 Read BD_ADDR Command
         '''
@@ -665,7 +706,7 @@ class Controller:
         self.le_event_mask = command.le_event_mask
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_read_buffer_size_command(self, command):
+    def on_hci_le_read_buffer_size_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.2 LE Read Buffer Size Command
         '''
@@ -676,9 +717,10 @@ class Controller:
             self.hc_total_num_le_data_packets,
         )
 
-    def on_hci_le_read_local_supported_features_command(self, command):
+    def on_hci_le_read_local_supported_features_command(self, _command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.3 LE Read Local Supported Features Command
+        See Bluetooth spec Vol 2, Part E - 7.8.3 LE Read Local Supported Features
+        Command
         '''
         return bytes([HCI_SUCCESS]) + self.le_features
 
@@ -696,9 +738,10 @@ class Controller:
         self.advertising_parameters = command
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_read_advertising_channel_tx_power_command(self, command):
+    def on_hci_le_read_advertising_channel_tx_power_command(self, _command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.6 LE Read Advertising Channel Tx Power Command
+        See Bluetooth spec Vol 2, Part E - 7.8.6 LE Read Advertising Channel Tx Power
+        Command
         '''
         return bytes([HCI_SUCCESS, self.advertising_channel_tx_power])
 
@@ -779,33 +822,36 @@ class Controller:
             )
         )
 
-    def on_hci_le_create_connection_cancel_command(self, command):
+    def on_hci_le_create_connection_cancel_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.13 LE Create Connection Cancel Command
         '''
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_read_filter_accept_list_size_command(self, command):
+    def on_hci_le_read_filter_accept_list_size_command(self, _command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.14 LE Read Filter Accept List Size Command
+        See Bluetooth spec Vol 2, Part E - 7.8.14 LE Read Filter Accept List Size
+        Command
         '''
         return bytes([HCI_SUCCESS, self.filter_accept_list_size])
 
-    def on_hci_le_clear_filter_accept_list_command(self, command):
+    def on_hci_le_clear_filter_accept_list_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.15 LE Clear Filter Accept List Command
         '''
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_add_device_to_filter_accept_list_command(self, command):
+    def on_hci_le_add_device_to_filter_accept_list_command(self, _command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.16 LE Add Device To Filter Accept List Command
+        See Bluetooth spec Vol 2, Part E - 7.8.16 LE Add Device To Filter Accept List
+        Command
         '''
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_remove_device_from_filter_accept_list_command(self, command):
+    def on_hci_le_remove_device_from_filter_accept_list_command(self, _command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.17 LE Remove Device From Filter Accept List Command
+        See Bluetooth spec Vol 2, Part E - 7.8.17 LE Remove Device From Filter Accept
+        List Command
         '''
         return bytes([HCI_SUCCESS])
 
@@ -832,7 +878,7 @@ class Controller:
             )
         )
 
-    def on_hci_le_rand_command(self, command):
+    def on_hci_le_rand_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.23 LE Rand Command
         '''
@@ -849,7 +895,7 @@ class Controller:
                 command.connection_handle
             )
         ):
-            logger.warn('connection not found')
+            logger.warning('connection not found')
             return bytes([HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
 
         # Notify that the connection is now encrypted
@@ -869,15 +915,18 @@ class Controller:
             )
         )
 
-    def on_hci_le_read_supported_states_command(self, command):
+        return None
+
+    def on_hci_le_read_supported_states_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.27 LE Read Supported States Command
         '''
         return bytes([HCI_SUCCESS]) + self.le_states
 
-    def on_hci_le_read_suggested_default_data_length_command(self, command):
+    def on_hci_le_read_suggested_default_data_length_command(self, _command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.34 LE Read Suggested Default Data Length Command
+        See Bluetooth spec Vol 2, Part E - 7.8.34 LE Read Suggested Default Data Length
+        Command
         '''
         return struct.pack(
             '<BHH',
@@ -888,33 +937,35 @@ class Controller:
 
     def on_hci_le_write_suggested_default_data_length_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.35 LE Write Suggested Default Data Length Command
+        See Bluetooth spec Vol 2, Part E - 7.8.35 LE Write Suggested Default Data Length
+        Command
         '''
         self.suggested_max_tx_octets, self.suggested_max_tx_time = struct.unpack(
             '<HH', command.parameters[:4]
         )
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_read_local_p_256_public_key_command(self, command):
+    def on_hci_le_read_local_p_256_public_key_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.36 LE Read P-256 Public Key Command
         '''
         # TODO create key and send HCI_LE_Read_Local_P-256_Public_Key_Complete event
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_add_device_to_resolving_list_command(self, command):
+    def on_hci_le_add_device_to_resolving_list_command(self, _command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.38 LE Add Device To Resolving List Command
+        See Bluetooth spec Vol 2, Part E - 7.8.38 LE Add Device To Resolving List
+        Command
         '''
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_clear_resolving_list_command(self, command):
+    def on_hci_le_clear_resolving_list_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.40 LE Clear Resolving List Command
         '''
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_read_resolving_list_size_command(self, command):
+    def on_hci_le_read_resolving_list_size_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.41 LE Read Resolving List Size Command
         '''
@@ -922,7 +973,8 @@ class Controller:
 
     def on_hci_le_set_address_resolution_enable_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.44 LE Set Address Resolution Enable Command
+        See Bluetooth spec Vol 2, Part E - 7.8.44 LE Set Address Resolution Enable
+        Command
         '''
         ret = HCI_SUCCESS
         if command.address_resolution_enable == 1:
@@ -935,12 +987,13 @@ class Controller:
 
     def on_hci_le_set_resolvable_private_address_timeout_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.45 LE Set Resolvable Private Address Timeout Command
+        See Bluetooth spec Vol 2, Part E - 7.8.45 LE Set Resolvable Private Address
+        Timeout Command
         '''
         self.le_rpa_timeout = command.rpa_timeout
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_read_maximum_data_length_command(self, command):
+    def on_hci_le_read_maximum_data_length_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.46 LE Read Maximum Data Length Command
         '''

@@ -103,6 +103,7 @@ async def main():
             print(
                 color('Regulatory Certification:', 'green'),
                 (
+                    # pylint: disable-next=line-too-long
                     await device_information_service.ieee_regulatory_certification_data_list.read_value()
                 ).hex(),
             )

@@ -47,5 +47,3 @@ NOTE: this assumes you're running a Link Relay on port `10723`.
 
 ## `console.py`
 A simple text-based-ui interactive Bluetooth device with GATT client capabilities.
-
-

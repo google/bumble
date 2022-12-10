@@ -125,7 +125,7 @@ def e(key, data):
 
 
 # -----------------------------------------------------------------------------
-def ah(k, r):
+def ah(k, r):  # pylint: disable=redefined-outer-name
     '''
     See Bluetooth spec Vol 3, Part H - 2.2.2 Random Address Hash function ah
     '''
@@ -136,9 +136,10 @@ def ah(k, r):
 
 
 # -----------------------------------------------------------------------------
-def c1(k, r, preq, pres, iat, rat, ia, ra):
+def c1(k, r, preq, pres, iat, rat, ia, ra):  # pylint: disable=redefined-outer-name
     '''
-    See Bluetooth spec, Vol 3, Part H - 2.2.3 Confirm value generation function c1 for LE Legacy Pairing
+    See Bluetooth spec, Vol 3, Part H - 2.2.3 Confirm value generation function c1 for
+    LE Legacy Pairing
     '''
 
     p1 = bytes([iat, rat]) + preq + pres
@@ -149,7 +150,8 @@ def c1(k, r, preq, pres, iat, rat, ia, ra):
 # -----------------------------------------------------------------------------
 def s1(k, r1, r2):
     '''
-    See Bluetooth spec, Vol 3, Part H - 2.2.4 Key generation function s1 for LE Legacy Pairing
+    See Bluetooth spec, Vol 3, Part H - 2.2.4 Key generation function s1 for LE Legacy
+    Pairing
     '''
 
     return e(k, r2[0:8] + r1[0:8])
@@ -170,7 +172,8 @@ def aes_cmac(m, k):
 # -----------------------------------------------------------------------------
 def f4(u, v, x, z):
     '''
-    See Bluetooth spec, Vol 3, Part H - 2.2.6 LE Secure Connections Confirm Value Generation Function f4
+    See Bluetooth spec, Vol 3, Part H - 2.2.6 LE Secure Connections Confirm Value
+    Generation Function f4
     '''
     return bytes(
         reversed(
@@ -182,7 +185,8 @@ def f4(u, v, x, z):
 # -----------------------------------------------------------------------------
 def f5(w, n1, n2, a1, a2):
     '''
-    See Bluetooth spec, Vol 3, Part H - 2.2.7 LE Secure Connections Key Generation Function f5
+    See Bluetooth spec, Vol 3, Part H - 2.2.7 LE Secure Connections Key Generation
+    Function f5
 
     NOTE: this returns a tuple: (MacKey, LTK) in little-endian byte order
     '''
@@ -222,9 +226,10 @@ def f5(w, n1, n2, a1, a2):
 
 
 # -----------------------------------------------------------------------------
-def f6(w, n1, n2, r, io_cap, a1, a2):
+def f6(w, n1, n2, r, io_cap, a1, a2):  # pylint: disable=redefined-outer-name
     '''
-    See Bluetooth spec, Vol 3, Part H - 2.2.8 LE Secure Connections Check Value Generation Function f6
+    See Bluetooth spec, Vol 3, Part H - 2.2.8 LE Secure Connections Check Value
+    Generation Function f6
     '''
     return bytes(
         reversed(
@@ -244,7 +249,8 @@ def f6(w, n1, n2, r, io_cap, a1, a2):
 # -----------------------------------------------------------------------------
 def g2(u, v, x, y):
     '''
-    See Bluetooth spec, Vol 3, Part H - 2.2.9 LE Secure Connections Numeric Comparison Value Generation Function g2
+    See Bluetooth spec, Vol 3, Part H - 2.2.9 LE Secure Connections Numeric Comparison
+    Value Generation Function g2
     '''
     return int.from_bytes(
         aes_cmac(

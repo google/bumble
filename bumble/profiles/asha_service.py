@@ -18,6 +18,7 @@
 # -----------------------------------------------------------------------------
 import struct
 import logging
+from typing import List
 from ..core import AdvertisingData
 from ..gatt import (
     GATT_ASHA_SERVICE,
@@ -29,7 +30,6 @@ from ..gatt import (
     TemplateService,
     Characteristic,
     CharacteristicValue,
-    PackedCharacteristicAdapter,
 )
 
 # -----------------------------------------------------------------------------
@@ -50,23 +50,26 @@ class AshaService(TemplateService):
     SUPPORTED_CODEC_ID = [0x02, 0x01]  # Codec IDs [G.722 at 16 kHz]
     RENDER_DELAY = [00, 00]
 
-    def __init__(self, capability: int, hisyncid: [int]):
+    def __init__(self, capability: int, hisyncid: List[int]):
         self.hisyncid = hisyncid
         self.capability = capability  # Device Capabilities [Left, Monaural]
 
         # Handler for volume control
-        def on_volume_write(connection, value):
+        def on_volume_write(_connection, value):
             logger.info(f'--- VOLUME Write:{value[0]}')
 
         # Handler for audio control commands
-        def on_audio_control_point_write(connection, value):
+        def on_audio_control_point_write(_connection, value):
             logger.info(f'--- AUDIO CONTROL POINT Write:{value.hex()}')
             opcode = value[0]
             if opcode == AshaService.OPCODE_START:
                 # Start
                 audio_type = ('Unknown', 'Ringtone', 'Phone Call', 'Media')[value[2]]
                 logger.info(
-                    f'### START: codec={value[1]}, audio_type={audio_type}, volume={value[3]}, otherstate={value[4]}'
+                    f'### START: codec={value[1]}, '
+                    f'audio_type={audio_type}, '
+                    f'volume={value[3]}, '
+                    f'otherstate={value[4]}'
                 )
             elif opcode == AshaService.OPCODE_STOP:
                 logger.info('### STOP')
@@ -74,7 +77,8 @@ class AshaService(TemplateService):
                 logger.info(f'### STATUS: connected={value[1]}')
 
             # TODO Respond with a status
-            # asyncio.create_task(device.notify_subscribers(audio_status_characteristic, force=True))
+            # asyncio.create_task(device.notify_subscribers(audio_status_characteristic,
+            # force=True))
 
         self.read_only_properties_characteristic = Characteristic(
             GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
