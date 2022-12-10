@@ -43,7 +43,7 @@ async def open_ws_client_transport(spec):
     transport = PumpedTransport(
         PumpedPacketSource(websocket.recv),
         PumpedPacketSink(websocket.send),
-        websocket.close
+        websocket.close,
     )
     transport.start()
     return transport

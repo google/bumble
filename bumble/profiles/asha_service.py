@@ -29,7 +29,7 @@ from ..gatt import (
     TemplateService,
     Characteristic,
     CharacteristicValue,
-    PackedCharacteristicAdapter
+    PackedCharacteristicAdapter,
 )
 
 # -----------------------------------------------------------------------------
@@ -66,7 +66,8 @@ class AshaService(TemplateService):
                 # Start
                 audio_type = ('Unknown', 'Ringtone', 'Phone Call', 'Media')[value[2]]
                 logger.info(
-                    f'### START: codec={value[1]}, audio_type={audio_type}, volume={value[3]}, otherstate={value[4]}')
+                    f'### START: codec={value[1]}, audio_type={audio_type}, volume={value[3]}, otherstate={value[4]}'
+                )
             elif opcode == AshaService.OPCODE_STOP:
                 logger.info('### STOP')
             elif opcode == AshaService.OPCODE_STATUS:
@@ -79,34 +80,36 @@ class AshaService(TemplateService):
             GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
             Characteristic.READ,
             Characteristic.READABLE,
-            bytes([
-                AshaService.PROTOCOL_VERSION,  # Version
-                self.capability,
-            ]) +
-            bytes(self.hisyncid) +
-            bytes(AshaService.FEATURE_MAP) +
-            bytes(AshaService.RENDER_DELAY) +
-            bytes(AshaService.RESERVED_FOR_FUTURE_USE) +
-            bytes(AshaService.SUPPORTED_CODEC_ID)
+            bytes(
+                [
+                    AshaService.PROTOCOL_VERSION,  # Version
+                    self.capability,
+                ]
+            )
+            + bytes(self.hisyncid)
+            + bytes(AshaService.FEATURE_MAP)
+            + bytes(AshaService.RENDER_DELAY)
+            + bytes(AshaService.RESERVED_FOR_FUTURE_USE)
+            + bytes(AshaService.SUPPORTED_CODEC_ID),
         )
 
         self.audio_control_point_characteristic = Characteristic(
             GATT_ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC,
             Characteristic.WRITE | Characteristic.WRITE_WITHOUT_RESPONSE,
             Characteristic.WRITEABLE,
-            CharacteristicValue(write=on_audio_control_point_write)
+            CharacteristicValue(write=on_audio_control_point_write),
         )
         self.audio_status_characteristic = Characteristic(
             GATT_ASHA_AUDIO_STATUS_CHARACTERISTIC,
             Characteristic.READ | Characteristic.NOTIFY,
             Characteristic.READABLE,
-            bytes([0])
+            bytes([0]),
         )
         self.volume_characteristic = Characteristic(
             GATT_ASHA_VOLUME_CHARACTERISTIC,
             Characteristic.WRITE_WITHOUT_RESPONSE,
             Characteristic.WRITEABLE,
-            CharacteristicValue(write=on_volume_write)
+            CharacteristicValue(write=on_volume_write),
         )
 
         # TODO add real psm value
@@ -116,26 +119,39 @@ class AshaService(TemplateService):
             GATT_ASHA_LE_PSM_OUT_CHARACTERISTIC,
             Characteristic.READ,
             Characteristic.READABLE,
-            struct.pack('<H', self.psm)
+            struct.pack('<H', self.psm),
         )
 
-        characteristics = [self.read_only_properties_characteristic,
-                           self.audio_control_point_characteristic,
-                           self.audio_status_characteristic,
-                           self.volume_characteristic,
-                           self.le_psm_out_characteristic]
+        characteristics = [
+            self.read_only_properties_characteristic,
+            self.audio_control_point_characteristic,
+            self.audio_status_characteristic,
+            self.volume_characteristic,
+            self.le_psm_out_characteristic,
+        ]
 
         super().__init__(characteristics)
 
     def get_advertising_data(self):
         # Advertisement only uses 4 least significant bytes of the HiSyncId.
         return bytes(
-            AdvertisingData([
-                (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, bytes(GATT_ASHA_SERVICE)),
-                (AdvertisingData.SERVICE_DATA_16_BIT_UUID, bytes(GATT_ASHA_SERVICE) + bytes([
-                    AshaService.PROTOCOL_VERSION,
-                    self.capability,
-                ]) + bytes(self.hisyncid[:4]))
-            ])
+            AdvertisingData(
+                [
+                    (
+                        AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+                        bytes(GATT_ASHA_SERVICE),
+                    ),
+                    (
+                        AdvertisingData.SERVICE_DATA_16_BIT_UUID,
+                        bytes(GATT_ASHA_SERVICE)
+                        + bytes(
+                            [
+                                AshaService.PROTOCOL_VERSION,
+                                self.capability,
+                            ]
+                        )
+                        + bytes(self.hisyncid[:4]),
+                    ),
+                ]
+            )
         )
-

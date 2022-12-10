@@ -64,9 +64,8 @@ async def open_serial_transport(spec):
         device,
         baudrate=speed,
         rtscts=rtscts,
-        dsrdtr=dsrdtr
+        dsrdtr=dsrdtr,
     )
     packet_sink = StreamPacketSink(serial_transport)
 
     return Transport(packet_source, packet_sink)
-

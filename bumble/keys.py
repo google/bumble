@@ -39,10 +39,10 @@ logger = logging.getLogger(__name__)
 class PairingKeys:
     class Key:
         def __init__(self, value, authenticated=False, ediv=None, rand=None):
-            self.value         = value
+            self.value = value
             self.authenticated = authenticated
-            self.ediv          = ediv
-            self.rand          = rand
+            self.ediv = ediv
+            self.rand = rand
 
         @classmethod
         def from_dict(cls, key_dict):
@@ -65,13 +65,13 @@ class PairingKeys:
             return key_dict
 
     def __init__(self):
-        self.address_type   = None
-        self.ltk            = None
-        self.ltk_central    = None
+        self.address_type = None
+        self.ltk = None
+        self.ltk_central = None
         self.ltk_peripheral = None
-        self.irk            = None
-        self.csrk           = None
-        self.link_key       = None  # Classic
+        self.irk = None
+        self.csrk = None
+        self.link_key = None  # Classic
 
     @staticmethod
     def key_from_dict(keys_dict, key_name):
@@ -83,13 +83,13 @@ class PairingKeys:
     def from_dict(keys_dict):
         keys = PairingKeys()
 
-        keys.address_type   = keys_dict.get('address_type')
-        keys.ltk            = PairingKeys.key_from_dict(keys_dict, 'ltk')
-        keys.ltk_central    = PairingKeys.key_from_dict(keys_dict, 'ltk_central')
+        keys.address_type = keys_dict.get('address_type')
+        keys.ltk = PairingKeys.key_from_dict(keys_dict, 'ltk')
+        keys.ltk_central = PairingKeys.key_from_dict(keys_dict, 'ltk_central')
         keys.ltk_peripheral = PairingKeys.key_from_dict(keys_dict, 'ltk_peripheral')
-        keys.irk            = PairingKeys.key_from_dict(keys_dict, 'irk')
-        keys.csrk           = PairingKeys.key_from_dict(keys_dict, 'csrk')
-        keys.link_key       = PairingKeys.key_from_dict(keys_dict, 'link_key')
+        keys.irk = PairingKeys.key_from_dict(keys_dict, 'irk')
+        keys.csrk = PairingKeys.key_from_dict(keys_dict, 'csrk')
+        keys.link_key = PairingKeys.key_from_dict(keys_dict, 'link_key')
 
         return keys
 
@@ -166,7 +166,7 @@ class KeyStore:
         separator = ''
         for (name, keys) in entries:
             print(separator + prefix + color(name, 'yellow'))
-            keys.print(prefix = prefix + '  ')
+            keys.print(prefix=prefix + '  ')
             separator = '\n'
 
     @staticmethod
@@ -183,9 +183,9 @@ class KeyStore:
 
 # -----------------------------------------------------------------------------
 class JsonKeyStore(KeyStore):
-    APP_NAME          = 'Bumble'
-    APP_AUTHOR        = 'Google'
-    KEYS_DIR          = 'Pairing'
+    APP_NAME = 'Bumble'
+    APP_AUTHOR = 'Google'
+    KEYS_DIR = 'Pairing'
     DEFAULT_NAMESPACE = '__DEFAULT__'
 
     def __init__(self, namespace, filename=None):
@@ -194,9 +194,9 @@ class JsonKeyStore(KeyStore):
         if filename is None:
             # Use a default for the current user
             import appdirs
+
             self.directory_name = os.path.join(
-                appdirs.user_data_dir(self.APP_NAME, self.APP_AUTHOR),
-                self.KEYS_DIR
+                appdirs.user_data_dir(self.APP_NAME, self.APP_AUTHOR), self.KEYS_DIR
             )
             json_filename = f'{self.namespace}.json'.lower().replace(':', '-')
             self.filename = os.path.join(self.directory_name, json_filename)
@@ -262,7 +262,9 @@ class JsonKeyStore(KeyStore):
         if namespace is None:
             return []
 
-        return [(name, PairingKeys.from_dict(keys)) for (name, keys) in namespace.items()]
+        return [
+            (name, PairingKeys.from_dict(keys)) for (name, keys) in namespace.items()
+        ]
 
     async def delete_all(self):
         db = await self.load()

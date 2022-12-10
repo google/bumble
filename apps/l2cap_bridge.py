@@ -38,36 +38,32 @@ class ServerBridge:
     and waits for a new L2CAP CoC channel to be connected.
     When the TCP connection is closed by the TCP server, XXXX
     """
-    def __init__(
-        self,
-        psm,
-        max_credits,
-        mtu,
-        mps,
-        tcp_host,
-        tcp_port
-    ):
-        self.psm         = psm
+
+    def __init__(self, psm, max_credits, mtu, mps, tcp_host, tcp_port):
+        self.psm = psm
         self.max_credits = max_credits
-        self.mtu         = mtu
-        self.mps         = mps
-        self.tcp_host    = tcp_host
-        self.tcp_port    = tcp_port
+        self.mtu = mtu
+        self.mps = mps
+        self.tcp_host = tcp_host
+        self.tcp_port = tcp_port
 
     async def start(self, device):
         # Listen for incoming L2CAP CoC connections
         device.register_l2cap_channel_server(
-            psm         = self.psm,
-            server      = self.on_coc,
-            max_credits = self.max_credits,
-            mtu         = self.mtu,
-            mps         = self.mps
+            psm=self.psm,
+            server=self.on_coc,
+            max_credits=self.max_credits,
+            mtu=self.mtu,
+            mps=self.mps,
         )
         print(color(f'### Listening for CoC connection on PSM {self.psm}', 'yellow'))
 
         def on_ble_connection(connection):
             def on_ble_disconnection(reason):
-                print(color('@@@ Bluetooth disconnection:', 'red'), HCI_Constant.error_name(reason))
+                print(
+                    color('@@@ Bluetooth disconnection:', 'red'),
+                    HCI_Constant.error_name(reason),
+                )
 
             print(color('@@@ Bluetooth connection:', 'green'), connection)
             connection.on('disconnection', on_ble_disconnection)
@@ -82,7 +78,7 @@ class ServerBridge:
 
         class Pipe:
             def __init__(self, bridge, l2cap_channel):
-                self.bridge        = bridge
+                self.bridge = bridge
                 self.tcp_transport = None
                 self.l2cap_channel = l2cap_channel
 
@@ -91,7 +87,12 @@ class ServerBridge:
 
             async def connect_to_tcp(self):
                 # Connect to the TCP server
-                print(color(f'### Connecting to TCP {self.bridge.tcp_host}:{self.bridge.tcp_port}...', 'yellow'))
+                print(
+                    color(
+                        f'### Connecting to TCP {self.bridge.tcp_host}:{self.bridge.tcp_port}...',
+                        'yellow',
+                    )
+                )
 
                 class TcpClientProtocol(asyncio.Protocol):
                     def __init__(self, pipe):
@@ -107,7 +108,10 @@ class ServerBridge:
                         self.pipe.l2cap_channel.write(data)
 
                 try:
-                    self.tcp_transport, _ = await asyncio.get_running_loop().create_connection(
+                    (
+                        self.tcp_transport,
+                        _,
+                    ) = await asyncio.get_running_loop().create_connection(
                         lambda: TcpClientProtocol(self),
                         host=self.bridge.tcp_host,
                         port=self.bridge.tcp_port,
@@ -149,23 +153,14 @@ class ClientBridge:
 
     READ_CHUNK_SIZE = 4096
 
-    def __init__(
-        self,
-        psm,
-        max_credits,
-        mtu,
-        mps,
-        address,
-        tcp_host,
-        tcp_port
-    ):
-        self.psm         = psm
+    def __init__(self, psm, max_credits, mtu, mps, address, tcp_host, tcp_port):
+        self.psm = psm
         self.max_credits = max_credits
-        self.mtu         = mtu
-        self.mps         = mps
-        self.address     = address
-        self.tcp_host    = tcp_host
-        self.tcp_port    = tcp_port
+        self.mtu = mtu
+        self.mps = mps
+        self.address = address
+        self.tcp_host = tcp_host
+        self.tcp_port = tcp_port
 
     async def start(self, device):
         print(color(f'### Connecting to {self.address}...', 'yellow'))
@@ -174,7 +169,10 @@ class ClientBridge:
 
         # Called when the BLE connection is disconnected
         def on_ble_disconnection(reason):
-            print(color('@@@ Bluetooth disconnection:', 'red'), HCI_Constant.error_name(reason))
+            print(
+                color('@@@ Bluetooth disconnection:', 'red'),
+                HCI_Constant.error_name(reason),
+            )
 
         connection.on('disconnection', on_ble_disconnection)
 
@@ -196,10 +194,10 @@ class ClientBridge:
             print(color(f'>>> Opening L2CAP channel on PSM = {self.psm}', 'yellow'))
             try:
                 l2cap_channel = await connection.open_l2cap_channel(
-                    psm         = self.psm,
-                    max_credits = self.max_credits,
-                    mtu         = self.mtu,
-                    mps         = self.mps
+                    psm=self.psm,
+                    max_credits=self.max_credits,
+                    mtu=self.mtu,
+                    mps=self.mps,
                 )
                 print(color('*** L2CAP channel:', 'cyan'), l2cap_channel)
             except Exception as error:
@@ -215,7 +213,7 @@ class ClientBridge:
                 l2cap_channel.pause_reading,
                 l2cap_channel.resume_reading,
                 writer.write,
-                writer.drain
+                writer.drain,
             )
             l2cap_to_tcp_pipe.start()
 
@@ -242,9 +240,13 @@ class ClientBridge:
         await asyncio.start_server(
             on_tcp_connection,
             host=self.tcp_host if self.tcp_host != '_' else None,
-            port=self.tcp_port
+            port=self.tcp_port,
         )
-        print(color(f'### Listening for TCP connections on port {self.tcp_port}', 'magenta'))
+        print(
+            color(
+                f'### Listening for TCP connections on port {self.tcp_port}', 'magenta'
+            )
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -266,20 +268,43 @@ async def run(device_config, hci_transport, bridge):
 # -----------------------------------------------------------------------------
 @click.group()
 @click.pass_context
-@click.option('--device-config',         help='Device configuration file', required=True)
-@click.option('--hci-transport',         help='HCI transport', required=True)
-@click.option('--psm',                   help='PSM for L2CAP CoC', type=int, default=1234)
-@click.option('--l2cap-coc-max-credits', help='Maximum L2CAP CoC Credits', type=click.IntRange(1, 65535), default=128)
-@click.option('--l2cap-coc-mtu',         help='L2CAP CoC MTU', type=click.IntRange(23, 65535), default=1022)
-@click.option('--l2cap-coc-mps',         help='L2CAP CoC MPS', type=click.IntRange(23, 65533), default=1024)
-def cli(context, device_config, hci_transport, psm, l2cap_coc_max_credits, l2cap_coc_mtu, l2cap_coc_mps):
+@click.option('--device-config', help='Device configuration file', required=True)
+@click.option('--hci-transport', help='HCI transport', required=True)
+@click.option('--psm', help='PSM for L2CAP CoC', type=int, default=1234)
+@click.option(
+    '--l2cap-coc-max-credits',
+    help='Maximum L2CAP CoC Credits',
+    type=click.IntRange(1, 65535),
+    default=128,
+)
+@click.option(
+    '--l2cap-coc-mtu',
+    help='L2CAP CoC MTU',
+    type=click.IntRange(23, 65535),
+    default=1022,
+)
+@click.option(
+    '--l2cap-coc-mps',
+    help='L2CAP CoC MPS',
+    type=click.IntRange(23, 65533),
+    default=1024,
+)
+def cli(
+    context,
+    device_config,
+    hci_transport,
+    psm,
+    l2cap_coc_max_credits,
+    l2cap_coc_mtu,
+    l2cap_coc_mps,
+):
     context.ensure_object(dict)
     context.obj['device_config'] = device_config
     context.obj['hci_transport'] = hci_transport
-    context.obj['psm']           = psm
-    context.obj['max_credits']   = l2cap_coc_max_credits
-    context.obj['mtu']           = l2cap_coc_mtu
-    context.obj['mps']           = l2cap_coc_mps
+    context.obj['psm'] = psm
+    context.obj['max_credits'] = l2cap_coc_max_credits
+    context.obj['mtu'] = l2cap_coc_mtu
+    context.obj['mps'] = l2cap_coc_mps
 
 
 # -----------------------------------------------------------------------------
@@ -294,12 +319,9 @@ def server(context, tcp_host, tcp_port):
         context.obj['mtu'],
         context.obj['mps'],
         tcp_host,
-        tcp_port)
-    asyncio.run(run(
-        context.obj['device_config'],
-        context.obj['hci_transport'],
-        bridge
-    ))
+        tcp_port,
+    )
+    asyncio.run(run(context.obj['device_config'], context.obj['hci_transport'], bridge))
 
 
 # -----------------------------------------------------------------------------
@@ -316,16 +338,12 @@ def client(context, bluetooth_address, tcp_host, tcp_port):
         context.obj['mps'],
         bluetooth_address,
         tcp_host,
-        tcp_port
+        tcp_port,
     )
-    asyncio.run(run(
-        context.obj['device_config'],
-        context.obj['hci_transport'],
-        bridge
-    ))
+    asyncio.run(run(context.obj['device_config'], context.obj['hci_transport'], bridge))
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
 if __name__ == '__main__':
     cli(obj={})

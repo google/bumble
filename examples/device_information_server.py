@@ -39,21 +39,26 @@ async def main():
 
         # Add a Device Information Service to the GATT sever
         device_information_service = DeviceInformationService(
-            manufacturer_name = 'ACME',
-            model_number      = 'AB-102',
-            serial_number     = '7654321',
-            hardware_revision = '1.1.3',
-            software_revision = '2.5.6',
-            system_id         = (0x123456, 0x8877665544)
+            manufacturer_name='ACME',
+            model_number='AB-102',
+            serial_number='7654321',
+            hardware_revision='1.1.3',
+            software_revision='2.5.6',
+            system_id=(0x123456, 0x8877665544),
         )
         device.add_service(device_information_service)
 
         # Set the advertising data
         device.advertising_data = bytes(
-            AdvertisingData([
-                (AdvertisingData.COMPLETE_LOCAL_NAME, bytes('Bumble Device', 'utf-8')),
-                (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340))
-            ])
+            AdvertisingData(
+                [
+                    (
+                        AdvertisingData.COMPLETE_LOCAL_NAME,
+                        bytes('Bumble Device', 'utf-8'),
+                    ),
+                    (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340)),
+                ]
+            )
         )
 
         # Go!
@@ -61,6 +66,7 @@ async def main():
         await device.start_advertising(auto_restart=True)
         await hci_source.wait_for_termination()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

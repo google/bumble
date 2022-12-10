@@ -23,7 +23,7 @@ from ..gatt import (
     TemplateService,
     Characteristic,
     CharacteristicValue,
-    PackedCharacteristicAdapter
+    PackedCharacteristicAdapter,
 )
 
 
@@ -38,9 +38,9 @@ class BatteryService(TemplateService):
                 GATT_BATTERY_LEVEL_CHARACTERISTIC,
                 Characteristic.READ | Characteristic.NOTIFY,
                 Characteristic.READABLE,
-                CharacteristicValue(read=read_battery_level)
+                CharacteristicValue(read=read_battery_level),
             ),
-            format=BatteryService.BATTERY_LEVEL_FORMAT
+            format=BatteryService.BATTERY_LEVEL_FORMAT,
         )
         super().__init__([self.battery_level_characteristic])
 
@@ -52,10 +52,11 @@ class BatteryServiceProxy(ProfileServiceProxy):
     def __init__(self, service_proxy):
         self.service_proxy = service_proxy
 
-        if characteristics := service_proxy.get_characteristics_by_uuid(GATT_BATTERY_LEVEL_CHARACTERISTIC):
+        if characteristics := service_proxy.get_characteristics_by_uuid(
+            GATT_BATTERY_LEVEL_CHARACTERISTIC
+        ):
             self.battery_level = PackedCharacteristicAdapter(
-                characteristics[0],
-                format=BatteryService.BATTERY_LEVEL_FORMAT
+                characteristics[0], format=BatteryService.BATTERY_LEVEL_FORMAT
             )
         else:
             self.battery_level = None

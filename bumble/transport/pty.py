@@ -47,13 +47,11 @@ async def open_pty_transport(spec):
     tty.setraw(replica)
 
     read_transport, packet_source = await asyncio.get_running_loop().connect_read_pipe(
-        lambda: StreamPacketSource(),
-        io.open(primary, 'rb', closefd=False)
+        lambda: StreamPacketSource(), io.open(primary, 'rb', closefd=False)
     )
 
     write_transport, _ = await asyncio.get_running_loop().connect_write_pipe(
-        lambda: asyncio.BaseProtocol(),
-        io.open(primary, 'wb', closefd=False)
+        lambda: asyncio.BaseProtocol(), io.open(primary, 'wb', closefd=False)
     )
     packet_sink = StreamPacketSink(write_transport)
 

@@ -35,10 +35,10 @@ class VhciForwardingServiceStub(object):
             channel: A grpc.Channel.
         """
         self.attachVhci = channel.stream_stream(
-                '/android.emulation.bluetooth.VhciForwardingService/attachVhci',
-                request_serializer=emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
-                response_deserializer=emulated__bluetooth__packets__pb2.HCIPacket.FromString,
-                )
+            '/android.emulation.bluetooth.VhciForwardingService/attachVhci',
+            request_serializer=emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
+            response_deserializer=emulated__bluetooth__packets__pb2.HCIPacket.FromString,
+        )
 
 
 class VhciForwardingServiceServicer(object):
@@ -75,18 +75,19 @@ class VhciForwardingServiceServicer(object):
 
 def add_VhciForwardingServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'attachVhci': grpc.stream_stream_rpc_method_handler(
-                    servicer.attachVhci,
-                    request_deserializer=emulated__bluetooth__packets__pb2.HCIPacket.FromString,
-                    response_serializer=emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
-            ),
+        'attachVhci': grpc.stream_stream_rpc_method_handler(
+            servicer.attachVhci,
+            request_deserializer=emulated__bluetooth__packets__pb2.HCIPacket.FromString,
+            response_serializer=emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'android.emulation.bluetooth.VhciForwardingService', rpc_method_handlers)
+        'android.emulation.bluetooth.VhciForwardingService', rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
 
 
- # This class is part of an EXPERIMENTAL API.
+# This class is part of an EXPERIMENTAL API.
 class VhciForwardingService(object):
     """This is a service which allows you to directly intercept the VHCI packets
     that are coming and going to the device before they are delivered to
@@ -97,18 +98,30 @@ class VhciForwardingService(object):
     """
 
     @staticmethod
-    def attachVhci(request_iterator,
+    def attachVhci(
+        request_iterator,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.stream_stream(
+            request_iterator,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_stream(request_iterator, target, '/android.emulation.bluetooth.VhciForwardingService/attachVhci',
+            '/android.emulation.bluetooth.VhciForwardingService/attachVhci',
             emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
             emulated__bluetooth__packets__pb2.HCIPacket.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )

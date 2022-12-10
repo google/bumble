@@ -31,7 +31,7 @@ from bumble.sdp import (
     SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
     SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID
+    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
 )
 from bumble.hci import BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID
 
@@ -40,22 +40,34 @@ from bumble.hci import BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID
 def sdp_records(channel):
     return {
         0x00010001: [
-            ServiceAttribute(SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID, DataElement.unsigned_integer_32(0x00010001)),
-            ServiceAttribute(SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID, DataElement.sequence([
-                DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)
-            ])),
-            ServiceAttribute(SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID, DataElement.sequence([
-                DataElement.uuid(UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'))
-            ])),
-            ServiceAttribute(SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID, DataElement.sequence([
-                DataElement.sequence([
-                    DataElement.uuid(BT_L2CAP_PROTOCOL_ID)
-                ]),
-                DataElement.sequence([
-                    DataElement.uuid(BT_RFCOMM_PROTOCOL_ID),
-                    DataElement.unsigned_integer_8(channel)
-                ])
-            ]))
+            ServiceAttribute(
+                SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+                DataElement.unsigned_integer_32(0x00010001),
+            ),
+            ServiceAttribute(
+                SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+                DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
+            ),
+            ServiceAttribute(
+                SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+                DataElement.sequence(
+                    [DataElement.uuid(UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'))]
+                ),
+            ),
+            ServiceAttribute(
+                SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                DataElement.sequence(
+                    [
+                        DataElement.sequence([DataElement.uuid(BT_L2CAP_PROTOCOL_ID)]),
+                        DataElement.sequence(
+                            [
+                                DataElement.uuid(BT_RFCOMM_PROTOCOL_ID),
+                                DataElement.unsigned_integer_8(channel),
+                            ]
+                        ),
+                    ]
+                ),
+            ),
         ]
     }
 
@@ -113,6 +125,7 @@ async def main():
 
         await hci_source.wait_for_termination()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

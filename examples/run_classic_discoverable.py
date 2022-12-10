@@ -30,48 +30,62 @@ from bumble.sdp import (
     SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID
+    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
 )
 from bumble.core import (
     BT_AUDIO_SINK_SERVICE,
     BT_L2CAP_PROTOCOL_ID,
     BT_AVDTP_PROTOCOL_ID,
-    BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE
+    BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
 )
 
 # -----------------------------------------------------------------------------
 SDP_SERVICE_RECORDS = {
     0x00010001: [
-        ServiceAttribute(SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID, DataElement.unsigned_integer_32(0x00010001)),
-        ServiceAttribute(SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID, DataElement.sequence([
-            DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)
-        ])),
+        ServiceAttribute(
+            SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+            DataElement.unsigned_integer_32(0x00010001),
+        ),
+        ServiceAttribute(
+            SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+            DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
+        ),
         ServiceAttribute(
             SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-            DataElement.sequence([DataElement.uuid(BT_AUDIO_SINK_SERVICE)])
+            DataElement.sequence([DataElement.uuid(BT_AUDIO_SINK_SERVICE)]),
         ),
         ServiceAttribute(
             SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            DataElement.sequence([
-                DataElement.sequence([
-                    DataElement.uuid(BT_L2CAP_PROTOCOL_ID),
-                    DataElement.unsigned_integer_16(25)
-                ]),
-                DataElement.sequence([
-                    DataElement.uuid(BT_AVDTP_PROTOCOL_ID),
-                    DataElement.unsigned_integer_16(256)
-                ])
-            ])
+            DataElement.sequence(
+                [
+                    DataElement.sequence(
+                        [
+                            DataElement.uuid(BT_L2CAP_PROTOCOL_ID),
+                            DataElement.unsigned_integer_16(25),
+                        ]
+                    ),
+                    DataElement.sequence(
+                        [
+                            DataElement.uuid(BT_AVDTP_PROTOCOL_ID),
+                            DataElement.unsigned_integer_16(256),
+                        ]
+                    ),
+                ]
+            ),
         ),
         ServiceAttribute(
             SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            DataElement.sequence([
-                DataElement.sequence([
-                    DataElement.uuid(BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE),
-                    DataElement.unsigned_integer_16(256)
-                ])
-            ])
-        )
+            DataElement.sequence(
+                [
+                    DataElement.sequence(
+                        [
+                            DataElement.uuid(BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE),
+                            DataElement.unsigned_integer_16(256),
+                        ]
+                    )
+                ]
+            ),
+        ),
     ]
 }
 
@@ -99,6 +113,7 @@ async def main():
 
         await hci_source.wait_for_termination()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

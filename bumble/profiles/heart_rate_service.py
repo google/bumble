@@ -30,25 +30,25 @@ from ..gatt import (
     Characteristic,
     CharacteristicValue,
     DelegatedCharacteristicAdapter,
-    PackedCharacteristicAdapter
+    PackedCharacteristicAdapter,
 )
 
 
 # -----------------------------------------------------------------------------
 class HeartRateService(TemplateService):
-    UUID                            = GATT_HEART_RATE_SERVICE
+    UUID = GATT_HEART_RATE_SERVICE
     HEART_RATE_CONTROL_POINT_FORMAT = 'B'
-    CONTROL_POINT_NOT_SUPPORTED     = 0x80
-    RESET_ENERGY_EXPENDED           = 0x01
+    CONTROL_POINT_NOT_SUPPORTED = 0x80
+    RESET_ENERGY_EXPENDED = 0x01
 
     class BodySensorLocation(IntEnum):
-        OTHER    = 0,
-        CHEST    = 1,
-        WRIST    = 2,
-        FINGER   = 3,
-        HAND     = 4,
-        EAR_LOBE = 5,
-        FOOT     = 6
+        OTHER = (0,)
+        CHEST = (1,)
+        WRIST = (2,)
+        FINGER = (3,)
+        HAND = (4,)
+        EAR_LOBE = (5,)
+        FOOT = 6
 
     class HeartRateMeasurement:
         def __init__(
@@ -56,12 +56,14 @@ class HeartRateService(TemplateService):
             heart_rate,
             sensor_contact_detected=None,
             energy_expended=None,
-            rr_intervals=None
+            rr_intervals=None,
         ):
             if heart_rate < 0 or heart_rate > 0xFFFF:
                 raise ValueError('heart_rate out of range')
 
-            if energy_expended is not None and (energy_expended < 0 or energy_expended > 0xFFFF):
+            if energy_expended is not None and (
+                energy_expended < 0 or energy_expended > 0xFFFF
+            ):
                 raise ValueError('energy_expended out of range')
 
             if rr_intervals:
@@ -69,10 +71,10 @@ class HeartRateService(TemplateService):
                     if rr_interval < 0 or rr_interval * 1024 > 0xFFFF:
                         raise ValueError('rr_intervals out of range')
 
-            self.heart_rate              = heart_rate
+            self.heart_rate = heart_rate
             self.sensor_contact_detected = sensor_contact_detected
-            self.energy_expended         = energy_expended
-            self.rr_intervals            = rr_intervals
+            self.energy_expended = energy_expended
+            self.rr_intervals = rr_intervals
 
         @classmethod
         def from_bytes(cls, data):
@@ -87,7 +89,7 @@ class HeartRateService(TemplateService):
                 offset += 1
 
             if flags & (1 << 2):
-                sensor_contact_detected = (flags & (1 << 1) != 0)
+                sensor_contact_detected = flags & (1 << 1) != 0
             else:
                 sensor_contact_detected = None
 
@@ -119,38 +121,42 @@ class HeartRateService(TemplateService):
                 flags |= ((1 if self.sensor_contact_detected else 0) << 1) | (1 << 2)
 
             if self.energy_expended is not None:
-                flags |= (1 << 3)
+                flags |= 1 << 3
                 data += struct.pack('<H', self.energy_expended)
 
             if self.rr_intervals:
-                flags |= (1 << 4)
-                data += b''.join([
-                    struct.pack('<H', int(rr_interval * 1024))
-                    for rr_interval in self.rr_intervals
-                ])
+                flags |= 1 << 4
+                data += b''.join(
+                    [
+                        struct.pack('<H', int(rr_interval * 1024))
+                        for rr_interval in self.rr_intervals
+                    ]
+                )
 
             return bytes([flags]) + data
 
         def __str__(self):
-            return f'HeartRateMeasurement(heart_rate={self.heart_rate},'\
-                f' sensor_contact_detected={self.sensor_contact_detected},'\
-                f' energy_expended={self.energy_expended},'\
+            return (
+                f'HeartRateMeasurement(heart_rate={self.heart_rate},'
+                f' sensor_contact_detected={self.sensor_contact_detected},'
+                f' energy_expended={self.energy_expended},'
                 f' rr_intervals={self.rr_intervals})'
+            )
 
     def __init__(
         self,
         read_heart_rate_measurement,
         body_sensor_location=None,
-        reset_energy_expended=None
+        reset_energy_expended=None,
     ):
         self.heart_rate_measurement_characteristic = DelegatedCharacteristicAdapter(
             Characteristic(
                 GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
                 Characteristic.NOTIFY,
                 0,
-                CharacteristicValue(read=read_heart_rate_measurement)
+                CharacteristicValue(read=read_heart_rate_measurement),
             ),
-            encode=lambda value: bytes(value)
+            encode=lambda value: bytes(value),
         )
         characteristics = [self.heart_rate_measurement_characteristic]
 
@@ -159,11 +165,12 @@ class HeartRateService(TemplateService):
                 GATT_BODY_SENSOR_LOCATION_CHARACTERISTIC,
                 Characteristic.READ,
                 Characteristic.READABLE,
-                bytes([int(body_sensor_location)])
+                bytes([int(body_sensor_location)]),
             )
             characteristics.append(self.body_sensor_location_characteristic)
 
         if reset_energy_expended:
+
             def write_heart_rate_control_point_value(connection, value):
                 if value == self.RESET_ENERGY_EXPENDED:
                     if reset_energy_expended is not None:
@@ -176,9 +183,9 @@ class HeartRateService(TemplateService):
                     GATT_HEART_RATE_CONTROL_POINT_CHARACTERISTIC,
                     Characteristic.WRITE,
                     Characteristic.WRITEABLE,
-                    CharacteristicValue(write=write_heart_rate_control_point_value)
+                    CharacteristicValue(write=write_heart_rate_control_point_value),
                 ),
-                format=HeartRateService.HEART_RATE_CONTROL_POINT_FORMAT
+                format=HeartRateService.HEART_RATE_CONTROL_POINT_FORMAT,
             )
             characteristics.append(self.heart_rate_control_point_characteristic)
 
@@ -192,30 +199,38 @@ class HeartRateServiceProxy(ProfileServiceProxy):
     def __init__(self, service_proxy):
         self.service_proxy = service_proxy
 
-        if characteristics := service_proxy.get_characteristics_by_uuid(GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC):
+        if characteristics := service_proxy.get_characteristics_by_uuid(
+            GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC
+        ):
             self.heart_rate_measurement = DelegatedCharacteristicAdapter(
                 characteristics[0],
-                decode=HeartRateService.HeartRateMeasurement.from_bytes
+                decode=HeartRateService.HeartRateMeasurement.from_bytes,
             )
         else:
             self.heart_rate_measurement = None
 
-        if characteristics := service_proxy.get_characteristics_by_uuid(GATT_BODY_SENSOR_LOCATION_CHARACTERISTIC):
+        if characteristics := service_proxy.get_characteristics_by_uuid(
+            GATT_BODY_SENSOR_LOCATION_CHARACTERISTIC
+        ):
             self.body_sensor_location = DelegatedCharacteristicAdapter(
                 characteristics[0],
-                decode=lambda value: HeartRateService.BodySensorLocation(value[0])
+                decode=lambda value: HeartRateService.BodySensorLocation(value[0]),
             )
         else:
             self.body_sensor_location = None
 
-        if characteristics := service_proxy.get_characteristics_by_uuid(GATT_HEART_RATE_CONTROL_POINT_CHARACTERISTIC):
+        if characteristics := service_proxy.get_characteristics_by_uuid(
+            GATT_HEART_RATE_CONTROL_POINT_CHARACTERISTIC
+        ):
             self.heart_rate_control_point = PackedCharacteristicAdapter(
                 characteristics[0],
-                format=HeartRateService.HEART_RATE_CONTROL_POINT_FORMAT
+                format=HeartRateService.HEART_RATE_CONTROL_POINT_FORMAT,
             )
         else:
             self.heart_rate_control_point = None
 
     async def reset_energy_expended(self):
         if self.heart_rate_control_point is not None:
-            return await self.heart_rate_control_point.write_value(HeartRateService.RESET_ENERGY_EXPENDED)
+            return await self.heart_rate_control_point.write_value(
+                HeartRateService.RESET_ENERGY_EXPENDED
+            )

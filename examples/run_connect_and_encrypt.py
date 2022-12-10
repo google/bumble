@@ -27,8 +27,12 @@ from bumble.transport import open_transport_or_link
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 3:
-        print('Usage: run_connect_and_encrypt.py <device-config> <transport-spec> <bluetooth-address>')
-        print('example: run_connect_and_encrypt.py device1.json usb:0 E1:CA:72:48:C4:E8')
+        print(
+            'Usage: run_connect_and_encrypt.py <device-config> <transport-spec> <bluetooth-address>'
+        )
+        print(
+            'example: run_connect_and_encrypt.py device1.json usb:0 E1:CA:72:48:C4:E8'
+        )
         return
 
     print('<<< connecting to HCI...')
@@ -53,6 +57,7 @@ async def main():
 
         await hci_source.wait_for_termination()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

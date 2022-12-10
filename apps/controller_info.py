@@ -39,7 +39,7 @@ from bumble.hci import (
     HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND,
     HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command,
     HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND,
-    HCI_LE_Read_Maximum_Advertising_Data_Length_Command
+    HCI_LE_Read_Maximum_Advertising_Data_Length_Command,
 )
 from bumble.host import Host
 from bumble.transport import open_transport_or_link
@@ -51,13 +51,18 @@ async def get_classic_info(host):
         response = await host.send_command(HCI_Read_BD_ADDR_Command())
         if response.return_parameters.status == HCI_SUCCESS:
             print()
-            print(color('Classic Address:', 'yellow'), response.return_parameters.bd_addr)
+            print(
+                color('Classic Address:', 'yellow'), response.return_parameters.bd_addr
+            )
 
     if host.supports_command(HCI_READ_LOCAL_NAME_COMMAND):
         response = await host.send_command(HCI_Read_Local_Name_Command())
         if response.return_parameters.status == HCI_SUCCESS:
             print()
-            print(color('Local Name:', 'yellow'), map_null_terminated_utf8_string(response.return_parameters.local_name))
+            print(
+                color('Local Name:', 'yellow'),
+                map_null_terminated_utf8_string(response.return_parameters.local_name),
+            )
 
 
 # -----------------------------------------------------------------------------
@@ -65,21 +70,25 @@ async def get_le_info(host):
     print()
 
     if host.supports_command(HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND):
-        response = await host.send_command(HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command())
+        response = await host.send_command(
+            HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command()
+        )
         if response.return_parameters.status == HCI_SUCCESS:
             print(
                 color('LE Number Of Supported Advertising Sets:', 'yellow'),
                 response.return_parameters.num_supported_advertising_sets,
-                '\n'
+                '\n',
             )
 
     if host.supports_command(HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND):
-        response = await host.send_command(HCI_LE_Read_Maximum_Advertising_Data_Length_Command())
+        response = await host.send_command(
+            HCI_LE_Read_Maximum_Advertising_Data_Length_Command()
+        )
         if response.return_parameters.status == HCI_SUCCESS:
             print(
                 color('LE Maximum Advertising Data Length:', 'yellow'),
                 response.return_parameters.max_advertising_data_length,
-                '\n'
+                '\n',
             )
 
     if host.supports_command(HCI_LE_READ_MAXIMUM_DATA_LENGTH_COMMAND):
@@ -93,7 +102,7 @@ async def get_le_info(host):
                     f'rx:{response.return_parameters.supported_max_rx_octets}/'
                     f'{response.return_parameters.supported_max_rx_time}'
                 ),
-                '\n'
+                '\n',
             )
 
     print(color('LE Features:', 'yellow'))
@@ -112,10 +121,19 @@ async def async_main(transport):
 
         # Print version
         print(color('Version:', 'yellow'))
-        print(color('  Manufacturer:  ', 'green'), name_or_number(COMPANY_IDENTIFIERS, host.local_version.company_identifier))
-        print(color('  HCI Version:   ', 'green'), name_or_number(HCI_VERSION_NAMES, host.local_version.hci_version))
+        print(
+            color('  Manufacturer:  ', 'green'),
+            name_or_number(COMPANY_IDENTIFIERS, host.local_version.company_identifier),
+        )
+        print(
+            color('  HCI Version:   ', 'green'),
+            name_or_number(HCI_VERSION_NAMES, host.local_version.hci_version),
+        )
         print(color('  HCI Subversion:', 'green'), host.local_version.hci_subversion)
-        print(color('  LMP Version:   ', 'green'), name_or_number(LMP_VERSION_NAMES, host.local_version.lmp_version))
+        print(
+            color('  LMP Version:   ', 'green'),
+            name_or_number(LMP_VERSION_NAMES, host.local_version.lmp_version),
+        )
         print(color('  LMP Subversion:', 'green'), host.local_version.lmp_subversion)
 
         # Get the Classic info
@@ -135,7 +153,7 @@ async def async_main(transport):
 @click.command()
 @click.argument('transport')
 def main(transport):
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
     asyncio.run(async_main(transport))
 
 

@@ -2704,5 +2704,5 @@ COMPANY_IDENTIFIERS = {
     0x0A7C: "WAFERLOCK",
     0x0A7D: "Freedman Electronics Pty Ltd",
     0x0A7E: "Keba AG",
-    0x0A7F: "Intuity Medical"
+    0x0A7F: "Intuity Medical",
 }

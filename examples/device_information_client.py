@@ -28,7 +28,9 @@ from bumble.transport import open_transport
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) != 3:
-        print('Usage: device_information_client.py <transport-spec> <bluetooth-address>')
+        print(
+            'Usage: device_information_client.py <transport-spec> <bluetooth-address>'
+        )
         print('example: device_information_client.py usb:0 E1:CA:72:48:C4:E8')
         return
 
@@ -49,7 +51,9 @@ async def main():
         # Discover the Device Information service
         peer = Peer(connection)
         print('=== Discovering Device Information Service')
-        device_information_service = await peer.discover_service_and_create_proxy(DeviceInformationServiceProxy)
+        device_information_service = await peer.discover_service_and_create_proxy(
+            DeviceInformationServiceProxy
+        )
 
         # Check that the service was found
         if device_information_service is None:
@@ -58,23 +62,52 @@ async def main():
 
         # Read and print the fields
         if device_information_service.manufacturer_name is not None:
-            print(color('Manufacturer Name:       ', 'green'), await device_information_service.manufacturer_name.read_value())
+            print(
+                color('Manufacturer Name:       ', 'green'),
+                await device_information_service.manufacturer_name.read_value(),
+            )
         if device_information_service.model_number is not None:
-            print(color('Model Number:            ', 'green'), await device_information_service.model_number.read_value())
+            print(
+                color('Model Number:            ', 'green'),
+                await device_information_service.model_number.read_value(),
+            )
         if device_information_service.serial_number is not None:
-            print(color('Serial Number:           ', 'green'), await device_information_service.serial_number.read_value())
+            print(
+                color('Serial Number:           ', 'green'),
+                await device_information_service.serial_number.read_value(),
+            )
         if device_information_service.hardware_revision is not None:
-            print(color('Hardware Revision:       ', 'green'), await device_information_service.hardware_revision.read_value())
+            print(
+                color('Hardware Revision:       ', 'green'),
+                await device_information_service.hardware_revision.read_value(),
+            )
         if device_information_service.firmware_revision is not None:
-            print(color('Firmware Revision:       ', 'green'), await device_information_service.firmware_revision.read_value())
+            print(
+                color('Firmware Revision:       ', 'green'),
+                await device_information_service.firmware_revision.read_value(),
+            )
         if device_information_service.software_revision is not None:
-            print(color('Software Revision:       ', 'green'), await device_information_service.software_revision.read_value())
+            print(
+                color('Software Revision:       ', 'green'),
+                await device_information_service.software_revision.read_value(),
+            )
         if device_information_service.system_id is not None:
-            print(color('System ID:               ', 'green'), await device_information_service.system_id.read_value())
-        if device_information_service.ieee_regulatory_certification_data_list is not None:
-            print(color('Regulatory Certification:', 'green'), (await device_information_service.ieee_regulatory_certification_data_list.read_value()).hex())
+            print(
+                color('System ID:               ', 'green'),
+                await device_information_service.system_id.read_value(),
+            )
+        if (
+            device_information_service.ieee_regulatory_certification_data_list
+            is not None
+        ):
+            print(
+                color('Regulatory Certification:', 'green'),
+                (
+                    await device_information_service.ieee_regulatory_certification_data_list.read_value()
+                ).hex(),
+            )
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

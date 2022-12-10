@@ -65,9 +65,9 @@ class Connection:
     """
 
     def __init__(self, room, websocket):
-        self.room      = room
+        self.room = room
         self.websocket = websocket
-        self.address   = str(uuid.uuid4())
+        self.address = str(uuid.uuid4())
 
     async def send_message(self, message):
         try:
@@ -110,9 +110,9 @@ class Room:
     """
 
     def __init__(self, relay, name):
-        self.relay       = relay
-        self.name        = name
-        self.observers   = []
+        self.relay = relay
+        self.name = name
+        self.observers = []
         self.connections = []
 
     async def add_connection(self, connection):
@@ -145,7 +145,9 @@ class Room:
                 # This is an RPC request
                 await self.on_rpc_request(connection, message)
             else:
-                await connection.send_message(f'result:{error_to_json("error: invalid message")}')
+                await connection.send_message(
+                    f'result:{error_to_json("error: invalid message")}'
+                )
 
     async def broadcast_message(self, sender, message):
         '''
@@ -155,7 +157,9 @@ class Room:
 
     async def on_rpc_request(self, connection, message):
         command, *params = message.split(' ', 1)
-        if handler := getattr(self, f'on_{command[1:].lower().replace("-","_")}_command', None):
+        if handler := getattr(
+            self, f'on_{command[1:].lower().replace("-","_")}_command', None
+        ):
             try:
                 result = await handler(connection, params)
             except Exception as error:
@@ -192,7 +196,9 @@ class Room:
         current_address = connection.address
         new_address = params[0]
         connection.set_address(new_address)
-        await self.broadcast_message(connection, f'address-changed:from={current_address},to={new_address}')
+        await self.broadcast_message(
+            connection, f'address-changed:from={current_address},to={new_address}'
+        )
 
 
 # ----------------------------------------------------------------------------
@@ -246,24 +252,24 @@ def main():
         print('ERROR: Python 3.6.1 or higher is required')
         sys.exit(1)
 
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
 
     # Parse arguments
     arg_parser = argparse.ArgumentParser(description='Bumble Link Relay')
     arg_parser.add_argument('--log-level', default='INFO', help='logger level')
     arg_parser.add_argument('--log-config', help='logger config file (YAML)')
-    arg_parser.add_argument('--port',
-                            type = int,
-                            default = DEFAULT_RELAY_PORT,
-                            help = 'Port to listen on')
+    arg_parser.add_argument(
+        '--port', type=int, default=DEFAULT_RELAY_PORT, help='Port to listen on'
+    )
     args = arg_parser.parse_args()
 
     # Setup logger
     if args.log_config:
         from logging import config
+
         config.fileConfig(args.log_config)
     else:
-        logging.basicConfig(level = getattr(logging, args.log_level.upper()))
+        logging.basicConfig(level=getattr(logging, args.log_level.upper()))
 
     # Start a relay
     relay = Relay(args.port)

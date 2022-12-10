@@ -23,7 +23,7 @@ from .gatt import (
     Characteristic,
     GATT_GENERIC_ACCESS_SERVICE,
     GATT_DEVICE_NAME_CHARACTERISTIC,
-    GATT_APPEARANCE_CHARACTERISTIC
+    GATT_APPEARANCE_CHARACTERISTIC,
 )
 
 # -----------------------------------------------------------------------------
@@ -38,22 +38,22 @@ logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
 class GenericAccessService(Service):
-    def __init__(self, device_name, appearance = (0, 0)):
+    def __init__(self, device_name, appearance=(0, 0)):
         device_name_characteristic = Characteristic(
             GATT_DEVICE_NAME_CHARACTERISTIC,
             Characteristic.READ,
             Characteristic.READABLE,
-            device_name.encode('utf-8')[:248]
+            device_name.encode('utf-8')[:248],
         )
 
         appearance_characteristic = Characteristic(
             GATT_APPEARANCE_CHARACTERISTIC,
             Characteristic.READ,
             Characteristic.READABLE,
-            struct.pack('<H', (appearance[0] << 6) | appearance[1])
+            struct.pack('<H', (appearance[0] << 6) | appearance[1]),
         )
 
-        super().__init__(GATT_GENERIC_ACCESS_SERVICE, [
-            device_name_characteristic,
-            appearance_characteristic
-        ])
+        super().__init__(
+            GATT_GENERIC_ACCESS_SERVICE,
+            [device_name_characteristic, appearance_characteristic],
+        )

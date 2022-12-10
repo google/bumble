@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 # For each packet type, the info represents:
 # (length-size, length-offset, unpack-type)
 HCI_PACKET_INFO = {
-    hci.HCI_COMMAND_PACKET:          (1, 2, 'B'),
-    hci.HCI_ACL_DATA_PACKET:         (2, 2, 'H'),
+    hci.HCI_COMMAND_PACKET: (1, 2, 'B'),
+    hci.HCI_ACL_DATA_PACKET: (2, 2, 'H'),
     hci.HCI_SYNCHRONOUS_DATA_PACKET: (1, 2, 'B'),
-    hci.HCI_EVENT_PACKET:            (1, 1, 'B')
+    hci.HCI_EVENT_PACKET: (1, 1, 'B'),
 }
 
 
@@ -48,7 +48,7 @@ class PacketPump:
 
     def __init__(self, reader, sink):
         self.reader = reader
-        self.sink   = sink
+        self.sink = sink
 
     async def run(self):
         while True:
@@ -67,41 +67,46 @@ class PacketParser:
     '''
     In-line parser that accepts data and emits 'on_packet' when a full packet has been parsed
     '''
-    NEED_TYPE   = 0
-    NEED_LENGTH = 1
-    NEED_BODY   = 2
 
-    def __init__(self, sink = None):
+    NEED_TYPE = 0
+    NEED_LENGTH = 1
+    NEED_BODY = 2
+
+    def __init__(self, sink=None):
         self.sink = sink
         self.extended_packet_info = {}
         self.reset()
 
     def reset(self):
-        self.state        = PacketParser.NEED_TYPE
+        self.state = PacketParser.NEED_TYPE
         self.bytes_needed = 1
-        self.packet       = bytearray()
-        self.packet_info  = None
+        self.packet = bytearray()
+        self.packet_info = None
 
     def feed_data(self, data):
         data_offset = 0
         data_left = len(data)
         while data_left and self.bytes_needed:
             consumed = min(self.bytes_needed, data_left)
-            self.packet.extend(data[data_offset:data_offset + consumed])
-            data_offset       += consumed
-            data_left         -= consumed
+            self.packet.extend(data[data_offset : data_offset + consumed])
+            data_offset += consumed
+            data_left -= consumed
             self.bytes_needed -= consumed
 
             if self.bytes_needed == 0:
                 if self.state == PacketParser.NEED_TYPE:
                     packet_type = self.packet[0]
-                    self.packet_info  = HCI_PACKET_INFO.get(packet_type) or self.extended_packet_info.get(packet_type)
+                    self.packet_info = HCI_PACKET_INFO.get(
+                        packet_type
+                    ) or self.extended_packet_info.get(packet_type)
                     if self.packet_info is None:
                         raise ValueError(f'invalid packet type {packet_type}')
                     self.state = PacketParser.NEED_LENGTH
                     self.bytes_needed = self.packet_info[0] + self.packet_info[1]
                 elif self.state == PacketParser.NEED_LENGTH:
-                    body_length = struct.unpack_from(self.packet_info[2], self.packet, 1 + self.packet_info[1])[0]
+                    body_length = struct.unpack_from(
+                        self.packet_info[2], self.packet, 1 + self.packet_info[1]
+                    )[0]
                     self.bytes_needed = body_length
                     self.state = PacketParser.NEED_BODY
 
@@ -111,7 +116,9 @@ class PacketParser:
                         try:
                             self.sink.on_packet(bytes(self.packet))
                         except Exception as error:
-                            logger.warning(color(f'!!! Exception in on_packet: {error}', 'red'))
+                            logger.warning(
+                                color(f'!!! Exception in on_packet: {error}', 'red')
+                            )
                     self.reset()
 
     def set_packet_sink(self, sink):
@@ -187,6 +194,7 @@ class AsyncPipeSink:
     '''
     Sink that forwards packets asynchronously to another sink
     '''
+
     def __init__(self, sink):
         self.sink = sink
         self.loop = asyncio.get_running_loop()
@@ -202,7 +210,7 @@ class ParserSource:
     """
 
     def __init__(self):
-        self.parser     = PacketParser()
+        self.parser = PacketParser()
         self.terminated = asyncio.get_running_loop().create_future()
 
     def set_packet_sink(self, sink):
@@ -237,7 +245,7 @@ class StreamPacketSink:
 class Transport:
     def __init__(self, source, sink):
         self.source = source
-        self.sink   = sink
+        self.sink = sink
 
     async def __aenter__(self):
         return self
@@ -258,7 +266,7 @@ class PumpedPacketSource(ParserSource):
     def __init__(self, receive):
         super().__init__()
         self.receive_function = receive
-        self.pump_task        = None
+        self.pump_task = None
 
     def start(self):
         async def pump_packets():
@@ -285,8 +293,8 @@ class PumpedPacketSource(ParserSource):
 class PumpedPacketSink:
     def __init__(self, send):
         self.send_function = send
-        self.packet_queue  = asyncio.Queue()
-        self.pump_task     = None
+        self.packet_queue = asyncio.Queue()
+        self.pump_task = None
 
     def on_packet(self, packet):
         self.packet_queue.put_nowait(packet)

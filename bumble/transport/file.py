@@ -39,14 +39,12 @@ async def open_file_transport(spec):
 
     # Setup reading
     read_transport, packet_source = await asyncio.get_running_loop().connect_read_pipe(
-        lambda: StreamPacketSource(),
-        file
+        lambda: StreamPacketSource(), file
     )
 
     # Setup writing
     write_transport, _ = await asyncio.get_running_loop().connect_write_pipe(
-        lambda: asyncio.BaseProtocol(),
-        file
+        lambda: asyncio.BaseProtocol(), file
     )
     packet_sink = StreamPacketSink(write_transport)
 
@@ -57,4 +55,3 @@ async def open_file_transport(spec):
             file.close()
 
     return FileTransport(packet_source, packet_sink)
-
