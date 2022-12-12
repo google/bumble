@@ -30,7 +30,9 @@ from bumble.transport import open_transport_or_link
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 3:
-        print('Usage: run_advertiser.py <config-file> <transport-spec> [type] [address]')
+        print(
+            'Usage: run_advertiser.py <config-file> <transport-spec> [type] [address]'
+        )
         print('example: run_advertiser.py device1.json usb:0')
         return
 
@@ -56,6 +58,7 @@ async def main():
         await device.start_advertising(advertising_type=advertising_type, target=target)
         await hci_source.wait_for_termination()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

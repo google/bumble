@@ -54,7 +54,7 @@ async def unbond(keystore_file, device_config, address):
 @click.argument('device-config')
 @click.argument('address', required=False)
 def main(keystore_file, device_config, address):
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(unbond(keystore_file, device_config, address))
 
 

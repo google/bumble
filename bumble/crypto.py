@@ -24,19 +24,16 @@
 import logging
 import operator
 import platform
+
 if platform.system() != 'Emscripten':
     import secrets
-    from cryptography.hazmat.primitives.ciphers import (
-        Cipher,
-        algorithms,
-        modes
-    )
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     from cryptography.hazmat.primitives.asymmetric.ec import (
         generate_private_key,
         ECDH,
         EllipticCurvePublicNumbers,
         EllipticCurvePrivateNumbers,
-        SECP256R1
+        SECP256R1,
     )
     from cryptography.hazmat.primitives import cmac
 else:
@@ -66,16 +63,26 @@ class EccKey:
         d = int.from_bytes(d_bytes, byteorder='big', signed=False)
         x = int.from_bytes(x_bytes, byteorder='big', signed=False)
         y = int.from_bytes(y_bytes, byteorder='big', signed=False)
-        private_key = EllipticCurvePrivateNumbers(d, EllipticCurvePublicNumbers(x, y, SECP256R1())).private_key()
+        private_key = EllipticCurvePrivateNumbers(
+            d, EllipticCurvePublicNumbers(x, y, SECP256R1())
+        ).private_key()
         return cls(private_key)
 
     @property
     def x(self):
-        return self.private_key.public_key().public_numbers().x.to_bytes(32, byteorder='big')
+        return (
+            self.private_key.public_key()
+            .public_numbers()
+            .x.to_bytes(32, byteorder='big')
+        )
 
     @property
     def y(self):
-        return self.private_key.public_key().public_numbers().y.to_bytes(32, byteorder='big')
+        return (
+            self.private_key.public_key()
+            .public_numbers()
+            .y.to_bytes(32, byteorder='big')
+        )
 
     def dh(self, public_key_x, public_key_y):
         x = int.from_bytes(public_key_x, byteorder='big', signed=False)
@@ -92,7 +99,7 @@ class EccKey:
 
 # -----------------------------------------------------------------------------
 def xor(x, y):
-    assert(len(x) == len(y))
+    assert len(x) == len(y)
     return bytes(map(operator.xor, x, y))
 
 
@@ -165,7 +172,11 @@ def f4(u, v, x, z):
     '''
     See Bluetooth spec, Vol 3, Part H - 2.2.6 LE Secure Connections Confirm Value Generation Function f4
     '''
-    return bytes(reversed(aes_cmac(bytes(reversed(u)) + bytes(reversed(v)) + z, bytes(reversed(x)))))
+    return bytes(
+        reversed(
+            aes_cmac(bytes(reversed(u)) + bytes(reversed(v)) + z, bytes(reversed(x)))
+        )
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -177,28 +188,36 @@ def f5(w, n1, n2, a1, a2):
     '''
     salt = bytes.fromhex('6C888391AAF5A53860370BDB5A6083BE')
     t = aes_cmac(bytes(reversed(w)), salt)
-    key_id = bytes([0x62, 0x74, 0x6c, 0x65])
+    key_id = bytes([0x62, 0x74, 0x6C, 0x65])
     return (
-        bytes(reversed(aes_cmac(
-            bytes([0]) +
-            key_id +
-            bytes(reversed(n1)) +
-            bytes(reversed(n2)) +
-            bytes(reversed(a1)) +
-            bytes(reversed(a2)) +
-            bytes([1, 0]),
-            t
-        ))),
-        bytes(reversed(aes_cmac(
-            bytes([1]) +
-            key_id +
-            bytes(reversed(n1)) +
-            bytes(reversed(n2)) +
-            bytes(reversed(a1)) +
-            bytes(reversed(a2)) +
-            bytes([1, 0]),
-            t
-        )))
+        bytes(
+            reversed(
+                aes_cmac(
+                    bytes([0])
+                    + key_id
+                    + bytes(reversed(n1))
+                    + bytes(reversed(n2))
+                    + bytes(reversed(a1))
+                    + bytes(reversed(a2))
+                    + bytes([1, 0]),
+                    t,
+                )
+            )
+        ),
+        bytes(
+            reversed(
+                aes_cmac(
+                    bytes([1])
+                    + key_id
+                    + bytes(reversed(n1))
+                    + bytes(reversed(n2))
+                    + bytes(reversed(a1))
+                    + bytes(reversed(a2))
+                    + bytes([1, 0]),
+                    t,
+                )
+            )
+        ),
     )
 
 
@@ -207,15 +226,19 @@ def f6(w, n1, n2, r, io_cap, a1, a2):
     '''
     See Bluetooth spec, Vol 3, Part H - 2.2.8 LE Secure Connections Check Value Generation Function f6
     '''
-    return bytes(reversed(aes_cmac(
-        bytes(reversed(n1)) +
-        bytes(reversed(n2)) +
-        bytes(reversed(r)) +
-        bytes(reversed(io_cap)) +
-        bytes(reversed(a1)) +
-        bytes(reversed(a2)),
-        bytes(reversed(w))
-    )))
+    return bytes(
+        reversed(
+            aes_cmac(
+                bytes(reversed(n1))
+                + bytes(reversed(n2))
+                + bytes(reversed(r))
+                + bytes(reversed(io_cap))
+                + bytes(reversed(a1))
+                + bytes(reversed(a2)),
+                bytes(reversed(w)),
+            )
+        )
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -224,9 +247,13 @@ def g2(u, v, x, y):
     See Bluetooth spec, Vol 3, Part H - 2.2.9 LE Secure Connections Numeric Comparison Value Generation Function g2
     '''
     return int.from_bytes(
-        aes_cmac(bytes(reversed(u)) + bytes(reversed(v)) + bytes(reversed(y)), bytes(reversed(x)))[-4:],
-        byteorder='big'
+        aes_cmac(
+            bytes(reversed(u)) + bytes(reversed(v)) + bytes(reversed(y)),
+            bytes(reversed(x)),
+        )[-4:],
+        byteorder='big',
     )
+
 
 # -----------------------------------------------------------------------------
 def h6(w, key_id):
@@ -234,6 +261,7 @@ def h6(w, key_id):
     See Bluetooth spec, Vol 3, Part H - 2.2.10 Link key conversion function h6
     '''
     return aes_cmac(key_id, w)
+
 
 # -----------------------------------------------------------------------------
 def h7(salt, w):

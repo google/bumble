@@ -31,8 +31,8 @@ from bumble.hci import HCI_Constant, HCI_LE_1M_PHY, HCI_LE_CODED_PHY
 
 # -----------------------------------------------------------------------------
 def make_rssi_bar(rssi):
-    DISPLAY_MIN_RSSI       = -105
-    DISPLAY_MAX_RSSI       = -30
+    DISPLAY_MIN_RSSI = -105
+    DISPLAY_MAX_RSSI = -30
     DEFAULT_RSSI_BAR_WIDTH = 30
 
     blocks = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉']
@@ -63,7 +63,9 @@ class AdvertisementPrinter:
                 resolution_qualifier = f'(resolved from {advertisement.address})'
                 address = resolved
 
-        address_type_string = ('PUBLIC', 'RANDOM', 'PUBLIC_ID', 'RANDOM_ID')[address.address_type]
+        address_type_string = ('PUBLIC', 'RANDOM', 'PUBLIC_ID', 'RANDOM_ID')[
+            address.address_type
+        ]
         if address.is_public:
             type_color = 'cyan'
         else:
@@ -93,7 +95,8 @@ class AdvertisementPrinter:
             f'[{color(address_type_string, type_color)}]{address_qualifier}{resolution_qualifier}:{separator}'
             f'{phy_info}'
             f'RSSI:{advertisement.rssi:4} {rssi_bar}{separator}'
-            f'{advertisement.data.to_string(separator)}\n')
+            f'{advertisement.data.to_string(separator)}\n'
+        )
 
     def on_advertisement(self, advertisement):
         self.print_advertisement(advertisement)
@@ -114,16 +117,20 @@ async def scan(
     raw,
     keystore_file,
     device_config,
-    transport
+    transport,
 ):
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(transport) as (hci_source, hci_sink):
         print('<<< connected')
 
         if device_config:
-            device = Device.from_config_file_with_hci(device_config, hci_source, hci_sink)
+            device = Device.from_config_file_with_hci(
+                device_config, hci_source, hci_sink
+            )
         else:
-            device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
+            device = Device.with_hci(
+                'Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink
+            )
 
         if keystore_file:
             keystore = JsonKeyStore(namespace=None, filename=keystore_file)
@@ -153,7 +160,7 @@ async def scan(
             scan_interval=scan_interval,
             scan_window=scan_window,
             filter_duplicates=filter_duplicates,
-            scanning_phys=scanning_phys
+            scanning_phys=scanning_phys,
         )
 
         await hci_source.wait_for_termination()
@@ -165,15 +172,51 @@ async def scan(
 @click.option('--passive', is_flag=True, default=False, help='Perform passive scanning')
 @click.option('--scan-interval', type=int, default=60, help='Scan interval')
 @click.option('--scan-window', type=int, default=60, help='Scan window')
-@click.option('--phy', type=click.Choice(['1m', 'coded']), help='Only scan on the specified PHY')
-@click.option('--filter-duplicates', type=bool, default=True, help='Filter duplicates at the controller level')
-@click.option('--raw', is_flag=True, default=False, help='Listen for raw advertising reports instead of processed ones')
+@click.option(
+    '--phy', type=click.Choice(['1m', 'coded']), help='Only scan on the specified PHY'
+)
+@click.option(
+    '--filter-duplicates',
+    type=bool,
+    default=True,
+    help='Filter duplicates at the controller level',
+)
+@click.option(
+    '--raw',
+    is_flag=True,
+    default=False,
+    help='Listen for raw advertising reports instead of processed ones',
+)
 @click.option('--keystore-file', help='Keystore file to use when resolving addresses')
 @click.option('--device-config', help='Device config file for the scanning device')
 @click.argument('transport')
-def main(min_rssi, passive, scan_interval, scan_window, phy, filter_duplicates, raw, keystore_file, device_config, transport):
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
-    asyncio.run(scan(min_rssi, passive, scan_interval, scan_window, phy, filter_duplicates, raw, keystore_file, device_config, transport))
+def main(
+    min_rssi,
+    passive,
+    scan_interval,
+    scan_window,
+    phy,
+    filter_duplicates,
+    raw,
+    keystore_file,
+    device_config,
+    transport,
+):
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
+    asyncio.run(
+        scan(
+            min_rssi,
+            passive,
+            scan_interval,
+            scan_window,
+            phy,
+            filter_duplicates,
+            raw,
+            keystore_file,
+            device_config,
+            transport,
+        )
+    )
 
 
 # -----------------------------------------------------------------------------

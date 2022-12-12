@@ -29,20 +29,17 @@ from .l2cap import (
     L2CAP_SIGNALING_CID,
     L2CAP_LE_SIGNALING_CID,
     L2CAP_Control_Frame,
-    L2CAP_Connection_Response
+    L2CAP_Connection_Response,
 )
 from .hci import (
     HCI_EVENT_PACKET,
     HCI_ACL_DATA_PACKET,
     HCI_DISCONNECTION_COMPLETE_EVENT,
-    HCI_AclDataPacketAssembler
+    HCI_AclDataPacketAssembler,
 )
 from .rfcomm import RFCOMM_Frame, RFCOMM_PSM
 from .sdp import SDP_PDU, SDP_PSM
-from .avdtp import (
-    MessageAssembler as AVDTP_MessageAssembler,
-    AVDTP_PSM
-)
+from .avdtp import MessageAssembler as AVDTP_MessageAssembler, AVDTP_PSM
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -53,8 +50,8 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 PSM_NAMES = {
     RFCOMM_PSM: 'RFCOMM',
-    SDP_PSM:    'SDP',
-    AVDTP_PSM:  'AVDTP'
+    SDP_PSM: 'SDP',
+    AVDTP_PSM: 'AVDTP'
     # TODO: add more PSM values
 }
 
@@ -63,11 +60,11 @@ PSM_NAMES = {
 class PacketTracer:
     class AclStream:
         def __init__(self, analyzer):
-            self.analyzer         = analyzer
+            self.analyzer = analyzer
             self.packet_assembler = HCI_AclDataPacketAssembler(self.on_acl_pdu)
-            self.avdtp_assemblers = {}    # AVDTP assemblers, by source_cid
-            self.psms             = {}    # PSM, by source_cid
-            self.peer             = None  # ACL stream in the other direction
+            self.avdtp_assemblers = {}  # AVDTP assemblers, by source_cid
+            self.psms = {}  # PSM, by source_cid
+            self.peer = None  # ACL stream in the other direction
 
         def on_acl_pdu(self, pdu):
             l2cap_pdu = L2CAP_PDU.from_bytes(pdu)
@@ -78,7 +75,10 @@ class PacketTracer:
             elif l2cap_pdu.cid == SMP_CID:
                 smp_command = SMP_Command.from_bytes(l2cap_pdu.payload)
                 self.analyzer.emit(smp_command)
-            elif l2cap_pdu.cid == L2CAP_SIGNALING_CID or l2cap_pdu.cid == L2CAP_LE_SIGNALING_CID:
+            elif (
+                l2cap_pdu.cid == L2CAP_SIGNALING_CID
+                or l2cap_pdu.cid == L2CAP_LE_SIGNALING_CID
+            ):
                 control_frame = L2CAP_Control_Frame.from_bytes(l2cap_pdu.payload)
                 self.analyzer.emit(control_frame)
 
@@ -86,7 +86,10 @@ class PacketTracer:
                 if control_frame.code == L2CAP_CONNECTION_REQUEST:
                     self.psms[control_frame.source_cid] = control_frame.psm
                 elif control_frame.code == L2CAP_CONNECTION_RESPONSE:
-                    if control_frame.result == L2CAP_Connection_Response.CONNECTION_SUCCESSFUL:
+                    if (
+                        control_frame.result
+                        == L2CAP_Connection_Response.CONNECTION_SUCCESSFUL
+                    ):
                         if self.peer:
                             if psm := self.peer.psms.get(control_frame.source_cid):
                                 # Found a pending connection
@@ -94,8 +97,14 @@ class PacketTracer:
 
                                 # For AVDTP connections, create a packet assembler for each direction
                                 if psm == AVDTP_PSM:
-                                    self.avdtp_assemblers[control_frame.source_cid] = AVDTP_MessageAssembler(self.on_avdtp_message)
-                                    self.peer.avdtp_assemblers[control_frame.destination_cid] = AVDTP_MessageAssembler(self.peer.on_avdtp_message)
+                                    self.avdtp_assemblers[
+                                        control_frame.source_cid
+                                    ] = AVDTP_MessageAssembler(self.on_avdtp_message)
+                                    self.peer.avdtp_assemblers[
+                                        control_frame.destination_cid
+                                    ] = AVDTP_MessageAssembler(
+                                        self.peer.on_avdtp_message
+                                    )
 
             else:
                 # Try to find the PSM associated with this PDU
@@ -107,31 +116,39 @@ class PacketTracer:
                         rfcomm_frame = RFCOMM_Frame.from_bytes(l2cap_pdu.payload)
                         self.analyzer.emit(rfcomm_frame)
                     elif psm == AVDTP_PSM:
-                        self.analyzer.emit(f'{color("L2CAP", "green")} [CID={l2cap_pdu.cid}, PSM=AVDTP]: {l2cap_pdu.payload.hex()}')
+                        self.analyzer.emit(
+                            f'{color("L2CAP", "green")} [CID={l2cap_pdu.cid}, PSM=AVDTP]: {l2cap_pdu.payload.hex()}'
+                        )
                         assembler = self.avdtp_assemblers.get(l2cap_pdu.cid)
                         if assembler:
                             assembler.on_pdu(l2cap_pdu.payload)
                     else:
                         psm_string = name_or_number(PSM_NAMES, psm)
-                        self.analyzer.emit(f'{color("L2CAP", "green")} [CID={l2cap_pdu.cid}, PSM={psm_string}]: {l2cap_pdu.payload.hex()}')
+                        self.analyzer.emit(
+                            f'{color("L2CAP", "green")} [CID={l2cap_pdu.cid}, PSM={psm_string}]: {l2cap_pdu.payload.hex()}'
+                        )
                 else:
                     self.analyzer.emit(l2cap_pdu)
 
         def on_avdtp_message(self, transaction_label, message):
-            self.analyzer.emit(f'{color("AVDTP", "green")} [{transaction_label}] {message}')
+            self.analyzer.emit(
+                f'{color("AVDTP", "green")} [{transaction_label}] {message}'
+            )
 
         def feed_packet(self, packet):
             self.packet_assembler.feed_packet(packet)
 
     class Analyzer:
         def __init__(self, label, emit_message):
-            self.label        = label
+            self.label = label
             self.emit_message = emit_message
-            self.acl_streams  = {}    # ACL streams, by connection handle
-            self.peer         = None  # Analyzer in the other direction
+            self.acl_streams = {}  # ACL streams, by connection handle
+            self.peer = None  # Analyzer in the other direction
 
         def start_acl_stream(self, connection_handle):
-            logger.info(f'[{self.label}] +++ Creating ACL stream for connection 0x{connection_handle:04X}')
+            logger.info(
+                f'[{self.label}] +++ Creating ACL stream for connection 0x{connection_handle:04X}'
+            )
             stream = PacketTracer.AclStream(self)
             self.acl_streams[connection_handle] = stream
 
@@ -144,7 +161,9 @@ class PacketTracer:
 
         def end_acl_stream(self, connection_handle):
             if connection_handle in self.acl_streams:
-                logger.info(f'[{self.label}] --- Removing ACL stream for connection 0x{connection_handle:04X}')
+                logger.info(
+                    f'[{self.label}] --- Removing ACL stream for connection 0x{connection_handle:04X}'
+                )
                 del self.acl_streams[connection_handle]
 
                 # Let the other forwarder know so it can cleanup its stream as well
@@ -176,9 +195,13 @@ class PacketTracer:
         self,
         host_to_controller_label=color('HOST->CONTROLLER', 'blue'),
         controller_to_host_label=color('CONTROLLER->HOST', 'cyan'),
-        emit_message=logger.info
+        emit_message=logger.info,
     ):
-        self.host_to_controller_analyzer = PacketTracer.Analyzer(host_to_controller_label, emit_message)
-        self.controller_to_host_analyzer = PacketTracer.Analyzer(controller_to_host_label, emit_message)
+        self.host_to_controller_analyzer = PacketTracer.Analyzer(
+            host_to_controller_label, emit_message
+        )
+        self.controller_to_host_analyzer = PacketTracer.Analyzer(
+            controller_to_host_label, emit_message
+        )
         self.host_to_controller_analyzer.peer = self.controller_to_host_analyzer
         self.controller_to_host_analyzer.peer = self.host_to_controller_analyzer

@@ -37,7 +37,9 @@ class ScannerListener(Device.Listener):
         else:
             type_color = 'cyan'
 
-        print(f'>>> {color(advertisement.address, address_color)} [{color(address_type_string, type_color)}]: RSSI={advertisement.rssi}, {advertisement.data}')
+        print(
+            f'>>> {color(advertisement.address, address_color)} [{color(address_type_string, type_color)}]: RSSI={advertisement.rssi}, {advertisement.data}'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -55,20 +57,25 @@ async def main():
         link = LocalLink()
 
         # Create a first controller using the packet source/sink as its host interface
-        controller1 = Controller('C1', host_source = hci_source, host_sink = hci_sink, link = link)
+        controller1 = Controller(
+            'C1', host_source=hci_source, host_sink=hci_sink, link=link
+        )
         controller1.address = 'E0:E1:E2:E3:E4:E5'
 
         # Create a second controller using the same link
-        controller2 = Controller('C2', link = link)
+        controller2 = Controller('C2', link=link)
 
         # Create a device with a scanner listener
-        device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', controller2, controller2)
+        device = Device.with_hci(
+            'Bumble', 'F0:F1:F2:F3:F4:F5', controller2, controller2
+        )
         device.listener = ScannerListener()
         await device.power_on()
         await device.start_scanning()
 
         await hci_source.wait_for_termination()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

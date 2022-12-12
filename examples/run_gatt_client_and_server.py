@@ -32,7 +32,7 @@ from bumble.gatt import (
     show_services,
     GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR,
     GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
-    GATT_DEVICE_INFORMATION_SERVICE
+    GATT_DEVICE_INFORMATION_SERVICE,
 )
 
 
@@ -48,32 +48,36 @@ async def main():
     link = LocalLink()
 
     # Setup a stack for the client
-    client_controller = Controller("client controller", link = link)
+    client_controller = Controller("client controller", link=link)
     client_host = Host()
     client_host.controller = client_controller
-    client_device = Device("client", address = 'F0:F1:F2:F3:F4:F5', host = client_host)
+    client_device = Device("client", address='F0:F1:F2:F3:F4:F5', host=client_host)
     await client_device.power_on()
 
     # Setup a stack for the server
-    server_controller = Controller("server controller", link = link)
+    server_controller = Controller("server controller", link=link)
     server_host = Host()
     server_host.controller = server_controller
-    server_device = Device("server", address = 'F6:F7:F8:F9:FA:FB', host = server_host)
+    server_device = Device("server", address='F6:F7:F8:F9:FA:FB', host=server_host)
     server_device.listener = ServerListener()
     await server_device.power_on()
 
     # Add a few entries to the device's GATT server
-    descriptor = Descriptor(GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR, Descriptor.READABLE, 'My Description')
+    descriptor = Descriptor(
+        GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR,
+        Descriptor.READABLE,
+        'My Description',
+    )
     manufacturer_name_characteristic = Characteristic(
         GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
         Characteristic.READ,
         Characteristic.READABLE,
         "Fitbit",
-        [descriptor]
+        [descriptor],
     )
-    device_info_service = Service(GATT_DEVICE_INFORMATION_SERVICE, [
-        manufacturer_name_characteristic
-    ])
+    device_info_service = Service(
+        GATT_DEVICE_INFORMATION_SERVICE, [manufacturer_name_characteristic]
+    )
     server_device.add_service(device_info_service)
 
     # Connect the client to the server
@@ -109,6 +113,7 @@ async def main():
 
     await asyncio.get_running_loop().create_future()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

@@ -70,7 +70,9 @@ class Listener(Device.Listener):
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 3:
-        print('Usage: run_gatt_client.py <device-config> <transport-spec> [<bluetooth-address>]')
+        print(
+            'Usage: run_gatt_client.py <device-config> <transport-spec> [<bluetooth-address>]'
+        )
         print('example: run_gatt_client.py device1.json usb:0 E1:CA:72:48:C4:E8')
         return
 
@@ -93,6 +95,7 @@ async def main():
 
         await asyncio.get_running_loop().create_future()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

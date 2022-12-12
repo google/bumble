@@ -41,8 +41,8 @@ async def open_ws_server_transport(spec):
 
     class WsServerTransport(Transport):
         def __init__(self):
-            source          = ParserSource()
-            sink            = PumpedPacketSink(self.send_packet)
+            source = ParserSource()
+            sink = PumpedPacketSink(self.send_packet)
             self.connection = asyncio.get_running_loop().create_future()
 
             super().__init__(source, sink)
@@ -50,14 +50,16 @@ async def open_ws_server_transport(spec):
         async def serve(self, local_host, local_port):
             self.sink.start()
             self.server = await websockets.serve(
-                ws_handler = self.on_connection,
-                host       = local_host if local_host != '_' else None,
-                port       = int(local_port)
+                ws_handler=self.on_connection,
+                host=local_host if local_host != '_' else None,
+                port=int(local_port),
             )
             logger.debug(f'websocket server ready on port {local_port}')
 
         async def on_connection(self, connection):
-            logger.debug(f'new connection on {connection.local_address} from {connection.remote_address}')
+            logger.debug(
+                f'new connection on {connection.local_address} from {connection.remote_address}'
+            )
             self.connection.set_result(connection)
             try:
                 async for packet in connection:

@@ -30,7 +30,7 @@ from bumble.avdtp import (
     MediaCodecCapabilities,
     MediaPacketPump,
     Protocol,
-    Listener
+    Listener,
 )
 from bumble.a2dp import (
     SBC_JOINT_STEREO_CHANNEL_MODE,
@@ -38,7 +38,7 @@ from bumble.a2dp import (
     make_audio_source_service_sdp_records,
     A2DP_SBC_CODEC_TYPE,
     SbcMediaCodecInformation,
-    SbcPacketSource
+    SbcPacketSource,
 )
 
 
@@ -46,7 +46,9 @@ from bumble.a2dp import (
 def sdp_records():
     service_record_handle = 0x00010001
     return {
-        service_record_handle: make_audio_source_service_sdp_records(service_record_handle)
+        service_record_handle: make_audio_source_service_sdp_records(
+            service_record_handle
+        )
     }
 
 
@@ -54,23 +56,25 @@ def sdp_records():
 def codec_capabilities():
     # NOTE: this shouldn't be hardcoded, but should be inferred from the input file instead
     return MediaCodecCapabilities(
-        media_type                = AVDTP_AUDIO_MEDIA_TYPE,
-        media_codec_type          = A2DP_SBC_CODEC_TYPE,
-        media_codec_information   = SbcMediaCodecInformation.from_discrete_values(
-            sampling_frequency    = 44100,
-            channel_mode          = SBC_JOINT_STEREO_CHANNEL_MODE,
-            block_length          = 16,
-            subbands              = 8,
-            allocation_method     = SBC_LOUDNESS_ALLOCATION_METHOD,
-            minimum_bitpool_value = 2,
-            maximum_bitpool_value = 53
-        )
+        media_type=AVDTP_AUDIO_MEDIA_TYPE,
+        media_codec_type=A2DP_SBC_CODEC_TYPE,
+        media_codec_information=SbcMediaCodecInformation.from_discrete_values(
+            sampling_frequency=44100,
+            channel_mode=SBC_JOINT_STEREO_CHANNEL_MODE,
+            block_length=16,
+            subbands=8,
+            allocation_method=SBC_LOUDNESS_ALLOCATION_METHOD,
+            minimum_bitpool_value=2,
+            maximum_bitpool_value=53,
+        ),
     )
 
 
 # -----------------------------------------------------------------------------
 def on_avdtp_connection(read_function, protocol):
-    packet_source = SbcPacketSource(read_function, protocol.l2cap_channel.mtu, codec_capabilities())
+    packet_source = SbcPacketSource(
+        read_function, protocol.l2cap_channel.mtu, codec_capabilities()
+    )
     packet_pump = MediaPacketPump(packet_source.packets)
     protocol.add_source(packet_source.codec_capabilities, packet_pump)
 
@@ -83,14 +87,18 @@ async def stream_packets(read_function, protocol):
         print('@@@', endpoint)
 
     # Select a sink
-    sink = protocol.find_remote_sink_by_codec(AVDTP_AUDIO_MEDIA_TYPE, A2DP_SBC_CODEC_TYPE)
+    sink = protocol.find_remote_sink_by_codec(
+        AVDTP_AUDIO_MEDIA_TYPE, A2DP_SBC_CODEC_TYPE
+    )
     if sink is None:
         print(color('!!! no SBC sink found', 'red'))
         return
     print(f'### Selected sink: {sink.seid}')
 
     # Stream the packets
-    packet_source = SbcPacketSource(read_function, protocol.l2cap_channel.mtu, codec_capabilities())
+    packet_source = SbcPacketSource(
+        read_function, protocol.l2cap_channel.mtu, codec_capabilities()
+    )
     packet_pump = MediaPacketPump(packet_source.packets)
     source = protocol.add_source(packet_source.codec_capabilities, packet_pump)
     stream = await protocol.create_stream(source, sink)
@@ -107,8 +115,12 @@ async def stream_packets(read_function, protocol):
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 4:
-        print('Usage: run_a2dp_source.py <device-config> <transport-spec> <sbc-file> [<bluetooth-address>]')
-        print('example: run_a2dp_source.py classic1.json usb:0 test.sbc E1:CA:72:48:C4:E8')
+        print(
+            'Usage: run_a2dp_source.py <device-config> <transport-spec> <sbc-file> [<bluetooth-address>]'
+        )
+        print(
+            'example: run_a2dp_source.py classic1.json usb:0 test.sbc E1:CA:72:48:C4:E8'
+        )
         return
 
     print('<<< connecting to HCI...')
@@ -134,7 +146,9 @@ async def main():
                 # Connect to a peer
                 target_address = sys.argv[4]
                 print(f'=== Connecting to {target_address}...')
-                connection = await device.connect(target_address, transport=BT_BR_EDR_TRANSPORT)
+                connection = await device.connect(
+                    target_address, transport=BT_BR_EDR_TRANSPORT
+                )
                 print(f'=== Connected to {connection.peer_address}!')
 
                 # Request authentication
@@ -148,7 +162,9 @@ async def main():
                 print('*** Encryption on')
 
                 # Look for an A2DP service
-                avdtp_version = await find_avdtp_service_with_connection(device, connection)
+                avdtp_version = await find_avdtp_service_with_connection(
+                    device, connection
+                )
                 if not avdtp_version:
                     print(color('!!! no A2DP service found'))
                     return
@@ -161,7 +177,9 @@ async def main():
             else:
                 # Create a listener to wait for AVDTP connections
                 listener = Listener(Listener.create_registrar(device), version=(1, 2))
-                listener.on('connection', lambda protocol: on_avdtp_connection(read, protocol))
+                listener.on(
+                    'connection', lambda protocol: on_avdtp_connection(read, protocol)
+                )
 
                 # Become connectable and wait for a connection
                 await device.set_discoverable(True)
@@ -171,5 +189,5 @@ async def main():
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

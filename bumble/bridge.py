@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 class HCI_Bridge:
     class Forwarder:
         def __init__(self, hci_sink, sender_hci_sink, packet_filter, trace):
-            self.hci_sink        = hci_sink
+            self.hci_sink = hci_sink
             self.sender_hci_sink = sender_hci_sink
-            self.packet_filter   = packet_filter
-            self.trace           = trace
+            self.packet_filter = packet_filter
+            self.trace = trace
 
         def on_packet(self, packet):
             # Convert the packet bytes to an object
@@ -61,15 +61,15 @@ class HCI_Bridge:
         hci_host_sink,
         hci_controller_source,
         hci_controller_sink,
-        host_to_controller_filter = None,
-        controller_to_host_filter = None
+        host_to_controller_filter=None,
+        controller_to_host_filter=None,
     ):
         tracer = PacketTracer(emit_message=logger.info)
         host_to_controller_forwarder = HCI_Bridge.Forwarder(
             hci_controller_sink,
             hci_host_sink,
             host_to_controller_filter,
-            lambda packet: tracer.trace(packet, 0)
+            lambda packet: tracer.trace(packet, 0),
         )
         hci_host_source.set_packet_sink(host_to_controller_forwarder)
 
@@ -77,6 +77,6 @@ class HCI_Bridge:
             hci_host_sink,
             hci_controller_sink,
             controller_to_host_filter,
-            lambda packet: tracer.trace(packet, 1)
+            lambda packet: tracer.trace(packet, 1),
         )
         hci_controller_source.set_packet_sink(controller_to_host_forwarder)

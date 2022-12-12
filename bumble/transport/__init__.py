@@ -38,42 +38,55 @@ async def open_transport(name):
     scheme, *spec = name.split(':', 1)
     if scheme == 'serial' and spec:
         from .serial import open_serial_transport
+
         return await open_serial_transport(spec[0])
     elif scheme == 'udp' and spec:
         from .udp import open_udp_transport
+
         return await open_udp_transport(spec[0])
     elif scheme == 'tcp-client' and spec:
         from .tcp_client import open_tcp_client_transport
+
         return await open_tcp_client_transport(spec[0])
     elif scheme == 'tcp-server' and spec:
         from .tcp_server import open_tcp_server_transport
+
         return await open_tcp_server_transport(spec[0])
     elif scheme == 'ws-client' and spec:
         from .ws_client import open_ws_client_transport
+
         return await open_ws_client_transport(spec[0])
     elif scheme == 'ws-server' and spec:
         from .ws_server import open_ws_server_transport
+
         return await open_ws_server_transport(spec[0])
     elif scheme == 'pty':
         from .pty import open_pty_transport
+
         return await open_pty_transport(spec[0] if spec else None)
     elif scheme == 'file':
         from .file import open_file_transport
+
         return await open_file_transport(spec[0] if spec else None)
     elif scheme == 'vhci':
         from .vhci import open_vhci_transport
+
         return await open_vhci_transport(spec[0] if spec else None)
     elif scheme == 'hci-socket':
         from .hci_socket import open_hci_socket_transport
+
         return await open_hci_socket_transport(spec[0] if spec else None)
     elif scheme == 'usb':
         from .usb import open_usb_transport
+
         return await open_usb_transport(spec[0] if spec else None)
     elif scheme == 'pyusb':
         from .pyusb import open_pyusb_transport
+
         return await open_pyusb_transport(spec[0] if spec else None)
     elif scheme == 'android-emulator':
         from .android_emulator import open_android_emulator_transport
+
         return await open_android_emulator_transport(spec[0] if spec else None)
     else:
         raise ValueError('unknown transport scheme')
@@ -84,7 +97,7 @@ async def open_transport_or_link(name):
     if name.startswith('link-relay:'):
         link = RemoteLink(name[11:])
         await link.wait_until_connected()
-        controller = Controller('remote', link = link)
+        controller = Controller('remote', link=link)
 
         class LinkTransport(Transport):
             async def close(self):

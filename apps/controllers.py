@@ -28,7 +28,9 @@ from bumble.transport import open_transport_or_link
 # -----------------------------------------------------------------------------
 async def async_main():
     if len(sys.argv) != 3:
-        print('Usage: controllers.py <hci-transport-1> <hci-transport-2> [<hci-transport-3> ...]')
+        print(
+            'Usage: controllers.py <hci-transport-1> <hci-transport-2> [<hci-transport-3> ...]'
+        )
         print('example: python controllers.py pty:ble1 pty:ble2')
         return
 
@@ -41,7 +43,12 @@ async def async_main():
     for index, transport_name in enumerate(sys.argv[1:]):
         transport = await open_transport_or_link(transport_name)
         transports.append(transport)
-        controller = Controller(f'C{index}', host_source = transport.source, host_sink = transport.sink, link = link)
+        controller = Controller(
+            f'C{index}',
+            host_source=transport.source,
+            host_sink=transport.sink,
+            link=link,
+        )
         controllers.append(controller)
 
     # Wait until the user interrupts
@@ -54,7 +61,7 @@ async def async_main():
 
 # -----------------------------------------------------------------------------
 def main():
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(async_main())
 
 

@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Utils
 # -----------------------------------------------------------------------------
 def hci_command_op_code(ogf, ocf):
-    return (ogf << 10 | ocf)
+    return ogf << 10 | ocf
 
 
 def key_with_value(dictionary, target_value):
@@ -58,7 +58,11 @@ def map_null_terminated_utf8_string(utf8_bytes):
 
 
 def map_class_of_device(class_of_device):
-    service_classes, major_device_class, minor_device_class = DeviceClass.split_class_of_device(class_of_device)
+    (
+        service_classes,
+        major_device_class,
+        minor_device_class,
+    ) = DeviceClass.split_class_of_device(class_of_device)
     return f'[{class_of_device:06X}] Services({",".join(DeviceClass.service_class_labels(service_classes))}),Class({DeviceClass.major_device_class_name(major_device_class)}|{DeviceClass.minor_device_class_name(major_device_class, minor_device_class)})'
 
 
@@ -70,13 +74,14 @@ def phy_list_to_bits(phys):
         for phy in phys:
             if phy not in HCI_LE_PHY_TYPE_TO_BIT:
                 raise ValueError('invalid PHY')
-            phy_bits |= (1 << HCI_LE_PHY_TYPE_TO_BIT[phy])
+            phy_bits |= 1 << HCI_LE_PHY_TYPE_TO_BIT[phy]
         return phy_bits
 
 
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
+# fmt: off
 
 # HCI Version
 HCI_VERSION_BLUETOOTH_CORE_1_0B    = 0
@@ -1349,6 +1354,8 @@ HCI_LE_SUPPORTED_FEATURES_NAMES = {
     if feature_name.startswith('HCI_') and feature_name.endswith('_LE_SUPPORTED_FEATURE')
 }
 
+# fmt: on
+
 # -----------------------------------------------------------------------------
 STATUS_SPEC = {'size': 1, 'mapper': lambda x: HCI_Constant.status_name(x)}
 
@@ -1382,8 +1389,7 @@ class HCI_Constant:
     @staticmethod
     def authentication_requirements_name(authentication_requirements):
         return HCI_AUTHENTICATION_REQUIREMENTS_NAMES.get(
-            authentication_requirements,
-            f'0x{authentication_requirements:02X}'
+            authentication_requirements, f'0x{authentication_requirements:02X}'
         )
 
     @staticmethod
@@ -1403,7 +1409,7 @@ class HCI_StatusError(ProtocolError):
         super().__init__(
             response.status,
             error_namespace=HCI_Command.command_name(response.command_opcode),
-            error_name=HCI_Constant.status_name(response.status)
+            error_name=HCI_Constant.status_name(response.status),
         )
 
 
@@ -1463,7 +1469,7 @@ class HCI_Object:
                 offset += 1
             elif field_type == 3:
                 # 24-bit unsigned
-                padded = data[offset:offset + 3] + bytes([0])
+                padded = data[offset : offset + 3] + bytes([0])
                 field_value = struct.unpack('<I', padded)[0]
                 offset += 3
             elif field_type == 4:
@@ -1476,7 +1482,7 @@ class HCI_Object:
                 offset += 4
             elif type(field_type) is int and field_type > 4 and field_type <= 256:
                 # Byte array (from 5 up to 256 bytes)
-                field_value = data[offset:offset + field_type]
+                field_value = data[offset : offset + field_type]
                 offset += field_type
             elif callable(field_type):
                 offset, field_value = field_type(data, offset)
@@ -1535,7 +1541,11 @@ class HCI_Object:
                         raise ValueError('value too large for *-typed field')
                 else:
                     field_bytes = bytes(field_value)
-            elif type(field_value) is bytes or type(field_value) is bytearray or hasattr(field_value, 'to_bytes'):
+            elif (
+                type(field_value) is bytes
+                or type(field_value) is bytearray
+                or hasattr(field_value, 'to_bytes')
+            ):
                 field_bytes = bytes(field_value)
                 if type(field_type) is int and field_type > 4 and field_type <= 256:
                     # Truncate or Pad with zeros if the field is too long or too short
@@ -1544,7 +1554,9 @@ class HCI_Object:
                     elif len(field_bytes) > field_type:
                         field_bytes = field_bytes[:field_type]
             else:
-                raise ValueError(f"don't know how to serialize type {type(field_value)}")
+                raise ValueError(
+                    f"don't know how to serialize type {type(field_value)}"
+                )
 
             result += field_bytes
 
@@ -1560,12 +1572,14 @@ class HCI_Object:
     @staticmethod
     def parse_length_prefixed_bytes(data, offset):
         length = data[offset]
-        return offset + 1 + length, data[offset + 1:offset + 1 + length]
+        return offset + 1 + length, data[offset + 1 : offset + 1 + length]
 
     @staticmethod
     def serialize_length_prefixed_bytes(data, padded_size=0):
         prefixed_size = 1 + len(data)
-        padding = bytes(padded_size - prefixed_size) if prefixed_size < padded_size else b''
+        padding = (
+            bytes(padded_size - prefixed_size) if prefixed_size < padded_size else b''
+        )
         return bytes([len(data)]) + data + padding
 
     @staticmethod
@@ -1583,7 +1597,9 @@ class HCI_Object:
             return ''
 
         # Measure the widest field name
-        max_field_name_length = max([len(key[0] if type(key) is tuple else key) for key in keys])
+        max_field_name_length = max(
+            [len(key[0] if type(key) is tuple else key) for key in keys]
+        )
 
         # Build array of formatted key:value pairs
         fields = []
@@ -1606,7 +1622,9 @@ class HCI_Object:
                 value = value_mapper(value)
 
             # Get the string representation of the value
-            value_str = HCI_Object.format_field_value(value, indentation = indentation + '  ')
+            value_str = HCI_Object.format_field_value(
+                value, indentation=indentation + '  '
+            )
 
             # Add the field to the formatted result
             key_str = color(f'{key + ":":{1 + max_field_name_length}}', 'cyan')
@@ -1622,7 +1640,9 @@ class HCI_Object:
         self.init_from_fields(self, fields, kwargs)
 
     def to_string(self, indentation='', value_mappers={}):
-        return HCI_Object.format_fields(self.__dict__, self.fields, indentation, value_mappers)
+        return HCI_Object.format_fields(
+            self.__dict__, self.fields, indentation, value_mappers
+        )
 
     def __str__(self):
         return self.to_string()
@@ -1638,16 +1658,16 @@ class Address:
     address[0] is the LSB of the address, address[5] is the MSB.
     '''
 
-    PUBLIC_DEVICE_ADDRESS   = 0x00
-    RANDOM_DEVICE_ADDRESS   = 0x01
+    PUBLIC_DEVICE_ADDRESS = 0x00
+    RANDOM_DEVICE_ADDRESS = 0x01
     PUBLIC_IDENTITY_ADDRESS = 0x02
     RANDOM_IDENTITY_ADDRESS = 0x03
 
     ADDRESS_TYPE_NAMES = {
-        PUBLIC_DEVICE_ADDRESS:   'PUBLIC_DEVICE_ADDRESS',
-        RANDOM_DEVICE_ADDRESS:   'RANDOM_DEVICE_ADDRESS',
+        PUBLIC_DEVICE_ADDRESS: 'PUBLIC_DEVICE_ADDRESS',
+        RANDOM_DEVICE_ADDRESS: 'RANDOM_DEVICE_ADDRESS',
         PUBLIC_IDENTITY_ADDRESS: 'PUBLIC_IDENTITY_ADDRESS',
-        RANDOM_IDENTITY_ADDRESS: 'RANDOM_IDENTITY_ADDRESS'
+        RANDOM_IDENTITY_ADDRESS: 'RANDOM_IDENTITY_ADDRESS',
     }
 
     ADDRESS_TYPE_SPEC = {'size': 1, 'mapper': lambda x: Address.address_type_name(x)}
@@ -1667,18 +1687,20 @@ class Address:
     @staticmethod
     def parse_address(data, offset):
         # Fix the type to a default value. This is used for parsing type-less Classic addresses
-        return Address.parse_address_with_type(data, offset, Address.PUBLIC_DEVICE_ADDRESS)
+        return Address.parse_address_with_type(
+            data, offset, Address.PUBLIC_DEVICE_ADDRESS
+        )
 
     @staticmethod
     def parse_address_with_type(data, offset, address_type):
-        return offset + 6, Address(data[offset:offset + 6], address_type)
+        return offset + 6, Address(data[offset : offset + 6], address_type)
 
     @staticmethod
     def parse_address_preceded_by_type(data, offset):
         address_type = data[offset - 1]
         return Address.parse_address_with_type(data, offset, address_type)
 
-    def __init__(self, address, address_type = RANDOM_DEVICE_ADDRESS):
+    def __init__(self, address, address_type=RANDOM_DEVICE_ADDRESS):
         '''
         Initialize an instance. `address` may be a byte array in little-endian
         format, or a hex string in big-endian format (with optional ':'
@@ -1709,7 +1731,10 @@ class Address:
 
     @property
     def is_public(self):
-        return self.address_type == self.PUBLIC_DEVICE_ADDRESS or self.address_type == self.PUBLIC_IDENTITY_ADDRESS
+        return (
+            self.address_type == self.PUBLIC_DEVICE_ADDRESS
+            or self.address_type == self.PUBLIC_IDENTITY_ADDRESS
+        )
 
     @property
     def is_random(self):
@@ -1717,11 +1742,16 @@ class Address:
 
     @property
     def is_resolved(self):
-        return self.address_type == self.PUBLIC_IDENTITY_ADDRESS or self.address_type == self.RANDOM_IDENTITY_ADDRESS
+        return (
+            self.address_type == self.PUBLIC_IDENTITY_ADDRESS
+            or self.address_type == self.RANDOM_IDENTITY_ADDRESS
+        )
 
     @property
     def is_resolvable(self):
-        return self.address_type == self.RANDOM_DEVICE_ADDRESS and (self.address_bytes[5] >> 6 == 1)
+        return self.address_type == self.RANDOM_DEVICE_ADDRESS and (
+            self.address_bytes[5] >> 6 == 1
+        )
 
     @property
     def is_static(self):
@@ -1737,7 +1767,10 @@ class Address:
         return hash(self.address_bytes)
 
     def __eq__(self, other):
-        return self.address_bytes == other.address_bytes and self.is_public == other.is_public
+        return (
+            self.address_bytes == other.address_bytes
+            and self.is_public == other.is_public
+        )
 
     def __str__(self):
         '''
@@ -1761,10 +1794,10 @@ class OwnAddressType:
     RESOLVABLE_OR_RANDOM = 3
 
     TYPE_NAMES = {
-        PUBLIC:               'PUBLIC',
-        RANDOM:               'RANDOM',
+        PUBLIC: 'PUBLIC',
+        RANDOM: 'RANDOM',
         RESOLVABLE_OR_PUBLIC: 'RESOLVABLE_OR_PUBLIC',
-        RESOLVABLE_OR_RANDOM: 'RESOLVABLE_OR_RANDOM'
+        RESOLVABLE_OR_RANDOM: 'RESOLVABLE_OR_RANDOM',
     }
 
     @staticmethod
@@ -1772,6 +1805,7 @@ class OwnAddressType:
         return name_or_number(OwnAddressType.TYPE_NAMES, type)
 
     TYPE_SPEC = {'size': 1, 'mapper': lambda x: OwnAddressType.type_name(x)}
+
 
 # -----------------------------------------------------------------------------
 class HCI_Packet:
@@ -1803,7 +1837,7 @@ class HCI_CustomPacket(HCI_Packet):
     def __init__(self, payload):
         super().__init__('HCI_CUSTOM_PACKET')
         self.hci_packet_type = payload[0]
-        self.payload         = payload
+        self.payload = payload
 
 
 # -----------------------------------------------------------------------------
@@ -1811,6 +1845,7 @@ class HCI_Command(HCI_Packet):
     '''
     See Bluetooth spec @ Vol 2, Part E - 5.4.1 HCI Command Packet
     '''
+
     hci_packet_type = HCI_COMMAND_PACKET
     command_classes = {}
 
@@ -1830,8 +1865,10 @@ class HCI_Command(HCI_Packet):
 
             # Patch the __init__ method to fix the op_code
             if fields is not None:
+
                 def init(self, parameters=None, **kwargs):
                     return HCI_Command.__init__(self, cls.op_code, parameters, **kwargs)
+
                 cls.__init__ = init
 
             # Register a factory for this class
@@ -1880,12 +1917,15 @@ class HCI_Command(HCI_Packet):
             HCI_Object.init_from_fields(self, fields, kwargs)
             if parameters is None:
                 parameters = HCI_Object.dict_to_bytes(kwargs, fields)
-        self.op_code    = op_code
+        self.op_code = op_code
         self.parameters = parameters
 
     def to_bytes(self):
         parameters = b'' if self.parameters is None else self.parameters
-        return struct.pack('<BHB', HCI_COMMAND_PACKET, self.op_code, len(parameters)) + parameters
+        return (
+            struct.pack('<BHB', HCI_COMMAND_PACKET, self.op_code, len(parameters))
+            + parameters
+        )
 
     def __bytes__(self):
         return self.to_bytes()
@@ -1901,11 +1941,13 @@ class HCI_Command(HCI_Packet):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('lap',            {'size': 3, 'mapper': HCI_Constant.inquiry_lap_name}),
-    ('inquiry_length', 1),
-    ('num_responses',  1)
-])
+@HCI_Command.command(
+    [
+        ('lap', {'size': 3, 'mapper': HCI_Constant.inquiry_lap_name}),
+        ('inquiry_length', 1),
+        ('num_responses', 1),
+    ]
+)
 class HCI_Inquiry_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.1 Inquiry Command
@@ -1921,14 +1963,16 @@ class HCI_Inquiry_Cancel_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('bd_addr',                   Address.parse_address),
-    ('packet_type',               2),
-    ('page_scan_repetition_mode', 1),
-    ('reserved',                  1),
-    ('clock_offset',              2),
-    ('allow_role_switch',         1)
-])
+@HCI_Command.command(
+    [
+        ('bd_addr', Address.parse_address),
+        ('packet_type', 2),
+        ('page_scan_repetition_mode', 1),
+        ('reserved', 1),
+        ('clock_offset', 2),
+        ('allow_role_switch', 1),
+    ]
+)
 class HCI_Create_Connection_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.5 Create Connection Command
@@ -1936,10 +1980,12 @@ class HCI_Create_Connection_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2),
-    ('reason',            {'size': 1, 'mapper': HCI_Constant.error_name})
-])
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('reason', {'size': 1, 'mapper': HCI_Constant.error_name}),
+    ]
+)
 class HCI_Disconnect_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.6 Disconnect Command
@@ -1948,13 +1994,11 @@ class HCI_Disconnect_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('bd_addr', Address.parse_address)
-    ],
+    fields=[('bd_addr', Address.parse_address)],
     return_parameters_fields=[
-        ('status',  STATUS_SPEC),
-        ('bd_addr', Address.parse_address)
-    ]
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
 )
 class HCI_Create_Connection_Cancel_Command(HCI_Command):
     '''
@@ -1963,10 +2007,7 @@ class HCI_Create_Connection_Cancel_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('bd_addr', Address.parse_address),
-    ('role',    1)
-])
+@HCI_Command.command([('bd_addr', Address.parse_address), ('role', 1)])
 class HCI_Accept_Connection_Request_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.8 Accept Connection Request Command
@@ -1974,10 +2015,12 @@ class HCI_Accept_Connection_Request_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('bd_addr', Address.parse_address),
-    ('reason',  {'size': 1, 'mapper': HCI_Constant.error_name})
-])
+@HCI_Command.command(
+    [
+        ('bd_addr', Address.parse_address),
+        ('reason', {'size': 1, 'mapper': HCI_Constant.error_name}),
+    ]
+)
 class HCI_Reject_Connection_Request_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.9 Reject Connection Request Command
@@ -1985,10 +2028,7 @@ class HCI_Reject_Connection_Request_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('bd_addr',  Address.parse_address),
-    ('link_key', 16)
-])
+@HCI_Command.command([('bd_addr', Address.parse_address), ('link_key', 16)])
 class HCI_Link_Key_Request_Reply_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.10 Link Key Request Reply Command
@@ -1997,13 +2037,11 @@ class HCI_Link_Key_Request_Reply_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('bd_addr', Address.parse_address)
-    ],
+    fields=[('bd_addr', Address.parse_address)],
     return_parameters_fields=[
-        ('status',  STATUS_SPEC),
-        ('bd_addr', Address.parse_address)
-    ]
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
 )
 class HCI_Link_Key_Request_Negative_Reply_Command(HCI_Command):
     '''
@@ -2013,13 +2051,11 @@ class HCI_Link_Key_Request_Negative_Reply_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('bd_addr', Address.parse_address)
-    ],
+    fields=[('bd_addr', Address.parse_address)],
     return_parameters_fields=[
-        ('status',  STATUS_SPEC),
-        ('bd_addr', Address.parse_address)
-    ]
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
 )
 class HCI_PIN_Code_Request_Negative_Reply_Command(HCI_Command):
     '''
@@ -2028,10 +2064,7 @@ class HCI_PIN_Code_Request_Negative_Reply_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2),
-    ('packet_type',       2)
-])
+@HCI_Command.command([('connection_handle', 2), ('packet_type', 2)])
 class HCI_Change_Connection_Packet_Type_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.14 Change Connection Packet Type Command
@@ -2039,9 +2072,7 @@ class HCI_Change_Connection_Packet_Type_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2)
-])
+@HCI_Command.command([('connection_handle', 2)])
 class HCI_Authentication_Requested_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.15 Authentication Requested Command
@@ -2049,10 +2080,7 @@ class HCI_Authentication_Requested_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2),
-    ('encryption_enable', 1)
-])
+@HCI_Command.command([('connection_handle', 2), ('encryption_enable', 1)])
 class HCI_Set_Connection_Encryption_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.16 Set Connection Encryption Command
@@ -2060,25 +2088,26 @@ class HCI_Set_Connection_Encryption_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('bd_addr',                   Address.parse_address),
-    ('page_scan_repetition_mode', 1),
-    ('reserved',                  1),
-    ('clock_offset',              2)
-])
+@HCI_Command.command(
+    [
+        ('bd_addr', Address.parse_address),
+        ('page_scan_repetition_mode', 1),
+        ('reserved', 1),
+        ('clock_offset', 2),
+    ]
+)
 class HCI_Remote_Name_Request_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.19 Remote Name Request Command
     '''
+
     R0 = 0x00
     R1 = 0x01
     R2 = 0x02
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2)
-])
+@HCI_Command.command([('connection_handle', 2)])
 class HCI_Read_Remote_Supported_Features_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.21 Read Remote Supported Features Command
@@ -2086,10 +2115,7 @@ class HCI_Read_Remote_Supported_Features_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2),
-    ('page_number',       1)
-])
+@HCI_Command.command([('connection_handle', 2), ('page_number', 1)])
 class HCI_Read_Remote_Extended_Features_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.22 Read Remote Extended Features Command
@@ -2097,9 +2123,7 @@ class HCI_Read_Remote_Extended_Features_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2)
-])
+@HCI_Command.command([('connection_handle', 2)])
 class HCI_Read_Remote_Version_Information_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.23 Read Remote Version Information Command
@@ -2107,9 +2131,7 @@ class HCI_Read_Remote_Version_Information_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2)
-])
+@HCI_Command.command([('connection_handle', 2)])
 class HCI_Read_Clock_Offset_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.23 Read Clock Offset Command
@@ -2119,15 +2141,18 @@ class HCI_Read_Clock_Offset_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
     fields=[
-        ('bd_addr',                     Address.parse_address),
-        ('io_capability',               {'size': 1, 'mapper': HCI_Constant.io_capability_name}),
-        ('oob_data_present',            1),
-        ('authentication_requirements', {'size': 1, 'mapper': HCI_Constant.authentication_requirements_name})
+        ('bd_addr', Address.parse_address),
+        ('io_capability', {'size': 1, 'mapper': HCI_Constant.io_capability_name}),
+        ('oob_data_present', 1),
+        (
+            'authentication_requirements',
+            {'size': 1, 'mapper': HCI_Constant.authentication_requirements_name},
+        ),
     ],
     return_parameters_fields=[
-        ('status',  STATUS_SPEC),
-        ('bd_addr', Address.parse_address)
-    ]
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
 )
 class HCI_IO_Capability_Request_Reply_Command(HCI_Command):
     '''
@@ -2137,13 +2162,11 @@ class HCI_IO_Capability_Request_Reply_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('bd_addr', Address.parse_address)
-    ],
+    fields=[('bd_addr', Address.parse_address)],
     return_parameters_fields=[
-        ('status',  STATUS_SPEC),
-        ('bd_addr', Address.parse_address)
-    ]
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
 )
 class HCI_User_Confirmation_Request_Reply_Command(HCI_Command):
     '''
@@ -2153,13 +2176,11 @@ class HCI_User_Confirmation_Request_Reply_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('bd_addr', Address.parse_address)
-    ],
+    fields=[('bd_addr', Address.parse_address)],
     return_parameters_fields=[
-        ('status',  STATUS_SPEC),
-        ('bd_addr', Address.parse_address)
-    ]
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
 )
 class HCI_User_Confirmation_Request_Negative_Reply_Command(HCI_Command):
     '''
@@ -2169,14 +2190,11 @@ class HCI_User_Confirmation_Request_Negative_Reply_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('bd_addr', Address.parse_address),
-        ('numeric_value', 4)
-    ],
+    fields=[('bd_addr', Address.parse_address), ('numeric_value', 4)],
     return_parameters_fields=[
-        ('status',  STATUS_SPEC),
-        ('bd_addr', Address.parse_address)
-    ]
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
 )
 class HCI_User_Passkey_Request_Reply_Command(HCI_Command):
     '''
@@ -2186,13 +2204,11 @@ class HCI_User_Passkey_Request_Reply_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('bd_addr', Address.parse_address)
-    ],
+    fields=[('bd_addr', Address.parse_address)],
     return_parameters_fields=[
-        ('status',  STATUS_SPEC),
-        ('bd_addr', Address.parse_address)
-    ]
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
 )
 class HCI_User_Passkey_Request_Negative_Reply_Command(HCI_Command):
     '''
@@ -2201,32 +2217,34 @@ class HCI_User_Passkey_Request_Negative_Reply_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle',                      2),
-    ('transmit_bandwidth',                     4),
-    ('receive_bandwidth',                      4),
-    ('transmit_coding_format',                 5),
-    ('receive_coding_format',                  5),
-    ('transmit_codec_frame_size',              2),
-    ('receive_codec_frame_size',               2),
-    ('input_bandwidth',                        4),
-    ('output_bandwidth',                       4),
-    ('input_coding_format',                    5),
-    ('output_coding_format',                   5),
-    ('input_coded_data_size',                  2),
-    ('output_coded_data_size',                 2),
-    ('input_pcm_data_format',                  1),
-    ('output_pcm_data_format',                 1),
-    ('input_pcm_sample_payload_msb_position',  1),
-    ('output_pcm_sample_payload_msb_position', 1),
-    ('input_data_path',                        1),
-    ('output_data_path',                       1),
-    ('input_transport_unit_size',              1),
-    ('output_transport_unit_size',             1),
-    ('max_latency',                            2),
-    ('packet_type',                            2),
-    ('retransmission_effort',                  1)
-])
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('transmit_bandwidth', 4),
+        ('receive_bandwidth', 4),
+        ('transmit_coding_format', 5),
+        ('receive_coding_format', 5),
+        ('transmit_codec_frame_size', 2),
+        ('receive_codec_frame_size', 2),
+        ('input_bandwidth', 4),
+        ('output_bandwidth', 4),
+        ('input_coding_format', 5),
+        ('output_coding_format', 5),
+        ('input_coded_data_size', 2),
+        ('output_coded_data_size', 2),
+        ('input_pcm_data_format', 1),
+        ('output_pcm_data_format', 1),
+        ('input_pcm_sample_payload_msb_position', 1),
+        ('output_pcm_sample_payload_msb_position', 1),
+        ('input_data_path', 1),
+        ('output_data_path', 1),
+        ('input_transport_unit_size', 1),
+        ('output_transport_unit_size', 1),
+        ('max_latency', 2),
+        ('packet_type', 2),
+        ('retransmission_effort', 1),
+    ]
+)
 class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.45 Enhanced Setup Synchronous Connection Command
@@ -2234,13 +2252,15 @@ class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle',  2),
-    ('sniff_max_interval', 2),
-    ('sniff_min_interval', 2),
-    ('sniff_attempt',      2),
-    ('sniff_timeout',      2)
-])
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('sniff_max_interval', 2),
+        ('sniff_min_interval', 2),
+        ('sniff_attempt', 2),
+        ('sniff_timeout', 2),
+    ]
+)
 class HCI_Sniff_Mode_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.2.2 Sniff Mode Command
@@ -2248,9 +2268,7 @@ class HCI_Sniff_Mode_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2)
-])
+@HCI_Command.command([('connection_handle', 2)])
 class HCI_Exit_Sniff_Mode_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.2.3 Exit Sniff Mode Command
@@ -2258,10 +2276,12 @@ class HCI_Exit_Sniff_Mode_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('bd_addr', Address.parse_address),
-    ('role',    {'size': 1, 'mapper': HCI_Constant.role_name})
-])
+@HCI_Command.command(
+    [
+        ('bd_addr', Address.parse_address),
+        ('role', {'size': 1, 'mapper': HCI_Constant.role_name}),
+    ]
+)
 class HCI_Switch_Role_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.2.8 Switch Role Command
@@ -2269,10 +2289,7 @@ class HCI_Switch_Role_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle',    2),
-    ('link_policy_settings', 2)
-])
+@HCI_Command.command([('connection_handle', 2), ('link_policy_settings', 2)])
 class HCI_Write_Link_Policy_Settings_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.2.10 Write Link Policy Settings Command
@@ -2280,9 +2297,7 @@ class HCI_Write_Link_Policy_Settings_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('default_link_policy_settings', 2)
-])
+@HCI_Command.command([('default_link_policy_settings', 2)])
 class HCI_Write_Default_Link_Policy_Settings_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.2.12 Write Default Link Policy Settings Command
@@ -2290,12 +2305,14 @@ class HCI_Write_Default_Link_Policy_Settings_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle',      2),
-    ('maximum_latency',        2),
-    ('minimum_remote_timeout', 2),
-    ('minimum_local_timeout',  2)
-])
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('maximum_latency', 2),
+        ('minimum_remote_timeout', 2),
+        ('minimum_local_timeout', 2),
+    ]
+)
 class HCI_Sniff_Subrating_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.2.14 Sniff Subrating Command
@@ -2303,9 +2320,7 @@ class HCI_Sniff_Subrating_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('event_mask', 8)
-])
+@HCI_Command.command([('event_mask', 8)])
 class HCI_Set_Event_Mask_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.1 Set Event Mask Command
@@ -2321,10 +2336,12 @@ class HCI_Reset_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('filter_type',       1),
-    ('filter_condition', '*'),
-])
+@HCI_Command.command(
+    [
+        ('filter_type', 1),
+        ('filter_condition', '*'),
+    ]
+)
 class HCI_Set_Event_Filter_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.3 Set Event Filter Command
@@ -2333,15 +2350,12 @@ class HCI_Set_Event_Filter_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('bd_addr',       Address.parse_address),
-        ('read_all_flag', 1)
-    ],
+    fields=[('bd_addr', Address.parse_address), ('read_all_flag', 1)],
     return_parameters_fields=[
-        ('status',        STATUS_SPEC),
-        ('max_num_keys',  2),
-        ('num_keys_read', 2)
-    ]
+        ('status', STATUS_SPEC),
+        ('max_num_keys', 2),
+        ('num_keys_read', 2),
+    ],
 )
 class HCI_Read_Stored_Link_Key_Command(HCI_Command):
     '''
@@ -2351,14 +2365,8 @@ class HCI_Read_Stored_Link_Key_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('bd_addr',         Address.parse_address),
-        ('delete_all_flag', 1)
-    ],
-    return_parameters_fields=[
-        ('status',           STATUS_SPEC),
-        ('num_keys_deleted', 2)
-    ]
+    fields=[('bd_addr', Address.parse_address), ('delete_all_flag', 1)],
+    return_parameters_fields=[('status', STATUS_SPEC), ('num_keys_deleted', 2)],
 )
 class HCI_Delete_Stored_Link_Key_Command(HCI_Command):
     '''
@@ -2367,9 +2375,9 @@ class HCI_Delete_Stored_Link_Key_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('local_name', {'size': 248, 'mapper': map_null_terminated_utf8_string})
-])
+@HCI_Command.command(
+    [('local_name', {'size': 248, 'mapper': map_null_terminated_utf8_string})]
+)
 class HCI_Write_Local_Name_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.11 Write Local Name Command
@@ -2377,10 +2385,12 @@ class HCI_Write_Local_Name_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',     STATUS_SPEC),
-    ('local_name', {'size': 248, 'mapper': map_null_terminated_utf8_string})
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('local_name', {'size': 248, 'mapper': map_null_terminated_utf8_string}),
+    ]
+)
 class HCI_Read_Local_Name_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.12 Read Local Name Command
@@ -2388,9 +2398,7 @@ class HCI_Read_Local_Name_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_accept_timeout', 2)
-])
+@HCI_Command.command([('connection_accept_timeout', 2)])
 class HCI_Write_Connection_Accept_Timeout_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.14 Write Connection Accept Timeout Command
@@ -2398,9 +2406,7 @@ class HCI_Write_Connection_Accept_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('page_timeout', 2)
-])
+@HCI_Command.command([('page_timeout', 2)])
 class HCI_Write_Page_Timeout_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.16 Write Page Timeout Command
@@ -2408,9 +2414,7 @@ class HCI_Write_Page_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('scan_enable', 1)
-])
+@HCI_Command.command([('scan_enable', 1)])
 class HCI_Write_Scan_Enable_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.18 Write Scan Enable Command
@@ -2418,11 +2422,13 @@ class HCI_Write_Scan_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',             STATUS_SPEC),
-    ('page_scan_interval', 2),
-    ('page_scan_window',   2)
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('page_scan_interval', 2),
+        ('page_scan_window', 2),
+    ]
+)
 class HCI_Read_Page_Scan_Activity_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.19 Read Page Scan Activity Command
@@ -2430,10 +2436,7 @@ class HCI_Read_Page_Scan_Activity_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('page_scan_interval', 2),
-    ('page_scan_window',   2)
-])
+@HCI_Command.command([('page_scan_interval', 2), ('page_scan_window', 2)])
 class HCI_Write_Page_Scan_Activity_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.20 Write Page Scan Activity Command
@@ -2441,10 +2444,7 @@ class HCI_Write_Page_Scan_Activity_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('inquiry_scan_interval', 2),
-    ('inquiry_scan_window',   2)
-])
+@HCI_Command.command([('inquiry_scan_interval', 2), ('inquiry_scan_window', 2)])
 class HCI_Write_Inquiry_Scan_Activity_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.22 Write Inquiry Scan Activity Command
@@ -2452,10 +2452,12 @@ class HCI_Write_Inquiry_Scan_Activity_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',          STATUS_SPEC),
-    ('class_of_device', {'size': 3, 'mapper': map_class_of_device})
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
+    ]
+)
 class HCI_Read_Class_Of_Device_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.25 Read Class of Device Command
@@ -2463,9 +2465,7 @@ class HCI_Read_Class_Of_Device_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('class_of_device', {'size': 3, 'mapper': map_class_of_device})
-])
+@HCI_Command.command([('class_of_device', {'size': 3, 'mapper': map_class_of_device})])
 class HCI_Write_Class_Of_Device_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.26 Write Class of Device Command
@@ -2473,10 +2473,9 @@ class HCI_Write_Class_Of_Device_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',        STATUS_SPEC),
-    ('voice_setting', 2)
-])
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('voice_setting', 2)]
+)
 class HCI_Read_Voice_Setting_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.27 Read Voice Setting Command
@@ -2484,9 +2483,7 @@ class HCI_Read_Voice_Setting_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('voice_setting', 2)
-])
+@HCI_Command.command([('voice_setting', 2)])
 class HCI_Write_Voice_Setting_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.28 Write Voice Setting Command
@@ -2502,9 +2499,7 @@ class HCI_Read_Synchronous_Flow_Control_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('synchronous_flow_control_enable', 1)
-])
+@HCI_Command.command([('synchronous_flow_control_enable', 1)])
 class HCI_Write_Synchronous_Flow_Control_Enable_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.37 Write Synchronous Flow Control Enable Command
@@ -2512,12 +2507,14 @@ class HCI_Write_Synchronous_Flow_Control_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('host_acl_data_packet_length',             2),
-    ('host_synchronous_data_packet_length',     1),
-    ('host_total_num_acl_data_packets',         2),
-    ('host_total_num_synchronous_data_packets', 2)
-])
+@HCI_Command.command(
+    [
+        ('host_acl_data_packet_length', 2),
+        ('host_synchronous_data_packet_length', 1),
+        ('host_total_num_acl_data_packets', 2),
+        ('host_total_num_synchronous_data_packets', 2),
+    ]
+)
 class HCI_Host_Buffer_Size_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.39 Host Buffer Size Command
@@ -2526,14 +2523,11 @@ class HCI_Host_Buffer_Size_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('handle',                   2),
-        ('link_supervision_timeout', 2)
-    ],
+    fields=[('handle', 2), ('link_supervision_timeout', 2)],
     return_parameters_fields=[
         ('status', STATUS_SPEC),
         ('handle', 2),
-    ]
+    ],
 )
 class HCI_Write_Link_Supervision_Timeout_Command(HCI_Command):
     '''
@@ -2542,10 +2536,9 @@ class HCI_Write_Link_Supervision_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',          STATUS_SPEC),
-    ('num_support_iac', 1)
-])
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('num_support_iac', 1)]
+)
 class HCI_Read_Number_Of_Supported_IAC_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.43 Read Number Of Supported IAC Command
@@ -2553,11 +2546,13 @@ class HCI_Read_Number_Of_Supported_IAC_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',          STATUS_SPEC),
-    ('num_current_iac', 1),
-    ('iac_lap',         '*')  # TODO: this should be parsed as an array
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('num_current_iac', 1),
+        ('iac_lap', '*'),  # TODO: this should be parsed as an array
+    ]
+)
 class HCI_Read_Current_IAC_LAP_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.44 Read Current IAC LAP Command
@@ -2565,9 +2560,7 @@ class HCI_Read_Current_IAC_LAP_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('scan_type', 1)
-])
+@HCI_Command.command([('scan_type', 1)])
 class HCI_Write_Inquiry_Scan_Type_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.48 Write Inquiry Scan Type Command
@@ -2575,9 +2568,7 @@ class HCI_Write_Inquiry_Scan_Type_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('inquiry_mode', 1)
-])
+@HCI_Command.command([('inquiry_mode', 1)])
 class HCI_Write_Inquiry_Mode_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.50 Write Inquiry Mode Command
@@ -2585,10 +2576,9 @@ class HCI_Write_Inquiry_Mode_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',         STATUS_SPEC),
-    ('page_scan_type', 1)
-])
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('page_scan_type', 1)]
+)
 class HCI_Read_Page_Scan_Type_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.51 Read Page Scan Type Command
@@ -2596,9 +2586,7 @@ class HCI_Read_Page_Scan_Type_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('page_scan_type', 1)
-])
+@HCI_Command.command([('page_scan_type', 1)])
 class HCI_Write_Page_Scan_Type_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.52 Write Page Scan Type Command
@@ -2606,10 +2594,15 @@ class HCI_Write_Page_Scan_Type_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('fec_required',              1),
-    ('extended_inquiry_response', {'size': 240, 'serializer': lambda x: padded_bytes(x, 240)})
-])
+@HCI_Command.command(
+    [
+        ('fec_required', 1),
+        (
+            'extended_inquiry_response',
+            {'size': 240, 'serializer': lambda x: padded_bytes(x, 240)},
+        ),
+    ]
+)
 class HCI_Write_Extended_Inquiry_Response_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.56 Write Extended Inquiry Response Command
@@ -2617,9 +2610,7 @@ class HCI_Write_Extended_Inquiry_Response_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('simple_pairing_mode', 1)
-])
+@HCI_Command.command([('simple_pairing_mode', 1)])
 class HCI_Write_Simple_Pairing_Mode_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.59 Write Simple Pairing Mode Command
@@ -2627,10 +2618,9 @@ class HCI_Write_Simple_Pairing_Mode_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',   STATUS_SPEC),
-    ('tx_power', -1)
-])
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('tx_power', -1)]
+)
 class HCI_Read_Inquiry_Response_Transmit_Power_Level_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.61 Read Inquiry Response Transmit Power Level Command
@@ -2638,10 +2628,9 @@ class HCI_Read_Inquiry_Response_Transmit_Power_Level_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',                   STATUS_SPEC),
-    ('erroneous_data_reporting', 1)
-])
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('erroneous_data_reporting', 1)]
+)
 class HCI_Read_Default_Erroneous_Data_Reporting_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.64 Read Default Erroneous Data Reporting Command
@@ -2649,9 +2638,7 @@ class HCI_Read_Default_Erroneous_Data_Reporting_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('event_mask_page_2', 8)
-])
+@HCI_Command.command([('event_mask_page_2', 8)])
 class HCI_Set_Event_Mask_Page_2_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.69 Set Event Mask Page 2 Command
@@ -2667,10 +2654,7 @@ class HCI_Read_LE_Host_Support_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('le_supported_host',    1),
-    ('simultaneous_le_host', 1)
-])
+@HCI_Command.command([('le_supported_host', 1), ('simultaneous_le_host', 1)])
 class HCI_Write_LE_Host_Support_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.79 Write LE Host Support Command
@@ -2678,9 +2662,7 @@ class HCI_Write_LE_Host_Support_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('secure_connections_host_support', 1)
-])
+@HCI_Command.command([('secure_connections_host_support', 1)])
 class HCI_Write_Secure_Connections_Host_Support_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.92 Write Secure Connections Host Support Command
@@ -2688,10 +2670,7 @@ class HCI_Write_Secure_Connections_Host_Support_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle',             2),
-    ('authenticated_payload_timeout', 2)
-])
+@HCI_Command.command([('connection_handle', 2), ('authenticated_payload_timeout', 2)])
 class HCI_Write_Authenticated_Payload_Timeout_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.94 Write Authenticated Payload Timeout Command
@@ -2699,14 +2678,16 @@ class HCI_Write_Authenticated_Payload_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',              STATUS_SPEC),
-    ('hci_version',         1),
-    ('hci_subversion',      2),
-    ('lmp_version',         1),
-    ('company_identifier',  2),
-    ('lmp_subversion',      2)
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('hci_version', 1),
+        ('hci_subversion', 2),
+        ('lmp_version', 1),
+        ('company_identifier', 2),
+        ('lmp_subversion', 2),
+    ]
+)
 class HCI_Read_Local_Version_Information_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.4.1 Read Local Version Information Command
@@ -2714,10 +2695,9 @@ class HCI_Read_Local_Version_Information_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',             STATUS_SPEC),
-    ('supported_commands', 64)
-])
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('supported_commands', 64)]
+)
 class HCI_Read_Local_Supported_Commands_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.4.2 Read Local Supported Commands Command
@@ -2734,15 +2714,13 @@ class HCI_Read_Local_Supported_Features_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('page_number', 1)
-    ],
+    fields=[('page_number', 1)],
     return_parameters_fields=[
-        ('status',                STATUS_SPEC),
-        ('page_number',           1),
-        ('maximum_page_number',   1),
-        ('extended_lmp_features', 8)
-    ]
+        ('status', STATUS_SPEC),
+        ('page_number', 1),
+        ('maximum_page_number', 1),
+        ('extended_lmp_features', 8),
+    ],
 )
 class HCI_Read_Local_Extended_Features_Command(HCI_Command):
     '''
@@ -2751,13 +2729,15 @@ class HCI_Read_Local_Extended_Features_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',                                STATUS_SPEC),
-    ('hc_acl_data_packet_length',             2),
-    ('hc_synchronous_data_packet_length',     1),
-    ('hc_total_num_acl_data_packets',         2),
-    ('hc_total_num_synchronous_data_packets', 2)
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('hc_acl_data_packet_length', 2),
+        ('hc_synchronous_data_packet_length', 1),
+        ('hc_total_num_acl_data_packets', 2),
+        ('hc_total_num_synchronous_data_packets', 2),
+    ]
+)
 class HCI_Read_Buffer_Size_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.4.5 Read Buffer Size Command
@@ -2765,10 +2745,12 @@ class HCI_Read_Buffer_Size_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',  STATUS_SPEC),
-    ('bd_addr', Address.parse_address)
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ]
+)
 class HCI_Read_BD_ADDR_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.4.6 Read BD_ADDR Command
@@ -2785,14 +2767,8 @@ class HCI_Read_Local_Supported_Codecs_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('handle', 2)
-    ],
-    return_parameters_fields=[
-        ('status', STATUS_SPEC),
-        ('handle', 2),
-        ('rssi',   -1)
-    ]
+    fields=[('handle', 2)],
+    return_parameters_fields=[('status', STATUS_SPEC), ('handle', 2), ('rssi', -1)],
 )
 class HCI_Read_RSSI_Command(HCI_Command):
     '''
@@ -2802,14 +2778,12 @@ class HCI_Read_RSSI_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('connection_handle', 2)
-    ],
+    fields=[('connection_handle', 2)],
     return_parameters_fields=[
-        ('status',            STATUS_SPEC),
+        ('status', STATUS_SPEC),
         ('connection_handle', 2),
-        ('key_size',          1)
-    ]
+        ('key_size', 1),
+    ],
 )
 class HCI_Read_Encryption_Key_Size_Command(HCI_Command):
     '''
@@ -2818,9 +2792,7 @@ class HCI_Read_Encryption_Key_Size_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('le_event_mask', 8)
-])
+@HCI_Command.command([('le_event_mask', 8)])
 class HCI_LE_Set_Event_Mask_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.1 LE Set Event Mask Command
@@ -2828,11 +2800,13 @@ class HCI_LE_Set_Event_Mask_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',                           STATUS_SPEC),
-    ('hc_le_acl_data_packet_length',     2),
-    ('hc_total_num_le_acl_data_packets', 1)
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('hc_le_acl_data_packet_length', 2),
+        ('hc_total_num_le_acl_data_packets', 1),
+    ]
+)
 class HCI_LE_Read_Buffer_Size_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.2 LE Read Buffer Size Command
@@ -2840,10 +2814,9 @@ class HCI_LE_Read_Buffer_Size_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',      STATUS_SPEC),
-    ('le_features', 8)
-])
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('le_features', 8)]
+)
 class HCI_LE_Read_Local_Supported_Features_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.3 LE Read Local Supported Features Command
@@ -2851,9 +2824,16 @@ class HCI_LE_Read_Local_Supported_Features_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('random_address', lambda data, offset: Address.parse_address_with_type(data, offset, Address.RANDOM_DEVICE_ADDRESS))
-])
+@HCI_Command.command(
+    [
+        (
+            'random_address',
+            lambda data, offset: Address.parse_address_with_type(
+                data, offset, Address.RANDOM_DEVICE_ADDRESS
+            ),
+        )
+    ]
+)
 class HCI_LE_Set_Random_Address_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.4 LE Set Random Address Command
@@ -2861,33 +2841,43 @@ class HCI_LE_Set_Random_Address_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('advertising_interval_min',  2),
-    ('advertising_interval_max',  2),
-    ('advertising_type',          {'size': 1, 'mapper': lambda x: HCI_LE_Set_Advertising_Parameters_Command.advertising_type_name(x)}),
-    ('own_address_type',          OwnAddressType.TYPE_SPEC),
-    ('peer_address_type',         Address.ADDRESS_TYPE_SPEC),
-    ('peer_address',              Address.parse_address_preceded_by_type),
-    ('advertising_channel_map',   1),
-    ('advertising_filter_policy', 1),
-])
+@HCI_Command.command(
+    [
+        ('advertising_interval_min', 2),
+        ('advertising_interval_max', 2),
+        (
+            'advertising_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Set_Advertising_Parameters_Command.advertising_type_name(
+                    x
+                ),
+            },
+        ),
+        ('own_address_type', OwnAddressType.TYPE_SPEC),
+        ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('peer_address', Address.parse_address_preceded_by_type),
+        ('advertising_channel_map', 1),
+        ('advertising_filter_policy', 1),
+    ]
+)
 class HCI_LE_Set_Advertising_Parameters_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.5 LE Set Advertising Parameters Command
     '''
 
-    ADV_IND                 = 0x00
-    ADV_DIRECT_IND          = 0x01
-    ADV_SCAN_IND            = 0x02
-    ADV_NONCONN_IND         = 0x03
+    ADV_IND = 0x00
+    ADV_DIRECT_IND = 0x01
+    ADV_SCAN_IND = 0x02
+    ADV_NONCONN_IND = 0x03
     ADV_DIRECT_IND_LOW_DUTY = 0x04
 
     ADVERTISING_TYPE_NAMES = {
-        ADV_IND:                 'ADV_IND',
-        ADV_DIRECT_IND:          'ADV_DIRECT_IND',
-        ADV_SCAN_IND:            'ADV_SCAN_IND',
-        ADV_NONCONN_IND:         'ADV_NONCONN_IND',
-        ADV_DIRECT_IND_LOW_DUTY: 'ADV_DIRECT_IND_LOW_DUTY'
+        ADV_IND: 'ADV_IND',
+        ADV_DIRECT_IND: 'ADV_DIRECT_IND',
+        ADV_SCAN_IND: 'ADV_SCAN_IND',
+        ADV_NONCONN_IND: 'ADV_NONCONN_IND',
+        ADV_DIRECT_IND_LOW_DUTY: 'ADV_DIRECT_IND_LOW_DUTY',
     }
 
     @classmethod
@@ -2904,12 +2894,19 @@ class HCI_LE_Read_Advertising_Physical_Channel_Tx_Power_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('advertising_data', {
-        'parser':     HCI_Object.parse_length_prefixed_bytes,
-        'serializer': functools.partial(HCI_Object.serialize_length_prefixed_bytes, padded_size=32)
-    })
-])
+@HCI_Command.command(
+    [
+        (
+            'advertising_data',
+            {
+                'parser': HCI_Object.parse_length_prefixed_bytes,
+                'serializer': functools.partial(
+                    HCI_Object.serialize_length_prefixed_bytes, padded_size=32
+                ),
+            },
+        )
+    ]
+)
 class HCI_LE_Set_Advertising_Data_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.7 LE Set Advertising Data Command
@@ -2917,12 +2914,19 @@ class HCI_LE_Set_Advertising_Data_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('scan_response_data', {
-        'parser':     HCI_Object.parse_length_prefixed_bytes,
-        'serializer': functools.partial(HCI_Object.serialize_length_prefixed_bytes, padded_size=32)
-    })
-])
+@HCI_Command.command(
+    [
+        (
+            'scan_response_data',
+            {
+                'parser': HCI_Object.parse_length_prefixed_bytes,
+                'serializer': functools.partial(
+                    HCI_Object.serialize_length_prefixed_bytes, padded_size=32
+                ),
+            },
+        )
+    ]
+)
 class HCI_LE_Set_Scan_Response_Data_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.8 LE Set Scan Response Data Command
@@ -2930,9 +2934,7 @@ class HCI_LE_Set_Scan_Response_Data_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('advertising_enable', 1)
-])
+@HCI_Command.command([('advertising_enable', 1)])
 class HCI_LE_Set_Advertising_Enable_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.9 LE Set Advertising Enable Command
@@ -2940,31 +2942,36 @@ class HCI_LE_Set_Advertising_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('le_scan_type',           1),
-    ('le_scan_interval',       2),
-    ('le_scan_window',         2),
-    ('own_address_type',       OwnAddressType.TYPE_SPEC),
-    ('scanning_filter_policy', 1)
-])
+@HCI_Command.command(
+    [
+        ('le_scan_type', 1),
+        ('le_scan_interval', 2),
+        ('le_scan_window', 2),
+        ('own_address_type', OwnAddressType.TYPE_SPEC),
+        ('scanning_filter_policy', 1),
+    ]
+)
 class HCI_LE_Set_Scan_Parameters_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.10 LE Set Scan Parameters Command
     '''
-    PASSIVE_SCANNING = 0
-    ACTIVE_SCANNING  = 1
 
-    BASIC_UNFILTERED_POLICY    = 0x00
-    BASIC_FILTERED_POLICY      = 0x01
+    PASSIVE_SCANNING = 0
+    ACTIVE_SCANNING = 1
+
+    BASIC_UNFILTERED_POLICY = 0x00
+    BASIC_FILTERED_POLICY = 0x01
     EXTENDED_UNFILTERED_POLICY = 0x02
-    EXTENDED_FILTERED_POLICY   = 0x03
+    EXTENDED_FILTERED_POLICY = 0x03
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('le_scan_enable',    1),
-    ('filter_duplicates', 1),
-])
+@HCI_Command.command(
+    [
+        ('le_scan_enable', 1),
+        ('filter_duplicates', 1),
+    ]
+)
 class HCI_LE_Set_Scan_Enable_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.11 LE Set Scan Enable Command
@@ -2972,20 +2979,22 @@ class HCI_LE_Set_Scan_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('le_scan_interval',        2),
-    ('le_scan_window',          2),
-    ('initiator_filter_policy', 1),
-    ('peer_address_type',       Address.ADDRESS_TYPE_SPEC),
-    ('peer_address',            Address.parse_address_preceded_by_type),
-    ('own_address_type',        OwnAddressType.TYPE_SPEC),
-    ('connection_interval_min', 2),
-    ('connection_interval_max', 2),
-    ('max_latency',             2),
-    ('supervision_timeout',     2),
-    ('min_ce_length',           2),
-    ('max_ce_length',           2)
-])
+@HCI_Command.command(
+    [
+        ('le_scan_interval', 2),
+        ('le_scan_window', 2),
+        ('initiator_filter_policy', 1),
+        ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('peer_address', Address.parse_address_preceded_by_type),
+        ('own_address_type', OwnAddressType.TYPE_SPEC),
+        ('connection_interval_min', 2),
+        ('connection_interval_max', 2),
+        ('max_latency', 2),
+        ('supervision_timeout', 2),
+        ('min_ce_length', 2),
+        ('max_ce_length', 2),
+    ]
+)
 class HCI_LE_Create_Connection_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.12 LE Create Connection Command
@@ -3017,10 +3026,12 @@ class HCI_LE_Clear_Filter_Accept_List_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('address_type', Address.ADDRESS_TYPE_SPEC),
-    ('address',      Address.parse_address_preceded_by_type)
-])
+@HCI_Command.command(
+    [
+        ('address_type', Address.ADDRESS_TYPE_SPEC),
+        ('address', Address.parse_address_preceded_by_type),
+    ]
+)
 class HCI_LE_Add_Device_To_Filter_Accept_List_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.16 LE Add Device To Filter Accept List Command
@@ -3028,10 +3039,12 @@ class HCI_LE_Add_Device_To_Filter_Accept_List_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('address_type', Address.ADDRESS_TYPE_SPEC),
-    ('address',      Address.parse_address_preceded_by_type)
-])
+@HCI_Command.command(
+    [
+        ('address_type', Address.ADDRESS_TYPE_SPEC),
+        ('address', Address.parse_address_preceded_by_type),
+    ]
+)
 class HCI_LE_Remove_Device_From_Filter_Accept_List_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.17 LE Remove Device From Filter Accept List Command
@@ -3039,15 +3052,17 @@ class HCI_LE_Remove_Device_From_Filter_Accept_List_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle',       2),
-    ('connection_interval_min', 2),
-    ('connection_interval_max', 2),
-    ('max_latency',             2),
-    ('supervision_timeout',     2),
-    ('min_ce_length',           2),
-    ('max_ce_length',           2)
-])
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('connection_interval_min', 2),
+        ('connection_interval_max', 2),
+        ('max_latency', 2),
+        ('supervision_timeout', 2),
+        ('min_ce_length', 2),
+        ('max_ce_length', 2),
+    ]
+)
 class HCI_LE_Connection_Update_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.18 LE Connection Update Command
@@ -3055,9 +3070,7 @@ class HCI_LE_Connection_Update_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2)
-])
+@HCI_Command.command([('connection_handle', 2)])
 class HCI_LE_Read_Remote_Features_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.21 LE Read Remote Features Command
@@ -3065,12 +3078,14 @@ class HCI_LE_Read_Remote_Features_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle',     2),
-    ('random_number',         8),
-    ('encrypted_diversifier', 2),
-    ('long_term_key',         16)
-])
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('random_number', 8),
+        ('encrypted_diversifier', 2),
+        ('long_term_key', 16),
+    ]
+)
 class HCI_LE_Enable_Encryption_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.24 LE Enable Encryption Command
@@ -3079,10 +3094,7 @@ class HCI_LE_Enable_Encryption_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2),
-    ('long_term_key',     16)
-])
+@HCI_Command.command([('connection_handle', 2), ('long_term_key', 16)])
 class HCI_LE_Long_Term_Key_Request_Reply_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.25 LE Long Term Key Request Reply Command
@@ -3090,9 +3102,7 @@ class HCI_LE_Long_Term_Key_Request_Reply_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2)
-])
+@HCI_Command.command([('connection_handle', 2)])
 class HCI_LE_Long_Term_Key_Request_Negative_Reply_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.26 LE Long Term Key Request Negative Reply Command
@@ -3108,15 +3118,17 @@ class HCI_LE_Read_Supported_States_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2),
-    ('interval_min',      2),
-    ('interval_max',      2),
-    ('max_latency',       2),
-    ('timeout',           2),
-    ('min_ce_length',     2),
-    ('max_ce_length',     2)
-])
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('interval_min', 2),
+        ('interval_max', 2),
+        ('max_latency', 2),
+        ('timeout', 2),
+        ('min_ce_length', 2),
+        ('max_ce_length', 2),
+    ]
+)
 class HCI_LE_Remote_Connection_Parameter_Request_Reply_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.31 LE Remote Connection Parameter Request Reply Command
@@ -3124,10 +3136,12 @@ class HCI_LE_Remote_Connection_Parameter_Request_Reply_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2),
-    ('reason',            {'size': 1, 'mapper': HCI_Constant.error_name})
-])
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('reason', {'size': 1, 'mapper': HCI_Constant.error_name}),
+    ]
+)
 class HCI_LE_Remote_Connection_Parameter_Request_Negative_Reply_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.32 LE Remote Connection Parameter Request Negative Reply Command
@@ -3138,13 +3152,10 @@ class HCI_LE_Remote_Connection_Parameter_Request_Negative_Reply_Command(HCI_Comm
 @HCI_Command.command(
     fields=[
         ('connection_handle', 2),
-        ('tx_octets',         2),
-        ('tx_time',           2),
+        ('tx_octets', 2),
+        ('tx_time', 2),
     ],
-    return_parameters_fields=[
-        ('status',            STATUS_SPEC),
-        ('connection_handle', 2)
-    ]
+    return_parameters_fields=[('status', STATUS_SPEC), ('connection_handle', 2)],
 )
 class HCI_LE_Set_Data_Length_Command(HCI_Command):
     '''
@@ -3153,11 +3164,13 @@ class HCI_LE_Set_Data_Length_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',                  STATUS_SPEC),
-    ('suggested_max_tx_octets', 2),
-    ('suggested_max_tx_time',   2),
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('suggested_max_tx_octets', 2),
+        ('suggested_max_tx_time', 2),
+    ]
+)
 class HCI_LE_Read_Suggested_Default_Data_Length_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.34 LE Read Suggested Default Data Length Command
@@ -3165,10 +3178,7 @@ class HCI_LE_Read_Suggested_Default_Data_Length_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('suggested_max_tx_octets', 2),
-    ('suggested_max_tx_time',   2)
-])
+@HCI_Command.command([('suggested_max_tx_octets', 2), ('suggested_max_tx_time', 2)])
 class HCI_LE_Write_Suggested_Default_Data_Length_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.35 LE Write Suggested Default Data Length Command
@@ -3176,12 +3186,14 @@ class HCI_LE_Write_Suggested_Default_Data_Length_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('peer_identity_address_type', Address.ADDRESS_TYPE_SPEC),
-    ('peer_identity_address',      Address.parse_address_preceded_by_type),
-    ('peer_irk',                   16),
-    ('local_irk',                  16),
-])
+@HCI_Command.command(
+    [
+        ('peer_identity_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('peer_identity_address', Address.parse_address_preceded_by_type),
+        ('peer_irk', 16),
+        ('local_irk', 16),
+    ]
+)
 class HCI_LE_Add_Device_To_Resolving_List_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.38 LE Add Device To Resolving List Command
@@ -3197,9 +3209,7 @@ class HCI_LE_Clear_Resolving_List_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('address_resolution_enable', 1)
-])
+@HCI_Command.command([('address_resolution_enable', 1)])
 class HCI_LE_Set_Address_Resolution_Enable_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.44 LE Set Address Resolution Enable Command
@@ -3207,9 +3217,7 @@ class HCI_LE_Set_Address_Resolution_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('rpa_timeout', 2)
-])
+@HCI_Command.command([('rpa_timeout', 2)])
 class HCI_LE_Set_Resolvable_Private_Address_Timeout_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.45 LE Set Resolvable Private Address Timeout Command
@@ -3217,13 +3225,15 @@ class HCI_LE_Set_Resolvable_Private_Address_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',                  STATUS_SPEC),
-    ('supported_max_tx_octets', 2),
-    ('supported_max_tx_time',   2),
-    ('supported_max_rx_octets', 2),
-    ('supported_max_rx_time',   2)
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('supported_max_tx_octets', 2),
+        ('supported_max_tx_time', 2),
+        ('supported_max_rx_octets', 2),
+        ('supported_max_rx_time', 2),
+    ]
+)
 class HCI_LE_Read_Maximum_Data_Length_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.46 LE Read Maximum Data Length Command
@@ -3232,15 +3242,14 @@ class HCI_LE_Read_Maximum_Data_Length_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[
-        ('connection_handle', 2)
-    ],
+    fields=[('connection_handle', 2)],
     return_parameters_fields=[
-        ('status',            STATUS_SPEC),
+        ('status', STATUS_SPEC),
         ('connection_handle', 2),
-        ('tx_phy',            {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
-        ('rx_phy',            {'size': 1, 'mapper': HCI_Constant.le_phy_name})
-    ])
+        ('tx_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('rx_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+    ],
+)
 class HCI_LE_Read_PHY_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.47 LE Read PHY Command
@@ -3248,15 +3257,38 @@ class HCI_LE_Read_PHY_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('all_phys', {'size': 1, 'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_Set_Default_PHY_Command.ANY_PHY_BIT_NAMES)}),
-    ('tx_phys',  {'size': 1, 'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_PHY_BIT_NAMES)}),
-    ('rx_phys',  {'size': 1, 'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_PHY_BIT_NAMES)})
-])
+@HCI_Command.command(
+    [
+        (
+            'all_phys',
+            {
+                'size': 1,
+                'mapper': lambda x: bit_flags_to_strings(
+                    x, HCI_LE_Set_Default_PHY_Command.ANY_PHY_BIT_NAMES
+                ),
+            },
+        ),
+        (
+            'tx_phys',
+            {
+                'size': 1,
+                'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_PHY_BIT_NAMES),
+            },
+        ),
+        (
+            'rx_phys',
+            {
+                'size': 1,
+                'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_PHY_BIT_NAMES),
+            },
+        ),
+    ]
+)
 class HCI_LE_Set_Default_PHY_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.48 LE Set Default PHY Command
     '''
+
     ANY_TX_PHY_BIT = 0
     ANY_RX_PHY_BIT = 1
 
@@ -3264,17 +3296,40 @@ class HCI_LE_Set_Default_PHY_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('connection_handle', 2),
-    ('all_phys',          {'size': 1, 'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_Set_PHY_Command.ANY_PHY_BIT_NAMES)}),
-    ('tx_phys',           {'size': 1, 'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_PHY_BIT_NAMES)}),
-    ('rx_phys',           {'size': 1, 'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_PHY_BIT_NAMES)}),
-    ('phy_options',       2)
-])
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        (
+            'all_phys',
+            {
+                'size': 1,
+                'mapper': lambda x: bit_flags_to_strings(
+                    x, HCI_LE_Set_PHY_Command.ANY_PHY_BIT_NAMES
+                ),
+            },
+        ),
+        (
+            'tx_phys',
+            {
+                'size': 1,
+                'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_PHY_BIT_NAMES),
+            },
+        ),
+        (
+            'rx_phys',
+            {
+                'size': 1,
+                'mapper': lambda x: bit_flags_to_strings(x, HCI_LE_PHY_BIT_NAMES),
+            },
+        ),
+        ('phy_options', 2),
+    ]
+)
 class HCI_LE_Set_PHY_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.49 LE Set PHY Command
     '''
+
     ANY_TX_PHY_BIT = 0
     ANY_RX_PHY_BIT = 1
 
@@ -3282,10 +3337,17 @@ class HCI_LE_Set_PHY_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('advertising_handle', 1),
-    ('random_address', lambda data, offset: Address.parse_address_with_type(data, offset, Address.RANDOM_DEVICE_ADDRESS))
-])
+@HCI_Command.command(
+    [
+        ('advertising_handle', 1),
+        (
+            'random_address',
+            lambda data, offset: Address.parse_address_with_type(
+                data, offset, Address.RANDOM_DEVICE_ADDRESS
+            ),
+        ),
+    ]
+)
 class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.52 LE Set Advertising Set Random Address Command
@@ -3295,39 +3357,52 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
     fields=[
-        ('advertising_handle',               1),
-        ('advertising_event_properties',     {'size': 2, 'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.advertising_properties_string(x)}),
+        ('advertising_handle', 1),
+        (
+            'advertising_event_properties',
+            {
+                'size': 2,
+                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.advertising_properties_string(
+                    x
+                ),
+            },
+        ),
         ('primary_advertising_interval_min', 3),
         ('primary_advertising_interval_max', 3),
-        ('primary_advertising_channel_map',  {'size': 1, 'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.channel_map_string(x)}),
-        ('own_address_type',                 OwnAddressType.TYPE_SPEC),
-        ('peer_address_type',                Address.ADDRESS_TYPE_SPEC),
-        ('peer_address',                     Address.parse_address_preceded_by_type),
-        ('advertising_filter_policy',        1),
-        ('advertising_tx_power',             1),
-        ('primary_advertising_phy',          {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
-        ('secondary_advertising_max_skip',   1),
-        ('secondary_advertising_phy',        {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
-        ('advertising_sid',                  1),
-        ('scan_request_notification_enable', 1)
+        (
+            'primary_advertising_channel_map',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.channel_map_string(
+                    x
+                ),
+            },
+        ),
+        ('own_address_type', OwnAddressType.TYPE_SPEC),
+        ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('peer_address', Address.parse_address_preceded_by_type),
+        ('advertising_filter_policy', 1),
+        ('advertising_tx_power', 1),
+        ('primary_advertising_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('secondary_advertising_max_skip', 1),
+        ('secondary_advertising_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('advertising_sid', 1),
+        ('scan_request_notification_enable', 1),
     ],
-    return_parameters_fields=[
-        ('status',                      STATUS_SPEC),
-        ('selected_tx__power', 1)
-    ]
+    return_parameters_fields=[('status', STATUS_SPEC), ('selected_tx__power', 1)],
 )
 class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.53 LE Set Extended Advertising Parameters Command
     '''
 
-    CONNECTABLE_ADVERTISING                          = 0
-    SCANNABLE_ADVERTISING                            = 1
-    DIRECTED_ADVERTISING                             = 2
+    CONNECTABLE_ADVERTISING = 0
+    SCANNABLE_ADVERTISING = 1
+    DIRECTED_ADVERTISING = 2
     HIGH_DUTY_CYCLE_DIRECTED_CONNECTABLE_ADVERTISING = 3
-    USE_LEGACY_ADVERTISING_PDUS                      = 4
-    ANONYMOUS_ADVERTISING                            = 5
-    INCLUDE_TX_POWER                                 = 6
+    USE_LEGACY_ADVERTISING_PDUS = 4
+    ANONYMOUS_ADVERTISING = 5
+    INCLUDE_TX_POWER = 6
 
     ADVERTISING_PROPERTIES_NAMES = (
         'CONNECTABLE_ADVERTISING',
@@ -3336,7 +3411,7 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
         'HIGH_DUTY_CYCLE_DIRECTED_CONNECTABLE_ADVERTISING',
         'USE_LEGACY_ADVERTISING_PDUS',
         'ANONYMOUS_ADVERTISING',
-        'INCLUDE_TX_POWER'
+        'INCLUDE_TX_POWER',
     )
 
     CHANNEL_37 = 0
@@ -3355,32 +3430,47 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('advertising_handle',  1),
-    ('operation',           {'size': 1, 'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Data_Command.operation_name(x)}),
-    ('fragment_preference', 1),
-    ('advertising_data', {
-        'parser':     HCI_Object.parse_length_prefixed_bytes,
-        'serializer': functools.partial(HCI_Object.serialize_length_prefixed_bytes)
-    })
-])
+@HCI_Command.command(
+    [
+        ('advertising_handle', 1),
+        (
+            'operation',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Data_Command.operation_name(
+                    x
+                ),
+            },
+        ),
+        ('fragment_preference', 1),
+        (
+            'advertising_data',
+            {
+                'parser': HCI_Object.parse_length_prefixed_bytes,
+                'serializer': functools.partial(
+                    HCI_Object.serialize_length_prefixed_bytes
+                ),
+            },
+        ),
+    ]
+)
 class HCI_LE_Set_Extended_Advertising_Data_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.54 LE Set Extended Advertising Data Command
     '''
 
     INTERMEDIATE_FRAGMENT = 0x00
-    FIRST_FRAGMENT        = 0x01
-    LAST_FRAGMENT         = 0x02
-    COMPLETE_DATA         = 0x03
-    UNCHANGED_DATA        = 0x04
+    FIRST_FRAGMENT = 0x01
+    LAST_FRAGMENT = 0x02
+    COMPLETE_DATA = 0x03
+    UNCHANGED_DATA = 0x04
 
     OPERATION_NAMES = {
         INTERMEDIATE_FRAGMENT: 'INTERMEDIATE_FRAGMENT',
-        FIRST_FRAGMENT:        'FIRST_FRAGMENT',
-        LAST_FRAGMENT:         'LAST_FRAGMENT',
-        COMPLETE_DATA:         'COMPLETE_DATA',
-        UNCHANGED_DATA:        'UNCHANGED_DATA'
+        FIRST_FRAGMENT: 'FIRST_FRAGMENT',
+        LAST_FRAGMENT: 'LAST_FRAGMENT',
+        COMPLETE_DATA: 'COMPLETE_DATA',
+        UNCHANGED_DATA: 'UNCHANGED_DATA',
     }
 
     @classmethod
@@ -3389,30 +3479,45 @@ class HCI_LE_Set_Extended_Advertising_Data_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('advertising_handle',  1),
-    ('operation',           {'size': 1, 'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Data_Command.operation_name(x)}),
-    ('fragment_preference', 1),
-    ('scan_response_data', {
-        'parser':     HCI_Object.parse_length_prefixed_bytes,
-        'serializer': functools.partial(HCI_Object.serialize_length_prefixed_bytes)
-    })
-])
+@HCI_Command.command(
+    [
+        ('advertising_handle', 1),
+        (
+            'operation',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Data_Command.operation_name(
+                    x
+                ),
+            },
+        ),
+        ('fragment_preference', 1),
+        (
+            'scan_response_data',
+            {
+                'parser': HCI_Object.parse_length_prefixed_bytes,
+                'serializer': functools.partial(
+                    HCI_Object.serialize_length_prefixed_bytes
+                ),
+            },
+        ),
+    ]
+)
 class HCI_LE_Set_Extended_Scan_Response_Data_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.55 LE Set Extended Scan Response Data Command
     '''
 
     INTERMEDIATE_FRAGMENT = 0x00
-    FIRST_FRAGMENT        = 0x01
-    LAST_FRAGMENT         = 0x02
-    COMPLETE_DATA         = 0x03
+    FIRST_FRAGMENT = 0x01
+    LAST_FRAGMENT = 0x02
+    COMPLETE_DATA = 0x03
 
     OPERATION_NAMES = {
         INTERMEDIATE_FRAGMENT: 'INTERMEDIATE_FRAGMENT',
-        FIRST_FRAGMENT:        'FIRST_FRAGMENT',
-        LAST_FRAGMENT:         'LAST_FRAGMENT',
-        COMPLETE_DATA:         'COMPLETE_DATA'
+        FIRST_FRAGMENT: 'FIRST_FRAGMENT',
+        LAST_FRAGMENT: 'LAST_FRAGMENT',
+        COMPLETE_DATA: 'COMPLETE_DATA',
     }
 
     @classmethod
@@ -3429,10 +3534,10 @@ class HCI_LE_Set_Extended_Advertising_Enable_Command(HCI_Command):
 
     @classmethod
     def from_parameters(cls, parameters):
-        enable   = parameters[0]
+        enable = parameters[0]
         num_sets = parameters[1]
-        advertising_handles             = []
-        durations                       = []
+        advertising_handles = []
+        durations = []
         max_extended_advertising_events = []
         offset = 2
         for _ in range(num_sets):
@@ -3441,42 +3546,61 @@ class HCI_LE_Set_Extended_Advertising_Enable_Command(HCI_Command):
             max_extended_advertising_events.append(parameters[offset + 3])
             offset += 4
 
-        return cls(enable, advertising_handles, durations, max_extended_advertising_events)
+        return cls(
+            enable, advertising_handles, durations, max_extended_advertising_events
+        )
 
-    def __init__(self, enable, advertising_handles, durations, max_extended_advertising_events):
+    def __init__(
+        self, enable, advertising_handles, durations, max_extended_advertising_events
+    ):
         super().__init__(HCI_LE_SET_EXTENDED_ADVERTISING_ENABLE_COMMAND)
-        self.enable                          = enable
-        self.advertising_handles             = advertising_handles
-        self.durations                       = durations
+        self.enable = enable
+        self.advertising_handles = advertising_handles
+        self.durations = durations
         self.max_extended_advertising_events = max_extended_advertising_events
 
-        self.parameters = bytes([enable, len(advertising_handles)]) + b''.join([
-            struct.pack(
-                '<BHB',
-                advertising_handles[i],
-                durations[i],
-                max_extended_advertising_events[i]
-            )
-            for i in range(len(advertising_handles))
-        ])
+        self.parameters = bytes([enable, len(advertising_handles)]) + b''.join(
+            [
+                struct.pack(
+                    '<BHB',
+                    advertising_handles[i],
+                    durations[i],
+                    max_extended_advertising_events[i],
+                )
+                for i in range(len(advertising_handles))
+            ]
+        )
 
     def __str__(self):
         fields = [('enable:', self.enable)]
         for i in range(len(self.advertising_handles)):
-            fields.append((f'advertising_handle[{i}]:             ', self.advertising_handles[i]))
+            fields.append(
+                (f'advertising_handle[{i}]:             ', self.advertising_handles[i])
+            )
             fields.append((f'duration[{i}]:                       ', self.durations[i]))
-            fields.append((f'max_extended_advertising_events[{i}]:', self.max_extended_advertising_events[i]))
+            fields.append(
+                (
+                    f'max_extended_advertising_events[{i}]:',
+                    self.max_extended_advertising_events[i],
+                )
+            )
 
-        return color(self.name, 'green') + ':\n' + '\n'.join(
-            [color(field[0], 'cyan') + ' ' + str(field[1]) for field in fields]
+        return (
+            color(self.name, 'green')
+            + ':\n'
+            + '\n'.join(
+                [color(field[0], 'cyan') + ' ' + str(field[1]) for field in fields]
+            )
         )
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',                      STATUS_SPEC),
-    ('max_advertising_data_length', 2)
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('max_advertising_data_length', 2),
+    ]
+)
 class HCI_LE_Read_Maximum_Advertising_Data_Length_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.57 LE Read Maximum Advertising Data Length Command
@@ -3484,10 +3608,12 @@ class HCI_LE_Read_Maximum_Advertising_Data_Length_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(return_parameters_fields=[
-    ('status',                         STATUS_SPEC),
-    ('num_supported_advertising_sets', 1)
-])
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('num_supported_advertising_sets', 1),
+    ]
+)
 class HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.58 LE Read Number of Supported Advertising Sets Command
@@ -3495,9 +3621,7 @@ class HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('advertising_handle', 1)
-])
+@HCI_Command.command([('advertising_handle', 1)])
 class HCI_LE_Remove_Advertising_Set_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.59 LE Remove Advertising Set Command
@@ -3513,10 +3637,7 @@ class HCI_LE_Clear_Advertising_Sets_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('enable',             1),
-    ('advertising_handle', 1)
-])
+@HCI_Command.command([('enable', 1), ('advertising_handle', 1)])
 class HCI_LE_Set_Periodic_Advertising_Enable_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.63 LE Set Periodic Advertising Enable Command
@@ -3529,36 +3650,41 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.64 LE Set Extended Scan Parameters Command
     '''
-    PASSIVE_SCANNING = 0
-    ACTIVE_SCANNING  = 1
 
-    BASIC_UNFILTERED_POLICY    = 0x00
-    BASIC_FILTERED_POLICY      = 0x01
+    PASSIVE_SCANNING = 0
+    ACTIVE_SCANNING = 1
+
+    BASIC_UNFILTERED_POLICY = 0x00
+    BASIC_FILTERED_POLICY = 0x01
     EXTENDED_UNFILTERED_POLICY = 0x02
-    EXTENDED_FILTERED_POLICY   = 0x03
+    EXTENDED_FILTERED_POLICY = 0x03
 
     @classmethod
     def from_parameters(cls, parameters):
-        own_address_type       = parameters[0]
+        own_address_type = parameters[0]
         scanning_filter_policy = parameters[1]
-        scanning_phys          = parameters[2]
+        scanning_phys = parameters[2]
 
         phy_bits_set = bin(scanning_phys).count('1')
-        scan_types     = []
+        scan_types = []
         scan_intervals = []
-        scan_windows   = []
+        scan_windows = []
         for i in range(phy_bits_set):
             scan_types.append(parameters[3 + (5 * i)])
-            scan_intervals.append(struct.unpack_from('<H', parameters, 3 + (5 * i) + 1)[0])
-            scan_windows.append(struct.unpack_from('<H', parameters, 3 + (5 * i) + 3)[0])
+            scan_intervals.append(
+                struct.unpack_from('<H', parameters, 3 + (5 * i) + 1)[0]
+            )
+            scan_windows.append(
+                struct.unpack_from('<H', parameters, 3 + (5 * i) + 3)[0]
+            )
 
         return cls(
-            own_address_type       = own_address_type,
-            scanning_filter_policy = scanning_filter_policy,
-            scanning_phys          = scanning_phys,
-            scan_types             = scan_types,
-            scan_intervals         = scan_intervals,
-            scan_windows           = scan_windows
+            own_address_type=own_address_type,
+            scanning_filter_policy=scanning_filter_policy,
+            scanning_phys=scanning_phys,
+            scan_types=scan_types,
+            scan_intervals=scan_intervals,
+            scan_windows=scan_windows,
         )
 
     def __init__(
@@ -3568,45 +3694,64 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
         scanning_phys,
         scan_types,
         scan_intervals,
-        scan_windows
+        scan_windows,
     ):
         super().__init__(HCI_LE_SET_EXTENDED_SCAN_PARAMETERS_COMMAND)
-        self.own_address_type       = own_address_type
+        self.own_address_type = own_address_type
         self.scanning_filter_policy = scanning_filter_policy
-        self.scanning_phys          = scanning_phys
-        self.scan_types             = scan_types
-        self.scan_intervals         = scan_intervals
-        self.scan_windows           = scan_windows
+        self.scanning_phys = scanning_phys
+        self.scan_types = scan_types
+        self.scan_intervals = scan_intervals
+        self.scan_windows = scan_windows
 
-        self.parameters = bytes([own_address_type, scanning_filter_policy, scanning_phys])
+        self.parameters = bytes(
+            [own_address_type, scanning_filter_policy, scanning_phys]
+        )
         phy_bits_set = bin(scanning_phys).count('1')
         for i in range(phy_bits_set):
-            self.parameters += struct.pack('<BHH', scan_types[i], scan_intervals[i], scan_windows[i])
+            self.parameters += struct.pack(
+                '<BHH', scan_types[i], scan_intervals[i], scan_windows[i]
+            )
 
     def __str__(self):
-        scanning_phys_strs = bit_flags_to_strings(self.scanning_phys, HCI_LE_PHY_BIT_NAMES)
+        scanning_phys_strs = bit_flags_to_strings(
+            self.scanning_phys, HCI_LE_PHY_BIT_NAMES
+        )
         fields = [
-            ('own_address_type:      ', Address.address_type_name(self.own_address_type)),
+            (
+                'own_address_type:      ',
+                Address.address_type_name(self.own_address_type),
+            ),
             ('scanning_filter_policy:', self.scanning_filter_policy),
             ('scanning_phys:         ', ','.join(scanning_phys_strs)),
         ]
         for (i, scanning_phy_str) in enumerate(scanning_phys_strs):
-            fields.append((f'{scanning_phy_str}.scan_type:    ', 'PASSIVE' if self.scan_types[i] == self.PASSIVE_SCANNING else 'ACTIVE'))
-            fields.append((f'{scanning_phy_str}.scan_interval:', self.scan_intervals[i])),
+            fields.append(
+                (
+                    f'{scanning_phy_str}.scan_type:    ',
+                    'PASSIVE'
+                    if self.scan_types[i] == self.PASSIVE_SCANNING
+                    else 'ACTIVE',
+                )
+            )
+            fields.append(
+                (f'{scanning_phy_str}.scan_interval:', self.scan_intervals[i])
+            ),
             fields.append((f'{scanning_phy_str}.scan_window:  ', self.scan_windows[i]))
 
-        return color(self.name, 'green') + ':\n' + '\n'.join(
-            [color(field[0], 'cyan') + ' ' + str(field[1]) for field in fields]
+        return (
+            color(self.name, 'green')
+            + ':\n'
+            + '\n'.join(
+                [color(field[0], 'cyan') + ' ' + str(field[1]) for field in fields]
+            )
         )
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('enable',            1),
-    ('filter_duplicates', 1),
-    ('duration',          2),
-    ('period',            2)
-])
+@HCI_Command.command(
+    [('enable', 1), ('filter_duplicates', 1), ('duration', 2), ('period', 2)]
+)
 class HCI_LE_Set_Extended_Scan_Enable_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.65 LE Set Extended Scan Enable Command
@@ -3623,30 +3768,33 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
     @classmethod
     def from_parameters(cls, parameters):
         initiator_filter_policy = parameters[0]
-        own_address_type        = parameters[1]
-        peer_address_type       = parameters[2]
-        peer_address            = Address.parse_address_preceded_by_type(parameters, 3)[1]
-        initiating_phys         = parameters[9]
+        own_address_type = parameters[1]
+        peer_address_type = parameters[2]
+        peer_address = Address.parse_address_preceded_by_type(parameters, 3)[1]
+        initiating_phys = parameters[9]
 
         phy_bits_set = bin(initiating_phys).count('1')
 
         def read_parameter_list(offset):
-            return [struct.unpack_from('<H', parameters, offset + 16 * i)[0] for i in range(phy_bits_set)]
+            return [
+                struct.unpack_from('<H', parameters, offset + 16 * i)[0]
+                for i in range(phy_bits_set)
+            ]
 
         return cls(
-            initiator_filter_policy  = initiator_filter_policy,
-            own_address_type         = own_address_type,
-            peer_address_type        = peer_address_type,
-            peer_address             = peer_address,
-            initiating_phys          = initiating_phys,
-            scan_intervals           = read_parameter_list(10),
-            scan_windows             = read_parameter_list(12),
-            connection_interval_mins = read_parameter_list(14),
-            connection_interval_maxs = read_parameter_list(16),
-            max_latencies            = read_parameter_list(18),
-            supervision_timeouts     = read_parameter_list(20),
-            min_ce_lengths           = read_parameter_list(22),
-            max_ce_lengths           = read_parameter_list(24)
+            initiator_filter_policy=initiator_filter_policy,
+            own_address_type=own_address_type,
+            peer_address_type=peer_address_type,
+            peer_address=peer_address,
+            initiating_phys=initiating_phys,
+            scan_intervals=read_parameter_list(10),
+            scan_windows=read_parameter_list(12),
+            connection_interval_mins=read_parameter_list(14),
+            connection_interval_maxs=read_parameter_list(16),
+            max_latencies=read_parameter_list(18),
+            supervision_timeouts=read_parameter_list(20),
+            min_ce_lengths=read_parameter_list(22),
+            max_ce_lengths=read_parameter_list(24),
         )
 
     def __init__(
@@ -3663,28 +3811,28 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
         max_latencies,
         supervision_timeouts,
         min_ce_lengths,
-        max_ce_lengths
+        max_ce_lengths,
     ):
         super().__init__(HCI_LE_EXTENDED_CREATE_CONNECTION_COMMAND)
-        self.initiator_filter_policy  = initiator_filter_policy
-        self.own_address_type         = own_address_type
-        self.peer_address_type        = peer_address_type
-        self.peer_address             = peer_address
-        self.initiating_phys          = initiating_phys
-        self.scan_intervals           = scan_intervals
-        self.scan_windows             = scan_windows
+        self.initiator_filter_policy = initiator_filter_policy
+        self.own_address_type = own_address_type
+        self.peer_address_type = peer_address_type
+        self.peer_address = peer_address
+        self.initiating_phys = initiating_phys
+        self.scan_intervals = scan_intervals
+        self.scan_windows = scan_windows
         self.connection_interval_mins = connection_interval_mins
         self.connection_interval_maxs = connection_interval_maxs
-        self.max_latencies            = max_latencies
-        self.supervision_timeouts     = supervision_timeouts
-        self.min_ce_lengths           = min_ce_lengths
-        self.max_ce_lengths           = max_ce_lengths
+        self.max_latencies = max_latencies
+        self.supervision_timeouts = supervision_timeouts
+        self.min_ce_lengths = min_ce_lengths
+        self.max_ce_lengths = max_ce_lengths
 
-        self.parameters = bytes([
-            initiator_filter_policy,
-            own_address_type,
-            peer_address_type
-        ]) + bytes(peer_address) + bytes([initiating_phys])
+        self.parameters = (
+            bytes([initiator_filter_policy, own_address_type, peer_address_type])
+            + bytes(peer_address)
+            + bytes([initiating_phys])
+        )
 
         phy_bits_set = bin(initiating_phys).count('1')
         for i in range(phy_bits_set):
@@ -3697,50 +3845,112 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
                 max_latencies[i],
                 supervision_timeouts[i],
                 min_ce_lengths[i],
-                max_ce_lengths[i]
+                max_ce_lengths[i],
             )
 
     def __str__(self):
-        initiating_phys_strs = bit_flags_to_strings(self.initiating_phys, HCI_LE_PHY_BIT_NAMES)
+        initiating_phys_strs = bit_flags_to_strings(
+            self.initiating_phys, HCI_LE_PHY_BIT_NAMES
+        )
         fields = [
             ('initiator_filter_policy:', self.initiator_filter_policy),
-            ('own_address_type:       ', OwnAddressType.type_name(self.own_address_type)),
-            ('peer_address_type:      ', Address.address_type_name(self.peer_address_type)),
+            (
+                'own_address_type:       ',
+                OwnAddressType.type_name(self.own_address_type),
+            ),
+            (
+                'peer_address_type:      ',
+                Address.address_type_name(self.peer_address_type),
+            ),
             ('peer_address:           ', str(self.peer_address)),
             ('initiating_phys:        ', ','.join(initiating_phys_strs)),
         ]
         for (i, initiating_phys_str) in enumerate(initiating_phys_strs):
-            fields.append((f'{initiating_phys_str}.scan_interval:          ', self.scan_intervals[i])),
-            fields.append((f'{initiating_phys_str}.scan_window:            ', self.scan_windows[i])),
-            fields.append((f'{initiating_phys_str}.connection_interval_min:', self.connection_interval_mins[i])),
-            fields.append((f'{initiating_phys_str}.connection_interval_max:', self.connection_interval_maxs[i])),
-            fields.append((f'{initiating_phys_str}.max_latency:            ', self.max_latencies[i])),
-            fields.append((f'{initiating_phys_str}.supervision_timeout:    ', self.supervision_timeouts[i])),
-            fields.append((f'{initiating_phys_str}.min_ce_length:          ', self.min_ce_lengths[i])),
-            fields.append((f'{initiating_phys_str}.max_ce_length:          ', self.max_ce_lengths[i]))
+            fields.append(
+                (
+                    f'{initiating_phys_str}.scan_interval:          ',
+                    self.scan_intervals[i],
+                )
+            ),
+            fields.append(
+                (
+                    f'{initiating_phys_str}.scan_window:            ',
+                    self.scan_windows[i],
+                )
+            ),
+            fields.append(
+                (
+                    f'{initiating_phys_str}.connection_interval_min:',
+                    self.connection_interval_mins[i],
+                )
+            ),
+            fields.append(
+                (
+                    f'{initiating_phys_str}.connection_interval_max:',
+                    self.connection_interval_maxs[i],
+                )
+            ),
+            fields.append(
+                (
+                    f'{initiating_phys_str}.max_latency:            ',
+                    self.max_latencies[i],
+                )
+            ),
+            fields.append(
+                (
+                    f'{initiating_phys_str}.supervision_timeout:    ',
+                    self.supervision_timeouts[i],
+                )
+            ),
+            fields.append(
+                (
+                    f'{initiating_phys_str}.min_ce_length:          ',
+                    self.min_ce_lengths[i],
+                )
+            ),
+            fields.append(
+                (
+                    f'{initiating_phys_str}.max_ce_length:          ',
+                    self.max_ce_lengths[i],
+                )
+            )
 
-        return color(self.name, 'green') + ':\n' + '\n'.join(
-            [color(field[0], 'cyan') + ' ' + str(field[1]) for field in fields]
+        return (
+            color(self.name, 'green')
+            + ':\n'
+            + '\n'.join(
+                [color(field[0], 'cyan') + ' ' + str(field[1]) for field in fields]
+            )
         )
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('peer_identity_address_type', Address.ADDRESS_TYPE_SPEC),
-    ('peer_identity_address',      Address.parse_address_preceded_by_type),
-    ('privacy_mode',               {'size': 1, 'mapper': lambda x: HCI_LE_Set_Privacy_Mode_Command.privacy_mode_name(x)})
-])
+@HCI_Command.command(
+    [
+        ('peer_identity_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('peer_identity_address', Address.parse_address_preceded_by_type),
+        (
+            'privacy_mode',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Set_Privacy_Mode_Command.privacy_mode_name(
+                    x
+                ),
+            },
+        ),
+    ]
+)
 class HCI_LE_Set_Privacy_Mode_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.77 LE Set Privacy Mode Command
     '''
 
     NETWORK_PRIVACY_MODE = 0x00
-    DEVICE_PRIVACY_MODE  = 0x01
+    DEVICE_PRIVACY_MODE = 0x01
 
     PRIVACY_MODE_NAMES = {
         NETWORK_PRIVACY_MODE: 'NETWORK_PRIVACY_MODE',
-        DEVICE_PRIVACY_MODE:  'DEVICE_PRIVACY_MODE'
+        DEVICE_PRIVACY_MODE: 'DEVICE_PRIVACY_MODE',
     }
 
     @classmethod
@@ -3749,10 +3959,7 @@ class HCI_LE_Set_Privacy_Mode_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([
-    ('bit_number', 1),
-    ('bit_value',  1)
-])
+@HCI_Command.command([('bit_number', 1), ('bit_value', 1)])
 class HCI_LE_Set_Host_Feature_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.115 LE Set Host Feature Command
@@ -3766,8 +3973,9 @@ class HCI_Event(HCI_Packet):
     '''
     See Bluetooth spec @ Vol 2, Part E - 5.4.4 HCI Event Packet
     '''
-    hci_packet_type    = HCI_EVENT_PACKET
-    event_classes      = {}
+
+    hci_packet_type = HCI_EVENT_PACKET
+    event_classes = {}
     meta_event_classes = {}
 
     @staticmethod
@@ -3786,6 +3994,7 @@ class HCI_Event(HCI_Packet):
             # Patch the __init__ method to fix the event_code
             def init(self, parameters=None, **kwargs):
                 return HCI_Event.__init__(self, cls.event_code, parameters, **kwargs)
+
             cls.__init__ = init
 
             # Register a factory for this class
@@ -3810,7 +4019,7 @@ class HCI_Event(HCI_Packet):
     @staticmethod
     def from_bytes(packet):
         event_code = packet[1]
-        length     = packet[2]
+        length = packet[2]
         parameters = packet[3:]
         if len(parameters) != length:
             raise ValueError('invalid packet length')
@@ -3891,7 +4100,10 @@ class HCI_LE_Meta_Event(HCI_Event):
 
             # Patch the __init__ method to fix the subevent_code
             def init(self, parameters=None, **kwargs):
-                return HCI_LE_Meta_Event.__init__(self, cls.subevent_code, parameters, **kwargs)
+                return HCI_LE_Meta_Event.__init__(
+                    self, cls.subevent_code, parameters, **kwargs
+                )
+
             cls.__init__ = init
 
             # Register a factory for this class
@@ -3916,7 +4128,9 @@ class HCI_LE_Meta_Event(HCI_Event):
     def __init__(self, subevent_code, parameters, **kwargs):
         self.subevent_code = subevent_code
         if parameters is None and (fields := getattr(self, 'fields', None)) and kwargs:
-            parameters = bytes([subevent_code]) + HCI_Object.dict_to_bytes(kwargs, fields)
+            parameters = bytes([subevent_code]) + HCI_Object.dict_to_bytes(
+                kwargs, fields
+            )
         super().__init__(HCI_LE_META_EVENT, parameters, **kwargs)
 
         # Override the name in order to adopt the subevent name instead
@@ -3933,17 +4147,22 @@ class HCI_LE_Meta_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_LE_Meta_Event.event([
-    ('status',                 STATUS_SPEC),
-    ('connection_handle',      2),
-    ('role',                   {'size': 1, 'mapper': lambda x: 'CENTRAL' if x == 0 else 'PERIPHERAL'}),
-    ('peer_address_type',      Address.ADDRESS_TYPE_SPEC),
-    ('peer_address',           Address.parse_address_preceded_by_type),
-    ('connection_interval',    2),
-    ('peripheral_latency',     2),
-    ('supervision_timeout',    2),
-    ('central_clock_accuracy', 1)
-])
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        (
+            'role',
+            {'size': 1, 'mapper': lambda x: 'CENTRAL' if x == 0 else 'PERIPHERAL'},
+        ),
+        ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('peer_address', Address.parse_address_preceded_by_type),
+        ('connection_interval', 2),
+        ('peripheral_latency', 2),
+        ('supervision_timeout', 2),
+        ('central_clock_accuracy', 1),
+    ]
+)
 class HCI_LE_Connection_Complete_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.1 LE Connection Complete Event
@@ -3955,30 +4174,37 @@ class HCI_LE_Advertising_Report_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.2 LE Advertising Report Event
     '''
+
     subevent_code = HCI_LE_ADVERTISING_REPORT_EVENT
 
     # Event Types
-    ADV_IND         = 0x00
-    ADV_DIRECT_IND  = 0x01
-    ADV_SCAN_IND    = 0x02
+    ADV_IND = 0x00
+    ADV_DIRECT_IND = 0x01
+    ADV_SCAN_IND = 0x02
     ADV_NONCONN_IND = 0x03
-    SCAN_RSP        = 0x04
+    SCAN_RSP = 0x04
 
     EVENT_TYPE_NAMES = {
-        ADV_IND:         'ADV_IND',          # Connectable and scannable undirected advertising
-        ADV_DIRECT_IND:  'ADV_DIRECT_IND',   # Connectable directed advertising
-        ADV_SCAN_IND:    'ADV_SCAN_IND',     # Scannable undirected advertising
+        ADV_IND: 'ADV_IND',  # Connectable and scannable undirected advertising
+        ADV_DIRECT_IND: 'ADV_DIRECT_IND',  # Connectable directed advertising
+        ADV_SCAN_IND: 'ADV_SCAN_IND',  # Scannable undirected advertising
         ADV_NONCONN_IND: 'ADV_NONCONN_IND',  # Non connectable undirected advertising
-        SCAN_RSP:        'SCAN_RSP'          # Scan Response
+        SCAN_RSP: 'SCAN_RSP',  # Scan Response
     }
 
     class Report(HCI_Object):
         FIELDS = [
-            ('event_type',   1),
+            ('event_type', 1),
             ('address_type', Address.ADDRESS_TYPE_SPEC),
-            ('address',      Address.parse_address_preceded_by_type),
-            ('data',         {'parser': HCI_Object.parse_length_prefixed_bytes, 'serializer': HCI_Object.serialize_length_prefixed_bytes}),
-            ('rssi',         -1)
+            ('address', Address.parse_address_preceded_by_type),
+            (
+                'data',
+                {
+                    'parser': HCI_Object.parse_length_prefixed_bytes,
+                    'serializer': HCI_Object.serialize_length_prefixed_bytes,
+                },
+            ),
+            ('rssi', -1),
         ]
 
         @classmethod
@@ -3989,11 +4215,14 @@ class HCI_LE_Advertising_Report_Event(HCI_LE_Meta_Event):
             return HCI_LE_Advertising_Report_Event.event_type_name(self.event_type)
 
         def to_string(self, prefix):
-            return super().to_string(prefix, {
-                'event_type': HCI_LE_Advertising_Report_Event.event_type_name,
-                'address_type': Address.address_type_name,
-                'data': lambda x: str(AdvertisingData.from_bytes(x))
-            })
+            return super().to_string(
+                prefix,
+                {
+                    'event_type': HCI_LE_Advertising_Report_Event.event_type_name,
+                    'address_type': Address.address_type_name,
+                    'data': lambda x: str(AdvertisingData.from_bytes(x)),
+                },
+            )
 
     @classmethod
     def event_type_name(cls, event_type):
@@ -4015,26 +4244,34 @@ class HCI_LE_Advertising_Report_Event(HCI_LE_Meta_Event):
         self.reports = reports[:]
 
         # Serialize the fields
-        parameters = bytes([HCI_LE_ADVERTISING_REPORT_EVENT, len(reports)]) + b''.join([bytes(report) for report in reports])
+        parameters = bytes([HCI_LE_ADVERTISING_REPORT_EVENT, len(reports)]) + b''.join(
+            [bytes(report) for report in reports]
+        )
 
         super().__init__(self.subevent_code, parameters)
 
     def __str__(self):
-        reports = '\n'.join([f'{i}:\n{report.to_string("  ")}' for i, report in enumerate(self.reports)])
+        reports = '\n'.join(
+            [f'{i}:\n{report.to_string("  ")}' for i, report in enumerate(self.reports)]
+        )
         return f'{color(self.subevent_name(self.subevent_code), "magenta")}:\n{reports}'
 
 
-HCI_Event.meta_event_classes[HCI_LE_ADVERTISING_REPORT_EVENT] = HCI_LE_Advertising_Report_Event
+HCI_Event.meta_event_classes[
+    HCI_LE_ADVERTISING_REPORT_EVENT
+] = HCI_LE_Advertising_Report_Event
 
 
 # -----------------------------------------------------------------------------
-@HCI_LE_Meta_Event.event([
-    ('status',              STATUS_SPEC),
-    ('connection_handle',   2),
-    ('connection_interval', 2),
-    ('peripheral_latency',  2),
-    ('supervision_timeout', 2)
-])
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('connection_interval', 2),
+        ('peripheral_latency', 2),
+        ('supervision_timeout', 2),
+    ]
+)
 class HCI_LE_Connection_Update_Complete_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.3 LE Connection Update Complete Event
@@ -4042,11 +4279,9 @@ class HCI_LE_Connection_Update_Complete_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_LE_Meta_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2),
-    ('le_features',       8)
-])
+@HCI_LE_Meta_Event.event(
+    [('status', STATUS_SPEC), ('connection_handle', 2), ('le_features', 8)]
+)
 class HCI_LE_Read_Remote_Features_Complete_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.4 LE Read Remote Features Complete Event
@@ -4054,11 +4289,9 @@ class HCI_LE_Read_Remote_Features_Complete_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_LE_Meta_Event.event([
-    ('connection_handle',     2),
-    ('random_number',         8),
-    ('encryption_diversifier', 2)
-])
+@HCI_LE_Meta_Event.event(
+    [('connection_handle', 2), ('random_number', 8), ('encryption_diversifier', 2)]
+)
 class HCI_LE_Long_Term_Key_Request_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.5 LE Long Term Key Request Event
@@ -4066,13 +4299,15 @@ class HCI_LE_Long_Term_Key_Request_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_LE_Meta_Event.event([
-    ('connection_handle', 2),
-    ('interval_min',      2),
-    ('interval_max',      2),
-    ('max_latency',       2),
-    ('timeout',           2)
-])
+@HCI_LE_Meta_Event.event(
+    [
+        ('connection_handle', 2),
+        ('interval_min', 2),
+        ('interval_max', 2),
+        ('max_latency', 2),
+        ('timeout', 2),
+    ]
+)
 class HCI_LE_Remote_Connection_Parameter_Request_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.6 LE Remote Connection Parameter Request Event
@@ -4080,13 +4315,15 @@ class HCI_LE_Remote_Connection_Parameter_Request_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_LE_Meta_Event.event([
-    ('connection_handle', 2),
-    ('max_tx_octets',     2),
-    ('max_tx_time',       2),
-    ('max_rx_octets',     2),
-    ('max_rx_time',       2),
-])
+@HCI_LE_Meta_Event.event(
+    [
+        ('connection_handle', 2),
+        ('max_tx_octets', 2),
+        ('max_tx_time', 2),
+        ('max_rx_octets', 2),
+        ('max_rx_time', 2),
+    ]
+)
 class HCI_LE_Data_Length_Change_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.7 LE Data Length Change Event
@@ -4094,19 +4331,24 @@ class HCI_LE_Data_Length_Change_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_LE_Meta_Event.event([
-    ('status',                           STATUS_SPEC),
-    ('connection_handle',                2),
-    ('role',                             {'size': 1, 'mapper': lambda x: 'CENTRAL' if x == 0 else 'PERIPHERAL'}),
-    ('peer_address_type',                Address.ADDRESS_TYPE_SPEC),
-    ('peer_address',                     Address.parse_address_preceded_by_type),
-    ('local_resolvable_private_address', Address.parse_address),
-    ('peer_resolvable_private_address',  Address.parse_address),
-    ('connection_interval',              2),
-    ('peripheral_latency',               2),
-    ('supervision_timeout',              2),
-    ('central_clock_accuracy',           1)
-])
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        (
+            'role',
+            {'size': 1, 'mapper': lambda x: 'CENTRAL' if x == 0 else 'PERIPHERAL'},
+        ),
+        ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('peer_address', Address.parse_address_preceded_by_type),
+        ('local_resolvable_private_address', Address.parse_address),
+        ('peer_resolvable_private_address', Address.parse_address),
+        ('connection_interval', 2),
+        ('peripheral_latency', 2),
+        ('supervision_timeout', 2),
+        ('central_clock_accuracy', 1),
+    ]
+)
 class HCI_LE_Enhanced_Connection_Complete_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.10 LE Enhanced Connection Complete Event
@@ -4114,12 +4356,14 @@ class HCI_LE_Enhanced_Connection_Complete_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_LE_Meta_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2),
-    ('tx_phy',            {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
-    ('rx_phy',            {'size': 1, 'mapper': HCI_Constant.le_phy_name})
-])
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('tx_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('rx_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+    ]
+)
 class HCI_LE_PHY_Update_Complete_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.12 LE PHY Update Complete Event
@@ -4131,17 +4375,18 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.13 LE Extended Advertising Report Event
     '''
+
     subevent_code = HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT
 
     # Event types flags
-    CONNECTABLE_ADVERTISING     = 0
-    SCANNABLE_ADVERTISING       = 1
-    DIRECTED_ADVERTISING        = 2
-    SCAN_RESPONSE               = 3
+    CONNECTABLE_ADVERTISING = 0
+    SCANNABLE_ADVERTISING = 1
+    DIRECTED_ADVERTISING = 2
+    SCAN_RESPONSE = 3
     LEGACY_ADVERTISING_PDU_USED = 4
 
-    DATA_COMPLETE                             = 0x00
-    DATA_INCOMPLETE_MORE_TO_COME              = 0x01
+    DATA_COMPLETE = 0x00
+    DATA_INCOMPLETE_MORE_TO_COME = 0x01
     DATA_INCOMPLETE_TRUNCATED_NO_MORE_TO_COME = 0x02
 
     EVENT_TYPE_FLAG_NAMES = (
@@ -4149,7 +4394,7 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
         'SCANNABLE_ADVERTISING',
         'DIRECTED_ADVERTISING',
         'SCAN_RESPONSE',
-        'LEGACY_ADVERTISING_PDU_USED'
+        'LEGACY_ADVERTISING_PDU_USED',
     )
 
     LEGACY_PDU_TYPE_MAP = {
@@ -4158,29 +4403,35 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
         0b0010: HCI_LE_Advertising_Report_Event.ADV_SCAN_IND,
         0b0000: HCI_LE_Advertising_Report_Event.ADV_NONCONN_IND,
         0b1011: HCI_LE_Advertising_Report_Event.SCAN_RSP,
-        0b1010: HCI_LE_Advertising_Report_Event.SCAN_RSP
+        0b1010: HCI_LE_Advertising_Report_Event.SCAN_RSP,
     }
 
-    NO_ADI_FIELD_PROVIDED              = 0xFF
+    NO_ADI_FIELD_PROVIDED = 0xFF
     TX_POWER_INFORMATION_NOT_AVAILABLE = 0x7F
-    RSSI_NOT_AVAILABLE                 = 0x7F
-    ANONYMOUS_ADDRESS_TYPE             = 0xFF
+    RSSI_NOT_AVAILABLE = 0x7F
+    ANONYMOUS_ADDRESS_TYPE = 0xFF
     UNRESOLVED_RESOLVABLE_ADDRESS_TYPE = 0xFE
 
     class Report(HCI_Object):
         FIELDS = [
-            ('event_type',                    2),
-            ('address_type',                  Address.ADDRESS_TYPE_SPEC),
-            ('address',                       Address.parse_address_preceded_by_type),
-            ('primary_phy',                   {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
-            ('secondary_phy',                 {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
-            ('advertising_sid',               1),
-            ('tx_power',                      1),
-            ('rssi',                          -1),
+            ('event_type', 2),
+            ('address_type', Address.ADDRESS_TYPE_SPEC),
+            ('address', Address.parse_address_preceded_by_type),
+            ('primary_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+            ('secondary_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+            ('advertising_sid', 1),
+            ('tx_power', 1),
+            ('rssi', -1),
             ('periodic_advertising_interval', 2),
-            ('direct_address_type',           Address.ADDRESS_TYPE_SPEC),
-            ('direct_address',                Address.parse_address_preceded_by_type),
-            ('data',                          {'parser': HCI_Object.parse_length_prefixed_bytes, 'serializer': HCI_Object.serialize_length_prefixed_bytes}),
+            ('direct_address_type', Address.ADDRESS_TYPE_SPEC),
+            ('direct_address', Address.parse_address_preceded_by_type),
+            (
+                'data',
+                {
+                    'parser': HCI_Object.parse_length_prefixed_bytes,
+                    'serializer': HCI_Object.serialize_length_prefixed_bytes,
+                },
+            ),
         ]
 
         @classmethod
@@ -4188,14 +4439,19 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
             return cls.from_bytes(parameters, offset, cls.FIELDS)
 
         def event_type_string(self):
-            return HCI_LE_Extended_Advertising_Report_Event.event_type_string(self.event_type)
+            return HCI_LE_Extended_Advertising_Report_Event.event_type_string(
+                self.event_type
+            )
 
         def to_string(self, prefix):
-            return super().to_string(prefix, {
-                'event_type': HCI_LE_Extended_Advertising_Report_Event.event_type_string,
-                'address_type': Address.address_type_name,
-                'data': lambda x: str(AdvertisingData.from_bytes(x))
-            })
+            return super().to_string(
+                prefix,
+                {
+                    'event_type': HCI_LE_Extended_Advertising_Report_Event.event_type_string,
+                    'address_type': Address.address_type_name,
+                    'data': lambda x: str(AdvertisingData.from_bytes(x)),
+                },
+            )
 
     @staticmethod
     def event_type_string(event_type):
@@ -4203,10 +4459,18 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
             event_type & 0x1F,
             HCI_LE_Extended_Advertising_Report_Event.EVENT_TYPE_FLAG_NAMES,
         )
-        event_type_flags.append(('COMPLETE', 'INCOMPLETE+', 'INCOMPLETE#', '?')[(event_type >> 5) & 3])
+        event_type_flags.append(
+            ('COMPLETE', 'INCOMPLETE+', 'INCOMPLETE#', '?')[(event_type >> 5) & 3]
+        )
 
-        if event_type & (1 << HCI_LE_Extended_Advertising_Report_Event.LEGACY_ADVERTISING_PDU_USED):
-            legacy_pdu_type = HCI_LE_Extended_Advertising_Report_Event.LEGACY_PDU_TYPE_MAP.get(event_type & 0x0F)
+        if event_type & (
+            1 << HCI_LE_Extended_Advertising_Report_Event.LEGACY_ADVERTISING_PDU_USED
+        ):
+            legacy_pdu_type = (
+                HCI_LE_Extended_Advertising_Report_Event.LEGACY_PDU_TYPE_MAP.get(
+                    event_type & 0x0F
+                )
+            )
             if legacy_pdu_type is not None:
                 legacy_info_string = f'({HCI_LE_Advertising_Report_Event.event_type_name(legacy_pdu_type)})'
             else:
@@ -4232,23 +4496,26 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
         self.reports = reports[:]
 
         # Serialize the fields
-        parameters = bytes([HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT, len(reports)]) + b''.join([bytes(report) for report in reports])
+        parameters = bytes(
+            [HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT, len(reports)]
+        ) + b''.join([bytes(report) for report in reports])
 
         super().__init__(self.subevent_code, parameters)
 
     def __str__(self):
-        reports = '\n'.join([f'{i}:\n{report.to_string("  ")}' for i, report in enumerate(self.reports)])
+        reports = '\n'.join(
+            [f'{i}:\n{report.to_string("  ")}' for i, report in enumerate(self.reports)]
+        )
         return f'{color(self.subevent_name(self.subevent_code), "magenta")}:\n{reports}'
 
 
-HCI_Event.meta_event_classes[HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT] = HCI_LE_Extended_Advertising_Report_Event
+HCI_Event.meta_event_classes[
+    HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT
+] = HCI_LE_Extended_Advertising_Report_Event
 
 
 # -----------------------------------------------------------------------------
-@HCI_LE_Meta_Event.event([
-    ('connection_handle',           2),
-    ('channel_selection_algorithm', 1)
-])
+@HCI_LE_Meta_Event.event([('connection_handle', 2), ('channel_selection_algorithm', 1)])
 class HCI_LE_Channel_Selection_Algorithm_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.20 LE Channel Selection Algorithm Event
@@ -4256,9 +4523,7 @@ class HCI_LE_Channel_Selection_Algorithm_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status', STATUS_SPEC)
-])
+@HCI_Event.event([('status', STATUS_SPEC)])
 class HCI_Inquiry_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.1 Inquiry Complete Event
@@ -4273,12 +4538,12 @@ class HCI_Inquiry_Result_Event(HCI_Event):
     '''
 
     RESPONSE_FIELDS = [
-        ('bd_addr',                   Address.parse_address),
+        ('bd_addr', Address.parse_address),
         ('page_scan_repetition_mode', 1),
-        ('reserved',                  1),
-        ('reserved',                  1),
-        ('class_of_device',           {'size': 3, 'mapper': map_class_of_device}),
-        ('clock_offset',              2)
+        ('reserved', 1),
+        ('reserved', 1),
+        ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
+        ('clock_offset', 2),
     ]
 
     @staticmethod
@@ -4287,7 +4552,9 @@ class HCI_Inquiry_Result_Event(HCI_Event):
         responses = []
         offset = 1
         for _ in range(num_responses):
-            response = HCI_Object.from_bytes(parameters, offset, HCI_Inquiry_Result_Event.RESPONSE_FIELDS)
+            response = HCI_Object.from_bytes(
+                parameters, offset, HCI_Inquiry_Result_Event.RESPONSE_FIELDS
+            )
             offset += 14
             responses.append(response)
 
@@ -4297,36 +4564,48 @@ class HCI_Inquiry_Result_Event(HCI_Event):
         self.responses = responses[:]
 
         # Serialize the fields
-        parameters = bytes([HCI_INQUIRY_RESULT_EVENT, len(responses)]) + b''.join([bytes(response) for response in responses])
+        parameters = bytes([HCI_INQUIRY_RESULT_EVENT, len(responses)]) + b''.join(
+            [bytes(response) for response in responses]
+        )
 
         super().__init__(HCI_INQUIRY_RESULT_EVENT, parameters)
 
     def __str__(self):
-        responses = '\n'.join([response.to_string(indentation='  ') for response in self.responses])
+        responses = '\n'.join(
+            [response.to_string(indentation='  ') for response in self.responses]
+        )
         return f'{color("HCI_INQUIRY_RESULT_EVENT", "magenta")}:\n{responses}'
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',             STATUS_SPEC),
-    ('connection_handle',  2),
-    ('bd_addr',            Address.parse_address),
-    ('link_type',          {'size': 1, 'mapper': lambda x: HCI_Connection_Complete_Event.link_type_name(x)}),
-    ('encryption_enabled', 1)
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('bd_addr', Address.parse_address),
+        (
+            'link_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_Connection_Complete_Event.link_type_name(x),
+            },
+        ),
+        ('encryption_enabled', 1),
+    ]
+)
 class HCI_Connection_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.3 Connection Complete Event
     '''
 
-    SCO_LINK_TYPE  = 0x00
-    ACL_LINK_TYPE  = 0x01
+    SCO_LINK_TYPE = 0x00
+    ACL_LINK_TYPE = 0x01
     ESCO_LINK_TYPE = 0x02
 
     LINK_TYPE_NAMES = {
-        SCO_LINK_TYPE:  'SCO',
-        ACL_LINK_TYPE:  'ACL',
-        ESCO_LINK_TYPE: 'eSCO'
+        SCO_LINK_TYPE: 'SCO',
+        ACL_LINK_TYPE: 'ACL',
+        ESCO_LINK_TYPE: 'eSCO',
     }
 
     @staticmethod
@@ -4335,11 +4614,19 @@ class HCI_Connection_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr',         Address.parse_address),
-    ('class_of_device', 3),
-    ('link_type',       {'size': 1, 'mapper': lambda x: HCI_Connection_Complete_Event.link_type_name(x)})
-])
+@HCI_Event.event(
+    [
+        ('bd_addr', Address.parse_address),
+        ('class_of_device', 3),
+        (
+            'link_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_Connection_Complete_Event.link_type_name(x),
+            },
+        ),
+    ]
+)
 class HCI_Connection_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.4 Connection Request Event
@@ -4347,11 +4634,13 @@ class HCI_Connection_Request_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2),
-    ('reason',            {'size': 1, 'mapper': HCI_Constant.error_name})
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('reason', {'size': 1, 'mapper': HCI_Constant.error_name}),
+    ]
+)
 class HCI_Disconnection_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.5 Disconnection Complete Event
@@ -4359,10 +4648,7 @@ class HCI_Disconnection_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2)
-])
+@HCI_Event.event([('status', STATUS_SPEC), ('connection_handle', 2)])
 class HCI_Authentication_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.6 Authentication Complete Event
@@ -4370,11 +4656,13 @@ class HCI_Authentication_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',      STATUS_SPEC),
-    ('bd_addr',     Address.parse_address),
-    ('remote_name', {'size': 248, 'mapper': map_null_terminated_utf8_string})
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+        ('remote_name', {'size': 248, 'mapper': map_null_terminated_utf8_string}),
+    ]
+)
 class HCI_Remote_Name_Request_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.7 Remote Name Request Complete Event
@@ -4382,37 +4670,47 @@ class HCI_Remote_Name_Request_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',             STATUS_SPEC),
-    ('connection_handle',  2),
-    ('encryption_enabled', {'size': 1, 'mapper': lambda x: HCI_Encryption_Change_Event.encryption_enabled_name(x)})
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        (
+            'encryption_enabled',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_Encryption_Change_Event.encryption_enabled_name(
+                    x
+                ),
+            },
+        ),
+    ]
+)
 class HCI_Encryption_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.8 Encryption Change Event
     '''
 
-    OFF           = 0x00
+    OFF = 0x00
     E0_OR_AES_CCM = 0x01
-    AES_CCM       = 0x02
+    AES_CCM = 0x02
 
     ENCRYPTION_ENABLED_NAMES = {
-        OFF:           'OFF',
+        OFF: 'OFF',
         E0_OR_AES_CCM: 'E0_OR_AES_CCM',
-        AES_CCM:       'AES_CCM'
+        AES_CCM: 'AES_CCM',
     }
 
     @staticmethod
     def encryption_enabled_name(encryption_enabled):
-        return name_or_number(HCI_Encryption_Change_Event.ENCRYPTION_ENABLED_NAMES, encryption_enabled)
+        return name_or_number(
+            HCI_Encryption_Change_Event.ENCRYPTION_ENABLED_NAMES, encryption_enabled
+        )
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2),
-    ('lmp_features',      8)
-])
+@HCI_Event.event(
+    [('status', STATUS_SPEC), ('connection_handle', 2), ('lmp_features', 8)]
+)
 class HCI_Read_Remote_Supported_Features_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.11 Read Remote Supported Features Complete Event
@@ -4420,13 +4718,15 @@ class HCI_Read_Remote_Supported_Features_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2),
-    ('version',           1),
-    ('manufacturer_name', 2),
-    ('subversion',        2)
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('version', 1),
+        ('manufacturer_name', 2),
+        ('subversion', 2),
+    ]
+)
 class HCI_Read_Remote_Version_Information_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.12 Read Remote Version Information Complete Event
@@ -4434,11 +4734,13 @@ class HCI_Read_Remote_Version_Information_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('num_hci_command_packets', 1),
-    ('command_opcode',          {'size': 2, 'mapper': HCI_Command.command_name}),
-    ('return_parameters',       '*')
-])
+@HCI_Event.event(
+    [
+        ('num_hci_command_packets', 1),
+        ('command_opcode', {'size': 2, 'mapper': HCI_Command.command_name}),
+        ('return_parameters', '*'),
+    ]
+)
 class HCI_Command_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.14 Command Complete Event
@@ -4459,7 +4761,9 @@ class HCI_Command_Complete_Event(HCI_Event):
     def from_parameters(parameters):
         self = HCI_Command_Complete_Event.__new__(HCI_Command_Complete_Event)
         HCI_Event.__init__(self, self.event_code, parameters)
-        HCI_Object.init_from_bytes(self, parameters, 0, HCI_Command_Complete_Event.fields)
+        HCI_Object.init_from_bytes(
+            self, parameters, 0, HCI_Command_Complete_Event.fields
+        )
 
         # Parse the return parameters
         if type(self.return_parameters) is bytes and len(self.return_parameters) == 1:
@@ -4468,27 +4772,38 @@ class HCI_Command_Complete_Event(HCI_Event):
         else:
             cls = HCI_Command.command_classes.get(self.command_opcode)
             if cls and cls.return_parameters_fields:
-                self.return_parameters = HCI_Object.from_bytes(self.return_parameters, 0, cls.return_parameters_fields)
+                self.return_parameters = HCI_Object.from_bytes(
+                    self.return_parameters, 0, cls.return_parameters_fields
+                )
                 self.return_parameters.fields = cls.return_parameters_fields
 
         return self
 
     def __str__(self):
-        return f'{color(self.name, "magenta")}:\n' + HCI_Object.format_fields(self.__dict__, self.fields, '  ', {
-            'return_parameters': self.map_return_parameters
-        })
+        return f'{color(self.name, "magenta")}:\n' + HCI_Object.format_fields(
+            self.__dict__,
+            self.fields,
+            '  ',
+            {'return_parameters': self.map_return_parameters},
+        )
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',                  {'size': 1, 'mapper': lambda x: HCI_Command_Status_Event.status_name(x)}),
-    ('num_hci_command_packets', 1),
-    ('command_opcode',          {'size': 2, 'mapper': HCI_Command.command_name})
-])
+@HCI_Event.event(
+    [
+        (
+            'status',
+            {'size': 1, 'mapper': lambda x: HCI_Command_Status_Event.status_name(x)},
+        ),
+        ('num_hci_command_packets', 1),
+        ('command_opcode', {'size': 2, 'mapper': HCI_Command.command_name}),
+    ]
+)
 class HCI_Command_Status_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.15 Command Complete Event
     '''
+
     PENDING = 0
 
     @staticmethod
@@ -4500,11 +4815,13 @@ class HCI_Command_Status_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',   STATUS_SPEC),
-    ('bd_addr',  Address.parse_address),
-    ('new_role', {'size': 1, 'mapper': HCI_Constant.role_name})
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+        ('new_role', {'size': 1, 'mapper': HCI_Constant.role_name}),
+    ]
+)
 class HCI_Role_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.18 Role Change Event
@@ -4549,34 +4866,46 @@ class HCI_Number_Of_Completed_Packets_Event(HCI_Event):
     def __str__(self):
         lines = [
             color(self.name, 'magenta') + ':',
-            color('  number_of_handles:         ', 'cyan') + f'{len(self.connection_handles)}'
+            color('  number_of_handles:         ', 'cyan')
+            + f'{len(self.connection_handles)}',
         ]
         for i in range(len(self.connection_handles)):
-            lines.append(color(f'  connection_handle[{i}]:     ', 'cyan') + f'{self.connection_handles[i]}')
-            lines.append(color(f'  num_completed_packets[{i}]: ', 'cyan') + f'{self.num_completed_packets[i]}')
+            lines.append(
+                color(f'  connection_handle[{i}]:     ', 'cyan')
+                + f'{self.connection_handles[i]}'
+            )
+            lines.append(
+                color(f'  num_completed_packets[{i}]: ', 'cyan')
+                + f'{self.num_completed_packets[i]}'
+            )
         return '\n'.join(lines)
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2),
-    ('current_mode',      {'size': 1, 'mapper': lambda x: HCI_Mode_Change_Event.mode_name(x)}),
-    ('interval',          2)
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        (
+            'current_mode',
+            {'size': 1, 'mapper': lambda x: HCI_Mode_Change_Event.mode_name(x)},
+        ),
+        ('interval', 2),
+    ]
+)
 class HCI_Mode_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.20 Mode Change Event
     '''
 
     ACTIVE_MODE = 0x00
-    HOLD_MODE   = 0x01
-    SNIFF_MODE  = 0x02
+    HOLD_MODE = 0x01
+    SNIFF_MODE = 0x02
 
     MODE_NAMES = {
         ACTIVE_MODE: 'ACTIVE_MODE',
-        HOLD_MODE:   'HOLD_MODE',
-        SNIFF_MODE:  'SNIFF_MODE'
+        HOLD_MODE: 'HOLD_MODE',
+        SNIFF_MODE: 'SNIFF_MODE',
     }
 
     @staticmethod
@@ -4585,9 +4914,7 @@ class HCI_Mode_Change_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr', Address.parse_address)
-])
+@HCI_Event.event([('bd_addr', Address.parse_address)])
 class HCI_PIN_Code_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.22 PIN Code Request Event
@@ -4595,9 +4922,7 @@ class HCI_PIN_Code_Request_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr',  Address.parse_address)
-])
+@HCI_Event.event([('bd_addr', Address.parse_address)])
 class HCI_Link_Key_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.24 7.7.23 Link Key Request Event
@@ -4605,11 +4930,13 @@ class HCI_Link_Key_Request_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr',  Address.parse_address),
-    ('link_key', 16),
-    ('key_type', {'size': 1, 'mapper': HCI_Constant.link_key_type_name})
-])
+@HCI_Event.event(
+    [
+        ('bd_addr', Address.parse_address),
+        ('link_key', 16),
+        ('key_type', {'size': 1, 'mapper': HCI_Constant.link_key_type_name}),
+    ]
+)
 class HCI_Link_Key_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.24 Link Key Notification Event
@@ -4617,10 +4944,7 @@ class HCI_Link_Key_Notification_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('connection_handle', 2),
-    ('lmp_max_slots',     1)
-])
+@HCI_Event.event([('connection_handle', 2), ('lmp_max_slots', 1)])
 class HCI_Max_Slots_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.27 Max Slots Change Event
@@ -4628,11 +4952,9 @@ class HCI_Max_Slots_Change_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2),
-    ('clock_offset',      2)
-])
+@HCI_Event.event(
+    [('status', STATUS_SPEC), ('connection_handle', 2), ('clock_offset', 2)]
+)
 class HCI_Read_Clock_Offset_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.28 Read Clock Offset Complete Event
@@ -4640,11 +4962,9 @@ class HCI_Read_Clock_Offset_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2),
-    ('packet_type',       2)
-])
+@HCI_Event.event(
+    [('status', STATUS_SPEC), ('connection_handle', 2), ('packet_type', 2)]
+)
 class HCI_Connection_Packet_Type_Changed_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.29 Connection Packet Type Changed Event
@@ -4652,10 +4972,7 @@ class HCI_Connection_Packet_Type_Changed_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr',                   Address.parse_address),
-    ('page_scan_repetition_mode', 1)
-])
+@HCI_Event.event([('bd_addr', Address.parse_address), ('page_scan_repetition_mode', 1)])
 class HCI_Page_Scan_Repetition_Mode_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.31 Page Scan Repetition Mode Change Event
@@ -4670,12 +4987,12 @@ class HCI_Inquiry_Result_With_RSSI_Event(HCI_Event):
     '''
 
     RESPONSE_FIELDS = [
-        ('bd_addr',                   Address.parse_address),
+        ('bd_addr', Address.parse_address),
         ('page_scan_repetition_mode', 1),
-        ('reserved',                  1),
-        ('class_of_device',           {'size': 3, 'mapper': map_class_of_device}),
-        ('clock_offset',              2),
-        ('rssi',                      -1)
+        ('reserved', 1),
+        ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
+        ('clock_offset', 2),
+        ('rssi', -1),
     ]
 
     @staticmethod
@@ -4684,7 +5001,9 @@ class HCI_Inquiry_Result_With_RSSI_Event(HCI_Event):
         responses = []
         offset = 1
         for _ in range(num_responses):
-            response = HCI_Object.from_bytes(parameters, offset, HCI_Inquiry_Result_With_RSSI_Event.RESPONSE_FIELDS)
+            response = HCI_Object.from_bytes(
+                parameters, offset, HCI_Inquiry_Result_With_RSSI_Event.RESPONSE_FIELDS
+            )
             offset += 14
             responses.append(response)
 
@@ -4694,23 +5013,29 @@ class HCI_Inquiry_Result_With_RSSI_Event(HCI_Event):
         self.responses = responses[:]
 
         # Serialize the fields
-        parameters = bytes([HCI_INQUIRY_RESULT_WITH_RSSI_EVENT, len(responses)]) + b''.join([bytes(response) for response in responses])
+        parameters = bytes(
+            [HCI_INQUIRY_RESULT_WITH_RSSI_EVENT, len(responses)]
+        ) + b''.join([bytes(response) for response in responses])
 
         super().__init__(HCI_INQUIRY_RESULT_WITH_RSSI_EVENT, parameters)
 
     def __str__(self):
-        responses = '\n'.join([response.to_string(indentation='  ') for response in self.responses])
+        responses = '\n'.join(
+            [response.to_string(indentation='  ') for response in self.responses]
+        )
         return f'{color("HCI_INQUIRY_RESULT_WITH_RSSI_EVENT", "magenta")}:\n{responses}'
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',                STATUS_SPEC),
-    ('connection_handle',     2),
-    ('page_number',           1),
-    ('maximum_page_number',   1),
-    ('extended_lmp_features', 8)
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('page_number', 1),
+        ('maximum_page_number', 1),
+        ('extended_lmp_features', 8),
+    ]
+)
 class HCI_Read_Remote_Extended_Features_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.34 Read Remote Extended Features Complete Event
@@ -4718,17 +5043,35 @@ class HCI_Read_Remote_Extended_Features_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',                STATUS_SPEC),
-    ('connection_handle',     2),
-    ('bd_addr',               Address.parse_address),
-    ('link_type',             {'size': 1, 'mapper': lambda x: HCI_Synchronous_Connection_Complete_Event.link_type_name(x)}),
-    ('transmission_interval', 1),
-    ('retransmission_window', 1),
-    ('rx_packet_length',      2),
-    ('tx_packet_length',      2),
-    ('air_mode',              {'size': 1, 'mapper': lambda x: HCI_Synchronous_Connection_Complete_Event.air_mode_name(x)}),
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('bd_addr', Address.parse_address),
+        (
+            'link_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_Synchronous_Connection_Complete_Event.link_type_name(
+                    x
+                ),
+            },
+        ),
+        ('transmission_interval', 1),
+        ('retransmission_window', 1),
+        ('rx_packet_length', 2),
+        ('tx_packet_length', 2),
+        (
+            'air_mode',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_Synchronous_Connection_Complete_Event.air_mode_name(
+                    x
+                ),
+            },
+        ),
+    ]
+)
 class HCI_Synchronous_Connection_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.35 Synchronous Connection Complete Event
@@ -4738,40 +5081,46 @@ class HCI_Synchronous_Connection_Complete_Event(HCI_Event):
     ESCO_CONNECTION_LINK_TYPE = 0x02
 
     LINK_TYPE_NAMES = {
-        SCO_CONNECTION_LINK_TYPE:  'SCO',
-        ESCO_CONNECTION_LINK_TYPE: 'eSCO'
+        SCO_CONNECTION_LINK_TYPE: 'SCO',
+        ESCO_CONNECTION_LINK_TYPE: 'eSCO',
     }
 
-    U_LAW_LOG_AIR_MODE        = 0x00
-    A_LAW_LOG_AIR_MORE        = 0x01
-    CVSD_AIR_MODE             = 0x02
+    U_LAW_LOG_AIR_MODE = 0x00
+    A_LAW_LOG_AIR_MORE = 0x01
+    CVSD_AIR_MODE = 0x02
     TRANSPARENT_DATA_AIR_MODE = 0x03
 
     AIR_MODE_NAMES = {
-        U_LAW_LOG_AIR_MODE:        'u-law log',
-        A_LAW_LOG_AIR_MORE:        'A-law log',
-        CVSD_AIR_MODE:             'CVSD',
-        TRANSPARENT_DATA_AIR_MODE: 'Transparent Data'
+        U_LAW_LOG_AIR_MODE: 'u-law log',
+        A_LAW_LOG_AIR_MORE: 'A-law log',
+        CVSD_AIR_MODE: 'CVSD',
+        TRANSPARENT_DATA_AIR_MODE: 'Transparent Data',
     }
 
     @staticmethod
     def link_type_name(link_type):
-        return name_or_number(HCI_Synchronous_Connection_Complete_Event.LINK_TYPE_NAMES, link_type)
+        return name_or_number(
+            HCI_Synchronous_Connection_Complete_Event.LINK_TYPE_NAMES, link_type
+        )
 
     @staticmethod
     def air_mode_name(air_mode):
-        return name_or_number(HCI_Synchronous_Connection_Complete_Event.AIR_MODE_NAMES, air_mode)
+        return name_or_number(
+            HCI_Synchronous_Connection_Complete_Event.AIR_MODE_NAMES, air_mode
+        )
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',                STATUS_SPEC),
-    ('connection_handle',     2),
-    ('transmission_interval', 1),
-    ('retransmission_window', 1),
-    ('rx_packet_length',      2),
-    ('tx_packet_length',      2)
-])
+@HCI_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('transmission_interval', 1),
+        ('retransmission_window', 1),
+        ('rx_packet_length', 2),
+        ('tx_packet_length', 2),
+    ]
+)
 class HCI_Synchronous_Connection_Changed_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.36 Synchronous Connection Changed Event
@@ -4779,16 +5128,18 @@ class HCI_Synchronous_Connection_Changed_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('num_responses',             1),
-    ('bd_addr',                   Address.parse_address),
-    ('page_scan_repetition_mode', 1),
-    ('reserved',                  1),
-    ('class_of_device',          {'size': 3, 'mapper': map_class_of_device}),
-    ('clock_offset',              2),
-    ('rssi',                     -1),
-    ('extended_inquiry_response', 240),
-])
+@HCI_Event.event(
+    [
+        ('num_responses', 1),
+        ('bd_addr', Address.parse_address),
+        ('page_scan_repetition_mode', 1),
+        ('reserved', 1),
+        ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
+        ('clock_offset', 2),
+        ('rssi', -1),
+        ('extended_inquiry_response', 240),
+    ]
+)
 class HCI_Extended_Inquiry_Result_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.38 Extended Inquiry Result Event
@@ -4796,10 +5147,7 @@ class HCI_Extended_Inquiry_Result_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',            STATUS_SPEC),
-    ('connection_handle', 2)
-])
+@HCI_Event.event([('status', STATUS_SPEC), ('connection_handle', 2)])
 class HCI_Encryption_Key_Refresh_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.39 Encryption Key Refresh Complete Event
@@ -4807,9 +5155,7 @@ class HCI_Encryption_Key_Refresh_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr', Address.parse_address)
-])
+@HCI_Event.event([('bd_addr', Address.parse_address)])
 class HCI_IO_Capability_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.40 IO Capability Request Event
@@ -4817,12 +5163,17 @@ class HCI_IO_Capability_Request_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr',                     Address.parse_address),
-    ('io_capability',               {'size': 1, 'mapper': HCI_Constant.io_capability_name}),
-    ('oob_data_present',            1),
-    ('authentication_requirements', {'size': 1, 'mapper': HCI_Constant.authentication_requirements_name})
-])
+@HCI_Event.event(
+    [
+        ('bd_addr', Address.parse_address),
+        ('io_capability', {'size': 1, 'mapper': HCI_Constant.io_capability_name}),
+        ('oob_data_present', 1),
+        (
+            'authentication_requirements',
+            {'size': 1, 'mapper': HCI_Constant.authentication_requirements_name},
+        ),
+    ]
+)
 class HCI_IO_Capability_Response_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.41 IO Capability Response Event
@@ -4830,10 +5181,7 @@ class HCI_IO_Capability_Response_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr',       Address.parse_address),
-    ('numeric_value', 4)
-])
+@HCI_Event.event([('bd_addr', Address.parse_address), ('numeric_value', 4)])
 class HCI_User_Confirmation_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.42 User Confirmation Request Event
@@ -4841,9 +5189,7 @@ class HCI_User_Confirmation_Request_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr', Address.parse_address)
-])
+@HCI_Event.event([('bd_addr', Address.parse_address)])
 class HCI_User_Passkey_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.43 User Passkey Request Event
@@ -4851,10 +5197,7 @@ class HCI_User_Passkey_Request_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('status',  STATUS_SPEC),
-    ('bd_addr', Address.parse_address)
-])
+@HCI_Event.event([('status', STATUS_SPEC), ('bd_addr', Address.parse_address)])
 class HCI_Simple_Pairing_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.45 Simple Pairing Complete Event
@@ -4862,10 +5205,7 @@ class HCI_Simple_Pairing_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('connection_handle',        2),
-    ('link_supervision_timeout', 2)
-])
+@HCI_Event.event([('connection_handle', 2), ('link_supervision_timeout', 2)])
 class HCI_Link_Supervision_Timeout_Changed_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.46 Link Supervision Timeout Changed Event
@@ -4873,10 +5213,7 @@ class HCI_Link_Supervision_Timeout_Changed_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr', Address.parse_address),
-    ('passkey', 4)
-])
+@HCI_Event.event([('bd_addr', Address.parse_address), ('passkey', 4)])
 class HCI_User_Passkey_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.48 User Passkey Notification Event
@@ -4884,10 +5221,7 @@ class HCI_User_Passkey_Notification_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([
-    ('bd_addr',                 Address.parse_address),
-    ('host_supported_features', 8)
-])
+@HCI_Event.event([('bd_addr', Address.parse_address), ('host_supported_features', 8)])
 class HCI_Remote_Host_Supported_Features_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.50 Remote Host Supported Features Notification Event
@@ -4899,6 +5233,7 @@ class HCI_AclDataPacket(HCI_Packet):
     '''
     See Bluetooth spec @ 5.4.2 HCI ACL Data Packets
     '''
+
     hci_packet_type = HCI_ACL_DATA_PACKET
 
     @staticmethod
@@ -4911,11 +5246,16 @@ class HCI_AclDataPacket(HCI_Packet):
         data = packet[5:]
         if len(data) != data_total_length:
             raise ValueError('invalid packet length')
-        return HCI_AclDataPacket(connection_handle, pb_flag, bc_flag, data_total_length, data)
+        return HCI_AclDataPacket(
+            connection_handle, pb_flag, bc_flag, data_total_length, data
+        )
 
     def to_bytes(self):
         h = (self.pb_flag << 12) | (self.bc_flag << 14) | self.connection_handle
-        return struct.pack('<BHH', HCI_ACL_DATA_PACKET, h, self.data_total_length) + self.data
+        return (
+            struct.pack('<BHH', HCI_ACL_DATA_PACKET, h, self.data_total_length)
+            + self.data
+        )
 
     def __init__(self, connection_handle, pb_flag, bc_flag, data_total_length, data):
         self.connection_handle = connection_handle
@@ -4934,14 +5274,17 @@ class HCI_AclDataPacket(HCI_Packet):
 # -----------------------------------------------------------------------------
 class HCI_AclDataPacketAssembler:
     def __init__(self, callback):
-        self.callback         = callback
-        self.current_data     = None
+        self.callback = callback
+        self.current_data = None
         self.l2cap_pdu_length = 0
 
     def feed_packet(self, packet):
-        if packet.pb_flag == HCI_ACL_PB_FIRST_NON_FLUSHABLE or packet.pb_flag == HCI_ACL_PB_FIRST_FLUSHABLE:
-            (l2cap_pdu_length,)   = struct.unpack_from('<H', packet.data, 0)
-            self.current_data     = packet.data
+        if (
+            packet.pb_flag == HCI_ACL_PB_FIRST_NON_FLUSHABLE
+            or packet.pb_flag == HCI_ACL_PB_FIRST_FLUSHABLE
+        ):
+            (l2cap_pdu_length,) = struct.unpack_from('<H', packet.data, 0)
+            self.current_data = packet.data
             self.l2cap_pdu_length = l2cap_pdu_length
         elif packet.pb_flag == HCI_ACL_PB_CONTINUATION:
             if self.current_data is None:
@@ -4955,11 +5298,11 @@ class HCI_AclDataPacketAssembler:
             self.callback(self.current_data)
 
             # Reset
-            self.current_data     = None
+            self.current_data = None
             self.l2cap_pdu_length = 0
         else:
             # Sanity check
             if len(self.current_data) > self.l2cap_pdu_length + 4:
                 logger.warning('!!! ACL data exceeds L2CAP PDU')
-                self.current_data     = None
+                self.current_data = None
                 self.l2cap_pdu_length = 0

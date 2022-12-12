@@ -30,10 +30,10 @@ def basic_frame_check(x):
     parsed_bytes = bytes(parsed)
     if len(serialized) < 500:
         print('Parsed Bytes:', parsed_bytes.hex())
-    assert(parsed_bytes == serialized)
+    assert parsed_bytes == serialized
     x_str = str(x)
     parsed_str = str(parsed)
-    assert(x_str == parsed_str)
+    assert x_str == parsed_str
 
 
 # -----------------------------------------------------------------------------

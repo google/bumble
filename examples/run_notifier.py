@@ -23,10 +23,7 @@ import logging
 
 from bumble.device import Device, Connection
 from bumble.transport import open_transport_or_link
-from bumble.gatt import (
-    Service,
-    Characteristic
-)
+from bumble.gatt import Service, Characteristic
 
 
 # -----------------------------------------------------------------------------
@@ -41,7 +38,9 @@ class Listener(Device.Listener, Connection.Listener):
     def on_disconnection(self, reason):
         print(f'### Disconnected, reason={reason}')
 
-    def on_characteristic_subscription(self, connection, characteristic, notify_enabled, indicate_enabled):
+    def on_characteristic_subscription(
+        self, connection, characteristic, notify_enabled, indicate_enabled
+    ):
         print(
             f'$$$ Characteristic subscription for handle {characteristic.handle} from {connection}: '
             f'notify {"enabled" if notify_enabled else "disabled"}, '
@@ -54,6 +53,7 @@ class Listener(Device.Listener, Connection.Listener):
 # -----------------------------------------------------------------------------
 def on_my_characteristic_subscription(peer, enabled):
     print(f'### My characteristic from {peer}: {"enabled" if enabled else "disabled"}')
+
 
 # -----------------------------------------------------------------------------
 async def main():
@@ -75,24 +75,24 @@ async def main():
             '486F64C6-4B5F-4B3B-8AFF-EDE134A8446A',
             Characteristic.READ | Characteristic.NOTIFY,
             Characteristic.READABLE,
-            bytes([0x40])
+            bytes([0x40]),
         )
         characteristic2 = Characteristic(
             '8EBDEBAE-0017-418E-8D3B-3A3809492165',
             Characteristic.READ | Characteristic.INDICATE,
             Characteristic.READABLE,
-            bytes([0x41])
+            bytes([0x41]),
         )
         characteristic3 = Characteristic(
             '8EBDEBAE-0017-418E-8D3B-3A3809492165',
             Characteristic.READ | Characteristic.NOTIFY | Characteristic.INDICATE,
             Characteristic.READABLE,
-            bytes([0x42])
+            bytes([0x42]),
         )
         characteristic3.on('subscription', on_my_characteristic_subscription)
         custom_service = Service(
             '50DB505C-8AC4-4738-8448-3B1D9CC09CC5',
-            [characteristic1, characteristic2, characteristic3]
+            [characteristic1, characteristic2, characteristic3],
         )
         device.add_services([custom_service])
 
@@ -123,5 +123,5 @@ async def main():
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

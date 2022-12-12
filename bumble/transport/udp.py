@@ -53,10 +53,13 @@ async def open_udp_transport(spec):
     local, remote = spec.split(',')
     local_host, local_port = local.split(':')
     remote_host, remote_port = remote.split(':')
-    udp_transport, packet_source = await asyncio.get_running_loop().create_datagram_endpoint(
+    (
+        udp_transport,
+        packet_source,
+    ) = await asyncio.get_running_loop().create_datagram_endpoint(
         lambda: UdpPacketSource(),
         local_addr=(local_host, int(local_port)),
-        remote_addr=(remote_host, int(remote_port))
+        remote_addr=(remote_host, int(remote_port)),
     )
     packet_sink = UdpPacketSink(udp_transport)
 

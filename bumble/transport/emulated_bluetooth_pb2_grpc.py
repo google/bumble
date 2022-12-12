@@ -39,20 +39,20 @@ class EmulatedBluetoothServiceStub(object):
             channel: A grpc.Channel.
         """
         self.registerClassicPhy = channel.stream_stream(
-                '/android.emulation.bluetooth.EmulatedBluetoothService/registerClassicPhy',
-                request_serializer=emulated__bluetooth__pb2.RawData.SerializeToString,
-                response_deserializer=emulated__bluetooth__pb2.RawData.FromString,
-                )
+            '/android.emulation.bluetooth.EmulatedBluetoothService/registerClassicPhy',
+            request_serializer=emulated__bluetooth__pb2.RawData.SerializeToString,
+            response_deserializer=emulated__bluetooth__pb2.RawData.FromString,
+        )
         self.registerBlePhy = channel.stream_stream(
-                '/android.emulation.bluetooth.EmulatedBluetoothService/registerBlePhy',
-                request_serializer=emulated__bluetooth__pb2.RawData.SerializeToString,
-                response_deserializer=emulated__bluetooth__pb2.RawData.FromString,
-                )
+            '/android.emulation.bluetooth.EmulatedBluetoothService/registerBlePhy',
+            request_serializer=emulated__bluetooth__pb2.RawData.SerializeToString,
+            response_deserializer=emulated__bluetooth__pb2.RawData.FromString,
+        )
         self.registerHCIDevice = channel.stream_stream(
-                '/android.emulation.bluetooth.EmulatedBluetoothService/registerHCIDevice',
-                request_serializer=emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
-                response_deserializer=emulated__bluetooth__packets__pb2.HCIPacket.FromString,
-                )
+            '/android.emulation.bluetooth.EmulatedBluetoothService/registerHCIDevice',
+            request_serializer=emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
+            response_deserializer=emulated__bluetooth__packets__pb2.HCIPacket.FromString,
+        )
 
 
 class EmulatedBluetoothServiceServicer(object):
@@ -121,28 +121,29 @@ class EmulatedBluetoothServiceServicer(object):
 
 def add_EmulatedBluetoothServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'registerClassicPhy': grpc.stream_stream_rpc_method_handler(
-                    servicer.registerClassicPhy,
-                    request_deserializer=emulated__bluetooth__pb2.RawData.FromString,
-                    response_serializer=emulated__bluetooth__pb2.RawData.SerializeToString,
-            ),
-            'registerBlePhy': grpc.stream_stream_rpc_method_handler(
-                    servicer.registerBlePhy,
-                    request_deserializer=emulated__bluetooth__pb2.RawData.FromString,
-                    response_serializer=emulated__bluetooth__pb2.RawData.SerializeToString,
-            ),
-            'registerHCIDevice': grpc.stream_stream_rpc_method_handler(
-                    servicer.registerHCIDevice,
-                    request_deserializer=emulated__bluetooth__packets__pb2.HCIPacket.FromString,
-                    response_serializer=emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
-            ),
+        'registerClassicPhy': grpc.stream_stream_rpc_method_handler(
+            servicer.registerClassicPhy,
+            request_deserializer=emulated__bluetooth__pb2.RawData.FromString,
+            response_serializer=emulated__bluetooth__pb2.RawData.SerializeToString,
+        ),
+        'registerBlePhy': grpc.stream_stream_rpc_method_handler(
+            servicer.registerBlePhy,
+            request_deserializer=emulated__bluetooth__pb2.RawData.FromString,
+            response_serializer=emulated__bluetooth__pb2.RawData.SerializeToString,
+        ),
+        'registerHCIDevice': grpc.stream_stream_rpc_method_handler(
+            servicer.registerHCIDevice,
+            request_deserializer=emulated__bluetooth__packets__pb2.HCIPacket.FromString,
+            response_serializer=emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'android.emulation.bluetooth.EmulatedBluetoothService', rpc_method_handlers)
+        'android.emulation.bluetooth.EmulatedBluetoothService', rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
 
 
- # This class is part of an EXPERIMENTAL API.
+# This class is part of an EXPERIMENTAL API.
 class EmulatedBluetoothService(object):
     """An Emulated Bluetooth Service exposes the emulated bluetooth chip from the
     android emulator. It allows you to register emulated bluetooth devices and
@@ -156,52 +157,88 @@ class EmulatedBluetoothService(object):
     """
 
     @staticmethod
-    def registerClassicPhy(request_iterator,
+    def registerClassicPhy(
+        request_iterator,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.stream_stream(
+            request_iterator,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_stream(request_iterator, target, '/android.emulation.bluetooth.EmulatedBluetoothService/registerClassicPhy',
+            '/android.emulation.bluetooth.EmulatedBluetoothService/registerClassicPhy',
             emulated__bluetooth__pb2.RawData.SerializeToString,
             emulated__bluetooth__pb2.RawData.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
 
     @staticmethod
-    def registerBlePhy(request_iterator,
+    def registerBlePhy(
+        request_iterator,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.stream_stream(
+            request_iterator,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_stream(request_iterator, target, '/android.emulation.bluetooth.EmulatedBluetoothService/registerBlePhy',
+            '/android.emulation.bluetooth.EmulatedBluetoothService/registerBlePhy',
             emulated__bluetooth__pb2.RawData.SerializeToString,
             emulated__bluetooth__pb2.RawData.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
 
     @staticmethod
-    def registerHCIDevice(request_iterator,
+    def registerHCIDevice(
+        request_iterator,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.stream_stream(
+            request_iterator,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_stream(request_iterator, target, '/android.emulation.bluetooth.EmulatedBluetoothService/registerHCIDevice',
+            '/android.emulation.bluetooth.EmulatedBluetoothService/registerHCIDevice',
             emulated__bluetooth__packets__pb2.HCIPacket.SerializeToString,
             emulated__bluetooth__packets__pb2.HCIPacket.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )

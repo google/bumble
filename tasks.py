@@ -27,6 +27,7 @@ ns = Collection()
 build_tasks = Collection()
 ns.add_collection(build_tasks, name="build")
 
+
 @task
 def build(ctx, install=False):
     if install:
@@ -34,17 +35,22 @@ def build(ctx, install=False):
 
     ctx.run("python -m build")
 
+
 build_tasks.add_task(build, default=True)
+
 
 @task
 def release_build(ctx):
     build(ctx, install=True)
 
+
 build_tasks.add_task(release_build, name="release")
+
 
 @task
 def mkdocs(ctx):
     ctx.run("mkdocs build -f docs/mkdocs/mkdocs.yml")
+
 
 build_tasks.add_task(mkdocs, name="mkdocs")
 
@@ -70,10 +76,13 @@ def test(ctx, filter=None, junit=False, install=False, html=False, verbose=0):
         args += f" -{'v' * verbose}"
     ctx.run(f"python -m pytest {os.path.join(ROOT_DIR, 'tests')} {args}")
 
+
 test_tasks.add_task(test, default=True)
+
 
 @task
 def release_test(ctx):
     test(ctx, install=True)
+
 
 test_tasks.add_task(release_test, name="release")

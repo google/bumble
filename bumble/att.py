@@ -31,6 +31,8 @@ from .hci import *
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
+# fmt: off
+
 ATT_CID = 0x04
 
 ATT_ERROR_RESPONSE              = 0x01
@@ -166,6 +168,8 @@ HANDLE_FIELD_SPEC    = {'size': 2, 'mapper': lambda x: f'0x{x:04X}'}
 UUID_2_16_FIELD_SPEC = lambda x, y: UUID.parse_uuid(x, y)    # noqa: E731
 UUID_2_FIELD_SPEC    = lambda x, y: UUID.parse_uuid_2(x, y)  # noqa: E731
 
+# fmt: on
+
 
 # -----------------------------------------------------------------------------
 # Utils
@@ -196,6 +200,7 @@ class ATT_PDU:
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.3 ATTRIBUTE PDU
     '''
+
     pdu_classes = {}
     op_code = 0
 
@@ -274,11 +279,13 @@ class ATT_PDU:
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('request_opcode_in_error',   {'size': 1, 'mapper': ATT_PDU.pdu_name}),
-    ('attribute_handle_in_error', HANDLE_FIELD_SPEC),
-    ('error_code',                {'size': 1, 'mapper': ATT_PDU.error_name})
-])
+@ATT_PDU.subclass(
+    [
+        ('request_opcode_in_error', {'size': 1, 'mapper': ATT_PDU.pdu_name}),
+        ('attribute_handle_in_error', HANDLE_FIELD_SPEC),
+        ('error_code', {'size': 1, 'mapper': ATT_PDU.error_name}),
+    ]
+)
 class ATT_Error_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.1.1 Error Response
@@ -286,9 +293,7 @@ class ATT_Error_Response(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('client_rx_mtu', 2)
-])
+@ATT_PDU.subclass([('client_rx_mtu', 2)])
 class ATT_Exchange_MTU_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.2.1 Exchange MTU Request
@@ -296,9 +301,7 @@ class ATT_Exchange_MTU_Request(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('server_rx_mtu', 2)
-])
+@ATT_PDU.subclass([('server_rx_mtu', 2)])
 class ATT_Exchange_MTU_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.2.2 Exchange MTU Response
@@ -306,10 +309,9 @@ class ATT_Exchange_MTU_Response(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('starting_handle', HANDLE_FIELD_SPEC),
-    ('ending_handle',   HANDLE_FIELD_SPEC)
-])
+@ATT_PDU.subclass(
+    [('starting_handle', HANDLE_FIELD_SPEC), ('ending_handle', HANDLE_FIELD_SPEC)]
+)
 class ATT_Find_Information_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.3.1 Find Information Request
@@ -317,10 +319,7 @@ class ATT_Find_Information_Request(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('format',           1),
-    ('information_data', '*')
-])
+@ATT_PDU.subclass([('format', 1), ('information_data', '*')])
 class ATT_Find_Information_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.3.2 Find Information Response
@@ -332,7 +331,7 @@ class ATT_Find_Information_Response(ATT_PDU):
         uuid_size = 2 if self.format == 1 else 16
         while offset + uuid_size <= len(self.information_data):
             handle = struct.unpack_from('<H', self.information_data, offset)[0]
-            uuid   = self.information_data[2 + offset:2 + offset + uuid_size]
+            uuid = self.information_data[2 + offset : 2 + offset + uuid_size]
             self.information.append((handle, uuid))
             offset += 2 + uuid_size
 
@@ -346,20 +345,33 @@ class ATT_Find_Information_Response(ATT_PDU):
 
     def __str__(self):
         result = color(self.name, 'yellow')
-        result += ':\n' + HCI_Object.format_fields(self.__dict__, [
-            ('format',       1),
-            ('information', {'mapper': lambda x: ', '.join([f'0x{handle:04X}:{uuid.hex()}' for handle, uuid in x])})
-        ], '  ')
+        result += ':\n' + HCI_Object.format_fields(
+            self.__dict__,
+            [
+                ('format', 1),
+                (
+                    'information',
+                    {
+                        'mapper': lambda x: ', '.join(
+                            [f'0x{handle:04X}:{uuid.hex()}' for handle, uuid in x]
+                        )
+                    },
+                ),
+            ],
+            '  ',
+        )
         return result
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('starting_handle', HANDLE_FIELD_SPEC),
-    ('ending_handle',   HANDLE_FIELD_SPEC),
-    ('attribute_type',  UUID_2_FIELD_SPEC),
-    ('attribute_value', '*')
-])
+@ATT_PDU.subclass(
+    [
+        ('starting_handle', HANDLE_FIELD_SPEC),
+        ('ending_handle', HANDLE_FIELD_SPEC),
+        ('attribute_type', UUID_2_FIELD_SPEC),
+        ('attribute_value', '*'),
+    ]
+)
 class ATT_Find_By_Type_Value_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.3.3 Find By Type Value Request
@@ -367,9 +379,7 @@ class ATT_Find_By_Type_Value_Request(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('handles_information_list', '*')
-])
+@ATT_PDU.subclass([('handles_information_list', '*')])
 class ATT_Find_By_Type_Value_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.3.4 Find By Type Value Response
@@ -379,7 +389,9 @@ class ATT_Find_By_Type_Value_Response(ATT_PDU):
         self.handles_information = []
         offset = 0
         while offset + 4 <= len(self.handles_information_list):
-            found_attribute_handle, group_end_handle = struct.unpack_from('<HH', self.handles_information_list, offset)
+            found_attribute_handle, group_end_handle = struct.unpack_from(
+                '<HH', self.handles_information_list, offset
+            )
             self.handles_information.append((found_attribute_handle, group_end_handle))
             offset += 4
 
@@ -393,18 +405,34 @@ class ATT_Find_By_Type_Value_Response(ATT_PDU):
 
     def __str__(self):
         result = color(self.name, 'yellow')
-        result += ':\n' + HCI_Object.format_fields(self.__dict__, [
-            ('handles_information', {'mapper': lambda x: ', '.join([f'0x{handle1:04X}-0x{handle2:04X}' for handle1, handle2 in x])})
-        ], '  ')
+        result += ':\n' + HCI_Object.format_fields(
+            self.__dict__,
+            [
+                (
+                    'handles_information',
+                    {
+                        'mapper': lambda x: ', '.join(
+                            [
+                                f'0x{handle1:04X}-0x{handle2:04X}'
+                                for handle1, handle2 in x
+                            ]
+                        )
+                    },
+                )
+            ],
+            '  ',
+        )
         return result
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('starting_handle', HANDLE_FIELD_SPEC),
-    ('ending_handle',   HANDLE_FIELD_SPEC),
-    ('attribute_type',  UUID_2_16_FIELD_SPEC)
-])
+@ATT_PDU.subclass(
+    [
+        ('starting_handle', HANDLE_FIELD_SPEC),
+        ('ending_handle', HANDLE_FIELD_SPEC),
+        ('attribute_type', UUID_2_16_FIELD_SPEC),
+    ]
+)
 class ATT_Read_By_Type_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.1 Read By Type Request
@@ -412,10 +440,7 @@ class ATT_Read_By_Type_Request(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('length',              1),
-    ('attribute_data_list', '*')
-])
+@ATT_PDU.subclass([('length', 1), ('attribute_data_list', '*')])
 class ATT_Read_By_Type_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.2 Read By Type Response
@@ -424,9 +449,15 @@ class ATT_Read_By_Type_Response(ATT_PDU):
     def parse_attribute_data_list(self):
         self.attributes = []
         offset = 0
-        while self.length != 0 and offset + self.length <= len(self.attribute_data_list):
-            attribute_handle, = struct.unpack_from('<H', self.attribute_data_list, offset)
-            attribute_value = self.attribute_data_list[offset + 2:offset + self.length]
+        while self.length != 0 and offset + self.length <= len(
+            self.attribute_data_list
+        ):
+            (attribute_handle,) = struct.unpack_from(
+                '<H', self.attribute_data_list, offset
+            )
+            attribute_value = self.attribute_data_list[
+                offset + 2 : offset + self.length
+            ]
             self.attributes.append((attribute_handle, attribute_value))
             offset += self.length
 
@@ -440,17 +471,26 @@ class ATT_Read_By_Type_Response(ATT_PDU):
 
     def __str__(self):
         result = color(self.name, 'yellow')
-        result += ':\n' + HCI_Object.format_fields(self.__dict__, [
-            ('length',     1),
-            ('attributes', {'mapper': lambda x: ', '.join([f'0x{handle:04X}:{value.hex()}' for handle, value in x])})
-        ], '  ')
+        result += ':\n' + HCI_Object.format_fields(
+            self.__dict__,
+            [
+                ('length', 1),
+                (
+                    'attributes',
+                    {
+                        'mapper': lambda x: ', '.join(
+                            [f'0x{handle:04X}:{value.hex()}' for handle, value in x]
+                        )
+                    },
+                ),
+            ],
+            '  ',
+        )
         return result
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_handle', HANDLE_FIELD_SPEC)
-])
+@ATT_PDU.subclass([('attribute_handle', HANDLE_FIELD_SPEC)])
 class ATT_Read_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.3 Read Request
@@ -458,9 +498,7 @@ class ATT_Read_Request(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_value', '*')
-])
+@ATT_PDU.subclass([('attribute_value', '*')])
 class ATT_Read_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.4 Read Response
@@ -468,10 +506,7 @@ class ATT_Read_Response(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_handle', HANDLE_FIELD_SPEC),
-    ('value_offset',     2)
-])
+@ATT_PDU.subclass([('attribute_handle', HANDLE_FIELD_SPEC), ('value_offset', 2)])
 class ATT_Read_Blob_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.5 Read Blob Request
@@ -479,9 +514,7 @@ class ATT_Read_Blob_Request(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('part_attribute_value', '*')
-])
+@ATT_PDU.subclass([('part_attribute_value', '*')])
 class ATT_Read_Blob_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.6 Read Blob Response
@@ -489,9 +522,7 @@ class ATT_Read_Blob_Response(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('set_of_handles', '*')
-])
+@ATT_PDU.subclass([('set_of_handles', '*')])
 class ATT_Read_Multiple_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.7 Read Multiple Request
@@ -499,9 +530,7 @@ class ATT_Read_Multiple_Request(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('set_of_values', '*')
-])
+@ATT_PDU.subclass([('set_of_values', '*')])
 class ATT_Read_Multiple_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.8 Read Multiple Response
@@ -509,11 +538,13 @@ class ATT_Read_Multiple_Response(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('starting_handle',      HANDLE_FIELD_SPEC),
-    ('ending_handle',        HANDLE_FIELD_SPEC),
-    ('attribute_group_type', UUID_2_16_FIELD_SPEC)
-])
+@ATT_PDU.subclass(
+    [
+        ('starting_handle', HANDLE_FIELD_SPEC),
+        ('ending_handle', HANDLE_FIELD_SPEC),
+        ('attribute_group_type', UUID_2_16_FIELD_SPEC),
+    ]
+)
 class ATT_Read_By_Group_Type_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.9 Read by Group Type Request
@@ -521,10 +552,7 @@ class ATT_Read_By_Group_Type_Request(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('length',              1),
-    ('attribute_data_list', '*')
-])
+@ATT_PDU.subclass([('length', 1), ('attribute_data_list', '*')])
 class ATT_Read_By_Group_Type_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.10 Read by Group Type Response
@@ -533,10 +561,18 @@ class ATT_Read_By_Group_Type_Response(ATT_PDU):
     def parse_attribute_data_list(self):
         self.attributes = []
         offset = 0
-        while self.length != 0 and offset + self.length <= len(self.attribute_data_list):
-            attribute_handle, end_group_handle = struct.unpack_from('<HH', self.attribute_data_list, offset)
-            attribute_value = self.attribute_data_list[offset + 4:offset + self.length]
-            self.attributes.append((attribute_handle, end_group_handle, attribute_value))
+        while self.length != 0 and offset + self.length <= len(
+            self.attribute_data_list
+        ):
+            attribute_handle, end_group_handle = struct.unpack_from(
+                '<HH', self.attribute_data_list, offset
+            )
+            attribute_value = self.attribute_data_list[
+                offset + 4 : offset + self.length
+            ]
+            self.attributes.append(
+                (attribute_handle, end_group_handle, attribute_value)
+            )
             offset += self.length
 
     def __init__(self, *args, **kwargs):
@@ -549,18 +585,29 @@ class ATT_Read_By_Group_Type_Response(ATT_PDU):
 
     def __str__(self):
         result = color(self.name, 'yellow')
-        result += ':\n' + HCI_Object.format_fields(self.__dict__, [
-            ('length',     1),
-            ('attributes', {'mapper': lambda x: ', '.join([f'0x{handle:04X}-0x{end:04X}:{value.hex()}' for handle, end, value in x])})
-        ], '  ')
+        result += ':\n' + HCI_Object.format_fields(
+            self.__dict__,
+            [
+                ('length', 1),
+                (
+                    'attributes',
+                    {
+                        'mapper': lambda x: ', '.join(
+                            [
+                                f'0x{handle:04X}-0x{end:04X}:{value.hex()}'
+                                for handle, end, value in x
+                            ]
+                        )
+                    },
+                ),
+            ],
+            '  ',
+        )
         return result
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_handle', HANDLE_FIELD_SPEC),
-    ('attribute_value',  '*')
-])
+@ATT_PDU.subclass([('attribute_handle', HANDLE_FIELD_SPEC), ('attribute_value', '*')])
 class ATT_Write_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.5.1 Write Request
@@ -576,10 +623,7 @@ class ATT_Write_Response(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_handle', HANDLE_FIELD_SPEC),
-    ('attribute_value',  '*')
-])
+@ATT_PDU.subclass([('attribute_handle', HANDLE_FIELD_SPEC), ('attribute_value', '*')])
 class ATT_Write_Command(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.5.3 Write Command
@@ -587,11 +631,13 @@ class ATT_Write_Command(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_handle', HANDLE_FIELD_SPEC),
-    ('attribute_value',  '*')
-    # ('authentication_signature', 'TODO')
-])
+@ATT_PDU.subclass(
+    [
+        ('attribute_handle', HANDLE_FIELD_SPEC),
+        ('attribute_value', '*')
+        # ('authentication_signature', 'TODO')
+    ]
+)
 class ATT_Signed_Write_Command(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.5.4 Signed Write Command
@@ -599,11 +645,13 @@ class ATT_Signed_Write_Command(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_handle',     HANDLE_FIELD_SPEC),
-    ('value_offset',         2),
-    ('part_attribute_value', '*')
-])
+@ATT_PDU.subclass(
+    [
+        ('attribute_handle', HANDLE_FIELD_SPEC),
+        ('value_offset', 2),
+        ('part_attribute_value', '*'),
+    ]
+)
 class ATT_Prepare_Write_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.6.1 Prepare Write Request
@@ -611,11 +659,13 @@ class ATT_Prepare_Write_Request(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_handle',     HANDLE_FIELD_SPEC),
-    ('value_offset',         2),
-    ('part_attribute_value', '*')
-])
+@ATT_PDU.subclass(
+    [
+        ('attribute_handle', HANDLE_FIELD_SPEC),
+        ('value_offset', 2),
+        ('part_attribute_value', '*'),
+    ]
+)
 class ATT_Prepare_Write_Response(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.6.2 Prepare Write Response
@@ -639,10 +689,7 @@ class ATT_Execute_Write_Response(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_handle', HANDLE_FIELD_SPEC),
-    ('attribute_value',  '*')
-])
+@ATT_PDU.subclass([('attribute_handle', HANDLE_FIELD_SPEC), ('attribute_value', '*')])
 class ATT_Handle_Value_Notification(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.7.1 Handle Value Notification
@@ -650,10 +697,7 @@ class ATT_Handle_Value_Notification(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([
-    ('attribute_handle', HANDLE_FIELD_SPEC),
-    ('attribute_value',  '*')
-])
+@ATT_PDU.subclass([('attribute_handle', HANDLE_FIELD_SPEC), ('attribute_value', '*')])
 class ATT_Handle_Value_Indication(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.7.2 Handle Value Indication
@@ -671,20 +715,20 @@ class ATT_Handle_Value_Confirmation(ATT_PDU):
 # -----------------------------------------------------------------------------
 class Attribute(EventEmitter):
     # Permission flags
-    READABLE                      = 0x01
-    WRITEABLE                     = 0x02
-    READ_REQUIRES_ENCRYPTION      = 0x04
-    WRITE_REQUIRES_ENCRYPTION     = 0x08
-    READ_REQUIRES_AUTHENTICATION  = 0x10
+    READABLE = 0x01
+    WRITEABLE = 0x02
+    READ_REQUIRES_ENCRYPTION = 0x04
+    WRITE_REQUIRES_ENCRYPTION = 0x08
+    READ_REQUIRES_AUTHENTICATION = 0x10
     WRITE_REQUIRES_AUTHENTICATION = 0x20
-    READ_REQUIRES_AUTHORIZATION   = 0x40
-    WRITE_REQUIRES_AUTHORIZATION  = 0x80
+    READ_REQUIRES_AUTHORIZATION = 0x40
+    WRITE_REQUIRES_AUTHORIZATION = 0x80
 
-    def __init__(self, attribute_type, permissions, value = b''):
+    def __init__(self, attribute_type, permissions, value=b''):
         EventEmitter.__init__(self)
-        self.handle           = 0
+        self.handle = 0
         self.end_group_handle = 0
-        self.permissions      = permissions
+        self.permissions = permissions
 
         # Convert the type to a UUID object if it isn't already
         if type(attribute_type) is str:

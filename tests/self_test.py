@@ -50,18 +50,18 @@ class TwoDevices:
 
         self.link = LocalLink()
         self.controllers = [
-            Controller('C1', link = self.link),
-            Controller('C2', link = self.link)
+            Controller('C1', link=self.link),
+            Controller('C2', link=self.link),
         ]
         self.devices = [
             Device(
-                address = 'F0:F1:F2:F3:F4:F5',
-                host    = Host(self.controllers[0], AsyncPipeSink(self.controllers[0]))
+                address='F0:F1:F2:F3:F4:F5',
+                host=Host(self.controllers[0], AsyncPipeSink(self.controllers[0])),
             ),
             Device(
-                address = 'F5:F4:F3:F2:F1:F0',
-                host    = Host(self.controllers[1], AsyncPipeSink(self.controllers[1]))
-            )
+                address='F5:F4:F3:F2:F1:F0',
+                host=Host(self.controllers[1], AsyncPipeSink(self.controllers[1])),
+            ),
         ]
 
         self.paired = [None, None]
@@ -80,8 +80,12 @@ async def test_self_connection():
     two_devices = TwoDevices()
 
     # Attach listeners
-    two_devices.devices[0].on('connection', lambda connection: two_devices.on_connection(0, connection))
-    two_devices.devices[1].on('connection', lambda connection: two_devices.on_connection(1, connection))
+    two_devices.devices[0].on(
+        'connection', lambda connection: two_devices.on_connection(0, connection)
+    )
+    two_devices.devices[1].on(
+        'connection', lambda connection: two_devices.on_connection(1, connection)
+    )
 
     # Start
     await two_devices.devices[0].power_on()
@@ -91,8 +95,8 @@ async def test_self_connection():
     await two_devices.devices[0].connect(two_devices.devices[1].random_address)
 
     # Check the post conditions
-    assert(two_devices.connections[0] is not None)
-    assert(two_devices.connections[1] is not None)
+    assert two_devices.connections[0] is not None
+    assert two_devices.connections[1] is not None
 
 
 # -----------------------------------------------------------------------------
@@ -106,25 +110,25 @@ async def test_self_gatt():
         '3A143AD7-D4A7-436B-97D6-5B62C315E833',
         Characteristic.READ,
         Characteristic.READABLE,
-        bytes([1, 2, 3])
+        bytes([1, 2, 3]),
     )
     c2 = Characteristic(
         '9557CCE2-DB37-46EB-94C4-50AE5B9CB0F8',
         Characteristic.READ | Characteristic.WRITE,
         Characteristic.READABLE | Characteristic.WRITEABLE,
-        bytes([4, 5, 6])
+        bytes([4, 5, 6]),
     )
     c3 = Characteristic(
         '84FC1A2E-C52D-4A2D-B8C3-8855BAB86638',
         Characteristic.READ | Characteristic.WRITE_WITHOUT_RESPONSE,
         Characteristic.READABLE | Characteristic.WRITEABLE,
-        bytes([7, 8, 9])
+        bytes([7, 8, 9]),
     )
     c4 = Characteristic(
         '84FC1A2E-C52D-4A2D-B8C3-8855BAB86638',
         Characteristic.READ | Characteristic.NOTIFY | Characteristic.INDICATE,
         Characteristic.READABLE,
-        bytes([1, 1, 1])
+        bytes([1, 1, 1]),
     )
 
     s1 = Service('8140E247-04F0-42C1-BC34-534C344DAFCA', [c1, c2, c3])
@@ -136,31 +140,33 @@ async def test_self_gatt():
     await two_devices.devices[1].power_on()
 
     # Connect the two devices
-    connection = await two_devices.devices[0].connect(two_devices.devices[1].random_address)
+    connection = await two_devices.devices[0].connect(
+        two_devices.devices[1].random_address
+    )
     peer = Peer(connection)
 
     bogus_uuid = 'A0AA6007-0B48-4BBE-80AC-0DE9AAF541EA'
     result = await peer.discover_services([bogus_uuid])
-    assert(result == [])
+    assert result == []
     services = peer.get_services_by_uuid(bogus_uuid)
-    assert(len(services) == 0)
+    assert len(services) == 0
 
     result = await peer.discover_service(s1.uuid)
-    assert(len(result) == 1)
+    assert len(result) == 1
     services = peer.get_services_by_uuid(s1.uuid)
-    assert(len(services) == 1)
+    assert len(services) == 1
     s = services[0]
-    assert(services[0].uuid == s1.uuid)
+    assert services[0].uuid == s1.uuid
 
     result = await peer.discover_characteristics([c1.uuid], s)
-    assert(len(result) == 1)
+    assert len(result) == 1
     characteristics = peer.get_characteristics_by_uuid(c1.uuid)
-    assert(len(characteristics) == 1)
+    assert len(characteristics) == 1
     c = characteristics[0]
-    assert(c.uuid == c1.uuid)
+    assert c.uuid == c1.uuid
     result = await peer.read_value(c)
-    assert(result is not None)
-    assert(result == c1.value)
+    assert result is not None
+    assert result == c1.value
 
 
 # -----------------------------------------------------------------------------
@@ -175,7 +181,7 @@ async def test_self_gatt_long_read():
             f'3A143AD7-D4A7-436B-97D6-5B62C315{i:04X}',
             Characteristic.READ,
             Characteristic.READABLE,
-            bytes([x & 255 for x in range(i)])
+            bytes([x & 255 for x in range(i)]),
         )
         for i in range(0, 513)
     ]
@@ -188,17 +194,19 @@ async def test_self_gatt_long_read():
     await two_devices.devices[1].power_on()
 
     # Connect the two devices
-    connection = await two_devices.devices[0].connect(two_devices.devices[1].random_address)
+    connection = await two_devices.devices[0].connect(
+        two_devices.devices[1].random_address
+    )
     peer = Peer(connection)
 
     result = await peer.discover_service(service.uuid)
-    assert(len(result) == 1)
+    assert len(result) == 1
     found_service = result[0]
     found_characteristics = await found_service.discover_characteristics()
-    assert(len(found_characteristics) == 513)
+    assert len(found_characteristics) == 513
     for (i, characteristic) in enumerate(found_characteristics):
         value = await characteristic.read_value()
-        assert(value == characteristics[i].value)
+        assert value == characteristics[i].value
 
 
 # -----------------------------------------------------------------------------
@@ -211,28 +219,42 @@ async def _test_self_smp_with_configs(pairing_config1, pairing_config2):
     await two_devices.devices[1].power_on()
 
     # Attach listeners
-    two_devices.devices[0].on('connection', lambda connection: two_devices.on_connection(0, connection))
-    two_devices.devices[1].on('connection', lambda connection: two_devices.on_connection(1, connection))
+    two_devices.devices[0].on(
+        'connection', lambda connection: two_devices.on_connection(0, connection)
+    )
+    two_devices.devices[1].on(
+        'connection', lambda connection: two_devices.on_connection(1, connection)
+    )
 
     # Connect the two devices
-    connection = await two_devices.devices[0].connect(two_devices.devices[1].random_address)
-    assert(not connection.is_encrypted)
+    connection = await two_devices.devices[0].connect(
+        two_devices.devices[1].random_address
+    )
+    assert not connection.is_encrypted
 
     # Attach connection listeners
-    two_devices.connections[0].on('pairing', lambda keys: two_devices.on_paired(0, keys))
-    two_devices.connections[1].on('pairing', lambda keys: two_devices.on_paired(1, keys))
+    two_devices.connections[0].on(
+        'pairing', lambda keys: two_devices.on_paired(0, keys)
+    )
+    two_devices.connections[1].on(
+        'pairing', lambda keys: two_devices.on_paired(1, keys)
+    )
 
     # Set up the pairing configs
     if pairing_config1:
-        two_devices.devices[0].pairing_config_factory = lambda connection: pairing_config1
+        two_devices.devices[
+            0
+        ].pairing_config_factory = lambda connection: pairing_config1
     if pairing_config2:
-        two_devices.devices[1].pairing_config_factory = lambda connection: pairing_config2
+        two_devices.devices[
+            1
+        ].pairing_config_factory = lambda connection: pairing_config2
 
     # Pair
     await two_devices.devices[0].pair(connection)
-    assert(connection.is_encrypted)
-    assert(two_devices.paired[0] is not None)
-    assert(two_devices.paired[1] is not None)
+    assert connection.is_encrypted
+    assert two_devices.paired[0] is not None
+    assert two_devices.paired[1] is not None
 
 
 # -----------------------------------------------------------------------------
@@ -241,22 +263,32 @@ IO_CAP = [
     PairingDelegate.KEYBOARD_INPUT_ONLY,
     PairingDelegate.DISPLAY_OUTPUT_ONLY,
     PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT,
-    PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT
+    PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT,
 ]
 SC = [False, True]
 MITM = [False, True]
 # Key distribution is a 4-bit bitmask
 KEY_DIST = range(16)
 
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize('io_cap, sc, mitm, key_dist',
-    itertools.product(IO_CAP, SC, MITM, KEY_DIST)
+@pytest.mark.parametrize(
+    'io_cap, sc, mitm, key_dist', itertools.product(IO_CAP, SC, MITM, KEY_DIST)
 )
 async def test_self_smp(io_cap, sc, mitm, key_dist):
     class Delegate(PairingDelegate):
-        def __init__(self, name, io_capability, local_initiator_key_distribution, local_responder_key_distribution):
-            super().__init__(io_capability, local_initiator_key_distribution,
-                             local_responder_key_distribution)
+        def __init__(
+            self,
+            name,
+            io_capability,
+            local_initiator_key_distribution,
+            local_responder_key_distribution,
+        ):
+            super().__init__(
+                io_capability,
+                local_initiator_key_distribution,
+                local_responder_key_distribution,
+            )
             self.name = name
             self.reset()
 
@@ -279,7 +311,10 @@ async def test_self_smp(io_cap, sc, mitm, key_dist):
                 logger.warn(f'[{self.name}] no peer delegate')
                 return 0
             else:
-                if self.peer_delegate.io_capability == PairingDelegate.KEYBOARD_INPUT_ONLY:
+                if (
+                    self.peer_delegate.io_capability
+                    == PairingDelegate.KEYBOARD_INPUT_ONLY
+                ):
                     peer_number = 6789
                 else:
                     logger.debug(f'[{self.name}] waiting for peer number')
@@ -301,7 +336,9 @@ async def test_self_smp(io_cap, sc, mitm, key_dist):
 
     for pairing_config1 in pairing_config_sets[0][1]:
         for pairing_config2 in pairing_config_sets[1][1]:
-            logger.info(f'########## self_smp with {pairing_config1} and {pairing_config2}')
+            logger.info(
+                f'########## self_smp with {pairing_config1} and {pairing_config2}'
+            )
             if pairing_config1:
                 pairing_config1.delegate.reset()
             if pairing_config2:
@@ -311,7 +348,6 @@ async def test_self_smp(io_cap, sc, mitm, key_dist):
                 pairing_config2.delegate.peer_delegate = pairing_config1.delegate
 
             await _test_self_smp_with_configs(pairing_config1, pairing_config2)
-
 
 
 # -----------------------------------------------------------------------------
@@ -324,15 +360,15 @@ async def test_self_smp_reject():
         async def accept(self):
             return False
 
-    rejecting_pairing_config = PairingConfig(delegate = RejectingDelegate())
+    rejecting_pairing_config = PairingConfig(delegate=RejectingDelegate())
     paired = False
     try:
         await _test_self_smp_with_configs(None, rejecting_pairing_config)
         paired = True
     except ProtocolError as error:
-        assert(error.error_code == SMP_PAIRING_NOT_SUPPORTED_ERROR)
+        assert error.error_code == SMP_PAIRING_NOT_SUPPORTED_ERROR
 
-    assert(not paired)
+    assert not paired
 
 
 # -----------------------------------------------------------------------------
@@ -345,15 +381,17 @@ async def test_self_smp_wrong_pin():
         async def compare_numbers(self, number, digits):
             return False
 
-    wrong_pin_pairing_config = PairingConfig(delegate = WrongPinDelegate())
+    wrong_pin_pairing_config = PairingConfig(delegate=WrongPinDelegate())
     paired = False
     try:
-        await _test_self_smp_with_configs(wrong_pin_pairing_config, wrong_pin_pairing_config)
+        await _test_self_smp_with_configs(
+            wrong_pin_pairing_config, wrong_pin_pairing_config
+        )
         paired = True
     except ProtocolError as error:
-        assert(error.error_code == SMP_CONFIRM_VALUE_FAILED_ERROR)
+        assert error.error_code == SMP_CONFIRM_VALUE_FAILED_ERROR
 
-    assert(not paired)
+    assert not paired
 
 
 # -----------------------------------------------------------------------------
@@ -365,7 +403,8 @@ async def run_test_self():
     await test_self_smp_reject()
     await test_self_smp_wrong_pin()
 
+
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(run_test_self())

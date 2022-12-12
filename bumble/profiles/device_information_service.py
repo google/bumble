@@ -33,7 +33,7 @@ from ..gatt import (
     TemplateService,
     Characteristic,
     DelegatedCharacteristicAdapter,
-    UTF8CharacteristicAdapter
+    UTF8CharacteristicAdapter,
 )
 
 
@@ -63,38 +63,37 @@ class DeviceInformationService(TemplateService):
         # TODO: pnp_id
     ):
         characteristics = [
-            Characteristic(
-                uuid,
-                Characteristic.READ,
-                Characteristic.READABLE,
-                field
-            )
+            Characteristic(uuid, Characteristic.READ, Characteristic.READABLE, field)
             for (field, uuid) in (
                 (manufacturer_name, GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC),
-                (model_number,      GATT_MODEL_NUMBER_STRING_CHARACTERISTIC),
-                (serial_number,     GATT_SERIAL_NUMBER_STRING_CHARACTERISTIC),
+                (model_number, GATT_MODEL_NUMBER_STRING_CHARACTERISTIC),
+                (serial_number, GATT_SERIAL_NUMBER_STRING_CHARACTERISTIC),
                 (hardware_revision, GATT_HARDWARE_REVISION_STRING_CHARACTERISTIC),
                 (firmware_revision, GATT_FIRMWARE_REVISION_STRING_CHARACTERISTIC),
-                (software_revision, GATT_SOFTWARE_REVISION_STRING_CHARACTERISTIC)
+                (software_revision, GATT_SOFTWARE_REVISION_STRING_CHARACTERISTIC),
             )
             if field is not None
         ]
 
         if system_id is not None:
-            characteristics.append(Characteristic(
-                GATT_SYSTEM_ID_CHARACTERISTIC,
-                Characteristic.READ,
-                Characteristic.READABLE,
-                self.pack_system_id(*system_id)
-            ))
+            characteristics.append(
+                Characteristic(
+                    GATT_SYSTEM_ID_CHARACTERISTIC,
+                    Characteristic.READ,
+                    Characteristic.READABLE,
+                    self.pack_system_id(*system_id),
+                )
+            )
 
         if ieee_regulatory_certification_data_list is not None:
-            characteristics.append(Characteristic(
-                GATT_REGULATORY_CERTIFICATION_DATA_LIST_CHARACTERISTIC,
-                Characteristic.READ,
-                Characteristic.READABLE,
-                ieee_regulatory_certification_data_list
-            ))
+            characteristics.append(
+                Characteristic(
+                    GATT_REGULATORY_CERTIFICATION_DATA_LIST_CHARACTERISTIC,
+                    Characteristic.READ,
+                    Characteristic.READABLE,
+                    ieee_regulatory_certification_data_list,
+                )
+            )
 
         super().__init__(characteristics)
 
@@ -108,11 +107,11 @@ class DeviceInformationServiceProxy(ProfileServiceProxy):
 
         for (field, uuid) in (
             ('manufacturer_name', GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC),
-            ('model_number',      GATT_MODEL_NUMBER_STRING_CHARACTERISTIC),
-            ('serial_number',     GATT_SERIAL_NUMBER_STRING_CHARACTERISTIC),
+            ('model_number', GATT_MODEL_NUMBER_STRING_CHARACTERISTIC),
+            ('serial_number', GATT_SERIAL_NUMBER_STRING_CHARACTERISTIC),
             ('hardware_revision', GATT_HARDWARE_REVISION_STRING_CHARACTERISTIC),
             ('firmware_revision', GATT_FIRMWARE_REVISION_STRING_CHARACTERISTIC),
-            ('software_revision', GATT_SOFTWARE_REVISION_STRING_CHARACTERISTIC)
+            ('software_revision', GATT_SOFTWARE_REVISION_STRING_CHARACTERISTIC),
         ):
             if characteristics := service_proxy.get_characteristics_by_uuid(uuid):
                 characteristic = UTF8CharacteristicAdapter(characteristics[0])
@@ -120,16 +119,20 @@ class DeviceInformationServiceProxy(ProfileServiceProxy):
                 characteristic = None
             self.__setattr__(field, characteristic)
 
-        if characteristics := service_proxy.get_characteristics_by_uuid(GATT_SYSTEM_ID_CHARACTERISTIC):
+        if characteristics := service_proxy.get_characteristics_by_uuid(
+            GATT_SYSTEM_ID_CHARACTERISTIC
+        ):
             self.system_id = DelegatedCharacteristicAdapter(
                 characteristics[0],
                 encode=lambda v: DeviceInformationService.pack_system_id(*v),
-                decode=DeviceInformationService.unpack_system_id
+                decode=DeviceInformationService.unpack_system_id,
             )
         else:
             self.system_id = None
 
-        if characteristics := service_proxy.get_characteristics_by_uuid(GATT_REGULATORY_CERTIFICATION_DATA_LIST_CHARACTERISTIC):
+        if characteristics := service_proxy.get_characteristics_by_uuid(
+            GATT_REGULATORY_CERTIFICATION_DATA_LIST_CHARACTERISTIC
+        ):
             self.ieee_regulatory_certification_data_list = characteristics[0]
         else:
             self.ieee_regulatory_certification_data_list = None

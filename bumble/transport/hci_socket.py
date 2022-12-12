@@ -44,7 +44,11 @@ async def open_hci_socket_transport(spec):
 
     # Create a raw HCI socket
     try:
-        hci_socket = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_RAW | socket.SOCK_NONBLOCK, socket.BTPROTO_HCI)
+        hci_socket = socket.socket(
+            socket.AF_BLUETOOTH,
+            socket.SOCK_RAW | socket.SOCK_NONBLOCK,
+            socket.BTPROTO_HCI,
+        )
     except AttributeError:
         # Not supported on this platform
         logger.info("HCI sockets not supported on this platform")
@@ -67,15 +71,26 @@ async def open_hci_socket_transport(spec):
         raise Exception('Bluetooth HCI sockets not supported on this platform')
     libc.bind.argtypes = (ctypes.c_int, ctypes.POINTER(ctypes.c_char), ctypes.c_int)
     libc.bind.restype = ctypes.c_int
-    bind_address = struct.pack('<HHH', socket.AF_BLUETOOTH, adapter_index, HCI_CHANNEL_USER)
-    if libc.bind(hci_socket.fileno(), ctypes.create_string_buffer(bind_address), len(bind_address)) != 0:
+    bind_address = struct.pack(
+        '<HHH', socket.AF_BLUETOOTH, adapter_index, HCI_CHANNEL_USER
+    )
+    if (
+        libc.bind(
+            hci_socket.fileno(),
+            ctypes.create_string_buffer(bind_address),
+            len(bind_address),
+        )
+        != 0
+    ):
         raise IOError(ctypes.get_errno(), os.strerror(ctypes.get_errno()))
 
     class HciSocketSource(ParserSource):
         def __init__(self, socket):
             super().__init__()
-            self.socket  = socket
-            asyncio.get_running_loop().add_reader(socket.fileno(), self.recv_until_would_block)
+            self.socket = socket
+            asyncio.get_running_loop().add_reader(
+                socket.fileno(), self.recv_until_would_block
+            )
 
         def recv_until_would_block(self):
             logger.debug('recv until would block +++')
@@ -93,8 +108,8 @@ async def open_hci_socket_transport(spec):
 
     class HciSocketSink:
         def __init__(self, socket):
-            self.socket       = socket
-            self.packets      = collections.deque()
+            self.socket = socket
+            self.packets = collections.deque()
             self.writer_added = False
 
         def send_until_would_block(self):
@@ -114,7 +129,9 @@ async def open_hci_socket_transport(spec):
             if self.packets:
                 # There's still something to send, ensure that we are monitoring the socket
                 if not self.writer_added:
-                    asyncio.get_running_loop().add_writer(socket.fileno(), self.send_until_would_block)
+                    asyncio.get_running_loop().add_writer(
+                        socket.fileno(), self.send_until_would_block
+                    )
                     self.writer_added = True
             else:
                 # Nothing left to send, stop monitoring the socket
