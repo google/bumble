@@ -31,12 +31,9 @@ from bumble.sdp import (
     ServiceAttribute,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID
+    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
 )
-from bumble.hci import (
-    BT_HANDSFREE_SERVICE,
-    BT_RFCOMM_PROTOCOL_ID
-)
+from bumble.hci import BT_HANDSFREE_SERVICE, BT_RFCOMM_PROTOCOL_ID
 from bumble.hfp import HfpProtocol
 
 
@@ -52,8 +49,8 @@ async def list_rfcomm_channels(device, connection):
         [
             SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
             SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID
-        ]
+            SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+        ],
     )
     print(color('==================================', 'blue'))
     print(color('Handsfree Services:', 'yellow'))
@@ -61,40 +58,59 @@ async def list_rfcomm_channels(device, connection):
     for attribute_list in search_result:
         # Look for the RFCOMM Channel number
         protocol_descriptor_list = ServiceAttribute.find_attribute_in_list(
-            attribute_list,
-            SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID
+            attribute_list, SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID
         )
         if protocol_descriptor_list:
             for protocol_descriptor in protocol_descriptor_list.value:
                 if len(protocol_descriptor.value) >= 2:
                     if protocol_descriptor.value[0].value == BT_RFCOMM_PROTOCOL_ID:
                         print(color('SERVICE:', 'green'))
-                        print(color('  RFCOMM Channel:', 'cyan'), protocol_descriptor.value[1].value)
+                        print(
+                            color('  RFCOMM Channel:', 'cyan'),
+                            protocol_descriptor.value[1].value,
+                        )
                         rfcomm_channels.append(protocol_descriptor.value[1].value)
 
                         # List profiles
-                        bluetooth_profile_descriptor_list = ServiceAttribute.find_attribute_in_list(
-                            attribute_list,
-                            SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID
+                        bluetooth_profile_descriptor_list = (
+                            ServiceAttribute.find_attribute_in_list(
+                                attribute_list,
+                                SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                            )
                         )
                         if bluetooth_profile_descriptor_list:
                             if bluetooth_profile_descriptor_list.value:
-                                if bluetooth_profile_descriptor_list.value[0].type == DataElement.SEQUENCE:
-                                    bluetooth_profile_descriptors = bluetooth_profile_descriptor_list.value
+                                if (
+                                    bluetooth_profile_descriptor_list.value[0].type
+                                    == DataElement.SEQUENCE
+                                ):
+                                    bluetooth_profile_descriptors = (
+                                        bluetooth_profile_descriptor_list.value
+                                    )
                                 else:
                                     # Sometimes, instead of a list of lists, we just find a list. Fix that
-                                    bluetooth_profile_descriptors = [bluetooth_profile_descriptor_list]
+                                    bluetooth_profile_descriptors = [
+                                        bluetooth_profile_descriptor_list
+                                    ]
 
                                 print(color('  Profiles:', 'green'))
-                                for bluetooth_profile_descriptor in bluetooth_profile_descriptors:
-                                    version_major = bluetooth_profile_descriptor.value[1].value >> 8
-                                    version_minor = bluetooth_profile_descriptor.value[1].value & 0xFF
-                                    print(f'    {bluetooth_profile_descriptor.value[0].value} - version {version_major}.{version_minor}')
+                                for (
+                                    bluetooth_profile_descriptor
+                                ) in bluetooth_profile_descriptors:
+                                    version_major = (
+                                        bluetooth_profile_descriptor.value[1].value >> 8
+                                    )
+                                    version_minor = (
+                                        bluetooth_profile_descriptor.value[1].value
+                                        & 0xFF
+                                    )
+                                    print(
+                                        f'    {bluetooth_profile_descriptor.value[0].value} - version {version_major}.{version_minor}'
+                                    )
 
                         # List service classes
                         service_class_id_list = ServiceAttribute.find_attribute_in_list(
-                            attribute_list,
-                            SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID
+                            attribute_list, SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID
                         )
                         if service_class_id_list:
                             if service_class_id_list.value:
@@ -109,9 +125,15 @@ async def list_rfcomm_channels(device, connection):
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 4:
-        print('Usage: run_hfp_gateway.py <device-config> <transport-spec> <bluetooth-address>')
-        print('  specifying a channel number, or "discover" to list all RFCOMM channels')
-        print('example: run_hfp_gateway.py hfp_gateway.json usb:04b4:f901 E1:CA:72:48:C4:E8')
+        print(
+            'Usage: run_hfp_gateway.py <device-config> <transport-spec> <bluetooth-address>'
+        )
+        print(
+            '  specifying a channel number, or "discover" to list all RFCOMM channels'
+        )
+        print(
+            'example: run_hfp_gateway.py hfp_gateway.json usb:04b4:f901 E1:CA:72:48:C4:E8'
+        )
         return
 
     print('<<< connecting to HCI...')
@@ -173,7 +195,9 @@ async def main():
                 protocol.send_response_line('+BRSF: 30')
                 protocol.send_response_line('OK')
             elif line.startswith('AT+CIND=?'):
-                protocol.send_response_line('+CIND: ("call",(0,1)),("callsetup",(0-3)),("service",(0-1)),("signal",(0-5)),("roam",(0,1)),("battchg",(0-5)),("callheld",(0-2))')
+                protocol.send_response_line(
+                    '+CIND: ("call",(0,1)),("callsetup",(0-3)),("service",(0-1)),("signal",(0-5)),("roam",(0,1)),("battchg",(0-5)),("callheld",(0-2))'
+                )
                 protocol.send_response_line('OK')
             elif line.startswith('AT+CIND?'):
                 protocol.send_response_line('+CIND: 0,0,1,4,1,5,0')
@@ -193,7 +217,9 @@ async def main():
             elif line.startswith('AT+BIA='):
                 protocol.send_response_line('OK')
             elif line.startswith('AT+BVRA='):
-                protocol.send_response_line('+BVRA: 1,1,12AA,1,1,"Message 1 from Janina"')
+                protocol.send_response_line(
+                    '+BVRA: 1,1,12AA,1,1,"Message 1 from Janina"'
+                )
             elif line.startswith('AT+XEVENT='):
                 protocol.send_response_line('OK')
             elif line.startswith('AT+XAPL='):
@@ -204,6 +230,7 @@ async def main():
 
         await hci_source.wait_for_termination()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

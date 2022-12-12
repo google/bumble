@@ -64,9 +64,13 @@ async def async_main(device_config, encrypt, transport, address_or_name):
 
         # Create a device
         if device_config:
-            device = Device.from_config_file_with_hci(device_config, hci_source, hci_sink)
+            device = Device.from_config_file_with_hci(
+                device_config, hci_source, hci_sink
+            )
         else:
-            device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
+            device = Device.with_hci(
+                'Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink
+            )
         await device.power_on()
 
         if address_or_name:
@@ -81,7 +85,12 @@ async def async_main(device_config, encrypt, transport, address_or_name):
         else:
             # Wait for a connection
             done = asyncio.get_running_loop().create_future()
-            device.on('connection', lambda connection: asyncio.create_task(dump_gatt_db(Peer(connection), done)))
+            device.on(
+                'connection',
+                lambda connection: asyncio.create_task(
+                    dump_gatt_db(Peer(connection), done)
+                ),
+            )
             await device.start_advertising(auto_restart=True)
 
             print(color('### Waiting for connection...', 'blue'))
@@ -99,7 +108,7 @@ def main(device_config, encrypt, transport, address_or_name):
     Dump the GATT database on a remote device. If ADDRESS_OR_NAME is not specified,
     wait for an incoming connection.
     """
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(async_main(device_config, encrypt, transport, address_or_name))
 
 

@@ -50,34 +50,52 @@ async def main():
 
         # Add a Device Information Service and Heart Rate Service to the GATT sever
         device_information_service = DeviceInformationService(
-            manufacturer_name = 'ACME',
-            model_number      = 'HR-102',
-            serial_number     = '7654321',
-            hardware_revision = '1.1.3',
-            software_revision = '2.5.6',
-            system_id         = (0x123456, 0x8877665544)
+            manufacturer_name='ACME',
+            model_number='HR-102',
+            serial_number='7654321',
+            hardware_revision='1.1.3',
+            software_revision='2.5.6',
+            system_id=(0x123456, 0x8877665544),
         )
 
         heart_rate_service = HeartRateService(
-            read_heart_rate_measurement = lambda _: HeartRateService.HeartRateMeasurement(
-                heart_rate              = 100 + int(50 * math.sin(time.time() * math.pi / 60)),
-                sensor_contact_detected = random.choice((True, False, None)),
-                energy_expended         = random.choice((int((time.time() - energy_start_time) * 100), None)),
-                rr_intervals            = random.choice(((random.randint(900, 1100) / 1000, random.randint(900, 1100) / 1000), None))
+            read_heart_rate_measurement=lambda _: HeartRateService.HeartRateMeasurement(
+                heart_rate=100 + int(50 * math.sin(time.time() * math.pi / 60)),
+                sensor_contact_detected=random.choice((True, False, None)),
+                energy_expended=random.choice(
+                    (int((time.time() - energy_start_time) * 100), None)
+                ),
+                rr_intervals=random.choice(
+                    (
+                        (
+                            random.randint(900, 1100) / 1000,
+                            random.randint(900, 1100) / 1000,
+                        ),
+                        None,
+                    )
+                ),
             ),
             body_sensor_location=HeartRateService.BodySensorLocation.WRIST,
-            reset_energy_expended=lambda _: reset_energy_expended()
+            reset_energy_expended=lambda _: reset_energy_expended(),
         )
 
         device.add_services([device_information_service, heart_rate_service])
 
         # Set the advertising data
         device.advertising_data = bytes(
-            AdvertisingData([
-                (AdvertisingData.COMPLETE_LOCAL_NAME, bytes('Bumble Heart', 'utf-8')),
-                (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, bytes(heart_rate_service.uuid)),
-                (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340))
-            ])
+            AdvertisingData(
+                [
+                    (
+                        AdvertisingData.COMPLETE_LOCAL_NAME,
+                        bytes('Bumble Heart', 'utf-8'),
+                    ),
+                    (
+                        AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+                        bytes(heart_rate_service.uuid),
+                    ),
+                    (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340)),
+                ]
+            )
         )
 
         # Go!
@@ -87,9 +105,11 @@ async def main():
         # Notify every 3 seconds
         while True:
             await asyncio.sleep(3.0)
-            await device.notify_subscribers(heart_rate_service.heart_rate_measurement_characteristic)
+            await device.notify_subscribers(
+                heart_rate_service.heart_rate_measurement_characteristic
+            )
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

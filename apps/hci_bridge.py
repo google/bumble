@@ -34,16 +34,26 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 async def async_main():
     if len(sys.argv) < 3:
-        print('Usage: hci_bridge.py <host-transport-spec> <controller-transport-spec> [command-short-circuit-list]')
-        print('example: python hci_bridge.py udp:0.0.0.0:9000,127.0.0.1:9001 serial:/dev/tty.usbmodem0006839912171,1000000 0x3f:0x0070,0x3f:0x0074,0x3f:0x0077,0x3f:0x0078')
+        print(
+            'Usage: hci_bridge.py <host-transport-spec> <controller-transport-spec> [command-short-circuit-list]'
+        )
+        print(
+            'example: python hci_bridge.py udp:0.0.0.0:9000,127.0.0.1:9001 serial:/dev/tty.usbmodem0006839912171,1000000 0x3f:0x0070,0x3f:0x0074,0x3f:0x0077,0x3f:0x0078'
+        )
         return
 
     print('>>> connecting to HCI...')
-    async with await transport.open_transport_or_link(sys.argv[1]) as (hci_host_source, hci_host_sink):
+    async with await transport.open_transport_or_link(sys.argv[1]) as (
+        hci_host_source,
+        hci_host_sink,
+    ):
         print('>>> connected')
 
         print('>>> connecting to HCI...')
-        async with await transport.open_transport_or_link(sys.argv[2]) as (hci_controller_source, hci_controller_sink):
+        async with await transport.open_transport_or_link(sys.argv[2]) as (
+            hci_controller_source,
+            hci_controller_sink,
+        ):
             print('>>> connected')
 
             command_short_circuits = []
@@ -51,18 +61,23 @@ async def async_main():
                 for op_code_str in sys.argv[3].split(','):
                     if ':' in op_code_str:
                         ogf, ocf = op_code_str.split(':')
-                        command_short_circuits.append(hci.hci_command_op_code(int(ogf, 16), int(ocf, 16)))
+                        command_short_circuits.append(
+                            hci.hci_command_op_code(int(ogf, 16), int(ocf, 16))
+                        )
                     else:
                         command_short_circuits.append(int(op_code_str, 16))
 
             def host_to_controller_filter(hci_packet):
-                if hci_packet.hci_packet_type == hci.HCI_COMMAND_PACKET and hci_packet.op_code in command_short_circuits:
+                if (
+                    hci_packet.hci_packet_type == hci.HCI_COMMAND_PACKET
+                    and hci_packet.op_code in command_short_circuits
+                ):
                     # Respond with a success response
                     logger.debug('short-circuiting packet')
                     response = hci.HCI_Command_Complete_Event(
-                        num_hci_command_packets = 1,
-                        command_opcode          = hci_packet.op_code,
-                        return_parameters       = bytes([hci.HCI_SUCCESS])
+                        num_hci_command_packets=1,
+                        command_opcode=hci_packet.op_code,
+                        return_parameters=bytes([hci.HCI_SUCCESS]),
                     )
                     # Return a packet with 'respond to sender' set to True
                     return (response.to_bytes(), True)
@@ -73,14 +88,14 @@ async def async_main():
                 hci_controller_source,
                 hci_controller_sink,
                 host_to_controller_filter,
-                None
+                None,
             )
             await asyncio.get_running_loop().create_future()
 
 
 # -----------------------------------------------------------------------------
 def main():
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(async_main())
 
 

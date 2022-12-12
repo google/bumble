@@ -31,10 +31,10 @@ def basic_check(x):
     parsed_bytes = bytes(parsed)
     if len(serialized) < 500:
         print('Parsed Bytes:', parsed_bytes.hex())
-    assert(parsed_bytes == serialized)
+    assert parsed_bytes == serialized
     x_str = str(x)
     parsed_str = str(parsed)
-    assert(x_str == parsed_str)
+    assert x_str == parsed_str
 
 
 # -----------------------------------------------------------------------------
@@ -99,19 +99,25 @@ def test_data_elements():
     e = DataElement(DataElement.SEQUENCE, [DataElement(DataElement.BOOLEAN, True)])
     basic_check(e)
 
-    e = DataElement(DataElement.SEQUENCE, [
-        DataElement(DataElement.BOOLEAN, True),
-        DataElement(DataElement.TEXT_STRING, 'hello')
-    ])
+    e = DataElement(
+        DataElement.SEQUENCE,
+        [
+            DataElement(DataElement.BOOLEAN, True),
+            DataElement(DataElement.TEXT_STRING, 'hello'),
+        ],
+    )
     basic_check(e)
 
     e = DataElement(DataElement.ALTERNATIVE, [DataElement(DataElement.BOOLEAN, True)])
     basic_check(e)
 
-    e = DataElement(DataElement.ALTERNATIVE, [
-        DataElement(DataElement.BOOLEAN, True),
-        DataElement(DataElement.TEXT_STRING, 'hello')
-    ])
+    e = DataElement(
+        DataElement.ALTERNATIVE,
+        [
+            DataElement(DataElement.BOOLEAN, True),
+            DataElement(DataElement.TEXT_STRING, 'hello'),
+        ],
+    )
     basic_check(e)
 
     e = DataElement(DataElement.URL, 'http://example.com')
@@ -133,10 +139,14 @@ def test_data_elements():
     e = DataElement.boolean(True)
     basic_check(e)
 
-    e = DataElement.sequence([DataElement.signed_integer(0, 1), DataElement.text_string('hello')])
+    e = DataElement.sequence(
+        [DataElement.signed_integer(0, 1), DataElement.text_string('hello')]
+    )
     basic_check(e)
 
-    e = DataElement.alternative([DataElement.signed_integer(0, 1), DataElement.text_string('hello')])
+    e = DataElement.alternative(
+        [DataElement.signed_integer(0, 1), DataElement.text_string('hello')]
+    )
     basic_check(e)
 
     e = DataElement.url('http://foobar.com')

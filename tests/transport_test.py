@@ -37,7 +37,9 @@ def test_parser():
     parser2 = PacketParser(sink2)
 
     for parser in [parser1, parser2]:
-        with open(os.path.join(os.path.dirname(__file__), 'hci_data_001.bin'), 'rb') as input:
+        with open(
+            os.path.join(os.path.dirname(__file__), 'hci_data_001.bin'), 'rb'
+        ) as input:
             while True:
                 n = random.randint(1, 9)
                 data = input.read(n)
@@ -45,7 +47,7 @@ def test_parser():
                     break
                 parser.feed_data(data)
 
-    assert(sink1.packets == sink2.packets)
+    assert sink1.packets == sink2.packets
 
 
 # -----------------------------------------------------------------------------
@@ -60,13 +62,13 @@ def test_parser_extensions():
     except ValueError:
         exception_thrown = True
 
-    assert(exception_thrown)
+    assert exception_thrown
 
     # Now add a custom info
     parser.extended_packet_info[0x77] = (1, 1, 'B')
     parser.reset()
     parser.feed_data(bytes([0x77, 0x00, 0x02, 0x01, 0x02]))
-    assert(len(sink.packets) == 1)
+    assert len(sink.packets) == 1
 
 
 # -----------------------------------------------------------------------------

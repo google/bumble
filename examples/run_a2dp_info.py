@@ -27,12 +27,9 @@ from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     BT_AVDTP_PROTOCOL_ID,
     BT_AUDIO_SINK_SERVICE,
-    BT_L2CAP_PROTOCOL_ID
+    BT_L2CAP_PROTOCOL_ID,
 )
-from bumble.avdtp import (
-    Protocol as AVDTP_Protocol,
-    find_avdtp_service_with_connection
-)
+from bumble.avdtp import Protocol as AVDTP_Protocol, find_avdtp_service_with_connection
 from bumble.a2dp import make_audio_source_service_sdp_records
 from bumble.sdp import (
     Client as SDP_Client,
@@ -40,7 +37,7 @@ from bumble.sdp import (
     DataElement,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID
+    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
 )
 
 
@@ -48,7 +45,9 @@ from bumble.sdp import (
 def sdp_records():
     service_record_handle = 0x00010001
     return {
-        service_record_handle: make_audio_source_service_sdp_records(service_record_handle)
+        service_record_handle: make_audio_source_service_sdp_records(
+            service_record_handle
+        )
     }
 
 
@@ -64,8 +63,8 @@ async def find_a2dp_service(device, connection):
         [
             SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
             SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID
-        ]
+            SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+        ],
     )
 
     print(color('==================================', 'blue'))
@@ -78,8 +77,7 @@ async def find_a2dp_service(device, connection):
 
         # Service classes
         service_class_id_list = ServiceAttribute.find_attribute_in_list(
-            attribute_list,
-            SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID
+            attribute_list, SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID
         )
         if service_class_id_list:
             if service_class_id_list.value:
@@ -89,8 +87,7 @@ async def find_a2dp_service(device, connection):
 
         # Protocol info
         protocol_descriptor_list = ServiceAttribute.find_attribute_in_list(
-            attribute_list,
-            SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID
+            attribute_list, SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID
         )
         if protocol_descriptor_list:
             print(color('  Protocol:', 'green'))
@@ -103,18 +100,24 @@ async def find_a2dp_service(device, connection):
                     if len(protocol_descriptor.value) >= 2:
                         avdtp_version_major = protocol_descriptor.value[1].value >> 8
                         avdtp_version_minor = protocol_descriptor.value[1].value & 0xFF
-                        print(f'{color("    AVDTP Version:", "cyan")} {avdtp_version_major}.{avdtp_version_minor}')
+                        print(
+                            f'{color("    AVDTP Version:", "cyan")} {avdtp_version_major}.{avdtp_version_minor}'
+                        )
                         service_version = (avdtp_version_major, avdtp_version_minor)
 
         # Profile info
         bluetooth_profile_descriptor_list = ServiceAttribute.find_attribute_in_list(
-            attribute_list,
-            SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID
+            attribute_list, SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID
         )
         if bluetooth_profile_descriptor_list:
             if bluetooth_profile_descriptor_list.value:
-                if bluetooth_profile_descriptor_list.value[0].type == DataElement.SEQUENCE:
-                    bluetooth_profile_descriptors = bluetooth_profile_descriptor_list.value
+                if (
+                    bluetooth_profile_descriptor_list.value[0].type
+                    == DataElement.SEQUENCE
+                ):
+                    bluetooth_profile_descriptors = (
+                        bluetooth_profile_descriptor_list.value
+                    )
                 else:
                     # Sometimes, instead of a list of lists, we just find a list. Fix that
                     bluetooth_profile_descriptors = [bluetooth_profile_descriptor_list]
@@ -123,7 +126,9 @@ async def find_a2dp_service(device, connection):
                 for bluetooth_profile_descriptor in bluetooth_profile_descriptors:
                     version_major = bluetooth_profile_descriptor.value[1].value >> 8
                     version_minor = bluetooth_profile_descriptor.value[1].value & 0xFF
-                    print(f'    {bluetooth_profile_descriptor.value[0].value} - version {version_major}.{version_minor}')
+                    print(
+                        f'    {bluetooth_profile_descriptor.value[0].value} - version {version_major}.{version_minor}'
+                    )
 
     await sdp_client.disconnect()
     return service_version
@@ -184,5 +189,5 @@ async def main():
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

@@ -27,9 +27,7 @@ from bumble.device import Device
 from bumble.host import Host
 from bumble.transport import AsyncPipeSink
 from bumble.core import ProtocolError
-from bumble.l2cap import (
-    L2CAP_Connection_Request
-)
+from bumble.l2cap import L2CAP_Connection_Request
 
 
 # -----------------------------------------------------------------------------
@@ -45,18 +43,18 @@ class TwoDevices:
 
         self.link = LocalLink()
         self.controllers = [
-            Controller('C1', link = self.link),
-            Controller('C2', link = self.link)
+            Controller('C1', link=self.link),
+            Controller('C2', link=self.link),
         ]
         self.devices = [
             Device(
-                address = 'F0:F1:F2:F3:F4:F5',
-                host    = Host(self.controllers[0], AsyncPipeSink(self.controllers[0]))
+                address='F0:F1:F2:F3:F4:F5',
+                host=Host(self.controllers[0], AsyncPipeSink(self.controllers[0])),
             ),
             Device(
-                address = 'F5:F4:F3:F2:F1:F0',
-                host    = Host(self.controllers[1], AsyncPipeSink(self.controllers[1]))
-            )
+                address='F5:F4:F3:F2:F1:F0',
+                host=Host(self.controllers[1], AsyncPipeSink(self.controllers[1])),
+            ),
         ]
 
         self.paired = [None, None]
@@ -74,8 +72,12 @@ async def setup_connection():
     two_devices = TwoDevices()
 
     # Attach listeners
-    two_devices.devices[0].on('connection', lambda connection: two_devices.on_connection(0, connection))
-    two_devices.devices[1].on('connection', lambda connection: two_devices.on_connection(1, connection))
+    two_devices.devices[0].on(
+        'connection', lambda connection: two_devices.on_connection(0, connection)
+    )
+    two_devices.devices[1].on(
+        'connection', lambda connection: two_devices.on_connection(1, connection)
+    )
 
     # Start
     await two_devices.devices[0].power_on()
@@ -102,19 +104,25 @@ def test_helpers():
     psm = L2CAP_Connection_Request.serialize_psm(0x242311)
     assert psm == bytes([0x11, 0x23, 0x24])
 
-    (offset, psm) = L2CAP_Connection_Request.parse_psm(bytes([0x00, 0x01, 0x00, 0x44]), 1)
+    (offset, psm) = L2CAP_Connection_Request.parse_psm(
+        bytes([0x00, 0x01, 0x00, 0x44]), 1
+    )
     assert offset == 3
     assert psm == 0x01
 
-    (offset, psm) = L2CAP_Connection_Request.parse_psm(bytes([0x00, 0x23, 0x10, 0x44]), 1)
+    (offset, psm) = L2CAP_Connection_Request.parse_psm(
+        bytes([0x00, 0x23, 0x10, 0x44]), 1
+    )
     assert offset == 3
     assert psm == 0x1023
 
-    (offset, psm) = L2CAP_Connection_Request.parse_psm(bytes([0x00, 0x11, 0x23, 0x24, 0x44]), 1)
+    (offset, psm) = L2CAP_Connection_Request.parse_psm(
+        bytes([0x00, 0x11, 0x23, 0x24, 0x44]), 1
+    )
     assert offset == 4
     assert psm == 0x242311
 
-    rq = L2CAP_Connection_Request(psm = 0x01, source_cid = 0x44)
+    rq = L2CAP_Connection_Request(psm=0x01, source_cid=0x44)
     brq = bytes(rq)
     srq = L2CAP_Connection_Request.from_bytes(brq)
     assert srq.psm == rq.psm
@@ -147,11 +155,7 @@ async def test_basic_connection():
     devices.devices[1].register_l2cap_channel_server(psm, on_coc)
     l2cap_channel = await devices.connections[0].open_l2cap_channel(psm)
 
-    messages = (
-        bytes([1, 2, 3]),
-        bytes([4, 5, 6]),
-        bytes(10000)
-    )
+    messages = (bytes([1, 2, 3]), bytes([4, 5, 6]), bytes(10000))
     for message in messages:
         l2cap_channel.write(message)
         await asyncio.sleep(0)
@@ -191,18 +195,11 @@ async def transfer_payload(max_credits, mtu, mps):
         channel.sink = on_data
 
     psm = devices.devices[1].register_l2cap_channel_server(
-        psm         = 0,
-        server      = on_coc,
-        max_credits = max_credits,
-        mtu         = mtu,
-        mps         = mps
+        psm=0, server=on_coc, max_credits=max_credits, mtu=mtu, mps=mps
     )
     l2cap_channel = await devices.connections[0].open_l2cap_channel(psm)
 
-    messages = [
-        bytes([1, 2, 3, 4, 5, 6, 7]) * x
-        for x in (3, 10, 100, 789)
-    ]
+    messages = [bytes([1, 2, 3, 4, 5, 6, 7]) * x for x in (3, 10, 100, 789)]
     for message in messages:
         l2cap_channel.write(message)
         await asyncio.sleep(0)
@@ -233,7 +230,7 @@ async def test_bidirectional_transfer():
 
     client_received = []
     server_received = []
-    server_channel  = None
+    server_channel = None
 
     def on_server_coc(channel):
         nonlocal server_channel
@@ -251,10 +248,7 @@ async def test_bidirectional_transfer():
     client_channel = await devices.connections[0].open_l2cap_channel(psm)
     client_channel.sink = on_client_data
 
-    messages = [
-        bytes([1, 2, 3, 4, 5, 6, 7]) * x
-        for x in (3, 10, 100)
-    ]
+    messages = [bytes([1, 2, 3, 4, 5, 6, 7]) * x for x in (3, 10, 100)]
     for message in messages:
         client_channel.write(message)
         await client_channel.drain()
@@ -278,7 +272,8 @@ async def run():
     await test_transfer()
     await test_bidirectional_transfer()
 
+
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(run())

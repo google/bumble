@@ -28,7 +28,7 @@ from bumble.avdtp import (
     AVDTP_AUDIO_MEDIA_TYPE,
     Protocol,
     Listener,
-    MediaCodecCapabilities
+    MediaCodecCapabilities,
 )
 from bumble.a2dp import (
     make_audio_sink_service_sdp_records,
@@ -39,19 +39,19 @@ from bumble.a2dp import (
     SBC_LOUDNESS_ALLOCATION_METHOD,
     SBC_STEREO_CHANNEL_MODE,
     SBC_JOINT_STEREO_CHANNEL_MODE,
-    SbcMediaCodecInformation
+    SbcMediaCodecInformation,
 )
 
-Context = {
-    'output': None
-}
+Context = {'output': None}
 
 
 # -----------------------------------------------------------------------------
 def sdp_records():
     service_record_handle = 0x00010001
     return {
-        service_record_handle: make_audio_sink_service_sdp_records(service_record_handle)
+        service_record_handle: make_audio_sink_service_sdp_records(
+            service_record_handle
+        )
     }
 
 
@@ -59,22 +59,25 @@ def sdp_records():
 def codec_capabilities():
     # NOTE: this shouldn't be hardcoded, but passed on the command line instead
     return MediaCodecCapabilities(
-        media_type                = AVDTP_AUDIO_MEDIA_TYPE,
-        media_codec_type          = A2DP_SBC_CODEC_TYPE,
-        media_codec_information   = SbcMediaCodecInformation.from_lists(
-            sampling_frequencies  = [48000, 44100, 32000, 16000],
-            channel_modes         = [
+        media_type=AVDTP_AUDIO_MEDIA_TYPE,
+        media_codec_type=A2DP_SBC_CODEC_TYPE,
+        media_codec_information=SbcMediaCodecInformation.from_lists(
+            sampling_frequencies=[48000, 44100, 32000, 16000],
+            channel_modes=[
                 SBC_MONO_CHANNEL_MODE,
                 SBC_DUAL_CHANNEL_MODE,
                 SBC_STEREO_CHANNEL_MODE,
-                SBC_JOINT_STEREO_CHANNEL_MODE
+                SBC_JOINT_STEREO_CHANNEL_MODE,
             ],
-            block_lengths         = [4, 8, 12, 16],
-            subbands              = [4, 8],
-            allocation_methods    = [SBC_LOUDNESS_ALLOCATION_METHOD, SBC_SNR_ALLOCATION_METHOD],
-            minimum_bitpool_value = 2,
-            maximum_bitpool_value = 53
-        )
+            block_lengths=[4, 8, 12, 16],
+            subbands=[4, 8],
+            allocation_methods=[
+                SBC_LOUDNESS_ALLOCATION_METHOD,
+                SBC_SNR_ALLOCATION_METHOD,
+            ],
+            minimum_bitpool_value=2,
+            maximum_bitpool_value=53,
+        ),
     )
 
 
@@ -87,10 +90,10 @@ def on_avdtp_connection(server):
 
 # -----------------------------------------------------------------------------
 def on_rtp_packet(packet):
-    header           = packet.payload[0]
-    fragmented       = header >> 7
-    start            = (header >> 6) & 0x01
-    last             = (header >> 5) & 0x01
+    header = packet.payload[0]
+    fragmented = header >> 7
+    start = (header >> 6) & 0x01
+    last = (header >> 5) & 0x01
     number_of_frames = header & 0x0F
 
     if fragmented:
@@ -104,7 +107,9 @@ def on_rtp_packet(packet):
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 4:
-        print('Usage: run_a2dp_sink.py <device-config> <transport-spec> <sbc-file> [<bt-addr>]')
+        print(
+            'Usage: run_a2dp_sink.py <device-config> <transport-spec> <sbc-file> [<bt-addr>]'
+        )
         print('example: run_a2dp_sink.py classic1.json usb:0 output.sbc')
         return
 
@@ -133,7 +138,9 @@ async def main():
                 # Connect to the source
                 target_address = sys.argv[4]
                 print(f'=== Connecting to {target_address}...')
-                connection = await device.connect(target_address, transport=BT_BR_EDR_TRANSPORT)
+                connection = await device.connect(
+                    target_address, transport=BT_BR_EDR_TRANSPORT
+                )
                 print(f'=== Connected to {connection.peer_address}!')
 
                 # Request authentication
@@ -159,5 +166,5 @@ async def main():
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

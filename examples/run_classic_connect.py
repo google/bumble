@@ -24,14 +24,22 @@ from colors import color
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.core import BT_BR_EDR_TRANSPORT, BT_L2CAP_PROTOCOL_ID
-from bumble.sdp import Client as SDP_Client, SDP_PUBLIC_BROWSE_ROOT, SDP_ALL_ATTRIBUTES_RANGE
+from bumble.sdp import (
+    Client as SDP_Client,
+    SDP_PUBLIC_BROWSE_ROOT,
+    SDP_ALL_ATTRIBUTES_RANGE,
+)
 
 
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 3:
-        print('Usage: run_classic_connect.py <device-config> <transport-spec> <bluetooth-addresses..>')
-        print('example: run_classic_connect.py classic1.json usb:04b4:f901 E1:CA:72:48:C4:E8')
+        print(
+            'Usage: run_classic_connect.py <device-config> <transport-spec> <bluetooth-addresses..>'
+        )
+        print(
+            'example: run_classic_connect.py classic1.json usb:04b4:f901 E1:CA:72:48:C4:E8'
+        )
         return
 
     print('<<< connecting to HCI...')
@@ -53,32 +61,49 @@ async def main():
         await sdp_client.connect(connection)
 
         # List all services in the root browse group
-        service_record_handles = await sdp_client.search_services([SDP_PUBLIC_BROWSE_ROOT])
+        service_record_handles = await sdp_client.search_services(
+            [SDP_PUBLIC_BROWSE_ROOT]
+        )
         print(color('\n==================================', 'blue'))
         print(color('SERVICES:', 'yellow'), service_record_handles)
 
         # For each service in the root browse group, get all its attributes
         for service_record_handle in service_record_handles:
-            attributes = await sdp_client.get_attributes(service_record_handle, [SDP_ALL_ATTRIBUTES_RANGE])
+            attributes = await sdp_client.get_attributes(
+                service_record_handle, [SDP_ALL_ATTRIBUTES_RANGE]
+            )
             print(color(f'SERVICE {service_record_handle:04X} attributes:', 'yellow'))
             for attribute in attributes:
                 print('  ', attribute.to_string(color=True))
 
         # Search for services with an L2CAP service attribute
-        search_result = await sdp_client.search_attributes([BT_L2CAP_PROTOCOL_ID], [SDP_ALL_ATTRIBUTES_RANGE])
+        search_result = await sdp_client.search_attributes(
+            [BT_L2CAP_PROTOCOL_ID], [SDP_ALL_ATTRIBUTES_RANGE]
+        )
         print(color('\n==================================', 'blue'))
         print(color('SEARCH RESULTS:', 'yellow'))
         for attribute_list in search_result:
             print(color('SERVICE:', 'green'))
-            print('  ' + '\n  '.join([attribute.to_string(color=True) for attribute in attribute_list]))
+            print(
+                '  '
+                + '\n  '.join(
+                    [attribute.to_string(color=True) for attribute in attribute_list]
+                )
+            )
 
         await sdp_client.disconnect()
         await hci_source.wait_for_termination()
 
     # Connect to a peer
     target_addresses = sys.argv[3:]
-    await asyncio.wait([asyncio.create_task(connect(target_address)) for target_address in target_addresses])
+    await asyncio.wait(
+        [
+            asyncio.create_task(connect(target_address))
+            for target_address in target_addresses
+        ]
+    )
+
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

@@ -35,13 +35,15 @@ async def main():
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(sys.argv[1]) as (hci_source, hci_sink):
         print('<<< connected')
-        filter_duplicates = (len(sys.argv) == 3 and sys.argv[2] == 'filter')
+        filter_duplicates = len(sys.argv) == 3 and sys.argv[2] == 'filter'
 
         device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
 
         @device.on('advertisement')
         def _(advertisement):
-            address_type_string = ('PUBLIC', 'RANDOM', 'PUBLIC_ID', 'RANDOM_ID')[advertisement.address.address_type]
+            address_type_string = ('PUBLIC', 'RANDOM', 'PUBLIC_ID', 'RANDOM_ID')[
+                advertisement.address.address_type
+            ]
             address_color = 'yellow' if advertisement.is_connectable else 'red'
             address_qualifier = ''
             if address_type_string.startswith('P'):
@@ -57,13 +59,16 @@ async def main():
                     type_color = 'white'
 
             separator = '\n  '
-            print(f'>>> {color(advertisement.address, address_color)} [{color(address_type_string, type_color)}]{address_qualifier}:{separator}RSSI:{advertisement.rssi}{separator}{advertisement.data.to_string(separator)}')
+            print(
+                f'>>> {color(advertisement.address, address_color)} [{color(address_type_string, type_color)}]{address_qualifier}:{separator}RSSI:{advertisement.rssi}{separator}{advertisement.data.to_string(separator)}'
+            )
 
         await device.power_on()
         await device.start_scanning(filter_duplicates=filter_duplicates)
 
         await hci_source.wait_for_termination()
 
+
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

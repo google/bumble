@@ -59,15 +59,10 @@ async def open_android_emulator_transport(spec):
             return bytes([packet.type]) + packet.packet
 
         async def write(self, packet):
-            await self.hci_device.write(
-                HCIPacket(
-                    type   = packet[0],
-                    packet = packet[1:]
-                )
-            )
+            await self.hci_device.write(HCIPacket(type=packet[0], packet=packet[1:]))
 
     # Parse the parameters
-    mode        = 'host'
+    mode = 'host'
     server_host = 'localhost'
     server_port = 8554
     if spec is not None:
@@ -100,7 +95,7 @@ async def open_android_emulator_transport(spec):
     transport = PumpedTransport(
         PumpedPacketSource(hci_device.read),
         PumpedPacketSink(hci_device.write),
-        channel.close
+        channel.close,
     )
     transport.start()
 

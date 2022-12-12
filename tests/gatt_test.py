@@ -36,7 +36,7 @@ from bumble.gatt import (
     UTF8CharacteristicAdapter,
     Service,
     Characteristic,
-    CharacteristicValue
+    CharacteristicValue,
 )
 from bumble.transport import AsyncPipeSink
 from bumble.core import UUID
@@ -45,7 +45,7 @@ from bumble.att import (
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     ATT_PDU,
     ATT_Error_Response,
-    ATT_Read_By_Group_Type_Request
+    ATT_Read_By_Group_Type_Request,
 )
 
 
@@ -72,20 +72,20 @@ def test_UUID():
     assert str(w) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6'
 
     u1 = UUID.from_16_bits(0x1234)
-    b1 = u1.to_bytes(force_128 = True)
+    b1 = u1.to_bytes(force_128=True)
     u2 = UUID.from_bytes(b1)
     assert u1 == u2
 
-    u3 = UUID.from_16_bits(0x180a)
+    u3 = UUID.from_16_bits(0x180A)
     assert str(u3) == 'UUID-16:180A (Device Information)'
 
 
 # -----------------------------------------------------------------------------
 def test_ATT_Error_Response():
     pdu = ATT_Error_Response(
-        request_opcode_in_error = ATT_EXCHANGE_MTU_REQUEST,
-        attribute_handle_in_error = 0x0000,
-        error_code = ATT_ATTRIBUTE_NOT_FOUND_ERROR
+        request_opcode_in_error=ATT_EXCHANGE_MTU_REQUEST,
+        attribute_handle_in_error=0x0000,
+        error_code=ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     )
     basic_check(pdu)
 
@@ -93,9 +93,9 @@ def test_ATT_Error_Response():
 # -----------------------------------------------------------------------------
 def test_ATT_Read_By_Group_Type_Request():
     pdu = ATT_Read_By_Group_Type_Request(
-        starting_handle      = 0x0001,
-        ending_handle        = 0xFFFF,
-        attribute_group_type = UUID.from_16_bits(0x2800)
+        starting_handle=0x0001,
+        ending_handle=0xFFFF,
+        attribute_group_type=UUID.from_16_bits(0x2800),
     )
     basic_check(pdu)
 
@@ -110,7 +110,12 @@ async def test_characteristic_encoding():
         def decode_value(self, value_bytes):
             return value_bytes[0]
 
-    c = Foo(GATT_BATTERY_LEVEL_CHARACTERISTIC, Characteristic.READ, Characteristic.READABLE, 123)
+    c = Foo(
+        GATT_BATTERY_LEVEL_CHARACTERISTIC,
+        Characteristic.READ,
+        Characteristic.READABLE,
+        123,
+    )
     x = c.read_value(None)
     assert x == bytes([123])
     c.write_value(None, bytes([122]))
@@ -123,7 +128,7 @@ async def test_characteristic_encoding():
                 characteristic.handle,
                 characteristic.end_group_handle,
                 characteristic.uuid,
-                characteristic.properties
+                characteristic.properties,
             )
 
         def encode_value(self, value):
@@ -138,13 +143,10 @@ async def test_characteristic_encoding():
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
         Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
         Characteristic.READABLE | Characteristic.WRITEABLE,
-        bytes([123])
+        bytes([123]),
     )
 
-    service = Service(
-        '3A657F47-D34F-46B3-B1EC-698E29B6B829',
-        [characteristic]
-    )
+    service = Service('3A657F47-D34F-46B3-B1EC-698E29B6B829', [characteristic])
     server.add_service(service)
 
     await client.power_on()
@@ -237,7 +239,7 @@ async def test_attribute_getters():
         characteristic_uuid,
         Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
         Characteristic.READABLE | Characteristic.WRITEABLE,
-        bytes([123])
+        bytes([123]),
     )
 
     service_uuid = UUID('3A657F47-D34F-46B3-B1EC-698E29B6B829')
@@ -247,22 +249,43 @@ async def test_attribute_getters():
     service_attr = server.gatt_server.get_service_attribute(service_uuid)
     assert service_attr
 
-    (char_decl_attr, char_value_attr) = server.gatt_server.get_characteristic_attributes(service_uuid, characteristic_uuid)
+    (
+        char_decl_attr,
+        char_value_attr,
+    ) = server.gatt_server.get_characteristic_attributes(
+        service_uuid, characteristic_uuid
+    )
     assert char_decl_attr and char_value_attr
 
-    desc_attr = server.gatt_server.get_descriptor_attribute(service_uuid, characteristic_uuid, GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR)
+    desc_attr = server.gatt_server.get_descriptor_attribute(
+        service_uuid,
+        characteristic_uuid,
+        GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
+    )
     assert desc_attr
 
     # assert all handles are in expected order
-    assert service_attr.handle < char_decl_attr.handle < char_value_attr.handle < desc_attr.handle == service_attr.end_group_handle
+    assert (
+        service_attr.handle
+        < char_decl_attr.handle
+        < char_value_attr.handle
+        < desc_attr.handle
+        == service_attr.end_group_handle
+    )
     # assert characteristic declarations attribute is followed by characteristic value attribute
     assert char_decl_attr.handle + 1 == char_value_attr.handle
+
 
 # -----------------------------------------------------------------------------
 def test_CharacteristicAdapter():
     # Check that the CharacteristicAdapter base class is transparent
     v = bytes([1, 2, 3])
-    c = Characteristic(GATT_BATTERY_LEVEL_CHARACTERISTIC, Characteristic.READ, Characteristic.READABLE, v)
+    c = Characteristic(
+        GATT_BATTERY_LEVEL_CHARACTERISTIC,
+        Characteristic.READ,
+        Characteristic.READABLE,
+        v,
+    )
     a = CharacteristicAdapter(c)
 
     value = a.read_value(None)
@@ -273,7 +296,9 @@ def test_CharacteristicAdapter():
     assert c.value == v
 
     # Simple delegated adapter
-    a = DelegatedCharacteristicAdapter(c, lambda x: bytes(reversed(x)), lambda x: bytes(reversed(x)))
+    a = DelegatedCharacteristicAdapter(
+        c, lambda x: bytes(reversed(x)), lambda x: bytes(reversed(x))
+    )
 
     value = a.read_value(None)
     assert value == bytes(reversed(v))
@@ -342,7 +367,9 @@ def test_CharacteristicValue():
     assert x == b
 
     result = []
-    c = CharacteristicValue(write=lambda connection, value: result.append((connection, value)))
+    c = CharacteristicValue(
+        write=lambda connection, value: result.append((connection, value))
+    )
     z = object()
     c.write(z, b)
     assert result == [(z, b)]
@@ -355,23 +382,23 @@ class LinkedDevices:
 
         self.link = LocalLink()
         self.controllers = [
-            Controller('C1', link = self.link),
-            Controller('C2', link = self.link),
-            Controller('C3', link = self.link)
+            Controller('C1', link=self.link),
+            Controller('C2', link=self.link),
+            Controller('C3', link=self.link),
         ]
         self.devices = [
             Device(
-                address = 'F0:F1:F2:F3:F4:F5',
-                host    = Host(self.controllers[0], AsyncPipeSink(self.controllers[0]))
+                address='F0:F1:F2:F3:F4:F5',
+                host=Host(self.controllers[0], AsyncPipeSink(self.controllers[0])),
             ),
             Device(
-                address = 'F1:F2:F3:F4:F5:F6',
-                host    = Host(self.controllers[1], AsyncPipeSink(self.controllers[1]))
+                address='F1:F2:F3:F4:F5:F6',
+                host=Host(self.controllers[1], AsyncPipeSink(self.controllers[1])),
             ),
             Device(
-                address = 'F2:F3:F4:F5:F6:F7',
-                host    = Host(self.controllers[2], AsyncPipeSink(self.controllers[2]))
-            )
+                address='F2:F3:F4:F5:F6:F7',
+                host=Host(self.controllers[2], AsyncPipeSink(self.controllers[2])),
+            ),
         ]
 
         self.paired = [None, None, None]
@@ -392,7 +419,7 @@ async def test_read_write():
     characteristic1 = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
         Characteristic.READ | Characteristic.WRITE,
-        Characteristic.READABLE | Characteristic.WRITEABLE
+        Characteristic.READABLE | Characteristic.WRITEABLE,
     )
 
     def on_characteristic1_write(connection, value):
@@ -410,15 +437,13 @@ async def test_read_write():
         '66DE9057-C848-4ACA-B993-D675644EBB85',
         Characteristic.READ | Characteristic.WRITE,
         Characteristic.READABLE | Characteristic.WRITEABLE,
-        CharacteristicValue(read=on_characteristic2_read, write=on_characteristic2_write)
+        CharacteristicValue(
+            read=on_characteristic2_read, write=on_characteristic2_write
+        ),
     )
 
     service1 = Service(
-        '3A657F47-D34F-46B3-B1EC-698E29B6B829',
-        [
-            characteristic1,
-            characteristic2
-        ]
+        '3A657F47-D34F-46B3-B1EC-698E29B6B829', [characteristic1, characteristic2]
     )
     server.add_services([service1])
 
@@ -446,7 +471,9 @@ async def test_read_write():
     assert v1 == b
     assert type(characteristic1._last_value is tuple)
     assert len(characteristic1._last_value) == 2
-    assert str(characteristic1._last_value[0].peer_address) == str(client.random_address)
+    assert str(characteristic1._last_value[0].peer_address) == str(
+        client.random_address
+    )
     assert characteristic1._last_value[1] == b
     bb = bytes([3, 4, 5, 6])
     characteristic1.value = bb
@@ -457,7 +484,9 @@ async def test_read_write():
     await async_barrier()
     assert type(characteristic2._last_value is tuple)
     assert len(characteristic2._last_value) == 2
-    assert str(characteristic2._last_value[0].peer_address) == str(client.random_address)
+    assert str(characteristic2._last_value[0].peer_address) == str(
+        client.random_address
+    )
     assert characteristic2._last_value[1] == b
 
 
@@ -471,15 +500,10 @@ async def test_read_write2():
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
         Characteristic.READ | Characteristic.WRITE,
         Characteristic.READABLE | Characteristic.WRITEABLE,
-        value=v
+        value=v,
     )
 
-    service1 = Service(
-        '3A657F47-D34F-46B3-B1EC-698E29B6B829',
-        [
-            characteristic1
-        ]
-    )
+    service1 = Service('3A657F47-D34F-46B3-B1EC-698E29B6B829', [characteristic1])
     server.add_services([service1])
 
     await client.power_on()
@@ -520,11 +544,15 @@ async def test_subscribe_notify():
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
         Characteristic.READ | Characteristic.NOTIFY,
         Characteristic.READABLE,
-        bytes([1, 2, 3])
+        bytes([1, 2, 3]),
     )
 
     def on_characteristic1_subscription(connection, notify_enabled, indicate_enabled):
-        characteristic1._last_subscription = (connection, notify_enabled, indicate_enabled)
+        characteristic1._last_subscription = (
+            connection,
+            notify_enabled,
+            indicate_enabled,
+        )
 
     characteristic1.on('subscription', on_characteristic1_subscription)
 
@@ -532,11 +560,15 @@ async def test_subscribe_notify():
         '66DE9057-C848-4ACA-B993-D675644EBB85',
         Characteristic.READ | Characteristic.INDICATE,
         Characteristic.READABLE,
-        bytes([4, 5, 6])
+        bytes([4, 5, 6]),
     )
 
     def on_characteristic2_subscription(connection, notify_enabled, indicate_enabled):
-        characteristic2._last_subscription = (connection, notify_enabled, indicate_enabled)
+        characteristic2._last_subscription = (
+            connection,
+            notify_enabled,
+            indicate_enabled,
+        )
 
     characteristic2.on('subscription', on_characteristic2_subscription)
 
@@ -544,26 +576,33 @@ async def test_subscribe_notify():
         'AB5E639C-40C1-4238-B9CB-AF41F8B806E4',
         Characteristic.READ | Characteristic.NOTIFY | Characteristic.INDICATE,
         Characteristic.READABLE,
-        bytes([7, 8, 9])
+        bytes([7, 8, 9]),
     )
 
     def on_characteristic3_subscription(connection, notify_enabled, indicate_enabled):
-        characteristic3._last_subscription = (connection, notify_enabled, indicate_enabled)
+        characteristic3._last_subscription = (
+            connection,
+            notify_enabled,
+            indicate_enabled,
+        )
 
     characteristic3.on('subscription', on_characteristic3_subscription)
 
     service1 = Service(
         '3A657F47-D34F-46B3-B1EC-698E29B6B829',
-        [
-            characteristic1,
-            characteristic2,
-            characteristic3
-        ]
+        [characteristic1, characteristic2, characteristic3],
     )
     server.add_services([service1])
 
-    def on_characteristic_subscription(connection, characteristic, notify_enabled, indicate_enabled):
-        server._last_subscription = (connection, characteristic, notify_enabled, indicate_enabled)
+    def on_characteristic_subscription(
+        connection, characteristic, notify_enabled, indicate_enabled
+    ):
+        server._last_subscription = (
+            connection,
+            characteristic,
+            notify_enabled,
+            indicate_enabled,
+        )
 
     server.on('characteristic_subscription', on_characteristic_subscription)
 
@@ -630,17 +669,23 @@ async def test_subscribe_notify():
 
     await peer.subscribe(c2, on_c2_update)
     await async_barrier()
-    await server.notify_subscriber(characteristic2._last_subscription[0], characteristic2)
+    await server.notify_subscriber(
+        characteristic2._last_subscription[0], characteristic2
+    )
     await async_barrier()
     assert not c2._called
-    await server.indicate_subscriber(characteristic2._last_subscription[0], characteristic2)
+    await server.indicate_subscriber(
+        characteristic2._last_subscription[0], characteristic2
+    )
     await async_barrier()
     assert c2._called
     assert c2._last_update == characteristic2.value
 
     c2._called = False
     await peer.unsubscribe(c2, on_c2_update)
-    await server.indicate_subscriber(characteristic2._last_subscription[0], characteristic2)
+    await server.indicate_subscriber(
+        characteristic2._last_subscription[0], characteristic2
+    )
     await async_barrier()
     assert not c2._called
 
@@ -666,7 +711,9 @@ async def test_subscribe_notify():
     c3.on('update', on_c3_update)
     await peer.subscribe(c3, on_c3_update_2)
     await async_barrier()
-    await server.notify_subscriber(characteristic3._last_subscription[0], characteristic3)
+    await server.notify_subscriber(
+        characteristic3._last_subscription[0], characteristic3
+    )
     await async_barrier()
     assert c3._called
     assert c3._last_update == characteristic3.value
@@ -681,7 +728,9 @@ async def test_subscribe_notify():
     await peer.subscribe(c3, on_c3_update_3, prefer_notify=False)
     await async_barrier()
     characteristic3.value = bytes([1, 2, 3])
-    await server.indicate_subscriber(characteristic3._last_subscription[0], characteristic3)
+    await server.indicate_subscriber(
+        characteristic3._last_subscription[0], characteristic3
+    )
     await async_barrier()
     assert c3._called
     assert c3._last_update == characteristic3.value
@@ -693,8 +742,12 @@ async def test_subscribe_notify():
     c3._called_2 = False
     c3._called_3 = False
     await peer.unsubscribe(c3)
-    await server.notify_subscriber(characteristic3._last_subscription[0], characteristic3)
-    await server.indicate_subscriber(characteristic3._last_subscription[0], characteristic3)
+    await server.notify_subscriber(
+        characteristic3._last_subscription[0], characteristic3
+    )
+    await server.indicate_subscriber(
+        characteristic3._last_subscription[0], characteristic3
+    )
     await async_barrier()
     assert not c3._called
     assert not c3._called_2
@@ -709,6 +762,7 @@ async def test_mtu_exchange():
     d3.gatt_server.max_mtu = 100
 
     d3_connections = []
+
     @d3.on('connection')
     def on_d3_connection(connection):
         d3_connections.append(connection)
@@ -745,7 +799,12 @@ def test_char_property_to_string():
 
     # double
     assert Characteristic.properties_as_string(0x03) == "BROADCAST,READ"
-    assert Characteristic.properties_as_string(Characteristic.BROADCAST | Characteristic.READ) == "BROADCAST,READ"
+    assert (
+        Characteristic.properties_as_string(
+            Characteristic.BROADCAST | Characteristic.READ
+        )
+        == "BROADCAST,READ"
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -754,8 +813,14 @@ def test_char_property_string_to_type():
     assert Characteristic.string_to_properties("BROADCAST") == Characteristic.BROADCAST
 
     # double
-    assert Characteristic.string_to_properties("BROADCAST,READ") == Characteristic.BROADCAST | Characteristic.READ
-    assert Characteristic.string_to_properties("READ,BROADCAST") == Characteristic.BROADCAST | Characteristic.READ
+    assert (
+        Characteristic.string_to_properties("BROADCAST,READ")
+        == Characteristic.BROADCAST | Characteristic.READ
+    )
+    assert (
+        Characteristic.string_to_properties("READ,BROADCAST")
+        == Characteristic.BROADCAST | Characteristic.READ
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -767,16 +832,15 @@ async def test_server_string():
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
         Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
         Characteristic.READABLE | Characteristic.WRITEABLE,
-        bytes([123])
+        bytes([123]),
     )
 
-    service = Service(
-        '3A657F47-D34F-46B3-B1EC-698E29B6B829',
-        [characteristic]
-    )
+    service = Service('3A657F47-D34F-46B3-B1EC-698E29B6B829', [characteristic])
     server.add_service(service)
 
-    assert str(server.gatt_server) == """Service(handle=0x0001, end=0x0005, uuid=UUID-16:1800 (Generic Access))
+    assert (
+        str(server.gatt_server)
+        == """Service(handle=0x0001, end=0x0005, uuid=UUID-16:1800 (Generic Access))
 CharacteristicDeclaration(handle=0x0002, value_handle=0x0003, uuid=UUID-16:2A00 (Device Name), properties=READ)
 Characteristic(handle=0x0003, end=0x0003, uuid=UUID-16:2A00 (Device Name), properties=READ)
 CharacteristicDeclaration(handle=0x0004, value_handle=0x0005, uuid=UUID-16:2A01 (Appearance), properties=READ)
@@ -785,6 +849,8 @@ Service(handle=0x0006, end=0x0009, uuid=3A657F47-D34F-46B3-B1EC-698E29B6B829)
 CharacteristicDeclaration(handle=0x0007, value_handle=0x0008, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, properties=READ,WRITE,NOTIFY)
 Characteristic(handle=0x0008, end=0x0009, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, properties=READ,WRITE,NOTIFY)
 Descriptor(handle=0x0009, type=UUID-16:2902 (Client Characteristic Configuration), value=0000)"""
+    )
+
 
 # -----------------------------------------------------------------------------
 async def async_main():
@@ -797,7 +863,7 @@ async def async_main():
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     test_UUID()
     test_ATT_Error_Response()
     test_ATT_Read_By_Group_Type_Request()

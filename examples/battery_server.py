@@ -44,11 +44,19 @@ async def main():
 
         # Set the advertising data
         device.advertising_data = bytes(
-            AdvertisingData([
-                (AdvertisingData.COMPLETE_LOCAL_NAME, bytes('Bumble Battery', 'utf-8')),
-                (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, bytes(battery_service.uuid)),
-                (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340))
-            ])
+            AdvertisingData(
+                [
+                    (
+                        AdvertisingData.COMPLETE_LOCAL_NAME,
+                        bytes('Bumble Battery', 'utf-8'),
+                    ),
+                    (
+                        AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+                        bytes(battery_service.uuid),
+                    ),
+                    (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340)),
+                ]
+            )
         )
 
         # Go!
@@ -58,9 +66,11 @@ async def main():
         # Notify every 3 seconds
         while True:
             await asyncio.sleep(3.0)
-            await device.notify_subscribers(battery_service.battery_level_characteristic)
+            await device.notify_subscribers(
+                battery_service.battery_level_characteristic
+            )
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())

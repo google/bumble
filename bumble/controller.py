@@ -39,67 +39,79 @@ class DataObject:
 # -----------------------------------------------------------------------------
 class Connection:
     def __init__(self, controller, handle, role, peer_address, link):
-        self.controller   = controller
-        self.handle       = handle
-        self.role         = role
+        self.controller = controller
+        self.handle = handle
+        self.role = role
         self.peer_address = peer_address
-        self.link         = link
-        self.assembler    = HCI_AclDataPacketAssembler(self.on_acl_pdu)
+        self.link = link
+        self.assembler = HCI_AclDataPacketAssembler(self.on_acl_pdu)
 
     def on_hci_acl_data_packet(self, packet):
         self.assembler.feed_packet(packet)
-        self.controller.send_hci_packet(HCI_Number_Of_Completed_Packets_Event([(self.handle, 1)]))
+        self.controller.send_hci_packet(
+            HCI_Number_Of_Completed_Packets_Event([(self.handle, 1)])
+        )
 
     def on_acl_pdu(self, data):
         if self.link:
-            self.link.send_acl_data(self.controller.random_address, self.peer_address, data)
+            self.link.send_acl_data(
+                self.controller.random_address, self.peer_address, data
+            )
 
 
 # -----------------------------------------------------------------------------
 class Controller:
-    def __init__(self, name, host_source = None, host_sink = None, link = None):
-        self.name     = name
+    def __init__(self, name, host_source=None, host_sink=None, link=None):
+        self.name = name
         self.hci_sink = None
-        self.link     = link
+        self.link = link
 
-        self.central_connections    = {}  # Connections where this controller is the central
-        self.peripheral_connections = {}  # Connections where this controller is the peripheral
+        self.central_connections = (
+            {}
+        )  # Connections where this controller is the central
+        self.peripheral_connections = (
+            {}
+        )  # Connections where this controller is the peripheral
 
-        self.hci_version                  = HCI_VERSION_BLUETOOTH_CORE_5_0
-        self.hci_revision                 = 0
-        self.lmp_version                  = HCI_VERSION_BLUETOOTH_CORE_5_0
-        self.lmp_subversion               = 0
-        self.lmp_features                 = bytes.fromhex('0000000060000000')  # BR/EDR Not Supported, LE Supported (Controller)
-        self.manufacturer_name            = 0xFFFF
-        self.hc_le_data_packet_length     = 27
+        self.hci_version = HCI_VERSION_BLUETOOTH_CORE_5_0
+        self.hci_revision = 0
+        self.lmp_version = HCI_VERSION_BLUETOOTH_CORE_5_0
+        self.lmp_subversion = 0
+        self.lmp_features = bytes.fromhex(
+            '0000000060000000'
+        )  # BR/EDR Not Supported, LE Supported (Controller)
+        self.manufacturer_name = 0xFFFF
+        self.hc_le_data_packet_length = 27
         self.hc_total_num_le_data_packets = 64
-        self.supported_commands           = bytes.fromhex('2000800000c000000000e40000002822000000000000040000f7ffff7f00000030f0f9ff01008004000000000000000000000000000000000000000000000000')
-        self.le_features                  = bytes.fromhex('ff49010000000000')
-        self.le_states                    = bytes.fromhex('ffff3fffff030000')
+        self.supported_commands = bytes.fromhex(
+            '2000800000c000000000e40000002822000000000000040000f7ffff7f00000030f0f9ff01008004000000000000000000000000000000000000000000000000'
+        )
+        self.le_features = bytes.fromhex('ff49010000000000')
+        self.le_states = bytes.fromhex('ffff3fffff030000')
         self.advertising_channel_tx_power = 0
-        self.filter_accept_list_size      = 8
-        self.resolving_list_size          = 8
-        self.supported_max_tx_octets      = 27
-        self.supported_max_tx_time        = 10000  # microseconds
-        self.supported_max_rx_octets      = 27
-        self.supported_max_rx_time        = 10000  # microseconds
-        self.suggested_max_tx_octets      = 27
-        self.suggested_max_tx_time        = 0x0148  # microseconds
-        self.default_phy                  = bytes([0, 0, 0])
-        self.le_scan_type                 = 0
-        self.le_scan_interval             = 0x10
-        self.le_scan_window               = 0x10
-        self.le_scan_enable               = 0
-        self.le_scan_own_address_type     = Address.RANDOM_DEVICE_ADDRESS
-        self.le_scanning_filter_policy    = 0
-        self.le_scan_response_data        = None
-        self.le_address_resolution        = False
-        self.le_rpa_timeout               = 0
-        self.sync_flow_control            = False
-        self.local_name                   = 'Bumble'
+        self.filter_accept_list_size = 8
+        self.resolving_list_size = 8
+        self.supported_max_tx_octets = 27
+        self.supported_max_tx_time = 10000  # microseconds
+        self.supported_max_rx_octets = 27
+        self.supported_max_rx_time = 10000  # microseconds
+        self.suggested_max_tx_octets = 27
+        self.suggested_max_tx_time = 0x0148  # microseconds
+        self.default_phy = bytes([0, 0, 0])
+        self.le_scan_type = 0
+        self.le_scan_interval = 0x10
+        self.le_scan_window = 0x10
+        self.le_scan_enable = 0
+        self.le_scan_own_address_type = Address.RANDOM_DEVICE_ADDRESS
+        self.le_scanning_filter_policy = 0
+        self.le_scan_response_data = None
+        self.le_address_resolution = False
+        self.le_rpa_timeout = 0
+        self.sync_flow_control = False
+        self.local_name = 'Bumble'
 
-        self.advertising_interval     = 2000  # Fixed for now
-        self.advertising_data         = None
+        self.advertising_interval = 2000  # Fixed for now
+        self.advertising_data = None
         self.advertising_timer_handle = None
 
         self._random_address = Address('00:00:00:00:00:00')
@@ -162,7 +174,9 @@ class Controller:
         self.on_hci_packet(HCI_Packet.from_bytes(packet))
 
     def on_hci_packet(self, packet):
-        logger.debug(f'{color("<<<", "blue")} [{self.name}] {color("HOST -> CONTROLLER", "blue")}: {packet}')
+        logger.debug(
+            f'{color("<<<", "blue")} [{self.name}] {color("HOST -> CONTROLLER", "blue")}: {packet}'
+        )
 
         # If the packet is a command, invoke the handler for this packet
         if packet.hci_packet_type == HCI_COMMAND_PACKET:
@@ -179,11 +193,13 @@ class Controller:
         handler = getattr(self, handler_name, self.on_hci_command)
         result = handler(command)
         if type(result) is bytes:
-            self.send_hci_packet(HCI_Command_Complete_Event(
-                num_hci_command_packets = 1,
-                command_opcode          = command.op_code,
-                return_parameters       = result
-            ))
+            self.send_hci_packet(
+                HCI_Command_Complete_Event(
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                    return_parameters=result,
+                )
+            )
 
     def on_hci_event_packet(self, event):
         logger.warning('!!! unexpected event packet')
@@ -192,14 +208,18 @@ class Controller:
         # Look for the connection to which this data belongs
         connection = self.find_connection_by_handle(packet.connection_handle)
         if connection is None:
-            logger.warning(f'!!! no connection for handle 0x{packet.connection_handle:04X}')
+            logger.warning(
+                f'!!! no connection for handle 0x{packet.connection_handle:04X}'
+            )
             return
 
         # Pass the packet to the connection
         connection.on_hci_acl_data_packet(packet)
 
     def send_hci_packet(self, packet):
-        logger.debug(f'{color(">>>", "green")} [{self.name}] {color("CONTROLLER -> HOST", "green")}: {packet}')
+        logger.debug(
+            f'{color(">>>", "green")} [{self.name}] {color("CONTROLLER -> HOST", "green")}: {packet}'
+        )
         if self.host:
             self.host.on_packet(packet.to_bytes())
 
@@ -215,8 +235,7 @@ class Controller:
         handle = 0
         max_handle = 0
         for connection in itertools.chain(
-            self.central_connections.values(),
-            self.peripheral_connections.values()
+            self.central_connections.values(), self.peripheral_connections.values()
         ):
             max_handle = max(max_handle, connection.handle)
             if connection.handle == handle:
@@ -225,12 +244,13 @@ class Controller:
         return handle
 
     def find_connection_by_address(self, address):
-        return self.central_connections.get(address) or self.peripheral_connections.get(address)
+        return self.central_connections.get(address) or self.peripheral_connections.get(
+            address
+        )
 
     def find_connection_by_handle(self, handle):
         for connection in itertools.chain(
-            self.central_connections.values(),
-            self.peripheral_connections.values()
+            self.central_connections.values(), self.peripheral_connections.values()
         ):
             if connection.handle == handle:
                 return connection
@@ -253,22 +273,26 @@ class Controller:
         connection = self.peripheral_connections.get(peer_address)
         if connection is None:
             connection_handle = self.allocate_connection_handle()
-            connection = Connection(self, connection_handle, BT_PERIPHERAL_ROLE, peer_address, self.link)
+            connection = Connection(
+                self, connection_handle, BT_PERIPHERAL_ROLE, peer_address, self.link
+            )
             self.peripheral_connections[peer_address] = connection
             logger.debug(f'New PERIPHERAL connection handle: 0x{connection_handle:04X}')
 
         # Then say that the connection has completed
-        self.send_hci_packet(HCI_LE_Connection_Complete_Event(
-            status                 = HCI_SUCCESS,
-            connection_handle      = connection.handle,
-            role                   = connection.role,
-            peer_address_type      = peer_address_type,
-            peer_address           = peer_address,
-            connection_interval    = 10,  # FIXME
-            peripheral_latency     = 0,   # FIXME
-            supervision_timeout    = 10,  # FIXME
-            central_clock_accuracy = 7    # FIXME
-        ))
+        self.send_hci_packet(
+            HCI_LE_Connection_Complete_Event(
+                status=HCI_SUCCESS,
+                connection_handle=connection.handle,
+                role=connection.role,
+                peer_address_type=peer_address_type,
+                peer_address=peer_address,
+                connection_interval=10,  # FIXME
+                peripheral_latency=0,  # FIXME
+                supervision_timeout=10,  # FIXME
+                central_clock_accuracy=7,  # FIXME
+            )
+        )
 
     def on_link_central_disconnected(self, peer_address, reason):
         '''
@@ -277,18 +301,22 @@ class Controller:
 
         # Send a disconnection complete event
         if connection := self.peripheral_connections.get(peer_address):
-            self.send_hci_packet(HCI_Disconnection_Complete_Event(
-                status            = HCI_SUCCESS,
-                connection_handle = connection.handle,
-                reason            = reason
-            ))
+            self.send_hci_packet(
+                HCI_Disconnection_Complete_Event(
+                    status=HCI_SUCCESS,
+                    connection_handle=connection.handle,
+                    reason=reason,
+                )
+            )
 
             # Remove the connection
             del self.peripheral_connections[peer_address]
         else:
             logger.warn(f'!!! No peripheral connection found for {peer_address}')
 
-    def on_link_peripheral_connection_complete(self, le_create_connection_command, status):
+    def on_link_peripheral_connection_complete(
+        self, le_create_connection_command, status
+    ):
         '''
         Called by the link when a connection has been made or has failed to be made
         '''
@@ -300,29 +328,29 @@ class Controller:
             if connection is None:
                 connection_handle = self.allocate_connection_handle()
                 connection = Connection(
-                    self,
-                    connection_handle,
-                    BT_CENTRAL_ROLE,
-                    peer_address,
-                    self.link
+                    self, connection_handle, BT_CENTRAL_ROLE, peer_address, self.link
                 )
                 self.central_connections[peer_address] = connection
-                logger.debug(f'New CENTRAL connection handle: 0x{connection_handle:04X}')
+                logger.debug(
+                    f'New CENTRAL connection handle: 0x{connection_handle:04X}'
+                )
         else:
             connection = None
 
         # Say that the connection has completed
-        self.send_hci_packet(HCI_LE_Connection_Complete_Event(
-            status                 = status,
-            connection_handle      = connection.handle if connection else 0,
-            role                   = BT_CENTRAL_ROLE,
-            peer_address_type      = le_create_connection_command.peer_address_type,
-            peer_address           = le_create_connection_command.peer_address,
-            connection_interval    = le_create_connection_command.connection_interval_min,
-            peripheral_latency     = le_create_connection_command.max_latency,
-            supervision_timeout    = le_create_connection_command.supervision_timeout,
-            central_clock_accuracy = 0
-        ))
+        self.send_hci_packet(
+            HCI_LE_Connection_Complete_Event(
+                status=status,
+                connection_handle=connection.handle if connection else 0,
+                role=BT_CENTRAL_ROLE,
+                peer_address_type=le_create_connection_command.peer_address_type,
+                peer_address=le_create_connection_command.peer_address,
+                connection_interval=le_create_connection_command.connection_interval_min,
+                peripheral_latency=le_create_connection_command.max_latency,
+                supervision_timeout=le_create_connection_command.supervision_timeout,
+                central_clock_accuracy=0,
+            )
+        )
 
     def on_link_peripheral_disconnection_complete(self, disconnection_command, status):
         '''
@@ -330,14 +358,18 @@ class Controller:
         '''
 
         # Send a disconnection complete event
-        self.send_hci_packet(HCI_Disconnection_Complete_Event(
-            status            = status,
-            connection_handle = disconnection_command.connection_handle,
-            reason            = disconnection_command.reason
-        ))
+        self.send_hci_packet(
+            HCI_Disconnection_Complete_Event(
+                status=status,
+                connection_handle=disconnection_command.connection_handle,
+                reason=disconnection_command.reason,
+            )
+        )
 
         # Remove the connection
-        if connection := self.find_central_connection_by_handle(disconnection_command.connection_handle):
+        if connection := self.find_central_connection_by_handle(
+            disconnection_command.connection_handle
+        ):
             logger.debug(f'CENTRAL Connection removed: {connection}')
             del self.central_connections[connection.peer_address]
 
@@ -348,11 +380,13 @@ class Controller:
 
         # Send a disconnection complete event
         if connection := self.central_connections.get(peer_address):
-            self.send_hci_packet(HCI_Disconnection_Complete_Event(
-                status            = HCI_SUCCESS,
-                connection_handle = connection.handle,
-                reason            = HCI_CONNECTION_TIMEOUT_ERROR
-            ))
+            self.send_hci_packet(
+                HCI_Disconnection_Complete_Event(
+                    status=HCI_SUCCESS,
+                    connection_handle=connection.handle,
+                    reason=HCI_CONNECTION_TIMEOUT_ERROR,
+                )
+            )
 
             # Remove the connection
             del self.central_connections[peer_address]
@@ -364,9 +398,7 @@ class Controller:
         if connection := self.find_connection_by_address(peer_address):
             self.send_hci_packet(
                 HCI_Encryption_Change_Event(
-                    status             = 0,
-                    connection_handle  = connection.handle,
-                    encryption_enabled = 1
+                    status=0, connection_handle=connection.handle, encryption_enabled=1
                 )
             )
 
@@ -390,22 +422,22 @@ class Controller:
         # Send a scan report
         report = HCI_Object(
             HCI_LE_Advertising_Report_Event.REPORT_FIELDS,
-            event_type   = HCI_LE_Advertising_Report_Event.ADV_IND,
-            address_type = sender_address.address_type,
-            address      = sender_address,
-            data         = data,
-            rssi         = -50
+            event_type=HCI_LE_Advertising_Report_Event.ADV_IND,
+            address_type=sender_address.address_type,
+            address=sender_address,
+            data=data,
+            rssi=-50,
         )
         self.send_hci_packet(HCI_LE_Advertising_Report_Event([report]))
 
         # Simulate a scan response
         report = HCI_Object(
             HCI_LE_Advertising_Report_Event.REPORT_FIELDS,
-            event_type   = HCI_LE_Advertising_Report_Event.SCAN_RSP,
-            address_type = sender_address.address_type,
-            address      = sender_address,
-            data         = data,
-            rssi         = -50
+            event_type=HCI_LE_Advertising_Report_Event.SCAN_RSP,
+            address_type=sender_address.address_type,
+            address=sender_address,
+            data=data,
+            rssi=-50,
         )
         self.send_hci_packet(HCI_LE_Advertising_Report_Event([report]))
 
@@ -414,14 +446,18 @@ class Controller:
     ############################################################
     def on_advertising_timer_fired(self):
         self.send_advertising_data()
-        self.advertising_timer_handle = asyncio.get_running_loop().call_later(self.advertising_interval / 1000.0, self.on_advertising_timer_fired)
+        self.advertising_timer_handle = asyncio.get_running_loop().call_later(
+            self.advertising_interval / 1000.0, self.on_advertising_timer_fired
+        )
 
     def start_advertising(self):
         # Stop any ongoing advertising before we start again
         self.stop_advertising()
 
         # Advertise now
-        self.advertising_timer_handle = asyncio.get_running_loop().call_soon(self.on_advertising_timer_fired)
+        self.advertising_timer_handle = asyncio.get_running_loop().call_soon(
+            self.on_advertising_timer_fired
+        )
 
     def stop_advertising(self):
         if self.advertising_timer_handle is not None:
@@ -455,14 +491,20 @@ class Controller:
         See Bluetooth spec Vol 2, Part E - 7.1.6 Disconnect Command
         '''
         # First, say that the disconnection is pending
-        self.send_hci_packet(HCI_Command_Status_Event(
-            status                  = HCI_COMMAND_STATUS_PENDING,
-            num_hci_command_packets = 1,
-            command_opcode          = command.op_code
-        ))
+        self.send_hci_packet(
+            HCI_Command_Status_Event(
+                status=HCI_COMMAND_STATUS_PENDING,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
 
         # Notify the link of the disconnection
-        if not (connection := self.find_central_connection_by_handle(command.connection_handle)):
+        if not (
+            connection := self.find_central_connection_by_handle(
+                command.connection_handle
+            )
+        ):
             logger.warn('connection not found')
             return
 
@@ -590,7 +632,7 @@ class Controller:
             self.hci_revision,
             self.lmp_version,
             self.manufacturer_name,
-            self.lmp_subversion
+            self.lmp_subversion,
         )
 
     def on_hci_read_local_supported_commands_command(self, command):
@@ -609,7 +651,11 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.4.6 Read BD_ADDR Command
         '''
-        bd_addr = self._public_address.to_bytes() if self._public_address is not None else bytes(6)
+        bd_addr = (
+            self._public_address.to_bytes()
+            if self._public_address is not None
+            else bytes(6)
+        )
         return bytes([HCI_SUCCESS]) + bd_addr
 
     def on_hci_le_set_event_mask_command(self, command):
@@ -623,10 +669,12 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.2 LE Read Buffer Size Command
         '''
-        return struct.pack('<BHB',
-                           HCI_SUCCESS,
-                           self.hc_le_data_packet_length,
-                           self.hc_total_num_le_data_packets)
+        return struct.pack(
+            '<BHB',
+            HCI_SUCCESS,
+            self.hc_le_data_packet_length,
+            self.hc_total_num_le_data_packets,
+        )
 
     def on_hci_le_read_local_supported_features_command(self, command):
         '''
@@ -683,10 +731,10 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.10 LE Set Scan Parameters Command
         '''
-        self.le_scan_type              = command.le_scan_type
-        self.le_scan_interval          = command.le_scan_interval
-        self.le_scan_window            = command.le_scan_window
-        self.le_scan_own_address_type  = command.own_address_type
+        self.le_scan_type = command.le_scan_type
+        self.le_scan_interval = command.le_scan_interval
+        self.le_scan_window = command.le_scan_window
+        self.le_scan_own_address_type = command.own_address_type
         self.le_scanning_filter_policy = command.scanning_filter_policy
         return bytes([HCI_SUCCESS])
 
@@ -694,7 +742,7 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.11 LE Set Scan Enable Command
         '''
-        self.le_scan_enable    = command.le_scan_enable
+        self.le_scan_enable = command.le_scan_enable
         self.filter_duplicates = command.filter_duplicates
         return bytes([HCI_SUCCESS])
 
@@ -710,22 +758,26 @@ class Controller:
 
         # Check that we don't already have a pending connection
         if self.link.get_pending_connection():
-            self.send_hci_packet(HCI_Command_Status_Event(
-                status                  = HCI_COMMAND_DISALLOWED_ERROR,
-                num_hci_command_packets = 1,
-                command_opcode          = command.op_code
-            ))
+            self.send_hci_packet(
+                HCI_Command_Status_Event(
+                    status=HCI_COMMAND_DISALLOWED_ERROR,
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                )
+            )
             return
 
         # Initiate the connection
         self.link.connect(self.random_address, command)
 
         # Say that the connection is pending
-        self.send_hci_packet(HCI_Command_Status_Event(
-            status                  = HCI_COMMAND_STATUS_PENDING,
-            num_hci_command_packets = 1,
-            command_opcode          = command.op_code
-        ))
+        self.send_hci_packet(
+            HCI_Command_Status_Event(
+                status=HCI_COMMAND_STATUS_PENDING,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
 
     def on_hci_le_create_connection_cancel_command(self, command):
         '''
@@ -763,18 +815,22 @@ class Controller:
         '''
 
         # First, say that the command is pending
-        self.send_hci_packet(HCI_Command_Status_Event(
-            status                  = HCI_COMMAND_STATUS_PENDING,
-            num_hci_command_packets = 1,
-            command_opcode          = command.op_code
-        ))
+        self.send_hci_packet(
+            HCI_Command_Status_Event(
+                status=HCI_COMMAND_STATUS_PENDING,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
 
         # Then send the remote features
-        self.send_hci_packet(HCI_LE_Read_Remote_Features_Complete_Event(
-            status            = HCI_SUCCESS,
-            connection_handle = 0,
-            le_features       = bytes.fromhex('dd40000000000000')
-        ))
+        self.send_hci_packet(
+            HCI_LE_Read_Remote_Features_Complete_Event(
+                status=HCI_SUCCESS,
+                connection_handle=0,
+                le_features=bytes.fromhex('dd40000000000000'),
+            )
+        )
 
     def on_hci_le_rand_command(self, command):
         '''
@@ -788,7 +844,11 @@ class Controller:
         '''
 
         # Check the parameters
-        if not (connection := self.find_central_connection_by_handle(command.connection_handle)):
+        if not (
+            connection := self.find_central_connection_by_handle(
+                command.connection_handle
+            )
+        ):
             logger.warn('connection not found')
             return bytes([HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
 
@@ -798,14 +858,16 @@ class Controller:
             connection.peer_address,
             command.random_number,
             command.encrypted_diversifier,
-            command.long_term_key
+            command.long_term_key,
         )
 
-        self.send_hci_packet(HCI_Command_Status_Event(
-            status                  = HCI_COMMAND_STATUS_PENDING,
-            num_hci_command_packets = 1,
-            command_opcode          = command.op_code
-        ))
+        self.send_hci_packet(
+            HCI_Command_Status_Event(
+                status=HCI_COMMAND_STATUS_PENDING,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
 
     def on_hci_le_read_supported_states_command(self, command):
         '''
@@ -817,16 +879,20 @@ class Controller:
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.34 LE Read Suggested Default Data Length Command
         '''
-        return struct.pack('<BHH',
-                           HCI_SUCCESS,
-                           self.suggested_max_tx_octets,
-                           self.suggested_max_tx_time)
+        return struct.pack(
+            '<BHH',
+            HCI_SUCCESS,
+            self.suggested_max_tx_octets,
+            self.suggested_max_tx_time,
+        )
 
     def on_hci_le_write_suggested_default_data_length_command(self, command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.35 LE Write Suggested Default Data Length Command
         '''
-        self.suggested_max_tx_octets, self.suggested_max_tx_time = struct.unpack('<HH', command.parameters[:4])
+        self.suggested_max_tx_octets, self.suggested_max_tx_time = struct.unpack(
+            '<HH', command.parameters[:4]
+        )
         return bytes([HCI_SUCCESS])
 
     def on_hci_le_read_local_p_256_public_key_command(self, command):
@@ -884,7 +950,7 @@ class Controller:
             self.supported_max_tx_octets,
             self.supported_max_tx_time,
             self.supported_max_rx_octets,
-            self.supported_max_rx_time
+            self.supported_max_rx_time,
         )
 
     def on_hci_le_read_phy_command(self, command):
@@ -896,7 +962,7 @@ class Controller:
             HCI_SUCCESS,
             command.connection_handle,
             HCI_LE_1M_PHY,
-            HCI_LE_1M_PHY
+            HCI_LE_1M_PHY,
         )
 
     def on_hci_le_set_default_phy_command(self, command):
@@ -905,8 +971,7 @@ class Controller:
         '''
         self.default_phy = {
             'all_phys': command.all_phys,
-            'tx_phys':  command.tx_phys,
-            'rx_phys':  command.rx_phys
+            'tx_phys': command.tx_phys,
+            'rx_phys': command.rx_phys,
         }
         return bytes([HCI_SUCCESS])
-

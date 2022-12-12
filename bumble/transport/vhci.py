@@ -33,7 +33,7 @@ async def open_vhci_transport(spec):
     path at /dev/vhci), or the path of a VHCI device
     '''
 
-    HCI_VENDOR_PKT = 0xff
+    HCI_VENDOR_PKT = 0xFF
     HCI_BREDR = 0x00  # Controller type
 
     # Open the VHCI device
@@ -56,4 +56,3 @@ async def open_vhci_transport(spec):
     transport.sink.on_packet(bytes([HCI_VENDOR_PKT, HCI_BREDR]))
 
     return transport
-

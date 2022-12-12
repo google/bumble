@@ -31,11 +31,15 @@ from colors import color
 
 from .att import *
 from .core import InvalidStateError, ProtocolError, TimeoutError
-from .gatt import (GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
-                   GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
-                   GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE, GATT_REQUEST_TIMEOUT,
-                   GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE, Characteristic,
-                   ClientCharacteristicConfigurationBits)
+from .gatt import (
+    GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
+    GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
+    GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
+    GATT_REQUEST_TIMEOUT,
+    GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
+    Characteristic,
+    ClientCharacteristicConfigurationBits,
+)
 from .hci import *
 
 # -----------------------------------------------------------------------------
@@ -50,16 +54,20 @@ logger = logging.getLogger(__name__)
 class AttributeProxy(EventEmitter):
     def __init__(self, client, handle, end_group_handle, attribute_type):
         EventEmitter.__init__(self)
-        self.client           = client
-        self.handle           = handle
+        self.client = client
+        self.handle = handle
         self.end_group_handle = end_group_handle
-        self.type             = attribute_type
+        self.type = attribute_type
 
     async def read_value(self, no_long_read=False):
-        return self.decode_value(await self.client.read_value(self.handle, no_long_read))
+        return self.decode_value(
+            await self.client.read_value(self.handle, no_long_read)
+        )
 
     async def write_value(self, value, with_response=False):
-        return await self.client.write_value(self.handle, self.encode_value(value), with_response)
+        return await self.client.write_value(
+            self.handle, self.encode_value(value), with_response
+        )
 
     def encode_value(self, value):
         return value
@@ -80,9 +88,13 @@ class ServiceProxy(AttributeProxy):
         return cls(service) if service else None
 
     def __init__(self, client, handle, end_group_handle, uuid, primary=True):
-        attribute_type = GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE if primary else GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE
+        attribute_type = (
+            GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE
+            if primary
+            else GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE
+        )
         super().__init__(client, handle, end_group_handle, attribute_type)
-        self.uuid            = uuid
+        self.uuid = uuid
         self.characteristics = []
 
     async def discover_characteristics(self, uuids=[]):
@@ -98,11 +110,11 @@ class ServiceProxy(AttributeProxy):
 class CharacteristicProxy(AttributeProxy):
     def __init__(self, client, handle, end_group_handle, uuid, properties):
         super().__init__(client, handle, end_group_handle, uuid)
-        self.uuid                   = uuid
-        self.properties             = properties
-        self.descriptors            = []
+        self.uuid = uuid
+        self.properties = properties
+        self.descriptors = []
         self.descriptors_discovered = False
-        self.subscribers            = {}  # Map from subscriber to proxy subscriber
+        self.subscribers = {}  # Map from subscriber to proxy subscriber
 
     def get_descriptor(self, descriptor_type):
         for descriptor in self.descriptors:
@@ -123,6 +135,7 @@ class CharacteristicProxy(AttributeProxy):
 
                 def on_change(value):
                     original_subscriber(self.decode_value(value))
+
                 self.subscribers[subscriber] = on_change
                 subscriber = on_change
 
@@ -150,6 +163,7 @@ class ProfileServiceProxy:
     '''
     Base class for profile-specific service proxies
     '''
+
     @classmethod
     def from_client(cls, client):
         return ServiceProxy.from_client(cls, client, cls.SERVICE_CLASS.UUID)
@@ -160,24 +174,30 @@ class ProfileServiceProxy:
 # -----------------------------------------------------------------------------
 class Client:
     def __init__(self, connection):
-        self.connection               = connection
-        self.mtu_exchange_done        = False
-        self.request_semaphore        = asyncio.Semaphore(1)
-        self.pending_request          = None
-        self.pending_response         = None
-        self.notification_subscribers = {}  # Notification subscribers, by attribute handle
-        self.indication_subscribers   = {}  # Indication subscribers, by attribute handle
-        self.services                 = []
+        self.connection = connection
+        self.mtu_exchange_done = False
+        self.request_semaphore = asyncio.Semaphore(1)
+        self.pending_request = None
+        self.pending_response = None
+        self.notification_subscribers = (
+            {}
+        )  # Notification subscribers, by attribute handle
+        self.indication_subscribers = {}  # Indication subscribers, by attribute handle
+        self.services = []
 
     def send_gatt_pdu(self, pdu):
         self.connection.send_l2cap_pdu(ATT_CID, pdu)
 
     async def send_command(self, command):
-        logger.debug(f'GATT Command from client: [0x{self.connection.handle:04X}] {command}')
+        logger.debug(
+            f'GATT Command from client: [0x{self.connection.handle:04X}] {command}'
+        )
         self.send_gatt_pdu(command.to_bytes())
 
     async def send_request(self, request):
-        logger.debug(f'GATT Request from client: [0x{self.connection.handle:04X}] {request}')
+        logger.debug(
+            f'GATT Request from client: [0x{self.connection.handle:04X}] {request}'
+        )
 
         # Wait until we can send (only one pending command at a time for the connection)
         response = None
@@ -187,22 +207,26 @@ class Client:
 
             # Create a future value to hold the eventual response
             self.pending_response = asyncio.get_running_loop().create_future()
-            self.pending_request  = request
+            self.pending_request = request
 
             try:
                 self.send_gatt_pdu(request.to_bytes())
-                response = await asyncio.wait_for(self.pending_response, GATT_REQUEST_TIMEOUT)
+                response = await asyncio.wait_for(
+                    self.pending_response, GATT_REQUEST_TIMEOUT
+                )
             except asyncio.TimeoutError:
                 logger.warning(color('!!! GATT Request timeout', 'red'))
                 raise TimeoutError(f'GATT timeout for {request.name}')
             finally:
-                self.pending_request  = None
+                self.pending_request = None
                 self.pending_response = None
 
         return response
 
     def send_confirmation(self, confirmation):
-        logger.debug(f'GATT Confirmation from client: [0x{self.connection.handle:04X}] {confirmation}')
+        logger.debug(
+            f'GATT Confirmation from client: [0x{self.connection.handle:04X}] {confirmation}'
+        )
         self.send_gatt_pdu(confirmation.to_bytes())
 
     async def request_mtu(self, mtu):
@@ -218,13 +242,13 @@ class Client:
 
         # Send the request
         self.mtu_exchange_done = True
-        response = await self.send_request(ATT_Exchange_MTU_Request(client_rx_mtu = mtu))
+        response = await self.send_request(ATT_Exchange_MTU_Request(client_rx_mtu=mtu))
         if response.op_code == ATT_ERROR_RESPONSE:
             raise ProtocolError(
                 response.error_code,
                 'att',
                 ATT_PDU.error_name(response.error_code),
-                response
+                response,
             )
 
         # Compute the final MTU
@@ -235,12 +259,16 @@ class Client:
     def get_services_by_uuid(self, uuid):
         return [service for service in self.services if service.uuid == uuid]
 
-    def get_characteristics_by_uuid(self, uuid, service = None):
+    def get_characteristics_by_uuid(self, uuid, service=None):
         services = [service] if service else self.services
-        return [c for c in [c for s in services for c in s.characteristics] if c.uuid == uuid]
+        return [
+            c
+            for c in [c for s in services for c in s.characteristics]
+            if c.uuid == uuid
+        ]
 
     def on_service_discovered(self, service):
-        ''' Add a service to the service list if it wasn't already there '''
+        '''Add a service to the service list if it wasn't already there'''
         already_known = False
         for existing_service in self.services:
             if existing_service.handle == service.handle:
@@ -249,7 +277,7 @@ class Client:
         if not already_known:
             self.services.append(service)
 
-    async def discover_services(self, uuids = None):
+    async def discover_services(self, uuids=None):
         '''
         See Vol 3, Part G - 4.4.1 Discover All Primary Services
         '''
@@ -258,9 +286,9 @@ class Client:
         while starting_handle < 0xFFFF:
             response = await self.send_request(
                 ATT_Read_By_Group_Type_Request(
-                    starting_handle      = starting_handle,
-                    ending_handle        = 0xFFFF,
-                    attribute_group_type = GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE
+                    starting_handle=starting_handle,
+                    ending_handle=0xFFFF,
+                    attribute_group_type=GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
                 )
             )
             if response is None:
@@ -271,15 +299,26 @@ class Client:
             if response.op_code == ATT_ERROR_RESPONSE:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
-                    logger.warning(f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}')
+                    logger.warning(
+                        f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}'
+                    )
                     # TODO raise appropriate exception
                     return
                 break
 
-            for attribute_handle, end_group_handle, attribute_value in response.attributes:
-                if attribute_handle < starting_handle or end_group_handle < attribute_handle:
+            for (
+                attribute_handle,
+                end_group_handle,
+                attribute_value,
+            ) in response.attributes:
+                if (
+                    attribute_handle < starting_handle
+                    or end_group_handle < attribute_handle
+                ):
                     # Something's not right
-                    logger.warning(f'bogus handle values: {attribute_handle} {end_group_handle}')
+                    logger.warning(
+                        f'bogus handle values: {attribute_handle} {end_group_handle}'
+                    )
                     return
 
                 # Create a service proxy for this service
@@ -288,7 +327,7 @@ class Client:
                     attribute_handle,
                     end_group_handle,
                     UUID.from_bytes(attribute_value),
-                    True
+                    True,
                 )
 
                 # Filter out returned services based on the given uuids list
@@ -321,10 +360,10 @@ class Client:
         while starting_handle < 0xFFFF:
             response = await self.send_request(
                 ATT_Find_By_Type_Value_Request(
-                    starting_handle = starting_handle,
-                    ending_handle   = 0xFFFF,
-                    attribute_type  = GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
-                    attribute_value = uuid.to_pdu_bytes()
+                    starting_handle=starting_handle,
+                    ending_handle=0xFFFF,
+                    attribute_type=GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
+                    attribute_value=uuid.to_pdu_bytes(),
                 )
             )
             if response is None:
@@ -335,19 +374,28 @@ class Client:
             if response.op_code == ATT_ERROR_RESPONSE:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
-                    logger.warning(f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}')
+                    logger.warning(
+                        f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}'
+                    )
                     # TODO raise appropriate exception
                     return
                 break
 
             for attribute_handle, end_group_handle in response.handles_information:
-                if attribute_handle < starting_handle or end_group_handle < attribute_handle:
+                if (
+                    attribute_handle < starting_handle
+                    or end_group_handle < attribute_handle
+                ):
                     # Something's not right
-                    logger.warning(f'bogus handle values: {attribute_handle} {end_group_handle}')
+                    logger.warning(
+                        f'bogus handle values: {attribute_handle} {end_group_handle}'
+                    )
                     return
 
                 # Create a service proxy for this service
-                service = ServiceProxy(self, attribute_handle, end_group_handle, uuid, True)
+                service = ServiceProxy(
+                    self, attribute_handle, end_group_handle, uuid, True
+                )
 
                 # Add the service to the peer's service list
                 services.append(service)
@@ -388,15 +436,15 @@ class Client:
         discovered_characteristics = []
         for service in services:
             starting_handle = service.handle
-            ending_handle   = service.end_group_handle
+            ending_handle = service.end_group_handle
 
             characteristics = []
             while starting_handle <= ending_handle:
                 response = await self.send_request(
                     ATT_Read_By_Type_Request(
-                        starting_handle = starting_handle,
-                        ending_handle   = ending_handle,
-                        attribute_type  = GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+                        starting_handle=starting_handle,
+                        ending_handle=ending_handle,
+                        attribute_type=GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
                     )
                 )
                 if response is None:
@@ -407,7 +455,9 @@ class Client:
                 if response.op_code == ATT_ERROR_RESPONSE:
                     if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                         # Unexpected end
-                        logger.warning(f'!!! unexpected error while discovering characteristics: {HCI_Constant.error_name(response.error_code)}')
+                        logger.warning(
+                            f'!!! unexpected error while discovering characteristics: {HCI_Constant.error_name(response.error_code)}'
+                        )
                         # TODO raise appropriate exception
                         return
                     break
@@ -425,7 +475,9 @@ class Client:
 
                     properties, handle = struct.unpack_from('<BH', attribute_value)
                     characteristic_uuid = UUID.from_bytes(attribute_value[3:])
-                    characteristic = CharacteristicProxy(self, handle, 0, characteristic_uuid, properties)
+                    characteristic = CharacteristicProxy(
+                        self, handle, 0, characteristic_uuid, properties
+                    )
 
                     # Set the previous characteristic's end handle
                     if characteristics:
@@ -441,22 +493,26 @@ class Client:
                 characteristics[-1].end_group_handle = service.end_group_handle
 
             # Set the service's characteristics
-            characteristics = [c for c in characteristics if not uuids or c.uuid in uuids]
+            characteristics = [
+                c for c in characteristics if not uuids or c.uuid in uuids
+            ]
             service.characteristics = characteristics
             discovered_characteristics.extend(characteristics)
 
         return discovered_characteristics
 
-    async def discover_descriptors(self, characteristic = None, start_handle = None, end_handle = None):
+    async def discover_descriptors(
+        self, characteristic=None, start_handle=None, end_handle=None
+    ):
         '''
         See Vol 3, Part G - 4.7.1 Discover All Characteristic Descriptors
         '''
         if characteristic:
             starting_handle = characteristic.handle + 1
-            ending_handle   = characteristic.end_group_handle
+            ending_handle = characteristic.end_group_handle
         elif start_handle and end_handle:
             starting_handle = start_handle
-            ending_handle   = end_handle
+            ending_handle = end_handle
         else:
             return []
 
@@ -464,8 +520,7 @@ class Client:
         while starting_handle <= ending_handle:
             response = await self.send_request(
                 ATT_Find_Information_Request(
-                    starting_handle = starting_handle,
-                    ending_handle   = ending_handle
+                    starting_handle=starting_handle, ending_handle=ending_handle
                 )
             )
             if response is None:
@@ -476,7 +531,9 @@ class Client:
             if response.op_code == ATT_ERROR_RESPONSE:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
-                    logger.warning(f'!!! unexpected error while discovering descriptors: {HCI_Constant.error_name(response.error_code)}')
+                    logger.warning(
+                        f'!!! unexpected error while discovering descriptors: {HCI_Constant.error_name(response.error_code)}'
+                    )
                     # TODO raise appropriate exception
                     return []
                 break
@@ -492,7 +549,9 @@ class Client:
                     logger.warning(f'bogus handle value: {attribute_handle}')
                     return []
 
-                descriptor = DescriptorProxy(self, attribute_handle, UUID.from_bytes(attribute_uuid))
+                descriptor = DescriptorProxy(
+                    self, attribute_handle, UUID.from_bytes(attribute_uuid)
+                )
                 descriptors.append(descriptor)
                 # TODO: read descriptor value
 
@@ -510,13 +569,12 @@ class Client:
         Discover all attributes, regardless of type
         '''
         starting_handle = 0x0001
-        ending_handle   = 0xFFFF
+        ending_handle = 0xFFFF
         attributes = []
         while True:
             response = await self.send_request(
                 ATT_Find_Information_Request(
-                    starting_handle = starting_handle,
-                    ending_handle   = ending_handle
+                    starting_handle=starting_handle, ending_handle=ending_handle
                 )
             )
             if response is None:
@@ -526,7 +584,9 @@ class Client:
             if response.op_code == ATT_ERROR_RESPONSE:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
-                    logger.warning(f'!!! unexpected error while discovering attributes: {HCI_Constant.error_name(response.error_code)}')
+                    logger.warning(
+                        f'!!! unexpected error while discovering attributes: {HCI_Constant.error_name(response.error_code)}'
+                    )
                     return []
                 break
 
@@ -536,7 +596,9 @@ class Client:
                     logger.warning(f'bogus handle value: {attribute_handle}')
                     return []
 
-                attribute = AttributeProxy(self, attribute_handle, 0, UUID.from_bytes(attribute_uuid))
+                attribute = AttributeProxy(
+                    self, attribute_handle, 0, UUID.from_bytes(attribute_uuid)
+                )
                 attributes.append(attribute)
 
             # Move on to the next attributes
@@ -550,7 +612,9 @@ class Client:
             await self.discover_descriptors(characteristic)
 
         # Look for the CCCD descriptor
-        cccd = characteristic.get_descriptor(GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR)
+        cccd = characteristic.get_descriptor(
+            GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR
+        )
         if not cccd:
             logger.warning('subscribing to characteristic with no CCCD descriptor')
             return
@@ -590,14 +654,19 @@ class Client:
             await self.discover_descriptors(characteristic)
 
         # Look for the CCCD descriptor
-        cccd = characteristic.get_descriptor(GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR)
+        cccd = characteristic.get_descriptor(
+            GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR
+        )
         if not cccd:
             logger.warning('unsubscribing from characteristic with no CCCD descriptor')
             return
 
         if subscriber is not None:
             # Remove matching subscriber from subscriber sets
-            for subscriber_set in (self.notification_subscribers, self.indication_subscribers):
+            for subscriber_set in (
+                self.notification_subscribers,
+                self.indication_subscribers,
+            ):
                 subscribers = subscriber_set.get(characteristic.handle, [])
                 if subscriber in subscribers:
                     subscribers.remove(subscriber)
@@ -623,7 +692,9 @@ class Client:
 
         # Send a request to read
         attribute_handle = attribute if type(attribute) is int else attribute.handle
-        response = await self.send_request(ATT_Read_Request(attribute_handle = attribute_handle))
+        response = await self.send_request(
+            ATT_Read_Request(attribute_handle=attribute_handle)
+        )
         if response is None:
             raise TimeoutError('read timeout')
         if response.op_code == ATT_ERROR_RESPONSE:
@@ -631,7 +702,7 @@ class Client:
                 response.error_code,
                 'att',
                 ATT_PDU.error_name(response.error_code),
-                response
+                response,
             )
 
         # If the value is the max size for the MTU, try to read more unless the caller
@@ -642,18 +713,23 @@ class Client:
             offset = len(attribute_value)
             while True:
                 response = await self.send_request(
-                    ATT_Read_Blob_Request(attribute_handle = attribute_handle, value_offset = offset)
+                    ATT_Read_Blob_Request(
+                        attribute_handle=attribute_handle, value_offset=offset
+                    )
                 )
                 if response is None:
                     raise TimeoutError('read timeout')
                 if response.op_code == ATT_ERROR_RESPONSE:
-                    if response.error_code == ATT_ATTRIBUTE_NOT_LONG_ERROR or response.error_code == ATT_INVALID_OFFSET_ERROR:
+                    if (
+                        response.error_code == ATT_ATTRIBUTE_NOT_LONG_ERROR
+                        or response.error_code == ATT_INVALID_OFFSET_ERROR
+                    ):
                         break
                     raise ProtocolError(
                         response.error_code,
                         'att',
                         ATT_PDU.error_name(response.error_code),
-                        response
+                        response,
                     )
 
                 part = response.part_attribute_value
@@ -674,18 +750,18 @@ class Client:
 
         if service is None:
             starting_handle = 0x0001
-            ending_handle   = 0xFFFF
+            ending_handle = 0xFFFF
         else:
             starting_handle = service.handle
-            ending_handle   = service.end_group_handle
+            ending_handle = service.end_group_handle
 
         characteristics_values = []
         while starting_handle <= ending_handle:
             response = await self.send_request(
                 ATT_Read_By_Type_Request(
-                    starting_handle = starting_handle,
-                    ending_handle   = ending_handle,
-                    attribute_type  = uuid
+                    starting_handle=starting_handle,
+                    ending_handle=ending_handle,
+                    attribute_type=uuid,
                 )
             )
             if response is None:
@@ -696,7 +772,9 @@ class Client:
             if response.op_code == ATT_ERROR_RESPONSE:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
-                    logger.warning(f'!!! unexpected error while reading characteristics: {HCI_Constant.error_name(response.error_code)}')
+                    logger.warning(
+                        f'!!! unexpected error while reading characteristics: {HCI_Constant.error_name(response.error_code)}'
+                    )
                     # TODO raise appropriate exception
                     return []
                 break
@@ -731,26 +809,27 @@ class Client:
         if with_response:
             response = await self.send_request(
                 ATT_Write_Request(
-                    attribute_handle = attribute_handle,
-                    attribute_value  = value
+                    attribute_handle=attribute_handle, attribute_value=value
                 )
             )
             if response.op_code == ATT_ERROR_RESPONSE:
                 raise ProtocolError(
                     response.error_code,
                     'att',
-                    ATT_PDU.error_name(response.error_code), response
+                    ATT_PDU.error_name(response.error_code),
+                    response,
                 )
         else:
             await self.send_command(
                 ATT_Write_Command(
-                    attribute_handle = attribute_handle,
-                    attribute_value  = value
+                    attribute_handle=attribute_handle, attribute_value=value
                 )
             )
 
     def on_gatt_pdu(self, att_pdu):
-        logger.debug(f'GATT Response to client: [0x{self.connection.handle:04X}] {att_pdu}')
+        logger.debug(
+            f'GATT Response to client: [0x{self.connection.handle:04X}] {att_pdu}'
+        )
         if att_pdu.op_code in ATT_RESPONSES:
             if self.pending_request is None:
                 # Not expected!
@@ -759,9 +838,13 @@ class Client:
 
             # Sanity check: the response should match the pending request unless it is an error response
             if att_pdu.op_code != ATT_ERROR_RESPONSE:
-                expected_response_name = self.pending_request.name.replace('_REQUEST', '_RESPONSE')
+                expected_response_name = self.pending_request.name.replace(
+                    '_REQUEST', '_RESPONSE'
+                )
                 if att_pdu.name != expected_response_name:
-                    logger.warning(f'!!! mismatched response: expected {expected_response_name}')
+                    logger.warning(
+                        f'!!! mismatched response: expected {expected_response_name}'
+                    )
                     return
 
             # Return the response to the coroutine that is waiting for it
@@ -772,11 +855,15 @@ class Client:
             if handler is not None:
                 handler(att_pdu)
             else:
-                logger.warning(f'{color(f"--- Ignoring GATT Response from [0x{self.connection.handle:04X}]:", "red")} {att_pdu}')
+                logger.warning(
+                    f'{color(f"--- Ignoring GATT Response from [0x{self.connection.handle:04X}]:", "red")} {att_pdu}'
+                )
 
     def on_att_handle_value_notification(self, notification):
         # Call all subscribers
-        subscribers = self.notification_subscribers.get(notification.attribute_handle, [])
+        subscribers = self.notification_subscribers.get(
+            notification.attribute_handle, []
+        )
         if not subscribers:
             logger.warning('!!! received notification with no subscriber')
         for subscriber in subscribers:

@@ -61,12 +61,14 @@ async def main():
             # Subscribe to the heart rate measurement
             if heart_rate_service.heart_rate_measurement:
                 await heart_rate_service.heart_rate_measurement.subscribe(
-                    lambda value: print(f'{color("Heart Rate Measurement:", "green")} {value}')
+                    lambda value: print(
+                        f'{color("Heart Rate Measurement:", "green")} {value}'
+                    )
                 )
 
             await peer.sustain()
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level = os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())
