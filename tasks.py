@@ -86,3 +86,12 @@ def release_test(ctx):
 
 
 test_tasks.add_task(release_test, name="release")
+
+
+@task
+def format(ctx, app="black", check=False):
+    check_flag = "--check" if check else ""
+    ctx.run(f"{app} -S {check_flag} .")
+
+
+ns.add_task(format, name="format")
