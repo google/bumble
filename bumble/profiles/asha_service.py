@@ -131,7 +131,6 @@ class AshaService(TemplateService):
         # Advertisement only uses 4 least significant bytes of the HiSyncId.
         return bytes(
             AdvertisingData([
-                (AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS, bytes(GATT_ASHA_SERVICE)),
                 (AdvertisingData.SERVICE_DATA_16_BIT_UUID, bytes(GATT_ASHA_SERVICE) + bytes([
                     AshaService.PROTOCOL_VERSION,
                     self.capability,
