@@ -149,9 +149,9 @@ async def get_peer_name(peer, mode):
         if not services:
             return None
 
-        values = await peer.read_characteristics_by_uuid(GATT_DEVICE_NAME_CHARACTERISTIC, services[0])
-        if values:
-            return values[0].decode('utf-8')
+        characteristics = await peer.read_characteristics_by_uuid(GATT_DEVICE_NAME_CHARACTERISTIC, services[0])
+        if characteristics:
+            return characteristics[0][1].decode('utf-8')
 
 
 # -----------------------------------------------------------------------------
