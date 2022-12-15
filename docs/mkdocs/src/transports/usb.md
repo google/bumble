@@ -22,10 +22,10 @@ the first USB interface of the device will be used, regardless of the interface 
 This may be useful for some devices that use a custom class/subclass but may nonetheless work as-is.
 
 !!! examples
-    `usb:04b4:f901`  
+    `usb:04b4:f901`
     The USB dongle with `<vendor>` equal to `04b4` and `<product>` equal to `f901`
 
-    `usb:0`  
+    `usb:0`
     The first Bluetooth HCI dongle that's declared as such by Class/Subclass/Protocol
 
     `usb:04b4:f901/0016A45B05D8`
@@ -41,6 +41,11 @@ This may be useful for some devices that use a custom class/subclass but may non
 ## Alternative
 The library includes two different implementations of the USB transport, implemented using different python bindings for `libusb`.
 Using the transport prefix `pyusb:` instead of `usb:` selects the implementation based on  [PyUSB](https://pypi.org/project/pyusb/), using the synchronous API of `libusb`, whereas the default implementation is based on [libusb1](https://pypi.org/project/libusb1/), using the asynchronous API of `libusb`. In order to use the alternative PyUSB-based implementation, you need to ensure that you have installed that python module, as it isn't installed by default as a dependency of Bumble.
+
+## Libusb
+
+The `libusb-1.0` shared library is required to use both `usb` and `pyusb` transports. This library should be installed automatically with Bumble, as part of the `libusb_package` Python package.
+If your OS or architecture is not supported by `libusb_package`, you can install a system-wide library with `brew install libusb` for Mac or `apt install libusb-1.0-0` for Linux.
 
 ## Listing Available USB Devices
 

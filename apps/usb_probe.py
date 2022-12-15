@@ -31,6 +31,7 @@ import logging
 import sys
 import click
 import usb1
+from bumble.transport.usb import load_libusb
 from colors import color
 
 
@@ -169,6 +170,7 @@ def is_bluetooth_hci(device):
 def main(verbose):
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
 
+    load_libusb()
     with usb1.USBContext() as context:
         bluetooth_device_count = 0
         devices = {}
