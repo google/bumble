@@ -19,6 +19,8 @@ import asyncio
 import logging
 import traceback
 import collections
+import sys
+from typing import Awaitable
 from functools import wraps
 from colors import color
 from pyee import EventEmitter
@@ -62,7 +64,37 @@ def composite_listener(cls):
 
 
 # -----------------------------------------------------------------------------
-class CompositeEventEmitter(EventEmitter):
+class AbortableEventEmitter(EventEmitter):
+
+    def abort_on(self, event: str, awaitable: Awaitable):
+        """
+        Set a coroutine or future to abort when an event occur.
+        """
+        future = asyncio.ensure_future(awaitable)
+        if future.done():
+            return future
+
+        def on_event(*_):
+            msg = f'abort: {event} event occurred.'
+            if isinstance(future, asyncio.Task):
+                # python prior to 3.9 does not support passing a message on `Task.cancel`
+                if sys.version_info < (3, 9, 0):
+                    future.cancel()
+                else:
+                    future.cancel(msg)
+            else:
+                future.set_exception(asyncio.CancelledError(msg))
+
+        def on_done(_):
+            self.remove_listener(event, on_event)
+
+        self.on(event, on_event)
+        future.add_done_callback(on_done)
+        return future
+
+
+# -----------------------------------------------------------------------------
+class CompositeEventEmitter(AbortableEventEmitter):
     def __init__(self):
         super().__init__()
         self._listener = None
