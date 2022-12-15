@@ -2237,8 +2237,7 @@ class Device(CompositeEventEmitter):
             result = await self.send_command(
                 HCI_Remote_Name_Request_Command(
                     bd_addr=peer_address,
-                    # TODO investigate other options
-                    page_scan_repetition_mode=HCI_Remote_Name_Request_Command.R0,
+                    page_scan_repetition_mode=HCI_Remote_Name_Request_Command.R2,
                     reserved=0,
                     clock_offset=0,  # TODO investigate non-0 values
                 )
