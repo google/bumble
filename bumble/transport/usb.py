@@ -17,9 +17,12 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import logging
+import libusb_package
 import usb1
 import threading
 import collections
+import ctypes
+import platform
 from colors import color
 
 from .common import Transport, ParserSource
@@ -33,6 +36,19 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
+def load_libusb():
+    '''
+    Attempt to load the libusb-1.0 C library from libusb_package in site-packages.
+    If library exists, we create a DLL object and initialize the usb1 backend.
+    This only needs to be done once, but bufore a usb1.USBContext is created.
+    If library does not exists, do nothing and usb1 will search default system paths
+    when usb1.USBContext is created.
+    '''
+    if libusb_path := libusb_package.get_library_path():
+        dll_loader = ctypes.WinDLL if platform.system() == 'Windows' else ctypes.CDLL
+        libusb_dll = dll_loader(libusb_path, use_errno=True, use_last_error=True)
+        usb1.loadLibrary(libusb_dll)
+
 async def open_usb_transport(spec):
     '''
     Open a USB transport.
@@ -305,6 +321,7 @@ async def open_usb_transport(spec):
             self.context.close()
 
     # Find the device according to the spec moniker
+    load_libusb()
     context = usb1.USBContext()
     context.open()
     try:

@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import logging
+import libusb_package
 import usb.core
 import usb.util
 import threading
@@ -203,13 +204,13 @@ async def open_pyusb_transport(spec):
     # Find the device according to the spec moniker
     if ':' in spec:
         vendor_id, product_id = spec.split(':')
-        device = usb.core.find(
+        device = libusb_package.find(
             idVendor=int(vendor_id, 16), idProduct=int(product_id, 16)
         )
     else:
         device_index = int(spec)
         devices = list(
-            usb.core.find(
+            libusb_package.find(
                 find_all=1,
                 bDeviceClass=USB_DEVICE_CLASS_WIRELESS_CONTROLLER,
                 bDeviceSubClass=USB_DEVICE_SUBCLASS_RF_CONTROLLER,
