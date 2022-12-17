@@ -28,11 +28,11 @@
 # -----------------------------------------------------------------------------
 import os
 import logging
-import sys
 import click
 import usb1
-from bumble.transport.usb import load_libusb
 from colors import color
+
+from bumble.transport.usb import load_libusb
 
 
 # -----------------------------------------------------------------------------
@@ -95,9 +95,9 @@ def show_device_details(device):
         print(f'  Configuration {configuration.getConfigurationValue()}')
         for interface in configuration:
             for setting in interface:
-                alternateSetting = setting.getAlternateSetting()
+                alternate_setting = setting.getAlternateSetting()
                 suffix = (
-                    f'/{alternateSetting}' if interface.getNumSettings() > 1 else ''
+                    f'/{alternate_setting}' if interface.getNumSettings() > 1 else ''
                 )
                 (class_string, subclass_string) = get_class_info(
                     setting.getClass(), setting.getSubClass(), setting.getProtocol()
@@ -112,7 +112,8 @@ def show_device_details(device):
                         else 'IN'
                     )
                     print(
-                        f'        Endpoint 0x{endpoint.getAddress():02X}: {endpoint_type} {endpoint_direction}'
+                        f'        Endpoint 0x{endpoint.getAddress():02X}: '
+                        f'{endpoint_type} {endpoint_direction}'
                     )
 
 
@@ -123,7 +124,7 @@ def get_class_info(cls, subclass, protocol):
     if class_info is None:
         class_string = f'0x{cls:02X}'
     else:
-        if type(class_info) is tuple:
+        if isinstance(class_info, tuple):
             class_string = class_info[0]
             subclass_info = class_info[1].get(subclass)
             if subclass_info:
@@ -274,4 +275,4 @@ def main(verbose):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    main()
+    main()  # pylint: disable=no-value-for-parameter

@@ -16,9 +16,9 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import click
 import logging
 import os
+import click
 from colors import color
 
 from bumble.transport import open_transport_or_link
@@ -89,7 +89,8 @@ class ServerBridge:
                 # Connect to the TCP server
                 print(
                     color(
-                        f'### Connecting to TCP {self.bridge.tcp_host}:{self.bridge.tcp_port}...',
+                        f'### Connecting to TCP {self.bridge.tcp_host}:'
+                        f'{self.bridge.tcp_port}...',
                         'yellow',
                     )
                 )
@@ -98,8 +99,8 @@ class ServerBridge:
                     def __init__(self, pipe):
                         self.pipe = pipe
 
-                    def connection_lost(self, error):
-                        print(color(f'!!! TCP connection lost: {error}', 'red'))
+                    def connection_lost(self, exc):
+                        print(color(f'!!! TCP connection lost: {exc}', 'red'))
                         if self.pipe.l2cap_channel is not None:
                             asyncio.create_task(self.pipe.l2cap_channel.disconnect())
 
@@ -178,8 +179,8 @@ class ClientBridge:
 
         # Called when a TCP connection is established
         async def on_tcp_connection(reader, writer):
-            peername = writer.get_extra_info('peername')
-            print(color(f'<<< TCP connection from {peername}', 'magenta'))
+            peer_name = writer.get_extra_info('peer_name')
+            print(color(f'<<< TCP connection from {peer_name}', 'magenta'))
 
             def on_coc_sdu(sdu):
                 print(color(f'<<< [L2CAP SDU]: {len(sdu)} bytes', 'cyan'))
@@ -346,4 +347,4 @@ def client(context, bluetooth_address, tcp_host, tcp_port):
 # -----------------------------------------------------------------------------
 logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
 if __name__ == '__main__':
-    cli(obj={})
+    cli(obj={})  # pylint: disable=no-value-for-parameter

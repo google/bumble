@@ -5,18 +5,18 @@ GETTING STARTED WITH BUMBLE
 
 You need Python 3.8 or above. Python >= 3.9 is recommended, but 3.8 should be sufficient if
 necessary (there may be some optional functionality that will not work on some platforms with
-python 3.8).  
+python 3.8).
 Visit the [Python site](https://www.python.org/) for instructions on how to install Python
-for your platform.  
+for your platform.
 Throughout the documentation, when shell commands are shown, it is assumed that you can
 invoke Python as
 ```
 $ python
 ```
-If invoking python is different on your platform (it may be `python3` for example, or just `py` or `py.exe`), 
+If invoking python is different on your platform (it may be `python3` for example, or just `py` or `py.exe`),
 adjust accordingly.
 
-You may be simply using Bumble as a module for your own application or as a dependency to your own 
+You may be simply using Bumble as a module for your own application or as a dependency to your own
 module, or you may be working on modifying or contributing to the Bumble module or example code
 itself.
 
@@ -65,15 +65,17 @@ $ python -m pip install git+https://github.com/google/bumble.git@27c0551
 
 # Working On The Bumble Code
 When you work on the Bumble code itself, and run some of the tests or example apps, or import the
-module in your own code, you typically either install the package from source in "development mode" as described above, or you may choose to skip the install phase. 
+module in your own code, you typically either install the package from source in "development mode" as described above, or you may choose to skip the install phase.
+
+If you plan on contributing to the project, please read the [contributing](development/contributing.md) section.
 
 ## Without Installing
-If you prefer not to install the package (even in development mode), you can load the module directly from its location in the project. 
+If you prefer not to install the package (even in development mode), you can load the module directly from its location in the project.
 A simple way to do that is to set your `PYTHONPATH` to
 point to the root project directory, where the `bumble` subdirectory is located. You may set
 `PYTHONPATH` globally, or locally with each command line execution (on Unix-like systems).
 
-Example with a global `PYTHONPATH`, from a unix shell, when the working directory is the root 
+Example with a global `PYTHONPATH`, from a unix shell, when the working directory is the root
 directory of the project.
 
 ```bash
@@ -96,11 +98,11 @@ $ PYTHONPATH=. python examples/run_advertiser.py examples/device1.json serial:/d
 ```
 
 # Where To Go Next
-Once you've installed or downloaded Bumble, you can either start using some of the 
+Once you've installed or downloaded Bumble, you can either start using some of the
 [Bundled apps and tools](apps_and_tools/index.md), or look at the [examples](examples/index.md)
 to get a feel for how to use the APIs, and start writing your own applications.
 
 Depending on the use case you're interested in exploring, you may need to use a physical Bluetooth
 controller, like a USB dongle or a board with a Bluetooth radio. Visit the [Hardware page](hardware/index.md)
-for more information on using a physical radio, and/or the [Transports page](transports/index.md) for more 
+for more information on using a physical radio, and/or the [Transports page](transports/index.md) for more
 details on interfacing with either hardware modules or virtual controllers over various transports.

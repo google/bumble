@@ -21,9 +21,15 @@ import os
 import logging
 
 from colors import color
+
+import bumble.core
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
-from bumble.core import ConnectionError, BT_BR_EDR_TRANSPORT
+from bumble.core import (
+    BT_L2CAP_PROTOCOL_ID,
+    BT_RFCOMM_PROTOCOL_ID,
+    BT_BR_EDR_TRANSPORT,
+)
 from bumble.rfcomm import Client
 from bumble.sdp import (
     Client as SDP_Client,
@@ -33,7 +39,6 @@ from bumble.sdp import (
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
 )
-from bumble.hci import BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID
 
 
 # -----------------------------------------------------------------------------
@@ -53,6 +58,7 @@ async def list_rfcomm_channels(device, connection):
     )
     print(color('==================================', 'blue'))
     print(color('RFCOMM Services:', 'yellow'))
+    # pylint: disable-next=too-many-nested-blocks
     for attribute_list in search_result:
         # Look for the RFCOMM Channel number
         protocol_descriptor_list = ServiceAttribute.find_attribute_in_list(
@@ -85,7 +91,8 @@ async def list_rfcomm_channels(device, connection):
                                         bluetooth_profile_descriptor_list.value
                                     )
                                 else:
-                                    # Sometimes, instead of a list of lists, we just find a list. Fix that
+                                    # Sometimes, instead of a list of lists, we just
+                                    # find a list. Fix that
                                     bluetooth_profile_descriptors = [
                                         bluetooth_profile_descriptor_list
                                     ]
@@ -102,7 +109,9 @@ async def list_rfcomm_channels(device, connection):
                                         & 0xFF
                                     )
                                     print(
-                                        f'    {bluetooth_profile_descriptor.value[0].value} - version {version_major}.{version_minor}'
+                                        '    '
+                                        f'{bluetooth_profile_descriptor.value[0].value}'
+                                        f' - version {version_major}.{version_minor}'
                                     )
 
                         # List service classes
@@ -122,10 +131,11 @@ async def list_rfcomm_channels(device, connection):
 class TcpServerProtocol(asyncio.Protocol):
     def __init__(self, rfcomm_session):
         self.rfcomm_session = rfcomm_session
+        self.transport = None
 
     def connection_made(self, transport):
-        peername = transport.get_extra_info('peername')
-        print(f'<<< TCP Server: connection from {peername}')
+        peer_name = transport.get_extra_info('peer_name')
+        print(f'<<< TCP Server: connection from {peer_name}')
         self.transport = transport
         self.rfcomm_session.sink = self.rfcomm_data_received
 
@@ -158,14 +168,13 @@ async def tcp_server(tcp_port, rfcomm_session):
 async def main():
     if len(sys.argv) < 5:
         print(
-            'Usage: run_rfcomm_client.py <device-config> <transport-spec> <bluetooth-address> <channel>|discover [tcp-port]'
+            'Usage: run_rfcomm_client.py <device-config> <transport-spec> '
+            '<bluetooth-address> <channel>|discover [tcp-port]'
         )
         print(
             '  specifying a channel number, or "discover" to list all RFCOMM channels'
         )
-        print(
-            'example: run_rfcomm_client.py classic1.json usb:04b4:f901 E1:CA:72:48:C4:E8 8'
-        )
+        print('example: run_rfcomm_client.py classic1.json usb:0 E1:CA:72:48:C4:E8 8')
         return
 
     print('<<< connecting to HCI...')
@@ -209,7 +218,7 @@ async def main():
         try:
             session = await rfcomm_mux.open_dlc(channel)
             print('### Session open', session)
-        except ConnectionError as error:
+        except bumble.core.ConnectionError as error:
             print(f'### Session open failed: {error}')
             await rfcomm_mux.disconnect()
             print('@@@ Disconnected from RFCOMM server')

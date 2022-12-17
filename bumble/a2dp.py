@@ -16,10 +16,9 @@
 # Imports
 # -----------------------------------------------------------------------------
 import struct
-import bitstruct
 import logging
 from collections import namedtuple
-from colors import color
+import bitstruct
 
 from .company_ids import COMPANY_IDENTIFIERS
 from .sdp import (
@@ -134,14 +133,15 @@ MPEG_2_4_OBJECT_TYPE_NAMES = {
 # -----------------------------------------------------------------------------
 def flags_to_list(flags, values):
     result = []
-    for i in range(len(values)):
+    for i, value in enumerate(values):
         if flags & (1 << (len(values) - i - 1)):
-            result.append(values[i])
+            result.append(value)
     return result
 
 
 # -----------------------------------------------------------------------------
 def make_audio_source_service_sdp_records(service_record_handle, version=(1, 3)):
+    # pylint: disable=import-outside-toplevel
     from .avdtp import AVDTP_PSM
 
     version_int = version[0] << 8 | version[1]
@@ -191,6 +191,7 @@ def make_audio_source_service_sdp_records(service_record_handle, version=(1, 3))
 
 # -----------------------------------------------------------------------------
 def make_audio_sink_service_sdp_records(service_record_handle, version=(1, 3)):
+    # pylint: disable=import-outside-toplevel
     from .avdtp import AVDTP_PSM
 
     version_int = version[0] << 8 | version[1]
@@ -331,6 +332,7 @@ class SbcMediaCodecInformation(
         channel_modes = ['MONO', 'DUAL_CHANNEL', 'STEREO', 'JOINT_STEREO']
         allocation_methods = ['SNR', 'Loudness']
         return '\n'.join(
+            # pylint: disable=line-too-long
             [
                 'SbcMediaCodecInformation(',
                 f'  sampling_frequency:    {",".join([str(x) for x in flags_to_list(self.sampling_frequency, SBC_SAMPLING_FREQUENCIES)])}',
@@ -423,6 +425,7 @@ class AacMediaCodecInformation(
             '[7]',
         ]
         channels = [1, 2]
+        # pylint: disable=line-too-long
         return '\n'.join(
             [
                 'AacMediaCodecInformation(',
@@ -455,6 +458,7 @@ class VendorSpecificMediaCodecInformation:
         return struct.pack('<IH', self.vendor_id, self.codec_id, self.value)
 
     def __str__(self):
+        # pylint: disable=line-too-long
         return '\n'.join(
             [
                 'VendorSpecificMediaCodecInformation(',
@@ -489,7 +493,13 @@ class SbcFrame:
         return self.sample_count / self.sampling_frequency
 
     def __str__(self):
-        return f'SBC(sf={self.sampling_frequency},cm={self.channel_mode},br={self.bitrate},sc={self.sample_count},size={len(self.payload)})'
+        return (
+            f'SBC(sf={self.sampling_frequency},'
+            f'cm={self.channel_mode},'
+            f'br={self.bitrate},'
+            f'sc={self.sample_count},'
+            f'size={len(self.payload)})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -551,6 +561,7 @@ class SbcPacketSource:
     @property
     def packets(self):
         async def generate_packets():
+            # pylint: disable=import-outside-toplevel
             from .avdtp import MediaPacket  # Import here to avoid a circular reference
 
             sequence_number = 0
@@ -582,7 +593,7 @@ class SbcPacketSource:
 
                     # Prepare for next packets
                     sequence_number += 1
-                    timestamp += sum([frame.sample_count for frame in frames])
+                    timestamp += sum((frame.sample_count for frame in frames))
                     frames = [frame]
                     frames_size = len(frame.payload)
                 else:

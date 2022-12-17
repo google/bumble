@@ -100,7 +100,7 @@ class ProtocolError(BaseError):
     """Protocol Error"""
 
 
-class TimeoutError(Exception):
+class TimeoutError(Exception):  # pylint: disable=redefined-builtin
     """Timeout Error"""
 
 
@@ -112,7 +112,7 @@ class InvalidStateError(Exception):
     """Invalid State Error"""
 
 
-class ConnectionError(BaseError):
+class ConnectionError(BaseError):  # pylint: disable=redefined-builtin
     """Connection Error"""
 
     FAILURE = 0x01
@@ -148,7 +148,7 @@ class UUID:
     UUIDS = []  # Registry of all instances created
 
     def __init__(self, uuid_str_or_int, name=None):
-        if type(uuid_str_or_int) is int:
+        if isinstance(uuid_str_or_int, int):
             self.uuid_bytes = struct.pack('<H', uuid_str_or_int)
         else:
             if len(uuid_str_or_int) == 36:
@@ -168,7 +168,8 @@ class UUID:
         self.name = name
 
     def register(self):
-        # Register this object in the class registry, and update the entry's name if it wasn't set already
+        # Register this object in the class registry, and update the entry's name if
+        # it wasn't set already
         for uuid in self.UUIDS:
             if self == uuid:
                 if uuid.name is None:
@@ -180,14 +181,14 @@ class UUID:
 
     @classmethod
     def from_bytes(cls, uuid_bytes, name=None):
-        if len(uuid_bytes) in {2, 4, 16}:
+        if len(uuid_bytes) in (2, 4, 16):
             self = cls.__new__(cls)
             self.uuid_bytes = uuid_bytes
             self.name = name
 
             return self.register()
-        else:
-            raise ValueError('only 2, 4 and 16 bytes are allowed')
+
+        raise ValueError('only 2, 4 and 16 bytes are allowed')
 
     @classmethod
     def from_16_bits(cls, uuid_16, name=None):
@@ -198,20 +199,21 @@ class UUID:
         return cls.from_bytes(struct.pack('<I', uuid_32), name)
 
     @classmethod
-    def parse_uuid(cls, bytes, offset):
-        return len(bytes), cls.from_bytes(bytes[offset:])
+    def parse_uuid(cls, uuid_as_bytes, offset):
+        return len(uuid_as_bytes), cls.from_bytes(uuid_as_bytes[offset:])
 
     @classmethod
-    def parse_uuid_2(cls, bytes, offset):
-        return offset + 2, cls.from_bytes(bytes[offset : offset + 2])
+    def parse_uuid_2(cls, uuid_as_bytes, offset):
+        return offset + 2, cls.from_bytes(uuid_as_bytes[offset : offset + 2])
 
     def to_bytes(self, force_128=False):
         if len(self.uuid_bytes) == 16 or not force_128:
             return self.uuid_bytes
-        elif len(self.uuid_bytes) == 4:
+
+        if len(self.uuid_bytes) == 4:
             return self.uuid_bytes + UUID.BASE_UUID
-        else:
-            return self.uuid_bytes + bytes([0, 0]) + UUID.BASE_UUID
+
+        return self.uuid_bytes + bytes([0, 0]) + UUID.BASE_UUID
 
     def to_pdu_bytes(self):
         '''
@@ -225,16 +227,16 @@ class UUID:
     def to_hex_str(self):
         if len(self.uuid_bytes) == 2 or len(self.uuid_bytes) == 4:
             return bytes(reversed(self.uuid_bytes)).hex().upper()
-        else:
-            return ''.join(
-                [
-                    bytes(reversed(self.uuid_bytes[12:16])).hex(),
-                    bytes(reversed(self.uuid_bytes[10:12])).hex(),
-                    bytes(reversed(self.uuid_bytes[8:10])).hex(),
-                    bytes(reversed(self.uuid_bytes[6:8])).hex(),
-                    bytes(reversed(self.uuid_bytes[0:6])).hex(),
-                ]
-            ).upper()
+
+        return ''.join(
+            [
+                bytes(reversed(self.uuid_bytes[12:16])).hex(),
+                bytes(reversed(self.uuid_bytes[10:12])).hex(),
+                bytes(reversed(self.uuid_bytes[8:10])).hex(),
+                bytes(reversed(self.uuid_bytes[6:8])).hex(),
+                bytes(reversed(self.uuid_bytes[0:6])).hex(),
+            ]
+        ).upper()
 
     def __bytes__(self):
         return self.to_bytes()
@@ -242,7 +244,8 @@ class UUID:
     def __eq__(self, other):
         if isinstance(other, UUID):
             return self.to_bytes(force_128=True) == other.to_bytes(force_128=True)
-        elif type(other) is str:
+
+        if isinstance(other, str):
             return UUID(other) == self
 
         return False
@@ -252,11 +255,11 @@ class UUID:
 
     def __str__(self):
         if len(self.uuid_bytes) == 2:
-            v = struct.unpack('<H', self.uuid_bytes)[0]
-            result = f'UUID-16:{v:04X}'
+            uuid = struct.unpack('<H', self.uuid_bytes)[0]
+            result = f'UUID-16:{uuid:04X}'
         elif len(self.uuid_bytes) == 4:
-            v = struct.unpack('<I', self.uuid_bytes)[0]
-            result = f'UUID-32:{v:08X}'
+            uuid = struct.unpack('<I', self.uuid_bytes)[0]
+            result = f'UUID-32:{uuid:08X}'
         else:
             result = '-'.join(
                 [
@@ -267,10 +270,11 @@ class UUID:
                     bytes(reversed(self.uuid_bytes[0:6])).hex(),
                 ]
             ).upper()
+
         if self.name is not None:
             return result + f' ({self.name})'
-        else:
-            return result
+
+        return result
 
     def __repr__(self):
         return str(self)
@@ -280,6 +284,7 @@ class UUID:
 # Common UUID constants
 # -----------------------------------------------------------------------------
 # fmt: off
+# pylint: disable=line-too-long
 
 # Protocol Identifiers
 BT_SDP_PROTOCOL_ID                      = UUID.from_16_bits(0x0001, 'SDP')
@@ -386,6 +391,7 @@ BT_HDP_SOURCE_SERVICE                                = UUID.from_16_bits(0x1401,
 BT_HDP_SINK_SERVICE                                  = UUID.from_16_bits(0x1402, 'HDP Sink')
 
 # fmt: on
+# pylint: enable=line-too-long
 
 
 # -----------------------------------------------------------------------------
@@ -393,6 +399,7 @@ BT_HDP_SINK_SERVICE                                  = UUID.from_16_bits(0x1402,
 # -----------------------------------------------------------------------------
 class DeviceClass:
     # fmt: off
+    # pylint: disable=line-too-long
 
     # Major Service Classes (flags combined with OR)
     LIMITED_DISCOVERABLE_MODE_SERVICE_CLASS = (1 << 0)
@@ -562,6 +569,7 @@ class DeviceClass:
     }
 
     # fmt: on
+    # pylint: enable=line-too-long
 
     @staticmethod
     def split_class_of_device(class_of_device):
@@ -600,6 +608,7 @@ class DeviceClass:
 # -----------------------------------------------------------------------------
 class AdvertisingData:
     # fmt: off
+    # pylint: disable=line-too-long
 
     # This list is only partial, it still needs to be filled in from the spec
     FLAGS                                          = 0x01
@@ -713,8 +722,11 @@ class AdvertisingData:
     BR_EDR_HOST_FLAG                  = 0x10
 
     # fmt: on
+    # pylint: enable=line-too-long
 
-    def __init__(self, ad_structures=[]):
+    def __init__(self, ad_structures=None):
+        if ad_structures is None:
+            ad_structures = []
         self.ad_structures = ad_structures[:]
 
     @staticmethod
@@ -814,53 +826,65 @@ class AdvertisingData:
 
         return f'[{ad_type_str}]: {ad_data_str}'
 
+    # pylint: disable=too-many-return-statements
     @staticmethod
     def ad_data_to_object(ad_type, ad_data):
-        if ad_type in {
+        if ad_type in (
             AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
             AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
             AdvertisingData.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS,
-        }:
+        ):
             return AdvertisingData.uuid_list_to_objects(ad_data, 2)
-        elif ad_type in {
+
+        if ad_type in (
             AdvertisingData.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
             AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
             AdvertisingData.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS,
-        }:
+        ):
             return AdvertisingData.uuid_list_to_objects(ad_data, 4)
-        elif ad_type in {
+
+        if ad_type in (
             AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
             AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
             AdvertisingData.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS,
-        }:
+        ):
             return AdvertisingData.uuid_list_to_objects(ad_data, 16)
-        elif ad_type == AdvertisingData.SERVICE_DATA_16_BIT_UUID:
+
+        if ad_type == AdvertisingData.SERVICE_DATA_16_BIT_UUID:
             return (UUID.from_bytes(ad_data[:2]), ad_data[2:])
-        elif ad_type == AdvertisingData.SERVICE_DATA_32_BIT_UUID:
+
+        if ad_type == AdvertisingData.SERVICE_DATA_32_BIT_UUID:
             return (UUID.from_bytes(ad_data[:4]), ad_data[4:])
-        elif ad_type == AdvertisingData.SERVICE_DATA_128_BIT_UUID:
+
+        if ad_type == AdvertisingData.SERVICE_DATA_128_BIT_UUID:
             return (UUID.from_bytes(ad_data[:16]), ad_data[16:])
-        elif ad_type in {
+
+        if ad_type in (
             AdvertisingData.SHORTENED_LOCAL_NAME,
             AdvertisingData.COMPLETE_LOCAL_NAME,
             AdvertisingData.URI,
-        }:
+        ):
             return ad_data.decode("utf-8")
-        elif ad_type in {AdvertisingData.TX_POWER_LEVEL, AdvertisingData.FLAGS}:
+
+        if ad_type in (AdvertisingData.TX_POWER_LEVEL, AdvertisingData.FLAGS):
             return ad_data[0]
-        elif ad_type in {
+
+        if ad_type in (
             AdvertisingData.APPEARANCE,
             AdvertisingData.ADVERTISING_INTERVAL,
-        }:
+        ):
             return struct.unpack('<H', ad_data)[0]
-        elif ad_type == AdvertisingData.CLASS_OF_DEVICE:
+
+        if ad_type == AdvertisingData.CLASS_OF_DEVICE:
             return struct.unpack('<I', bytes([*ad_data, 0]))[0]
-        elif ad_type == AdvertisingData.PERIPHERAL_CONNECTION_INTERVAL_RANGE:
+
+        if ad_type == AdvertisingData.PERIPHERAL_CONNECTION_INTERVAL_RANGE:
             return struct.unpack('<HH', ad_data)
-        elif ad_type == AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
+
+        if ad_type == AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
             return (struct.unpack_from('<H', ad_data, 0)[0], ad_data[2:])
-        else:
-            return ad_data
+
+        return ad_data
 
     def append(self, data):
         offset = 0
@@ -888,15 +912,11 @@ class AdvertisingData:
             return [
                 process_ad_data(ad[1]) for ad in self.ad_structures if ad[0] == type_id
             ]
-        else:
-            return next(
-                (
-                    process_ad_data(ad[1])
-                    for ad in self.ad_structures
-                    if ad[0] == type_id
-                ),
-                None,
-            )
+
+        return next(
+            (process_ad_data(ad[1]) for ad in self.ad_structures if ad[0] == type_id),
+            None,
+        )
 
     def __bytes__(self):
         return b''.join(

@@ -163,4 +163,3 @@ Future features to be considered include:
   * Bindings for languages other than Python
   * RPC interface to expose most of the API for remote use
   * (...suggest anything you want...)
-

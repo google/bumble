@@ -65,8 +65,11 @@ class PacketPump:
 # -----------------------------------------------------------------------------
 class PacketParser:
     '''
-    In-line parser that accepts data and emits 'on_packet' when a full packet has been parsed
+    In-line parser that accepts data and emits 'on_packet' when a full packet has been
+    parsed
     '''
+
+    # pylint: disable=attribute-defined-outside-init
 
     NEED_TYPE = 0
     NEED_LENGTH = 1
@@ -278,7 +281,7 @@ class PumpedPacketSource(ParserSource):
                     logger.debug('source pump task done')
                     break
                 except Exception as error:
-                    logger.warn(f'exception while waiting for packet: {error}')
+                    logger.warning(f'exception while waiting for packet: {error}')
                     self.terminated.set_result(error)
                     break
 
@@ -309,7 +312,7 @@ class PumpedPacketSink:
                     logger.debug('sink pump task done')
                     break
                 except Exception as error:
-                    logger.warn(f'exception while sending packet: {error}')
+                    logger.warning(f'exception while sending packet: {error}')
                     break
 
         self.pump_task = asyncio.create_task(pump_packets())

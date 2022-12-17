@@ -60,7 +60,11 @@ async def main():
 
             separator = '\n  '
             print(
-                f'>>> {color(advertisement.address, address_color)} [{color(address_type_string, type_color)}]{address_qualifier}:{separator}RSSI:{advertisement.rssi}{separator}{advertisement.data.to_string(separator)}'
+                f'>>> {color(advertisement.address, address_color)} '
+                f'[{color(address_type_string, type_color)}]'
+                f'{address_qualifier}:{separator}RSSI:{advertisement.rssi}'
+                f'{separator}'
+                f'{advertisement.data.to_string(separator)}'
             )
 
         await device.power_on()

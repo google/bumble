@@ -31,4 +31,3 @@ The WebSocket path used by a connecting client indicates which virtual "chat roo
     It is possible to connect to a "chat room" in a relay as an observer, rather than a virtual controller. In this case, a text-based console can be used to observe what is going on in the "chat room". Tools like [`wscat`](https://github.com/websockets/wscat#readme) or [`websocat`](https://github.com/vi/websocat) can be used for that.
 
     Example: `wscat --connect ws://localhost:10723/test`
-

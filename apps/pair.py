@@ -86,15 +86,17 @@ class Delegate(PairingDelegate):
             while True:
                 response = await aioconsole.ainput(color('>>> Accept? ', 'yellow'))
                 response = response.lower().strip()
+
                 if response == 'yes':
                     return True
-                elif response == 'no':
-                    return False
-        else:
-            # Accept silently
-            return True
 
-    async def compare_numbers(self, number, digits):
+                if response == 'no':
+                    return False
+
+        # Accept silently
+        return True
+
+    async def compare_numbers(self, number, digits=6):
         await self.update_peer_name()
 
         # Wait a bit to allow some of the log lines to print before we prompt
@@ -111,9 +113,11 @@ class Delegate(PairingDelegate):
                 )
             )
             response = response.lower().strip()
+
             if response == 'yes':
                 return True
-            elif response == 'no':
+
+            if response == 'no':
                 return False
 
     async def get_number(self):
@@ -132,7 +136,7 @@ class Delegate(PairingDelegate):
             except ValueError:
                 pass
 
-    async def display_number(self, number, digits):
+    async def display_number(self, number, digits=6):
         await self.update_peer_name()
 
         # Wait a bit to allow some of the log lines to print before we prompt
@@ -149,17 +153,19 @@ class Delegate(PairingDelegate):
 async def get_peer_name(peer, mode):
     if mode == 'classic':
         return await peer.request_name()
-    else:
-        # Try to get the peer name from GATT
-        services = await peer.discover_service(GATT_GENERIC_ACCESS_SERVICE)
-        if not services:
-            return None
 
-        values = await peer.read_characteristics_by_uuid(
-            GATT_DEVICE_NAME_CHARACTERISTIC, services[0]
-        )
-        if values:
-            return values[0].decode('utf-8')
+    # Try to get the peer name from GATT
+    services = await peer.discover_service(GATT_GENERIC_ACCESS_SERVICE)
+    if not services:
+        return None
+
+    values = await peer.read_characteristics_by_uuid(
+        GATT_DEVICE_NAME_CHARACTERISTIC, services[0]
+    )
+    if values:
+        return values[0].decode('utf-8')
+
+    return None
 
 
 # -----------------------------------------------------------------------------
@@ -172,12 +178,12 @@ def read_with_error(connection):
 
     if AUTHENTICATION_ERROR_RETURNED[0]:
         return bytes([1])
-    else:
-        AUTHENTICATION_ERROR_RETURNED[0] = True
-        raise ATT_Error(ATT_INSUFFICIENT_AUTHENTICATION_ERROR)
+
+    AUTHENTICATION_ERROR_RETURNED[0] = True
+    raise ATT_Error(ATT_INSUFFICIENT_AUTHENTICATION_ERROR)
 
 
-def write_with_error(connection, value):
+def write_with_error(connection, _value):
     if not connection.is_encrypted:
         raise ATT_Error(ATT_INSUFFICIENT_ENCRYPTION_ERROR)
 

@@ -20,8 +20,8 @@ import sys
 import os
 import logging
 import struct
-import websockets
 import json
+import websockets
 from colors import color
 
 from bumble.core import AdvertisingData
@@ -59,9 +59,10 @@ HID_FEATURE_REPORT = 0x03
 
 # Report Map
 HID_KEYBOARD_REPORT_MAP = bytes(
+    # pylint: disable=line-too-long
     [
         0x05,
-        0x01,  # Usage Page (Generic Desktop Ctrls)
+        0x01,  # Usage Page (Generic Desktop Controls)
         0x09,
         0x06,  # Usage (Keyboard)
         0xA1,
@@ -69,7 +70,7 @@ HID_KEYBOARD_REPORT_MAP = bytes(
         0x85,
         0x01,  # . Report ID (1)
         0x05,
-        0x07,  # . Usage Page (Kbrd/Keypad)
+        0x07,  # . Usage Page (Keyboard/Keypad)
         0x19,
         0xE0,  # . Usage Minimum (0xE0)
         0x29,
@@ -99,7 +100,7 @@ HID_KEYBOARD_REPORT_MAP = bytes(
         0x25,
         0x94,  # . Logical Maximum (0x94)
         0x05,
-        0x07,  # . Usage Page (Kbrd/Keypad)
+        0x07,  # . Usage Page (Keyboard/Keypad)
         0x19,
         0x00,  # . Usage Minimum (0x00)
         0x29,
@@ -130,6 +131,7 @@ HID_KEYBOARD_REPORT_MAP = bytes(
 
 
 # -----------------------------------------------------------------------------
+# pylint: disable=invalid-overridden-method
 class ServerListener(Device.Listener, Connection.Listener):
     def __init__(self, device):
         self.device = device
@@ -145,7 +147,7 @@ class ServerListener(Device.Listener, Connection.Listener):
 
 
 # -----------------------------------------------------------------------------
-def on_hid_control_point_write(connection, value):
+def on_hid_control_point_write(_connection, value):
     print(f'Control Point Write: {value}')
 
 
@@ -295,9 +297,9 @@ async def keyboard_device(device, command):
                         GATT_HID_INFORMATION_CHARACTERISTIC,
                         Characteristic.READ,
                         Characteristic.READABLE,
-                        bytes(
-                            [0x11, 0x01, 0x00, 0x03]
-                        ),  # bcdHID=1.1, bCountryCode=0x00, Flags=RemoteWake|NormallyConnectable
+                        # bcdHID=1.1, bCountryCode=0x00,
+                        # Flags=RemoteWake|NormallyConnectable
+                        bytes([0x11, 0x01, 0x00, 0x03]),
                     ),
                     Characteristic(
                         GATT_HID_CONTROL_POINT_CHARACTERISTIC,
@@ -360,7 +362,7 @@ async def keyboard_device(device, command):
 
     if command == 'web':
         # Start a Websocket server to receive events from a web page
-        async def serve(websocket, path):
+        async def serve(websocket, _path):
             while True:
                 try:
                     message = await websocket.recv()
@@ -373,7 +375,7 @@ async def keyboard_device(device, command):
                         key = parsed['key']
                         if len(key) == 1:
                             code = ord(key)
-                            if code >= ord('a') and code <= ord('z'):
+                            if ord('a') <= code <= ord('z'):
                                 hid_code = 0x04 + code - ord('a')
                                 input_report_characteristic.value = bytes(
                                     [0, 0, hid_code, 0, 0, 0, 0, 0]
@@ -390,6 +392,7 @@ async def keyboard_device(device, command):
                 except websockets.exceptions.ConnectionClosedOK:
                     pass
 
+        # pylint: disable-next=no-member
         await websockets.serve(serve, 'localhost', 8989)
         await asyncio.get_event_loop().create_future()
     else:
@@ -413,11 +416,12 @@ async def keyboard_device(device, command):
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) < 4:
-        print('Usage: python keyboard.py <device-config> <transport-spec> <command>')
-        print('  where <command> is one of:')
-        print('  connect <address> (run a keyboard host, connecting to a keyboard)')
         print(
-            '  web (run a keyboard with keypress input from a web page, see keyboard.html'
+            'Usage: python keyboard.py <device-config> <transport-spec> <command>'
+            '  where <command> is one of:\n'
+            '  connect <address> (run a keyboard host, connecting to a keyboard)\n'
+            '  web (run a keyboard with keypress input from a web page, '
+            'see keyboard.html\n'
         )
         print(
             '  sim (run a keyboard simulation, emitting a canned sequence of keystrokes'
@@ -436,7 +440,7 @@ async def main():
         if command == 'connect':
             # Run as a Keyboard host
             await keyboard_host(device, sys.argv[4])
-        elif command in {'sim', 'web'}:
+        elif command in ('sim', 'web'):
             # Run as a keyboard device
             await keyboard_device(device, command)
 

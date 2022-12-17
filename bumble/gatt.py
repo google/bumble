@@ -25,14 +25,15 @@
 from __future__ import annotations
 import asyncio
 import enum
-import types
+import functools
 import logging
-from pyee import EventEmitter
+import struct
+from typing import Sequence
 from colors import color
 
-from .core import *
-from .hci import *
-from .att import *
+from .core import UUID, get_dict_key_by_value
+from .att import Attribute
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # -----------------------------------------------------------------------------
 # fmt: off
+# pylint: disable=line-too-long
 
 GATT_REQUEST_TIMEOUT = 30  # seconds
 
@@ -177,6 +179,7 @@ GATT_BOOT_KEYBOARD_OUTPUT_REPORT_CHARACTERISTIC                = UUID.from_16_bi
 GATT_CENTRAL_ADDRESS_RESOLUTION__CHARACTERISTIC                = UUID.from_16_bits(0x2AA6, 'Central Address Resolution')
 
 # fmt: on
+# pylint: enable=line-too-long
 
 
 # -----------------------------------------------------------------------------
@@ -203,7 +206,7 @@ class Service(Attribute):
 
     def __init__(self, uuid, characteristics: list[Characteristic], primary=True):
         # Convert the uuid to a UUID object if it isn't already
-        if type(uuid) is str:
+        if isinstance(uuid, str):
             uuid = UUID(uuid)
 
         super().__init__(
@@ -227,7 +230,12 @@ class Service(Attribute):
         return None
 
     def __str__(self):
-        return f'Service(handle=0x{self.handle:04X}, end=0x{self.end_group_handle:04X}, uuid={self.uuid}){"" if self.primary else "*"}'
+        return (
+            f'Service(handle=0x{self.handle:04X}, '
+            f'end=0x{self.end_group_handle:04X}, '
+            f'uuid={self.uuid})'
+            f'{"" if self.primary else "*"}'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -271,15 +279,15 @@ class Characteristic(Attribute):
     }
 
     @staticmethod
-    def property_name(property):
-        return Characteristic.PROPERTY_NAMES.get(property, '')
+    def property_name(property_int):
+        return Characteristic.PROPERTY_NAMES.get(property_int, '')
 
     @staticmethod
     def properties_as_string(properties):
         return ','.join(
             [
                 Characteristic.property_name(p)
-                for p in Characteristic.PROPERTY_NAMES.keys()
+                for p in Characteristic.PROPERTY_NAMES
                 if properties & p
             ]
         )
@@ -298,11 +306,11 @@ class Characteristic(Attribute):
         properties,
         permissions,
         value=b'',
-        descriptors: list[Descriptor] = [],
+        descriptors: Sequence[Descriptor] = (),
     ):
         super().__init__(uuid, permissions, value)
         self.uuid = self.type
-        if type(properties) is str:
+        if isinstance(properties, str):
             self.properties = Characteristic.string_to_properties(properties)
         else:
             self.properties = properties
@@ -313,8 +321,15 @@ class Characteristic(Attribute):
             if descriptor.type == descriptor_type:
                 return descriptor
 
+        return None
+
     def __str__(self):
-        return f'Characteristic(handle=0x{self.handle:04X}, end=0x{self.end_group_handle:04X}, uuid={self.uuid}, properties={Characteristic.properties_as_string(self.properties)})'
+        return (
+            f'Characteristic(handle=0x{self.handle:04X}, '
+            f'end=0x{self.end_group_handle:04X}, '
+            f'uuid={self.uuid}, '
+            f'properties={Characteristic.properties_as_string(self.properties)})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -335,7 +350,12 @@ class CharacteristicDeclaration(Attribute):
         self.characteristic = characteristic
 
     def __str__(self):
-        return f'CharacteristicDeclaration(handle=0x{self.handle:04X}, value_handle=0x{self.value_handle:04X}, uuid={self.characteristic.uuid}, properties={Characteristic.properties_as_string(self.characteristic.properties)})'
+        return (
+            f'CharacteristicDeclaration(handle=0x{self.handle:04X}, '
+            f'value_handle=0x{self.value_handle:04X}, '
+            f'uuid={self.characteristic.uuid}, properties='
+            f'{Characteristic.properties_as_string(self.characteristic.properties)})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -395,14 +415,14 @@ class CharacteristicAdapter:
         return getattr(self.wrapped_characteristic, name)
 
     def __setattr__(self, name, value):
-        if name in {
+        if name in (
             'wrapped_characteristic',
             'subscribers',
             'read_value',
             'write_value',
             'subscribe',
             'unsubscribe',
-        }:
+        ):
             super().__setattr__(name, value)
         else:
             setattr(self.wrapped_characteristic, name, value)
@@ -486,9 +506,9 @@ class PackedCharacteristicAdapter(CharacteristicAdapter):
     the format.
     '''
 
-    def __init__(self, characteristic, format):
+    def __init__(self, characteristic, pack_format):
         super().__init__(characteristic)
-        self.struct = struct.Struct(format)
+        self.struct = struct.Struct(pack_format)
 
     def pack(self, *values):
         return self.struct.pack(*values)
@@ -497,7 +517,7 @@ class PackedCharacteristicAdapter(CharacteristicAdapter):
         return self.struct.unpack(buffer)
 
     def encode_value(self, value):
-        return self.pack(*value if type(value) is tuple else (value,))
+        return self.pack(*value if isinstance(value, tuple) else (value,))
 
     def decode_value(self, value):
         unpacked = self.unpack(value)
@@ -510,14 +530,15 @@ class MappedCharacteristicAdapter(PackedCharacteristicAdapter):
     Adapter that packs/unpacks characteristic values according to a standard
     Python `struct` format.
     The adapted `read_value` and `write_value` methods return/accept aa dictionary which
-    is packed/unpacked according to format, with the arguments extracted from the dictionary
-    by key, in the same order as they occur in the `keys` parameter.
+    is packed/unpacked according to format, with the arguments extracted from the
+    dictionary by key, in the same order as they occur in the `keys` parameter.
     '''
 
-    def __init__(self, characteristic, format, keys):
-        super().__init__(characteristic, format)
+    def __init__(self, characteristic, pack_format, keys):
+        super().__init__(characteristic, pack_format)
         self.keys = keys
 
+    # pylint: disable=arguments-differ
     def pack(self, values):
         return super().pack(*(values[key] for key in self.keys))
 
@@ -544,16 +565,18 @@ class Descriptor(Attribute):
     See Vol 3, Part G - 3.3.3 Characteristic Descriptor Declarations
     '''
 
-    def __init__(self, descriptor_type, permissions, value=b''):
-        super().__init__(descriptor_type, permissions, value)
-
     def __str__(self):
-        return f'Descriptor(handle=0x{self.handle:04X}, type={self.type}, value={self.read_value(None).hex()})'
+        return (
+            f'Descriptor(handle=0x{self.handle:04X}, '
+            f'type={self.type}, '
+            f'value={self.read_value(None).hex()})'
+        )
 
 
 class ClientCharacteristicConfigurationBits(enum.IntFlag):
     '''
-    See Vol 3, Part G - 3.3.3.3 - Table 3.11 Client Characteristic Configuration bit field definition
+    See Vol 3, Part G - 3.3.3.3 - Table 3.11 Client Characteristic Configuration bit
+    field definition
     '''
 
     DEFAULT = 0x0000

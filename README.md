@@ -15,10 +15,10 @@ Bumble is a full-featured Bluetooth stack written entirely in Python. It support
 
 ## Documentation
 
-Browse the pre-built [Online Documentation](https://google.github.io/bumble/), 
+Browse the pre-built [Online Documentation](https://google.github.io/bumble/),
 or see the documentation source under `docs/mkdocs/src`, or build the static HTML site from the markdown text with:
 ```
-mkdocs build -f docs/mkdocs/mkdocs.yml 
+mkdocs build -f docs/mkdocs/mkdocs.yml
 ```
 
 ## Usage
@@ -29,7 +29,7 @@ For a quick start to using Bumble, see the [Getting Started](docs/mkdocs/src/get
 
 ### Dependencies
 
-To install package dependencies needed to run the bumble examples execute the following commands:
+To install package dependencies needed to run the bumble examples, execute the following commands:
 
 ```
 python -m pip install --upgrade pip
@@ -50,7 +50,7 @@ Bumble is easiest to use with a dedicated USB dongle.
 This is because internal Bluetooth interfaces tend to be locked down by the operating system.
 You can use the [usb_probe](/docs/mkdocs/src/apps_and_tools/usb_probe.md) tool (all platforms) or `lsusb` (Linux or macOS) to list the available USB devices on your system.
 
-See the [USB Transport](/docs/mkdocs/src/transports/usb.md) page for details on how to refer to USB devices.
+See the [USB Transport](/docs/mkdocs/src/transports/usb.md) page for details on how to refer to USB devices. Also, if your are on a mac, see [these instructions](docs/mkdocs/src/platforms/macos.md).
 
 ## License
 

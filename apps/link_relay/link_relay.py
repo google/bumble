@@ -16,7 +16,6 @@
 # Imports
 # ----------------------------------------------------------------------------
 import sys
-import websockets
 import logging
 import json
 import asyncio
@@ -25,6 +24,7 @@ import uuid
 import os
 from urllib.parse import urlparse
 from colors import color
+import websockets
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -98,7 +98,11 @@ class Connection:
         self.address = address
 
     def __str__(self):
-        return f'Connection(address="{self.address}", client={self.websocket.remote_address[0]}:{self.websocket.remote_address[1]})'
+        return (
+            f'Connection(address="{self.address}", '
+            f'client={self.websocket.remote_address[0]}:'
+            f'{self.websocket.remote_address[1]})'
+        )
 
 
 # ----------------------------------------------------------------------------
@@ -139,8 +143,8 @@ class Room:
 
             # Parse the message to decide how to handle it
             if message.startswith('@'):
-                # This is a targetted message
-                await self.on_targetted_message(connection, message)
+                # This is a targeted message
+                await self.on_targeted_message(connection, message)
             elif message.startswith('/'):
                 # This is an RPC request
                 await self.on_rpc_request(connection, message)
@@ -169,7 +173,7 @@ class Room:
 
         await connection.send_message(result or 'result:{}')
 
-    async def on_targetted_message(self, connection, message):
+    async def on_targeted_message(self, connection, message):
         target, *payload = message.split(' ', 1)
         if not payload:
             return error_to_json('missing arguments')
@@ -178,7 +182,8 @@ class Room:
 
         # Determine what targets to send to
         if target == '*':
-            # Send to all connections in the room except the connection from which the message was received
+            # Send to all connections in the room except the connection from which the
+            # message was received
             connections = [c for c in self.connections if c != connection]
         else:
             connections = self.find_connections_by_address(target)
@@ -216,9 +221,10 @@ class Relay:
     def start(self):
         logger.info(f'Starting Relay on port {self.port}')
 
+        # pylint: disable-next=no-member
         return websockets.serve(self.serve, '0.0.0.0', self.port, ping_interval=None)
 
-    async def serve_as_controller(connection):
+    async def serve_as_controller(self, connection):
         pass
 
     async def serve(self, websocket, path):
@@ -265,7 +271,7 @@ def main():
 
     # Setup logger
     if args.log_config:
-        from logging import config
+        from logging import config  # pylint: disable=import-outside-toplevel
 
         config.fileConfig(args.log_config)
     else:

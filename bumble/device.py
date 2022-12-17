@@ -16,29 +16,130 @@
 # Imports
 # -----------------------------------------------------------------------------
 from enum import IntEnum
+import functools
 import json
 import asyncio
 import logging
 from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
+from colors import color
 
-from .hci import *
+from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
+from .gatt import Characteristic, Descriptor, Service
+from .hci import (
+    HCI_CENTRAL_ROLE,
+    HCI_COMMAND_STATUS_PENDING,
+    HCI_CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR,
+    HCI_DISPLAY_ONLY_IO_CAPABILITY,
+    HCI_DISPLAY_YES_NO_IO_CAPABILITY,
+    HCI_EXTENDED_INQUIRY_MODE,
+    HCI_GENERAL_INQUIRY_LAP,
+    HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR,
+    HCI_KEYBOARD_ONLY_IO_CAPABILITY,
+    HCI_LE_1M_PHY,
+    HCI_LE_1M_PHY_BIT,
+    HCI_LE_2M_PHY,
+    HCI_LE_2M_PHY_LE_SUPPORTED_FEATURE,
+    HCI_LE_CLEAR_RESOLVING_LIST_COMMAND,
+    HCI_LE_CODED_PHY,
+    HCI_LE_CODED_PHY_BIT,
+    HCI_LE_CODED_PHY_LE_SUPPORTED_FEATURE,
+    HCI_LE_EXTENDED_ADVERTISING_LE_SUPPORTED_FEATURE,
+    HCI_LE_EXTENDED_CREATE_CONNECTION_COMMAND,
+    HCI_LE_READ_PHY_COMMAND,
+    HCI_MITM_NOT_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
+    HCI_MITM_NOT_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
+    HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
+    HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
+    HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
+    HCI_R2_PAGE_SCAN_REPETITION_MODE,
+    HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
+    HCI_SUCCESS,
+    HCI_WRITE_LE_HOST_SUPPORT_COMMAND,
+    Address,
+    HCI_Accept_Connection_Request_Command,
+    HCI_Authentication_Requested_Command,
+    HCI_Command_Status_Event,
+    HCI_Constant,
+    HCI_Create_Connection_Cancel_Command,
+    HCI_Create_Connection_Command,
+    HCI_Disconnect_Command,
+    HCI_Encryption_Change_Event,
+    HCI_Error,
+    HCI_IO_Capability_Request_Reply_Command,
+    HCI_Inquiry_Cancel_Command,
+    HCI_Inquiry_Command,
+    HCI_LE_Add_Device_To_Resolving_List_Command,
+    HCI_LE_Advertising_Report_Event,
+    HCI_LE_Clear_Resolving_List_Command,
+    HCI_LE_Connection_Update_Command,
+    HCI_LE_Create_Connection_Cancel_Command,
+    HCI_LE_Create_Connection_Command,
+    HCI_LE_Enable_Encryption_Command,
+    HCI_LE_Extended_Advertising_Report_Event,
+    HCI_LE_Extended_Create_Connection_Command,
+    HCI_LE_Read_PHY_Command,
+    HCI_LE_Set_Advertising_Data_Command,
+    HCI_LE_Set_Advertising_Enable_Command,
+    HCI_LE_Set_Advertising_Parameters_Command,
+    HCI_LE_Set_Default_PHY_Command,
+    HCI_LE_Set_Extended_Scan_Enable_Command,
+    HCI_LE_Set_Extended_Scan_Parameters_Command,
+    HCI_LE_Set_PHY_Command,
+    HCI_LE_Set_Random_Address_Command,
+    HCI_LE_Set_Scan_Enable_Command,
+    HCI_LE_Set_Scan_Parameters_Command,
+    HCI_LE_Set_Scan_Response_Data_Command,
+    HCI_Read_BD_ADDR_Command,
+    HCI_Read_RSSI_Command,
+    HCI_Reject_Connection_Request_Command,
+    HCI_Remote_Name_Request_Command,
+    HCI_Set_Connection_Encryption_Command,
+    HCI_StatusError,
+    HCI_User_Confirmation_Request_Negative_Reply_Command,
+    HCI_User_Confirmation_Request_Reply_Command,
+    HCI_User_Passkey_Request_Negative_Reply_Command,
+    HCI_User_Passkey_Request_Reply_Command,
+    HCI_Write_Class_Of_Device_Command,
+    HCI_Write_Extended_Inquiry_Response_Command,
+    HCI_Write_Inquiry_Mode_Command,
+    HCI_Write_LE_Host_Support_Command,
+    HCI_Write_Local_Name_Command,
+    HCI_Write_Scan_Enable_Command,
+    HCI_Write_Secure_Connections_Host_Support_Command,
+    HCI_Write_Simple_Pairing_Mode_Command,
+    OwnAddressType,
+    phy_list_to_bits,
+)
 from .host import Host
-from .gatt import *
 from .gap import GenericAccessService
-from .core import AdvertisingData, BT_CENTRAL_ROLE, BT_PERIPHERAL_ROLE
+from .core import (
+    BT_BR_EDR_TRANSPORT,
+    BT_CENTRAL_ROLE,
+    BT_LE_TRANSPORT,
+    BT_PERIPHERAL_ROLE,
+    AdvertisingData,
+    CommandTimeoutError,
+    ConnectionPHY,
+    InvalidStateError,
+)
 from .utils import (
     AsyncRunner,
     CompositeEventEmitter,
     setup_event_forwarding,
     composite_listener,
 )
+from .keys import (
+    KeyStore,
+    PairingKeys,
+)
 from . import gatt_client
 from . import gatt_server
 from . import smp
 from . import sdp
 from . import l2cap
-from . import keys
+from . import core
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -49,6 +150,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # -----------------------------------------------------------------------------
 # fmt: off
+# pylint: disable=line-too-long
 
 DEVICE_MIN_SCAN_INTERVAL                      = 25
 DEVICE_MAX_SCAN_INTERVAL                      = 10240
@@ -81,6 +183,7 @@ DEVICE_DEFAULT_L2CAP_COC_MPS                  = l2cap.L2CAP_LE_CREDIT_BASED_CONN
 DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS          = l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_INITIAL_CREDITS
 
 # fmt: on
+# pylint: enable=line-too-long
 
 
 # -----------------------------------------------------------------------------
@@ -98,9 +201,13 @@ class Advertisement:
     def from_advertising_report(cls, report):
         if isinstance(report, HCI_LE_Advertising_Report_Event.Report):
             return LegacyAdvertisement.from_advertising_report(report)
-        elif isinstance(report, HCI_LE_Extended_Advertising_Report_Event.Report):
+
+        if isinstance(report, HCI_LE_Extended_Advertising_Report_Event.Report):
             return ExtendedAdvertisement.from_advertising_report(report)
 
+        return None
+
+    # pylint: disable=line-too-long
     def __init__(
         self,
         address,
@@ -145,17 +252,17 @@ class LegacyAdvertisement(Advertisement):
             rssi=report.rssi,
             is_legacy=True,
             is_connectable=report.event_type
-            in {
+            in (
                 HCI_LE_Advertising_Report_Event.ADV_IND,
                 HCI_LE_Advertising_Report_Event.ADV_DIRECT_IND,
-            },
+            ),
             is_directed=report.event_type
             == HCI_LE_Advertising_Report_Event.ADV_DIRECT_IND,
             is_scannable=report.event_type
-            in {
+            in (
                 HCI_LE_Advertising_Report_Event.ADV_IND,
                 HCI_LE_Advertising_Report_Event.ADV_SCAN_IND,
-            },
+            ),
             is_scan_response=report.event_type
             == HCI_LE_Advertising_Report_Event.SCAN_RSP,
             data=report.data,
@@ -167,6 +274,7 @@ class ExtendedAdvertisement(Advertisement):
     @classmethod
     def from_advertising_report(cls, report):
         # fmt: off
+        # pylint: disable=line-too-long
         return cls(
             address          = report.address,
             rssi             = report.rssi,
@@ -231,6 +339,7 @@ class AdvertisementDataAccumulator:
 # -----------------------------------------------------------------------------
 class AdvertisingType(IntEnum):
     # fmt: off
+    # pylint: disable=line-too-long
     UNDIRECTED_CONNECTABLE_SCANNABLE = 0x00  # Undirected, connectable,     scannable
     DIRECTED_CONNECTABLE_HIGH_DUTY   = 0x01  # Directed,   connectable,     non-scannable
     UNDIRECTED_SCANNABLE             = 0x02  # Undirected, non-connectable, scannable
@@ -240,33 +349,33 @@ class AdvertisingType(IntEnum):
 
     @property
     def has_data(self):
-        return self in {
+        return self in (
             AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
             AdvertisingType.UNDIRECTED_SCANNABLE,
             AdvertisingType.UNDIRECTED,
-        }
+        )
 
     @property
     def is_connectable(self):
-        return self in {
+        return self in (
             AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
             AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY,
             AdvertisingType.DIRECTED_CONNECTABLE_LOW_DUTY,
-        }
+        )
 
     @property
     def is_scannable(self):
-        return self in {
+        return self in (
             AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
             AdvertisingType.UNDIRECTED_SCANNABLE,
-        }
+        )
 
     @property
     def is_directed(self):
-        return self in {
+        return self in (
             AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY,
             AdvertisingType.DIRECTED_CONNECTABLE_LOW_DUTY,
-        }
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -304,13 +413,13 @@ class Peer:
     async def discover_service(self, uuid):
         return await self.gatt_client.discover_service(uuid)
 
-    async def discover_services(self, uuids=[]):
+    async def discover_services(self, uuids=()):
         return await self.gatt_client.discover_services(uuids)
 
     async def discover_included_services(self, service):
         return await self.gatt_client.discover_included_services(service)
 
-    async def discover_characteristics(self, uuids=[], service=None):
+    async def discover_characteristics(self, uuids=(), service=None):
         return await self.gatt_client.discover_characteristics(
             uuids=uuids, service=service
         )
@@ -369,7 +478,7 @@ class Peer:
     async def __aenter__(self):
         await self.discover_services()
         for service in self.services:
-            await self.discover_characteristics()
+            await service.discover_characteristics()
 
         return self
 
@@ -460,7 +569,8 @@ class Connection(CompositeEventEmitter):
     @classmethod
     def incomplete(cls, device, peer_address):
         """
-        Instantiate an incomplete connection (ie. one waiting for a HCI Connection Complete event).
+        Instantiate an incomplete connection (ie. one waiting for a HCI Connection
+        Complete event).
         Once received it shall be completed using the `.complete` method.
         """
         return cls(
@@ -576,13 +686,17 @@ class Connection(CompositeEventEmitter):
         if exc_type is None:
             try:
                 await self.disconnect()
-            except HCI_StatusError as e:
+            except HCI_StatusError as error:
                 # Invalid parameter means the connection is no longer valid
-                if e.error_code != HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR:
+                if error.error_code != HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR:
                     raise
 
     def __str__(self):
-        return f'Connection(handle=0x{self.handle:04X}, role={self.role_name}, address={self.peer_address})'
+        return (
+            f'Connection(handle=0x{self.handle:04X}, '
+            f'role={self.role_name}, '
+            f'address={self.peer_address})'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -645,7 +759,8 @@ class DeviceConfiguration:
             self.irk = bytes.fromhex(irk)
         else:
             # Construct an IRK from the address bytes
-            # NOTE: this is not secure, but will always give the same IRK for the same address
+            # NOTE: this is not secure, but will always give the same IRK for the same
+            # address
             address_bytes = bytes(self.address)
             self.irk = (address_bytes * 3)[:16]
 
@@ -655,7 +770,7 @@ class DeviceConfiguration:
             self.advertising_data = bytes.fromhex(advertising_data)
 
     def load_from_file(self, filename):
-        with open(filename, 'r') as file:
+        with open(filename, 'r', encoding='utf-8') as file:
             self.load_from_dict(json.load(file))
 
 
@@ -691,7 +806,8 @@ def with_connection_from_address(function):
     return wrapper
 
 
-# Decorator that tries to convert the first argument from a bluetooth address to a connection
+# Decorator that tries to convert the first argument from a bluetooth address to a
+# connection
 def try_with_connection_from_address(function):
     @functools.wraps(function)
     def wrapper(self, address, *args, **kwargs):
@@ -816,7 +932,7 @@ class Device(CompositeEventEmitter):
         self.advertising_data = config.advertising_data
         self.advertising_interval_min = config.advertising_interval_min
         self.advertising_interval_max = config.advertising_interval_max
-        self.keystore = keys.KeyStore.create_for_device(config)
+        self.keystore = KeyStore.create_for_device(config)
         self.irk = config.irk
         self.le_enabled = config.le_enabled
         self.le_simultaneous_enabled = config.le_simultaneous_enabled
@@ -832,7 +948,7 @@ class Device(CompositeEventEmitter):
                 descriptors = []
                 for descriptor in characteristic.get("descriptors", []):
                     new_descriptor = Descriptor(
-                        descriptor_type=descriptor["descriptor_type"],
+                        attribute_type=descriptor["descriptor_type"],
                         permissions=descriptor["permission"],
                     )
                     descriptors.append(new_descriptor)
@@ -852,7 +968,7 @@ class Device(CompositeEventEmitter):
 
         # If an address is passed, override the address from the config
         if address:
-            if type(address) is str:
+            if isinstance(address, str):
                 address = Address(address)
             self.random_address = address
 
@@ -914,6 +1030,8 @@ class Device(CompositeEventEmitter):
         if connection := self.connections.get(connection_handle):
             return connection
 
+        return None
+
     def find_connection_by_bd_addr(
         self, bd_addr, transport=None, check_address_type=False
     ):
@@ -926,6 +1044,8 @@ class Device(CompositeEventEmitter):
                     continue
                 if transport is None or connection.transport == transport:
                     return connection
+
+        return None
 
     def create_l2cap_connector(self, connection, psm):
         return lambda: self.l2cap_channel_manager.connect(connection, psm)
@@ -968,9 +1088,9 @@ class Device(CompositeEventEmitter):
             return await asyncio.wait_for(
                 self.host.send_command(command, check_result), self.command_timeout
             )
-        except asyncio.TimeoutError:
+        except asyncio.TimeoutError as error:
             logger.warning('!!! Command timed out')
-            raise CommandTimeoutError()
+            raise CommandTimeoutError() from error
 
     async def power_on(self):
         # Reset the controller
@@ -1017,7 +1137,9 @@ class Device(CompositeEventEmitter):
 
                 # Enable address resolution
                 # await self.send_command(
-                #     HCI_LE_Set_Address_Resolution_Enable_Command(address_resolution_enable=1)
+                #     HCI_LE_Set_Address_Resolution_Enable_Command(
+                #         address_resolution_enable=1)
+                #     )
                 # )
 
                 # Create a host-side address resolver
@@ -1171,7 +1293,7 @@ class Device(CompositeEventEmitter):
             raise ValueError('scan_interval out of range')
 
         # Reset the accumulators
-        self.advertisement_accumulator = {}
+        self.advertisement_accumulators = {}
 
         # Enable scanning
         if not legacy and self.supports_le_feature(
@@ -1230,6 +1352,7 @@ class Device(CompositeEventEmitter):
                 else HCI_LE_Set_Scan_Parameters_Command.PASSIVE_SCANNING
             )
             await self.send_command(
+                # pylint: disable=line-too-long
                 HCI_LE_Set_Scan_Parameters_Command(
                     le_scan_type=scan_type,
                     le_scan_interval=int(scan_window / 0.625),
@@ -1376,17 +1499,19 @@ class Device(CompositeEventEmitter):
     ):
         '''
         Request a connection to a peer.
-        When transport is BLE, this method cannot be called if there is already a pending connection.
+        When transport is BLE, this method cannot be called if there is already a
+        pending connection.
 
         connection_parameters_preferences: (BLE only, ignored for BR/EDR)
           * None: use all PHYs with default parameters
-          * map: each entry has a PHY as key and a ConnectionParametersPreferences object as value
+          * map: each entry has a PHY as key and a ConnectionParametersPreferences
+            object as value
 
         own_address_type: (BLE only)
         '''
 
         # Check parameters
-        if transport not in {BT_LE_TRANSPORT, BT_BR_EDR_TRANSPORT}:
+        if transport not in (BT_LE_TRANSPORT, BT_BR_EDR_TRANSPORT):
             raise ValueError('invalid transport')
 
         # Adjust the transport automatically if we need to
@@ -1399,7 +1524,7 @@ class Device(CompositeEventEmitter):
         if transport == BT_LE_TRANSPORT and self.is_le_connecting:
             raise InvalidStateError('connection already pending')
 
-        if type(peer_address) is str:
+        if isinstance(peer_address, str):
             try:
                 peer_address = Address.from_string_for_transport(
                     peer_address, transport
@@ -1590,27 +1715,26 @@ class Device(CompositeEventEmitter):
             # Wait for the connection process to complete
             if transport == BT_LE_TRANSPORT:
                 self.le_connecting = True
+
             if timeout is None:
                 return await self.abort_on('flush', pending_connection)
-            else:
-                try:
-                    return await asyncio.wait_for(
-                        asyncio.shield(pending_connection), timeout
-                    )
-                except asyncio.TimeoutError:
-                    if transport == BT_LE_TRANSPORT:
-                        await self.send_command(
-                            HCI_LE_Create_Connection_Cancel_Command()
-                        )
-                    else:
-                        await self.send_command(
-                            HCI_Create_Connection_Cancel_Command(bd_addr=peer_address)
-                        )
 
-                    try:
-                        return await self.abort_on('flush', pending_connection)
-                    except ConnectionError:
-                        raise TimeoutError()
+            try:
+                return await asyncio.wait_for(
+                    asyncio.shield(pending_connection), timeout
+                )
+            except asyncio.TimeoutError:
+                if transport == BT_LE_TRANSPORT:
+                    await self.send_command(HCI_LE_Create_Connection_Cancel_Command())
+                else:
+                    await self.send_command(
+                        HCI_Create_Connection_Cancel_Command(bd_addr=peer_address)
+                    )
+
+                try:
+                    return await self.abort_on('flush', pending_connection)
+                except ConnectionError as error:
+                    raise core.TimeoutError() from error
         finally:
             self.remove_listener('connection', on_connection)
             self.remove_listener('connection_failure', on_connection_failure)
@@ -1627,15 +1751,17 @@ class Device(CompositeEventEmitter):
         timeout=DEVICE_DEFAULT_CONNECT_TIMEOUT,
     ):
         '''
-        Wait and accept any incoming connection or a connection from `peer_address` when set.
+        Wait and accept any incoming connection or a connection from `peer_address` when
+        set.
 
         Notes:
           * A `connect` to the same peer will also complete this call.
-          * The `timeout` parameter is only handled while waiting for the connection request,
-            once received and accepted, the controller shall issue a connection complete event.
+          * The `timeout` parameter is only handled while waiting for the connection
+            request, once received and accepted, the controller shall issue a connection
+            complete event.
         '''
 
-        if type(peer_address) is str:
+        if isinstance(peer_address, str):
             try:
                 peer_address = Address(peer_address)
             except ValueError:
@@ -1680,7 +1806,7 @@ class Device(CompositeEventEmitter):
             return result
 
         # Otherwise, result came from `on_connection_request`
-        peer_address, class_of_device, link_type = result
+        peer_address, _class_of_device, _link_type = result
 
         # Create a future so that we can wait for the connection's result
         pending_connection = asyncio.get_running_loop().create_future()
@@ -1749,9 +1875,10 @@ class Device(CompositeEventEmitter):
             )
 
         # BR/EDR: try to cancel to ongoing connection
-        # NOTE: This API does not prevent from trying to cancel a connection which is not currently being created
+        # NOTE: This API does not prevent from trying to cancel a connection which is
+        # not currently being created
         else:
-            if type(peer_address) is str:
+            if isinstance(peer_address, str):
                 try:
                     peer_address = Address(peer_address)
                 except ValueError:
@@ -1804,7 +1931,8 @@ class Device(CompositeEventEmitter):
         max_ce_length=0,
     ):
         '''
-        NOTE: the name of the parameters may look odd, but it just follows the names used in the Bluetooth spec.
+        NOTE: the name of the parameters may look odd, but it just follows the names
+        used in the Bluetooth spec.
         '''
         await self.send_command(
             HCI_LE_Connection_Update_Command(
@@ -1881,8 +2009,10 @@ class Device(CompositeEventEmitter):
                 if local_name.decode('utf-8') == name:
                     peer_address.set_result(address)
 
+        handler = None
+        was_scanning = self.scanning
+        was_discovering = self.discovering
         try:
-            handler = None
             if transport == BT_LE_TRANSPORT:
                 event_name = 'advertisement'
                 handler = self.on(
@@ -1892,7 +2022,6 @@ class Device(CompositeEventEmitter):
                     ),
                 )
 
-                was_scanning = self.scanning
                 if not self.scanning:
                     await self.start_scanning(filter_duplicates=True)
 
@@ -1905,7 +2034,6 @@ class Device(CompositeEventEmitter):
                     ),
                 )
 
-                was_discovering = self.discovering
                 if not self.discovering:
                     await self.start_discovery()
             else:
@@ -1951,9 +2079,11 @@ class Device(CompositeEventEmitter):
                 logger.debug('found keys in the key store')
                 if keys.ltk:
                     return keys.ltk.value
-                elif connection.role == BT_CENTRAL_ROLE and keys.ltk_central:
+
+                if connection.role == BT_CENTRAL_ROLE and keys.ltk_central:
                     return keys.ltk_central.value
-                elif connection.role == BT_PERIPHERAL_ROLE and keys.ltk_peripheral:
+
+                if connection.role == BT_PERIPHERAL_ROLE and keys.ltk_peripheral:
                     return keys.ltk_peripheral.value
 
     async def get_link_key(self, address):
@@ -1986,8 +2116,9 @@ class Device(CompositeEventEmitter):
                 )
             )
             if result.status != HCI_COMMAND_STATUS_PENDING:
-                logger.warn(
-                    f'HCI_Authentication_Requested_Command failed: {HCI_Constant.error_name(result.status)}'
+                logger.warning(
+                    'HCI_Authentication_Requested_Command failed: '
+                    f'{HCI_Constant.error_name(result.status)}'
                 )
                 raise HCI_StatusError(result)
 
@@ -2050,20 +2181,23 @@ class Device(CompositeEventEmitter):
                 )
 
                 if result.status != HCI_COMMAND_STATUS_PENDING:
-                    logger.warn(
-                        f'HCI_LE_Enable_Encryption_Command failed: {HCI_Constant.error_name(result.status)}'
+                    logger.warning(
+                        'HCI_LE_Enable_Encryption_Command failed: '
+                        f'{HCI_Constant.error_name(result.status)}'
                     )
                     raise HCI_StatusError(result)
             else:
                 result = await self.send_command(
                     HCI_Set_Connection_Encryption_Command(
-                        connection_handle=connection.handle, encryption_enable=0x01 if enable else 0x00
+                        connection_handle=connection.handle,
+                        encryption_enable=0x01 if enable else 0x00,
                     )
                 )
 
                 if result.status != HCI_COMMAND_STATUS_PENDING:
-                    logger.warn(
-                        f'HCI_Set_Connection_Encryption_Command failed: {HCI_Constant.error_name(result.status)}'
+                    logger.warning(
+                        'HCI_Set_Connection_Encryption_Command failed: '
+                        f'{HCI_Constant.error_name(result.status)}'
                     )
                     raise HCI_StatusError(result)
 
@@ -2082,7 +2216,7 @@ class Device(CompositeEventEmitter):
         # Set up event handlers
         pending_name = asyncio.get_running_loop().create_future()
 
-        peer_address = remote if type(remote) == Address else remote.peer_address
+        peer_address = remote if isinstance(remote, Address) else remote.peer_address
 
         handler = self.on(
             'remote_name',
@@ -2103,15 +2237,17 @@ class Device(CompositeEventEmitter):
             result = await self.send_command(
                 HCI_Remote_Name_Request_Command(
                     bd_addr=peer_address,
-                    page_scan_repetition_mode=HCI_Remote_Name_Request_Command.R0,  # TODO investigate other options
+                    # TODO investigate other options
+                    page_scan_repetition_mode=HCI_Remote_Name_Request_Command.R0,
                     reserved=0,
                     clock_offset=0,  # TODO investigate non-0 values
                 )
             )
 
             if result.status != HCI_COMMAND_STATUS_PENDING:
-                logger.warn(
-                    f'HCI_Set_Connection_Encryption_Command failed: {HCI_Constant.error_name(result.status)}'
+                logger.warning(
+                    'HCI_Set_Connection_Encryption_Command failed: '
+                    f'{HCI_Constant.error_name(result.status)}'
                 )
                 raise HCI_StatusError(result)
 
@@ -2133,14 +2269,14 @@ class Device(CompositeEventEmitter):
     def on_link_key(self, bd_addr, link_key, key_type):
         # Store the keys in the key store
         if self.keystore:
-            pairing_keys = keys.PairingKeys()
-            pairing_keys.link_key = keys.PairingKeys.Key(value=link_key)
+            pairing_keys = PairingKeys()
+            pairing_keys.link_key = PairingKeys.Key(value=link_key)
 
             async def store_keys():
                 try:
                     await self.keystore.update(str(bd_addr), pairing_keys)
                 except Exception as error:
-                    logger.warn(f'!!! error while storing keys: {error}')
+                    logger.warning(f'!!! error while storing keys: {error}')
 
             self.abort_on('flush', store_keys())
 
@@ -2183,10 +2319,11 @@ class Device(CompositeEventEmitter):
         connection_parameters,
     ):
         logger.debug(
-            f'*** Connection: [0x{connection_handle:04X}] {peer_address} as {HCI_Constant.role_name(role)}'
+            f'*** Connection: [0x{connection_handle:04X}] '
+            f'{peer_address} as {HCI_Constant.role_name(role)}'
         )
         if connection_handle in self.connections:
-            logger.warn(
+            logger.warning(
                 'new connection reuses the same handle as a previous connection'
             )
 
@@ -2198,10 +2335,12 @@ class Device(CompositeEventEmitter):
             )
             self.connections[connection_handle] = connection
 
-            # We may have an accept ongoing waiting for a connection request for `peer_address`.
-            # Typically happen when using `connect` to the same `peer_address` we are waiting with
-            # an `accept` for.
-            # In this case, set the completed `connection` to the `accept` future result.
+            # We may have an accept ongoing waiting for a connection request for
+            # `peer_address`.
+            # Typically happen when using `connect` to the same `peer_address` we are
+            # waiting for with an `accept`.
+            # In this case, set the completed `connection` to the `accept` future
+            # result.
             if peer_address in self.classic_pending_accepts:
                 future = self.classic_pending_accepts.pop(peer_address)
                 future.set_result(connection)
@@ -2234,10 +2373,14 @@ class Device(CompositeEventEmitter):
             async def new_connection():
                 # Figure out which PHY we're connected with
                 if self.host.supports_command(HCI_LE_READ_PHY_COMMAND):
-                    result = await asyncio.shield(self.send_command(
-                        HCI_LE_Read_PHY_Command(connection_handle=connection_handle),
-                        check_result=True,
-                    ))
+                    result = await asyncio.shield(
+                        self.send_command(
+                            HCI_LE_Read_PHY_Command(
+                                connection_handle=connection_handle
+                            ),
+                            check_result=True,
+                        )
+                    )
                     phy = ConnectionPHY(
                         result.return_parameters.tx_phy, result.return_parameters.rx_phy
                     )
@@ -2332,7 +2475,8 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_disconnection(self, connection, reason):
         logger.debug(
-            f'*** Disconnection: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, reason={reason}'
+            f'*** Disconnection: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, reason={reason}'
         )
         connection.emit('disconnection', reason)
 
@@ -2345,10 +2489,11 @@ class Device(CompositeEventEmitter):
         # Restart advertising if auto-restart is enabled
         if self.auto_restart_advertising:
             logger.debug('restarting advertising')
-            self.abort_on('flush',
+            self.abort_on(
+                'flush',
                 self.start_advertising(
                     advertising_type=self.advertising_type, auto_restart=True
-                )
+                ),
             )
 
     @host_event_handler
@@ -2379,7 +2524,8 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_authentication(self, connection):
         logger.debug(
-            f'*** Connection Authentication: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}'
+            f'*** Connection Authentication: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}'
         )
         connection.authenticated = True
         connection.emit('connection_authentication')
@@ -2388,9 +2534,24 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_authentication_failure(self, connection, error):
         logger.debug(
-            f'*** Connection Authentication Failure: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, error={error}'
+            f'*** Connection Authentication Failure: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, error={error}'
         )
         connection.emit('connection_authentication_failure', error)
+
+    @host_event_handler
+    @with_connection_from_address
+    def on_ssp_complete(self, connection):
+        # On Secure Simple Pairing complete, in case:
+        # - Connection isn't already authenticated
+        # - AND we are not the initiator of the authentication
+        # We must trigger authentication to known if we are truly authenticated
+        if not connection.authenticating and not connection.authenticated:
+            logger.debug(
+                f'*** Trigger Connection Authentication: [0x{connection.handle:04X}] '
+                f'{connection.peer_address}'
+            )
+            asyncio.create_task(connection.authenticate())
 
     # [Classic only]
     @host_event_handler
@@ -2400,6 +2561,7 @@ class Device(CompositeEventEmitter):
         pairing_config = self.pairing_config_factory(connection)
 
         # Map the SMP IO capability to a Classic IO capability
+        # pylint: disable=line-too-long
         io_capability = {
             smp.SMP_DISPLAY_ONLY_IO_CAPABILITY: HCI_DISPLAY_ONLY_IO_CAPABILITY,
             smp.SMP_DISPLAY_YES_NO_IO_CAPABILITY: HCI_DISPLAY_YES_NO_IO_CAPABILITY,
@@ -2445,19 +2607,18 @@ class Device(CompositeEventEmitter):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
 
-        can_compare = pairing_config.delegate.io_capability not in {
+        can_compare = pairing_config.delegate.io_capability not in (
             smp.SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
             smp.SMP_DISPLAY_ONLY_IO_CAPABILITY,
-        }
+        )
 
         # Respond
         if can_compare:
 
             async def compare_numbers():
-                numbers_match = await connection.abort_on('disconnection',
-                    pairing_config.delegate.compare_numbers(
-                        code, digits=6
-                    )
+                numbers_match = await connection.abort_on(
+                    'disconnection',
+                    pairing_config.delegate.compare_numbers(code, digits=6),
                 )
                 if numbers_match:
                     await self.host.send_command(
@@ -2476,8 +2637,9 @@ class Device(CompositeEventEmitter):
         else:
 
             async def confirm():
-                confirm = await connection.abort_on('disconnection',
-                    pairing_config.delegate.confirm())
+                confirm = await connection.abort_on(
+                    'disconnection', pairing_config.delegate.confirm()
+                )
                 if confirm:
                     await self.host.send_command(
                         HCI_User_Confirmation_Request_Reply_Command(
@@ -2500,17 +2662,18 @@ class Device(CompositeEventEmitter):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
 
-        can_input = pairing_config.delegate.io_capability in {
+        can_input = pairing_config.delegate.io_capability in (
             smp.SMP_KEYBOARD_ONLY_IO_CAPABILITY,
             smp.SMP_KEYBOARD_DISPLAY_IO_CAPABILITY,
-        }
+        )
 
         # Respond
         if can_input:
 
             async def get_number():
-                number = await connection.abort_on('disconnection',
-                    pairing_config.delegate.get_number())
+                number = await connection.abort_on(
+                    'disconnection', pairing_config.delegate.get_number()
+                )
                 if number is not None:
                     await self.host.send_command(
                         HCI_User_Passkey_Request_Reply_Command(
@@ -2539,7 +2702,9 @@ class Device(CompositeEventEmitter):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
 
-        connection.abort_on('disconnection', pairing_config.delegate.display_number(passkey))
+        connection.abort_on(
+            'disconnection', pairing_config.delegate.display_number(passkey)
+        )
 
     # [Classic only]
     @host_event_handler
@@ -2571,10 +2736,15 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_encryption_change(self, connection, encryption):
         logger.debug(
-            f'*** Connection Encryption Change: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, encryption={encryption}'
+            f'*** Connection Encryption Change: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, '
+            f'encryption={encryption}'
         )
         connection.encryption = encryption
-        if not connection.authenticated and encryption == HCI_Encryption_Change_Event.AES_CCM:
+        if (
+            not connection.authenticated
+            and encryption == HCI_Encryption_Change_Event.AES_CCM
+        ):
             connection.authenticated = True
             connection.sc = True
         connection.emit('connection_encryption_change')
@@ -2583,7 +2753,9 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_encryption_failure(self, connection, error):
         logger.debug(
-            f'*** Connection Encryption Failure: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, error={error}'
+            f'*** Connection Encryption Failure: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, '
+            f'error={error}'
         )
         connection.emit('connection_encryption_failure', error)
 
@@ -2591,7 +2763,8 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_encryption_key_refresh(self, connection):
         logger.debug(
-            f'*** Connection Key Refresh: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}'
+            f'*** Connection Key Refresh: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}'
         )
         connection.emit('connection_encryption_key_refresh')
 
@@ -2599,7 +2772,9 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_parameters_update(self, connection, connection_parameters):
         logger.debug(
-            f'*** Connection Parameters Update: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, {connection_parameters}'
+            f'*** Connection Parameters Update: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, '
+            f'{connection_parameters}'
         )
         connection.parameters = connection_parameters
         connection.emit('connection_parameters_update')
@@ -2608,7 +2783,9 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_parameters_update_failure(self, connection, error):
         logger.debug(
-            f'*** Connection Parameters Update Failed: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, error={error}'
+            f'*** Connection Parameters Update Failed: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, '
+            f'error={error}'
         )
         connection.emit('connection_parameters_update_failure', error)
 
@@ -2616,7 +2793,9 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_phy_update(self, connection, connection_phy):
         logger.debug(
-            f'*** Connection PHY Update: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, {connection_phy}'
+            f'*** Connection PHY Update: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, '
+            f'{connection_phy}'
         )
         connection.phy = connection_phy
         connection.emit('connection_phy_update')
@@ -2625,7 +2804,9 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_phy_update_failure(self, connection, error):
         logger.debug(
-            f'*** Connection PHY Update Failed: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, error={error}'
+            f'*** Connection PHY Update Failed: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, '
+            f'error={error}'
         )
         connection.emit('connection_phy_update_failure', error)
 
@@ -2633,7 +2814,9 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_connection_att_mtu_update(self, connection, att_mtu):
         logger.debug(
-            f'*** Connection ATT MTU Update: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}, {att_mtu}'
+            f'*** Connection ATT MTU Update: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, '
+            f'{att_mtu}'
         )
         connection.att_mtu = att_mtu
         connection.emit('connection_att_mtu_update')
@@ -2644,7 +2827,8 @@ class Device(CompositeEventEmitter):
         self, connection, max_tx_octets, max_tx_time, max_rx_octets, max_rx_time
     ):
         logger.debug(
-            f'*** Connection Data Length Change: [0x{connection.handle:04X}] {connection.peer_address} as {connection.role_name}'
+            f'*** Connection Data Length Change: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}'
         )
         connection.data_length = (
             max_tx_octets,
@@ -2677,14 +2861,14 @@ class Device(CompositeEventEmitter):
         # odd-numbered ones are server->client
         if att_pdu.op_code & 1:
             if connection.gatt_client is None:
-                logger.warn(
+                logger.warning(
                     color('no GATT client for connection 0x{connection_handle:04X}')
                 )
                 return
             connection.gatt_client.on_gatt_pdu(att_pdu)
         else:
             if connection.gatt_server is None:
-                logger.warn(
+                logger.warning(
                     color('no GATT server for connection 0x{connection_handle:04X}')
                 )
                 return
@@ -2700,4 +2884,8 @@ class Device(CompositeEventEmitter):
         self.l2cap_channel_manager.on_pdu(connection, cid, pdu)
 
     def __str__(self):
-        return f'Device(name="{self.name}", random_address="{self.random_address}"", public_address="{self.public_address}")'
+        return (
+            f'Device(name="{self.name}", '
+            f'random_address="{self.random_address}", '
+            f'public_address="{self.public_address}")'
+        )

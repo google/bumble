@@ -49,8 +49,8 @@ async def open_tcp_server_transport(spec):
 
         # Called when a new connection is established
         def connection_made(self, transport):
-            peername = transport.get_extra_info('peername')
-            logger.debug('connection from {}'.format(peername))
+            peer_name = transport.get_extra_info('peer_name')
+            logger.debug(f'connection from {peer_name}')
             self.packet_sink.transport = transport
 
         # Called when the client is disconnected

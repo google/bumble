@@ -16,16 +16,60 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import collections
 import logging
+import struct
+
 from colors import color
 
-from .hci import *
-from .l2cap import *
-from .att import *
-from .gatt import *
-from .smp import *
-from .core import ConnectionParameters
+from bumble.l2cap import L2CAP_PDU
+
+from .hci import (
+    HCI_ACL_DATA_PACKET,
+    HCI_COMMAND_COMPLETE_EVENT,
+    HCI_COMMAND_PACKET,
+    HCI_EVENT_PACKET,
+    HCI_LE_READ_BUFFER_SIZE_COMMAND,
+    HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND,
+    HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
+    HCI_LE_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
+    HCI_READ_BUFFER_SIZE_COMMAND,
+    HCI_READ_LOCAL_VERSION_INFORMATION_COMMAND,
+    HCI_RESET_COMMAND,
+    HCI_SUCCESS,
+    HCI_SUPPORTED_COMMANDS_FLAGS,
+    HCI_VERSION_BLUETOOTH_CORE_4_0,
+    HCI_AclDataPacket,
+    HCI_AclDataPacketAssembler,
+    HCI_Constant,
+    HCI_Error,
+    HCI_LE_Long_Term_Key_Request_Negative_Reply_Command,
+    HCI_LE_Long_Term_Key_Request_Reply_Command,
+    HCI_LE_Read_Buffer_Size_Command,
+    HCI_LE_Read_Local_Supported_Features_Command,
+    HCI_LE_Read_Suggested_Default_Data_Length_Command,
+    HCI_LE_Remote_Connection_Parameter_Request_Reply_Command,
+    HCI_LE_Set_Event_Mask_Command,
+    HCI_LE_Write_Suggested_Default_Data_Length_Command,
+    HCI_Link_Key_Request_Negative_Reply_Command,
+    HCI_Link_Key_Request_Reply_Command,
+    HCI_PIN_Code_Request_Negative_Reply_Command,
+    HCI_Packet,
+    HCI_Read_Buffer_Size_Command,
+    HCI_Read_Local_Supported_Commands_Command,
+    HCI_Read_Local_Version_Information_Command,
+    HCI_Reset_Command,
+    HCI_Set_Event_Mask_Command,
+)
+from .core import (
+    BT_BR_EDR_TRANSPORT,
+    BT_CENTRAL_ROLE,
+    BT_LE_TRANSPORT,
+    ConnectionPHY,
+    ConnectionParameters,
+)
 from .utils import AbortableEventEmitter
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -71,6 +115,7 @@ class Host(AbortableEventEmitter):
 
         self.hci_sink = None
         self.ready = False  # True when we can accept incoming packets
+        self.reset_done = False
         self.connections = {}  # Connections, by connection handle
         self.pending_command = None
         self.pending_response = None
@@ -139,10 +184,12 @@ class Host(AbortableEventEmitter):
             self.local_version is not None
             and self.local_version.hci_version <= HCI_VERSION_BLUETOOTH_CORE_4_0
         ):
-            # Some older controllers don't like event masks with bits they don't understand
+            # Some older controllers don't like event masks with bits they don't
+            # understand
             le_event_mask = bytes.fromhex('1F00000000000000')
         else:
             le_event_mask = bytes.fromhex('FFFFF00000000000')
+
         await self.send_command(
             HCI_LE_Set_Event_Mask_Command(le_event_mask=le_event_mask)
         )
@@ -159,7 +206,8 @@ class Host(AbortableEventEmitter):
             )
 
             logger.debug(
-                f'HCI ACL flow control: hc_acl_data_packet_length={self.hc_acl_data_packet_length},'
+                'HCI ACL flow control: '
+                f'hc_acl_data_packet_length={self.hc_acl_data_packet_length},'
                 f'hc_total_num_acl_data_packets={self.hc_total_num_acl_data_packets}'
             )
 
@@ -175,8 +223,10 @@ class Host(AbortableEventEmitter):
             )
 
             logger.debug(
-                f'HCI LE ACL flow control: hc_le_acl_data_packet_length={self.hc_le_acl_data_packet_length},'
-                f'hc_total_num_le_acl_data_packets={self.hc_total_num_le_acl_data_packets}'
+                'HCI LE ACL flow control: '
+                f'hc_le_acl_data_packet_length={self.hc_le_acl_data_packet_length},'
+                'hc_total_num_le_acl_data_packets='
+                f'{self.hc_total_num_le_acl_data_packets}'
             )
 
             if (
@@ -244,9 +294,9 @@ class Host(AbortableEventEmitter):
 
                 # Check the return parameters if required
                 if check_result:
-                    if type(response.return_parameters) is int:
+                    if isinstance(response.return_parameters, int):
                         status = response.return_parameters
-                    elif type(response.return_parameters) is bytes:
+                    elif isinstance(response.return_parameters, bytes):
                         # return parameters first field is a one byte status code
                         status = response.return_parameters[0]
                     else:
@@ -306,7 +356,8 @@ class Host(AbortableEventEmitter):
 
         if len(self.acl_packet_queue):
             logger.debug(
-                f'{self.acl_packets_in_flight} ACL packets in flight, {len(self.acl_packet_queue)} in queue'
+                f'{self.acl_packets_in_flight} ACL packets in flight, '
+                f'{len(self.acl_packet_queue)} in queue'
             )
 
     def check_acl_packet_queue(self):
@@ -400,7 +451,9 @@ class Host(AbortableEventEmitter):
             # Check that it is what we were expecting
             if self.pending_command.op_code != event.command_opcode:
                 logger.warning(
-                    f'!!! command result mismatch, expected 0x{self.pending_command.op_code:X} but got 0x{event.command_opcode:X}'
+                    '!!! command result mismatch, expected '
+                    f'0x{self.pending_command.op_code:X} but got '
+                    f'0x{event.command_opcode:X}'
                 )
 
             self.pending_response.set_result(event)
@@ -415,10 +468,12 @@ class Host(AbortableEventEmitter):
 
     def on_hci_command_complete_event(self, event):
         if event.command_opcode == 0:
-            # This is used just for the Num_HCI_Command_Packets field, not related to an actual command
+            # This is used just for the Num_HCI_Command_Packets field, not related to
+            # an actual command
             logger.debug('no-command event')
-        else:
-            return self.on_command_processed(event)
+            return None
+
+        return self.on_command_processed(event)
 
     def on_hci_command_status_event(self, event):
         return self.on_command_processed(event)
@@ -431,7 +486,8 @@ class Host(AbortableEventEmitter):
         else:
             logger.warning(
                 color(
-                    f'!!! {total_packets} completed but only {self.acl_packets_in_flight} in flight'
+                    '!!! {total_packets} completed but only '
+                    f'{self.acl_packets_in_flight} in flight'
                 )
             )
             self.acl_packets_in_flight = 0
@@ -451,7 +507,8 @@ class Host(AbortableEventEmitter):
         if event.status == HCI_SUCCESS:
             # Create/update the connection
             logger.debug(
-                f'### CONNECTION: [0x{event.connection_handle:04X}] {event.peer_address} as {HCI_Constant.role_name(event.role)}'
+                f'### CONNECTION: [0x{event.connection_handle:04X}] '
+                f'{event.peer_address} as {HCI_Constant.role_name(event.role)}'
             )
 
             connection = self.connections.get(event.connection_handle)
@@ -496,7 +553,8 @@ class Host(AbortableEventEmitter):
         if event.status == HCI_SUCCESS:
             # Create/update the connection
             logger.debug(
-                f'### BR/EDR CONNECTION: [0x{event.connection_handle:04X}] {event.bd_addr}'
+                f'### BR/EDR CONNECTION: [0x{event.connection_handle:04X}] '
+                f'{event.bd_addr}'
             )
 
             connection = self.connections.get(event.connection_handle)
@@ -536,7 +594,10 @@ class Host(AbortableEventEmitter):
 
         if event.status == HCI_SUCCESS:
             logger.debug(
-                f'### DISCONNECTION: [0x{event.connection_handle:04X}] {connection.peer_address} as {HCI_Constant.role_name(connection.role)}, reason={event.reason}'
+                f'### DISCONNECTION: [0x{event.connection_handle:04X}] '
+                f'{connection.peer_address} as '
+                f'{HCI_Constant.role_name(connection.role)}, '
+                f'reason={event.reason}'
             )
             del self.connections[event.connection_handle]
 
@@ -616,9 +677,15 @@ class Host(AbortableEventEmitter):
                 logger.debug('no long term key provider')
                 long_term_key = None
             else:
-                long_term_key = await self.abort_on('flush', self.long_term_key_provider(
-                    connection.handle, event.random_number, event.encryption_diversifier
-                ))
+                long_term_key = await self.abort_on(
+                    'flush',
+                    # pylint: disable-next=not-callable
+                    self.long_term_key_provider(
+                        connection.handle,
+                        event.random_number,
+                        event.encryption_diversifier,
+                    ),
+                )
             if long_term_key:
                 response = HCI_LE_Long_Term_Key_Request_Reply_Command(
                     connection_handle=event.connection_handle,
@@ -642,12 +709,14 @@ class Host(AbortableEventEmitter):
     def on_hci_role_change_event(self, event):
         if event.status == HCI_SUCCESS:
             logger.debug(
-                f'role change for {event.bd_addr}: {HCI_Constant.role_name(event.new_role)}'
+                f'role change for {event.bd_addr}: '
+                f'{HCI_Constant.role_name(event.new_role)}'
             )
             # TODO: lookup the connection and update the role
         else:
             logger.debug(
-                f'role change for {event.bd_addr} failed: {HCI_Constant.error_name(event.status)}'
+                f'role change for {event.bd_addr} failed: '
+                f'{HCI_Constant.error_name(event.status)}'
             )
 
     def on_hci_le_data_length_change_event(self, event):
@@ -706,13 +775,15 @@ class Host(AbortableEventEmitter):
 
     def on_hci_link_key_notification_event(self, event):
         logger.debug(
-            f'link key for {event.bd_addr}: {event.link_key.hex()}, type={HCI_Constant.link_key_type_name(event.key_type)}'
+            f'link key for {event.bd_addr}: {event.link_key.hex()}, '
+            f'type={HCI_Constant.link_key_type_name(event.key_type)}'
         )
         self.emit('link_key', event.bd_addr, event.link_key, event.key_type)
 
     def on_hci_simple_pairing_complete_event(self, event):
         logger.debug(
-            f'simple pairing complete for {event.bd_addr}: status={HCI_Constant.status_name(event.status)}'
+            f'simple pairing complete for {event.bd_addr}: '
+            f'status={HCI_Constant.status_name(event.status)}'
         )
 
     def on_hci_pin_code_request_event(self, event):
@@ -728,7 +799,11 @@ class Host(AbortableEventEmitter):
                 logger.debug('no link key provider')
                 link_key = None
             else:
-                link_key = await self.abort_on('flush', self.link_key_provider(event.bd_addr))
+                link_key = await self.abort_on(
+                    'flush',
+                    # pylint: disable-next=not-callable
+                    self.link_key_provider(event.bd_addr),
+                )
             if link_key:
                 response = HCI_Link_Key_Request_Reply_Command(
                     bd_addr=event.bd_addr, link_key=link_key
@@ -763,7 +838,7 @@ class Host(AbortableEventEmitter):
             'authentication_user_passkey_notification', event.bd_addr, event.passkey
         )
 
-    def on_hci_inquiry_complete_event(self, event):
+    def on_hci_inquiry_complete_event(self, _event):
         self.emit('inquiry_complete')
 
     def on_hci_inquiry_result_with_rssi_event(self, event):

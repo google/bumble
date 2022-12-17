@@ -10,7 +10,7 @@ An HCI Socket can send/receive HCI packets to/from a Bluetooth HCI controller ma
 The moniker for an HCI Socket transport is either just `hci-socket` (to use the default/first Bluetooth controller), or `hci-socket:<index>` where `<index>` is the 0-based index of a Bluetooth controller device.
 
 !!! example
-    `hci-socket`  
+    `hci-socket`
     Use an HCI socket to the first Bluetooth controller (`hci0 on Linux`)
 
 !!! tip "On Linux"

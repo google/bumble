@@ -16,4 +16,3 @@ Bumble Python API
 
 ### HCI_Disconnect_Command
 ::: bumble.hci.HCI_Disconnect_Command
-

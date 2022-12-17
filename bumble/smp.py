@@ -28,8 +28,14 @@ import secrets
 from pyee import EventEmitter
 from colors import color
 
-from .core import *
-from .hci import *
+from .hci import Address, HCI_LE_Enable_Encryption_Command, HCI_Object, key_with_value
+from .core import (
+    BT_BR_EDR_TRANSPORT,
+    BT_CENTRAL_ROLE,
+    BT_LE_TRANSPORT,
+    ProtocolError,
+    name_or_number,
+)
 from .keys import PairingKeys
 from . import crypto
 
@@ -44,6 +50,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # -----------------------------------------------------------------------------
 # fmt: off
+# pylint: disable=line-too-long
 
 SMP_CID = 0x06
 SMP_BR_CID = 0x07
@@ -158,6 +165,8 @@ SMP_CTKD_H7_LEBR_SALT = bytes.fromhex('00000000000000000000000000000000746D7031'
 SMP_CTKD_H7_BRLE_SALT = bytes.fromhex('00000000000000000000000000000000746D7032')
 
 # fmt: on
+# pylint: enable=line-too-long
+# pylint: disable=invalid-name
 
 
 # -----------------------------------------------------------------------------
@@ -177,6 +186,7 @@ class SMP_Command:
 
     smp_classes = {}
     code = 0
+    name = ''
 
     @staticmethod
     def from_bytes(pdu):
@@ -206,7 +216,10 @@ class SMP_Command:
         keypress = (value >> 4) & 1
         ct2 = (value >> 5) & 1
 
-        return f'bonding_flags={bonding_flags}, MITM={mitm}, sc={sc}, keypress={keypress}, ct2={ct2}'
+        return (
+            f'bonding_flags={bonding_flags}, '
+            f'MITM={mitm}, sc={sc}, keypress={keypress}, ct2={ct2}'
+        )
 
     @staticmethod
     def io_capability_name(io_capability):
@@ -458,11 +471,11 @@ class AddressResolver:
 
     def resolve(self, address):
         address_bytes = bytes(address)
-        hash = address_bytes[0:3]
+        hash_part = address_bytes[0:3]
         prand = address_bytes[3:6]
         for (irk, resolved_address) in self.resolving_keys:
             local_hash = crypto.ah(irk, prand)
-            if local_hash == hash:
+            if local_hash == hash_part:
                 # Match!
                 if resolved_address.address_type == Address.PUBLIC_DEVICE_ADDRESS:
                     resolved_address_type = Address.PUBLIC_IDENTITY_ADDRESS
@@ -471,6 +484,8 @@ class AddressResolver:
                 return Address(
                     address=str(resolved_address), address_type=resolved_address_type
                 )
+
+        return None
 
 
 # -----------------------------------------------------------------------------
@@ -500,13 +515,13 @@ class PairingDelegate:
     async def confirm(self):
         return True
 
-    async def compare_numbers(self, number, digits=6):
+    async def compare_numbers(self, _number, _digits=6):
         return True
 
     async def get_number(self):
         return 0
 
-    async def display_number(self, number, digits=6):
+    async def display_number(self, _number, _digits=6):
         pass
 
     async def key_distribution_response(
@@ -528,7 +543,11 @@ class PairingConfig:
 
     def __str__(self):
         io_capability_str = SMP_Command.io_capability_name(self.delegate.io_capability)
-        return f'PairingConfig(sc={self.sc}, mitm={self.mitm}, bonding={self.bonding}, delegate[{io_capability_str}])'
+        return (
+            f'PairingConfig(sc={self.sc}, '
+            f'mitm={self.mitm}, bonding={self.bonding}, '
+            f'delegate[{io_capability_str}])'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -548,14 +567,16 @@ class Session:
 
     # I/O Capability to pairing method decision matrix
     #
-    # See Bluetooth spec @ Vol 3, part H - Table 2.8: Mapping of IO Capabilities to Key Generation Method
+    # See Bluetooth spec @ Vol 3, part H - Table 2.8: Mapping of IO Capabilities to Key
+    # Generation Method
     #
     # Map: initiator -> responder -> <method>
-    # where <method> may be a simple entry or a 2-element tuple, with the first element for legacy
-    # pairing and the second  for secure connections, when the two are different.
-    # Each entry is either a method name, or, for PASSKEY, a tuple:
+    # where <method> may be a simple entry or a 2-element tuple, with the first element
+    # for legacy pairing and the second  for secure connections, when the two are
+    # different. Each entry is either a method name, or, for PASSKEY, a tuple:
     # (method, initiator_displays, responder_displays)
-    # to specify if the initiator and responder should display (True) or input a code (False).
+    # to specify if the initiator and responder should display (True) or input a code
+    # (False).
     PAIRING_METHODS = {
         SMP_DISPLAY_ONLY_IO_CAPABILITY: {
             SMP_DISPLAY_ONLY_IO_CAPABILITY: JUST_WORKS,
@@ -606,6 +627,10 @@ class Session:
     def __init__(self, manager, connection, pairing_config):
         self.manager = manager
         self.connection = connection
+        self.preq = None
+        self.pres = None
+        self.ea = None
+        self.eb = None
         self.tk = bytes(16)
         self.r = bytes(16)
         self.stk = None
@@ -626,6 +651,7 @@ class Session:
         self.peer_signature_key = None
         self.peer_expected_distributions = []
         self.dh_key = None
+        self.confirm_value = None
         self.passkey = 0
         self.passkey_step = 0
         self.passkey_display = False
@@ -726,6 +752,8 @@ class Session:
         else:
             return self.ltk
 
+        return None
+
     def decide_pairing_method(
         self, auth_req, initiator_io_capability, responder_io_capability
     ):
@@ -734,10 +762,10 @@ class Session:
             return
 
         details = self.PAIRING_METHODS[initiator_io_capability][responder_io_capability]
-        if type(details) is tuple and len(details) == 2:
+        if isinstance(details, tuple) and len(details) == 2:
             # One entry for legacy pairing and one for secure connections
             details = details[1 if self.sc else 0]
-        if type(details) is int:
+        if isinstance(details, int):
             # Just a method ID
             self.pairing_method = details
         else:
@@ -762,7 +790,7 @@ class Session:
                     next_steps()
                     return
             except Exception as error:
-                logger.warn(f'exception while confirm: {error}')
+                logger.warning(f'exception while confirm: {error}')
 
             self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
 
@@ -779,7 +807,7 @@ class Session:
                     next_steps()
                     return
             except Exception as error:
-                logger.warn(f'exception while prompting: {error}')
+                logger.warning(f'exception while prompting: {error}')
 
             self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
 
@@ -793,7 +821,7 @@ class Session:
                 logger.debug(f'user input: {passkey}')
                 next_steps(passkey)
             except Exception as error:
-                logger.warn(f'exception while prompting: {error}')
+                logger.warning(f'exception while prompting: {error}')
                 self.send_pairing_failed(SMP_PASSKEY_ENTRY_FAILED_ERROR)
 
         self.connection.abort_on('disconnection', prompt())
@@ -808,8 +836,9 @@ class Session:
             self.tk = self.passkey.to_bytes(16, byteorder='little')
             logger.debug(f'TK from passkey = {self.tk.hex()}')
 
-        self.connection.abort_on('disconnection',
-            self.pairing_config.delegate.display_number(self.passkey, digits=6)
+        self.connection.abort_on(
+            'disconnection',
+            self.pairing_config.delegate.display_number(self.passkey, digits=6),
         )
 
     def input_passkey(self, next_steps=None):
@@ -872,10 +901,7 @@ class Session:
         logger.debug(f'generated random: {self.r.hex()}')
 
         if self.sc:
-            if (
-                self.pairing_method == self.JUST_WORKS
-                or self.pairing_method == self.NUMERIC_COMPARISON
-            ):
+            if self.pairing_method in (self.JUST_WORKS, self.NUMERIC_COMPARISON):
                 z = 0
             elif self.pairing_method == self.PASSKEY:
                 z = 0x80 + ((self.passkey >> self.passkey_step) & 1)
@@ -926,7 +952,7 @@ class Session:
                 connection_handle=self.connection.handle,
                 random_number=bytes(8),
                 encrypted_diversifier=0,
-                long_term_key=key
+                long_term_key=key,
             )
         )
 
@@ -948,7 +974,9 @@ class Session:
                 self.connection.transport == BT_BR_EDR_TRANSPORT
                 and self.initiator_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
-                self.ctkd_task = self.connection.abort_on('disconnection', self.derive_ltk())
+                self.ctkd_task = self.connection.abort_on(
+                    'disconnection', self.derive_ltk()
+                )
             elif not self.sc:
                 # Distribute the LTK, EDIV and RAND
                 if self.initiator_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG:
@@ -995,7 +1023,9 @@ class Session:
                 self.connection.transport == BT_BR_EDR_TRANSPORT
                 and self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
-                self.ctkd_task = self.connection.abort_on('disconnection', self.derive_ltk())
+                self.ctkd_task = self.connection.abort_on(
+                    'disconnection', self.derive_ltk()
+                )
             # Distribute the LTK, EDIV and RAND
             elif not self.sc:
                 if self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG:
@@ -1055,13 +1085,14 @@ class Session:
         if key_distribution_flags & SMP_SIGN_KEY_DISTRIBUTION_FLAG != 0:
             self.peer_expected_distributions.append(SMP_Signing_Information_Command)
         logger.debug(
-            f'expecting distributions: {[c.__name__ for c in self.peer_expected_distributions]}'
+            'expecting distributions: '
+            f'{[c.__name__ for c in self.peer_expected_distributions]}'
         )
 
     def check_key_distribution(self, command_class):
         # First, check that the connection is encrypted
         if not self.connection.is_encrypted:
-            logger.warn(
+            logger.warning(
                 color('received key distribution on a non-encrypted connection', 'red')
             )
             self.send_pairing_failed(SMP_UNSPECIFIED_REASON_ERROR)
@@ -1071,14 +1102,16 @@ class Session:
         if command_class in self.peer_expected_distributions:
             self.peer_expected_distributions.remove(command_class)
             logger.debug(
-                f'remaining distributions: {[c.__name__ for c in self.peer_expected_distributions]}'
+                'remaining distributions: '
+                f'{[c.__name__ for c in self.peer_expected_distributions]}'
             )
             if not self.peer_expected_distributions:
                 self.on_peer_key_distribution_complete()
         else:
-            logger.warn(
+            logger.warning(
                 color(
-                    f'!!! unexpected key distribution command: {command_class.__name__}',
+                    '!!! unexpected key distribution command: '
+                    f'{command_class.__name__}',
                     'red',
                 )
             )
@@ -1094,7 +1127,7 @@ class Session:
         # Wait for the pairing process to finish
         await self.connection.abort_on('disconnection', self.pairing_result)
 
-    def on_disconnection(self, reason):
+    def on_disconnection(self, _):
         self.connection.remove_listener('disconnection', self.on_disconnection)
         self.connection.remove_listener(
             'connection_encryption_change', self.on_connection_encryption_change
@@ -1131,8 +1164,8 @@ class Session:
 
         if self.completed:
             return
-        else:
-            self.completed = True
+
+        self.completed = True
 
         if self.pairing_result is not None and not self.pairing_result.done():
             self.pairing_result.set_result(None)
@@ -1192,8 +1225,8 @@ class Session:
 
         if self.completed:
             return
-        else:
-            self.completed = True
+
+        self.completed = True
 
         error = ProtocolError(reason, 'smp', error_name(reason))
         if self.pairing_result is not None and not self.pairing_result.done():
@@ -1217,7 +1250,9 @@ class Session:
             logger.error(color('SMP command not handled???', 'red'))
 
     def on_smp_pairing_request_command(self, command):
-        self.connection.abort_on('disconnection', self.on_smp_pairing_request_command_async(command))
+        self.connection.abort_on(
+            'disconnection', self.on_smp_pairing_request_command_async(command)
+        )
 
     async def on_smp_pairing_request_command_async(self, command):
         # Check if the request should proceed
@@ -1237,7 +1272,7 @@ class Session:
 
         # Check for OOB
         if command.oob_data_flag != 0:
-            self.terminate(SMP_OOB_NOT_AVAILABLE_ERROR)
+            self.send_pairing_failed(SMP_OOB_NOT_AVAILABLE_ERROR)
             return
 
         # Decide which pairing method to use
@@ -1281,7 +1316,7 @@ class Session:
 
     def on_smp_pairing_response_command(self, command):
         if self.is_responder:
-            logger.warn(color('received pairing response as a responder', 'red'))
+            logger.warning(color('received pairing response as a responder', 'red'))
             return
 
         # Save the response
@@ -1330,7 +1365,7 @@ class Session:
             else:
                 self.send_pairing_confirm_command()
 
-    def on_smp_pairing_confirm_command_legacy(self, command):
+    def on_smp_pairing_confirm_command_legacy(self, _):
         if self.is_initiator:
             self.send_pairing_random_command()
         else:
@@ -1340,11 +1375,8 @@ class Session:
             else:
                 self.send_pairing_confirm_command()
 
-    def on_smp_pairing_confirm_command_secure_connections(self, command):
-        if (
-            self.pairing_method == self.JUST_WORKS
-            or self.pairing_method == self.NUMERIC_COMPARISON
-        ):
+    def on_smp_pairing_confirm_command_secure_connections(self, _):
+        if self.pairing_method in (self.JUST_WORKS, self.NUMERIC_COMPARISON):
             if self.is_initiator:
                 self.r = crypto.r()
                 self.send_pairing_random_command()
@@ -1397,11 +1429,9 @@ class Session:
             self.send_pairing_random_command()
 
     def on_smp_pairing_random_command_secure_connections(self, command):
+        # pylint: disable=too-many-return-statements
         if self.is_initiator:
-            if (
-                self.pairing_method == self.JUST_WORKS
-                or self.pairing_method == self.NUMERIC_COMPARISON
-            ):
+            if self.pairing_method in (self.JUST_WORKS, self.NUMERIC_COMPARISON):
                 # Check that the random value matches what was committed to earlier
                 confirm_verifier = crypto.f4(
                     self.pkb, self.pka, command.random_value, bytes([0])
@@ -1432,10 +1462,7 @@ class Session:
             else:
                 return
         else:
-            if (
-                self.pairing_method == self.JUST_WORKS
-                or self.pairing_method == self.NUMERIC_COMPARISON
-            ):
+            if self.pairing_method in (self.JUST_WORKS, self.NUMERIC_COMPARISON):
                 self.send_pairing_random_command()
             elif self.pairing_method == self.PASSKEY:
                 # Check that the random value matches what was committed to earlier
@@ -1467,10 +1494,7 @@ class Session:
         (mac_key, self.ltk) = crypto.f5(self.dh_key, self.na, self.nb, a, b)
 
         # Compute the DH Key checks
-        if (
-            self.pairing_method == self.JUST_WORKS
-            or self.pairing_method == self.NUMERIC_COMPARISON
-        ):
+        if self.pairing_method in (self.JUST_WORKS, self.NUMERIC_COMPARISON):
             ra = bytes(16)
             rb = ra
         elif self.pairing_method == self.PASSKEY:
@@ -1495,10 +1519,7 @@ class Session:
                     self.wait_before_continuing.set_result(None)
 
         # Prompt the user for confirmation if needed
-        if (
-            self.pairing_method == self.JUST_WORKS
-            or self.pairing_method == self.NUMERIC_COMPARISON
-        ):
+        if self.pairing_method in (self.JUST_WORKS, self.NUMERIC_COMPARISON):
             # Compute the 6-digit code
             code = crypto.g2(self.pka, self.pkb, self.na, self.nb) % 1000000
 
@@ -1547,10 +1568,7 @@ class Session:
             else:
                 self.send_public_key_command()
 
-            if (
-                self.pairing_method == self.JUST_WORKS
-                or self.pairing_method == self.NUMERIC_COMPARISON
-            ):
+            if self.pairing_method in (self.JUST_WORKS, self.NUMERIC_COMPARISON):
                 # We can now send the confirmation value
                 self.send_pairing_confirm_command()
 
@@ -1616,7 +1634,8 @@ class Manager(EventEmitter):
 
     def send_command(self, connection, command):
         logger.debug(
-            f'>>> Sending SMP Command on connection [0x{connection.handle:04X}] {connection.peer_address}: {command}'
+            f'>>> Sending SMP Command on connection [0x{connection.handle:04X}] '
+            f'{connection.peer_address}: {command}'
         )
         cid = SMP_BR_CID if connection.transport == BT_BR_EDR_TRANSPORT else SMP_CID
         connection.send_l2cap_pdu(cid, command.to_bytes())
@@ -1638,7 +1657,8 @@ class Manager(EventEmitter):
         # Parse the L2CAP payload into an SMP Command object
         command = SMP_Command.from_bytes(pdu)
         logger.debug(
-            f'<<< Received SMP Command on connection [0x{connection.handle:04X}] {connection.peer_address}: {command}'
+            f'<<< Received SMP Command on connection [0x{connection.handle:04X}] '
+            f'{connection.peer_address}: {command}'
         )
 
         # Delegate the handling of the command to the session
@@ -1684,7 +1704,7 @@ class Manager(EventEmitter):
                 try:
                     await self.device.keystore.update(str(identity_address), keys)
                 except Exception as error:
-                    logger.warn(f'!!! error while storing keys: {error}')
+                    logger.warning(f'!!! error while storing keys: {error}')
 
             self.device.abort_on('flush', store_keys())
 
@@ -1702,3 +1722,5 @@ class Manager(EventEmitter):
     def get_long_term_key(self, connection, rand, ediv):
         if session := self.sessions.get(connection.handle):
             return session.get_long_term_key(rand, ediv)
+
+        return None

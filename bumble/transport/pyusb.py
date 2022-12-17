@@ -17,11 +17,12 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import logging
+import threading
+import time
+
 import libusb_package
 import usb.core
 import usb.util
-import threading
-import time
 from colors import color
 
 from .common import Transport, ParserSource
@@ -49,6 +50,7 @@ async def open_pyusb_transport(spec):
     04b4:f901 --> the BT USB dongle with vendor=04b4 and product=f901
     '''
 
+    # pylint: disable=invalid-name
     USB_RECIPIENT_DEVICE = 0x00
     USB_REQUEST_TYPE_CLASS = 0x01 << 5
     USB_ENDPOINT_EVENTS_IN = 0x81
@@ -109,7 +111,7 @@ async def open_pyusb_transport(spec):
         def run(self):
             while self.stop_event is None:
                 time.sleep(1)
-            self.loop.call_soon_threadsafe(lambda: self.stop_event.set())
+            self.loop.call_soon_threadsafe(self.stop_event.set)
 
     class UsbPacketSource(asyncio.Protocol, ParserSource):
         def __init__(self, device, sco_enabled):
@@ -117,6 +119,7 @@ async def open_pyusb_transport(spec):
             self.device = device
             self.loop = asyncio.get_running_loop()
             self.queue = asyncio.Queue()
+            self.dequeue_task = None
             self.event_thread = threading.Thread(
                 target=self.run, args=(USB_ENDPOINT_EVENTS_IN, hci.HCI_EVENT_PACKET)
             )
@@ -135,8 +138,8 @@ async def open_pyusb_transport(spec):
                 )
                 self.sco_thread.stop_event = None
 
-        def data_received(self, packet):
-            self.parser.feed_data(packet)
+        def data_received(self, data):
+            self.parser.feed_data(data)
 
         def enqueue(self, packet):
             self.queue.put_nowait(packet)
@@ -180,16 +183,17 @@ async def open_pyusb_transport(spec):
                 except usb.core.USBTimeoutError:
                     continue
                 except usb.core.USBError:
-                    # Don't log this: because pyusb doesn't really support multiple threads
-                    # reading at the same time, we can get occasional USBError(errno=5)
-                    # Input/Output errors reported, but they seem to be harmless.
+                    # Don't log this: because pyusb doesn't really support multiple
+                    # threads reading at the same time, we can get occasional
+                    # USBError(errno=5) Input/Output errors reported, but they seem to
+                    # be harmless.
                     # Until support for async or multi-thread support is added to pyusb,
                     # we'll just live with this as is...
                     # logger.warning(f'USB read error: {error}')
                     time.sleep(1)  # Sleep one second to avoid busy looping
 
             stop_event = current_thread.stop_event
-            self.loop.call_soon_threadsafe(lambda: stop_event.set())
+            self.loop.call_soon_threadsafe(stop_event.set)
 
     class UsbTransport(Transport):
         def __init__(self, device, source, sink):
@@ -243,6 +247,7 @@ async def open_pyusb_transport(spec):
 
     # Select an alternate setting for SCO, if available
     sco_enabled = False
+    # pylint: disable=line-too-long
     # NOTE: this is disabled for now, because SCO with alternate settings is broken,
     # see: https://github.com/libusb/libusb/issues/36
     #

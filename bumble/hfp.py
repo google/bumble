@@ -43,7 +43,7 @@ class HfpProtocol:
 
     def feed(self, data):
         # Convert the data to a string if needed
-        if type(data) == bytes:
+        if isinstance(data, bytes):
             data = data.decode('utf-8')
 
         logger.debug(f'<<< Data received: {data}')
@@ -79,16 +79,16 @@ class HfpProtocol:
     async def initialize_service(self):
         # Perform Service Level Connection Initialization
         self.send_command_line('AT+BRSF=2072')  # Retrieve Supported Features
-        line = await (self.next_line())
-        line = await (self.next_line())
+        await (self.next_line())
+        await (self.next_line())
 
         self.send_command_line('AT+CIND=?')
-        line = await (self.next_line())
-        line = await (self.next_line())
+        await (self.next_line())
+        await (self.next_line())
 
         self.send_command_line('AT+CIND?')
-        line = await (self.next_line())
-        line = await (self.next_line())
+        await (self.next_line())
+        await (self.next_line())
 
         self.send_command_line('AT+CMER=3,0,0,1')
-        line = await (self.next_line())
+        await (self.next_line())

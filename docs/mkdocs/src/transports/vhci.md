@@ -10,5 +10,5 @@ The VHCI transport allows attaching a virtual controller to the Bluetooth stack 
 The moniker for a VHCI transport is either just `vhci` (to use the default VHCI device path at `/dev/vhci`), or `vhci:<path>` where `<path>` is the path of a VHCI device.
 
 !!! example
-    `vhci`  
+    `vhci`
     Attaches a virtual controller transport to `/dev/vhci`

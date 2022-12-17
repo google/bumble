@@ -28,9 +28,31 @@ import logging
 import struct
 
 from colors import color
+from pyee import EventEmitter
 
-from .att import *
-from .core import InvalidStateError, ProtocolError, TimeoutError
+from .hci import HCI_Constant
+from .att import (
+    ATT_ATTRIBUTE_NOT_FOUND_ERROR,
+    ATT_ATTRIBUTE_NOT_LONG_ERROR,
+    ATT_CID,
+    ATT_DEFAULT_MTU,
+    ATT_ERROR_RESPONSE,
+    ATT_INVALID_OFFSET_ERROR,
+    ATT_PDU,
+    ATT_RESPONSES,
+    ATT_Exchange_MTU_Request,
+    ATT_Find_By_Type_Value_Request,
+    ATT_Find_Information_Request,
+    ATT_Handle_Value_Confirmation,
+    ATT_Read_Blob_Request,
+    ATT_Read_By_Group_Type_Request,
+    ATT_Read_By_Type_Request,
+    ATT_Read_Request,
+    ATT_Write_Command,
+    ATT_Write_Request,
+)
+from . import core
+from .core import UUID, InvalidStateError, ProtocolError
 from .gatt import (
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
@@ -40,7 +62,6 @@ from .gatt import (
     Characteristic,
     ClientCharacteristicConfigurationBits,
 )
-from .hci import *
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -76,16 +97,17 @@ class AttributeProxy(EventEmitter):
         return value_bytes
 
     def __str__(self):
-        return f'Attribute(handle=0x{self.handle:04X}, type={self.uuid})'
+        return f'Attribute(handle=0x{self.handle:04X}, type={self.type})'
 
 
 class ServiceProxy(AttributeProxy):
     @staticmethod
-    def from_client(cls, client, service_uuid):
-        # The service and its characteristics are considered to have already been discovered
+    def from_client(service_class, client, service_uuid):
+        # The service and its characteristics are considered to have already been
+        # discovered
         services = client.get_services_by_uuid(service_uuid)
         service = services[0] if services else None
-        return cls(service) if service else None
+        return service_class(service) if service else None
 
     def __init__(self, client, handle, end_group_handle, uuid, primary=True):
         attribute_type = (
@@ -97,7 +119,7 @@ class ServiceProxy(AttributeProxy):
         self.uuid = uuid
         self.characteristics = []
 
-    async def discover_characteristics(self, uuids=[]):
+    async def discover_characteristics(self, uuids=()):
         return await self.client.discover_characteristics(uuids, self)
 
     def get_characteristics_by_uuid(self, uuid):
@@ -120,6 +142,8 @@ class CharacteristicProxy(AttributeProxy):
         for descriptor in self.descriptors:
             if descriptor.type == descriptor_type:
                 return descriptor
+
+        return None
 
     async def discover_descriptors(self):
         return await self.client.discover_descriptors(self)
@@ -148,7 +172,11 @@ class CharacteristicProxy(AttributeProxy):
         return await self.client.unsubscribe(self, subscriber)
 
     def __str__(self):
-        return f'Characteristic(handle=0x{self.handle:04X}, uuid={self.uuid}, properties={Characteristic.properties_as_string(self.properties)})'
+        return (
+            f'Characteristic(handle=0x{self.handle:04X}, '
+            f'uuid={self.uuid}, '
+            f'properties={Characteristic.properties_as_string(self.properties)})'
+        )
 
 
 class DescriptorProxy(AttributeProxy):
@@ -214,9 +242,9 @@ class Client:
                 response = await asyncio.wait_for(
                     self.pending_response, GATT_REQUEST_TIMEOUT
                 )
-            except asyncio.TimeoutError:
+            except asyncio.TimeoutError as error:
                 logger.warning(color('!!! GATT Request timeout', 'red'))
-                raise TimeoutError(f'GATT timeout for {request.name}')
+                raise core.TimeoutError(f'GATT timeout for {request.name}') from error
             finally:
                 self.pending_request = None
                 self.pending_response = None
@@ -225,7 +253,8 @@ class Client:
 
     def send_confirmation(self, confirmation):
         logger.debug(
-            f'GATT Confirmation from client: [0x{self.connection.handle:04X}] {confirmation}'
+            f'GATT Confirmation from client: [0x{self.connection.handle:04X}] '
+            f'{confirmation}'
         )
         self.send_gatt_pdu(confirmation.to_bytes())
 
@@ -300,7 +329,8 @@ class Client:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
-                        f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}'
+                        '!!! unexpected error while discovering services: '
+                        f'{HCI_Constant.error_name(response.error_code)}'
                     )
                     # TODO raise appropriate exception
                     return
@@ -352,7 +382,7 @@ class Client:
         '''
 
         # Force uuid to be a UUID object
-        if type(uuid) is str:
+        if isinstance(uuid, str):
             uuid = UUID(uuid)
 
         starting_handle = 0x0001
@@ -375,7 +405,8 @@ class Client:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
-                        f'!!! unexpected error while discovering services: {HCI_Constant.error_name(response.error_code)}'
+                        '!!! unexpected error while discovering services: '
+                        f'{HCI_Constant.error_name(response.error_code)}'
                     )
                     # TODO raise appropriate exception
                     return
@@ -414,7 +445,7 @@ class Client:
 
         return services
 
-    async def discover_included_services(self, service):
+    async def discover_included_services(self, _service):
         '''
         See Vol 3, Part G - 4.5.1 Find Included Services
         '''
@@ -423,11 +454,12 @@ class Client:
 
     async def discover_characteristics(self, uuids, service):
         '''
-        See Vol 3, Part G - 4.6.1 Discover All Characteristics of a Service and 4.6.2 Discover Characteristics by UUID
+        See Vol 3, Part G - 4.6.1 Discover All Characteristics of a Service and 4.6.2
+        Discover Characteristics by UUID
         '''
 
         # Cast the UUIDs type from string to object if needed
-        uuids = [UUID(uuid) if type(uuid) is str else uuid for uuid in uuids]
+        uuids = [UUID(uuid) if isinstance(uuid, str) else uuid for uuid in uuids]
 
         # Decide which services to discover for
         services = [service] if service else self.services
@@ -456,7 +488,8 @@ class Client:
                     if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                         # Unexpected end
                         logger.warning(
-                            f'!!! unexpected error while discovering characteristics: {HCI_Constant.error_name(response.error_code)}'
+                            '!!! unexpected error while discovering characteristics: '
+                            f'{HCI_Constant.error_name(response.error_code)}'
                         )
                         # TODO raise appropriate exception
                         return
@@ -532,7 +565,8 @@ class Client:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
-                        f'!!! unexpected error while discovering descriptors: {HCI_Constant.error_name(response.error_code)}'
+                        '!!! unexpected error while discovering descriptors: '
+                        f'{HCI_Constant.error_name(response.error_code)}'
                     )
                     # TODO raise appropriate exception
                     return []
@@ -585,7 +619,8 @@ class Client:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
-                        f'!!! unexpected error while discovering attributes: {HCI_Constant.error_name(response.error_code)}'
+                        '!!! unexpected error while discovering attributes: '
+                        f'{HCI_Constant.error_name(response.error_code)}'
                     )
                     return []
                 break
@@ -607,7 +642,8 @@ class Client:
         return attributes
 
     async def subscribe(self, characteristic, subscriber=None, prefer_notify=True):
-        # If we haven't already discovered the descriptors for this characteristic, do it now
+        # If we haven't already discovered the descriptors for this characteristic,
+        # do it now
         if not characteristic.descriptors_discovered:
             await self.discover_descriptors(characteristic)
 
@@ -642,14 +678,16 @@ class Client:
         subscriber_set = subscribers.setdefault(characteristic.handle, set())
         if subscriber is not None:
             subscriber_set.add(subscriber)
-        # Add the characteristic as a subscriber, which will result in the characteristic
-        # emitting an 'update' event when a notification or indication is received
+        # Add the characteristic as a subscriber, which will result in the
+        # characteristic emitting an 'update' event when a notification or indication
+        # is received
         subscriber_set.add(characteristic)
 
         await self.write_value(cccd, struct.pack('<H', bits), with_response=True)
 
     async def unsubscribe(self, characteristic, subscriber=None):
-        # If we haven't already discovered the descriptors for this characteristic, do it now
+        # If we haven't already discovered the descriptors for this characteristic,
+        # do it now
         if not characteristic.descriptors_discovered:
             await self.discover_descriptors(characteristic)
 
@@ -673,7 +711,7 @@ class Client:
 
                     # Cleanup if we removed the last one
                     if not subscribers:
-                        subscriber_set.remove(characteristic.handle)
+                        del subscriber_set[characteristic.handle]
         else:
             # Remove all subscribers for this attribute from the sets!
             self.notification_subscribers.pop(characteristic.handle, None)
@@ -691,7 +729,7 @@ class Client:
         '''
 
         # Send a request to read
-        attribute_handle = attribute if type(attribute) is int else attribute.handle
+        attribute_handle = attribute if isinstance(attribute, int) else attribute.handle
         response = await self.send_request(
             ATT_Read_Request(attribute_handle=attribute_handle)
         )
@@ -720,9 +758,9 @@ class Client:
                 if response is None:
                     raise TimeoutError('read timeout')
                 if response.op_code == ATT_ERROR_RESPONSE:
-                    if (
-                        response.error_code == ATT_ATTRIBUTE_NOT_LONG_ERROR
-                        or response.error_code == ATT_INVALID_OFFSET_ERROR
+                    if response.error_code in (
+                        ATT_ATTRIBUTE_NOT_LONG_ERROR,
+                        ATT_INVALID_OFFSET_ERROR,
                     ):
                         break
                     raise ProtocolError(
@@ -773,7 +811,8 @@ class Client:
                 if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
-                        f'!!! unexpected error while reading characteristics: {HCI_Constant.error_name(response.error_code)}'
+                        '!!! unexpected error while reading characteristics: '
+                        f'{HCI_Constant.error_name(response.error_code)}'
                     )
                     # TODO raise appropriate exception
                     return []
@@ -799,13 +838,14 @@ class Client:
 
     async def write_value(self, attribute, value, with_response=False):
         '''
-        See Vol 3, Part G - 4.9.1 Write Without Response & 4.9.3 Write Characteristic Value
+        See Vol 3, Part G - 4.9.1 Write Without Response & 4.9.3 Write Characteristic
+        Value
 
         `attribute` can be an Attribute object, or a handle value
         '''
 
         # Send a request or command to write
-        attribute_handle = attribute if type(attribute) is int else attribute.handle
+        attribute_handle = attribute if isinstance(attribute, int) else attribute.handle
         if with_response:
             response = await self.send_request(
                 ATT_Write_Request(
@@ -836,7 +876,8 @@ class Client:
                 logger.warning('!!! unexpected response, there is no pending request')
                 return
 
-            # Sanity check: the response should match the pending request unless it is an error response
+            # Sanity check: the response should match the pending request unless it is
+            # an error response
             if att_pdu.op_code != ATT_ERROR_RESPONSE:
                 expected_response_name = self.pending_request.name.replace(
                     '_REQUEST', '_RESPONSE'
@@ -856,7 +897,12 @@ class Client:
                 handler(att_pdu)
             else:
                 logger.warning(
-                    f'{color(f"--- Ignoring GATT Response from [0x{self.connection.handle:04X}]:", "red")} {att_pdu}'
+                    color(
+                        '--- Ignoring GATT Response from '
+                        f'[0x{self.connection.handle:04X}]: ',
+                        'red',
+                    )
+                    + str(att_pdu)
                 )
 
     def on_att_handle_value_notification(self, notification):

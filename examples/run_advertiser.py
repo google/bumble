@@ -16,14 +16,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import logging
 import sys
 import os
+from bumble.device import AdvertisingType, Device
+from bumble.hci import Address
 
-from bumble.hci import *
-from bumble.controller import *
-from bumble.device import *
-from bumble.transport import *
-from bumble.host import *
 from bumble.transport import open_transport_or_link
 
 

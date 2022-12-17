@@ -13,8 +13,8 @@ The 3 main types of physical Bluetooth controllers are:
 
 !!! tip "Conflicts with the kernel and BlueZ"
     If your use a USB dongle that is recognized by your kernel as a supported Bluetooth device, it is
-    likely that the kernel driver will claim that USB device and attach it to the BlueZ stack. 
-    If you want to claim ownership of it to use with Bumble, you will need to set the state of the corresponding HCI interface as `DOWN`. 
+    likely that the kernel driver will claim that USB device and attach it to the BlueZ stack.
+    If you want to claim ownership of it to use with Bumble, you will need to set the state of the corresponding HCI interface as `DOWN`.
     HCI interfaces are numbered, starting from 0 (i.e `hci0`, `hci1`, ...).
 
     For example, to bring `hci0` down:
@@ -36,7 +36,7 @@ See the [USB Transport page](../transports/usb.md) for general information on ho
 !!! tip "USB Permissions"
     By default, when running as a regular user, you won't have the permission to use
     arbitrary USB devices.
-    You can change the permissions for a specific USB device based on its bus number and 
+    You can change the permissions for a specific USB device based on its bus number and
     device number (you can use `lsusb` to find the Bus and Device numbers for your Bluetooth
     dongle).
 
@@ -69,9 +69,9 @@ You can bring a HCI controller `UP` or `DOWN` with `hciconfig hci<X> up` and `hc
     By default, when running as a regular user, you won't have the permission to use
     an HCI socket to a Bluetooth controller (you may see an exception like `PermissionError: [Errno 1] Operation not permitted`).
 
-    If you want to run without using `sudo`, you need to manage the capabilities by adding the appropriate entries in `/etc/security/capability.conf` to grant a user or group the `cap_net_admin` capability.  
+    If you want to run without using `sudo`, you need to manage the capabilities by adding the appropriate entries in `/etc/security/capability.conf` to grant a user or group the `cap_net_admin` capability.
     See [this manpage](https://manpages.ubuntu.com/manpages/bionic/man5/capability.conf.5.html) for details.
-    
+
     Alternatively, if you are just experimenting temporarily, the `capsh` command may be useful in order
     to execute a single command with enhanced permissions, as in this example:
 
@@ -80,7 +80,7 @@ You can bring a HCI controller `UP` or `DOWN` with `hciconfig hci<X> up` and `hc
     $ sudo capsh --caps="cap_net_admin+eip cap_setpcap,cap_setuid,cap_setgid+ep" --keep=1 --user=$USER --addamb=cap_net_admin  -- -c "<path/to/executable> <executable-args>"
     ```
     Where `<path/to/executable>` is the path to your `python3` executable or to one of the Bumble bundled command-line applications.
-    
+
 !!! tip "List all available controllers"
     The command
     ```
@@ -94,22 +94,22 @@ You can bring a HCI controller `UP` or `DOWN` with `hciconfig hci<X> up` and `hc
     pi@raspberrypi:~ $ hciconfig
     hci1:	Type: Primary  Bus: USB
         BD Address: 00:16:A4:5A:40:F2  ACL MTU: 1021:8  SCO MTU: 64:1
-        DOWN 
+        DOWN
         RX bytes:84056 acl:0 sco:0 events:51 errors:0
         TX bytes:1980 acl:0 sco:0 commands:90 errors:0
 
     hci0:	Type: Primary  Bus: UART
         BD Address: DC:A6:32:75:2C:97  ACL MTU: 1021:8  SCO MTU: 64:1
-        DOWN 
+        DOWN
         RX bytes:68038 acl:0 sco:0 events:692 errors:0
         TX bytes:20105 acl:0 sco:0 commands:843 errors:0
     ```
 
 !!! tip "Disabling `bluetoothd`"
-    When the Bluetooth daemon, `bluetoothd`, is running, it will try to use any HCI controller attached to the BlueZ stack, automatically. This means that whenever an HCI socket transport is released, it is likely that `bluetoothd` will take it over, so you will get a "device busy" condition (ex: `OSError: [Errno 16] Device or resource busy`). If that happens, you can always use 
+    When the Bluetooth daemon, `bluetoothd`, is running, it will try to use any HCI controller attached to the BlueZ stack, automatically. This means that whenever an HCI socket transport is released, it is likely that `bluetoothd` will take it over, so you will get a "device busy" condition (ex: `OSError: [Errno 16] Device or resource busy`). If that happens, you can always use
     ```
     $ hciconfig hci0 down
-    ``` 
+    ```
     (or `hci<X>` with `<X>` being the index of the controller device you want to use), but a simpler solution is to just stop the `bluetoothd` daemon, with a command like:
     ```
     $ sudo systemctl stop bluetooth.service
@@ -181,13 +181,13 @@ With the [VHCI transport](../transports/vhci.md) you can attach a Bumble virtual
     ```
     python3 examples/run_controller.py F6:F7:F8:F9:FA:FB examples/device1.json vhci
     ```
-    
+
     You should see a 'Virtual Bus' controller. For example:
     ```
     $ hciconfig
     hci0:	Type: Primary  Bus: Virtual
         BD Address: F6:F7:F8:F9:FA:FB  ACL MTU: 27:64  SCO MTU: 0:0
-        UP RUNNING 
+        UP RUNNING
         RX bytes:0 acl:0 sco:0 events:43 errors:0
         TX bytes:274 acl:0 sco:0 commands:43 errors:0
     ```
@@ -204,5 +204,3 @@ With the [VHCI transport](../transports/vhci.md) you can attach a Bumble virtual
 ### Using a Simulated UART HCI
 
 ### Bridge to a Remote Controller
-
-

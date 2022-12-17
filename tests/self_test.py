@@ -298,7 +298,7 @@ async def test_self_smp(io_cap, sc, mitm, key_dist):
 
         async def compare_numbers(self, number, digits):
             if self.peer_delegate is None:
-                logger.warn(f'[{self.name}] no peer delegate')
+                logger.warning(f'[{self.name}] no peer delegate')
                 return False
             await self.display_number(number, digits=6)
             logger.debug(f'[{self.name}] waiting for peer number')
@@ -308,7 +308,7 @@ async def test_self_smp(io_cap, sc, mitm, key_dist):
 
         async def get_number(self):
             if self.peer_delegate is None:
-                logger.warn(f'[{self.name}] no peer delegate')
+                logger.warning(f'[{self.name}] no peer delegate')
                 return 0
             else:
                 if (

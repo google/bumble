@@ -60,7 +60,7 @@ async def open_serial_transport(spec):
         device = spec
     serial_transport, packet_source = await serial_asyncio.create_serial_connection(
         asyncio.get_running_loop(),
-        lambda: StreamPacketSource(),
+        StreamPacketSource,
         device,
         baudrate=speed,
         rtscts=rtscts,

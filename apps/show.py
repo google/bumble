@@ -27,7 +27,8 @@ from bumble.helpers import PacketTracer
 # -----------------------------------------------------------------------------
 class SnoopPacketReader:
     '''
-    Reader that reads HCI packets from a "snoop" file (based on RFC 1761, but not exactly the same...)
+    Reader that reads HCI packets from a "snoop" file (based on RFC 1761, but not
+    exactly the same...)
     '''
 
     DATALINK_H1 = 1001
@@ -47,10 +48,7 @@ class SnoopPacketReader:
         (self.version_number, self.data_link_type) = struct.unpack(
             '>II', source.read(8)
         )
-        if (
-            self.data_link_type != self.DATALINK_H4
-            and self.data_link_type != self.DATALINK_H1
-        ):
+        if self.data_link_type not in (self.DATALINK_H4, self.DATALINK_H1):
             raise ValueError(f'datalink type {self.data_link_type} not supported')
 
     def next_packet(self):
@@ -62,9 +60,9 @@ class SnoopPacketReader:
             original_length,
             included_length,
             packet_flags,
-            cumulative_drops,
-            timestamp_seconds,
-            timestamp_microsecond,
+            _cumulative_drops,
+            _timestamp_seconds,
+            _timestamp_microsecond,
         ) = struct.unpack('>IIIIII', header)
 
         # Abort on truncated packets
@@ -90,8 +88,8 @@ class SnoopPacketReader:
                 packet_flags & 1,
                 bytes([packet_type]) + self.source.read(included_length),
             )
-        else:
-            return (packet_flags & 1, self.source.read(included_length))
+
+        return (packet_flags & 1, self.source.read(included_length))
 
 
 # -----------------------------------------------------------------------------
@@ -105,13 +103,14 @@ class SnoopPacketReader:
     help='Format of the input file',
 )
 @click.argument('filename')
+# pylint: disable=redefined-builtin
 def main(format, filename):
     input = open(filename, 'rb')
     if format == 'h4':
         packet_reader = PacketReader(input)
 
         def read_next_packet():
-            (0, packet_reader.next_packet())
+            return (0, packet_reader.next_packet())
 
     else:
         packet_reader = SnoopPacketReader(input)
@@ -128,9 +127,8 @@ def main(format, filename):
 
         except Exception as error:
             print(color(f'!!! {error}', 'red'))
-            pass
 
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    main()
+    main()  # pylint: disable=no-value-for-parameter

@@ -156,6 +156,7 @@ class HeartRateService(TemplateService):
                 0,
                 CharacteristicValue(read=read_heart_rate_measurement),
             ),
+            # pylint: disable=unnecessary-lambda
             encode=lambda value: bytes(value),
         )
         characteristics = [self.heart_rate_measurement_characteristic]
@@ -185,7 +186,7 @@ class HeartRateService(TemplateService):
                     Characteristic.WRITEABLE,
                     CharacteristicValue(write=write_heart_rate_control_point_value),
                 ),
-                format=HeartRateService.HEART_RATE_CONTROL_POINT_FORMAT,
+                pack_format=HeartRateService.HEART_RATE_CONTROL_POINT_FORMAT,
             )
             characteristics.append(self.heart_rate_control_point_characteristic)
 
@@ -224,7 +225,7 @@ class HeartRateServiceProxy(ProfileServiceProxy):
         ):
             self.heart_rate_control_point = PackedCharacteristicAdapter(
                 characteristics[0],
-                format=HeartRateService.HEART_RATE_CONTROL_POINT_FORMAT,
+                pack_format=HeartRateService.HEART_RATE_CONTROL_POINT_FORMAT,
             )
         else:
             self.heart_rate_control_point = None

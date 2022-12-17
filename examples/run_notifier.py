@@ -42,7 +42,8 @@ class Listener(Device.Listener, Connection.Listener):
         self, connection, characteristic, notify_enabled, indicate_enabled
     ):
         print(
-            f'$$$ Characteristic subscription for handle {characteristic.handle} from {connection}: '
+            f'$$$ Characteristic subscription for handle {characteristic.handle} '
+            f'from {connection}: '
             f'notify {"enabled" if notify_enabled else "disabled"}, '
             f'indicate {"enabled" if indicate_enabled else "disabled"}'
         )

@@ -22,16 +22,19 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+import struct
 from colors import color
 from pyee import EventEmitter
 
-from .core import *
-from .hci import *
+from bumble.core import UUID, name_or_number
+from bumble.hci import HCI_Object, key_with_value
+
 
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
 # fmt: off
+# pylint: disable=line-too-long
 
 ATT_CID = 0x04
 
@@ -165,21 +168,14 @@ ATT_ERROR_NAMES = {
 ATT_DEFAULT_MTU = 23
 
 HANDLE_FIELD_SPEC    = {'size': 2, 'mapper': lambda x: f'0x{x:04X}'}
-UUID_2_16_FIELD_SPEC = lambda x, y: UUID.parse_uuid(x, y)    # noqa: E731
+# pylint: disable-next=unnecessary-lambda-assignment,unnecessary-lambda
+UUID_2_16_FIELD_SPEC = lambda x, y: UUID.parse_uuid(x, y)
+# pylint: disable-next=unnecessary-lambda-assignment,unnecessary-lambda
 UUID_2_FIELD_SPEC    = lambda x, y: UUID.parse_uuid_2(x, y)  # noqa: E731
 
 # fmt: on
-
-
-# -----------------------------------------------------------------------------
-# Utils
-# -----------------------------------------------------------------------------
-def key_with_value(dictionary, target_value):
-    for key, value in dictionary.items():
-        if value == target_value:
-            return key
-    return None
-
+# pylint: enable=line-too-long
+# pylint: disable=invalid-name
 
 # -----------------------------------------------------------------------------
 # Exceptions
@@ -203,6 +199,7 @@ class ATT_PDU:
 
     pdu_classes = {}
     op_code = 0
+    name = None
 
     @staticmethod
     def from_bytes(pdu):
@@ -731,15 +728,15 @@ class Attribute(EventEmitter):
         self.permissions = permissions
 
         # Convert the type to a UUID object if it isn't already
-        if type(attribute_type) is str:
+        if isinstance(attribute_type, str):
             self.type = UUID(attribute_type)
-        elif type(attribute_type) is bytes:
+        elif isinstance(attribute_type, bytes):
             self.type = UUID.from_bytes(attribute_type)
         else:
             self.type = attribute_type
 
         # Convert the value to a byte array
-        if type(value) is str:
+        if isinstance(value, str):
             self.value = bytes(value, 'utf-8')
         else:
             self.value = value
@@ -753,9 +750,11 @@ class Attribute(EventEmitter):
     def read_value(self, connection):
         if read := getattr(self.value, 'read', None):
             try:
-                value = read(connection)
+                value = read(connection)  # pylint: disable=not-callable
             except ATT_Error as error:
-                raise ATT_Error(error_code=error.error_code, att_handle=self.handle)
+                raise ATT_Error(
+                    error_code=error.error_code, att_handle=self.handle
+                ) from error
         else:
             value = self.value
 
@@ -766,16 +765,18 @@ class Attribute(EventEmitter):
 
         if write := getattr(self.value, 'write', None):
             try:
-                write(connection, value)
+                write(connection, value)  # pylint: disable=not-callable
             except ATT_Error as error:
-                raise ATT_Error(error_code=error.error_code, att_handle=self.handle)
+                raise ATT_Error(
+                    error_code=error.error_code, att_handle=self.handle
+                ) from error
         else:
             self.value = value
 
         self.emit('write', connection, value)
 
     def __repr__(self):
-        if type(self.value) is bytes:
+        if isinstance(self.value, bytes):
             value_str = self.value.hex()
         else:
             value_str = str(self.value)
@@ -783,4 +784,8 @@ class Attribute(EventEmitter):
             value_string = f', value={self.value.hex()}'
         else:
             value_string = ''
-        return f'Attribute(handle=0x{self.handle:04X}, type={self.type}, permissions={self.permissions}{value_string})'
+        return (
+            f'Attribute(handle=0x{self.handle:04X}, '
+            f'type={self.type}, '
+            f'permissions={self.permissions}{value_string})'
+        )

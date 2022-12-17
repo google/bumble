@@ -15,10 +15,55 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from bumble.hci import *
+
+from bumble.hci import (
+    HCI_DISCONNECT_COMMAND,
+    HCI_LE_1M_PHY_BIT,
+    HCI_LE_CODED_PHY_BIT,
+    HCI_LE_READ_BUFFER_SIZE_COMMAND,
+    HCI_RESET_COMMAND,
+    HCI_SUCCESS,
+    Address,
+    HCI_Command,
+    HCI_Command_Complete_Event,
+    HCI_Command_Status_Event,
+    HCI_CustomPacket,
+    HCI_Disconnect_Command,
+    HCI_Event,
+    HCI_LE_Add_Device_To_Filter_Accept_List_Command,
+    HCI_LE_Advertising_Report_Event,
+    HCI_LE_Channel_Selection_Algorithm_Event,
+    HCI_LE_Connection_Complete_Event,
+    HCI_LE_Connection_Update_Command,
+    HCI_LE_Connection_Update_Complete_Event,
+    HCI_LE_Create_Connection_Command,
+    HCI_LE_Extended_Create_Connection_Command,
+    HCI_LE_Read_Buffer_Size_Command,
+    HCI_LE_Read_Remote_Features_Command,
+    HCI_LE_Read_Remote_Features_Complete_Event,
+    HCI_LE_Remove_Device_From_Filter_Accept_List_Command,
+    HCI_LE_Set_Advertising_Data_Command,
+    HCI_LE_Set_Advertising_Parameters_Command,
+    HCI_LE_Set_Default_PHY_Command,
+    HCI_LE_Set_Event_Mask_Command,
+    HCI_LE_Set_Extended_Scan_Parameters_Command,
+    HCI_LE_Set_Random_Address_Command,
+    HCI_LE_Set_Scan_Enable_Command,
+    HCI_LE_Set_Scan_Parameters_Command,
+    HCI_Number_Of_Completed_Packets_Event,
+    HCI_Packet,
+    HCI_Read_Local_Supported_Commands_Command,
+    HCI_Read_Local_Supported_Features_Command,
+    HCI_Read_Local_Version_Information_Command,
+    HCI_Reset_Command,
+    HCI_Set_Event_Mask_Command,
+)
 
 
 # -----------------------------------------------------------------------------
+# pylint: disable=invalid-name
+
+
 def basic_check(x):
     packet = x.to_bytes()
     print(packet.hex())
@@ -345,6 +390,7 @@ def test_HCI_LE_Set_Default_PHY_Command():
 def test_HCI_LE_Set_Extended_Scan_Parameters_Command():
     command = HCI_LE_Set_Extended_Scan_Parameters_Command(
         own_address_type=Address.RANDOM_DEVICE_ADDRESS,
+        # pylint: disable-next=line-too-long
         scanning_filter_policy=HCI_LE_Set_Extended_Scan_Parameters_Command.BASIC_FILTERED_POLICY,
         scanning_phys=(1 << HCI_LE_1M_PHY_BIT | 1 << HCI_LE_CODED_PHY_BIT | 1 << 4),
         scan_types=[

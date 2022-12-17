@@ -60,8 +60,8 @@ def my_custom_read_with_error(connection):
     print('----- READ from', connection, '[returning error]')
     if connection.is_encrypted:
         return bytes([123])
-    else:
-        raise ATT_Error(ATT_INSUFFICIENT_ENCRYPTION_ERROR)
+
+    raise ATT_Error(ATT_INSUFFICIENT_ENCRYPTION_ERROR)
 
 
 def my_custom_write_with_error(connection, value):
@@ -74,7 +74,8 @@ def my_custom_write_with_error(connection, value):
 async def main():
     if len(sys.argv) < 3:
         print(
-            'Usage: run_gatt_server.py <device-config> <transport-spec> [<bluetooth-address>]'
+            'Usage: run_gatt_server.py <device-config> <transport-spec> '
+            '[<bluetooth-address>]'
         )
         print('example: run_gatt_server.py device1.json usb:0 E1:CA:72:48:C4:E8')
         return
