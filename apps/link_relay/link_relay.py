@@ -253,7 +253,7 @@ class Relay:
 
 
 # ----------------------------------------------------------------------------
-def main():
+async def async_main():
     # Check the Python version
     if sys.version_info < (3, 6, 1):
         print('ERROR: Python 3.6.1 or higher is required')
@@ -280,8 +280,13 @@ def main():
 
     # Start a relay
     relay = Relay(args.port)
-    asyncio.get_event_loop().run_until_complete(relay.start())
-    asyncio.get_event_loop().run_forever()
+    async with relay.start():
+        await asyncio.Future()
+
+
+# ----------------------------------------------------------------------------
+def main():
+    asyncio.run(async_main())
 
 
 # ----------------------------------------------------------------------------

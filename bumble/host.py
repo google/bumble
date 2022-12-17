@@ -428,8 +428,8 @@ class Host(AbortableEventEmitter):
             and self.acl_packets_in_flight < self.hc_total_num_le_acl_data_packets
         ):
             packet = self.acl_packet_queue.pop()
-            self.send_hci_packet(packet)
             self.acl_packets_in_flight += 1
+            self.send_hci_packet(packet)
 
     def supports_command(self, command):
         # Find the support flag position for this command
@@ -568,7 +568,7 @@ class Host(AbortableEventEmitter):
         else:
             logger.warning(
                 color(
-                    '!!! {total_packets} completed but only '
+                    f'!!! {total_packets} completed but only '
                     f'{self.acl_packets_in_flight} in flight'
                 )
             )
