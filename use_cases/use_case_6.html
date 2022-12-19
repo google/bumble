@@ -234,6 +234,34 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing.html" class="md-nav__link">
+        Contributing
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/code_style.html" class="md-nav__link">
+        Code Style
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -1175,7 +1203,7 @@
 <h1 id="use-case-6">USE CASE 6<a class="headerlink" href="#use-case-6" title="Permanent link">&para;</a></h1>
 <h1 id="connecting-an-emulated-bluetooth-device-to-a-physical-controller">Connecting an emulated Bluetooth device to a physical controller<a class="headerlink" href="#connecting-an-emulated-bluetooth-device-to-a-physical-controller" title="Permanent link">&para;</a></h1>
 <p>It can be useful to connect an emulated device (like a phone simulator, or an emulated embedded device) to a physical controller in order to connect to other Bluetooth devices. By doing this via a Bumble HCI bridge, it becomes easy to inspect the HCI packets exchanged with the controller, and possibly filter/change them if needed (for example to support vendor-specific HCI extensions).</p>
-<div class="highlight"><pre><span></span><code>+-----------+             +--------+             +------------+             +-----------+ 
+<div class="highlight"><pre><span></span><code>+-----------+             +--------+             +------------+             +-----------+
 | Emulated  |             | Bumble |             | Physical   |             | Bluetooth |
 | Bluetooth |&lt;--  HCI  --&gt;| HCI    |&lt;--  HCI  --&gt;| Controller |{...radio...}| Device    |
 | Device    |  Transport  | Bridge |  Transport  |            |             |           |

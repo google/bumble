@@ -234,6 +234,34 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing.html" class="md-nav__link">
+        Contributing
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/code_style.html" class="md-nav__link">
+        Code Style
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -1222,7 +1250,7 @@
 <h2 id="usb-hci">USB HCI<a class="headerlink" href="#usb-hci" title="Permanent link">&para;</a></h2>
 <p>To use a Bluetooth USB dongle on Windows, you need a USB dongle that does not require a vendor Windows driver (the dongle will be used directly through the <a href="https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/winusb"><code>WinUSB</code></a> driver rather than through a vendor-supplied Windows driver).</p>
 <p>In order to use the dongle, the <code>WinUSB</code> driver must be assigned to the USB device. It is likely that, by default, when you first plug in the dongle, it will be recognized by Windows as a Bluetooth USB device, and Windows will try to use it with its native Bluetooth stack. You will need to switch the driver, which can be done easily with the <a href="https://zadig.akeo.ie/">Zadig tool</a>.
-In the Zadig tool, select your USB dongle device, and associate it with WinUSB.<br />
+In the Zadig tool, select your USB dongle device, and associate it with WinUSB.
 Once the WinUSB driver is correctly assigned to your device, you can confirm that by checking the settings with the Windows Device Manager control panel. Your device should appear under "Universal Serial Bus Device" (not under "Bluetooth"), and inspecting the driver details, you should see <code>winusb.sys</code> in the list of driver files.</p>
 <p><img alt="USB Driver Details" src="winusb_driver.png" /></p>
 

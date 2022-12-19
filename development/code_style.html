@@ -13,7 +13,7 @@
     
     
       
-        <title>GATT - Bumble</title>
+        <title>Code Style - Bumble</title>
       
     
     
@@ -62,7 +62,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gatt" class="md-skip">
+        <a href="#code-style" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +94,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              GATT
+              Code Style
             
           </span>
         </div>
@@ -198,12 +198,14 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
       
       
       
@@ -226,7 +228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/python_environments.html" class="md-nav__link">
+      <a href="python_environments.html" class="md-nav__link">
         Python Environments
       </a>
     </li>
@@ -240,7 +242,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/contributing.html" class="md-nav__link">
+      <a href="contributing.html" class="md-nav__link">
         Contributing
       </a>
     </li>
@@ -252,11 +254,21 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../development/code_style.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="code_style.html" class="md-nav__link md-nav__link--active">
         Code Style
       </a>
+      
     </li>
   
 
@@ -406,14 +418,12 @@
 
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_5" type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_5" type="checkbox" id="__nav_5" >
       
       
       
@@ -436,7 +446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="controller.html" class="md-nav__link">
+      <a href="../components/controller.html" class="md-nav__link">
         Controller
       </a>
     </li>
@@ -450,7 +460,7 @@
   
   
     <li class="md-nav__item">
-      <a href="host.html" class="md-nav__link">
+      <a href="../components/host.html" class="md-nav__link">
         Host
       </a>
     </li>
@@ -462,21 +472,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="gatt.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../components/gatt.html" class="md-nav__link">
         GATT
       </a>
-      
     </li>
   
 
@@ -488,7 +488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="security_manager.html" class="md-nav__link">
+      <a href="../components/security_manager.html" class="md-nav__link">
         Security Manager
       </a>
     </li>
@@ -1200,7 +1200,37 @@
                 
 
 
-<h1 id="gatt">GATT<a class="headerlink" href="#gatt" title="Permanent link">&para;</a></h1>
+<h1 id="code-style">CODE STYLE<a class="headerlink" href="#code-style" title="Permanent link">&para;</a></h1>
+<p>The Python code style used in this project follows the <a href="https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html">Black code style</a>. </p>
+<h1 id="formatting">Formatting<a class="headerlink" href="#formatting" title="Permanent link">&para;</a></h1>
+<p>For now, we are configuring the <code>black</code> formatter with the option to leave quotes unchanged.
+The preferred quote style is single quotes, which isn't a configurable option for <code>Black</code>, so we are not enforcing it. This may change in the future. </p>
+<h2 id="ignoring-commit-for-git-blame">Ignoring Commit for Git Blame<a class="headerlink" href="#ignoring-commit-for-git-blame" title="Permanent link">&para;</a></h2>
+<p>The adoption of <code>Black</code> as a formatter came in late in the project, with already a large code base. As a result, a large number of files were changed in a single commit, which gets in the way of tracing authorship with <code>git blame</code>. The file <code>git-blame-ignore-revs</code> contains the commit hash of when that mass-formatting event occurred, which you can use to skip it in a <code>git blame</code> analysis:</p>
+<div class="admonition example">
+<p class="admonition-title">Ignoring a commit with <code>git blame</code></p>
+<div class="highlight"><pre><span></span><code>$ git blame --ignore-revs-file .git-blame-ignore-revs
+</code></pre></div>
+</div>
+<h1 id="linting">Linting<a class="headerlink" href="#linting" title="Permanent link">&para;</a></h1>
+<p>The project includes a <code>pylint</code> configuration (see the <code>pyproject.toml</code> file for details). 
+The <code>pre-commit</code> checks only enforce that there are no errors. But we strongly recommend that you run the linter with warnings enabled at least, and possibly the "Refactor" ('R') and "Convention" ('C') categories as well. 
+To run the linter, use the <code>project.lint</code> invoke command. </p>
+<div class="admonition example">
+<p class="admonition-title">Running the linter with default options</p>
+<p>With the default settings, Errors and Warnings are enabled, but Refactor and Convention categories are not.
+<div class="highlight"><pre><span></span><code>$ invoke project.lint
+</code></pre></div></p>
+</div>
+<div class="admonition example">
+<p class="admonition-title">Running the linter with all categories</p>
+<div class="highlight"><pre><span></span><code>$ invoke project.lint --disable=&quot;&quot;
+</code></pre></div>
+</div>
+<h1 id="editoride-integration">Editor/IDE Integration<a class="headerlink" href="#editoride-integration" title="Permanent link">&para;</a></h1>
+<h2 id="visual-studio-code">Visual Studio Code<a class="headerlink" href="#visual-studio-code" title="Permanent link">&para;</a></h2>
+<p>The project includes a <code>.vscode/settings.json</code> file that specifies the <code>black</code> formatter and enables an editor ruler at 88 columns. 
+You may want to configure your own environment to "format on save" with <code>black</code> if you find that useful. We are not making that choice at the workspace level.</p>
 
 
 
@@ -1219,7 +1249,7 @@
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
         
-          <a href="host.html" title="Host" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+          <a href="contributing.html" title="Contributing" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
             <div class="md-flex__cell md-flex__cell--shrink">
               <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
             </div>
@@ -1228,19 +1258,19 @@
                 <span class="md-footer-nav__direction">
                   Previous
                 </span>
-                Host
+                Contributing
               </span>
             </div>
           </a>
         
         
-          <a href="security_manager.html" title="Security Manager" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
+          <a href="../use_cases/index.html" title="Overview" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
               <span class="md-flex__ellipsis">
                 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                Security Manager
+                Overview
               </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink">

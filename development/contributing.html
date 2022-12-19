@@ -13,7 +13,7 @@
     
     
       
-        <title>GATT - Bumble</title>
+        <title>Contributing - Bumble</title>
       
     
     
@@ -62,7 +62,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gatt" class="md-skip">
+        <a href="#contributing-to-the-project" class="md-skip">
           Skip to content
         </a>
       
@@ -94,7 +94,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              GATT
+              Contributing
             
           </span>
         </div>
@@ -198,12 +198,14 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_3" type="checkbox" id="__nav_3" checked>
       
       
       
@@ -226,7 +228,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/python_environments.html" class="md-nav__link">
+      <a href="python_environments.html" class="md-nav__link">
         Python Environments
       </a>
     </li>
@@ -238,11 +240,21 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../development/contributing.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="contributing.html" class="md-nav__link md-nav__link--active">
         Contributing
       </a>
+      
     </li>
   
 
@@ -254,7 +266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../development/code_style.html" class="md-nav__link">
+      <a href="code_style.html" class="md-nav__link">
         Code Style
       </a>
     </li>
@@ -406,14 +418,12 @@
 
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
-        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_5" type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle" data-md-toggle="__nav_5" type="checkbox" id="__nav_5" >
       
       
       
@@ -436,7 +446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="controller.html" class="md-nav__link">
+      <a href="../components/controller.html" class="md-nav__link">
         Controller
       </a>
     </li>
@@ -450,7 +460,7 @@
   
   
     <li class="md-nav__item">
-      <a href="host.html" class="md-nav__link">
+      <a href="../components/host.html" class="md-nav__link">
         Host
       </a>
     </li>
@@ -462,21 +472,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="gatt.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../components/gatt.html" class="md-nav__link">
         GATT
       </a>
-      
     </li>
   
 
@@ -488,7 +488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="security_manager.html" class="md-nav__link">
+      <a href="../components/security_manager.html" class="md-nav__link">
         Security Manager
       </a>
     </li>
@@ -1200,7 +1200,12 @@
                 
 
 
-<h1 id="gatt">GATT<a class="headerlink" href="#gatt" title="Permanent link">&para;</a></h1>
+<h1 id="contributing-to-the-project">CONTRIBUTING TO THE PROJECT<a class="headerlink" href="#contributing-to-the-project" title="Permanent link">&para;</a></h1>
+<p>To contribute some code to the project, you will need to submit a GitHub Pull Request (a.k.a PR). Please familiarize yourself with how that works (see <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests">GitHub Pull Requests</a>)</p>
+<p>You should follow the project's <a href="code_style.html">code style</a>, and pre-check your code before submitting a PR. The GitHub project is set up with some <a href="https://github.com/features/actions">Actions</a> that will check that a PR passes at least the basic tests and complies with the coding style, but it is still recommended to check that for yourself before submitting a PR. 
+To run the basic checks (essentially: running the tests, the linter, and the formatter), use the <code>project.pre-commit</code> <code>invoke</code> command, and address any issues found:</p>
+<div class="highlight"><pre><span></span><code>$ invoke project.pre-commit
+</code></pre></div>
 
 
 
@@ -1219,7 +1224,7 @@
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
         
-          <a href="host.html" title="Host" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+          <a href="python_environments.html" title="Python Environments" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
             <div class="md-flex__cell md-flex__cell--shrink">
               <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
             </div>
@@ -1228,19 +1233,19 @@
                 <span class="md-footer-nav__direction">
                   Previous
                 </span>
-                Host
+                Python Environments
               </span>
             </div>
           </a>
         
         
-          <a href="security_manager.html" title="Security Manager" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
+          <a href="code_style.html" title="Code Style" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
               <span class="md-flex__ellipsis">
                 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                Security Manager
+                Code Style
               </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink">

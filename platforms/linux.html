@@ -234,6 +234,34 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing.html" class="md-nav__link">
+        Contributing
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/code_style.html" class="md-nav__link">
+        Code Style
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -1432,8 +1460,8 @@ The 3 main types of physical Bluetooth controllers are:</p>
 <div class="admonition tip">
 <p class="admonition-title">Conflicts with the kernel and BlueZ</p>
 <p>If your use a USB dongle that is recognized by your kernel as a supported Bluetooth device, it is
-likely that the kernel driver will claim that USB device and attach it to the BlueZ stack. 
-If you want to claim ownership of it to use with Bumble, you will need to set the state of the corresponding HCI interface as <code>DOWN</code>. 
+likely that the kernel driver will claim that USB device and attach it to the BlueZ stack.
+If you want to claim ownership of it to use with Bumble, you will need to set the state of the corresponding HCI interface as <code>DOWN</code>.
 HCI interfaces are numbered, starting from 0 (i.e <code>hci0</code>, <code>hci1</code>, ...).</p>
 <p>For example, to bring <code>hci0</code> down:
 <div class="highlight"><pre><span></span><code>$ sudo hciconfig hci0 down
@@ -1450,7 +1478,7 @@ close it, so you may need to bring the interface back <code>UP</code> before usi
 <p class="admonition-title">USB Permissions</p>
 <p>By default, when running as a regular user, you won't have the permission to use
 arbitrary USB devices.
-You can change the permissions for a specific USB device based on its bus number and 
+You can change the permissions for a specific USB device based on its bus number and
 device number (you can use <code>lsusb</code> to find the Bus and Device numbers for your Bluetooth
 dongle).</p>
 <p>Example:
@@ -1474,7 +1502,7 @@ You can bring a HCI controller <code>UP</code> or <code>DOWN</code> with <code>h
 <p class="admonition-title">HCI Socket Permissions</p>
 <p>By default, when running as a regular user, you won't have the permission to use
 an HCI socket to a Bluetooth controller (you may see an exception like <code>PermissionError: [Errno 1] Operation not permitted</code>).</p>
-<p>If you want to run without using <code>sudo</code>, you need to manage the capabilities by adding the appropriate entries in <code>/etc/security/capability.conf</code> to grant a user or group the <code>cap_net_admin</code> capability.<br />
+<p>If you want to run without using <code>sudo</code>, you need to manage the capabilities by adding the appropriate entries in <code>/etc/security/capability.conf</code> to grant a user or group the <code>cap_net_admin</code> capability.
 See <a href="https://manpages.ubuntu.com/manpages/bionic/man5/capability.conf.5.html">this manpage</a> for details.</p>
 <p>Alternatively, if you are just experimenting temporarily, the <code>capsh</code> command may be useful in order
 to execute a single command with enhanced permissions, as in this example:</p>
@@ -1492,20 +1520,20 @@ lists all available HCI controllers and their state.</p>
 <div class="highlight"><pre><span></span><code>pi@raspberrypi:~ $ hciconfig
 hci1:   Type: Primary  Bus: USB
     BD Address: 00:16:A4:5A:40:F2  ACL MTU: 1021:8  SCO MTU: 64:1
-    DOWN 
+    DOWN
     RX bytes:84056 acl:0 sco:0 events:51 errors:0
     TX bytes:1980 acl:0 sco:0 commands:90 errors:0
 
 hci0:   Type: Primary  Bus: UART
     BD Address: DC:A6:32:75:2C:97  ACL MTU: 1021:8  SCO MTU: 64:1
-    DOWN 
+    DOWN
     RX bytes:68038 acl:0 sco:0 events:692 errors:0
     TX bytes:20105 acl:0 sco:0 commands:843 errors:0
 </code></pre></div>
 </div>
 <div class="admonition tip">
 <p class="admonition-title">Disabling <code>bluetoothd</code></p>
-<p>When the Bluetooth daemon, <code>bluetoothd</code>, is running, it will try to use any HCI controller attached to the BlueZ stack, automatically. This means that whenever an HCI socket transport is released, it is likely that <code>bluetoothd</code> will take it over, so you will get a "device busy" condition (ex: <code>OSError: [Errno 16] Device or resource busy</code>). If that happens, you can always use 
+<p>When the Bluetooth daemon, <code>bluetoothd</code>, is running, it will try to use any HCI controller attached to the BlueZ stack, automatically. This means that whenever an HCI socket transport is released, it is likely that <code>bluetoothd</code> will take it over, so you will get a "device busy" condition (ex: <code>OSError: [Errno 16] Device or resource busy</code>). If that happens, you can always use
 <div class="highlight"><pre><span></span><code>$ hciconfig hci0 down
 </code></pre></div>
 (or <code>hci&lt;X&gt;</code> with <code>&lt;X&gt;</code> being the index of the controller device you want to use), but a simpler solution is to just stop the <code>bluetoothd</code> daemon, with a command like:
@@ -1564,7 +1592,7 @@ In both cases, the controller can run locally on the Linux host, or remotely on 
 <div class="highlight"><pre><span></span><code>$ hciconfig
 hci0:   Type: Primary  Bus: Virtual
     BD Address: F6:F7:F8:F9:FA:FB  ACL MTU: 27:64  SCO MTU: 0:0
-    UP RUNNING 
+    UP RUNNING
     RX bytes:0 acl:0 sco:0 events:43 errors:0
     TX bytes:274 acl:0 sco:0 commands:43 errors:0
 </code></pre></div></p>

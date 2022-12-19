@@ -234,6 +234,34 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing.html" class="md-nav__link">
+        Contributing
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/code_style.html" class="md-nav__link">
+        Code Style
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -1222,21 +1250,22 @@
 <p>The Android emulator transport either connects, as a host, to a "Root Canal" virtual controller
 ("host" mode), or attaches a virtual controller to the Android Bluetooth host stack ("controller" mode).</p>
 <h2 id="moniker">Moniker<a class="headerlink" href="#moniker" title="Permanent link">&para;</a></h2>
-<p>The moniker syntax for an Android Emulator transport is: <code>android-emulator:[mode=&lt;host|controller&gt;][mode=&lt;host|controller&gt;]</code>.
-Both the <code>mode=&lt;host|controller&gt;</code> and <code>mode=&lt;host|controller&gt;</code> parameters are optional (so the moniker <code>android-emulator</code> by itself is a valid moniker, which will create a transport in <code>host</code> mode, connected to <code>localhost</code> on the default gRPC port for the emulator)</p>
+<p>The moniker syntax for an Android Emulator transport is: <code>android-emulator:[mode=&lt;host|controller&gt;][&lt;hostname&gt;:&lt;port&gt;]</code>, where
+the <code>mode</code> parameter can specify running as a host or a controller, and <code>&lt;hostname&gt;:&lt;port&gt;</code> can specify a host name (or IP address) and TCP port number on which to reach the gRPC server for the emulator.
+Both the <code>mode=&lt;host|controller&gt;</code> and <code>&lt;hostname&gt;:&lt;port&gt;</code> parameters are optional (so the moniker <code>android-emulator</code> by itself is a valid moniker, which will create a transport in <code>host</code> mode, connected to <code>localhost</code> on the default gRPC port for the emulator).</p>
 <div class="admonition example example">
 <p class="admonition-title">Example</p>
-<p><code>android-emulator</code><br />
+<p><code>android-emulator</code>
 connect as a host to the emulator on localhost:8554</p>
 </div>
 <div class="admonition example example">
 <p class="admonition-title">Example</p>
-<p><code>android-emulator:mode=controller</code><br />
+<p><code>android-emulator:mode=controller</code>
 connect as a controller to the emulator on localhost:8554</p>
 </div>
 <div class="admonition example example">
 <p class="admonition-title">Example</p>
-<p><code>android-emulator:localhost:8555</code><br />
+<p><code>android-emulator:localhost:8555</code>
 connect as a host to the emulator on localhost:8555</p>
 </div>
 

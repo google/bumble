@@ -234,6 +234,34 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing.html" class="md-nav__link">
+        Contributing
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/code_style.html" class="md-nav__link">
+        Code Style
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -1173,11 +1201,11 @@
 
 
 <h1 id="hardware">HARDWARE<a class="headerlink" href="#hardware" title="Permanent link">&para;</a></h1>
-<p>The Bumble Host connects to a controller over an <a href="../transports/index.html">HCI Transport</a>. 
-To use a hardware controller attached to the host on which the host application is running, the transport is typically either <a href="../transports/serial.html">HCI over UART</a> or <a href="../transports/usb.html">HCI over USB</a>. 
-On Linux, the <a href="../transports/vhci.html">VHCI Transport</a> can be used to communicate with any controller hardware managed by the operating system. Alternatively, a remote controller (a phyiscal controller attached to a remote host) can be used by connecting one of the networked transports (such as the <a href="../transports/tcp_client.html">TCP Client transport</a>, the <a href="../transports/tcp_server.html">TCP Server transport</a> or the <a href="../transports/udp.html">UDP Transport</a>) to an <a href="../apps_and_tools/hci_bridge">HCI Bridge</a> bridging the network transport to a physical controller on a remote host. </p>
-<p>In theory, any controller that is compliant with the HCI over UART or HCI over USB protocols can be used. </p>
-<p>HCI over USB is very common, implemented by a number of commercial Bluetooth dongles. </p>
+<p>The Bumble Host connects to a controller over an <a href="../transports/index.html">HCI Transport</a>.
+To use a hardware controller attached to the host on which the host application is running, the transport is typically either <a href="../transports/serial.html">HCI over UART</a> or <a href="../transports/usb.html">HCI over USB</a>.
+On Linux, the <a href="../transports/vhci.html">VHCI Transport</a> can be used to communicate with any controller hardware managed by the operating system. Alternatively, a remote controller (a phyiscal controller attached to a remote host) can be used by connecting one of the networked transports (such as the <a href="../transports/tcp_client.html">TCP Client transport</a>, the <a href="../transports/tcp_server.html">TCP Server transport</a> or the <a href="../transports/udp.html">UDP Transport</a>) to an <a href="../apps_and_tools/hci_bridge">HCI Bridge</a> bridging the network transport to a physical controller on a remote host.</p>
+<p>In theory, any controller that is compliant with the HCI over UART or HCI over USB protocols can be used.</p>
+<p>HCI over USB is very common, implemented by a number of commercial Bluetooth dongles.</p>
 <p>It is also possible to use an embedded development board, running a specialized application, such as the <a href="https://docs.zephyrproject.org/latest/samples/bluetooth/hci_uart/README.html"><code>HCI UART</code></a> and <a href="https://docs.zephyrproject.org/latest/samples/bluetooth/hci_usb/README.html"><code>HCI USB</code></a> demo applications from the <a href="https://www.zephyrproject.org/">Zephyr project</a>, or the <a href="https://mynewt.apache.org/latest/tutorials/ble/blehci_project.html"><code>blehci</code></a> application from <a href="https://mynewt.apache.org/">mynewt/nimble</a></p>
 <p>Some specific USB dongles and embedded boards that are known to work include:</p>
 <ul>

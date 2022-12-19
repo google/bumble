@@ -244,6 +244,34 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="development/contributing.html" class="md-nav__link">
+        Contributing
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="development/code_style.html" class="md-nav__link">
+        Code Style
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -1174,16 +1202,16 @@
 <h1 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h1>
 <p>You need Python 3.8 or above. Python &gt;= 3.9 is recommended, but 3.8 should be sufficient if
 necessary (there may be some optional functionality that will not work on some platforms with
-python 3.8).<br />
+python 3.8).
 Visit the <a href="https://www.python.org/">Python site</a> for instructions on how to install Python
-for your platform.<br />
+for your platform.
 Throughout the documentation, when shell commands are shown, it is assumed that you can
 invoke Python as
 <div class="highlight"><pre><span></span><code>$ python
 </code></pre></div>
-If invoking python is different on your platform (it may be <code>python3</code> for example, or just <code>py</code> or <code>py.exe</code>), 
+If invoking python is different on your platform (it may be <code>python3</code> for example, or just <code>py</code> or <code>py.exe</code>),
 adjust accordingly.</p>
-<p>You may be simply using Bumble as a module for your own application or as a dependency to your own 
+<p>You may be simply using Bumble as a module for your own application or as a dependency to your own
 module, or you may be working on modifying or contributing to the Bumble module or example code
 itself.</p>
 <h1 id="using-bumble-as-a-python-module">Using Bumble As A Python Module<a class="headerlink" href="#using-bumble-as-a-python-module" title="Permanent link">&para;</a></h1>
@@ -1216,13 +1244,14 @@ distribution
 </code></pre></div></p>
 <h1 id="working-on-the-bumble-code">Working On The Bumble Code<a class="headerlink" href="#working-on-the-bumble-code" title="Permanent link">&para;</a></h1>
 <p>When you work on the Bumble code itself, and run some of the tests or example apps, or import the
-module in your own code, you typically either install the package from source in "development mode" as described above, or you may choose to skip the install phase. </p>
+module in your own code, you typically either install the package from source in "development mode" as described above, or you may choose to skip the install phase.</p>
+<p>If you plan on contributing to the project, please read the <a href="development/contributing.html">contributing</a> section.</p>
 <h2 id="without-installing">Without Installing<a class="headerlink" href="#without-installing" title="Permanent link">&para;</a></h2>
-<p>If you prefer not to install the package (even in development mode), you can load the module directly from its location in the project. 
+<p>If you prefer not to install the package (even in development mode), you can load the module directly from its location in the project.
 A simple way to do that is to set your <code>PYTHONPATH</code> to
 point to the root project directory, where the <code>bumble</code> subdirectory is located. You may set
 <code>PYTHONPATH</code> globally, or locally with each command line execution (on Unix-like systems).</p>
-<p>Example with a global <code>PYTHONPATH</code>, from a unix shell, when the working directory is the root 
+<p>Example with a global <code>PYTHONPATH</code>, from a unix shell, when the working directory is the root
 directory of the project.</p>
 <div class="highlight"><pre><span></span><code>$ <span class="nb">export</span> <span class="nv">PYTHONPATH</span><span class="o">=</span>.
 $ python apps/console.py serial:/dev/tty.usbmodem0006839912171
@@ -1237,12 +1266,12 @@ $ python run_scanner.py usb:0
 <div class="highlight"><pre><span></span><code>$ PYTHONPATH=. python examples/run_advertiser.py examples/device1.json serial:/dev/tty.usbmodem0006839912171
 </code></pre></div></p>
 <h1 id="where-to-go-next">Where To Go Next<a class="headerlink" href="#where-to-go-next" title="Permanent link">&para;</a></h1>
-<p>Once you've installed or downloaded Bumble, you can either start using some of the 
+<p>Once you've installed or downloaded Bumble, you can either start using some of the
 <a href="apps_and_tools/index.html">Bundled apps and tools</a>, or look at the <a href="examples/index.html">examples</a>
 to get a feel for how to use the APIs, and start writing your own applications.</p>
 <p>Depending on the use case you're interested in exploring, you may need to use a physical Bluetooth
 controller, like a USB dongle or a board with a Bluetooth radio. Visit the <a href="hardware/index.html">Hardware page</a>
-for more information on using a physical radio, and/or the <a href="transports/index.html">Transports page</a> for more 
+for more information on using a physical radio, and/or the <a href="transports/index.html">Transports page</a> for more
 details on interfacing with either hardware modules or virtual controllers over various transports.</p>
 
 

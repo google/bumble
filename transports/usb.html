@@ -234,6 +234,34 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing.html" class="md-nav__link">
+        Contributing
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/code_style.html" class="md-nav__link">
+        Code Style
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -569,6 +597,13 @@
         <li class="md-nav__item">
   <a href="#alternative" class="md-nav__link">
     Alternative
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#libusb" class="md-nav__link">
+    Libusb
   </a>
   
 </li>
@@ -1266,6 +1301,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#libusb" class="md-nav__link">
+    Libusb
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#listing-available-usb-devices" class="md-nav__link">
     Listing Available USB Devices
   </a>
@@ -1345,9 +1387,9 @@ the first USB interface of the device will be used, regardless of the interface 
 This may be useful for some devices that use a custom class/subclass but may nonetheless work as-is.</p>
 <div class="admonition examples">
 <p class="admonition-title">Examples</p>
-<p><code>usb:04b4:f901</code><br />
+<p><code>usb:04b4:f901</code>
 The USB dongle with <code>&lt;vendor&gt;</code> equal to <code>04b4</code> and <code>&lt;product&gt;</code> equal to <code>f901</code></p>
-<p><code>usb:0</code><br />
+<p><code>usb:0</code>
 The first Bluetooth HCI dongle that's declared as such by Class/Subclass/Protocol</p>
 <p><code>usb:04b4:f901/0016A45B05D8</code>
 The USB dongle with <code>&lt;vendor&gt;</code> equal to <code>04b4</code>, <code>&lt;product&gt;</code> equal to <code>f901</code> and <code>&lt;serial&gt;</code> equal to <code>0016A45B05D8</code></p>
@@ -1359,6 +1401,9 @@ The BT USB dongle vendor=0B05 and product=17CB, in "forced" mode.</p>
 <h2 id="alternative">Alternative<a class="headerlink" href="#alternative" title="Permanent link">&para;</a></h2>
 <p>The library includes two different implementations of the USB transport, implemented using different python bindings for <code>libusb</code>.
 Using the transport prefix <code>pyusb:</code> instead of <code>usb:</code> selects the implementation based on  <a href="https://pypi.org/project/pyusb/">PyUSB</a>, using the synchronous API of <code>libusb</code>, whereas the default implementation is based on <a href="https://pypi.org/project/libusb1/">libusb1</a>, using the asynchronous API of <code>libusb</code>. In order to use the alternative PyUSB-based implementation, you need to ensure that you have installed that python module, as it isn't installed by default as a dependency of Bumble.</p>
+<h2 id="libusb">Libusb<a class="headerlink" href="#libusb" title="Permanent link">&para;</a></h2>
+<p>The <code>libusb-1.0</code> shared library is required to use both <code>usb</code> and <code>pyusb</code> transports. This library should be installed automatically with Bumble, as part of the <code>libusb_package</code> Python package.
+If your OS or architecture is not supported by <code>libusb_package</code>, you can install a system-wide library with <code>brew install libusb</code> for Mac or <code>apt install libusb-1.0-0</code> for Linux.</p>
 <h2 id="listing-available-usb-devices">Listing Available USB Devices<a class="headerlink" href="#listing-available-usb-devices" title="Permanent link">&para;</a></h2>
 <h3 id="with-usb_probe">With <code>usb_probe</code><a class="headerlink" href="#with-usb_probe" title="Permanent link">&para;</a></h3>
 <p>You can use the <a href="../apps_and_tools/usb_probe.html"><code>usb_probe</code></a> tool to list all the USB devices attached to your host computer.

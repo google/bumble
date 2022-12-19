@@ -234,6 +234,34 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing.html" class="md-nav__link">
+        Contributing
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/code_style.html" class="md-nav__link">
+        Code Style
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -1262,12 +1290,12 @@
 
 <h1 id="android-platform"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M16.61 15.15c-.46 0-.84-.37-.84-.83s.38-.82.84-.82c.46 0 .84.36.84.82 0 .46-.38.83-.84.83m-9.2 0c-.46 0-.84-.37-.84-.83 0-.46.38-.82.84-.82.46 0 .83.36.83.82 0 .46-.37.83-.83.83m9.5-5.01 1.67-2.88c.09-.17.03-.38-.13-.47-.17-.1-.38-.04-.45.13l-1.71 2.91A10.15 10.15 0 0 0 12 8.91c-1.53 0-3 .33-4.27.91L6.04 6.91a.334.334 0 0 0-.47-.13c-.17.09-.22.3-.13.47l1.66 2.88C4.25 11.69 2.29 14.58 2 18h20c-.28-3.41-2.23-6.3-5.09-7.86Z"/></svg></span> ANDROID PLATFORM<a class="headerlink" href="#android-platform" title="Permanent link">&para;</a></h1>
 <p>Using Bumble with Android is not about running the Bumble stack on the Android
-OS itself, but rather using Bumble with the Bluetooth support of the Android 
+OS itself, but rather using Bumble with the Bluetooth support of the Android
 emulator.</p>
 <p>The two main use cases are:</p>
 <ul>
 <li>Connecting the Bumble host stack to the Android emulator's virtual controller.</li>
-<li>Using Bumble as an HCI bridge to connect the Android emulator to a physical 
+<li>Using Bumble as an HCI bridge to connect the Android emulator to a physical
     Bluetooth controller, such as a USB dongle</li>
 </ul>
 <div class="admonition warning">
@@ -1277,13 +1305,13 @@ be evolving. The information contained here be somewhat out of sync with the
 version of the emulator you are using.
 You will need version 31.3.8.0 or later.</p>
 </div>
-<p>The Android emulator supports Bluetooth in two ways: either by exposing virtual 
+<p>The Android emulator supports Bluetooth in two ways: either by exposing virtual
 Bluetooth controllers to which you can connect a virtual Bluetooth host stack, or
 by exposing an way to connect your own virtual controller to the Android Bluetooth
 stack via a virtual HCI interface.
 Both ways are controlled via gRPC requests to the Android emulator.</p>
 <h2 id="launching-the-emulator">Launching the Emulator<a class="headerlink" href="#launching-the-emulator" title="Permanent link">&para;</a></h2>
-<p>If the version of the emulator you are running does not yet support enabling 
+<p>If the version of the emulator you are running does not yet support enabling
 Bluetooth support by default or automatically, you must launch the emulator from
 the command line.</p>
 <div class="admonition tip">
@@ -1299,7 +1327,7 @@ communicate link layer packets between them, thus creating a virtual radio netwo
 Configuring a Bumble Device instance to use Root Canal as a virtual controller
 allows that virtual device to communicate with the Android Bluetooth stack, and
 through it with Android applications as well as system-managed profiles.
-To connect a Bumble host stack to a Root Canal virtual controller instance, use 
+To connect a Bumble host stack to a Root Canal virtual controller instance, use
 the bumble <code>android-emulator</code> transport in <code>host</code> mode (the default).</p>
 <div class="admonition example">
 <p class="admonition-title">Run the example GATT server connected to the emulator</p>
@@ -1330,7 +1358,7 @@ before attaching the virtual controller, then re-enable it once attached.</p>
 </div>
 <h2 id="other-tools">Other Tools<a class="headerlink" href="#other-tools" title="Permanent link">&para;</a></h2>
 <p>The <code>show</code> application that's included with Bumble can be used to parse and pretty-print the HCI packets
-from an Android HCI "snoop log" (see <a href="https://source.android.com/devices/bluetooth/verifying_debugging">this page</a> 
+from an Android HCI "snoop log" (see <a href="https://source.android.com/devices/bluetooth/verifying_debugging">this page</a>
 for details on how to obtain HCI snoop logs from an Android device).
 Use the <code>--format snoop</code> option to specify that the file is in that specific format.</p>
 <div class="admonition example">
