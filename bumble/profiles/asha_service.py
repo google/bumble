@@ -55,6 +55,8 @@ class AshaService(TemplateService):
         self.hisyncid = hisyncid
         self.capability = capability  # Device Capabilities [Left, Monaural]
         self.device = device
+        self.emitted_data_name = 'ASHA_data_' + str(self.capability)
+        self.audio_out_data = b''
 
         # Handler for volume control
         def on_volume_write(_connection, value):
@@ -121,9 +123,10 @@ class AshaService(TemplateService):
         # Register an L2CAP CoC server
         def on_coc(channel):
             def on_data(data):
-                logging.debug(f'<<< Voice data received:{data.hex()}')
-                # TODO think about where data should be dumped
-                # audio_out.write(data)
+                logging.debug(f'<<< data received:{data}')
+
+                self.emit(self.emitted_data_name, data)
+                self.audio_out_data += data
 
             channel.sink = on_data
 
