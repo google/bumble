@@ -121,8 +121,8 @@ class AshaService(TemplateService):
         # Register an L2CAP CoC server
         def on_coc(channel):
             def on_data(data):
-                logging.debug('<<< Voice data received:', data.hex())
-                # TODO think about where should voice data go
+                logging.debug(f'<<< Voice data received:{data.hex()}')
+                # TODO think about where data should be dumped
                 # audio_out.write(data)
 
             channel.sink = on_data
