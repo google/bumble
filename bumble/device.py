@@ -2237,8 +2237,7 @@ class Device(CompositeEventEmitter):
             result = await self.send_command(
                 HCI_Remote_Name_Request_Command(
                     bd_addr=peer_address,
-                    # TODO investigate other options
-                    page_scan_repetition_mode=HCI_Remote_Name_Request_Command.R0,
+                    page_scan_repetition_mode=HCI_Remote_Name_Request_Command.R2,
                     reserved=0,
                     clock_offset=0,  # TODO investigate non-0 values
                 )
@@ -2369,49 +2368,50 @@ class Device(CompositeEventEmitter):
             self.advertising_own_address_type = None
             self.advertising = False
 
-            # Create and notify of the new connection asynchronously
-            async def new_connection():
-                # Figure out which PHY we're connected with
-                if self.host.supports_command(HCI_LE_READ_PHY_COMMAND):
-                    result = await asyncio.shield(
-                        self.send_command(
-                            HCI_LE_Read_PHY_Command(
-                                connection_handle=connection_handle
-                            ),
-                            check_result=True,
-                        )
+            if own_address_type in (
+                OwnAddressType.PUBLIC,
+                OwnAddressType.RESOLVABLE_OR_PUBLIC,
+            ):
+                self_address = self.public_address
+            else:
+                self_address = self.random_address
+
+            # Create a new connection
+            connection = Connection(
+                self,
+                connection_handle,
+                transport,
+                self_address,
+                peer_address,
+                peer_resolvable_address,
+                role,
+                connection_parameters,
+                ConnectionPHY(HCI_LE_1M_PHY, HCI_LE_1M_PHY),
+            )
+            self.connections[connection_handle] = connection
+
+            # If supported, read which PHY we're connected with before
+            # notifying listeners of the new connection.
+            if self.host.supports_command(HCI_LE_READ_PHY_COMMAND):
+                async def read_phy():
+                    result = await self.send_command(
+                        HCI_LE_Read_PHY_Command(
+                            connection_handle=connection_handle
+                        ),
+                        check_result=True,
                     )
-                    phy = ConnectionPHY(
+                    connection.phy = ConnectionPHY(
                         result.return_parameters.tx_phy, result.return_parameters.rx_phy
                     )
-                else:
-                    phy = ConnectionPHY(HCI_LE_1M_PHY, HCI_LE_1M_PHY)
+                    # Emit an event to notify listeners of the new connection
+                    self.emit('connection', connection)
 
-                self_address = self.random_address
-                if own_address_type in (
-                    OwnAddressType.PUBLIC,
-                    OwnAddressType.RESOLVABLE_OR_PUBLIC,
-                ):
-                    self_address = self.public_address
+                # Do so asynchronously to not block the current event handler
+                connection.abort_on('disconnection', read_phy())
 
-                # Create a new connection
-                connection = Connection(
-                    self,
-                    connection_handle,
-                    transport,
-                    self_address,
-                    peer_address,
-                    peer_resolvable_address,
-                    role,
-                    connection_parameters,
-                    phy,
-                )
-                self.connections[connection_handle] = connection
-
+            else:
                 # Emit an event to notify listeners of the new connection
                 self.emit('connection', connection)
-
-            self.abort_on('flush', new_connection())
 
     @host_event_handler
     def on_connection_failure(self, transport, peer_address, error_code):
