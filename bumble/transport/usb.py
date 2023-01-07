@@ -206,10 +206,11 @@ async def open_usb_transport(spec):
                     logger.debug('OUT transfer likely already completed')
 
     class UsbPacketSource(asyncio.Protocol, ParserSource):
-        def __init__(self, context, device, acl_in, events_in):
+        def __init__(self, context, device, metadata, acl_in, events_in):
             super().__init__()
             self.context = context
             self.device = device
+            self.metadata = metadata
             self.acl_in = acl_in
             self.events_in = events_in
             self.loop = asyncio.get_running_loop()
@@ -510,6 +511,10 @@ async def open_usb_transport(spec):
             f'events_in=0x{events_in:02X}, '
         )
 
+        device_metadata = {
+            'vendor_id': found.getVendorID(),
+            'product_id': found.getProductID(),
+        }
         device = found.open()
 
         # Auto-detach the kernel driver if supported
@@ -535,7 +540,7 @@ async def open_usb_transport(spec):
             except usb1.USBError:
                 logger.warning('failed to set configuration')
 
-        source = UsbPacketSource(context, device, acl_in, events_in)
+        source = UsbPacketSource(context, device, device_metadata, acl_in, events_in)
         sink = UsbPacketSink(device, acl_out)
         return UsbTransport(context, device, interface, setting, source, sink)
     except usb1.USBError as error:

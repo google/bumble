@@ -23,6 +23,7 @@ import struct
 from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
 from bumble.snoop import Snooper
+from bumble import drivers
 
 from typing import Optional
 
@@ -116,6 +117,7 @@ class Host(AbortableEventEmitter):
         super().__init__()
 
         self.hci_sink = None
+        self.hci_metadata = None
         self.ready = False  # True when we can accept incoming packets
         self.reset_done = False
         self.connections = {}  # Connections, by connection handle
@@ -141,6 +143,9 @@ class Host(AbortableEventEmitter):
         # Connect to the source and sink if specified
         if controller_source:
             controller_source.set_packet_sink(self)
+            self.hci_metadata = getattr(
+                controller_source, 'metadata', self.hci_metadata
+            )
         if controller_sink:
             self.set_packet_sink(controller_sink)
 
@@ -170,13 +175,22 @@ class Host(AbortableEventEmitter):
         self.emit('flush')
         self.command_semaphore.release()
 
-    async def reset(self):
+    async def reset(self, raw=False):
         if self.ready:
             self.ready = False
             await self.flush()
 
         await self.send_command(HCI_Reset_Command(), check_result=True)
         self.ready = True
+
+        # Instantiate and init a driver for the host if needed.
+        # NOTE: we don't keep a reference to the driver here, because we don't
+        # currently have a need for the driver later on. But if the driver interface
+        # evolves, it may be required, then, to store a reference to the driver in
+        # an object property.
+        if not raw:
+            if (driver :=  await drivers.get_driver_for_host(self)):
+                await driver.init_controller()
 
         response = await self.send_command(
             HCI_Read_Local_Supported_Commands_Command(), check_result=True
@@ -298,7 +312,7 @@ class Host(AbortableEventEmitter):
         if self.snooper:
             self.snooper.snoop(bytes(packet), Snooper.Direction.HOST_TO_CONTROLLER)
 
-        self.hci_sink.on_packet(packet.to_bytes())
+        self.hci_sink.on_packet(bytes(packet))
 
     async def send_command(self, command, check_result=False):
         logger.debug(f'{color("### HOST -> CONTROLLER", "blue")}: {command}')
@@ -350,7 +364,7 @@ class Host(AbortableEventEmitter):
         asyncio.create_task(send_command(command))
 
     def send_l2cap_pdu(self, connection_handle, cid, pdu):
-        l2cap_pdu = L2CAP_PDU(cid, pdu).to_bytes()
+        l2cap_pdu = bytes(L2CAP_PDU(cid, pdu))
 
         # Send the data to the controller via ACL packets
         bytes_remaining = len(l2cap_pdu)
