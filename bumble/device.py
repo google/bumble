@@ -2393,11 +2393,10 @@ class Device(CompositeEventEmitter):
             # If supported, read which PHY we're connected with before
             # notifying listeners of the new connection.
             if self.host.supports_command(HCI_LE_READ_PHY_COMMAND):
+
                 async def read_phy():
                     result = await self.send_command(
-                        HCI_LE_Read_PHY_Command(
-                            connection_handle=connection_handle
-                        ),
+                        HCI_LE_Read_PHY_Command(connection_handle=connection_handle),
                         check_result=True,
                     )
                     connection.phy = ConnectionPHY(

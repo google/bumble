@@ -458,8 +458,8 @@ class Controller:
             return
 
         # Send a scan report
-        report = HCI_Object(
-            HCI_LE_Advertising_Report_Event.REPORT_FIELDS,
+        report = HCI_LE_Advertising_Report_Event.Report(
+            HCI_LE_Advertising_Report_Event.Report.FIELDS,
             event_type=HCI_LE_Advertising_Report_Event.ADV_IND,
             address_type=sender_address.address_type,
             address=sender_address,
@@ -469,8 +469,8 @@ class Controller:
         self.send_hci_packet(HCI_LE_Advertising_Report_Event([report]))
 
         # Simulate a scan response
-        report = HCI_Object(
-            HCI_LE_Advertising_Report_Event.REPORT_FIELDS,
+        report = HCI_LE_Advertising_Report_Event.Report(
+            HCI_LE_Advertising_Report_Event.Report.FIELDS,
             event_type=HCI_LE_Advertising_Report_Event.SCAN_RSP,
             address_type=sender_address.address_type,
             address=sender_address,
@@ -738,10 +738,10 @@ class Controller:
         self.advertising_parameters = command
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_read_advertising_channel_tx_power_command(self, _command):
+    def on_hci_le_read_advertising_physical_channel_tx_power_command(self, _command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.6 LE Read Advertising Channel Tx Power
-        Command
+        See Bluetooth spec Vol 2, Part E - 7.8.6 LE Read Advertising Physical Channel
+        Tx Power Command
         '''
         return bytes([HCI_SUCCESS, self.advertising_channel_tx_power])
 
@@ -1008,7 +1008,7 @@ class Controller:
 
     def on_hci_le_read_phy_command(self, command):
         '''
-        See Bluetooth spec Vol 2, Part E - 7.8.47 LE Read PHY command
+        See Bluetooth spec Vol 2, Part E - 7.8.47 LE Read PHY Command
         '''
         return struct.pack(
             '<BHBB',
@@ -1028,3 +1028,9 @@ class Controller:
             'rx_phys': command.rx_phys,
         }
         return bytes([HCI_SUCCESS])
+
+    def on_hci_le_read_transmit_power_command(self, command):
+        '''
+        See Bluetooth spec Vol 2, Part E - 7.8.74 LE Read Transmit Power Command
+        '''
+        return struct.pack('<BBB', HCI_SUCCESS, 0, 0)
