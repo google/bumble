@@ -97,7 +97,7 @@ async def open_hci_socket_transport(spec):
             super().__init__()
             self.socket = hci_socket
             asyncio.get_running_loop().add_reader(
-                socket.fileno(), self.recv_until_would_block
+                self.socket.fileno(), self.recv_until_would_block
             )
 
         def recv_until_would_block(self):
@@ -140,7 +140,7 @@ async def open_hci_socket_transport(spec):
                 if not self.writer_added:
                     asyncio.get_running_loop().add_writer(
                         # pylint: disable=no-member
-                        socket.fileno(),
+                        self.socket.fileno(),
                         self.send_until_would_block,
                     )
                     self.writer_added = True
