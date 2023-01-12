@@ -20,7 +20,6 @@ import logging
 import threading
 import time
 
-import libusb_package
 import usb.core
 import usb.util
 from colors import color
@@ -205,16 +204,24 @@ async def open_pyusb_transport(spec):
             await self.sink.stop()
             usb.util.release_interface(self.device, 0)
 
+    usb_find =  usb.core.find
+    try:
+        import libusb_package
+    except ImportError:
+        logger.debug('libusb_package is not available')
+    else:
+        usb_find = libusb_package.find
+
     # Find the device according to the spec moniker
     if ':' in spec:
         vendor_id, product_id = spec.split(':')
-        device = libusb_package.find(
+        device = usb_find(
             idVendor=int(vendor_id, 16), idProduct=int(product_id, 16)
         )
     else:
         device_index = int(spec)
         devices = list(
-            libusb_package.find(
+            usb_find(
                 find_all=1,
                 bDeviceClass=USB_DEVICE_CLASS_WIRELESS_CONTROLLER,
                 bDeviceSubClass=USB_DEVICE_SUBCLASS_RF_CONTROLLER,
