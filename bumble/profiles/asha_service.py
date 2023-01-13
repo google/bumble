@@ -31,6 +31,7 @@ from ..gatt import (
     Characteristic,
     CharacteristicValue,
 )
+from ..device import Device
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -50,9 +51,13 @@ class AshaService(TemplateService):
     SUPPORTED_CODEC_ID = [0x02, 0x01]  # Codec IDs [G.722 at 16 kHz]
     RENDER_DELAY = [00, 00]
 
-    def __init__(self, capability: int, hisyncid: List[int]):
+    def __init__(self, capability: int, hisyncid: List[int], device: Device, psm=0):
         self.hisyncid = hisyncid
         self.capability = capability  # Device Capabilities [Left, Monaural]
+        self.device = device
+        self.emitted_data_name = 'ASHA_data_' + str(self.capability)
+        self.audio_out_data = b''
+        self.psm = psm  # a non-zero psm is mainly for testing purpose
 
         # Handler for volume control
         def on_volume_write(_connection, value):
@@ -116,9 +121,18 @@ class AshaService(TemplateService):
             CharacteristicValue(write=on_volume_write),
         )
 
-        # TODO add real psm value
-        self.psm = 0x0080
-        # self.psm = device.register_l2cap_channel_server(0, on_coc, 8)
+        # Register an L2CAP CoC server
+        def on_coc(channel):
+            def on_data(data):
+                logging.debug(f'<<< data received:{data}')
+
+                self.emit(self.emitted_data_name, data)
+                self.audio_out_data += data
+
+            channel.sink = on_data
+
+        # let the server find a free PSM
+        self.psm = self.device.register_l2cap_channel_server(self.psm, on_coc, 8)
         self.le_psm_out_characteristic = Characteristic(
             GATT_ASHA_LE_PSM_OUT_CHARACTERISTIC,
             Characteristic.READ,
