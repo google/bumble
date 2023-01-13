@@ -1113,10 +1113,13 @@ class Device(CompositeEventEmitter):
 
         if self.le_enabled:
             # Set the controller address
-            await self.send_command(
-                HCI_LE_Set_Random_Address_Command(random_address=self.random_address),
-                check_result=True,
-            )
+            if self.random_address != Address.ANY_RANDOM:
+                await self.send_command(
+                    HCI_LE_Set_Random_Address_Command(
+                        random_address=self.random_address
+                    ),
+                    check_result=True,
+                )
 
             # Load the address resolving list
             if self.keystore and self.host.supports_command(

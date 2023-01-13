@@ -1638,8 +1638,8 @@ class HCI_Object:
             # Map the value if needed
             if value_mappers:
                 value_mapper = value_mappers.get(key, value_mapper)
-                if value_mapper is not None:
-                    value = value_mapper(value)
+            if value_mapper is not None:
+                value = value_mapper(value)
 
             # Get the string representation of the value
             value_str = HCI_Object.format_field_value(
@@ -1807,6 +1807,7 @@ class Address:
 # Predefined address values
 Address.NIL = Address(b"\xff\xff\xff\xff\xff\xff", Address.PUBLIC_DEVICE_ADDRESS)
 Address.ANY = Address(b"\x00\x00\x00\x00\x00\x00", Address.PUBLIC_DEVICE_ADDRESS)
+Address.ANY_RANDOM = Address(b"\x00\x00\x00\x00\x00\x00", Address.RANDOM_DEVICE_ADDRESS)
 
 # -----------------------------------------------------------------------------
 class OwnAddressType:
