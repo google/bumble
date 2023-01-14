@@ -46,6 +46,7 @@ from .hci import (
     HCI_LE_CODED_PHY_LE_SUPPORTED_FEATURE,
     HCI_LE_EXTENDED_ADVERTISING_LE_SUPPORTED_FEATURE,
     HCI_LE_EXTENDED_CREATE_CONNECTION_COMMAND,
+    HCI_LE_RAND_COMMAND,
     HCI_LE_READ_PHY_COMMAND,
     HCI_MITM_NOT_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
     HCI_MITM_NOT_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
@@ -78,6 +79,7 @@ from .hci import (
     HCI_LE_Enable_Encryption_Command,
     HCI_LE_Extended_Advertising_Report_Event,
     HCI_LE_Extended_Create_Connection_Command,
+    HCI_LE_Rand_Command,
     HCI_LE_Read_PHY_Command,
     HCI_LE_Set_Advertising_Data_Command,
     HCI_LE_Set_Advertising_Enable_Command,
@@ -1113,7 +1115,29 @@ class Device(CompositeEventEmitter):
 
         if self.le_enabled:
             # Set the controller address
+            if self.random_address == Address.ANY_RANDOM:
+                # Try to use an address generated at random by the controller
+                if self.host.supports_command(HCI_LE_RAND_COMMAND):
+                    # Get 8 random bytes
+                    response = await self.send_command(
+                        HCI_LE_Rand_Command(), check_result=True
+                    )
+
+                    # Ensure the address bytes can be a static random address
+                    address_bytes = response.return_parameters.random_number[
+                        :5
+                    ] + bytes([response.return_parameters.random_number[5] | 0xC0])
+
+                    # Create a static random address from the random bytes
+                    self.random_address = Address(address_bytes)
+
             if self.random_address != Address.ANY_RANDOM:
+                logger.debug(
+                    color(
+                        f'LE Random Address: {self.random_address}',
+                        'yellow',
+                    )
+                )
                 await self.send_command(
                     HCI_LE_Set_Random_Address_Command(
                         random_address=self.random_address

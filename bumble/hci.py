@@ -3107,6 +3107,16 @@ class HCI_LE_Read_Remote_Features_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
+    return_parameters_fields=[("status", STATUS_SPEC), ("random_number", 8)]
+)
+class HCI_LE_Rand_Command(HCI_Command):
+    """
+    See Bluetooth spec @ 7.8.23 LE Rand Command
+    """
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
     [
         ('connection_handle', 2),
         ('random_number', 8),
