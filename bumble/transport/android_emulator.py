@@ -16,14 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-import grpc
+import grpc.aio
 
 from .common import PumpedTransport, PumpedPacketSource, PumpedPacketSink
-from .emulated_bluetooth_pb2_grpc import EmulatedBluetoothServiceStub
-from .emulated_bluetooth_vhci_pb2_grpc import VhciForwardingServiceStub
 
-# pylint: disable-next=no-name-in-module
-from .emulated_bluetooth_packets_pb2 import HCIPacket
+# pylint: disable=no-name-in-module
+from .grpc_protobuf.emulated_bluetooth_pb2_grpc import EmulatedBluetoothServiceStub
+from .grpc_protobuf.emulated_bluetooth_packets_pb2 import HCIPacket
+from .grpc_protobuf.emulated_bluetooth_vhci_pb2_grpc import VhciForwardingServiceStub
 
 
 # -----------------------------------------------------------------------------
