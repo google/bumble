@@ -281,7 +281,7 @@ class ConsoleApp:
             self.device.listener = DeviceListener(self)
             await self.device.power_on()
             self.show_device(self.device)
-            self.show_local_services(self.device.gatt_server.attributes)
+            self.update_local_services(self.device.gatt_server.attributes)
 
             # Run the UI
             await self.ui.run_async()
@@ -379,7 +379,10 @@ class ConsoleApp:
         self.remote_services_text.text = lines
         self.ui.invalidate()
 
-    def show_local_services(self, attributes):
+    def update_local_services(self, attributes):
+        """
+        Update the data for the local-services screen
+        """
         lines = []
         for attribute in attributes:
             if isinstance(attribute, Service):
@@ -392,7 +395,6 @@ class ConsoleApp:
                 lines.append(("ansiyellow", f"{attribute}\n"))
 
         self.local_services_text.text = lines
-        self.ui.invalidate()
 
     def show_device(self, device):
         lines = []
@@ -660,6 +662,13 @@ class ConsoleApp:
         else:
             self.show_error('unsupported arguments for advertise command')
 
+    async def update_timer(self):
+        if self.top_tab == 'local-services':
+            self.update_local_services(self.device.gatt_server.attributes)
+            self.ui.invalidate()
+            await asyncio.sleep(1)
+            await self.update_timer()
+
     async def do_show(self, params):
         if params:
             if params[0] in {
@@ -671,6 +680,9 @@ class ConsoleApp:
             }:
                 self.top_tab = params[0]
                 self.ui.invalidate()
+
+                if params[0] == 'local-services':
+                    asyncio.create_task(self.update_timer(), name="Update Screen Timer")
 
     async def do_get_phy(self, _):
         if not self.connected_peer:
