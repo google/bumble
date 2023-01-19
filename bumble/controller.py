@@ -46,7 +46,6 @@ from bumble.hci import (
     HCI_LE_Connection_Complete_Event,
     HCI_LE_Read_Remote_Features_Complete_Event,
     HCI_Number_Of_Completed_Packets_Event,
-    HCI_Object,
     HCI_Packet,
 )
 
@@ -1029,7 +1028,7 @@ class Controller:
         }
         return bytes([HCI_SUCCESS])
 
-    def on_hci_le_read_transmit_power_command(self, command):
+    def on_hci_le_read_transmit_power_command(self, _command):
         '''
         See Bluetooth spec Vol 2, Part E - 7.8.74 LE Read Transmit Power Command
         '''
