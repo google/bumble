@@ -57,7 +57,7 @@ from bumble.core import UUID, AdvertisingData, BT_LE_TRANSPORT
 from bumble.device import ConnectionParametersPreferences, Device, Connection, Peer
 from bumble.utils import AsyncRunner
 from bumble.transport import open_transport_or_link
-from bumble.gatt import Characteristic
+from bumble.gatt import Characteristic, Service, CharacteristicDeclaration, Descriptor
 from bumble.hci import (
     HCI_Constant,
     HCI_LE_1M_PHY,
@@ -154,10 +154,10 @@ class ConsoleApp:
                     'rssi': {'on': None, 'off': None},
                     'show': {
                         'scan': None,
-                        'services': None,
-                        'attributes': None,
                         'log': None,
                         'device': None,
+                        'local-services': None,
+                        'remote-services': None,
                     },
                     'filter': {
                         'address': None,
@@ -197,8 +197,8 @@ class ConsoleApp:
         )
         self.output_max_lines = 20
         self.scan_results_text = FormattedTextControl()
-        self.services_text = FormattedTextControl()
-        self.attributes_text = FormattedTextControl()
+        self.local_services_text = FormattedTextControl()
+        self.remote_services_text = FormattedTextControl()
         self.device_text = FormattedTextControl()
         self.log_text = FormattedTextControl(
             get_cursor_position=lambda: Point(0, max(0, len(self.log_lines) - 1))
@@ -214,12 +214,12 @@ class ConsoleApp:
                     filter=Condition(lambda: self.top_tab == 'scan'),
                 ),
                 ConditionalContainer(
-                    Frame(Window(self.services_text), title='Services'),
-                    filter=Condition(lambda: self.top_tab == 'services'),
+                    Frame(Window(self.local_services_text), title='Local Services'),
+                    filter=Condition(lambda: self.top_tab == 'local-services'),
                 ),
                 ConditionalContainer(
-                    Frame(Window(self.attributes_text), title='Attributes'),
-                    filter=Condition(lambda: self.top_tab == 'attributes'),
+                    Frame(Window(self.remote_services_text), title='Remove Services'),
+                    filter=Condition(lambda: self.top_tab == 'remote-services'),
                 ),
                 ConditionalContainer(
                     Frame(Window(self.log_text, height=self.log_height), title='Log'),
@@ -281,6 +281,7 @@ class ConsoleApp:
             self.device.listener = DeviceListener(self)
             await self.device.power_on()
             self.show_device(self.device)
+            self.show_local_services(self.device.gatt_server.attributes)
 
             # Run the UI
             await self.ui.run_async()
@@ -359,32 +360,38 @@ class ConsoleApp:
         self.scan_results_text.text = ANSI('\n'.join(lines))
         self.ui.invalidate()
 
-    def show_services(self, services):
+    def show_remote_services(self, services):
         lines = []
         del self.known_attributes[:]
         for service in services:
-            lines.append(('ansicyan', str(service) + '\n'))
+            lines.append(("ansicyan", f"{service}\n"))
 
             for characteristic in service.characteristics:
-                lines.append(('ansimagenta', '  ' + str(characteristic) + '\n'))
+                lines.append(('ansimagenta', f'  {characteristic} + \n'))
                 self.known_attributes.append(
                     f'{service.uuid.to_hex_str()}.{characteristic.uuid.to_hex_str()}'
                 )
                 self.known_attributes.append(f'*.{characteristic.uuid.to_hex_str()}')
                 self.known_attributes.append(f'#{characteristic.handle:X}')
                 for descriptor in characteristic.descriptors:
-                    lines.append(('ansigreen', '    ' + str(descriptor) + '\n'))
+                    lines.append(("ansigreen", f"    {descriptor}\n"))
 
-        self.services_text.text = lines
+        self.remote_services_text.text = lines
         self.ui.invalidate()
 
-    def show_attributes(self, attributes):
+    def show_local_services(self, attributes):
         lines = []
-
         for attribute in attributes:
-            lines.append(('ansicyan', f'{attribute}\n'))
+            if isinstance(attribute, Service):
+                lines.append(("ansicyan", f"{attribute}\n"))
+            elif isinstance(attribute, (Characteristic, CharacteristicDeclaration)):
+                lines.append(("ansimagenta", f"  {attribute}\n"))
+            elif isinstance(attribute, Descriptor):
+                lines.append(("ansigreen", f"    {attribute}\n"))
+            else:
+                lines.append(("ansiyellow", f"{attribute}\n"))
 
-        self.attributes_text.text = lines
+        self.local_services_text.text = lines
         self.ui.invalidate()
 
     def show_device(self, device):
@@ -469,7 +476,7 @@ class ConsoleApp:
                 await self.connected_peer.discover_descriptors(characteristic)
         self.append_to_output('discovery completed')
 
-        self.show_services(self.connected_peer.services)
+        self.show_remote_services(self.connected_peer.services)
 
     async def discover_attributes(self):
         if not self.connected_peer:
@@ -655,7 +662,13 @@ class ConsoleApp:
 
     async def do_show(self, params):
         if params:
-            if params[0] in {'scan', 'services', 'attributes', 'log', 'device'}:
+            if params[0] in {
+                'scan',
+                'log',
+                'device',
+                'local-services',
+                'remote-services',
+            }:
                 self.top_tab = params[0]
                 self.ui.invalidate()
 

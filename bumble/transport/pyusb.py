@@ -204,7 +204,7 @@ async def open_pyusb_transport(spec):
             await self.sink.stop()
             usb.util.release_interface(self.device, 0)
 
-    usb_find =  usb.core.find
+    usb_find = usb.core.find
     try:
         import libusb_package
     except ImportError:
@@ -215,9 +215,7 @@ async def open_pyusb_transport(spec):
     # Find the device according to the spec moniker
     if ':' in spec:
         vendor_id, product_id = spec.split(':')
-        device = usb_find(
-            idVendor=int(vendor_id, 16), idProduct=int(product_id, 16)
-        )
+        device = usb_find(idVendor=int(vendor_id, 16), idProduct=int(product_id, 16))
     else:
         device_index = int(spec)
         devices = list(
