@@ -15,10 +15,12 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import logging
 import struct
 from colors import color
 import colors
+from typing import Dict, Type
 
 from . import core
 from .core import InvalidStateError
@@ -520,7 +522,7 @@ class SDP_PDU:
     See Bluetooth spec @ Vol 3, Part B - 4.2 PROTOCOL DATA UNIT FORMAT
     '''
 
-    sdp_pdu_classes = {}
+    sdp_pdu_classes: Dict[int, Type[SDP_PDU]] = {}
     name = None
     pdu_id = 0
 

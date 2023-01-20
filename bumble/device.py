@@ -15,6 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 from enum import IntEnum
 import functools
 import json
@@ -22,6 +23,8 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
+from typing import ClassVar
+
 from colors import color
 
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
@@ -494,6 +497,7 @@ class Peer:
 # -----------------------------------------------------------------------------
 @dataclass
 class ConnectionParametersPreferences:
+    default: ClassVar[ConnectionParametersPreferences]
     connection_interval_min: int = DEVICE_DEFAULT_CONNECTION_INTERVAL_MIN
     connection_interval_max: int = DEVICE_DEFAULT_CONNECTION_INTERVAL_MAX
     max_latency: int = DEVICE_DEFAULT_CONNECTION_MAX_LATENCY
@@ -833,7 +837,7 @@ def host_event_handler(function):
 # List of host event handlers for the Device class.
 # (we define this list outside the class, because referencing a class in method
 #  decorators is not straightforward)
-device_host_event_handlers = []
+device_host_event_handlers: list[str] = []
 
 
 # -----------------------------------------------------------------------------
@@ -2355,7 +2359,7 @@ class Device(CompositeEventEmitter):
 
         if transport == BT_BR_EDR_TRANSPORT:
             # Create a new connection
-            connection: Connection = self.pending_connections.pop(peer_address)
+            connection = self.pending_connections.pop(peer_address)
             connection.complete(
                 connection_handle, peer_resolvable_address, role, connection_parameters
             )

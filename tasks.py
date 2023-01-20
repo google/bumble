@@ -22,7 +22,7 @@ Invoke tasks
 import os
 
 from invoke import task, call, Collection
-from invoke.exceptions import UnexpectedExit
+from invoke.exceptions import Exit, UnexpectedExit
 
 
 # -----------------------------------------------------------------------------
@@ -126,9 +126,9 @@ def lint(ctx, disable='C,R', errors_only=False):
     try:
         ctx.run(f"pylint {' '.join(options)} bumble apps examples tasks.py")
         print("The linter is happy. ✅ 😊 🐝'")
-    except UnexpectedExit:
+    except UnexpectedExit as exc:
         print("Please check your code against the linter messages. ❌")
-    print(">>> Linter done.")
+        raise Exit(code=1) from exc
 
 
 # -----------------------------------------------------------------------------
@@ -143,13 +143,31 @@ def format_code(ctx, check=False, diff=False):
     print(">>> Running the formatter...")
     try:
         ctx.run(f"black -S {' '.join(options)} .")
-    except UnexpectedExit:
+    except UnexpectedExit as exc:
         print("Please run 'invoke project.format' or 'black .' to format the code. ❌")
-    print(">>> formatter done.")
+        raise Exit(code=1) from exc
 
 
 # -----------------------------------------------------------------------------
-@task(pre=[call(format_code, check=True), call(lint, errors_only=True), test])
+@task
+def check_types(ctx):
+    checklist = ["apps", "bumble", "examples", "tests", "tasks.py"]
+    try:
+        ctx.run(f"mypy {' '.join(checklist)}")
+    except UnexpectedExit as exc:
+        print("Please check your code against the mypy messages.")
+        raise Exit(code=1) from exc
+
+
+# -----------------------------------------------------------------------------
+@task(
+    pre=[
+        call(format_code, check=True),
+        call(lint, errors_only=True),
+        call(check_types),
+        test,
+    ]
+)
 def pre_commit(_ctx):
     print("All good!")
 
@@ -157,4 +175,5 @@ def pre_commit(_ctx):
 # -----------------------------------------------------------------------------
 project_tasks.add_task(lint)
 project_tasks.add_task(format_code, name="format")
+project_tasks.add_task(check_types, name="check-types")
 project_tasks.add_task(pre_commit)

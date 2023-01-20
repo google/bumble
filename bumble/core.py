@@ -15,6 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import struct
 
 from .company_ids import COMPANY_IDENTIFIERS
@@ -145,7 +146,7 @@ class UUID:
     '''
 
     BASE_UUID = bytes.fromhex('00001000800000805F9B34FB')
-    UUIDS = []  # Registry of all instances created
+    UUIDS: list[UUID] = []  # Registry of all instances created
 
     def __init__(self, uuid_str_or_int, name=None):
         if isinstance(uuid_str_or_int, int):

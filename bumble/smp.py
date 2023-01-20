@@ -22,9 +22,12 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import logging
 import asyncio
 import secrets
+from typing import Dict, Type
+
 from pyee import EventEmitter
 from colors import color
 
@@ -184,7 +187,7 @@ class SMP_Command:
     See Bluetooth spec @ Vol 3, Part H - 3 SECURITY MANAGER PROTOCOL
     '''
 
-    smp_classes = {}
+    smp_classes: Dict[int, Type[SMP_Command]] = {}
     code = 0
     name = ''
 

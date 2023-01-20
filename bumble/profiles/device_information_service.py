@@ -17,7 +17,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import struct
-from typing import Tuple
+from typing import Optional, Tuple
 
 from ..gatt_client import ProfileServiceProxy
 from ..gatt import (
@@ -52,14 +52,14 @@ class DeviceInformationService(TemplateService):
 
     def __init__(
         self,
-        manufacturer_name: str = None,
-        model_number: str = None,
-        serial_number: str = None,
-        hardware_revision: str = None,
-        firmware_revision: str = None,
-        software_revision: str = None,
-        system_id: Tuple[int, int] = None,  # (OUI, Manufacturer ID)
-        ieee_regulatory_certification_data_list: bytes = None
+        manufacturer_name: Optional[str] = None,
+        model_number: Optional[str] = None,
+        serial_number: Optional[str] = None,
+        hardware_revision: Optional[str] = None,
+        firmware_revision: Optional[str] = None,
+        software_revision: Optional[str] = None,
+        system_id: Optional[Tuple[int, int]] = None,  # (OUI, Manufacturer ID)
+        ieee_regulatory_certification_data_list: Optional[bytes] = None
         # TODO: pnp_id
     ):
         characteristics = [

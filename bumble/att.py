@@ -22,9 +22,11 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import struct
 from colors import color
 from pyee import EventEmitter
+from typing import Dict, Type
 
 from bumble.core import UUID, name_or_number
 from bumble.hci import HCI_Object, key_with_value
@@ -197,7 +199,7 @@ class ATT_PDU:
     See Bluetooth spec @ Vol 3, Part F - 3.3 ATTRIBUTE PDU
     '''
 
-    pdu_classes = {}
+    pdu_classes: Dict[int, Type[ATT_PDU]] = {}
     op_code = 0
     name = None
 

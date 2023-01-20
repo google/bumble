@@ -1,4 +1,4 @@
-# Copyright 2021-2022 Google LLC
+# Copyright 2021-2023 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,8 +20,10 @@ import grpc
 
 from .common import PumpedTransport, PumpedPacketSource, PumpedPacketSink
 from .emulated_bluetooth_pb2_grpc import EmulatedBluetoothServiceStub
-from .emulated_bluetooth_packets_pb2 import HCIPacket
 from .emulated_bluetooth_vhci_pb2_grpc import VhciForwardingServiceStub
+
+# pylint: disable-next=no-name-in-module
+from .emulated_bluetooth_packets_pb2 import HCIPacket
 
 
 # -----------------------------------------------------------------------------

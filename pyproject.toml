@@ -50,3 +50,44 @@ signature-mutators="AsyncRunner.run_in_task"
 
 [tool.black]
 skip-string-normalization = true
+
+[[tool.mypy.overrides]]
+module = "bumble.transport.emulated_bluetooth_pb2_grpc"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "bumble.transport.emulated_bluetooth_packets_pb2"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "aioconsole.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "bitstruct.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "colors.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "emulated_bluetooth_packets_pb2.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "grpc.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "serial_asyncio.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "usb.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "usb1.*"
+ignore_missing_imports = true
+
