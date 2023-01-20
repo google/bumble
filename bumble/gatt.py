@@ -217,7 +217,7 @@ class Service(Attribute):
             uuid.to_pdu_bytes(),
         )
         self.uuid = uuid
-        self.included_services = []
+        # self.included_services = []
         self.characteristics = characteristics[:]
         self.primary = primary
 

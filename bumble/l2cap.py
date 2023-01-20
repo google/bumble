@@ -15,6 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import asyncio
 import logging
 import struct
@@ -22,6 +23,7 @@ import struct
 from collections import deque
 from colors import color
 from pyee import EventEmitter
+from typing import Dict, Type
 
 from .core import BT_CENTRAL_ROLE, InvalidStateError, ProtocolError
 from .hci import (
@@ -184,7 +186,7 @@ class L2CAP_Control_Frame:
     See Bluetooth spec @ Vol 3, Part A - 4 SIGNALING PACKET FORMATS
     '''
 
-    classes = {}
+    classes: Dict[int, Type[L2CAP_Control_Frame]] = {}
     code = 0
     name = None
 

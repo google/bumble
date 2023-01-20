@@ -15,12 +15,14 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import asyncio
 import struct
 import time
 import logging
 from colors import color
 from pyee import EventEmitter
+from typing import Dict, Type
 
 from .core import (
     BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
@@ -627,7 +629,8 @@ class Message:  # pylint:disable=attribute-defined-outside-init
         RESPONSE_REJECT: 'RESPONSE_REJECT',
     }
 
-    subclasses = {}  # Subclasses, by signal identifier and message type
+    # Subclasses, by signal identifier and message type
+    subclasses: Dict[int, Dict[int, Type[Message]]] = {}
 
     @staticmethod
     def message_type_name(message_type):

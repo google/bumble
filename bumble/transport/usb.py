@@ -51,8 +51,12 @@ def load_libusb():
     else:
         if libusb_path := libusb_package.get_library_path():
             logger.debug(f'loading libusb library at {libusb_path}')
-            dll_loader = ctypes.WinDLL if platform.system() == 'Windows' else ctypes.CDLL
-            libusb_dll = dll_loader(str(libusb_path), use_errno=True, use_last_error=True)
+            dll_loader = (
+                ctypes.WinDLL if platform.system() == 'Windows' else ctypes.CDLL
+            )
+            libusb_dll = dll_loader(
+                str(libusb_path), use_errno=True, use_last_error=True
+            )
             usb1.loadLibrary(libusb_dll)
 
 

@@ -16,7 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from bumble.device import Device
-from bumble.transport import PacketParser
+from bumble.transport.common import PacketParser
 
 
 # -----------------------------------------------------------------------------
