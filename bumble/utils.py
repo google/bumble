@@ -20,7 +20,7 @@ import logging
 import traceback
 import collections
 import sys
-from typing import Awaitable
+from typing import Awaitable, TypeVar
 from functools import wraps
 from colors import color
 from pyee import EventEmitter
@@ -65,8 +65,11 @@ def composite_listener(cls):
 
 
 # -----------------------------------------------------------------------------
+_T = TypeVar('_T')
+
+
 class AbortableEventEmitter(EventEmitter):
-    def abort_on(self, event: str, awaitable: Awaitable):
+    def abort_on(self, event: str, awaitable: Awaitable[_T]) -> Awaitable[_T]:
         """
         Set a coroutine or future to abort when an event occur.
         """

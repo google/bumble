@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_transport(name):
+async def open_transport(name: str) -> Transport:
     '''
     Open a transport by name.
     The name must be <type>:<parameters>

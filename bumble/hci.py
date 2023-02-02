@@ -21,7 +21,7 @@ import collections
 import logging
 import functools
 from colors import color
-from typing import Dict, Type
+from typing import Dict, Type, Union
 
 from .core import (
     BT_BR_EDR_TRANSPORT,
@@ -1729,7 +1729,9 @@ class Address:
         address_type = data[offset - 1]
         return Address.parse_address_with_type(data, offset, address_type)
 
-    def __init__(self, address, address_type=RANDOM_DEVICE_ADDRESS):
+    def __init__(
+        self, address: Union[bytes, str], address_type: int = RANDOM_DEVICE_ADDRESS
+    ):
         '''
         Initialize an instance. `address` may be a byte array in little-endian
         format, or a hex string in big-endian format (with optional ':'

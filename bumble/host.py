@@ -141,7 +141,7 @@ class Host(AbortableEventEmitter):
         if controller_sink:
             self.set_packet_sink(controller_sink)
 
-    async def flush(self):
+    async def flush(self) -> None:
         # Make sure no command is pending
         await self.command_semaphore.acquire()
 

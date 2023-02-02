@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import struct
+from typing import List, Optional, Tuple, Union, cast
 
 from .company_ids import COMPANY_IDENTIFIERS
 
@@ -146,7 +147,7 @@ class UUID:
     '''
 
     BASE_UUID = bytes.fromhex('00001000800000805F9B34FB')
-    UUIDS: list[UUID] = []  # Registry of all instances created
+    UUIDS: List[UUID] = []  # Registry of all instances created
 
     def __init__(self, uuid_str_or_int, name=None):
         if isinstance(uuid_str_or_int, int):
@@ -181,7 +182,7 @@ class UUID:
         return self
 
     @classmethod
-    def from_bytes(cls, uuid_bytes, name=None):
+    def from_bytes(cls, uuid_bytes: bytes, name: Optional[str] = None) -> UUID:
         if len(uuid_bytes) in (2, 4, 16):
             self = cls.__new__(cls)
             self.uuid_bytes = uuid_bytes
@@ -225,7 +226,7 @@ class UUID:
         '''
         return self.to_bytes(force_128=(len(self.uuid_bytes) == 4))
 
-    def to_hex_str(self):
+    def to_hex_str(self) -> str:
         if len(self.uuid_bytes) == 2 or len(self.uuid_bytes) == 4:
             return bytes(reversed(self.uuid_bytes)).hex().upper()
 
@@ -607,6 +608,11 @@ class DeviceClass:
 # -----------------------------------------------------------------------------
 # Advertising Data
 # -----------------------------------------------------------------------------
+AdvertisingObject = Union[
+    List[UUID], Tuple[UUID, bytes], bytes, str, int, Tuple[int, int], Tuple[int, bytes]
+]
+
+
 class AdvertisingData:
     # fmt: off
     # pylint: disable=line-too-long
@@ -722,10 +728,12 @@ class AdvertisingData:
     BR_EDR_CONTROLLER_FLAG            = 0x08
     BR_EDR_HOST_FLAG                  = 0x10
 
+    ad_structures: List[Tuple[int, bytes]]
+
     # fmt: on
     # pylint: enable=line-too-long
 
-    def __init__(self, ad_structures=None):
+    def __init__(self, ad_structures: Optional[List[Tuple[int, bytes]]] = None) -> None:
         if ad_structures is None:
             ad_structures = []
         self.ad_structures = ad_structures[:]
@@ -752,7 +760,7 @@ class AdvertisingData:
         return ','.join(bit_flags_to_strings(flags, flag_names))
 
     @staticmethod
-    def uuid_list_to_objects(ad_data, uuid_size):
+    def uuid_list_to_objects(ad_data: bytes, uuid_size: int) -> List[UUID]:
         uuids = []
         offset = 0
         while (uuid_size * (offset + 1)) <= len(ad_data):
@@ -829,7 +837,7 @@ class AdvertisingData:
 
     # pylint: disable=too-many-return-statements
     @staticmethod
-    def ad_data_to_object(ad_type, ad_data):
+    def ad_data_to_object(ad_type: int, ad_data: bytes) -> AdvertisingObject:
         if ad_type in (
             AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
             AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
@@ -868,22 +876,22 @@ class AdvertisingData:
             return ad_data.decode("utf-8")
 
         if ad_type in (AdvertisingData.TX_POWER_LEVEL, AdvertisingData.FLAGS):
-            return ad_data[0]
+            return cast(int, struct.unpack('B', ad_data)[0])
 
         if ad_type in (
             AdvertisingData.APPEARANCE,
             AdvertisingData.ADVERTISING_INTERVAL,
         ):
-            return struct.unpack('<H', ad_data)[0]
+            return cast(int, struct.unpack('<H', ad_data)[0])
 
         if ad_type == AdvertisingData.CLASS_OF_DEVICE:
-            return struct.unpack('<I', bytes([*ad_data, 0]))[0]
+            return cast(int, struct.unpack('<I', bytes([*ad_data, 0]))[0])
 
         if ad_type == AdvertisingData.PERIPHERAL_CONNECTION_INTERVAL_RANGE:
-            return struct.unpack('<HH', ad_data)
+            return cast(Tuple[int, int], struct.unpack('<HH', ad_data))
 
         if ad_type == AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
-            return (struct.unpack_from('<H', ad_data, 0)[0], ad_data[2:])
+            return (cast(int, struct.unpack_from('<H', ad_data, 0)[0]), ad_data[2:])
 
         return ad_data
 
@@ -898,26 +906,27 @@ class AdvertisingData:
                 self.ad_structures.append((ad_type, ad_data))
             offset += length
 
-    def get(self, type_id, return_all=False, raw=False):
+    def get_all(self, type_id: int, raw: bool = False) -> List[AdvertisingObject]:
         '''
         Get Advertising Data Structure(s) with a given type
 
-        If return_all is True, returns a (possibly empty) list of matches,
-        else returns the first entry, or None if no structure matches.
+        Returns a (possibly empty) list of matches.
         '''
 
-        def process_ad_data(ad_data):
+        def process_ad_data(ad_data: bytes) -> AdvertisingObject:
             return ad_data if raw else self.ad_data_to_object(type_id, ad_data)
 
-        if return_all:
-            return [
-                process_ad_data(ad[1]) for ad in self.ad_structures if ad[0] == type_id
-            ]
+        return [process_ad_data(ad[1]) for ad in self.ad_structures if ad[0] == type_id]
 
-        return next(
-            (process_ad_data(ad[1]) for ad in self.ad_structures if ad[0] == type_id),
-            None,
-        )
+    def get(self, type_id: int, raw: bool = False) -> Optional[AdvertisingObject]:
+        '''
+        Get Advertising Data Structure(s) with a given type
+
+        Returns the first entry, or None if no structure matches.
+        '''
+
+        all = self.get_all(type_id, raw=raw)
+        return all[0] if all else None
 
     def __bytes__(self):
         return b''.join(
