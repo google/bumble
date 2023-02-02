@@ -24,6 +24,7 @@ import asyncio
 import logging
 import os
 import json
+from typing import Optional
 from colors import color
 
 from .hci import Address
@@ -242,7 +243,7 @@ class JsonKeyStore(KeyStore):
         # Atomically replace the previous file
         os.rename(temp_filename, self.filename)
 
-    async def delete(self, name):
+    async def delete(self, name: str) -> None:
         db = await self.load()
 
         namespace = db.get(self.namespace)
@@ -278,7 +279,7 @@ class JsonKeyStore(KeyStore):
 
         await self.save(db)
 
-    async def get(self, name):
+    async def get(self, name: str) -> Optional[PairingKeys]:
         db = await self.load()
 
         namespace = db.get(self.namespace)

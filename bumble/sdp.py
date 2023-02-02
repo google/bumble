@@ -20,7 +20,7 @@ import logging
 import struct
 from colors import color
 import colors
-from typing import Dict, Type
+from typing import Dict, List, Type
 
 from . import core
 from .core import InvalidStateError
@@ -183,63 +183,63 @@ class DataElement:
                 raise ValueError('integer types must have a value size specified')
 
     @staticmethod
-    def nil():
+    def nil() -> DataElement:
         return DataElement(DataElement.NIL, None)
 
     @staticmethod
-    def unsigned_integer(value, value_size):
+    def unsigned_integer(value: int, value_size: int) -> DataElement:
         return DataElement(DataElement.UNSIGNED_INTEGER, value, value_size)
 
     @staticmethod
-    def unsigned_integer_8(value):
+    def unsigned_integer_8(value: int) -> DataElement:
         return DataElement(DataElement.UNSIGNED_INTEGER, value, value_size=1)
 
     @staticmethod
-    def unsigned_integer_16(value):
+    def unsigned_integer_16(value: int) -> DataElement:
         return DataElement(DataElement.UNSIGNED_INTEGER, value, value_size=2)
 
     @staticmethod
-    def unsigned_integer_32(value):
+    def unsigned_integer_32(value: int) -> DataElement:
         return DataElement(DataElement.UNSIGNED_INTEGER, value, value_size=4)
 
     @staticmethod
-    def signed_integer(value, value_size):
+    def signed_integer(value: int, value_size: int) -> DataElement:
         return DataElement(DataElement.SIGNED_INTEGER, value, value_size)
 
     @staticmethod
-    def signed_integer_8(value):
+    def signed_integer_8(value: int) -> DataElement:
         return DataElement(DataElement.SIGNED_INTEGER, value, value_size=1)
 
     @staticmethod
-    def signed_integer_16(value):
+    def signed_integer_16(value: int) -> DataElement:
         return DataElement(DataElement.SIGNED_INTEGER, value, value_size=2)
 
     @staticmethod
-    def signed_integer_32(value):
+    def signed_integer_32(value: int) -> DataElement:
         return DataElement(DataElement.SIGNED_INTEGER, value, value_size=4)
 
     @staticmethod
-    def uuid(value):
+    def uuid(value: core.UUID) -> DataElement:
         return DataElement(DataElement.UUID, value)
 
     @staticmethod
-    def text_string(value):
+    def text_string(value: str) -> DataElement:
         return DataElement(DataElement.TEXT_STRING, value)
 
     @staticmethod
-    def boolean(value):
+    def boolean(value: bool) -> DataElement:
         return DataElement(DataElement.BOOLEAN, value)
 
     @staticmethod
-    def sequence(value):
+    def sequence(value: List[DataElement]) -> DataElement:
         return DataElement(DataElement.SEQUENCE, value)
 
     @staticmethod
-    def alternative(value):
+    def alternative(value: List[DataElement]) -> DataElement:
         return DataElement(DataElement.ALTERNATIVE, value)
 
     @staticmethod
-    def url(value):
+    def url(value: str) -> DataElement:
         return DataElement(DataElement.URL, value)
 
     @staticmethod
@@ -458,7 +458,7 @@ class DataElement:
 
 # -----------------------------------------------------------------------------
 class ServiceAttribute:
-    def __init__(self, attribute_id, value):
+    def __init__(self, attribute_id: int, value: DataElement) -> None:
         self.id = attribute_id
         self.value = value
 

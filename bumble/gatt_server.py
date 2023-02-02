@@ -27,7 +27,7 @@ import asyncio
 import logging
 from collections import defaultdict
 import struct
-from typing import Tuple, Optional
+from typing import List, Tuple, Optional
 from pyee import EventEmitter
 from colors import color
 
@@ -90,6 +90,8 @@ GATT_SERVER_DEFAULT_MAX_MTU = 517
 # GATT Server
 # -----------------------------------------------------------------------------
 class Server(EventEmitter):
+    attributes: List[Attribute]
+
     def __init__(self, device):
         super().__init__()
         self.device = device
@@ -140,6 +142,7 @@ class Server(EventEmitter):
                 attribute
                 for attribute in self.attributes
                 if attribute.type == GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE
+                and isinstance(attribute, Service)
                 and attribute.uuid == service_uuid
             ),
             None,

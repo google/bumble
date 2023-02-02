@@ -259,7 +259,7 @@ class Transport:
     def __iter__(self):
         return iter((self.source, self.sink))
 
-    async def close(self):
+    async def close(self) -> None:
         self.source.close()
         self.sink.close()
 

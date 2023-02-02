@@ -28,7 +28,7 @@ import enum
 import functools
 import logging
 import struct
-from typing import Sequence
+from typing import Optional, Sequence
 from colors import color
 
 from .core import UUID, get_dict_key_by_value
@@ -204,6 +204,8 @@ class Service(Attribute):
     See Vol 3, Part G - 3.1 SERVICE DEFINITION
     '''
 
+    uuid: UUID
+
     def __init__(self, uuid, characteristics: list[Characteristic], primary=True):
         # Convert the uuid to a UUID object if it isn't already
         if isinstance(uuid, str):
@@ -221,7 +223,7 @@ class Service(Attribute):
         self.characteristics = characteristics[:]
         self.primary = primary
 
-    def get_advertising_data(self):
+    def get_advertising_data(self) -> Optional[bytes]:
         """
         Get Service specific advertising data
         Defined by each Service, default value is empty

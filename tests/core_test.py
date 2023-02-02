@@ -25,10 +25,8 @@ def test_ad_data():
     assert data == ad_bytes
     assert ad.get(AdvertisingData.COMPLETE_LOCAL_NAME, raw=True) is None
     assert ad.get(AdvertisingData.TX_POWER_LEVEL, raw=True) == bytes([123])
-    assert ad.get(AdvertisingData.COMPLETE_LOCAL_NAME, return_all=True, raw=True) == []
-    assert ad.get(AdvertisingData.TX_POWER_LEVEL, return_all=True, raw=True) == [
-        bytes([123])
-    ]
+    assert ad.get_all(AdvertisingData.COMPLETE_LOCAL_NAME, raw=True) == []
+    assert ad.get_all(AdvertisingData.TX_POWER_LEVEL, raw=True) == [bytes([123])]
 
     data2 = bytes([2, AdvertisingData.TX_POWER_LEVEL, 234])
     ad.append(data2)
@@ -36,8 +34,8 @@ def test_ad_data():
     assert ad_bytes == data + data2
     assert ad.get(AdvertisingData.COMPLETE_LOCAL_NAME, raw=True) is None
     assert ad.get(AdvertisingData.TX_POWER_LEVEL, raw=True) == bytes([123])
-    assert ad.get(AdvertisingData.COMPLETE_LOCAL_NAME, return_all=True, raw=True) == []
-    assert ad.get(AdvertisingData.TX_POWER_LEVEL, return_all=True, raw=True) == [
+    assert ad.get_all(AdvertisingData.COMPLETE_LOCAL_NAME, raw=True) == []
+    assert ad.get_all(AdvertisingData.TX_POWER_LEVEL, raw=True) == [
         bytes([123]),
         bytes([234]),
     ]

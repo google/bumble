@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import asyncio
 import secrets
-from typing import Dict, Type
+from typing import Dict, Optional, Type
 
 from pyee import EventEmitter
 from colors import color
@@ -504,27 +504,27 @@ class PairingDelegate:
 
     def __init__(
         self,
-        io_capability=NO_OUTPUT_NO_INPUT,
-        local_initiator_key_distribution=DEFAULT_KEY_DISTRIBUTION,
-        local_responder_key_distribution=DEFAULT_KEY_DISTRIBUTION,
-    ):
+        io_capability: int = NO_OUTPUT_NO_INPUT,
+        local_initiator_key_distribution: int = DEFAULT_KEY_DISTRIBUTION,
+        local_responder_key_distribution: int = DEFAULT_KEY_DISTRIBUTION,
+    ) -> None:
         self.io_capability = io_capability
         self.local_initiator_key_distribution = local_initiator_key_distribution
         self.local_responder_key_distribution = local_responder_key_distribution
 
-    async def accept(self):
+    async def accept(self) -> bool:
         return True
 
-    async def confirm(self):
+    async def confirm(self) -> bool:
         return True
 
-    async def compare_numbers(self, _number, _digits=6):
+    async def compare_numbers(self, _number: int, _digits: int = 6) -> bool:
         return True
 
-    async def get_number(self):
+    async def get_number(self) -> int:
         return 0
 
-    async def display_number(self, _number, _digits=6):
+    async def display_number(self, _number: int, _digits: int = 6) -> None:
         pass
 
     async def key_distribution_response(
@@ -538,7 +538,13 @@ class PairingDelegate:
 
 # -----------------------------------------------------------------------------
 class PairingConfig:
-    def __init__(self, sc=True, mitm=True, bonding=True, delegate=None):
+    def __init__(
+        self,
+        sc: bool = True,
+        mitm: bool = True,
+        bonding: bool = True,
+        delegate: Optional[PairingDelegate] = None,
+    ) -> None:
         self.sc = sc
         self.mitm = mitm
         self.bonding = bonding
