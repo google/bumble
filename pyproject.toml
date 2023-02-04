@@ -68,6 +68,10 @@ module = "colors.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "construct.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "emulated_bluetooth_packets_pb2.*"
 ignore_missing_imports = true
 

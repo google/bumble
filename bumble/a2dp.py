@@ -258,15 +258,17 @@ class SbcMediaCodecInformation(
     A2DP spec - 4.3.2 Codec Specific Information Elements
     '''
 
-    BIT_FIELDS = construct.Bitwise(construct.Sequence(
-        construct.BitsInteger(4),
-        construct.BitsInteger(4),
-        construct.BitsInteger(4),
-        construct.BitsInteger(2),
-        construct.BitsInteger(2),
-        construct.BitsInteger(8),
-        construct.BitsInteger(8),
-    ))
+    BIT_FIELDS = construct.Bitwise(
+        construct.Sequence(
+            construct.BitsInteger(4),
+            construct.BitsInteger(4),
+            construct.BitsInteger(4),
+            construct.BitsInteger(2),
+            construct.BitsInteger(2),
+            construct.BitsInteger(8),
+            construct.BitsInteger(8),
+        )
+    )
     SAMPLING_FREQUENCY_BITS = {16000: 1 << 3, 32000: 1 << 2, 44100: 1 << 1, 48000: 1}
     CHANNEL_MODE_BITS = {
         SBC_MONO_CHANNEL_MODE: 1 << 3,
@@ -365,14 +367,16 @@ class AacMediaCodecInformation(
     A2DP spec - 4.5.2 Codec Specific Information Elements
     '''
 
-    BIT_FIELDS = construct.Bitwise(construct.Sequence(
-        construct.BitsInteger(8),
-        construct.BitsInteger(12),
-        construct.BitsInteger(2),
-        construct.BitsInteger(2),
-        construct.BitsInteger(1),
-        construct.BitsInteger(23),
-    ))
+    BIT_FIELDS = construct.Bitwise(
+        construct.Sequence(
+            construct.BitsInteger(8),
+            construct.BitsInteger(12),
+            construct.BitsInteger(2),
+            construct.BitsInteger(2),
+            construct.BitsInteger(1),
+            construct.BitsInteger(23),
+        )
+    )
     OBJECT_TYPE_BITS = {
         MPEG_2_AAC_LC_OBJECT_TYPE: 1 << 7,
         MPEG_4_AAC_LC_OBJECT_TYPE: 1 << 6,
