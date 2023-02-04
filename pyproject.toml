@@ -64,10 +64,6 @@ module = "aioconsole.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "bitstruct.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
 module = "colors.*"
 ignore_missing_imports = true
 
