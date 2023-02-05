@@ -18,7 +18,7 @@
 import struct
 import logging
 from collections import namedtuple
-import bitstruct
+import construct
 
 from .company_ids import COMPANY_IDENTIFIERS
 from .sdp import (
@@ -258,7 +258,17 @@ class SbcMediaCodecInformation(
     A2DP spec - 4.3.2 Codec Specific Information Elements
     '''
 
-    BIT_FIELDS = 'u4u4u4u2u2u8u8'
+    BIT_FIELDS = construct.Bitwise(
+        construct.Sequence(
+            construct.BitsInteger(4),
+            construct.BitsInteger(4),
+            construct.BitsInteger(4),
+            construct.BitsInteger(2),
+            construct.BitsInteger(2),
+            construct.BitsInteger(8),
+            construct.BitsInteger(8),
+        )
+    )
     SAMPLING_FREQUENCY_BITS = {16000: 1 << 3, 32000: 1 << 2, 44100: 1 << 1, 48000: 1}
     CHANNEL_MODE_BITS = {
         SBC_MONO_CHANNEL_MODE: 1 << 3,
@@ -276,7 +286,7 @@ class SbcMediaCodecInformation(
     @staticmethod
     def from_bytes(data):
         return SbcMediaCodecInformation(
-            *bitstruct.unpack(SbcMediaCodecInformation.BIT_FIELDS, data)
+            *SbcMediaCodecInformation.BIT_FIELDS.parse(data)
         )
 
     @classmethod
@@ -326,7 +336,7 @@ class SbcMediaCodecInformation(
         )
 
     def __bytes__(self):
-        return bitstruct.pack(self.BIT_FIELDS, *self)
+        return self.BIT_FIELDS.build(self)
 
     def __str__(self):
         channel_modes = ['MONO', 'DUAL_CHANNEL', 'STEREO', 'JOINT_STEREO']
@@ -350,14 +360,23 @@ class SbcMediaCodecInformation(
 class AacMediaCodecInformation(
     namedtuple(
         'AacMediaCodecInformation',
-        ['object_type', 'sampling_frequency', 'channels', 'vbr', 'bitrate'],
+        ['object_type', 'sampling_frequency', 'channels', 'rfa', 'vbr', 'bitrate'],
     )
 ):
     '''
     A2DP spec - 4.5.2 Codec Specific Information Elements
     '''
 
-    BIT_FIELDS = 'u8u12u2p2u1u23'
+    BIT_FIELDS = construct.Bitwise(
+        construct.Sequence(
+            construct.BitsInteger(8),
+            construct.BitsInteger(12),
+            construct.BitsInteger(2),
+            construct.BitsInteger(2),
+            construct.BitsInteger(1),
+            construct.BitsInteger(23),
+        )
+    )
     OBJECT_TYPE_BITS = {
         MPEG_2_AAC_LC_OBJECT_TYPE: 1 << 7,
         MPEG_4_AAC_LC_OBJECT_TYPE: 1 << 6,
@@ -383,7 +402,7 @@ class AacMediaCodecInformation(
     @staticmethod
     def from_bytes(data):
         return AacMediaCodecInformation(
-            *bitstruct.unpack(AacMediaCodecInformation.BIT_FIELDS, data)
+            *AacMediaCodecInformation.BIT_FIELDS.parse(data)
         )
 
     @classmethod
@@ -394,6 +413,7 @@ class AacMediaCodecInformation(
             object_type=cls.OBJECT_TYPE_BITS[object_type],
             sampling_frequency=cls.SAMPLING_FREQUENCY_BITS[sampling_frequency],
             channels=cls.CHANNELS_BITS[channels],
+            rfa=0,
             vbr=vbr,
             bitrate=bitrate,
         )
@@ -411,7 +431,7 @@ class AacMediaCodecInformation(
         )
 
     def __bytes__(self):
-        return bitstruct.pack(self.BIT_FIELDS, *self)
+        return self.BIT_FIELDS.build(self)
 
     def __str__(self):
         object_types = [
