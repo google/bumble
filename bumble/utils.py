@@ -78,6 +78,8 @@ class AbortableEventEmitter(EventEmitter):
             return future
 
         def on_event(*_):
+            if future.done():
+                return
             msg = f'abort: {event} event occurred.'
             if isinstance(future, asyncio.Task):
                 # python < 3.9 does not support passing a message on `Task.cancel`
