@@ -217,7 +217,7 @@ class JsonKeyStore(KeyStore):
         params = device_config.keystore.split(':', 1)[1:]
         namespace = str(device_config.address)
         if params:
-            filename = params[1]
+            filename = params[0]
         else:
             filename = None
 
