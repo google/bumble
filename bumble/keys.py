@@ -130,7 +130,7 @@ class PairingKeys:
                 for (key_property, key_value) in value.items():
                     print(f'{prefix}  {color(key_property, "green")}: {key_value}')
             else:
-                print(f'{prefix}{color(property, "cyan")}: {value}')
+                print(f'{prefix}{color(container_property, "cyan")}: {value}')
 
 
 # -----------------------------------------------------------------------------
