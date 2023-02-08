@@ -366,7 +366,11 @@ async def pair(
     '--request', is_flag=True, help='Request that the connecting peer initiate pairing'
 )
 @click.option('--print-keys', is_flag=True, help='Print the bond keys before pairing')
-@click.option('--keystore-file', metavar='<filename>', help='File in which to store the pairing keys')
+@click.option(
+    '--keystore-file',
+    metavar='<filename>',
+    help='File in which to store the pairing keys',
+)
 @click.argument('device-config')
 @click.argument('hci_transport')
 @click.argument('address-or-name', required=False)
