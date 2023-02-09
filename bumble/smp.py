@@ -518,13 +518,15 @@ class PairingDelegate:
     async def confirm(self) -> bool:
         return True
 
-    async def compare_numbers(self, _number: int, _digits: int = 6) -> bool:
+    async def compare_numbers(self, number: int, digits: int = 6) -> bool:
+        # pylint: disable=unused-argument
         return True
 
     async def get_number(self) -> int:
         return 0
 
-    async def display_number(self, _number: int, _digits: int = 6) -> None:
+    async def display_number(self, number: int, digits: int = 6) -> None:
+        # pylint: disable=unused-argument
         pass
 
     async def key_distribution_response(
