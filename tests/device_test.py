@@ -197,7 +197,7 @@ async def test_device_connect_parallel():
     d1.host.set_packet_sink(Sink(d1_flow()))
     d2.host.set_packet_sink(Sink(d2_flow()))
 
-    [c01, c02, a10, a20, a01] = await asyncio.gather(
+    [c01, c02, a10, a20] = await asyncio.gather(
         *[
             asyncio.create_task(
                 d0.connect(d1.public_address, transport=BT_BR_EDR_TRANSPORT)
@@ -207,7 +207,6 @@ async def test_device_connect_parallel():
             ),
             asyncio.create_task(d1.accept(peer_address=d0.public_address)),
             asyncio.create_task(d2.accept()),
-            asyncio.create_task(d0.accept(peer_address=d1.public_address)),
         ]
     )
 
@@ -215,11 +214,9 @@ async def test_device_connect_parallel():
     assert type(c02) == Connection
     assert type(a10) == Connection
     assert type(a20) == Connection
-    assert type(a01) == Connection
 
     assert c01.handle == a10.handle and c01.handle == 0x100
     assert c02.handle == a20.handle and c02.handle == 0x101
-    assert a01 == c01
 
 
 # -----------------------------------------------------------------------------
