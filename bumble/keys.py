@@ -130,7 +130,7 @@ class PairingKeys:
                 for (key_property, key_value) in value.items():
                     print(f'{prefix}  {color(key_property, "green")}: {key_value}')
             else:
-                print(f'{prefix}{color(property, "cyan")}: {value}')
+                print(f'{prefix}{color(container_property, "cyan")}: {value}')
 
 
 # -----------------------------------------------------------------------------
@@ -217,7 +217,7 @@ class JsonKeyStore(KeyStore):
         params = device_config.keystore.split(':', 1)[1:]
         namespace = str(device_config.address)
         if params:
-            filename = params[1]
+            filename = params[0]
         else:
             filename = None
 
