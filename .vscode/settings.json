@@ -71,5 +71,10 @@
         "editor.rulers": [88]
     },
     "python.formatting.provider": "black",
-    "pylint.importStrategy": "useBundled"
+    "pylint.importStrategy": "useBundled",
+    "python.testing.pytestArgs": [
+        "."
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }

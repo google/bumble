@@ -19,8 +19,8 @@ import asyncio
 import os
 import logging
 import click
-import aioconsole
 from colors import color
+from prompt_toolkit.shortcuts import PromptSession
 
 from bumble.device import Device, Peer
 from bumble.transport import open_transport_or_link
@@ -43,8 +43,22 @@ from bumble.att import (
 
 
 # -----------------------------------------------------------------------------
+class Waiter:
+    instance = None
+
+    def __init__(self):
+        self.done = asyncio.get_running_loop().create_future()
+
+    def terminate(self):
+        self.done.set_result(None)
+
+    async def wait_until_terminated(self):
+        return await self.done
+
+
+# -----------------------------------------------------------------------------
 class Delegate(PairingDelegate):
-    def __init__(self, mode, connection, capability_string, prompt):
+    def __init__(self, mode, connection, capability_string, do_prompt):
         super().__init__(
             {
                 'keyboard': PairingDelegate.KEYBOARD_INPUT_ONLY,
@@ -58,7 +72,19 @@ class Delegate(PairingDelegate):
         self.mode = mode
         self.peer = Peer(connection)
         self.peer_name = None
-        self.prompt = prompt
+        self.do_prompt = do_prompt
+
+    def print(self, message):
+        print(color(message, 'yellow'))
+
+    async def prompt(self, message):
+        # Wait a bit to allow some of the log lines to print before we prompt
+        await asyncio.sleep(1)
+
+        session = PromptSession(message)
+        # with patch_stdout.patch_stdout(raw=True):
+        response = await session.prompt_async()
+        return response.lower().strip()
 
     async def update_peer_name(self):
         if self.peer_name is not None:
@@ -73,19 +99,15 @@ class Delegate(PairingDelegate):
             self.peer_name = '[?]'
 
     async def accept(self):
-        if self.prompt:
+        if self.do_prompt:
             await self.update_peer_name()
 
-            # Wait a bit to allow some of the log lines to print before we prompt
-            await asyncio.sleep(1)
-
             # Prompt for acceptance
-            print(color('###-----------------------------------', 'yellow'))
-            print(color(f'### Pairing request from {self.peer_name}', 'yellow'))
-            print(color('###-----------------------------------', 'yellow'))
+            self.print('###-----------------------------------')
+            self.print(f'### Pairing request from {self.peer_name}')
+            self.print('###-----------------------------------')
             while True:
-                response = await aioconsole.ainput(color('>>> Accept? ', 'yellow'))
-                response = response.lower().strip()
+                response = await self.prompt('>>> Accept? ')
 
                 if response == 'yes':
                     return True
@@ -96,23 +118,17 @@ class Delegate(PairingDelegate):
         # Accept silently
         return True
 
-    async def compare_numbers(self, number, digits=6):
+    async def compare_numbers(self, number, digits):
         await self.update_peer_name()
 
-        # Wait a bit to allow some of the log lines to print before we prompt
-        await asyncio.sleep(1)
-
         # Prompt for a numeric comparison
-        print(color('###-----------------------------------', 'yellow'))
-        print(color(f'### Pairing with {self.peer_name}', 'yellow'))
-        print(color('###-----------------------------------', 'yellow'))
+        self.print('###-----------------------------------')
+        self.print(f'### Pairing with {self.peer_name}')
+        self.print('###-----------------------------------')
         while True:
-            response = await aioconsole.ainput(
-                color(
-                    f'>>> Does the other device display {number:0{digits}}? ', 'yellow'
-                )
+            response = await self.prompt(
+                f'>>> Does the other device display {number:0{digits}}? '
             )
-            response = response.lower().strip()
 
             if response == 'yes':
                 return True
@@ -123,30 +139,24 @@ class Delegate(PairingDelegate):
     async def get_number(self):
         await self.update_peer_name()
 
-        # Wait a bit to allow some of the log lines to print before we prompt
-        await asyncio.sleep(1)
-
         # Prompt for a PIN
         while True:
             try:
-                print(color('###-----------------------------------', 'yellow'))
-                print(color(f'### Pairing with {self.peer_name}', 'yellow'))
-                print(color('###-----------------------------------', 'yellow'))
-                return int(await aioconsole.ainput(color('>>> Enter PIN: ', 'yellow')))
+                self.print('###-----------------------------------')
+                self.print(f'### Pairing with {self.peer_name}')
+                self.print('###-----------------------------------')
+                return int(await self.prompt('>>> Enter PIN: '))
             except ValueError:
                 pass
 
-    async def display_number(self, number, digits=6):
+    async def display_number(self, number, digits):
         await self.update_peer_name()
 
-        # Wait a bit to allow some of the log lines to print before we prompt
-        await asyncio.sleep(1)
-
         # Display a PIN code
-        print(color('###-----------------------------------', 'yellow'))
-        print(color(f'### Pairing with {self.peer_name}', 'yellow'))
-        print(color(f'### PIN: {number:0{digits}}', 'yellow'))
-        print(color('###-----------------------------------', 'yellow'))
+        self.print('###-----------------------------------')
+        self.print(f'### Pairing with {self.peer_name}')
+        self.print(f'### PIN: {number:0{digits}}')
+        self.print('###-----------------------------------')
 
 
 # -----------------------------------------------------------------------------
@@ -238,6 +248,7 @@ def on_pairing(keys):
     print(color('*** Paired!', 'cyan'))
     keys.print(prefix=color('*** ', 'cyan'))
     print(color('***-----------------------------------', 'cyan'))
+    Waiter.instance.terminate()
 
 
 # -----------------------------------------------------------------------------
@@ -245,6 +256,7 @@ def on_pairing_failure(reason):
     print(color('***-----------------------------------', 'red'))
     print(color(f'*** Pairing failed: {smp_error_name(reason)}', 'red'))
     print(color('***-----------------------------------', 'red'))
+    Waiter.instance.terminate()
 
 
 # -----------------------------------------------------------------------------
@@ -262,6 +274,8 @@ async def pair(
     hci_transport,
     address_or_name,
 ):
+    Waiter.instance = Waiter()
+
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(hci_transport) as (hci_source, hci_sink):
         print('<<< connected')
@@ -332,7 +346,19 @@ async def pair(
             # Advertise so that peers can find us and connect
             await device.start_advertising(auto_restart=True)
 
-        await hci_source.wait_for_termination()
+        # Run until the user asks to exit
+        await Waiter.instance.wait_until_terminated()
+
+
+# -----------------------------------------------------------------------------
+class LogHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
+
+    def emit(self, record):
+        message = self.format(record)
+        print(message)
 
 
 # -----------------------------------------------------------------------------
@@ -388,7 +414,13 @@ def main(
     hci_transport,
     address_or_name,
 ):
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    # Setup logging
+    log_handler = LogHandler()
+    root_logger = logging.getLogger()
+    root_logger.addHandler(log_handler)
+    root_logger.setLevel(os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+
+    # Pair
     asyncio.run(
         pair(
             mode,
