@@ -1827,7 +1827,7 @@ class Device(CompositeEventEmitter):
         set.
 
         Notes:
-          * A `connect` to the same peer will also complete this call.
+          * A `connect` to the same peer will not complete this call.
           * The `timeout` parameter is only handled while waiting for the connection
             request, once received and accepted, the controller shall issue a connection
             complete event.
@@ -2408,16 +2408,6 @@ class Device(CompositeEventEmitter):
                 connection_handle, peer_resolvable_address, role, connection_parameters
             )
             self.connections[connection_handle] = connection
-
-            # We may have an accept ongoing waiting for a connection request for
-            # `peer_address`.
-            # Typically happen when using `connect` to the same `peer_address` we are
-            # waiting for with an `accept`.
-            # In this case, set the completed `connection` to the `accept` future
-            # result.
-            if peer_address in self.classic_pending_accepts:
-                future, *_ = self.classic_pending_accepts.pop(peer_address)
-                future.set_result(connection)
 
             # Emit an event to notify listeners of the new connection
             self.emit('connection', connection)
