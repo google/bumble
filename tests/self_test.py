@@ -32,7 +32,6 @@ from bumble.smp import (
     PairingDelegate,
     SMP_PAIRING_NOT_SUPPORTED_ERROR,
     SMP_CONFIRM_VALUE_FAILED_ERROR,
-    SMP_ID_KEY_DISTRIBUTION_FLAG,
 )
 from bumble.core import ProtocolError
 
@@ -273,9 +272,15 @@ KEY_DIST = range(16)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'io_cap, sc, mitm, key_dist', itertools.product(IO_CAP, SC, MITM, KEY_DIST)
+    'io_caps, sc, mitm, key_dist',
+    itertools.chain(
+        itertools.product([IO_CAP], SC, MITM, [15]),
+        itertools.product(
+            [[PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT]], SC, MITM, KEY_DIST
+        ),
+    ),
 )
-async def test_self_smp(io_cap, sc, mitm, key_dist):
+async def test_self_smp(io_caps, sc, mitm, key_dist):
     class Delegate(PairingDelegate):
         def __init__(
             self,
@@ -296,6 +301,7 @@ async def test_self_smp(io_cap, sc, mitm, key_dist):
             self.peer_delegate = None
             self.number = asyncio.get_running_loop().create_future()
 
+        # pylint: disable-next=unused-argument
         async def compare_numbers(self, number, digits):
             if self.peer_delegate is None:
                 logger.warning(f'[{self.name}] no peer delegate')
@@ -331,8 +337,9 @@ async def test_self_smp(io_cap, sc, mitm, key_dist):
 
     pairing_config_sets = [('Initiator', [None]), ('Responder', [None])]
     for pairing_config_set in pairing_config_sets:
-        delegate = Delegate(pairing_config_set[0], io_cap, key_dist, key_dist)
-        pairing_config_set[1].append(PairingConfig(sc, mitm, True, delegate))
+        for io_cap in io_caps:
+            delegate = Delegate(pairing_config_set[0], io_cap, key_dist, key_dist)
+            pairing_config_set[1].append(PairingConfig(sc, mitm, True, delegate))
 
     for pairing_config1 in pairing_config_sets[0][1]:
         for pairing_config2 in pairing_config_sets[1][1]:
