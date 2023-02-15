@@ -525,6 +525,7 @@ class PairingDelegate:
     async def get_number(self) -> int:
         return 0
 
+    # pylint: disable-next=unused-argument
     async def display_number(self, number: int, digits: int) -> None:
         pass
 
