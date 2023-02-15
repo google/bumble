@@ -82,7 +82,6 @@ class Delegate(PairingDelegate):
         await asyncio.sleep(1)
 
         session = PromptSession(message)
-        # with patch_stdout.patch_stdout(raw=True):
         response = await session.prompt_async()
         return response.lower().strip()
 
