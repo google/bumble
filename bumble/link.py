@@ -19,8 +19,6 @@ import logging
 import asyncio
 from functools import partial
 
-import websockets
-
 from bumble.colors import color
 from bumble.hci import (
     Address,
@@ -220,6 +218,8 @@ class RemoteLink:
                 )
 
     async def run_connection(self):
+        import websockets  # lazy import
+
         # Connect to the relay
         logger.debug(f'connecting to {self.uri}')
         # pylint: disable-next=no-member
