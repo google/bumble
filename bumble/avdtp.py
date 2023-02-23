@@ -20,7 +20,6 @@ import asyncio
 import struct
 import time
 import logging
-from colors import color
 from pyee import EventEmitter
 from typing import Dict, Type
 
@@ -40,6 +39,7 @@ from .a2dp import (
     VendorSpecificMediaCodecInformation,
 )
 from . import sdp
+from .colors import color
 
 # -----------------------------------------------------------------------------
 # Logging

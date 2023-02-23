@@ -19,9 +19,9 @@ import asyncio
 import os
 import logging
 import click
-from colors import color
 
 import bumble.core
+from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.gatt import show_services
 from bumble.transport import open_transport_or_link

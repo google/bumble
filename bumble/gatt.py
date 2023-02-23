@@ -29,8 +29,8 @@ import functools
 import logging
 import struct
 from typing import Optional, Sequence
-from colors import color
 
+from .colors import color
 from .core import UUID, get_dict_key_by_value
 from .att import Attribute
 

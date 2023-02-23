@@ -18,7 +18,8 @@
 import logging
 import asyncio
 import collections
-from colors import color
+
+from .colors import color
 
 
 # -----------------------------------------------------------------------------

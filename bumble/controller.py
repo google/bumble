@@ -20,7 +20,7 @@ import asyncio
 import itertools
 import random
 import struct
-from colors import color
+from bumble.colors import color
 from bumble.core import BT_CENTRAL_ROLE, BT_PERIPHERAL_ROLE
 
 from bumble.hci import (

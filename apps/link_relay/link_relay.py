@@ -23,8 +23,9 @@ import argparse
 import uuid
 import os
 from urllib.parse import urlparse
-from colors import color
 import websockets
+
+from bumble.colors import color
 
 # -----------------------------------------------------------------------------
 # Logging

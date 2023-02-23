@@ -22,7 +22,7 @@ import logging
 import struct
 import json
 import websockets
-from colors import color
+from bumble.colors import color
 
 from bumble.core import AdvertisingData
 from bumble.device import Device, Connection, Peer

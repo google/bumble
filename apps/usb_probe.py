@@ -30,8 +30,8 @@ import os
 import logging
 import click
 import usb1
-from colors import color
 
+from bumble.colors import color
 from bumble.transport.usb import load_libusb
 
 

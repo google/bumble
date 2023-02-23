@@ -27,7 +27,6 @@ import re
 from collections import OrderedDict
 
 import click
-import colors
 
 from prompt_toolkit import Application
 from prompt_toolkit.history import FileHistory
@@ -53,6 +52,7 @@ from prompt_toolkit.layout import (
 
 from bumble import __version__
 import bumble.core
+from bumble import colors
 from bumble.core import UUID, AdvertisingData, BT_LE_TRANSPORT
 from bumble.device import ConnectionParametersPreferences, Device, Connection, Peer
 from bumble.utils import AsyncRunner

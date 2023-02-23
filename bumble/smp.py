@@ -29,8 +29,8 @@ import secrets
 from typing import Dict, Optional, Type
 
 from pyee import EventEmitter
-from colors import color
 
+from .colors import color
 from .hci import Address, HCI_LE_Enable_Encryption_Command, HCI_Object, key_with_value
 from .core import (
     BT_BR_EDR_TRANSPORT,

@@ -25,8 +25,8 @@ import logging
 import os
 import json
 from typing import Optional
-from colors import color
 
+from .colors import color
 from .hci import Address
 
 

@@ -19,9 +19,9 @@ import logging
 import asyncio
 from functools import partial
 
-from colors import color
 import websockets
 
+from bumble.colors import color
 from bumble.hci import (
     Address,
     HCI_SUCCESS,

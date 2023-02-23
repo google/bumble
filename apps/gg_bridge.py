@@ -20,8 +20,8 @@ import os
 import struct
 import logging
 import click
-from colors import color
 
+from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.core import AdvertisingData
 from bumble.gatt import Service, Characteristic, CharacteristicValue

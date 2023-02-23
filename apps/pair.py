@@ -19,9 +19,9 @@ import asyncio
 import os
 import logging
 import click
-from colors import color
 from prompt_toolkit.shortcuts import PromptSession
 
+from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.transport import open_transport_or_link
 from bumble.smp import PairingDelegate, PairingConfig
