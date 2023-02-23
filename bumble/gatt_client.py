@@ -27,9 +27,9 @@ import asyncio
 import logging
 import struct
 
-from colors import color
 from pyee import EventEmitter
 
+from .colors import color
 from .hci import HCI_Constant
 from .att import (
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,

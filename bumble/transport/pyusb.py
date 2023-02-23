@@ -22,10 +22,10 @@ import time
 
 import usb.core
 import usb.util
-from colors import color
 
 from .common import Transport, ParserSource
 from .. import hci
+from ..colors import color
 
 
 # -----------------------------------------------------------------------------

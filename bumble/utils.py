@@ -22,9 +22,9 @@ import collections
 import sys
 from typing import Awaitable, TypeVar
 from functools import wraps
-from colors import color
 from pyee import EventEmitter
 
+from .colors import color
 
 # -----------------------------------------------------------------------------
 # Logging

@@ -18,9 +18,9 @@
 import struct
 import asyncio
 import logging
-from colors import color
 
 from .. import hci
+from ..colors import color
 
 
 # -----------------------------------------------------------------------------

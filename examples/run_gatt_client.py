@@ -19,7 +19,7 @@ import asyncio
 import sys
 import os
 import logging
-from colors import color
+from bumble.colors import color
 
 from bumble.core import ProtocolError
 from bumble.device import Device, Peer

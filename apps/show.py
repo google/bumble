@@ -17,8 +17,8 @@
 # -----------------------------------------------------------------------------
 import struct
 import click
-from colors import color
 
+from bumble.colors import color
 from bumble import hci
 from bumble.transport.common import PacketReader
 from bumble.helpers import PacketTracer

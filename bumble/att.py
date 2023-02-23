@@ -24,12 +24,12 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import struct
-from colors import color
 from pyee import EventEmitter
 from typing import Dict, Type
 
 from bumble.core import UUID, name_or_number
 from bumble.hci import HCI_Object, key_with_value
+from bumble.colors import color
 
 
 # -----------------------------------------------------------------------------

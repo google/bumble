@@ -25,8 +25,7 @@ from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
 from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union
 
-from colors import color
-
+from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
 from .gatt import Characteristic, Descriptor, Service
 from .hci import (

@@ -20,7 +20,7 @@ import sys
 import os
 import logging
 
-from colors import color
+from bumble.colors import color
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.core import BT_BR_EDR_TRANSPORT

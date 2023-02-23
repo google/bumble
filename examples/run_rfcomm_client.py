@@ -20,7 +20,7 @@ import sys
 import os
 import logging
 
-from colors import color
+from bumble.colors import color
 
 import bumble.core
 from bumble.device import Device

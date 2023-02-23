@@ -18,11 +18,10 @@
 from __future__ import annotations
 import logging
 import struct
-from colors import color
-import colors
 from typing import Dict, List, Type
 
 from . import core
+from .colors import color
 from .core import InvalidStateError
 from .hci import HCI_Object, name_or_number, key_with_value
 
@@ -506,7 +505,7 @@ class ServiceAttribute:
     def to_string(self, with_colors=False):
         if with_colors:
             return (
-                f'Attribute(id={colors.color(self.id_name(self.id),"magenta")},'
+                f'Attribute(id={color(self.id_name(self.id),"magenta")},'
                 f'value={self.value})'
             )
 

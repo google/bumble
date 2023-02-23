@@ -16,8 +16,8 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-from colors import color
 
+from .colors import color
 from .att import ATT_CID, ATT_PDU
 from .smp import SMP_CID, SMP_Command
 from .core import name_or_number

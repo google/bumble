@@ -21,10 +21,10 @@ import logging
 import struct
 
 from collections import deque
-from colors import color
 from pyee import EventEmitter
 from typing import Dict, Type
 
+from .colors import color
 from .core import BT_CENTRAL_ROLE, InvalidStateError, ProtocolError
 from .hci import (
     HCI_LE_Connection_Update_Command,

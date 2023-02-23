@@ -19,7 +19,7 @@ import asyncio
 import sys
 import os
 import logging
-from colors import color
+from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.profiles.device_information_service import DeviceInformationServiceProxy
 from bumble.transport import open_transport

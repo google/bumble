@@ -29,8 +29,8 @@ from collections import defaultdict
 import struct
 from typing import List, Tuple, Optional
 from pyee import EventEmitter
-from colors import color
 
+from .colors import color
 from .core import UUID
 from .att import (
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,

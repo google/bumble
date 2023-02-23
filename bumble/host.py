@@ -20,8 +20,7 @@ import collections
 import logging
 import struct
 
-from colors import color
-
+from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
 
 from .hci import (

@@ -23,10 +23,10 @@ import ctypes
 import platform
 
 import usb1
-from colors import color
 
 from .common import Transport, ParserSource
 from .. import hci
+from ..colors import color
 
 
 # -----------------------------------------------------------------------------

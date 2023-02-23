@@ -20,9 +20,9 @@ import struct
 import collections
 import logging
 import functools
-from colors import color
 from typing import Dict, Type, Union
 
+from .colors import color
 from .core import (
     BT_BR_EDR_TRANSPORT,
     AdvertisingData,

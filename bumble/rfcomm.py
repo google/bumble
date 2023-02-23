@@ -18,10 +18,10 @@
 import logging
 import asyncio
 
-from colors import color
 from pyee import EventEmitter
 
 from . import core
+from .colors import color
 from .core import BT_BR_EDR_TRANSPORT, InvalidStateError, ProtocolError
 
 # -----------------------------------------------------------------------------

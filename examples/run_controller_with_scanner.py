@@ -19,7 +19,7 @@ import logging
 import asyncio
 import sys
 import os
-from colors import color
+from bumble.colors import color
 
 from bumble.device import Device
 from bumble.controller import Controller

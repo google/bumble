@@ -19,9 +19,9 @@ import asyncio
 import os
 import logging
 import click
-from colors import color
 from bumble.company_ids import COMPANY_IDENTIFIERS
 
+from bumble.colors import color
 from bumble.core import name_or_number
 from bumble.hci import (
     map_null_terminated_utf8_string,
