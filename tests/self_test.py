@@ -20,6 +20,7 @@ import itertools
 import logging
 import os
 import pytest
+import time
 
 from bumble.controller import Controller
 from bumble.link import LocalLink
@@ -96,6 +97,38 @@ async def test_self_connection():
     # Check the post conditions
     assert two_devices.connections[0] is not None
     assert two_devices.connections[1] is not None
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_self_connection_with_btsnoop():
+    # Create two devices, each with a controller, attached to the same link
+    two_devices = TwoDevices()
+    snoop_path = f'/tmp/test_self_connection_with_btsnoop_{time.time()}.log'
+    two_devices.devices[0].host.snoop_start(snoop_path)
+
+    # Attach listeners
+    two_devices.devices[0].on(
+        'connection', lambda connection: two_devices.on_connection(0, connection)
+    )
+    two_devices.devices[1].on(
+        'connection', lambda connection: two_devices.on_connection(1, connection)
+    )
+
+    # Start
+    await two_devices.devices[0].power_on()
+    await two_devices.devices[1].power_on()
+
+    # Connect the two devices
+    await two_devices.devices[0].connect(two_devices.devices[1].random_address)
+
+    # Check the post conditions
+    assert two_devices.connections[0] is not None
+    assert two_devices.connections[1] is not None
+
+    two_devices.devices[0].host.snoop_stop()
+    assert os.path.getsize(snoop_path) > 0
+    os.remove(snoop_path)
 
 
 # -----------------------------------------------------------------------------

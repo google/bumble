@@ -17,11 +17,13 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import collections
+import datetime
 import logging
 import struct
 
 from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
+from bumble.snoop import Snoop
 
 from .hci import (
     HCI_ACL_DATA_PACKET,
@@ -133,12 +135,31 @@ class Host(AbortableEventEmitter):
         self.long_term_key_provider = None
         self.link_key_provider = None
         self.pairing_io_capability_provider = None  # Classic only
+        self.snoop_logger = None
 
         # Connect to the source and sink if specified
         if controller_source:
             controller_source.set_packet_sink(self)
         if controller_sink:
             self.set_packet_sink(controller_sink)
+
+    def snoop_start(self, path: str = '') -> None:
+        # Close existed logger
+        if self.snoop_logger is not None:
+            self.snoop_stop()
+
+        if path == '':
+            path = (
+                f'/tmp/bumble_{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}.log'
+            )
+        
+        self.snoop_logger = Snoop(path)
+
+    def snoop_stop(self) -> None:
+        if self.snoop_logger is None:
+            return
+        self.snoop_logger.close()
+        self.snoop_logger = None
 
     async def flush(self) -> None:
         # Make sure no command is pending
@@ -274,6 +295,8 @@ class Host(AbortableEventEmitter):
 
     def send_hci_packet(self, packet):
         self.hci_sink.on_packet(packet.to_bytes())
+        if self.snoop_logger is not None:
+            self.snoop_logger.write(packet, outgoing=True)
 
     async def send_command(self, command, check_result=False):
         logger.debug(f'{color("### HOST -> CONTROLLER", "blue")}: {command}')
@@ -417,6 +440,8 @@ class Host(AbortableEventEmitter):
             logger.debug('reset not done, ignoring packet from controller')
 
     def on_hci_packet(self, packet):
+        if self.snoop_logger is not None:
+            self.snoop_logger.write(packet, outgoing=False)
         logger.debug(f'{color("### CONTROLLER -> HOST", "green")}: {packet}')
 
         # If the packet is a command, invoke the handler for this packet

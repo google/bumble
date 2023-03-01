@@ -136,6 +136,7 @@ HCI_VERSION_NAMES = {
 LMP_VERSION_NAMES = HCI_VERSION_NAMES
 
 # HCI Packet types
+HCI_UNKNOWN_PACKET          = 0x00
 HCI_COMMAND_PACKET          = 0x01
 HCI_ACL_DATA_PACKET         = 0x02
 HCI_SYNCHRONOUS_DATA_PACKET = 0x03
@@ -1818,6 +1819,7 @@ Address.NIL = Address(b"\xff\xff\xff\xff\xff\xff", Address.PUBLIC_DEVICE_ADDRESS
 Address.ANY = Address(b"\x00\x00\x00\x00\x00\x00", Address.PUBLIC_DEVICE_ADDRESS)
 Address.ANY_RANDOM = Address(b"\x00\x00\x00\x00\x00\x00", Address.RANDOM_DEVICE_ADDRESS)
 
+
 # -----------------------------------------------------------------------------
 class OwnAddressType:
     PUBLIC = 0
@@ -1846,6 +1848,8 @@ class HCI_Packet:
     Abstract Base class for HCI packets
     '''
 
+    hci_packet_type = HCI_UNKNOWN_PACKET
+
     @staticmethod
     def from_bytes(packet):
         packet_type = packet[0]
@@ -1866,6 +1870,9 @@ class HCI_Packet:
 
     def __repr__(self) -> str:
         return self.name
+
+    def to_bytes(self) -> bytes:
+        return b''
 
 
 # -----------------------------------------------------------------------------
@@ -5302,7 +5309,7 @@ class HCI_Remote_Host_Supported_Features_Notification_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-class HCI_AclDataPacket:
+class HCI_AclDataPacket(HCI_Packet):
     '''
     See Bluetooth spec @ 5.4.2 HCI ACL Data Packets
     '''
