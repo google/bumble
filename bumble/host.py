@@ -22,6 +22,7 @@ import struct
 
 from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
+from bumble.snoop import Snooper
 
 from .hci import (
     HCI_ACL_DATA_PACKET,
@@ -133,6 +134,7 @@ class Host(AbortableEventEmitter):
         self.long_term_key_provider = None
         self.link_key_provider = None
         self.pairing_io_capability_provider = None  # Classic only
+        self.snooper = None
 
         # Connect to the source and sink if specified
         if controller_source:
@@ -273,6 +275,9 @@ class Host(AbortableEventEmitter):
         self.hci_sink = sink
 
     def send_hci_packet(self, packet):
+        if self.snooper:
+            self.snooper.snoop(packet, Snooper.Direction.HOST_TO_CONTROLLER)
+
         self.hci_sink.on_packet(packet.to_bytes())
 
     async def send_command(self, command, check_result=False):
@@ -418,6 +423,9 @@ class Host(AbortableEventEmitter):
 
     def on_hci_packet(self, packet):
         logger.debug(f'{color("### CONTROLLER -> HOST", "green")}: {packet}')
+
+        if self.snooper:
+            self.snooper.snoop(packet, Snooper.Direction.CONTROLLER_TO_HOST)
 
         # If the packet is a command, invoke the handler for this packet
         if packet.hci_packet_type == HCI_COMMAND_PACKET:

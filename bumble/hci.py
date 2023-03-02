@@ -1846,6 +1846,8 @@ class HCI_Packet:
     Abstract Base class for HCI packets
     '''
 
+    hci_packet_type: int
+
     @staticmethod
     def from_bytes(packet):
         packet_type = packet[0]
@@ -1864,6 +1866,9 @@ class HCI_Packet:
     def __init__(self, name):
         self.name = name
 
+    def __bytes__(self) -> bytes:
+        raise NotImplementedError
+
     def __repr__(self) -> str:
         return self.name
 
@@ -1874,6 +1879,9 @@ class HCI_CustomPacket(HCI_Packet):
         super().__init__('HCI_CUSTOM_PACKET')
         self.hci_packet_type = payload[0]
         self.payload = payload
+
+    def __bytes__(self) -> bytes:
+        return self.payload
 
 
 # -----------------------------------------------------------------------------
