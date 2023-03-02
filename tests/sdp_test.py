@@ -22,6 +22,7 @@ from bumble.sdp import DataElement
 # pylint: disable=invalid-name
 # -----------------------------------------------------------------------------
 
+
 # -----------------------------------------------------------------------------
 def basic_check(x):
     serialized = bytes(x)

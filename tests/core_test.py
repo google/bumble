@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from bumble.core import AdvertisingData, get_dict_key_by_value
 
+
 # -----------------------------------------------------------------------------
 def test_ad_data():
     data = bytes([2, AdvertisingData.TX_POWER_LEVEL, 123])

@@ -194,6 +194,7 @@ DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS          = l2cap.L2CAP_LE_CREDIT_BASED_CONN
 # Classes
 # -----------------------------------------------------------------------------
 
+
 # -----------------------------------------------------------------------------
 class Advertisement:
     address: Address
@@ -1196,7 +1197,7 @@ class Device(CompositeEventEmitter):
                 await self.send_command(HCI_LE_Clear_Resolving_List_Command())  # type: ignore[call-arg]
 
                 resolving_keys = await self.keystore.get_resolving_keys()
-                for (irk, address) in resolving_keys:
+                for irk, address in resolving_keys:
                     await self.send_command(
                         HCI_LE_Add_Device_To_Resolving_List_Command(
                             peer_identity_address_type=address.address_type,

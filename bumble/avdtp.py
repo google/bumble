@@ -659,7 +659,7 @@ class Message:  # pylint:disable=attribute-defined-outside-init
         subclass.message_type = message_type
 
         if signal_identifier_str is not None:
-            for (name, signal_identifier) in AVDTP_SIGNAL_IDENTIFIERS.items():
+            for name, signal_identifier in AVDTP_SIGNAL_IDENTIFIERS.items():
                 if name.lower().endswith(signal_identifier_str.lower()):
                     subclass.signal_identifier = signal_identifier
                     break

@@ -371,8 +371,8 @@ class Host(AbortableEventEmitter):
 
     def supports_command(self, command):
         # Find the support flag position for this command
-        for (octet, flags) in enumerate(HCI_SUPPORTED_COMMANDS_FLAGS):
-            for (flag_position, value) in enumerate(flags):
+        for octet, flags in enumerate(HCI_SUPPORTED_COMMANDS_FLAGS):
+            for flag_position, value in enumerate(flags):
                 if value == command:
                     # Check if the flag is set
                     if octet < len(self.local_supported_commands) and flag_position < 8:
@@ -385,7 +385,7 @@ class Host(AbortableEventEmitter):
     @property
     def supported_commands(self):
         commands = []
-        for (octet, flags) in enumerate(self.local_supported_commands):
+        for octet, flags in enumerate(self.local_supported_commands):
             if octet < len(HCI_SUPPORTED_COMMANDS_FLAGS):
                 for flag in range(8):
                     if flags & (1 << flag) != 0:

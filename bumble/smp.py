@@ -476,7 +476,7 @@ class AddressResolver:
         address_bytes = bytes(address)
         hash_part = address_bytes[0:3]
         prand = address_bytes[3:6]
-        for (irk, resolved_address) in self.resolving_keys:
+        for irk, resolved_address in self.resolving_keys:
             local_hash = crypto.ah(irk, prand)
             if local_hash == hash_part:
                 # Match!

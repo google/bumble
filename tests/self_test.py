@@ -203,7 +203,7 @@ async def test_self_gatt_long_read():
     found_service = result[0]
     found_characteristics = await found_service.discover_characteristics()
     assert len(found_characteristics) == 513
-    for (i, characteristic) in enumerate(found_characteristics):
+    for i, characteristic in enumerate(found_characteristics):
         value = await characteristic.read_value()
         assert value == characteristics[i].value
 

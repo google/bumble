@@ -1455,7 +1455,7 @@ class HCI_Object:
     @staticmethod
     def dict_from_bytes(data, offset, fields):
         result = collections.OrderedDict()
-        for (field_name, field_type) in fields:
+        for field_name, field_type in fields:
             # The field_type may be a dictionary with a mapper, parser, and/or size
             if isinstance(field_type, dict):
                 if 'size' in field_type:
@@ -1517,7 +1517,7 @@ class HCI_Object:
     @staticmethod
     def dict_to_bytes(hci_object, fields):
         result = bytearray()
-        for (field_name, field_type) in fields:
+        for field_name, field_type in fields:
             # The field_type may be a dictionary with a mapper, parser, serializer,
             # and/or size
             serializer = None
@@ -1817,6 +1817,7 @@ class Address:
 Address.NIL = Address(b"\xff\xff\xff\xff\xff\xff", Address.PUBLIC_DEVICE_ADDRESS)
 Address.ANY = Address(b"\x00\x00\x00\x00\x00\x00", Address.PUBLIC_DEVICE_ADDRESS)
 Address.ANY_RANDOM = Address(b"\x00\x00\x00\x00\x00\x00", Address.RANDOM_DEVICE_ADDRESS)
+
 
 # -----------------------------------------------------------------------------
 class OwnAddressType:
@@ -3778,7 +3779,7 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
             ('scanning_filter_policy:', self.scanning_filter_policy),
             ('scanning_phys:         ', ','.join(scanning_phys_strs)),
         ]
-        for (i, scanning_phy_str) in enumerate(scanning_phys_strs):
+        for i, scanning_phy_str in enumerate(scanning_phys_strs):
             fields.append(
                 (
                     f'{scanning_phy_str}.scan_type:    ',
@@ -3918,7 +3919,7 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
             ('peer_address:           ', str(self.peer_address)),
             ('initiating_phys:        ', ','.join(initiating_phys_strs)),
         ]
-        for (i, initiating_phys_str) in enumerate(initiating_phys_strs):
+        for i, initiating_phys_str in enumerate(initiating_phys_strs):
             fields.append(
                 (
                     f'{initiating_phys_str}.scan_interval:          ',

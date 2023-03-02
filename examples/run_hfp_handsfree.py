@@ -121,7 +121,7 @@ async def protocol_loop(protocol):
     await protocol.initialize_service()
 
     while True:
-        await (protocol.next_line())
+        await protocol.next_line()
 
 
 # -----------------------------------------------------------------------------

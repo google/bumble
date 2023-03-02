@@ -38,7 +38,6 @@ _builder.BuildTopDescriptorsAndMessages(
     DESCRIPTOR, 'emulated_bluetooth_vhci_pb2', globals()
 )
 if _descriptor._USE_C_DESCRIPTORS == False:
-
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b'\n\037com.android.emulation.bluetoothP\001\370\001\001\242\002\003AEB\252\002\033Android.Emulation.Bluetooth'
     _VHCIFORWARDINGSERVICE._serialized_start = 96

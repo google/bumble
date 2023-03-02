@@ -22,6 +22,7 @@ from bumble.crypto import EccKey, aes_cmac, ah, c1, f4, f5, f6, g2, h6, h7, s1
 # pylint: disable=invalid-name
 # -----------------------------------------------------------------------------
 
+
 # -----------------------------------------------------------------------------
 def reversed_hex(hex_str):
     return bytes(reversed(bytes.fromhex(hex_str)))

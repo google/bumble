@@ -441,7 +441,7 @@ async def open_usb_transport(spec):
         # Look for the first interface with the right class and endpoints
         def find_endpoints(device):
             # pylint: disable-next=too-many-nested-blocks
-            for (configuration_index, configuration) in enumerate(device):
+            for configuration_index, configuration in enumerate(device):
                 interface = None
                 for interface in configuration:
                     setting = None

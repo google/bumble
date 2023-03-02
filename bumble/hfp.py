@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 # Protocol Support
 # -----------------------------------------------------------------------------
 
+
 # -----------------------------------------------------------------------------
 class HfpProtocol:
     def __init__(self, dlc):
@@ -80,16 +81,16 @@ class HfpProtocol:
     async def initialize_service(self):
         # Perform Service Level Connection Initialization
         self.send_command_line('AT+BRSF=2072')  # Retrieve Supported Features
-        await (self.next_line())
-        await (self.next_line())
+        await self.next_line()
+        await self.next_line()
 
         self.send_command_line('AT+CIND=?')
-        await (self.next_line())
-        await (self.next_line())
+        await self.next_line()
+        await self.next_line()
 
         self.send_command_line('AT+CIND?')
-        await (self.next_line())
-        await (self.next_line())
+        await self.next_line()
+        await self.next_line()
 
         self.send_command_line('AT+CMER=3,0,0,1')
-        await (self.next_line())
+        await self.next_line()
