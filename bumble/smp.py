@@ -1023,10 +1023,17 @@ class Session:
                         identity_resolving_key=self.manager.device.irk
                     )
                 )
+                if self.manager.device.random_identity_address:
+                    addr_type = self.manager.device.random_identity_address.address_type
+                    bd_addr = self.manager.device.random_identity_address
+                else:
+                    addr_type=self.connection.self_address.address_type
+                    bd_addr=self.connection.self_address
+
                 self.send_command(
                     SMP_Identity_Address_Information_Command(
-                        addr_type=self.connection.self_address.address_type,
-                        bd_addr=self.connection.self_address,
+                        addr_type=addr_type,
+                        bd_addr=bd_addr,
                     )
                 )
 
