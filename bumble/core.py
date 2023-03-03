@@ -144,9 +144,12 @@ class ConnectionError(BaseError):  # pylint: disable=redefined-builtin
 class UUID:
     '''
     See Bluetooth spec Vol 3, Part B - 2.5.1 UUID
+
+    Note that this class expects and works in little-endian byte-order throughout.
+    The exception is when interacting with strings, which are in big-endian byte-order.
     '''
 
-    BASE_UUID = bytes.fromhex('00001000800000805F9B34FB')
+    BASE_UUID = bytes.fromhex('00001000800000805F9B34FB')[::-1]  # little-endian
     UUIDS: List[UUID] = []  # Registry of all instances created
 
     def __init__(self, uuid_str_or_int, name=None):
@@ -209,13 +212,20 @@ class UUID:
         return offset + 2, cls.from_bytes(uuid_as_bytes[offset : offset + 2])
 
     def to_bytes(self, force_128=False):
-        if len(self.uuid_bytes) == 16 or not force_128:
+        '''
+        Serialize UUID in little-endian byte-order
+        '''
+        if not force_128:
             return self.uuid_bytes
 
-        if len(self.uuid_bytes) == 4:
-            return self.uuid_bytes + UUID.BASE_UUID
-
-        return self.uuid_bytes + bytes([0, 0]) + UUID.BASE_UUID
+        if len(self.uuid_bytes) == 2:
+            return self.BASE_UUID + self.uuid_bytes + bytes([0, 0])
+        elif len(self.uuid_bytes) == 4:
+            return self.BASE_UUID + self.uuid_bytes
+        elif len(self.uuid_bytes) == 16:
+            return self.uuid_bytes
+        else:
+            assert False, "unreachable"
 
     def to_pdu_bytes(self):
         '''
