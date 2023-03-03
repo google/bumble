@@ -729,11 +729,13 @@ class DeviceConfiguration:
         # Setup defaults
         self.name = DEVICE_DEFAULT_NAME
         self.address = Address(DEVICE_DEFAULT_ADDRESS)
+        self.random_identity_address = None
         self.class_of_device = DEVICE_DEFAULT_CLASS_OF_DEVICE
         self.scan_response_data = DEVICE_DEFAULT_SCAN_RESPONSE_DATA
         self.advertising_interval_min = DEVICE_DEFAULT_ADVERTISING_INTERVAL
         self.advertising_interval_max = DEVICE_DEFAULT_ADVERTISING_INTERVAL
         self.le_enabled = True
+        self.classic_enabled = False
         # LE host enable 2nd parameter
         self.le_simultaneous_enabled = True
         self.classic_sc_enabled = True
@@ -755,6 +757,10 @@ class DeviceConfiguration:
         self.name = config.get('name', self.name)
         if address := config.get('address', None):
             self.address = Address(address)
+
+        if random_identity_address := config.get('random_identity_address', None):
+            self.random_identity_address = Address(random_identity_address, Address.RANDOM_IDENTITY_ADDRESS)
+
         self.class_of_device = config.get('class_of_device', self.class_of_device)
         self.advertising_interval_min = config.get(
             'advertising_interval', self.advertising_interval_min
@@ -762,6 +768,7 @@ class DeviceConfiguration:
         self.advertising_interval_max = self.advertising_interval_min
         self.keystore = config.get('keystore')
         self.le_enabled = config.get('le_enabled', self.le_enabled)
+        self.classic_enabled = config.get('classic_enabled', self.classic_enabled)
         self.le_simultaneous_enabled = config.get(
             'le_simultaneous_enabled', self.le_simultaneous_enabled
         )
@@ -968,6 +975,7 @@ class Device(CompositeEventEmitter):
             config = DeviceConfiguration()
         self.name = config.name
         self.random_address = config.address
+        self.random_identity_address = config.random_identity_address
         self.class_of_device = config.class_of_device
         self.scan_response_data = config.scan_response_data
         self.advertising_data = config.advertising_data
@@ -976,6 +984,7 @@ class Device(CompositeEventEmitter):
         self.keystore = KeyStore.create_for_device(config)
         self.irk = config.irk
         self.le_enabled = config.le_enabled
+        self.classic_enabled = config.classic_enabled
         self.le_simultaneous_enabled = config.le_simultaneous_enabled
         self.classic_ssp_enabled = config.classic_ssp_enabled
         self.classic_sc_enabled = config.classic_sc_enabled
