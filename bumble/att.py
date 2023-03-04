@@ -25,12 +25,14 @@
 from __future__ import annotations
 import struct
 from pyee import EventEmitter
-from typing import Dict, Type
+from typing import Dict, Type, TYPE_CHECKING
 
 from bumble.core import UUID, name_or_number
 from bumble.hci import HCI_Object, key_with_value
 from bumble.colors import color
 
+if TYPE_CHECKING:
+    from bumble.device import Connection
 
 # -----------------------------------------------------------------------------
 # Constants
@@ -749,7 +751,25 @@ class Attribute(EventEmitter):
     def decode_value(self, value_bytes):
         return value_bytes
 
-    def read_value(self, connection):
+    def read_value(self, connection: Connection):
+        if (
+            self.permissions & self.READ_REQUIRES_ENCRYPTION
+        ) and not connection.encryption:
+            raise ATT_Error(
+                error_code=ATT_INSUFFICIENT_ENCRYPTION_ERROR, att_handle=self.handle
+            )
+        if (
+            self.permissions & self.READ_REQUIRES_AUTHENTICATION
+        ) and not connection.authenticated:
+            raise ATT_Error(
+                error_code=ATT_INSUFFICIENT_AUTHENTICATION_ERROR, att_handle=self.handle
+            )
+        if self.permissions & self.READ_REQUIRES_AUTHORIZATION:
+            # TODO: handle authorization better
+            raise ATT_Error(
+                error_code=ATT_INSUFFICIENT_AUTHORIZATION_ERROR, att_handle=self.handle
+            )
+
         if read := getattr(self.value, 'read', None):
             try:
                 value = read(connection)  # pylint: disable=not-callable
@@ -762,7 +782,25 @@ class Attribute(EventEmitter):
 
         return self.encode_value(value)
 
-    def write_value(self, connection, value_bytes):
+    def write_value(self, connection: Connection, value_bytes):
+        if (
+            self.permissions & self.WRITE_REQUIRES_ENCRYPTION
+        ) and not connection.encryption:
+            raise ATT_Error(
+                error_code=ATT_INSUFFICIENT_ENCRYPTION_ERROR, att_handle=self.handle
+            )
+        if (
+            self.permissions & self.WRITE_REQUIRES_AUTHENTICATION
+        ) and not connection.authenticated:
+            raise ATT_Error(
+                error_code=ATT_INSUFFICIENT_AUTHENTICATION_ERROR, att_handle=self.handle
+            )
+        if self.permissions & self.WRITE_REQUIRES_AUTHORIZATION:
+            # TODO: handle authorization better
+            raise ATT_Error(
+                error_code=ATT_INSUFFICIENT_AUTHORIZATION_ERROR, att_handle=self.handle
+            )
+
         value = self.decode_value(value_bytes)
 
         if write := getattr(self.value, 'write', None):
