@@ -1421,7 +1421,11 @@ class HCI_Constant:
 # -----------------------------------------------------------------------------
 class HCI_Error(ProtocolError):
     def __init__(self, error_code):
-        super().__init__(error_code, 'hci', HCI_Constant.error_name(error_code))
+        super().__init__(
+            error_code,
+            error_namespace='hci',
+            error_name=HCI_Constant.error_name(error_code),
+        )
 
 
 # -----------------------------------------------------------------------------

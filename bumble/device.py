@@ -534,6 +534,9 @@ class Connection(CompositeEventEmitter):
         def on_connection_parameters_update_failure(self, error):
             pass
 
+        def on_connection_data_length_change(self):
+            pass
+
         def on_connection_phy_update(self):
             pass
 
@@ -2008,7 +2011,7 @@ class Device(CompositeEventEmitter):
         NOTE: the name of the parameters may look odd, but it just follows the names
         used in the Bluetooth spec.
         '''
-        await self.send_command(
+        result = await self.send_command(
             HCI_LE_Connection_Update_Command(
                 connection_handle=connection.handle,
                 connection_interval_min=connection_interval_min,
@@ -2017,9 +2020,10 @@ class Device(CompositeEventEmitter):
                 supervision_timeout=supervision_timeout,
                 min_ce_length=min_ce_length,
                 max_ce_length=max_ce_length,
-            ),
-            check_result=True,
+            )
         )
+        if result.status != HCI_Command_Status_Event.PENDING:
+            raise HCI_StatusError(result)
 
     async def get_connection_rssi(self, connection):
         result = await self.send_command(
