@@ -8,8 +8,7 @@ The project initially only supported BLE (Bluetooth Low Energy), but support for
 eventually added. Support for BLE is therefore currently somewhat more advanced than for Classic.
 
 !!! warning
-    This project is still very much experimental and in an alpha state where a lot of things are still missing or broken, and what's there changes frequently.
-    Also, there are still a few hardcoded values/parameters in some of the examples and apps which need to be changed (those will eventually be command line arguments, as appropriate)
+    This project is still in an early state of development where some things are still missing or broken, and what's implemented may change and evolve frequently.
 
 Overview
 --------

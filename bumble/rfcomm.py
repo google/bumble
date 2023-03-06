@@ -852,17 +852,27 @@ class Server(EventEmitter):
         # Register ourselves with the L2CAP channel manager
         device.register_l2cap_server(RFCOMM_PSM, self.on_connection)
 
-    def listen(self, acceptor):
-        # Find a free channel number
-        for channel in range(
-            RFCOMM_DYNAMIC_CHANNEL_NUMBER_START, RFCOMM_DYNAMIC_CHANNEL_NUMBER_END + 1
-        ):
-            if channel not in self.acceptors:
-                self.acceptors[channel] = acceptor
-                return channel
+    def listen(self, acceptor, channel=0):
+        if channel:
+            if channel in self.acceptors:
+                # Busy
+                return 0
+        else:
+            # Find a free channel number
+            for candidate in range(
+                RFCOMM_DYNAMIC_CHANNEL_NUMBER_START,
+                RFCOMM_DYNAMIC_CHANNEL_NUMBER_END + 1,
+            ):
+                if candidate not in self.acceptors:
+                    channel = candidate
+                    break
 
-        # All channels used...
-        return 0
+            if channel == 0:
+                # All channels used...
+                return 0
+
+        self.acceptors[channel] = acceptor
+        return channel
 
     def on_connection(self, l2cap_channel):
         logger.debug(f'+++ new L2CAP connection: {l2cap_channel}')

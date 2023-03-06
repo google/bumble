@@ -50,6 +50,7 @@ from .hci import (
     HCI_LE_EXTENDED_CREATE_CONNECTION_COMMAND,
     HCI_LE_RAND_COMMAND,
     HCI_LE_READ_PHY_COMMAND,
+    HCI_LE_SET_PHY_COMMAND,
     HCI_MITM_NOT_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
     HCI_MITM_NOT_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
     HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
@@ -1242,6 +1243,13 @@ class Device(CompositeEventEmitter):
         # Done
         self.powered_on = True
 
+    async def power_off(self) -> None:
+        if self.powered_on:
+            await self.host.reset()
+            self.powered_on = False
+
+        # TODO: more cleanup
+
     def supports_le_feature(self, feature):
         return self.host.supports_le_feature(feature)
 
@@ -1666,7 +1674,7 @@ class Device(CompositeEventEmitter):
                         )
                     )
                     if not phys:
-                        raise ValueError('least one supported PHY needed')
+                        raise ValueError('at least one supported PHY needed')
 
                     phy_count = len(phys)
                     initiating_phys = phy_list_to_bits(phys)
@@ -1807,7 +1815,7 @@ class Device(CompositeEventEmitter):
 
                 try:
                     return await self.abort_on('flush', pending_connection)
-                except ConnectionError as error:
+                except core.ConnectionError as error:
                     raise core.TimeoutError() from error
         finally:
             self.remove_listener('connection', on_connection)
@@ -2041,20 +2049,30 @@ class Device(CompositeEventEmitter):
     async def set_connection_phy(
         self, connection, tx_phys=None, rx_phys=None, phy_options=None
     ):
+        if not self.host.supports_command(HCI_LE_SET_PHY_COMMAND):
+            logger.warning('ignoring request, command not supported')
+            return
+
         all_phys_bits = (1 if tx_phys is None else 0) | (
             (1 if rx_phys is None else 0) << 1
         )
 
-        return await self.send_command(
+        result = await self.send_command(
             HCI_LE_Set_PHY_Command(
                 connection_handle=connection.handle,
                 all_phys=all_phys_bits,
                 tx_phys=phy_list_to_bits(tx_phys),
                 rx_phys=phy_list_to_bits(rx_phys),
                 phy_options=0 if phy_options is None else int(phy_options),
-            ),
-            check_result=True,
+            )
         )
+
+        if result.status != HCI_COMMAND_STATUS_PENDING:
+            logger.warning(
+                'HCI_LE_Set_PHY_Command failed: '
+                f'{HCI_Constant.error_name(result.status)}'
+            )
+            raise HCI_StatusError(result)
 
     async def set_default_phy(self, tx_phys=None, rx_phys=None):
         all_phys_bits = (1 if tx_phys is None else 0) | (
@@ -2494,7 +2512,7 @@ class Device(CompositeEventEmitter):
             self.advertising = False
 
         # Notify listeners
-        error = ConnectionError(
+        error = core.ConnectionError(
             error_code,
             transport,
             peer_address,
@@ -2567,7 +2585,7 @@ class Device(CompositeEventEmitter):
     @with_connection_from_handle
     def on_disconnection_failure(self, connection, error_code):
         logger.debug(f'*** Disconnection failed: {error_code}')
-        error = ConnectionError(
+        error = core.ConnectionError(
             error_code,
             connection.transport,
             connection.peer_address,
