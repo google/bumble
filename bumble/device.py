@@ -999,7 +999,7 @@ class Device(CompositeEventEmitter):
                 new_characteristic = Characteristic(
                     uuid=characteristic["uuid"],
                     properties=characteristic["properties"],
-                    permissions=int(characteristic["permissions"], 0),
+                    permissions=characteristic["permissions"],
                     descriptors=descriptors,
                 )
                 characteristics.append(new_characteristic)

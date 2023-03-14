@@ -23,11 +23,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+import functools
 import struct
 from pyee import EventEmitter
 from typing import Dict, Type, TYPE_CHECKING
 
-from bumble.core import UUID, name_or_number
+from bumble.core import UUID, name_or_number, get_dict_key_by_value
 from bumble.hci import HCI_Object, key_with_value
 from bumble.colors import color
 
@@ -725,11 +726,33 @@ class Attribute(EventEmitter):
     READ_REQUIRES_AUTHORIZATION = 0x40
     WRITE_REQUIRES_AUTHORIZATION = 0x80
 
+    PERMISSION_NAMES = {
+        READABLE: 'READABLE',
+        WRITEABLE: 'WRITEABLE',
+        READ_REQUIRES_ENCRYPTION: 'READ_REQUIRES_ENCRYPTION',
+        WRITE_REQUIRES_ENCRYPTION: 'WRITE_REQUIRES_ENCRYPTION',
+        READ_REQUIRES_AUTHENTICATION: 'READ_REQUIRES_AUTHENTICATION',
+        WRITE_REQUIRES_AUTHENTICATION: 'WRITE_REQUIRES_AUTHENTICATION',
+        READ_REQUIRES_AUTHORIZATION: 'READ_REQUIRES_AUTHORIZATION',
+        WRITE_REQUIRES_AUTHORIZATION: 'WRITE_REQUIRES_AUTHORIZATION',
+    }
+
+    @staticmethod
+    def string_to_permissions(permissions_str: str):
+        return functools.reduce(
+            lambda x, y: x | get_dict_key_by_value(Attribute.PERMISSION_NAMES, y),
+            permissions_str.split(","),
+            0,
+        )
+
     def __init__(self, attribute_type, permissions, value=b''):
         EventEmitter.__init__(self)
         self.handle = 0
         self.end_group_handle = 0
-        self.permissions = permissions
+        if isinstance(permissions, str):
+            self.permissions = self.string_to_permissions(permissions)
+        else:
+            self.permissions = permissions
 
         # Convert the type to a UUID object if it isn't already
         if isinstance(attribute_type, str):
