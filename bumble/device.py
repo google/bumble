@@ -615,7 +615,9 @@ class Connection(CompositeEventEmitter):
         assert self.transport == BT_BR_EDR_TRANSPORT
         self.handle = handle
         self.peer_resolvable_address = peer_resolvable_address
-        self.role = role
+        # Quirk: role might be known before complete
+        if self.role is None:
+            self.role = role
         self.parameters = parameters
 
     @property
@@ -2904,6 +2906,12 @@ class Device(CompositeEventEmitter):
             max_rx_time,
         )
         connection.emit('connection_data_length_change')
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    def on_role_change(self, connection, new_role):
+        connection.role = new_role
 
     @with_connection_from_handle
     def on_pairing_start(self, connection):

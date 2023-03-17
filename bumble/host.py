@@ -24,7 +24,10 @@ from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
 from bumble.snoop import Snooper
 
+from typing import Optional
+
 from .hci import (
+    Address,
     HCI_ACL_DATA_PACKET,
     HCI_COMMAND_COMPLETE_EVENT,
     HCI_COMMAND_PACKET,
@@ -141,6 +144,24 @@ class Host(AbortableEventEmitter):
             controller_source.set_packet_sink(self)
         if controller_sink:
             self.set_packet_sink(controller_sink)
+
+    def find_connection_by_bd_addr(
+        self,
+        bd_addr: Address,
+        transport: Optional[int] = None,
+        check_address_type: bool = False,
+    ) -> Optional[Connection]:
+        for connection in self.connections.values():
+            if connection.peer_address.to_bytes() == bd_addr.to_bytes():
+                if (
+                    check_address_type
+                    and connection.peer_address.address_type != bd_addr.address_type
+                ):
+                    continue
+                if transport is None or connection.transport == transport:
+                    return connection
+
+        return None
 
     async def flush(self) -> None:
         # Make sure no command is pending
@@ -582,7 +603,7 @@ class Host(AbortableEventEmitter):
                 BT_BR_EDR_TRANSPORT,
                 event.bd_addr,
                 None,
-                BT_CENTRAL_ROLE,
+                role,
                 None,
             )
         else:
@@ -719,7 +740,11 @@ class Host(AbortableEventEmitter):
                 f'role change for {event.bd_addr}: '
                 f'{HCI_Constant.role_name(event.new_role)}'
             )
-            # TODO: lookup the connection and update the role
+            if connection := self.find_connection_by_bd_addr(
+                event.bd_addr, BT_BR_EDR_TRANSPORT
+            ):
+                connection.role = event.new_role
+             self.emit('role_change', event.bd_addr, event.new_role)
         else:
             logger.debug(
                 f'role change for {event.bd_addr} failed: '
