@@ -144,7 +144,7 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
 
     if snooper_type == 'btsnoop':
         if ':' not in snooper_args:
-            raise ValueError('I/O type for btsnoop type missing')
+            raise ValueError('I/O type for btsnoop snooper type missing')
 
         io_type, io_name = snooper_args.split(':', maxsplit=1)
         if io_type == 'file':
@@ -165,6 +165,6 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
                 _SNOOPER_INSTANCE_COUNT -= 1
                 return
 
-        raise ValueError('I/O type not supported')
+        raise ValueError(f'I/O type {io_type} not supported')
 
     raise ValueError(f'snooper type {snooper_type} not found')
