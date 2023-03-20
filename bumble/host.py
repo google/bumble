@@ -276,7 +276,7 @@ class Host(AbortableEventEmitter):
 
     def send_hci_packet(self, packet):
         if self.snooper:
-            self.snooper.snoop(packet, Snooper.Direction.HOST_TO_CONTROLLER)
+            self.snooper.snoop(bytes(packet), Snooper.Direction.HOST_TO_CONTROLLER)
 
         self.hci_sink.on_packet(packet.to_bytes())
 
@@ -425,7 +425,7 @@ class Host(AbortableEventEmitter):
         logger.debug(f'{color("### CONTROLLER -> HOST", "green")}: {packet}')
 
         if self.snooper:
-            self.snooper.snoop(packet, Snooper.Direction.CONTROLLER_TO_HOST)
+            self.snooper.snoop(bytes(packet), Snooper.Direction.CONTROLLER_TO_HOST)
 
         # If the packet is a command, invoke the handler for this packet
         if packet.hci_packet_type == HCI_COMMAND_PACKET:
