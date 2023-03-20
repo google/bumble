@@ -603,7 +603,7 @@ class Host(AbortableEventEmitter):
                 BT_BR_EDR_TRANSPORT,
                 event.bd_addr,
                 None,
-                role,
+                BT_CENTRAL_ROLE,
                 None,
             )
         else:
@@ -744,12 +744,13 @@ class Host(AbortableEventEmitter):
                 event.bd_addr, BT_BR_EDR_TRANSPORT
             ):
                 connection.role = event.new_role
-             self.emit('role_change', event.bd_addr, event.new_role)
+            self.emit('role_change', event.bd_addr, event.new_role)
         else:
             logger.debug(
                 f'role change for {event.bd_addr} failed: '
                 f'{HCI_Constant.error_name(event.status)}'
             )
+            self.emit('role_change_failure', event.bd_addr, event.status)
 
     def on_hci_le_data_length_change_event(self, event):
         self.emit(

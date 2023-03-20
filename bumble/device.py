@@ -98,6 +98,7 @@ from .hci import (
     HCI_Read_RSSI_Command,
     HCI_Reject_Connection_Request_Command,
     HCI_Remote_Name_Request_Command,
+    HCI_Switch_Role_Command,
     HCI_Set_Connection_Encryption_Command,
     HCI_StatusError,
     HCI_User_Confirmation_Request_Negative_Reply_Command,
@@ -664,6 +665,9 @@ class Connection(CompositeEventEmitter):
 
     async def encrypt(self, enable: bool = True) -> None:
         return await self.device.encrypt(self, enable)
+
+    async def switch_role(self, role: int) -> None:
+        return await self.device.switch_role(self, role)
 
     async def sustain(self, timeout=None):
         """Idles the current task waiting for a disconnect or timeout"""
@@ -2292,6 +2296,34 @@ class Device(CompositeEventEmitter):
             )
 
     # [Classic only]
+    async def switch_role(self, connection: Connection, role: int):
+        pending_role_change = asyncio.get_running_loop().create_future()
+
+        def on_role_change(new_role):
+            pending_role_change.set_result(new_role)
+
+        def on_role_change_failure(error_code):
+            pending_role_change.set_exception(HCI_Error(error_code))
+
+        connection.on('role_change', on_role_change)
+        connection.on('role_change_failure', on_role_change_failure)
+
+        try:
+            result = await self.send_command(
+                HCI_Switch_Role_Command(bd_addr=connection.peer_address, role=role)  # type: ignore[call-arg]
+            )
+            if result.status != HCI_COMMAND_STATUS_PENDING:
+                logger.warning(
+                    'HCI_Switch_Role_Command failed: '
+                    f'{HCI_Constant.error_name(result.status)}'
+                )
+                raise HCI_StatusError(result)
+            await connection.abort_on('disconnection', pending_role_change)
+        finally:
+            connection.remove_listener('role_change', on_role_change)
+            connection.remove_listener('role_change_failure', on_role_change_failure)
+
+    # [Classic only]
     async def request_remote_name(self, remote: Union[Address, Connection]) -> str:
         # Set up event handlers
         pending_name = asyncio.get_running_loop().create_future()
@@ -2912,6 +2944,15 @@ class Device(CompositeEventEmitter):
     @with_connection_from_address
     def on_role_change(self, connection, new_role):
         connection.role = new_role
+        connection.emit('role_change', new_role)
+
+    # [Classic only]
+    @host_event_handler
+    @try_with_connection_from_address
+    def on_role_change_failure(self, connection, address, error):
+        if connection:
+            connection.emit('role_change_failure', error)
+        self.emit('role_change_failure', address, error)
 
     @with_connection_from_handle
     def on_pairing_start(self, connection):
