@@ -61,7 +61,7 @@ class AshaService(TemplateService):
         # Handler for volume control
         def on_volume_write(_connection, value):
             logger.info(f'--- VOLUME Write:{value[0]}')
-            self.emit('volume', str(value[0]).encode())
+            self.emit('volume', value[0])
 
         # Handler for audio control commands
         def on_audio_control_point_write(_connection, value):
@@ -76,10 +76,18 @@ class AshaService(TemplateService):
                     f'volume={value[3]}, '
                     f'otherstate={value[4]}'
                 )
-                self.emit('start', str(value[0]).encode())
+                self.emit(
+                    'start',
+                    {
+                        'codec': value[1],
+                        'audiotype': value[2],
+                        'volume': value[3],
+                        'otherstate': value[4],
+                    },
+                )
             elif opcode == AshaService.OPCODE_STOP:
                 logger.info('### STOP')
-                self.emit('stop', str(value[0]).encode())
+                self.emit('stop')
             elif opcode == AshaService.OPCODE_STATUS:
                 logger.info(f'### STATUS: connected={value[1]}')
 
