@@ -55,13 +55,13 @@ class AshaService(TemplateService):
         self.hisyncid = hisyncid
         self.capability = capability  # Device Capabilities [Left, Monaural]
         self.device = device
-        self.emitted_data_name = 'ASHA_data_' + str(self.capability)
         self.audio_out_data = b''
         self.psm = psm  # a non-zero psm is mainly for testing purpose
 
         # Handler for volume control
         def on_volume_write(_connection, value):
             logger.info(f'--- VOLUME Write:{value[0]}')
+            self.emit('volume', str(value[0]).encode())
 
         # Handler for audio control commands
         def on_audio_control_point_write(_connection, value):
@@ -76,8 +76,10 @@ class AshaService(TemplateService):
                     f'volume={value[3]}, '
                     f'otherstate={value[4]}'
                 )
+                self.emit('start', str(value[0]).encode())
             elif opcode == AshaService.OPCODE_STOP:
                 logger.info('### STOP')
+                self.emit('stop', str(value[0]).encode())
             elif opcode == AshaService.OPCODE_STATUS:
                 logger.info(f'### STATUS: connected={value[1]}')
 
@@ -126,7 +128,7 @@ class AshaService(TemplateService):
             def on_data(data):
                 logging.debug(f'<<< data received:{data}')
 
-                self.emit(self.emitted_data_name, data)
+                self.emit('data', data)
                 self.audio_out_data += data
 
             channel.sink = on_data
