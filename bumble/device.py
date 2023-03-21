@@ -1248,8 +1248,6 @@ class Device(CompositeEventEmitter):
             await self.host.flush()
             self.powered_on = False
 
-        # TODO: more cleanup
-
     def supports_le_feature(self, feature):
         return self.host.supports_le_feature(feature)
 
