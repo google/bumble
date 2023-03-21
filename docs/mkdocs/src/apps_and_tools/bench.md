@@ -145,3 +145,14 @@ the other on `usb:1`, and two consoles/terminals. We will run a command in each.
     ```
     $ bumble-bench --mode l2cap-server central --phy 2m usb:1
     ```
+
+!!! example "Reversed roles with L2CAP"
+    In the first console/terminal:
+    ```
+    $ bumble-bench --mode l2cap-client --role sender peripheral usb:0
+    ```
+
+    In the second console/terminal:
+    ```
+    $ bumble-bench --mode l2cap-server --role receiver central usb:1
+    ```
