@@ -55,6 +55,7 @@ from bumble.sdp import (
 from bumble.transport import open_transport_or_link
 import bumble.rfcomm
 import bumble.core
+from bumble.utils import AsyncRunner
 
 
 # -----------------------------------------------------------------------------
@@ -322,7 +323,7 @@ class Receiver:
         self.expected_packet_index = packet_index + 1
 
         if packet_flags & PACKET_FLAG_LAST:
-            asyncio.create_task(
+            AsyncRunner.run(
                 self.packet_io.send_packet(
                     struct.pack('>bbI', PacketType.ACK, packet_flags, packet_index)
                 )
@@ -403,7 +404,7 @@ class Ping:
             self.latencies.append(latency)
             print(
                 color(
-                    f'@@@ Received ACK [{packet_index}], latency={latency:.2f}ms',
+                    f'<<< Received ACK [{packet_index}], latency={latency:.2f}ms',
                     'green',
                 )
             )
@@ -422,7 +423,7 @@ class Ping:
             self.done.set()
             return
 
-        asyncio.create_task(self.send_next_ping())
+        AsyncRunner.run(self.send_next_ping())
 
 
 # -----------------------------------------------------------------------------
@@ -471,7 +472,7 @@ class Pong:
 
         self.expected_packet_index = packet_index + 1
 
-        asyncio.create_task(
+        AsyncRunner.run(
             self.packet_io.send_packet(
                 struct.pack('>bbI', PacketType.ACK, packet_flags, packet_index)
             )

@@ -43,7 +43,7 @@ To test once device against another, one of the two devices must be running
 the ``peripheral`` command and the other the ``central`` command. The device
 running the ``peripheral`` command will accept connections from the device
 running the ``central`` command.
-When using Bluetooth LE (all modes except for ``rfcomm-server`` and ``rfcomm`` client),
+When using Bluetooth LE (all modes except for ``rfcomm-server`` and ``rfcomm-client``),
 the default addresses configured in the tool should be sufficient. But when using 
 Bluetooth Classic, the address of the Peripheral must be specified on the Central 
 using the ``--peripheral`` option. The address will be printed by the Peripheral when

@@ -1245,7 +1245,7 @@ class Device(CompositeEventEmitter):
 
     async def power_off(self) -> None:
         if self.powered_on:
-            await self.host.reset()
+            await self.host.flush()
             self.powered_on = False
 
         # TODO: more cleanup
