@@ -1,4 +1,4 @@
-# Copyright 2021-2022 Google LLC
+# Copyright 2021-2023 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +15,13 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from contextlib import asynccontextmanager
 import logging
+import os
 
-from .common import Transport, AsyncPipeSink
+from .common import Transport, AsyncPipeSink, SnoopingTransport
 from ..controller import Controller
+from ..snoop import create_snooper
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -27,13 +30,52 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
+def _wrap_transport(transport: Transport) -> Transport:
+    """
+    Automatically wrap a Transport instance when a wrapping class can be inferred
+    from the environment.
+    If no wrapping class is applicable, the transport argument is returned as-is.
+    """
+
+    # If BUMBLE_SNOOPER is set, try to automatically create a snooper.
+    if snooper_spec := os.getenv('BUMBLE_SNOOPER'):
+        try:
+            return SnoopingTransport.create_with(
+                transport, create_snooper(snooper_spec)
+            )
+        except Exception as exc:
+            logger.warning(f'Exception while creating snooper: {exc}')
+
+    return transport
+
+
+# -----------------------------------------------------------------------------
 async def open_transport(name: str) -> Transport:
-    '''
+    """
     Open a transport by name.
     The name must be <type>:<parameters>
     Where <parameters> depend on the type (and may be empty for some types).
-    The supported types are: serial,udp,tcp,pty,usb
-    '''
+    The supported types are:
+      * serial
+      * udp
+      * tcp-client
+      * tcp-server
+      * ws-client
+      * ws-server
+      * pty
+      * file
+      * vhci
+      * hci-socket
+      * usb
+      * pyusb
+      * android-emulator
+    """
+
+    return _wrap_transport(await _open_transport(name))
+
+
+# -----------------------------------------------------------------------------
+async def _open_transport(name: str) -> Transport:
     # pylint: disable=import-outside-toplevel
     # pylint: disable=too-many-return-statements
 
@@ -107,7 +149,18 @@ async def open_transport(name: str) -> Transport:
 
 
 # -----------------------------------------------------------------------------
-async def open_transport_or_link(name):
+async def open_transport_or_link(name: str) -> Transport:
+    """
+    Open a transport or a link relay.
+
+    Args:
+      name:
+        Name of the transport or link relay to open.
+        When the name starts with "link-relay:", open a link relay (see RemoteLink
+        for details on what the arguments are).
+        For other namespaces, see `open_transport`.
+
+    """
     if name.startswith('link-relay:'):
         from ..link import RemoteLink  # lazy import
 
@@ -119,6 +172,6 @@ async def open_transport_or_link(name):
             async def close(self):
                 link.close()
 
-        return LinkTransport(controller, AsyncPipeSink(controller))
+        return _wrap_transport(LinkTransport(controller, AsyncPipeSink(controller)))
 
     return await open_transport(name)

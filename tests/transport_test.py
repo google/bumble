@@ -72,5 +72,6 @@ def test_parser_extensions():
 
 
 # -----------------------------------------------------------------------------
-test_parser()
-test_parser_extensions()
+if __name__ == '__main__':
+    test_parser()
+    test_parser_extensions()

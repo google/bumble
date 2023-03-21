@@ -1421,7 +1421,11 @@ class HCI_Constant:
 # -----------------------------------------------------------------------------
 class HCI_Error(ProtocolError):
     def __init__(self, error_code):
-        super().__init__(error_code, 'hci', HCI_Constant.error_name(error_code))
+        super().__init__(
+            error_code,
+            error_namespace='hci',
+            error_name=HCI_Constant.error_name(error_code),
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -1846,6 +1850,8 @@ class HCI_Packet:
     Abstract Base class for HCI packets
     '''
 
+    hci_packet_type: int
+
     @staticmethod
     def from_bytes(packet):
         packet_type = packet[0]
@@ -1864,6 +1870,9 @@ class HCI_Packet:
     def __init__(self, name):
         self.name = name
 
+    def __bytes__(self) -> bytes:
+        raise NotImplementedError
+
     def __repr__(self) -> str:
         return self.name
 
@@ -1874,6 +1883,9 @@ class HCI_CustomPacket(HCI_Packet):
         super().__init__('HCI_CUSTOM_PACKET')
         self.hci_packet_type = payload[0]
         self.payload = payload
+
+    def __bytes__(self) -> bytes:
+        return self.payload
 
 
 # -----------------------------------------------------------------------------
