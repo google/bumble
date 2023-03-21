@@ -739,6 +739,7 @@ class DeviceConfiguration:
         self.le_enabled = True
         # LE host enable 2nd parameter
         self.le_simultaneous_enabled = True
+        self.classic_enabled = False
         self.classic_sc_enabled = True
         self.classic_ssp_enabled = True
         self.classic_accept_any = True
@@ -768,6 +769,7 @@ class DeviceConfiguration:
         self.le_simultaneous_enabled = config.get(
             'le_simultaneous_enabled', self.le_simultaneous_enabled
         )
+        self.classic_enabled = config.get('classic_enabled', self.classic_enabled)
         self.classic_sc_enabled = config.get(
             'classic_sc_enabled', self.classic_sc_enabled
         )
@@ -979,6 +981,7 @@ class Device(CompositeEventEmitter):
         self.keystore = KeyStore.create_for_device(config)
         self.irk = config.irk
         self.le_enabled = config.le_enabled
+        self.classic_enabled = config.classic_enabled
         self.le_simultaneous_enabled = config.le_simultaneous_enabled
         self.classic_ssp_enabled = config.classic_ssp_enabled
         self.classic_sc_enabled = config.classic_sc_enabled
