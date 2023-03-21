@@ -15,12 +15,16 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
+import contextlib
 import struct
 import asyncio
 import logging
+from typing import ContextManager
 
 from .. import hci
 from ..colors import color
+from ..snoop import Snooper
 
 
 # -----------------------------------------------------------------------------
@@ -246,6 +250,20 @@ class StreamPacketSink:
 
 # -----------------------------------------------------------------------------
 class Transport:
+    """
+    Base class for all transports.
+
+    A Transport represents a source and a sink together.
+    An instance must be closed by calling close() when no longer used. Instances
+    implement the ContextManager protocol so that they may be used in a `async with`
+    statement.
+    An instance is iterable. The iterator yields, in order, its source and sink, so
+    that it may be used with a convenient call syntax like:
+
+    async with create_transport() as (source, sink):
+        ...
+    """
+
     def __init__(self, source, sink):
         self.source = source
         self.sink = sink
@@ -335,3 +353,60 @@ class PumpedTransport(Transport):
     async def close(self):
         await super().close()
         await self.close_function()
+
+
+# -----------------------------------------------------------------------------
+class SnoopingTransport(Transport):
+    """Transport wrapper that snoops on packets to/from a wrapped transport."""
+
+    @staticmethod
+    def create_with(
+        transport: Transport, snooper: ContextManager[Snooper]
+    ) -> SnoopingTransport:
+        """
+        Create an instance given a snooper that works as as context manager.
+
+        The returned instance will exit the snooper context when it is closed.
+        """
+        with contextlib.ExitStack() as exit_stack:
+            return SnoopingTransport(
+                transport, exit_stack.enter_context(snooper), exit_stack.pop_all().close
+            )
+        raise RuntimeError('unexpected code path')  # Satisfy the type checker
+
+    class Source:
+        def __init__(self, source, snooper):
+            self.source = source
+            self.snooper = snooper
+            self.sink = None
+
+        def set_packet_sink(self, sink):
+            self.sink = sink
+            self.source.set_packet_sink(self)
+
+        def on_packet(self, packet):
+            self.snooper.snoop(packet, Snooper.Direction.CONTROLLER_TO_HOST)
+            if self.sink:
+                self.sink.on_packet(packet)
+
+    class Sink:
+        def __init__(self, sink, snooper):
+            self.sink = sink
+            self.snooper = snooper
+
+        def on_packet(self, packet):
+            self.snooper.snoop(packet, Snooper.Direction.HOST_TO_CONTROLLER)
+            if self.sink:
+                self.sink.on_packet(packet)
+
+    def __init__(self, transport, snooper, close_snooper=None):
+        super().__init__(
+            self.Source(transport.source, snooper), self.Sink(transport.sink, snooper)
+        )
+        self.transport = transport
+        self.close_snooper = close_snooper
+
+    async def close(self):
+        await self.transport.close()
+        if self.close_snooper:
+            self.close_snooper()

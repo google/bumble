@@ -15,12 +15,21 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from contextlib import contextmanager
 from enum import IntEnum
+import logging
 import struct
 import datetime
-from typing import BinaryIO
+from typing import BinaryIO, Generator
+import os
 
-from bumble.hci import HCI_Packet, HCI_COMMAND_PACKET, HCI_EVENT_PACKET
+from bumble.hci import HCI_COMMAND_PACKET, HCI_EVENT_PACKET
+
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
@@ -44,7 +53,7 @@ class Snooper:
         HCI_BSCP = 1003
         H5 = 1004
 
-    def snoop(self, hci_packet: HCI_Packet, direction: Direction) -> None:
+    def snoop(self, hci_packet: bytes, direction: Direction) -> None:
         """Snoop on an HCI packet."""
 
 
@@ -67,9 +76,10 @@ class BtSnooper(Snooper):
             self.IDENTIFICATION_PATTERN + struct.pack('>LL', 1, self.DataLinkType.H4)
         )
 
-    def snoop(self, hci_packet: HCI_Packet, direction: Snooper.Direction) -> None:
+    def snoop(self, hci_packet: bytes, direction: Snooper.Direction) -> None:
         flags = int(direction)
-        if hci_packet.hci_packet_type in (HCI_EVENT_PACKET, HCI_COMMAND_PACKET):
+        packet_type = hci_packet[0]
+        if packet_type in (HCI_EVENT_PACKET, HCI_COMMAND_PACKET):
             flags |= 0x10
 
         # Compute the current timestamp
@@ -79,15 +89,82 @@ class BtSnooper(Snooper):
         )
 
         # Emit the record
-        packet_data = bytes(hci_packet)
         self.output.write(
             struct.pack(
                 '>IIIIQ',
-                len(packet_data),  # Original Length
-                len(packet_data),  # Included Length
+                len(hci_packet),  # Original Length
+                len(hci_packet),  # Included Length
                 flags,  # Packet Flags
                 0,  # Cumulative Drops
                 timestamp,  # Timestamp
             )
-            + packet_data
+            + hci_packet
         )
+
+
+# -----------------------------------------------------------------------------
+_SNOOPER_INSTANCE_COUNT = 0
+
+
+@contextmanager
+def create_snooper(spec: str) -> Generator[Snooper, None, None]:
+    """
+    Create a snooper given a specification string.
+
+    The general syntax for the specification string is:
+      <snooper-type>:<type-specific-arguments>
+
+    Supported snooper types are:
+
+      btsnoop
+        The syntax for the type-specific arguments for this type is:
+        <io-type>:<io-type-specific-arguments>
+
+        Supported I/O types are:
+
+        file
+          The type-specific arguments for this I/O type is a string that is converted
+          to a file path using the python `str.format()` string formatting. The log
+          records will be written to that file if it can be opened/created.
+          The keyword args that may be referenced by the string pattern are:
+            now: the value of `datetime.now()`
+            utcnow: the value of `datetime.utcnow()`
+            pid: the current process ID.
+            instance: the instance ID in the current process.
+
+    Examples:
+      btsnoop:file:my_btsnoop.log
+      btsnoop:file:/tmp/bumble_{now:%Y-%m-%d-%H:%M:%S}_{pid}.log
+
+    """
+    if ':' not in spec:
+        raise ValueError('snooper type prefix missing')
+
+    snooper_type, snooper_args = spec.split(':', maxsplit=1)
+
+    if snooper_type == 'btsnoop':
+        if ':' not in snooper_args:
+            raise ValueError('I/O type for btsnoop snooper type missing')
+
+        io_type, io_name = snooper_args.split(':', maxsplit=1)
+        if io_type == 'file':
+            # Process the file name string pattern.
+            global _SNOOPER_INSTANCE_COUNT
+            file_path = io_name.format(
+                now=datetime.datetime.now(),
+                utcnow=datetime.datetime.utcnow(),
+                pid=os.getpid(),
+                instance=_SNOOPER_INSTANCE_COUNT,
+            )
+
+            # Open the file
+            logger.debug(f'Snoop file: {file_path}')
+            with open(file_path, 'wb') as snoop_file:
+                _SNOOPER_INSTANCE_COUNT += 1
+                yield BtSnooper(snoop_file)
+                _SNOOPER_INSTANCE_COUNT -= 1
+                return
+
+        raise ValueError(f'I/O type {io_type} not supported')
+
+    raise ValueError(f'snooper type {snooper_type} not found')
