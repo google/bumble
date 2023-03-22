@@ -310,6 +310,9 @@ class AdvertisementDataAccumulator:
 
     def update(self, report):
         advertisement = Advertisement.from_advertising_report(report)
+        if advertisement is None:
+            return None
+
         result = None
 
         if advertisement.is_scan_response:
@@ -2776,7 +2779,7 @@ class Device(CompositeEventEmitter):
     # [Classic only]
     @host_event_handler
     @try_with_connection_from_address
-    def on_remote_name(self, connection, address, remote_name):
+    def on_remote_name(self, connection: Connection, address, remote_name):
         # Try to decode the name
         try:
             remote_name = remote_name.decode('utf-8')
@@ -2794,7 +2797,7 @@ class Device(CompositeEventEmitter):
     # [Classic only]
     @host_event_handler
     @try_with_connection_from_address
-    def on_remote_name_failure(self, connection, address, error):
+    def on_remote_name_failure(self, connection: Connection, address, error):
         if connection:
             connection.emit('remote_name_failure', error)
         self.emit('remote_name_failure', address, error)
