@@ -94,6 +94,8 @@ from .hci import (
     HCI_LE_Set_Scan_Enable_Command,
     HCI_LE_Set_Scan_Parameters_Command,
     HCI_LE_Set_Scan_Response_Data_Command,
+    HCI_PIN_Code_Request_Reply_Command,
+    HCI_PIN_Code_Request_Negative_Reply_Command,
     HCI_Read_BD_ADDR_Command,
     HCI_Read_RSSI_Command,
     HCI_Reject_Connection_Request_Command,
@@ -2761,6 +2763,51 @@ class Device(CompositeEventEmitter):
         else:
             self.host.send_command_sync(
                 HCI_User_Passkey_Request_Negative_Reply_Command(
+                    bd_addr=connection.peer_address
+                )
+            )
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    def on_pin_code_request(self, connection):
+        # classic legacy pairing
+        # Ask what the pairing config should be for this connection
+        pairing_config = self.pairing_config_factory(connection)
+
+        can_input = pairing_config.delegate.io_capability in (
+            smp.SMP_KEYBOARD_ONLY_IO_CAPABILITY,
+            smp.SMP_KEYBOARD_DISPLAY_IO_CAPABILITY,
+        )
+
+        # respond the pin code
+        if can_input:
+
+            async def get_pin_code():
+                pin_code = await connection.abort_on(
+                    'disconnection', pairing_config.delegate.get_number()
+                )
+
+                if pin_code is not None:
+                    pin_code = bytes(str(pin_code).zfill(6))
+                    await self.host.send_command(
+                        HCI_PIN_Code_Request_Reply_Command(
+                            bd_addr=connection.peer_address,
+                            pin_code_length=len(pin_code),
+                            pin_code=pin_code,
+                        )
+                    )
+                else:
+                    await self.host.send_command(
+                        HCI_PIN_Code_Request_Negative_Reply_Command(
+                            bd_addr=connection.peer_address
+                        )
+                    )
+
+            asyncio.create_task(get_pin_code())
+        else:
+            self.host.send_command_sync(
+                HCI_PIN_Code_Request_Negative_Reply_Command(
                     bd_addr=connection.peer_address
                 )
             )
