@@ -1491,7 +1491,7 @@ class HCI_Object:
             elif field_type == -2:
                 # 16-bit signed
                 field_value = struct.unpack_from('<h', data, offset)[0]
-                offset += 1
+                offset += 2
             elif field_type == 3:
                 # 24-bit unsigned
                 padded = data[offset : offset + 3] + bytes([0])
