@@ -172,16 +172,9 @@ class G722Decoder(object):
 
     def g722_decode(self, result_array, encoded_data) -> int:
         """Decode the data frame using g722 decoder."""
-        rlow = 0
-        rhigh = 0
-        xout1 = 0
-        xout2 = 0
-        code = 0
         result_length = 0
-        j = 0
 
-        for j in range(0, len(encoded_data)):
-            code = encoded_data[j]
+        for code in encoded_data:
             higher_bits = (code >> 6) & 0x03
             lower_bits = code & 0x3F
 
@@ -189,17 +182,12 @@ class G722Decoder(object):
             rhigh = self.higher_sub_band_decoder(higher_bits)
 
             # Apply the receive QMF
-            for i in range(22):
-                self._x[i] = self._x[i + 2]
-
+            self._x[:22] = self._x[2:]
             self._x[22] = rlow + rhigh
             self._x[23] = rlow - rhigh
-            xout1 = 0
-            xout2 = 0
 
-            for i in range(12):
-                xout2 += self._x[2 * i] * QMF_COEFFS[i]
-                xout1 += self._x[2 * i + 1] * QMF_COEFFS[11 - i]
+            xout2 = sum(self._x[2 * i] * QMF_COEFFS[i] for i in range(12))
+            xout1 = sum(self._x[2 * i + 1] * QMF_COEFFS[11 - i] for i in range(12))
 
             result_length = self.update_decoded_result(
                 xout1, result_length, result_array
