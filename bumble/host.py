@@ -53,7 +53,6 @@ from .hci import (
     HCI_LE_Write_Suggested_Default_Data_Length_Command,
     HCI_Link_Key_Request_Negative_Reply_Command,
     HCI_Link_Key_Request_Reply_Command,
-    HCI_PIN_Code_Request_Negative_Reply_Command,
     HCI_Packet,
     HCI_Read_Buffer_Size_Command,
     HCI_Read_Local_Supported_Commands_Command,
@@ -794,11 +793,7 @@ class Host(AbortableEventEmitter):
         )
 
     def on_hci_pin_code_request_event(self, event):
-        # For now, just refuse all requests
-        # TODO: delegate the decision
-        self.send_command_sync(
-            HCI_PIN_Code_Request_Negative_Reply_Command(bd_addr=event.bd_addr)
-        )
+        self.emit('pin_code_request', event.bd_addr)
 
     def on_hci_link_key_request_event(self, event):
         async def send_link_key():
