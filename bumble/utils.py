@@ -191,9 +191,9 @@ class AsyncRunner:
         return decorator
 
     @staticmethod
-    def run(coroutine):
+    def spawn(coroutine):
         """
-        Create a task to run a coroutine in a "fire and forget" task.
+        Spawn a task to run a coroutine in a "fire and forget" mode.
 
         Using this method instead of just calling `asyncio.create_task(coroutine)`
         is necessary when you don't keep a reference to the task, because `asyncio`

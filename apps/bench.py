@@ -323,7 +323,7 @@ class Receiver:
         self.expected_packet_index = packet_index + 1
 
         if packet_flags & PACKET_FLAG_LAST:
-            AsyncRunner.run(
+            AsyncRunner.spawn(
                 self.packet_io.send_packet(
                     struct.pack('>bbI', PacketType.ACK, packet_flags, packet_index)
                 )
@@ -423,7 +423,7 @@ class Ping:
             self.done.set()
             return
 
-        AsyncRunner.run(self.send_next_ping())
+        AsyncRunner.spawn(self.send_next_ping())
 
 
 # -----------------------------------------------------------------------------
@@ -472,7 +472,7 @@ class Pong:
 
         self.expected_packet_index = packet_index + 1
 
-        AsyncRunner.run(
+        AsyncRunner.spawn(
             self.packet_io.send_packet(
                 struct.pack('>bbI', PacketType.ACK, packet_flags, packet_index)
             )
