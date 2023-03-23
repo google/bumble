@@ -1491,7 +1491,7 @@ class HCI_Object:
             elif field_type == -2:
                 # 16-bit signed
                 field_value = struct.unpack_from('<h', data, offset)[0]
-                offset += 1
+                offset += 2
             elif field_type == 3:
                 # 24-bit unsigned
                 padded = data[offset : offset + 3] + bytes([0])
@@ -2094,6 +2094,24 @@ class HCI_Link_Key_Request_Reply_Command(HCI_Command):
 class HCI_Link_Key_Request_Negative_Reply_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.11 Link Key Request Negative Reply Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('bd_addr', Address.parse_address),
+        ('pin_code_length', 1),
+        ('pin_code', '*'),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
+)
+class HCI_PIN_Code_Request_Reply_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.12 PIN Code Request Reply Command
     '''
 
 

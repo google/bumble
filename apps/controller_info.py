@@ -30,6 +30,8 @@ from bumble.hci import (
     HCI_VERSION_NAMES,
     LMP_VERSION_NAMES,
     HCI_Command,
+    HCI_Command_Complete_Event,
+    HCI_Command_Status_Event,
     HCI_READ_BD_ADDR_COMMAND,
     HCI_Read_BD_ADDR_Command,
     HCI_READ_LOCAL_NAME_COMMAND,
@@ -46,10 +48,19 @@ from bumble.transport import open_transport_or_link
 
 
 # -----------------------------------------------------------------------------
+def command_succeeded(response):
+    if isinstance(response, HCI_Command_Status_Event):
+        return response.status == HCI_SUCCESS
+    if isinstance(response, HCI_Command_Complete_Event):
+        return response.return_parameters.status == HCI_SUCCESS
+    return False
+
+
+# -----------------------------------------------------------------------------
 async def get_classic_info(host):
     if host.supports_command(HCI_READ_BD_ADDR_COMMAND):
         response = await host.send_command(HCI_Read_BD_ADDR_Command())
-        if response.return_parameters.status == HCI_SUCCESS:
+        if command_succeeded(response):
             print()
             print(
                 color('Classic Address:', 'yellow'), response.return_parameters.bd_addr
@@ -57,7 +68,7 @@ async def get_classic_info(host):
 
     if host.supports_command(HCI_READ_LOCAL_NAME_COMMAND):
         response = await host.send_command(HCI_Read_Local_Name_Command())
-        if response.return_parameters.status == HCI_SUCCESS:
+        if command_succeeded(response):
             print()
             print(
                 color('Local Name:', 'yellow'),
@@ -73,7 +84,7 @@ async def get_le_info(host):
         response = await host.send_command(
             HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command()
         )
-        if response.return_parameters.status == HCI_SUCCESS:
+        if command_succeeded(response):
             print(
                 color('LE Number Of Supported Advertising Sets:', 'yellow'),
                 response.return_parameters.num_supported_advertising_sets,
@@ -84,7 +95,7 @@ async def get_le_info(host):
         response = await host.send_command(
             HCI_LE_Read_Maximum_Advertising_Data_Length_Command()
         )
-        if response.return_parameters.status == HCI_SUCCESS:
+        if command_succeeded(response):
             print(
                 color('LE Maximum Advertising Data Length:', 'yellow'),
                 response.return_parameters.max_advertising_data_length,
@@ -93,7 +104,7 @@ async def get_le_info(host):
 
     if host.supports_command(HCI_LE_READ_MAXIMUM_DATA_LENGTH_COMMAND):
         response = await host.send_command(HCI_LE_Read_Maximum_Data_Length_Command())
-        if response.return_parameters.status == HCI_SUCCESS:
+        if command_succeeded(response):
             print(
                 color('Maximum Data Length:', 'yellow'),
                 (

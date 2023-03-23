@@ -20,7 +20,7 @@ import logging
 import traceback
 import collections
 import sys
-from typing import Awaitable, TypeVar
+from typing import Awaitable, Set, TypeVar
 from functools import wraps
 from pyee import EventEmitter
 
@@ -157,6 +157,9 @@ class AsyncRunner:
     # Shared default queue
     default_queue = WorkQueue()
 
+    # Shared set of running tasks
+    running_tasks: Set[Awaitable] = set()
+
     @staticmethod
     def run_in_task(queue=None):
         """
@@ -186,6 +189,19 @@ class AsyncRunner:
             return wrapper
 
         return decorator
+
+    @staticmethod
+    def spawn(coroutine):
+        """
+        Spawn a task to run a coroutine in a "fire and forget" mode.
+
+        Using this method instead of just calling `asyncio.create_task(coroutine)`
+        is necessary when you don't keep a reference to the task, because `asyncio`
+        only keeps weak references to alive tasks.
+        """
+        task = asyncio.create_task(coroutine)
+        AsyncRunner.running_tasks.add(task)
+        task.add_done_callback(AsyncRunner.running_tasks.remove)
 
 
 # -----------------------------------------------------------------------------
