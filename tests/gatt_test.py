@@ -37,10 +37,12 @@ from bumble.gatt import (
     Service,
     Characteristic,
     CharacteristicValue,
+    Descriptor,
 )
 from bumble.transport import AsyncPipeSink
 from bumble.core import UUID
 from bumble.att import (
+    Attribute,
     ATT_EXCHANGE_MTU_REQUEST,
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     ATT_PDU,
@@ -859,6 +861,29 @@ async def async_main():
     await test_subscribe_notify()
     await test_characteristic_encoding()
     await test_mtu_exchange()
+
+
+# -----------------------------------------------------------------------------
+def test_attribute_string_to_permissions():
+    assert Attribute.string_to_permissions('READABLE') == 1
+    assert Attribute.string_to_permissions('WRITEABLE') == 2
+    assert Attribute.string_to_permissions('READABLE,WRITEABLE') == 3
+
+
+# -----------------------------------------------------------------------------
+def test_charracteristic_permissions():
+    characteristic = Characteristic(
+        'FDB159DB-036C-49E3-B3DB-6325AC750806',
+        Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
+        'READABLE,WRITEABLE',
+    )
+    assert characteristic.permissions == 3
+
+
+# -----------------------------------------------------------------------------
+def test_descriptor_permissions():
+    descriptor = Descriptor('2902', 'READABLE,WRITEABLE')
+    assert descriptor.permissions == 3
 
 
 # -----------------------------------------------------------------------------
