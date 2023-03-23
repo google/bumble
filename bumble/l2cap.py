@@ -796,6 +796,11 @@ class Channel(EventEmitter):
         self.disconnection_result = asyncio.get_running_loop().create_future()
         return await self.disconnection_result
 
+    def abort(self):
+        if self.state == self.OPEN:
+            self.change_state(self.CLOSED)
+            self.emit('close')
+
     def send_configure_request(self):
         options = L2CAP_Control_Frame.encode_configuration_options(
             [
@@ -1104,6 +1109,10 @@ class LeConnectionOrientedChannel(EventEmitter):
         # state
         self.disconnection_result = asyncio.get_running_loop().create_future()
         return await self.disconnection_result
+
+    def abort(self):
+        if self.state == self.CONNECTED:
+            self.change_state(self.DISCONNECTED)
 
     def on_pdu(self, pdu):
         if self.sink is None:
@@ -1492,8 +1501,12 @@ class ChannelManager:
     def on_disconnection(self, connection_handle, _reason):
         logger.debug(f'disconnection from {connection_handle}, cleaning up channels')
         if connection_handle in self.channels:
+            for _, channel in self.channels[connection_handle].items():
+                channel.abort()
             del self.channels[connection_handle]
         if connection_handle in self.le_coc_channels:
+            for _, channel in self.le_coc_channels[connection_handle].items():
+                channel.abort()
             del self.le_coc_channels[connection_handle]
         if connection_handle in self.identifiers:
             del self.identifiers[connection_handle]

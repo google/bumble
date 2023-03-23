@@ -691,7 +691,7 @@ class Server(EventEmitter):
                 length=entry_size, attribute_data_list=b''.join(attribute_data_list)
             )
         else:
-            logging.warning(f"not found {request}")
+            logging.debug(f"not found {request}")
 
         self.send_response(connection, response)
 

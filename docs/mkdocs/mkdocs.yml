@@ -43,7 +43,7 @@ nav:
   - Apps & Tools:
     - Overview: apps_and_tools/index.md
     - Console: apps_and_tools/console.md
-    - Link Relay: apps_and_tools/link_relay.md
+    - Bench: apps_and_tools/bench.md
     - HCI Bridge: apps_and_tools/hci_bridge.md
     - Golden Gate Bridge: apps_and_tools/gg_bridge.md
     - Show: apps_and_tools/show.md
@@ -51,6 +51,7 @@ nav:
     - Pair: apps_and_tools/pair.md
     - Unbond: apps_and_tools/unbond.md
     - USB Probe: apps_and_tools/usb_probe.md
+    - Link Relay: apps_and_tools/link_relay.md
   - Hardware:
     - Overview: hardware/index.md
   - Platforms:
@@ -62,7 +63,7 @@ nav:
   - Examples:
     - Overview: examples/index.md
 
-copyright: Copyright 2021-2022 Google LLC
+copyright: Copyright 2021-2023 Google LLC
 
 theme:
   name: 'material'
