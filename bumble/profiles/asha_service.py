@@ -20,6 +20,7 @@ import struct
 import logging
 from typing import List
 from ..core import AdvertisingData
+from ..device import Device
 from ..gatt import (
     GATT_ASHA_SERVICE,
     GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
@@ -31,7 +32,7 @@ from ..gatt import (
     Characteristic,
     CharacteristicValue,
 )
-from ..device import Device
+from ..utils import AsyncRunner
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -81,9 +82,13 @@ class AshaService(TemplateService):
             elif opcode == AshaService.OPCODE_STATUS:
                 logger.info(f'### STATUS: connected={value[1]}')
 
-            # TODO Respond with a status
-            # asyncio.create_task(device.notify_subscribers(audio_status_characteristic,
-            # force=True))
+            # OPCODE_STATUS does not need audio status point update
+            if opcode != AshaService.OPCODE_STATUS:
+                AsyncRunner.spawn(
+                    device.notify_subscribers(
+                        self.audio_status_characteristic, force=True
+                    )
+                )
 
         self.read_only_properties_characteristic = Characteristic(
             GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
