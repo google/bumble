@@ -2808,11 +2808,23 @@ class Device(CompositeEventEmitter):
                 )
 
                 if pin_code is not None:
-                    pin_code = bytes(str(pin_code).zfill(6))
+                    # TODO: make pin code input more flexible,
+                    # so far only numbers are allowed
+                    pin_code = bytes(str(pin_code), encoding='utf8')
+                    pin_code_len = len(pin_code)
+                    if pin_code_len > 16:
+                        logger.warning(
+                            'pin_code is longer than 16 bytes, truncated to 16'
+                        )
+                        pin_code_len = 16
+                        # the pin_code will be truncated according to pin_code_len
+                        # when converted to byte array in HCI_Object, so we
+                        # are not doing truncation here
+
                     await self.host.send_command(
                         HCI_PIN_Code_Request_Reply_Command(
                             bd_addr=connection.peer_address,
-                            pin_code_length=len(pin_code),
+                            pin_code_length=pin_code_len,
                             pin_code=pin_code,
                         )
                     )
