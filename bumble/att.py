@@ -739,11 +739,16 @@ class Attribute(EventEmitter):
 
     @staticmethod
     def string_to_permissions(permissions_str: str):
-        return functools.reduce(
-            lambda x, y: x | get_dict_key_by_value(Attribute.PERMISSION_NAMES, y),
-            permissions_str.split(","),
-            0,
-        )
+        try:
+            return functools.reduce(
+                lambda x, y: x | get_dict_key_by_value(Attribute.PERMISSION_NAMES, y),
+                permissions_str.split(","),
+                0,
+            )
+        except TypeError:
+            raise TypeError(
+                f"Attribute::permissions error:\nExpected a string containing any of the keys, seperated by commas: {','.join(Attribute.PERMISSION_NAMES.values())}\nGot: {permissions_str}"
+            )
 
     def __init__(self, attribute_type, permissions, value=b''):
         EventEmitter.__init__(self)

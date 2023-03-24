@@ -1000,9 +1000,14 @@ class Device(CompositeEventEmitter):
             for characteristic in service.get("characteristics", []):
                 descriptors = []
                 for descriptor in characteristic.get("descriptors", []):
+                    # Leave this check until 5/25/2023
+                    if descriptor.get("permission", False):
+                        raise Exception(
+                            "Error parsing Device Config's GATT Services. The key 'permission' must be renamed to 'permissions'"
+                        )
                     new_descriptor = Descriptor(
                         attribute_type=descriptor["descriptor_type"],
-                        permissions=descriptor["permission"],
+                        permissions=descriptor["permissions"],
                     )
                     descriptors.append(new_descriptor)
                 new_characteristic = Characteristic(
