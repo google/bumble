@@ -215,12 +215,18 @@ def test_HCI_Command():
 
 # -----------------------------------------------------------------------------
 def test_HCI_PIN_Code_Request_Reply_Command():
+    pin_code = b'1234'
+    pin_code_length = len(pin_code)
+    # here to make the test pass, we need to
+    # pad pin_code, as HCI_Object.format_fields
+    # does not do it for us
+    padded_pin_code = pin_code + bytes(16 - pin_code_length)
     command = HCI_PIN_Code_Request_Reply_Command(
         bd_addr=Address(
             '00:11:22:33:44:55', address_type=Address.PUBLIC_DEVICE_ADDRESS
         ),
-        pin_code_length=4,
-        pin_code=b'1234',
+        pin_code_length=pin_code_length,
+        pin_code=padded_pin_code,
     )
     basic_check(command)
 
