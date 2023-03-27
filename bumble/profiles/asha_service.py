@@ -65,7 +65,7 @@ class AshaService(TemplateService):
             self.emit('volume', connection, value[0])
 
         # Handler for audio control commands
-        def on_audio_control_point_write(connection, value):
+        def on_audio_control_point_write(connection: Connection, value):
             logger.info(f'--- AUDIO CONTROL POINT Write:{value.hex()}')
             opcode = value[0]
             if opcode == AshaService.OPCODE_START:
