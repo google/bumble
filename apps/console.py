@@ -222,7 +222,7 @@ class ConsoleApp:
                     filter=Condition(lambda: self.top_tab == 'local-services'),
                 ),
                 ConditionalContainer(
-                    Frame(Window(self.remote_services_text), title='Remove Services'),
+                    Frame(Window(self.remote_services_text), title='Remote Services'),
                     filter=Condition(lambda: self.top_tab == 'remote-services'),
                 ),
                 ConditionalContainer(
