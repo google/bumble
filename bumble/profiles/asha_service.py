@@ -20,7 +20,7 @@ import struct
 import logging
 from typing import List
 from ..core import AdvertisingData
-from ..device import Device
+from ..device import Device, Connection
 from ..gatt import (
     GATT_ASHA_SERVICE,
     GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
@@ -60,12 +60,12 @@ class AshaService(TemplateService):
         self.psm = psm  # a non-zero psm is mainly for testing purpose
 
         # Handler for volume control
-        def on_volume_write(_connection, value):
+        def on_volume_write(connection, value):
             logger.info(f'--- VOLUME Write:{value[0]}')
-            self.emit('volume', value[0])
+            self.emit('volume', connection, value[0])
 
         # Handler for audio control commands
-        def on_audio_control_point_write(_connection, value):
+        def on_audio_control_point_write(connection: Connection, value):
             logger.info(f'--- AUDIO CONTROL POINT Write:{value.hex()}')
             opcode = value[0]
             if opcode == AshaService.OPCODE_START:
@@ -79,6 +79,7 @@ class AshaService(TemplateService):
                 )
                 self.emit(
                     'start',
+                    connection,
                     {
                         'codec': value[1],
                         'audiotype': value[2],
@@ -88,7 +89,7 @@ class AshaService(TemplateService):
                 )
             elif opcode == AshaService.OPCODE_STOP:
                 logger.info('### STOP')
-                self.emit('stop')
+                self.emit('stop', connection)
             elif opcode == AshaService.OPCODE_STATUS:
                 logger.info(f'### STATUS: connected={value[1]}')
 
@@ -141,7 +142,7 @@ class AshaService(TemplateService):
             def on_data(data):
                 logging.debug(f'<<< data received:{data}')
 
-                self.emit('data', data)
+                self.emit('data', channel.connection, data)
                 self.audio_out_data += data
 
             channel.sink = on_data
