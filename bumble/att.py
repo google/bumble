@@ -28,8 +28,8 @@ import struct
 from pyee import EventEmitter
 from typing import Dict, Type, TYPE_CHECKING
 
-from bumble.core import UUID, name_or_number, get_dict_key_by_value
-from bumble.hci import HCI_Object, key_with_value
+from bumble.core import UUID, name_or_number, get_dict_key_by_value, ProtocolError
+from bumble.hci import HCI_Object, key_with_value, HCI_Constant
 from bumble.colors import color
 
 if TYPE_CHECKING:
@@ -185,13 +185,18 @@ UUID_2_FIELD_SPEC    = lambda x, y: UUID.parse_uuid_2(x, y)  # noqa: E731
 # -----------------------------------------------------------------------------
 # Exceptions
 # -----------------------------------------------------------------------------
-class ATT_Error(Exception):
-    def __init__(self, error_code, att_handle=0x0000):
-        self.error_code = error_code
+class ATT_Error(ProtocolError):
+    def __init__(self, error_code, att_handle=0x0000, message=''):
+        super().__init__(
+            error_code,
+            error_namespace='att',
+            error_name=ATT_PDU.error_name(self.error_code),
+        )
         self.att_handle = att_handle
+        self.message = message
 
     def __str__(self):
-        return f'ATT_Error({ATT_PDU.error_name(self.error_code)})'
+        return f'ATT_Error(error={self.error_name}, handle={self.att_handle:04X}): {self.message}'
 
 
 # -----------------------------------------------------------------------------
