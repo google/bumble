@@ -21,6 +21,7 @@ import os
 import pytest
 
 from bumble.controller import Controller
+from bumble.core import BT_BR_EDR_TRANSPORT
 from bumble.link import LocalLink
 from bumble.device import Device
 from bumble.host import Host
@@ -58,18 +59,19 @@ class TwoDevices:
     def __init__(self):
         self.connections = [None, None]
 
+        addresses = ['F0:F1:F2:F3:F4:F5', 'F5:F4:F3:F2:F1:F0']
         self.link = LocalLink()
         self.controllers = [
-            Controller('C1', link=self.link),
-            Controller('C2', link=self.link),
+            Controller('C1', link=self.link, public_address=addresses[0]),
+            Controller('C2', link=self.link, public_address=addresses[1]),
         ]
         self.devices = [
             Device(
-                address='F0:F1:F2:F3:F4:F5',
+                address=addresses[0],
                 host=Host(self.controllers[0], AsyncPipeSink(self.controllers[0])),
             ),
             Device(
-                address='F5:F4:F3:F2:F1:F0',
+                address=addresses[1],
                 host=Host(self.controllers[1], AsyncPipeSink(self.controllers[1])),
             ),
         ]
@@ -78,6 +80,9 @@ class TwoDevices:
 
     def on_connection(self, which, connection):
         self.connections[which] = connection
+
+    def on_paired(self, which, keys):
+        self.paired[which] = keys
 
 
 # -----------------------------------------------------------------------------
@@ -94,12 +99,21 @@ async def test_self_connection():
         'connection', lambda connection: two_devices.on_connection(1, connection)
     )
 
+    # Enable Classic connections
+    two_devices.devices[0].classic_enabled = True
+    two_devices.devices[1].classic_enabled = True
+
     # Start
     await two_devices.devices[0].power_on()
     await two_devices.devices[1].power_on()
 
     # Connect the two devices
-    await two_devices.devices[0].connect(two_devices.devices[1].random_address)
+    await asyncio.gather(
+        two_devices.devices[0].connect(
+            two_devices.devices[1].public_address, transport=BT_BR_EDR_TRANSPORT
+        ),
+        two_devices.devices[1].accept(two_devices.devices[0].public_address),
+    )
 
     # Check the post conditions
     assert two_devices.connections[0] is not None
@@ -152,6 +166,9 @@ def sink_codec_capabilities():
 @pytest.mark.asyncio
 async def test_source_sink_1():
     two_devices = TwoDevices()
+    # Enable Classic connections
+    two_devices.devices[0].classic_enabled = True
+    two_devices.devices[1].classic_enabled = True
     await two_devices.devices[0].power_on()
     await two_devices.devices[1].power_on()
 
@@ -171,9 +188,16 @@ async def test_source_sink_1():
     listener = Listener(Listener.create_registrar(two_devices.devices[1]))
     listener.on('connection', on_avdtp_connection)
 
-    connection = await two_devices.devices[0].connect(
-        two_devices.devices[1].random_address
-    )
+    async def make_connection():
+        connections = await asyncio.gather(
+            two_devices.devices[0].connect(
+                two_devices.devices[1].public_address, BT_BR_EDR_TRANSPORT
+            ),
+            two_devices.devices[1].accept(two_devices.devices[0].public_address),
+        )
+        return connections[0]
+
+    connection = await make_connection()
     client = await Protocol.connect(connection)
     endpoints = await client.discover_remote_endpoints()
     assert len(endpoints) == 1
