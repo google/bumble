@@ -20,7 +20,7 @@ import struct
 import logging
 from typing import List
 from ..core import AdvertisingData
-from ..device import Device
+from ..device import Device, Connection
 from ..gatt import (
     GATT_ASHA_SERVICE,
     GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
