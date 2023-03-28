@@ -140,6 +140,17 @@ async def test_self_classic_connection(responder_role):
     assert two_devices.connections[0] is not None
     assert two_devices.connections[1] is not None
 
+    # Check the role
+    assert two_devices.connections[0].role != responder_role
+    assert two_devices.connections[1].role == responder_role
+
+    # Role switch
+    await two_devices.connections[0].switch_role(responder_role)
+
+    # Check the role
+    assert two_devices.connections[0].role == responder_role
+    assert two_devices.connections[1].role != responder_role
+
     await two_devices.connections[0].disconnect()
 
 
