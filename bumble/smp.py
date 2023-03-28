@@ -522,7 +522,11 @@ class PairingDelegate:
     async def compare_numbers(self, number: int, digits: int) -> bool:
         return True
 
-    async def get_number(self) -> int:
+    async def get_number(self) -> Optional[int]:
+        '''
+        Returns an optional number as an answer to a passkey request.
+        Returning `None` will result in a negative reply.
+        '''
         return 0
 
     async def get_string(self, max_length) -> Optional[str]:
