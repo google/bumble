@@ -2102,7 +2102,7 @@ class HCI_Link_Key_Request_Negative_Reply_Command(HCI_Command):
     fields=[
         ('bd_addr', Address.parse_address),
         ('pin_code_length', 1),
-        ('pin_code', '*'),
+        ('pin_code', 16),
     ],
     return_parameters_fields=[
         ('status', STATUS_SPEC),

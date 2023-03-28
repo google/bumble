@@ -525,6 +525,12 @@ class PairingDelegate:
     async def get_number(self) -> int:
         return 0
 
+    async def get_string(self, max_length) -> Optional[str]:
+        '''
+        Returns a string whose utf-8 encoding is up to max_length bytes.
+        '''
+        return None
+
     # pylint: disable-next=unused-argument
     async def display_number(self, number: int, digits: int) -> None:
         pass

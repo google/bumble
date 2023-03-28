@@ -2843,19 +2843,22 @@ class Device(CompositeEventEmitter):
 
             async def get_pin_code():
                 pin_code = await connection.abort_on(
-                    'disconnection', pairing_config.delegate.get_number()
+                    'disconnection', pairing_config.delegate.get_string(16)
                 )
 
                 if pin_code is not None:
-                    pin_code = bytes(str(pin_code).zfill(6))
+                    pin_code = bytes(pin_code, encoding='utf-8')
+                    pin_code_len = len(pin_code)
+                    assert 0 < pin_code_len <= 16, "pin_code should be 1-16 bytes"
                     await self.host.send_command(
                         HCI_PIN_Code_Request_Reply_Command(
                             bd_addr=connection.peer_address,
-                            pin_code_length=len(pin_code),
+                            pin_code_length=pin_code_len,
                             pin_code=pin_code,
                         )
                     )
                 else:
+                    logger.debug("delegate.get_string() returned None")
                     await self.host.send_command(
                         HCI_PIN_Code_Request_Negative_Reply_Command(
                             bd_addr=connection.peer_address
