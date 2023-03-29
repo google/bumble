@@ -23,6 +23,7 @@ import pytest
 
 from bumble.controller import Controller
 from bumble.gatt_client import CharacteristicProxy
+from bumble.gatt_server import Server
 from bumble.link import LocalLink
 from bumble.device import Device, Peer
 from bumble.host import Host
@@ -884,6 +885,93 @@ def test_charracteristic_permissions():
 def test_descriptor_permissions():
     descriptor = Descriptor('2902', 'READABLE,WRITEABLE')
     assert descriptor.permissions == 3
+
+
+# -----------------------------------------------------------------------------
+def test_get_attribute_group():
+    device = Device()
+
+    # add some services / characteristics to the gatt server
+    characteristic1 = Characteristic(
+        '1111',
+        Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
+        Characteristic.READABLE | Characteristic.WRITEABLE,
+        bytes([123]),
+    )
+    characteristic2 = Characteristic(
+        '2222',
+        Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
+        Characteristic.READABLE | Characteristic.WRITEABLE,
+        bytes([123]),
+    )
+    services = [Service('1212', [characteristic1]), Service('3233', [characteristic2])]
+    device.gatt_server.add_services(services)
+
+    # get the handles from gatt server
+    characteristic_attributes1 = device.gatt_server.get_characteristic_attributes(
+        UUID('1212'), UUID('1111')
+    )
+    assert characteristic_attributes1 is not None
+    characteristic_attributes2 = device.gatt_server.get_characteristic_attributes(
+        UUID('3233'), UUID('2222')
+    )
+    assert characteristic_attributes2 is not None
+    descriptor1 = device.gatt_server.get_descriptor_attribute(
+        UUID('1212'), UUID('1111'), UUID('2902')
+    )
+    assert descriptor1 is not None
+    descriptor2 = device.gatt_server.get_descriptor_attribute(
+        UUID('3233'), UUID('2222'), UUID('2902')
+    )
+    assert descriptor2 is not None
+
+    # confirm the handles map back to the service
+    assert (
+        UUID('1212')
+        == device.gatt_server.get_attribute_group(
+            characteristic_attributes1[0].handle, Service
+        ).uuid
+    )
+    assert (
+        UUID('1212')
+        == device.gatt_server.get_attribute_group(
+            characteristic_attributes1[1].handle, Service
+        ).uuid
+    )
+    assert (
+        UUID('1212')
+        == device.gatt_server.get_attribute_group(descriptor1.handle, Service).uuid
+    )
+    assert (
+        UUID('3233')
+        == device.gatt_server.get_attribute_group(
+            characteristic_attributes2[0].handle, Service
+        ).uuid
+    )
+    assert (
+        UUID('3233')
+        == device.gatt_server.get_attribute_group(
+            characteristic_attributes2[1].handle, Service
+        ).uuid
+    )
+    assert (
+        UUID('3233')
+        == device.gatt_server.get_attribute_group(descriptor2.handle, Service).uuid
+    )
+
+    # confirm the handles map back to the characteristic
+    assert (
+        UUID('1111')
+        == device.gatt_server.get_attribute_group(
+            descriptor1.handle, Characteristic
+        ).uuid
+    )
+    assert (
+        UUID('2222')
+        == device.gatt_server.get_attribute_group(
+            descriptor2.handle, Characteristic
+        ).uuid
+    )
 
 
 # -----------------------------------------------------------------------------
