@@ -190,7 +190,7 @@ class ATT_Error(ProtocolError):
         super().__init__(
             error_code,
             error_namespace='att',
-            error_name=ATT_PDU.error_name(self.error_code),
+            error_name=ATT_PDU.error_name(error_code),
         )
         self.att_handle = att_handle
         self.message = message
