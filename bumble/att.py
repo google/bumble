@@ -750,10 +750,10 @@ class Attribute(EventEmitter):
                 permissions_str.split(","),
                 0,
             )
-        except TypeError:
+        except TypeError as exc:
             raise TypeError(
-                f"Attribute::permissions error:\nExpected a string containing any of the keys, seperated by commas: {','.join(Attribute.PERMISSION_NAMES.values())}\nGot: {permissions_str}"
-            )
+                f"Attribute::permissions error:\nExpected a string containing any of the keys, separated by commas: {','.join(Attribute.PERMISSION_NAMES.values())}\nGot: {permissions_str}"
+            ) from exc
 
     def __init__(self, attribute_type, permissions, value=b''):
         EventEmitter.__init__(self)
