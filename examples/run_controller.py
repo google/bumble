@@ -80,7 +80,7 @@ async def main():
         )
         manufacturer_name_characteristic = Characteristic(
             GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
-            Characteristic.READ,
+            Characteristic.Properties.READ,
             Characteristic.READABLE,
             "Fitbit",
             [descriptor],

@@ -558,11 +558,13 @@ class GattServer:
         # Setup the GATT service
         self.speed_tx = Characteristic(
             SPEED_TX_UUID,
-            Characteristic.WRITE,
+            Characteristic.Properties.WRITE,
             Characteristic.WRITEABLE,
             CharacteristicValue(write=self.on_tx_write),
         )
-        self.speed_rx = Characteristic(SPEED_RX_UUID, Characteristic.NOTIFY, 0)
+        self.speed_rx = Characteristic(
+            SPEED_RX_UUID, Characteristic.Properties.NOTIFY, 0
+        )
 
         speed_service = Service(
             SPEED_SERVICE_UUID,

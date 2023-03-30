@@ -36,7 +36,7 @@ class BatteryService(TemplateService):
         self.battery_level_characteristic = PackedCharacteristicAdapter(
             Characteristic(
                 GATT_BATTERY_LEVEL_CHARACTERISTIC,
-                Characteristic.READ | Characteristic.NOTIFY,
+                Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
                 Characteristic.READABLE,
                 CharacteristicValue(read=read_battery_level),
             ),

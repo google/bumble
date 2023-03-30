@@ -209,7 +209,7 @@ async def keyboard_host(device, peer_address):
         return
     for i, characteristic in enumerate(report_characteristics):
         print(color('REPORT:', 'yellow'), characteristic)
-        if characteristic.properties & Characteristic.NOTIFY:
+        if characteristic.properties & Characteristic.Properties.NOTIFY:
             await peer.discover_descriptors(characteristic)
             report_reference_descriptor = characteristic.get_descriptor(
                 GATT_REPORT_REFERENCE_DESCRIPTOR
@@ -241,7 +241,9 @@ async def keyboard_device(device, command):
     # Create an 'input report' characteristic to send keyboard reports to the host
     input_report_characteristic = Characteristic(
         GATT_REPORT_CHARACTERISTIC,
-        Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
+        Characteristic.Properties.READ
+        | Characteristic.Properties.WRITE
+        | Characteristic.Properties.NOTIFY,
         Characteristic.READABLE | Characteristic.WRITEABLE,
         bytes([0, 0, 0, 0, 0, 0, 0, 0]),
         [
@@ -256,8 +258,8 @@ async def keyboard_device(device, command):
     # Create an 'output report' characteristic to receive keyboard reports from the host
     output_report_characteristic = Characteristic(
         GATT_REPORT_CHARACTERISTIC,
-        Characteristic.READ
-        | Characteristic.WRITE
+        Characteristic.Properties.READ
+        | Characteristic.Properties.WRITE
         | Characteristic.WRITE_WITHOUT_RESPONSE,
         Characteristic.READABLE | Characteristic.WRITEABLE,
         bytes([0]),
@@ -278,7 +280,7 @@ async def keyboard_device(device, command):
                 [
                     Characteristic(
                         GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
-                        Characteristic.READ,
+                        Characteristic.Properties.READ,
                         Characteristic.READABLE,
                         'Bumble',
                     )
@@ -289,13 +291,13 @@ async def keyboard_device(device, command):
                 [
                     Characteristic(
                         GATT_PROTOCOL_MODE_CHARACTERISTIC,
-                        Characteristic.READ,
+                        Characteristic.Properties.READ,
                         Characteristic.READABLE,
                         bytes([HID_REPORT_PROTOCOL]),
                     ),
                     Characteristic(
                         GATT_HID_INFORMATION_CHARACTERISTIC,
-                        Characteristic.READ,
+                        Characteristic.Properties.READ,
                         Characteristic.READABLE,
                         # bcdHID=1.1, bCountryCode=0x00,
                         # Flags=RemoteWake|NormallyConnectable
@@ -309,7 +311,7 @@ async def keyboard_device(device, command):
                     ),
                     Characteristic(
                         GATT_REPORT_MAP_CHARACTERISTIC,
-                        Characteristic.READ,
+                        Characteristic.Properties.READ,
                         Characteristic.READABLE,
                         HID_KEYBOARD_REPORT_MAP,
                     ),
@@ -322,7 +324,7 @@ async def keyboard_device(device, command):
                 [
                     Characteristic(
                         GATT_BATTERY_LEVEL_CHARACTERISTIC,
-                        Characteristic.READ,
+                        Characteristic.Properties.READ,
                         Characteristic.READABLE,
                         bytes([100]),
                     )

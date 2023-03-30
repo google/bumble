@@ -74,19 +74,21 @@ async def main():
         # Add a few entries to the device's GATT server
         characteristic1 = Characteristic(
             '486F64C6-4B5F-4B3B-8AFF-EDE134A8446A',
-            Characteristic.READ | Characteristic.NOTIFY,
+            Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
             Characteristic.READABLE,
             bytes([0x40]),
         )
         characteristic2 = Characteristic(
             '8EBDEBAE-0017-418E-8D3B-3A3809492165',
-            Characteristic.READ | Characteristic.INDICATE,
+            Characteristic.Properties.READ | Characteristic.Properties.INDICATE,
             Characteristic.READABLE,
             bytes([0x41]),
         )
         characteristic3 = Characteristic(
             '8EBDEBAE-0017-418E-8D3B-3A3809492165',
-            Characteristic.READ | Characteristic.NOTIFY | Characteristic.INDICATE,
+            Characteristic.Properties.READ
+            | Characteristic.Properties.NOTIFY
+            | Characteristic.Properties.INDICATE,
             Characteristic.READABLE,
             bytes([0x42]),
         )

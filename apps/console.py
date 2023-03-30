@@ -873,7 +873,7 @@ class ConsoleApp:
             return
 
         # use write with response if supported
-        with_response = characteristic.properties & Characteristic.WRITE
+        with_response = characteristic.properties & Characteristic.Properties.WRITE
         await characteristic.write_value(value, with_response=with_response)
 
     async def do_local_write(self, params):

@@ -63,7 +63,9 @@ class DeviceInformationService(TemplateService):
         # TODO: pnp_id
     ):
         characteristics = [
-            Characteristic(uuid, Characteristic.READ, Characteristic.READABLE, field)
+            Characteristic(
+                uuid, Characteristic.Properties.READ, Characteristic.READABLE, field
+            )
             for (field, uuid) in (
                 (manufacturer_name, GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC),
                 (model_number, GATT_MODEL_NUMBER_STRING_CHARACTERISTIC),
@@ -79,7 +81,7 @@ class DeviceInformationService(TemplateService):
             characteristics.append(
                 Characteristic(
                     GATT_SYSTEM_ID_CHARACTERISTIC,
-                    Characteristic.READ,
+                    Characteristic.Properties.READ,
                     Characteristic.READABLE,
                     self.pack_system_id(*system_id),
                 )
@@ -89,7 +91,7 @@ class DeviceInformationService(TemplateService):
             characteristics.append(
                 Characteristic(
                     GATT_REGULATORY_CERTIFICATION_DATA_LIST_CHARACTERISTIC,
-                    Characteristic.READ,
+                    Characteristic.Properties.READ,
                     Characteristic.READABLE,
                     ieee_regulatory_certification_data_list,
                 )

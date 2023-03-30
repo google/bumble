@@ -96,7 +96,7 @@ async def main():
         )
         manufacturer_name_characteristic = Characteristic(
             GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
-            Characteristic.READ,
+            Characteristic.Properties.READ,
             Characteristic.READABLE,
             'Fitbit',
             [descriptor],
@@ -109,13 +109,13 @@ async def main():
             [
                 Characteristic(
                     'D901B45B-4916-412E-ACCA-376ECB603B2C',
-                    Characteristic.READ | Characteristic.WRITE,
+                    Characteristic.Properties.READ | Characteristic.Properties.WRITE,
                     Characteristic.READABLE | Characteristic.WRITEABLE,
                     CharacteristicValue(read=my_custom_read, write=my_custom_write),
                 ),
                 Characteristic(
                     '552957FB-CF1F-4A31-9535-E78847E1A714',
-                    Characteristic.READ | Characteristic.WRITE,
+                    Characteristic.Properties.READ | Characteristic.Properties.WRITE,
                     Characteristic.READABLE | Characteristic.WRITEABLE,
                     CharacteristicValue(
                         read=my_custom_read_with_error, write=my_custom_write_with_error
@@ -123,7 +123,7 @@ async def main():
                 ),
                 Characteristic(
                     '486F64C6-4B5F-4B3B-8AFF-EDE134A8446A',
-                    Characteristic.READ | Characteristic.NOTIFY,
+                    Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
                     Characteristic.READABLE,
                     'hello',
                 ),

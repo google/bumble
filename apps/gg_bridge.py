@@ -230,13 +230,13 @@ class GattlinkNodeBridge(GattlinkL2capEndpoint, Device.Listener):
         )
         self.tx_characteristic = Characteristic(
             GG_GATTLINK_TX_CHARACTERISTIC_UUID,
-            Characteristic.NOTIFY,
+            Characteristic.Properties.NOTIFY,
             Characteristic.READABLE,
         )
         self.tx_characteristic.on('subscription', self.on_tx_subscription)
         self.psm_characteristic = Characteristic(
             GG_GATTLINK_L2CAP_CHANNEL_PSM_CHARACTERISTIC_UUID,
-            Characteristic.READ | Characteristic.NOTIFY,
+            Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
             Characteristic.READABLE,
             bytes([psm, 0]),
         )
