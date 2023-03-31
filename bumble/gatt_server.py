@@ -243,7 +243,10 @@ class Server(EventEmitter):
             # unless there is one already
             if (
                 characteristic.properties
-                & (Characteristic.NOTIFY | Characteristic.INDICATE)
+                & (
+                    Characteristic.Properties.NOTIFY
+                    | Characteristic.Properties.INDICATE
+                )
                 and characteristic.get_descriptor(
                     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR
                 )

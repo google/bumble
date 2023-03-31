@@ -27,7 +27,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import struct
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Callable
 
 from pyee import EventEmitter
 
@@ -138,9 +138,18 @@ class ServiceProxy(AttributeProxy):
 
 
 class CharacteristicProxy(AttributeProxy):
+    properties: Characteristic.Properties
     descriptors: List[DescriptorProxy]
+    subscribers: Dict[Any, Callable]
 
-    def __init__(self, client, handle, end_group_handle, uuid, properties):
+    def __init__(
+        self,
+        client,
+        handle,
+        end_group_handle,
+        uuid,
+        properties: Characteristic.Properties,
+    ):
         super().__init__(client, handle, end_group_handle, uuid)
         self.uuid = uuid
         self.properties = properties
@@ -185,7 +194,7 @@ class CharacteristicProxy(AttributeProxy):
         return (
             f'Characteristic(handle=0x{self.handle:04X}, '
             f'uuid={self.uuid}, '
-            f'properties={Characteristic.properties_as_string(self.properties)})'
+            f'properties={self.properties!s})'
         )
 
 
@@ -677,8 +686,8 @@ class Client:
             return
 
         if (
-            characteristic.properties & Characteristic.NOTIFY
-            and characteristic.properties & Characteristic.INDICATE
+            characteristic.properties & Characteristic.Properties.NOTIFY
+            and characteristic.properties & Characteristic.Properties.INDICATE
         ):
             if prefer_notify:
                 bits = ClientCharacteristicConfigurationBits.NOTIFICATION
@@ -686,10 +695,10 @@ class Client:
             else:
                 bits = ClientCharacteristicConfigurationBits.INDICATION
                 subscribers = self.indication_subscribers
-        elif characteristic.properties & Characteristic.NOTIFY:
+        elif characteristic.properties & Characteristic.Properties.NOTIFY:
             bits = ClientCharacteristicConfigurationBits.NOTIFICATION
             subscribers = self.notification_subscribers
-        elif characteristic.properties & Characteristic.INDICATE:
+        elif characteristic.properties & Characteristic.Properties.INDICATE:
             bits = ClientCharacteristicConfigurationBits.INDICATION
             subscribers = self.indication_subscribers
         else:

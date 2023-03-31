@@ -101,7 +101,7 @@ async def main():
         # Add the ASHA service to the GATT server
         read_only_properties_characteristic = Characteristic(
             ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
-            Characteristic.READ,
+            Characteristic.Properties.READ,
             Characteristic.READABLE,
             bytes(
                 [
@@ -127,13 +127,13 @@ async def main():
         )
         audio_control_point_characteristic = Characteristic(
             ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC,
-            Characteristic.WRITE | Characteristic.WRITE_WITHOUT_RESPONSE,
+            Characteristic.Properties.WRITE | Characteristic.WRITE_WITHOUT_RESPONSE,
             Characteristic.WRITEABLE,
             CharacteristicValue(write=on_audio_control_point_write),
         )
         audio_status_characteristic = Characteristic(
             ASHA_AUDIO_STATUS_CHARACTERISTIC,
-            Characteristic.READ | Characteristic.NOTIFY,
+            Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
             Characteristic.READABLE,
             bytes([0]),
         )
@@ -145,7 +145,7 @@ async def main():
         )
         le_psm_out_characteristic = Characteristic(
             ASHA_LE_PSM_OUT_CHARACTERISTIC,
-            Characteristic.READ,
+            Characteristic.Properties.READ,
             Characteristic.READABLE,
             struct.pack('<H', psm),
         )

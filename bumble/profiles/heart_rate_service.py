@@ -152,7 +152,7 @@ class HeartRateService(TemplateService):
         self.heart_rate_measurement_characteristic = DelegatedCharacteristicAdapter(
             Characteristic(
                 GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
-                Characteristic.NOTIFY,
+                Characteristic.Properties.NOTIFY,
                 0,
                 CharacteristicValue(read=read_heart_rate_measurement),
             ),
@@ -164,7 +164,7 @@ class HeartRateService(TemplateService):
         if body_sensor_location is not None:
             self.body_sensor_location_characteristic = Characteristic(
                 GATT_BODY_SENSOR_LOCATION_CHARACTERISTIC,
-                Characteristic.READ,
+                Characteristic.Properties.READ,
                 Characteristic.READABLE,
                 bytes([int(body_sensor_location)]),
             )
@@ -182,7 +182,7 @@ class HeartRateService(TemplateService):
             self.heart_rate_control_point_characteristic = PackedCharacteristicAdapter(
                 Characteristic(
                     GATT_HEART_RATE_CONTROL_POINT_CHARACTERISTIC,
-                    Characteristic.WRITE,
+                    Characteristic.Properties.WRITE,
                     Characteristic.WRITEABLE,
                     CharacteristicValue(write=write_heart_rate_control_point_value),
                 ),

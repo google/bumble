@@ -163,25 +163,28 @@ async def test_self_gatt():
     # Add some GATT characteristics to device 1
     c1 = Characteristic(
         '3A143AD7-D4A7-436B-97D6-5B62C315E833',
-        Characteristic.READ,
+        Characteristic.Properties.READ,
         Characteristic.READABLE,
         bytes([1, 2, 3]),
     )
     c2 = Characteristic(
         '9557CCE2-DB37-46EB-94C4-50AE5B9CB0F8',
-        Characteristic.READ | Characteristic.WRITE,
+        Characteristic.Properties.READ | Characteristic.Properties.WRITE,
         Characteristic.READABLE | Characteristic.WRITEABLE,
         bytes([4, 5, 6]),
     )
     c3 = Characteristic(
         '84FC1A2E-C52D-4A2D-B8C3-8855BAB86638',
-        Characteristic.READ | Characteristic.WRITE_WITHOUT_RESPONSE,
+        Characteristic.Properties.READ
+        | Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
         Characteristic.READABLE | Characteristic.WRITEABLE,
         bytes([7, 8, 9]),
     )
     c4 = Characteristic(
         '84FC1A2E-C52D-4A2D-B8C3-8855BAB86638',
-        Characteristic.READ | Characteristic.NOTIFY | Characteristic.INDICATE,
+        Characteristic.Properties.READ
+        | Characteristic.Properties.NOTIFY
+        | Characteristic.Properties.INDICATE,
         Characteristic.READABLE,
         bytes([1, 1, 1]),
     )
@@ -234,7 +237,7 @@ async def test_self_gatt_long_read():
     characteristics = [
         Characteristic(
             f'3A143AD7-D4A7-436B-97D6-5B62C315{i:04X}',
-            Characteristic.READ,
+            Characteristic.Properties.READ,
             Characteristic.READABLE,
             bytes([x & 255 for x in range(i)]),
         )

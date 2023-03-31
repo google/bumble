@@ -41,14 +41,14 @@ class GenericAccessService(Service):
     def __init__(self, device_name, appearance=(0, 0)):
         device_name_characteristic = Characteristic(
             GATT_DEVICE_NAME_CHARACTERISTIC,
-            Characteristic.READ,
+            Characteristic.Properties.READ,
             Characteristic.READABLE,
             device_name.encode('utf-8')[:248],
         )
 
         appearance_characteristic = Characteristic(
             GATT_APPEARANCE_CHARACTERISTIC,
-            Characteristic.READ,
+            Characteristic.Properties.READ,
             Characteristic.READABLE,
             struct.pack('<H', (appearance[0] << 6) | appearance[1]),
         )

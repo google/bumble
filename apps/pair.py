@@ -302,7 +302,8 @@ async def pair(
                     [
                         Characteristic(
                             '552957FB-CF1F-4A31-9535-E78847E1A714',
-                            Characteristic.READ | Characteristic.WRITE,
+                            Characteristic.Properties.READ
+                            | Characteristic.Properties.WRITE,
                             Characteristic.READABLE | Characteristic.WRITEABLE,
                             CharacteristicValue(
                                 read=read_with_error, write=write_with_error
