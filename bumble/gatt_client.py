@@ -62,7 +62,6 @@ from .gatt import (
     GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
     GATT_REQUEST_TIMEOUT,
     GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
-    Service,
     Characteristic,
     ClientCharacteristicConfigurationBits,
 )

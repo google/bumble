@@ -872,13 +872,28 @@ def test_attribute_string_to_permissions():
 
 
 # -----------------------------------------------------------------------------
-def test_charracteristic_permissions():
+def test_characteristic_permissions():
     characteristic = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
         Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
         'READABLE,WRITEABLE',
     )
     assert characteristic.permissions == 3
+
+
+# -----------------------------------------------------------------------------
+def test_characteristic_has_properties():
+    characteristic = Characteristic(
+        'FDB159DB-036C-49E3-B3DB-6325AC750806',
+        Characteristic.READ | Characteristic.WRITE | Characteristic.NOTIFY,
+        'READABLE,WRITEABLE',
+    )
+    assert characteristic.has_properties([Characteristic.READ])
+    assert characteristic.has_properties([Characteristic.READ, Characteristic.WRITE])
+    assert not characteristic.has_properties(
+        [Characteristic.READ, Characteristic.WRITE, Characteristic.INDICATE]
+    )
+    assert not characteristic.has_properties([Characteristic.INDICATE])
 
 
 # -----------------------------------------------------------------------------

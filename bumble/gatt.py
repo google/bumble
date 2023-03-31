@@ -28,7 +28,7 @@ import enum
 import functools
 import logging
 import struct
-from typing import Optional, Sequence
+from typing import Optional, Sequence, List, Any, Iterable
 
 from .colors import color
 from .core import UUID, get_dict_key_by_value
@@ -259,6 +259,8 @@ class Characteristic(Attribute):
     See Vol 3, Part G - 3.3 CHARACTERISTIC DEFINITION
     '''
 
+    uuid: UUID
+
     # Property flags
     BROADCAST = 0x01
     READ = 0x02
@@ -325,6 +327,12 @@ class Characteristic(Attribute):
 
         return None
 
+    def has_properties(self, properties: Iterable[int]):
+        for prop in properties:
+            if self.properties & prop == 0:
+                return False
+        return True
+
     def __str__(self):
         return (
             f'Characteristic(handle=0x{self.handle:04X}, '
@@ -339,6 +347,8 @@ class CharacteristicDeclaration(Attribute):
     '''
     See Vol 3, Part G - 3.3.1 CHARACTERISTIC DECLARATION
     '''
+
+    characteristic: Characteristic
 
     def __init__(self, characteristic, value_handle):
         declaration_bytes = (
