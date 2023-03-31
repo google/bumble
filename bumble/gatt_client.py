@@ -148,11 +148,11 @@ class CharacteristicProxy(AttributeProxy):
         handle,
         end_group_handle,
         uuid,
-        properties: Characteristic.Properties,
+        properties: int,
     ):
         super().__init__(client, handle, end_group_handle, uuid)
         self.uuid = uuid
-        self.properties = properties
+        self.properties = Characteristic.Properties(properties)
         self.descriptors = []
         self.descriptors_discovered = False
         self.subscribers = {}  # Map from subscriber to proxy subscriber
@@ -194,7 +194,7 @@ class CharacteristicProxy(AttributeProxy):
         return (
             f'Characteristic(handle=0x{self.handle:04X}, '
             f'uuid={self.uuid}, '
-            f'properties={self.properties!s})'
+            f'{self.properties!s})'
         )
 
 
