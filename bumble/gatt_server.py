@@ -27,7 +27,7 @@ import asyncio
 import logging
 from collections import defaultdict
 import struct
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, TypeVar, Type
 from pyee import EventEmitter
 
 from .colors import color
@@ -134,6 +134,21 @@ class Server(EventEmitter):
                 self.attributes_by_handle[handle] = attribute
                 return attribute
         return None
+
+    AttributeGroupType = TypeVar('AttributeGroupType', Service, Characteristic)
+
+    def get_attribute_group(
+        self, handle: int, group_type: Type[AttributeGroupType]
+    ) -> Optional[AttributeGroupType]:
+        return next(
+            (
+                attribute
+                for attribute in self.attributes
+                if isinstance(attribute, group_type)
+                and attribute.handle <= handle <= attribute.end_group_handle
+            ),
+            None,
+        )
 
     def get_service_attribute(self, service_uuid: UUID) -> Optional[Service]:
         return next(

@@ -28,6 +28,7 @@ from typing import Optional
 from collections import OrderedDict
 
 import click
+from prettytable import PrettyTable
 
 from prompt_toolkit import Application
 from prompt_toolkit.history import FileHistory
@@ -162,6 +163,7 @@ class ConsoleApp:
                         'device': None,
                         'local-services': None,
                         'remote-services': None,
+                        'local-values': None,
                     },
                     'filter': {
                         'address': None,
@@ -207,6 +209,7 @@ class ConsoleApp:
         self.log_text = FormattedTextControl(
             get_cursor_position=lambda: Point(0, max(0, len(self.log_lines) - 1))
         )
+        self.local_values_text = FormattedTextControl()
         self.log_height = Dimension(min=7, weight=4)
         self.log_max_lines = 100
         self.log_lines = []
@@ -220,6 +223,10 @@ class ConsoleApp:
                 ConditionalContainer(
                     Frame(Window(self.local_services_text), title='Local Services'),
                     filter=Condition(lambda: self.top_tab == 'local-services'),
+                ),
+                ConditionalContainer(
+                    Frame(Window(self.local_values_text), title='Local Values'),
+                    filter=Condition(lambda: self.top_tab == 'local-values'),
                 ),
                 ConditionalContainer(
                     Frame(Window(self.remote_services_text), title='Remote Services'),
@@ -674,9 +681,69 @@ class ConsoleApp:
                 'device',
                 'local-services',
                 'remote-services',
+                'local-values',
             }:
                 self.top_tab = params[0]
                 self.ui.invalidate()
+
+        while self.top_tab == 'local-values':
+            await self.do_show_local_values()
+            await asyncio.sleep(1)
+
+    async def do_show_local_values(self):
+        prettytable = PrettyTable()
+        field_names = ["Service", "Characteristic", "Descriptor"]
+
+        # if there's no connections, add a column just for value
+        if not self.device.connections:
+            field_names.append("Value")
+
+        # if there are connections, add a column for each connection's value
+        for connection in self.device.connections.values():
+            field_names.append(f"Connection {connection.handle}")
+
+        for attribute in self.device.gatt_server.attributes:
+            if isinstance(attribute, Characteristic):
+                service = self.device.gatt_server.get_attribute_group(
+                    attribute.handle, Service
+                )
+                if not service:
+                    continue
+                values = [
+                    attribute.read_value(connection)
+                    for connection in self.device.connections.values()
+                ]
+                if not values:
+                    values = [attribute.read_value(None)]
+                prettytable.add_row([f"{service.uuid}", attribute.uuid, ""] + values)
+
+            elif isinstance(attribute, Descriptor):
+                service = self.device.gatt_server.get_attribute_group(
+                    attribute.handle, Service
+                )
+                if not service:
+                    continue
+                characteristic = self.device.gatt_server.get_attribute_group(
+                    attribute.handle, Characteristic
+                )
+                if not characteristic:
+                    continue
+                values = [
+                    attribute.read_value(connection)
+                    for connection in self.device.connections.values()
+                ]
+                if not values:
+                    values = [attribute.read_value(None)]
+
+                # TODO: future optimization: convert CCCD value to human readable string
+
+                prettytable.add_row(
+                    [service.uuid, characteristic.uuid, attribute.type] + values
+                )
+
+        prettytable.field_names = field_names
+        self.local_values_text.text = prettytable.get_string()
+        self.ui.invalidate()
 
     async def do_get_phy(self, _):
         if not self.connected_peer:
