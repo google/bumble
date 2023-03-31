@@ -27,7 +27,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import struct
-from typing import List, Optional, Dict, Any, Callable
+from datetime import datetime
+from typing import List, Optional, Dict, Tuple, Callable, Union, Any
 
 from pyee import EventEmitter
 
@@ -167,7 +168,9 @@ class CharacteristicProxy(AttributeProxy):
     async def discover_descriptors(self):
         return await self.client.discover_descriptors(self)
 
-    async def subscribe(self, subscriber=None, prefer_notify=True):
+    async def subscribe(
+        self, subscriber: Optional[Callable] = None, prefer_notify=True
+    ):
         if subscriber is not None:
             if subscriber in self.subscribers:
                 # We already have a proxy subscriber
@@ -221,6 +224,7 @@ class ProfileServiceProxy:
 # -----------------------------------------------------------------------------
 class Client:
     services: List[ServiceProxy]
+    cached_values: Dict[int, Tuple[datetime, bytes]]
 
     def __init__(self, connection):
         self.connection = connection
@@ -233,6 +237,7 @@ class Client:
         )  # Notification subscribers, by attribute handle
         self.indication_subscribers = {}  # Indication subscribers, by attribute handle
         self.services = []
+        self.cached_values = {}
 
     def send_gatt_pdu(self, pdu):
         self.connection.send_l2cap_pdu(ATT_CID, pdu)
@@ -316,6 +321,35 @@ class Client:
             for c in [c for s in services for c in s.characteristics]
             if c.uuid == uuid
         ]
+
+    def get_attribute_grouping(
+        self, attribute_handle: int
+    ) -> Optional[
+        Union[
+            ServiceProxy,
+            Tuple[ServiceProxy, CharacteristicProxy],
+            Tuple[ServiceProxy, CharacteristicProxy, DescriptorProxy],
+        ]
+    ]:
+        """
+        Get the attribute(s) associated with an attribute handle
+        """
+        for service in self.services:
+            if service.handle == attribute_handle:
+                return service
+            if service.handle <= attribute_handle <= service.end_group_handle:
+                for characteristic in service.characteristics:
+                    if characteristic.handle == attribute_handle:
+                        return (service, characteristic)
+                    if (
+                        characteristic.handle
+                        <= attribute_handle
+                        <= characteristic.end_group_handle
+                    ):
+                        for descriptor in characteristic.descriptors:
+                            if descriptor.handle == attribute_handle:
+                                return (service, characteristic, descriptor)
+        return None
 
     def on_service_discovered(self, service):
         '''Add a service to the service list if it wasn't already there'''
@@ -808,6 +842,7 @@ class Client:
 
                 offset += len(part)
 
+        self.cache_value(attribute_handle, attribute_value)
         # Return the value as bytes
         return attribute_value
 
@@ -942,6 +977,8 @@ class Client:
         )
         if not subscribers:
             logger.warning('!!! received notification with no subscriber')
+
+        self.cache_value(notification.attribute_handle, notification.attribute_value)
         for subscriber in subscribers:
             if callable(subscriber):
                 subscriber(notification.attribute_value)
@@ -953,6 +990,8 @@ class Client:
         subscribers = self.indication_subscribers.get(indication.attribute_handle, [])
         if not subscribers:
             logger.warning('!!! received indication with no subscriber')
+
+        self.cache_value(indication.attribute_handle, indication.attribute_value)
         for subscriber in subscribers:
             if callable(subscriber):
                 subscriber(indication.attribute_value)
@@ -961,3 +1000,9 @@ class Client:
 
         # Confirm that we received the indication
         self.send_confirmation(ATT_Handle_Value_Confirmation())
+
+    def cache_value(self, attribute_handle: int, value: bytes):
+        self.cached_values[attribute_handle] = (
+            datetime.now(),
+            value,
+        )

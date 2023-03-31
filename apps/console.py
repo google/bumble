@@ -24,6 +24,7 @@ import logging
 import os
 import random
 import re
+import humanize
 from typing import Optional, Union
 from collections import OrderedDict
 
@@ -165,6 +166,7 @@ class ConsoleApp:
                         'local-services': None,
                         'remote-services': None,
                         'local-values': None,
+                        'remote-values': None,
                     },
                     'filter': {
                         'address': None,
@@ -212,6 +214,7 @@ class ConsoleApp:
             get_cursor_position=lambda: Point(0, max(0, len(self.log_lines) - 1))
         )
         self.local_values_text = FormattedTextControl()
+        self.remote_values_text = FormattedTextControl()
         self.log_height = Dimension(min=7, weight=4)
         self.log_max_lines = 100
         self.log_lines = []
@@ -233,6 +236,10 @@ class ConsoleApp:
                 ConditionalContainer(
                     Frame(Window(self.remote_services_text), title='Remote Services'),
                     filter=Condition(lambda: self.top_tab == 'remote-services'),
+                ),
+                ConditionalContainer(
+                    Frame(Window(self.remote_values_text), title='Remote Values'),
+                    filter=Condition(lambda: self.top_tab == 'remote-values'),
                 ),
                 ConditionalContainer(
                     Frame(Window(self.log_text, height=self.log_height), title='Log'),
@@ -737,12 +744,17 @@ class ConsoleApp:
                 'local-services',
                 'remote-services',
                 'local-values',
+                'remote-values',
             }:
                 self.top_tab = params[0]
                 self.ui.invalidate()
 
         while self.top_tab == 'local-values':
             await self.do_show_local_values()
+            await asyncio.sleep(1)
+
+        while self.top_tab == 'remote-values':
+            await self.do_show_remote_values()
             await asyncio.sleep(1)
 
     async def do_show_local_values(self):
@@ -798,6 +810,40 @@ class ConsoleApp:
 
         prettytable.field_names = field_names
         self.local_values_text.text = prettytable.get_string()
+        self.ui.invalidate()
+
+    async def do_show_remote_values(self):
+        prettytable = PrettyTable(
+            field_names=[
+                "Connection",
+                "Service",
+                "Characteristic",
+                "Descriptor",
+                "Time",
+                "Value",
+            ]
+        )
+        for connection in self.device.connections.values():
+            for handle, (time, value) in connection.gatt_client.cached_values.items():
+                row = [connection.handle]
+                attribute = connection.gatt_client.get_attributes(handle)
+                if not attribute:
+                    continue
+                if len(attribute) == 3:
+                    row.extend(
+                        [attribute[0].uuid, attribute[1].uuid, attribute[2].type]
+                    )
+                elif len(attribute) == 2:
+                    row.extend([attribute[0].uuid, attribute[1].uuid, ""])
+                elif len(attribute) == 1:
+                    row.extend([attribute[0].uuid, "", ""])
+                else:
+                    continue
+
+                row.extend([humanize.naturaltime(time), value])
+                prettytable.add_row(row)
+
+        self.remote_values_text.text = prettytable.get_string()
         self.ui.invalidate()
 
     async def do_get_phy(self, _):
@@ -899,9 +945,9 @@ class ConsoleApp:
         # send data to any subscribers
         if isinstance(attribute, Characteristic):
             attribute.write_value(None, value)
-            if attribute.has_properties([Characteristic.NOTIFY]):
+            if attribute.has_properties(Characteristic.NOTIFY):
                 await self.device.gatt_server.notify_subscribers(attribute)
-            if attribute.has_properties([Characteristic.INDICATE]):
+            if attribute.has_properties(Characteristic.INDICATE):
                 await self.device.gatt_server.indicate_subscribers(attribute)
 
     async def do_subscribe(self, params):
