@@ -20,14 +20,18 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import asyncio
 import logging
 import os
 import json
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from .colors import color
 from .hci import Address
+
+if TYPE_CHECKING:
+    from .device import Device
 
 
 # -----------------------------------------------------------------------------
@@ -173,13 +177,13 @@ class KeyStore:
             separator = '\n'
 
     @staticmethod
-    def create_for_device(device_config):
-        if device_config.keystore is None:
+    def create_for_device(device: Device) -> Optional[KeyStore]:
+        if device.config.keystore is None:
             return None
 
-        keystore_type = device_config.keystore.split(':', 1)[0]
+        keystore_type = device.config.keystore.split(':', 1)[0]
         if keystore_type == 'JsonKeyStore':
-            return JsonKeyStore.from_device_config(device_config)
+            return JsonKeyStore.from_device(device)
 
         return None
 
@@ -204,7 +208,9 @@ class JsonKeyStore(KeyStore):
             self.directory_name = os.path.join(
                 appdirs.user_data_dir(self.APP_NAME, self.APP_AUTHOR), self.KEYS_DIR
             )
-            json_filename = f'{self.namespace}.json'.lower().replace(':', '-')
+            json_filename = (
+                f'{self.namespace}.json'.lower().replace(':', '-').replace('/p', '-p')
+            )
             self.filename = os.path.join(self.directory_name, json_filename)
         else:
             self.filename = filename
@@ -213,9 +219,19 @@ class JsonKeyStore(KeyStore):
         logger.debug(f'JSON keystore: {self.filename}')
 
     @staticmethod
-    def from_device_config(device_config):
-        params = device_config.keystore.split(':', 1)[1:]
-        namespace = str(device_config.address)
+    def from_device(device: Device) -> Optional[JsonKeyStore]:
+        if not device.config.keystore:
+            return None
+
+        params = device.config.keystore.split(':', 1)[1:]
+
+        # Use a namespace based on the device address
+        if device.public_address not in (Address.ANY, Address.ANY_RANDOM):
+            namespace = str(device.public_address)
+        elif device.random_address != Address.ANY_RANDOM:
+            namespace = str(device.random_address)
+        else:
+            namespace = JsonKeyStore.DEFAULT_NAMESPACE
         if params:
             filename = params[0]
         else:

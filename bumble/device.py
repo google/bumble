@@ -878,7 +878,7 @@ device_host_event_handlers: list[str] = []
 
 # -----------------------------------------------------------------------------
 class Device(CompositeEventEmitter):
-    # incomplete list of fields.
+    # Incomplete list of fields.
     random_address: Address
     public_address: Address
     classic_enabled: bool
@@ -893,6 +893,7 @@ class Device(CompositeEventEmitter):
         Address, List[asyncio.Future[Union[Connection, Tuple[Address, int, int]]]]
     ]
     advertisement_accumulators: Dict[Address, AdvertisementDataAccumulator]
+    config: DeviceConfiguration
 
     @composite_listener
     class Listener:
@@ -980,9 +981,10 @@ class Device(CompositeEventEmitter):
         self.connect_own_address_type = None
 
         # Use the initial config or a default
+        config = config or DeviceConfiguration()
+        self.config = config
+
         self.public_address = Address('00:00:00:00:00:00')
-        if config is None:
-            config = DeviceConfiguration()
         self.name = config.name
         self.random_address = config.address
         self.class_of_device = config.class_of_device
@@ -990,7 +992,7 @@ class Device(CompositeEventEmitter):
         self.advertising_data = config.advertising_data
         self.advertising_interval_min = config.advertising_interval_min
         self.advertising_interval_max = config.advertising_interval_max
-        self.keystore = KeyStore.create_for_device(config)
+        self.keystore = None
         self.irk = config.irk
         self.le_enabled = config.le_enabled
         self.classic_enabled = config.classic_enabled
@@ -1167,12 +1169,17 @@ class Device(CompositeEventEmitter):
         # Reset the controller
         await self.host.reset()
 
+        # Try to get the public address from the controller
         response = await self.send_command(HCI_Read_BD_ADDR_Command())  # type: ignore[call-arg]
         if response.return_parameters.status == HCI_SUCCESS:
             logger.debug(
                 color(f'BD_ADDR: {response.return_parameters.bd_addr}', 'yellow')
             )
             self.public_address = response.return_parameters.bd_addr
+
+        # Instantiate the Key Store (we do this here rather than at __init__ time
+        # because some Key Store implementations use the public address as a namespace)
+        self.keystore = KeyStore.create_for_device(self)
 
         if self.host.supports_command(HCI_WRITE_LE_HOST_SUPPORT_COMMAND):
             await self.send_command(
