@@ -1179,7 +1179,8 @@ class Device(CompositeEventEmitter):
 
         # Instantiate the Key Store (we do this here rather than at __init__ time
         # because some Key Store implementations use the public address as a namespace)
-        self.keystore = KeyStore.create_for_device(self)
+        if self.keystore is None:
+            self.keystore = KeyStore.create_for_device(self)
 
         if self.host.supports_command(HCI_WRITE_LE_HOST_SUPPORT_COMMAND):
             await self.send_command(
