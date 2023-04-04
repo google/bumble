@@ -339,8 +339,7 @@ async def run(
 
         # Create a UDP to TX bridge (receive from TX, send to UDP)
         bridge.tx_socket, _ = await loop.create_datagram_endpoint(
-            # pylint: disable-next=unnecessary-lambda
-            lambda: asyncio.DatagramProtocol(),
+            asyncio.DatagramProtocol,
             remote_addr=(send_host, send_port),
         )
 
