@@ -529,6 +529,7 @@ class Connection(CompositeEventEmitter):
     authenticated: bool
     sc: bool
     link_key_type: int
+    gatt_client: gatt_client.Client
 
     @composite_listener
     class Listener:
