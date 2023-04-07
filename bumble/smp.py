@@ -553,7 +553,7 @@ class PairingConfig:
     def __init__(
         self,
         sc: bool = True,
-        mitm: bool = True,
+        mitm: bool = False,
         bonding: bool = True,
         delegate: Optional[PairingDelegate] = None,
     ) -> None:

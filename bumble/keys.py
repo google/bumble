@@ -273,7 +273,7 @@ class JsonKeyStore(KeyStore):
         db = await self.load()
 
         namespace = db.setdefault(self.namespace, {})
-        namespace[name] = keys.to_dict()
+        namespace.setdefault(name, {}).update(keys.to_dict())
 
         await self.save(db)
 
