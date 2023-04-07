@@ -1950,7 +1950,10 @@ class Device(CompositeEventEmitter):
         self.on('connection', on_connection)
         self.on('connection_failure', on_connection_failure)
 
-        # Save pending connection
+        # Save pending connection, with the Peripheral role.
+        # Even if we requested a role switch in the HCI_Accept_Connection_Request
+        # command, this connection is still considered Peripheral until an eventual
+        # role change event.
         self.pending_connections[peer_address] = Connection.incomplete(
             self, peer_address, BT_PERIPHERAL_ROLE
         )
