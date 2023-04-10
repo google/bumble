@@ -1611,7 +1611,7 @@ class Device(CompositeEventEmitter):
         pending connection.
 
         connection_parameters_preferences: (BLE only, ignored for BR/EDR)
-          * None: use all PHYs with default parameters
+          * None: use the 1M PHY with default parameters
           * map: each entry has a PHY as key and a ConnectionParametersPreferences
             object as value
 
@@ -1680,9 +1680,7 @@ class Device(CompositeEventEmitter):
                 if connection_parameters_preferences is None:
                     if connection_parameters_preferences is None:
                         connection_parameters_preferences = {
-                            HCI_LE_1M_PHY: ConnectionParametersPreferences.default,
-                            HCI_LE_2M_PHY: ConnectionParametersPreferences.default,
-                            HCI_LE_CODED_PHY: ConnectionParametersPreferences.default,
+                            HCI_LE_1M_PHY: ConnectionParametersPreferences.default
                         }
 
                 self.connect_own_address_type = own_address_type
