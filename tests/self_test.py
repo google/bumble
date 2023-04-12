@@ -28,9 +28,8 @@ from bumble.device import Device, Peer
 from bumble.host import Host
 from bumble.gatt import Service, Characteristic
 from bumble.transport import AsyncPipeSink
+from bumble.pairing import PairingConfig, PairingDelegate
 from bumble.smp import (
-    PairingConfig,
-    PairingDelegate,
     SMP_PAIRING_NOT_SUPPORTED_ERROR,
     SMP_CONFIRM_VALUE_FAILED_ERROR,
 )
@@ -262,7 +261,7 @@ async def test_self_gatt_long_read():
     found_service = result[0]
     found_characteristics = await found_service.discover_characteristics()
     assert len(found_characteristics) == 513
-    for (i, characteristic) in enumerate(found_characteristics):
+    for i, characteristic in enumerate(found_characteristics):
         value = await characteristic.read_value()
         assert value == characteristics[i].value
 
@@ -317,11 +316,11 @@ async def _test_self_smp_with_configs(pairing_config1, pairing_config2):
 
 # -----------------------------------------------------------------------------
 IO_CAP = [
-    PairingDelegate.NO_OUTPUT_NO_INPUT,
-    PairingDelegate.KEYBOARD_INPUT_ONLY,
-    PairingDelegate.DISPLAY_OUTPUT_ONLY,
-    PairingDelegate.DISPLAY_OUTPUT_AND_YES_NO_INPUT,
-    PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT,
+    PairingDelegate.IoCapability.NO_OUTPUT_NO_INPUT,
+    PairingDelegate.IoCapability.KEYBOARD_INPUT_ONLY,
+    PairingDelegate.IoCapability.DISPLAY_OUTPUT_ONLY,
+    PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_YES_NO_INPUT,
+    PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT,
 ]
 SC = [False, True]
 MITM = [False, True]
@@ -335,7 +334,10 @@ KEY_DIST = range(16)
     itertools.chain(
         itertools.product([IO_CAP], SC, MITM, [15]),
         itertools.product(
-            [[PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT]], SC, MITM, KEY_DIST
+            [[PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT]],
+            SC,
+            MITM,
+            KEY_DIST,
         ),
     ),
 )
@@ -378,7 +380,7 @@ async def test_self_smp(io_caps, sc, mitm, key_dist):
             else:
                 if (
                     self.peer_delegate.io_capability
-                    == PairingDelegate.KEYBOARD_INPUT_ONLY
+                    == PairingDelegate.IoCapability.KEYBOARD_INPUT_ONLY
                 ):
                     peer_number = 6789
                 else:
@@ -421,7 +423,7 @@ async def test_self_smp(io_caps, sc, mitm, key_dist):
 async def test_self_smp_reject():
     class RejectingDelegate(PairingDelegate):
         def __init__(self):
-            super().__init__(PairingDelegate.NO_OUTPUT_NO_INPUT)
+            super().__init__(PairingDelegate.IoCapability.NO_OUTPUT_NO_INPUT)
 
         async def accept(self):
             return False
@@ -442,7 +444,9 @@ async def test_self_smp_reject():
 async def test_self_smp_wrong_pin():
     class WrongPinDelegate(PairingDelegate):
         def __init__(self):
-            super().__init__(PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT)
+            super().__init__(
+                PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT
+            )
 
         async def compare_numbers(self, number, digits):
             return False

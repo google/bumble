@@ -24,7 +24,7 @@ from prompt_toolkit.shortcuts import PromptSession
 from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.transport import open_transport_or_link
-from bumble.smp import PairingDelegate, PairingConfig
+from bumble.pairing import PairingDelegate, PairingConfig
 from bumble.smp import error_name as smp_error_name
 from bumble.keys import JsonKeyStore
 from bumble.core import ProtocolError
@@ -345,8 +345,13 @@ async def pair(
                     print(color(f'Pairing failed: {error}', 'red'))
                     return
         else:
-            # Advertise so that peers can find us and connect
-            await device.start_advertising(auto_restart=True)
+            if mode == 'le':
+                # Advertise so that peers can find us and connect
+                await device.start_advertising(auto_restart=True)
+            else:
+                # Become discoverable and connectable
+                await device.set_discoverable(True)
+                await device.set_connectable(True)
 
         # Run until the user asks to exit
         await Waiter.instance.wait_until_terminated()
