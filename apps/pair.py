@@ -264,6 +264,7 @@ async def pair(
     sc,
     mitm,
     bond,
+    ctkd,
     io,
     prompt,
     request,
@@ -317,6 +318,7 @@ async def pair(
         if mode == 'classic':
             device.classic_enabled = True
             device.le_enabled = False
+            device.classic_smp_enabled = ctkd
 
         # Get things going
         await device.power_on()
@@ -380,6 +382,13 @@ class LogHandler(logging.Handler):
     '--bond', type=bool, default=True, help='Enable bonding', show_default=True
 )
 @click.option(
+    '--ctkd',
+    type=bool,
+    default=True,
+    help='Enable CTKD',
+    show_default=True,
+)
+@click.option(
     '--io',
     type=click.Choice(
         ['keyboard', 'display', 'display+keyboard', 'display+yes/no', 'none']
@@ -405,6 +414,7 @@ def main(
     sc,
     mitm,
     bond,
+    ctkd,
     io,
     prompt,
     request,
@@ -427,6 +437,7 @@ def main(
             sc,
             mitm,
             bond,
+            ctkd,
             io,
             prompt,
             request,

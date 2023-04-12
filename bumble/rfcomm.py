@@ -439,7 +439,7 @@ class DLC(EventEmitter):
 
             logger.debug(
                 f'<<< Credits [{self.dlci}]: '
-                f'received {credits}, total={self.tx_credits}'
+                f'received {received_credits}, total={self.tx_credits}'
             )
             data = data[1:]
 

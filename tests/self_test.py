@@ -447,7 +447,7 @@ async def test_self_smp_wrong_pin():
         async def compare_numbers(self, number, digits):
             return False
 
-    wrong_pin_pairing_config = PairingConfig(delegate=WrongPinDelegate())
+    wrong_pin_pairing_config = PairingConfig(mitm=True, delegate=WrongPinDelegate())
     paired = False
     try:
         await _test_self_smp_with_configs(

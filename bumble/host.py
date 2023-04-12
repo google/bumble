@@ -94,10 +94,9 @@ HOST_HC_TOTAL_NUM_ACL_DATA_PACKETS        = 1
 
 # -----------------------------------------------------------------------------
 class Connection:
-    def __init__(self, host, handle, role, peer_address, transport):
+    def __init__(self, host, handle, peer_address, transport):
         self.host = host
         self.handle = handle
-        self.role = role
         self.peer_address = peer_address
         self.assembler = HCI_AclDataPacketAssembler(self.on_acl_pdu)
         self.transport = transport
@@ -534,7 +533,7 @@ class Host(AbortableEventEmitter):
         if event.status == HCI_SUCCESS:
             # Create/update the connection
             logger.debug(
-                f'### CONNECTION: [0x{event.connection_handle:04X}] '
+                f'### LE CONNECTION: [0x{event.connection_handle:04X}] '
                 f'{event.peer_address} as {HCI_Constant.role_name(event.role)}'
             )
 
@@ -543,7 +542,6 @@ class Host(AbortableEventEmitter):
                 connection = Connection(
                     self,
                     event.connection_handle,
-                    event.role,
                     event.peer_address,
                     BT_LE_TRANSPORT,
                 )
@@ -560,7 +558,6 @@ class Host(AbortableEventEmitter):
                 event.connection_handle,
                 BT_LE_TRANSPORT,
                 event.peer_address,
-                None,
                 event.role,
                 connection_parameters,
             )
@@ -589,7 +586,6 @@ class Host(AbortableEventEmitter):
                 connection = Connection(
                     self,
                     event.connection_handle,
-                    BT_CENTRAL_ROLE,
                     event.bd_addr,
                     BT_BR_EDR_TRANSPORT,
                 )
@@ -602,7 +598,6 @@ class Host(AbortableEventEmitter):
                 BT_BR_EDR_TRANSPORT,
                 event.bd_addr,
                 None,
-                BT_CENTRAL_ROLE,
                 None,
             )
         else:
@@ -622,8 +617,7 @@ class Host(AbortableEventEmitter):
         if event.status == HCI_SUCCESS:
             logger.debug(
                 f'### DISCONNECTION: [0x{event.connection_handle:04X}] '
-                f'{connection.peer_address} as '
-                f'{HCI_Constant.role_name(connection.role)}, '
+                f'{connection.peer_address} '
                 f'reason={event.reason}'
             )
             del self.connections[event.connection_handle]
@@ -739,10 +733,6 @@ class Host(AbortableEventEmitter):
                 f'role change for {event.bd_addr}: '
                 f'{HCI_Constant.role_name(event.new_role)}'
             )
-            if connection := self.find_connection_by_bd_addr(
-                event.bd_addr, BT_BR_EDR_TRANSPORT
-            ):
-                connection.role = event.new_role
             self.emit('role_change', event.bd_addr, event.new_role)
         else:
             logger.debug(

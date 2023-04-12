@@ -596,7 +596,7 @@ class Connection(CompositeEventEmitter):
 
     # [Classic only]
     @classmethod
-    def incomplete(cls, device, peer_address):
+    def incomplete(cls, device, peer_address, role):
         """
         Instantiate an incomplete connection (ie. one waiting for a HCI Connection
         Complete event).
@@ -609,28 +609,30 @@ class Connection(CompositeEventEmitter):
             device.public_address,
             peer_address,
             None,
-            None,
+            role,
             None,
             None,
         )
 
     # [Classic only]
-    def complete(self, handle, peer_resolvable_address, role, parameters):
+    def complete(self, handle, parameters):
         """
         Finish an incomplete connection upon completion.
         """
         assert self.handle is None
         assert self.transport == BT_BR_EDR_TRANSPORT
         self.handle = handle
-        self.peer_resolvable_address = peer_resolvable_address
-        # Quirk: role might be known before complete
-        if self.role is None:
-            self.role = role
         self.parameters = parameters
 
     @property
     def role_name(self):
-        return 'CENTRAL' if self.role == BT_CENTRAL_ROLE else 'PERIPHERAL'
+        if self.role is None:
+            return 'NOT-SET'
+        if self.role == BT_CENTRAL_ROLE:
+            return 'CENTRAL'
+        if self.role == BT_PERIPHERAL_ROLE:
+            return 'PERIPHERAL'
+        return f'UNKNOWN[{self.role}]'
 
     @property
     def is_encrypted(self):
@@ -638,7 +640,7 @@ class Connection(CompositeEventEmitter):
 
     @property
     def is_incomplete(self) -> bool:
-        return self.handle == None
+        return self.handle is None
 
     def send_l2cap_pdu(self, cid, pdu):
         self.device.send_l2cap_pdu(self.handle, cid, pdu)
@@ -751,10 +753,11 @@ class DeviceConfiguration:
         self.advertising_interval_max = DEVICE_DEFAULT_ADVERTISING_INTERVAL
         self.le_enabled = True
         # LE host enable 2nd parameter
-        self.le_simultaneous_enabled = True
+        self.le_simultaneous_enabled = False
         self.classic_enabled = False
         self.classic_sc_enabled = True
         self.classic_ssp_enabled = True
+        self.classic_smp_enabled = True
         self.classic_accept_any = True
         self.connectable = True
         self.discoverable = True
@@ -788,6 +791,9 @@ class DeviceConfiguration:
         )
         self.classic_ssp_enabled = config.get(
             'classic_ssp_enabled', self.classic_ssp_enabled
+        )
+        self.classic_smp_enabled = config.get(
+            'classic_smp_enabled', self.classic_smp_enabled
         )
         self.classic_accept_any = config.get(
             'classic_accept_any', self.classic_accept_any
@@ -998,8 +1004,9 @@ class Device(CompositeEventEmitter):
         self.le_enabled = config.le_enabled
         self.classic_enabled = config.classic_enabled
         self.le_simultaneous_enabled = config.le_simultaneous_enabled
-        self.classic_ssp_enabled = config.classic_ssp_enabled
         self.classic_sc_enabled = config.classic_sc_enabled
+        self.classic_ssp_enabled = config.classic_ssp_enabled
+        self.classic_smp_enabled = config.classic_smp_enabled
         self.discoverable = config.discoverable
         self.connectable = config.connectable
         self.classic_accept_any = config.classic_accept_any
@@ -1044,9 +1051,6 @@ class Device(CompositeEventEmitter):
         # Setup SMP
         self.smp_manager = smp.Manager(self)
         self.l2cap_channel_manager.register_fixed_channel(smp.SMP_CID, self.on_smp_pdu)
-        self.l2cap_channel_manager.register_fixed_channel(
-            smp.SMP_BR_CID, self.on_smp_pdu
-        )
 
         # Register the SDP server with the L2CAP Channel Manager
         self.sdp_server.register(self.l2cap_channel_manager)
@@ -1182,6 +1186,12 @@ class Device(CompositeEventEmitter):
         # because some Key Store implementations use the public address as a namespace)
         if self.keystore is None:
             self.keystore = KeyStore.create_for_device(self)
+
+        # Finish setting up SMP based on post-init configurable options
+        if self.classic_smp_enabled:
+            self.l2cap_channel_manager.register_fixed_channel(
+                smp.SMP_BR_CID, self.on_smp_pdu
+            )
 
         if self.host.supports_command(HCI_WRITE_LE_HOST_SUPPORT_COMMAND):
             await self.send_command(
@@ -1802,7 +1812,7 @@ class Device(CompositeEventEmitter):
             else:
                 # Save pending connection
                 self.pending_connections[peer_address] = Connection.incomplete(
-                    self, peer_address
+                    self, peer_address, BT_CENTRAL_ROLE
                 )
 
                 # TODO: allow passing other settings
@@ -1939,9 +1949,12 @@ class Device(CompositeEventEmitter):
         self.on('connection', on_connection)
         self.on('connection_failure', on_connection_failure)
 
-        # Save pending connection
+        # Save pending connection, with the Peripheral role.
+        # Even if we requested a role switch in the HCI_Accept_Connection_Request
+        # command, this connection is still considered Peripheral until an eventual
+        # role change event.
         self.pending_connections[peer_address] = Connection.incomplete(
-            self, peer_address
+            self, peer_address, BT_PERIPHERAL_ROLE
         )
 
         try:
@@ -2214,6 +2227,9 @@ class Device(CompositeEventEmitter):
             keys = await self.keystore.get(str(address))
             if keys is not None:
                 logger.debug('found keys in the key store')
+                if keys.link_key is None:
+                    logger.debug('no link key')
+                    return None
                 return keys.link_key.value
 
     # [Classic only]
@@ -2463,25 +2479,24 @@ class Device(CompositeEventEmitter):
         connection_handle,
         transport,
         peer_address,
-        peer_resolvable_address,
         role,
         connection_parameters,
     ):
         logger.debug(
             f'*** Connection: [0x{connection_handle:04X}] '
-            f'{peer_address} as {HCI_Constant.role_name(role)}'
+            f'{peer_address} {"" if role is None else HCI_Constant.role_name(role)}'
         )
         if connection_handle in self.connections:
             logger.warning(
                 'new connection reuses the same handle as a previous connection'
             )
 
+        peer_resolvable_address = None
+
         if transport == BT_BR_EDR_TRANSPORT:
             # Create a new connection
             connection = self.pending_connections.pop(peer_address)
-            connection.complete(
-                connection_handle, peer_resolvable_address, role, connection_parameters
-            )
+            connection.complete(connection_handle, connection_parameters)
             self.connections[connection_handle] = connection
 
             # Emit an event to notify listeners of the new connection
@@ -2593,7 +2608,9 @@ class Device(CompositeEventEmitter):
         # device configuration is set to accept any incoming connection
         elif self.classic_accept_any:
             # Save pending connection
-            self.pending_connections[bd_addr] = Connection.incomplete(self, bd_addr)
+            self.pending_connections[bd_addr] = Connection.incomplete(
+                self, bd_addr, BT_PERIPHERAL_ROLE
+            )
 
             self.host.send_command_sync(
                 HCI_Accept_Connection_Request_Command(
