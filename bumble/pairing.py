@@ -114,7 +114,7 @@ class PairingDelegate:
         return True
 
     async def confirm(self) -> bool:
-        """Respond yes or not to a Pairing confirmation question."""
+        """Respond yes or no to a Pairing confirmation question."""
         return True
 
     # pylint: disable-next=unused-argument

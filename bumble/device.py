@@ -2808,7 +2808,7 @@ class Device(CompositeEventEmitter):
                         )
                     )
 
-            AsyncRunner.spawn(confirm())
+            AsyncRunner.spawn(connection.abort_on('disconnection', confirm()))
             return
 
         if io_capability == HCI_DISPLAY_ONLY_IO_CAPABILITY:
