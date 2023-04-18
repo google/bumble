@@ -29,11 +29,13 @@ from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
 from .gatt import Characteristic, Descriptor, Service
 from .hci import (
+    HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE,
+    HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
     HCI_CENTRAL_ROLE,
     HCI_COMMAND_STATUS_PENDING,
     HCI_CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR,
-    HCI_DISPLAY_ONLY_IO_CAPABILITY,
     HCI_DISPLAY_YES_NO_IO_CAPABILITY,
+    HCI_DISPLAY_ONLY_IO_CAPABILITY,
     HCI_EXTENDED_INQUIRY_MODE,
     HCI_GENERAL_INQUIRY_LAP,
     HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR,
@@ -141,6 +143,7 @@ from .keys import (
     KeyStore,
     PairingKeys,
 )
+from .pairing import PairingConfig
 from . import gatt_client
 from . import gatt_server
 from . import smp
@@ -197,6 +200,7 @@ DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS          = l2cap.L2CAP_LE_CREDIT_BASED_CONN
 # -----------------------------------------------------------------------------
 # Classes
 # -----------------------------------------------------------------------------
+
 
 # -----------------------------------------------------------------------------
 class Advertisement:
@@ -530,6 +534,8 @@ class Connection(CompositeEventEmitter):
     sc: bool
     link_key_type: int
     gatt_client: gatt_client.Client
+    pairing_peer_io_capability: Optional[int]
+    pairing_peer_authentication_requirements: Optional[int]
 
     @composite_listener
     class Listener:
@@ -593,6 +599,8 @@ class Connection(CompositeEventEmitter):
         self.gatt_server = (
             device.gatt_server
         )  # By default, use the device's shared server
+        self.pairing_peer_io_capability = None
+        self.pairing_peer_authentication_requirements = None
 
     # [Classic only]
     @classmethod
@@ -1049,7 +1057,10 @@ class Device(CompositeEventEmitter):
             self.random_address = address
 
         # Setup SMP
-        self.smp_manager = smp.Manager(self)
+        self.smp_manager = smp.Manager(
+            self, pairing_config_factory=lambda connection: PairingConfig()
+        )
+
         self.l2cap_channel_manager.register_fixed_channel(smp.SMP_CID, self.on_smp_pdu)
 
         # Register the SDP server with the L2CAP Channel Manager
@@ -1240,7 +1251,7 @@ class Device(CompositeEventEmitter):
                 await self.send_command(HCI_LE_Clear_Resolving_List_Command())  # type: ignore[call-arg]
 
                 resolving_keys = await self.keystore.get_resolving_keys()
-                for (irk, address) in resolving_keys:
+                for irk, address in resolving_keys:
                     await self.send_command(
                         HCI_LE_Add_Device_To_Resolving_List_Command(
                             peer_identity_address_type=address.address_type,
@@ -2228,8 +2239,9 @@ class Device(CompositeEventEmitter):
             if keys is not None:
                 logger.debug('found keys in the key store')
                 if keys.link_key is None:
-                    logger.debug('no link key')
+                    logger.warning('no link key')
                     return None
+
                 return keys.link_key.value
 
     # [Classic only]
@@ -2434,8 +2446,14 @@ class Device(CompositeEventEmitter):
     def on_link_key(self, bd_addr, link_key, key_type):
         # Store the keys in the key store
         if self.keystore:
+            authenticated = key_type in (
+                HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE,
+                HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
+            )
             pairing_keys = PairingKeys()
-            pairing_keys.link_key = PairingKeys.Key(value=link_key)
+            pairing_keys.link_key = PairingKeys.Key(
+                value=link_key, authenticated=authenticated
+            )
 
             async def store_keys():
                 try:
@@ -2701,7 +2719,7 @@ class Device(CompositeEventEmitter):
         # On Secure Simple Pairing complete, in case:
         # - Connection isn't already authenticated
         # - AND we are not the initiator of the authentication
-        # We must trigger authentication to known if we are truly authenticated
+        # We must trigger authentication to know if we are truly authenticated
         if not connection.authenticating and not connection.authenticated:
             logger.debug(
                 f'*** Trigger Connection Authentication: [0x{connection.handle:04X}] '
@@ -2715,22 +2733,6 @@ class Device(CompositeEventEmitter):
     def on_authentication_io_capability_request(self, connection):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
-
-        # Map the SMP IO capability to a Classic IO capability
-        # pylint: disable=line-too-long
-        io_capability = {
-            smp.SMP_DISPLAY_ONLY_IO_CAPABILITY: HCI_DISPLAY_ONLY_IO_CAPABILITY,
-            smp.SMP_DISPLAY_YES_NO_IO_CAPABILITY: HCI_DISPLAY_YES_NO_IO_CAPABILITY,
-            smp.SMP_KEYBOARD_ONLY_IO_CAPABILITY: HCI_KEYBOARD_ONLY_IO_CAPABILITY,
-            smp.SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
-            smp.SMP_KEYBOARD_DISPLAY_IO_CAPABILITY: HCI_DISPLAY_YES_NO_IO_CAPABILITY,
-        }.get(pairing_config.delegate.io_capability)
-
-        if io_capability is None:
-            logger.warning(
-                f'cannot map IO capability ({pairing_config.delegate.io_capability}'
-            )
-            io_capability = HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
 
         # Compute the authentication requirements
         authentication_requirements = (
@@ -2750,7 +2752,7 @@ class Device(CompositeEventEmitter):
         self.host.send_command_sync(
             HCI_IO_Capability_Request_Reply_Command(
                 bd_addr=connection.peer_address,
-                io_capability=io_capability,
+                io_capability=pairing_config.delegate.classic_io_capability,
                 oob_data_present=0x00,  # Not present
                 authentication_requirements=authentication_requirements,
             )
@@ -2759,44 +2761,41 @@ class Device(CompositeEventEmitter):
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
+    def on_authentication_io_capability_response(
+        self, connection, io_capability, authentication_requirements
+    ):
+        connection.peer_pairing_io_capability = io_capability
+        connection.peer_pairing_authentication_requirements = (
+            authentication_requirements
+        )
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
     def on_authentication_user_confirmation_request(self, connection, code):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
-
-        can_compare = pairing_config.delegate.io_capability not in (
-            smp.SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
-            smp.SMP_DISPLAY_ONLY_IO_CAPABILITY,
-        )
+        io_capability = pairing_config.delegate.classic_io_capability
 
         # Respond
-        if can_compare:
-
-            async def compare_numbers():
-                numbers_match = await connection.abort_on(
-                    'disconnection',
-                    pairing_config.delegate.compare_numbers(code, digits=6),
-                )
-                if numbers_match:
-                    await self.host.send_command(
-                        HCI_User_Confirmation_Request_Reply_Command(
-                            bd_addr=connection.peer_address
-                        )
-                    )
-                else:
-                    await self.host.send_command(
-                        HCI_User_Confirmation_Request_Negative_Reply_Command(
-                            bd_addr=connection.peer_address
-                        )
+        if io_capability == HCI_DISPLAY_YES_NO_IO_CAPABILITY:
+            if connection.peer_pairing_io_capability in (
+                HCI_DISPLAY_YES_NO_IO_CAPABILITY,
+                HCI_DISPLAY_ONLY_IO_CAPABILITY,
+            ):
+                # Display the code and ask the user to compare
+                async def prompt():
+                    return (
+                        await pairing_config.delegate.compare_numbers(code, digits=6),
                     )
 
-            asyncio.create_task(compare_numbers())
-        else:
+            else:
+                # Ask the user to confirm the pairing, without showing a code
+                async def prompt():
+                    return await pairing_config.delegate.confirm()
 
             async def confirm():
-                confirm = await connection.abort_on(
-                    'disconnection', pairing_config.delegate.confirm()
-                )
-                if confirm:
+                if await prompt():
                     await self.host.send_command(
                         HCI_User_Confirmation_Request_Reply_Command(
                             bd_addr=connection.peer_address
@@ -2809,7 +2808,17 @@ class Device(CompositeEventEmitter):
                         )
                     )
 
-            asyncio.create_task(confirm())
+            AsyncRunner.spawn(connection.abort_on('disconnection', confirm()))
+            return
+
+        if io_capability == HCI_DISPLAY_ONLY_IO_CAPABILITY:
+            # Display the code to the user
+            AsyncRunner.spawn(pairing_config.delegate.display_number(code, 6))
+
+        # Automatic confirmation
+        self.host.send_command_sync(
+            HCI_User_Confirmation_Request_Reply_Command(bd_addr=connection.peer_address)
+        )
 
     # [Classic only]
     @host_event_handler
@@ -2817,15 +2826,11 @@ class Device(CompositeEventEmitter):
     def on_authentication_user_passkey_request(self, connection):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
-
-        can_input = pairing_config.delegate.io_capability in (
-            smp.SMP_KEYBOARD_ONLY_IO_CAPABILITY,
-            smp.SMP_KEYBOARD_DISPLAY_IO_CAPABILITY,
-        )
+        io_capability = pairing_config.delegate.classic_io_capability
 
         # Respond
-        if can_input:
-
+        if io_capability == HCI_KEYBOARD_ONLY_IO_CAPABILITY:
+            # Ask the user to input a number
             async def get_number():
                 number = await connection.abort_on(
                     'disconnection', pairing_config.delegate.get_number()
@@ -2855,18 +2860,14 @@ class Device(CompositeEventEmitter):
     @host_event_handler
     @with_connection_from_address
     def on_pin_code_request(self, connection):
-        # classic legacy pairing
+        # Classic legacy pairing
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
+        io_capability = pairing_config.delegate.classic_io_capability
 
-        can_input = pairing_config.delegate.io_capability in (
-            smp.SMP_KEYBOARD_ONLY_IO_CAPABILITY,
-            smp.SMP_KEYBOARD_DISPLAY_IO_CAPABILITY,
-        )
-
-        # respond the pin code
-        if can_input:
-
+        # Respond
+        if io_capability == HCI_KEYBOARD_ONLY_IO_CAPABILITY:
+            # Ask the user to enter a string
             async def get_pin_code():
                 pin_code = await connection.abort_on(
                     'disconnection', pairing_config.delegate.get_string(16)
@@ -2906,6 +2907,7 @@ class Device(CompositeEventEmitter):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
 
+        # Show the passkey to the user
         connection.abort_on(
             'disconnection', pairing_config.delegate.display_number(passkey)
         )

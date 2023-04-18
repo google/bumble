@@ -31,7 +31,16 @@ from typing import Dict, Optional, Type
 from pyee import EventEmitter
 
 from .colors import color
-from .hci import Address, HCI_LE_Enable_Encryption_Command, HCI_Object, key_with_value
+from .hci import (
+    HCI_DISPLAY_ONLY_IO_CAPABILITY,
+    HCI_DISPLAY_YES_NO_IO_CAPABILITY,
+    HCI_KEYBOARD_ONLY_IO_CAPABILITY,
+    HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
+    Address,
+    HCI_LE_Enable_Encryption_Command,
+    HCI_Object,
+    key_with_value,
+)
 from .core import (
     BT_BR_EDR_TRANSPORT,
     BT_CENTRAL_ROLE,
@@ -476,7 +485,7 @@ class AddressResolver:
         address_bytes = bytes(address)
         hash_part = address_bytes[0:3]
         prand = address_bytes[3:6]
-        for (irk, resolved_address) in self.resolving_keys:
+        for irk, resolved_address in self.resolving_keys:
             local_hash = crypto.ah(irk, prand)
             if local_hash == hash_part:
                 # Match!
@@ -489,86 +498,6 @@ class AddressResolver:
                 )
 
         return None
-
-
-# -----------------------------------------------------------------------------
-class PairingDelegate:
-    NO_OUTPUT_NO_INPUT = SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
-    KEYBOARD_INPUT_ONLY = SMP_KEYBOARD_ONLY_IO_CAPABILITY
-    DISPLAY_OUTPUT_ONLY = SMP_DISPLAY_ONLY_IO_CAPABILITY
-    DISPLAY_OUTPUT_AND_YES_NO_INPUT = SMP_DISPLAY_YES_NO_IO_CAPABILITY
-    DISPLAY_OUTPUT_AND_KEYBOARD_INPUT = SMP_KEYBOARD_DISPLAY_IO_CAPABILITY
-    DEFAULT_KEY_DISTRIBUTION: int = (
-        SMP_ENC_KEY_DISTRIBUTION_FLAG | SMP_ID_KEY_DISTRIBUTION_FLAG
-    )
-
-    def __init__(
-        self,
-        io_capability: int = NO_OUTPUT_NO_INPUT,
-        local_initiator_key_distribution: int = DEFAULT_KEY_DISTRIBUTION,
-        local_responder_key_distribution: int = DEFAULT_KEY_DISTRIBUTION,
-    ) -> None:
-        self.io_capability = io_capability
-        self.local_initiator_key_distribution = local_initiator_key_distribution
-        self.local_responder_key_distribution = local_responder_key_distribution
-
-    async def accept(self) -> bool:
-        return True
-
-    async def confirm(self) -> bool:
-        return True
-
-    # pylint: disable-next=unused-argument
-    async def compare_numbers(self, number: int, digits: int) -> bool:
-        return True
-
-    async def get_number(self) -> Optional[int]:
-        '''
-        Returns an optional number as an answer to a passkey request.
-        Returning `None` will result in a negative reply.
-        '''
-        return 0
-
-    async def get_string(self, max_length) -> Optional[str]:
-        '''
-        Returns a string whose utf-8 encoding is up to max_length bytes.
-        '''
-        return None
-
-    # pylint: disable-next=unused-argument
-    async def display_number(self, number: int, digits: int) -> None:
-        pass
-
-    async def key_distribution_response(
-        self, peer_initiator_key_distribution, peer_responder_key_distribution
-    ):
-        return (
-            (peer_initiator_key_distribution & self.local_initiator_key_distribution),
-            (peer_responder_key_distribution & self.local_responder_key_distribution),
-        )
-
-
-# -----------------------------------------------------------------------------
-class PairingConfig:
-    def __init__(
-        self,
-        sc: bool = True,
-        mitm: bool = False,
-        bonding: bool = True,
-        delegate: Optional[PairingDelegate] = None,
-    ) -> None:
-        self.sc = sc
-        self.mitm = mitm
-        self.bonding = bonding
-        self.delegate = delegate or PairingDelegate()
-
-    def __str__(self):
-        io_capability_str = SMP_Command.io_capability_name(self.delegate.io_capability)
-        return (
-            f'PairingConfig(sc={self.sc}, '
-            f'mitm={self.mitm}, bonding={self.bonding}, '
-            f'delegate[{io_capability_str}])'
-        )
 
 
 # -----------------------------------------------------------------------------
@@ -1662,12 +1591,12 @@ class Manager(EventEmitter):
     Implements the Initiator and Responder roles of the Security Manager Protocol
     '''
 
-    def __init__(self, device):
+    def __init__(self, device, pairing_config_factory):
         super().__init__()
         self.device = device
         self.sessions = {}
         self._ecc_key = None
-        self.pairing_config_factory = lambda connection: PairingConfig()
+        self.pairing_config_factory = pairing_config_factory
 
     def send_command(self, connection, command):
         logger.debug(

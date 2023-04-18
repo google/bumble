@@ -395,8 +395,8 @@ class Host(AbortableEventEmitter):
 
     def supports_command(self, command):
         # Find the support flag position for this command
-        for (octet, flags) in enumerate(HCI_SUPPORTED_COMMANDS_FLAGS):
-            for (flag_position, value) in enumerate(flags):
+        for octet, flags in enumerate(HCI_SUPPORTED_COMMANDS_FLAGS):
+            for flag_position, value in enumerate(flags):
                 if value == command:
                     # Check if the flag is set
                     if octet < len(self.local_supported_commands) and flag_position < 8:
@@ -409,7 +409,7 @@ class Host(AbortableEventEmitter):
     @property
     def supported_commands(self):
         commands = []
-        for (octet, flags) in enumerate(self.local_supported_commands):
+        for octet, flags in enumerate(self.local_supported_commands):
             if octet < len(HCI_SUPPORTED_COMMANDS_FLAGS):
                 for flag in range(8):
                     if flags & (1 << flag) != 0:
@@ -839,7 +839,12 @@ class Host(AbortableEventEmitter):
         self.emit('authentication_io_capability_request', event.bd_addr)
 
     def on_hci_io_capability_response_event(self, event):
-        pass
+        self.emit(
+            'authentication_io_capability_response',
+            event.bd_addr,
+            event.io_capability,
+            event.authentication_requirements,
+        )
 
     def on_hci_user_confirmation_request_event(self, event):
         self.emit(
