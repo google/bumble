@@ -2243,6 +2243,7 @@ class Device(CompositeEventEmitter):
                     return None
 
                 return keys.link_key.value
+        return None
 
     # [Classic only]
     async def authenticate(self, connection):
