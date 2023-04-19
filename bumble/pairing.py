@@ -114,8 +114,11 @@ class PairingDelegate:
         """Accept or reject a Pairing request."""
         return True
 
-    async def confirm(self) -> bool:
-        """Respond yes or no to a Pairing confirmation question."""
+    async def confirm(self, auto: bool = False) -> bool:
+        """
+        Respond yes or no to a Pairing confirmation question.
+        The `auto` parameter stands for automatic confirmation.
+        """
         return True
 
     # pylint: disable-next=unused-argument
