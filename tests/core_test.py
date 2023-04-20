@@ -15,7 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from bumble.core import AdvertisingData, get_dict_key_by_value
+from bumble.core import AdvertisingData, UUID, get_dict_key_by_value
 
 # -----------------------------------------------------------------------------
 def test_ad_data():
@@ -50,5 +50,23 @@ def test_get_dict_key_by_value():
 
 
 # -----------------------------------------------------------------------------
+def test_uuid_to_hex_str() -> None:
+    assert UUID("b5ea").to_hex_str() == "B5EA"
+    assert UUID("df5ce654").to_hex_str() == "DF5CE654"
+    assert (
+        UUID("df5ce654-e059-11ed-b5ea-0242ac120002").to_hex_str()
+        == "DF5CE654E05911EDB5EA0242AC120002"
+    )
+    assert UUID("b5ea").to_hex_str('-') == "B5EA"
+    assert UUID("df5ce654").to_hex_str('-') == "DF5CE654"
+    assert (
+        UUID("df5ce654-e059-11ed-b5ea-0242ac120002").to_hex_str('-')
+        == "DF5CE654-E059-11ED-B5EA-0242AC120002"
+    )
+
+
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     test_ad_data()
+    test_get_dict_key_by_value()
+    test_uuid_to_hex_str()
