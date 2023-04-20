@@ -773,7 +773,7 @@ class AdvertisingData:
     def uuid_list_to_objects(ad_data: bytes, uuid_size: int) -> List[UUID]:
         uuids = []
         offset = 0
-        while (uuid_size * (offset + 1)) <= len(ad_data):
+        while (offset + uuid_size) <= len(ad_data):
             uuids.append(UUID.from_bytes(ad_data[offset : offset + uuid_size]))
             offset += uuid_size
         return uuids
