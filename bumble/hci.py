@@ -5373,7 +5373,7 @@ class HCI_AclDataPacket:
     def __str__(self):
         return (
             f'{color("ACL", "blue")}: '
-            f'handle=0x{self.connection_handle:04x}'
+            f'handle=0x{self.connection_handle:04x}, '
             f'pb={self.pb_flag}, bc={self.bc_flag}, '
             f'data_total_length={self.data_total_length}, '
             f'data={self.data.hex()}'

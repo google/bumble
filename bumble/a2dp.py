@@ -432,6 +432,7 @@ class AacMediaCodecInformation(
                 cls.SAMPLING_FREQUENCY_BITS[x] for x in sampling_frequencies
             ),
             channels=sum(cls.CHANNELS_BITS[x] for x in channels),
+            rfa=0,
             vbr=vbr,
             bitrate=bitrate,
         )
