@@ -257,7 +257,7 @@ class JsonKeyStore(KeyStore):
             json.dump(db, output, sort_keys=True, indent=4)
 
         # Atomically replace the previous file
-        os.rename(temp_filename, self.filename)
+        os.replace(temp_filename, self.filename)
 
     async def delete(self, name: str) -> None:
         db = await self.load()
