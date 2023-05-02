@@ -100,7 +100,7 @@ def publish_grpc_port(grpc_port) -> bool:
         logger.debug('no known directory for .ini file')
         return False
 
-    if not ini_dir.is_dir:
+    if not ini_dir.is_dir():
         logger.debug('ini directory does not exist')
         return False
 
