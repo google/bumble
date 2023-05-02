@@ -1711,6 +1711,7 @@ class Manager(EventEmitter):
     device: Device
     sessions: Dict[int, Session]
     pairing_config_factory: Callable[[Connection], PairingConfig]
+    session_proxy: Type[Session]
 
     def __init__(
         self,
@@ -1722,6 +1723,7 @@ class Manager(EventEmitter):
         self.sessions = {}
         self._ecc_key = None
         self.pairing_config_factory = pairing_config_factory
+        self.session_proxy = Session
 
     def send_command(self, connection: Connection, command: SMP_Command) -> None:
         logger.debug(
@@ -1737,7 +1739,9 @@ class Manager(EventEmitter):
             if connection.role == BT_CENTRAL_ROLE:
                 logger.warning('Remote starts pairing as Peripheral!')
             pairing_config = self.pairing_config_factory(connection)
-            session = Session(self, connection, pairing_config, is_initiator=False)
+            session = self.session_proxy(
+                self, connection, pairing_config, is_initiator=False
+            )
             self.sessions[connection.handle] = session
 
         # Parse the L2CAP payload into an SMP Command object
@@ -1762,7 +1766,9 @@ class Manager(EventEmitter):
         if connection.role != BT_CENTRAL_ROLE:
             logger.warning('Start pairing as Peripheral!')
         pairing_config = self.pairing_config_factory(connection)
-        session = Session(self, connection, pairing_config, is_initiator=True)
+        session = self.session_proxy(
+            self, connection, pairing_config, is_initiator=True
+        )
         self.sessions[connection.handle] = session
         return await session.pair()
 

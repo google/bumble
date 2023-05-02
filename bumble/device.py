@@ -23,7 +23,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
@@ -2205,6 +2205,14 @@ class Device(CompositeEventEmitter):
         self, pairing_config_factory: Callable[[Connection], PairingConfig]
     ) -> None:
         self.smp_manager.pairing_config_factory = pairing_config_factory
+
+    @property
+    def smp_session_proxy(self) -> Type[smp.Session]:
+        return self.smp_manager.session_proxy
+
+    @smp_session_proxy.setter
+    def smp_session_proxy(self, session_proxy: Type[smp.Session]) -> None:
+        self.smp_manager.session_proxy = session_proxy
 
     async def pair(self, connection):
         return await self.smp_manager.pair(connection)
