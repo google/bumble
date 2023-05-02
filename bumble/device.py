@@ -23,7 +23,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Union
 
 from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
@@ -528,6 +528,7 @@ class Connection(CompositeEventEmitter):
     transport: int
     self_address: Address
     peer_address: Address
+    peer_resolvable_address: Optional[Address]
     role: int
     encryption: int
     authenticated: bool
@@ -2196,11 +2197,13 @@ class Device(CompositeEventEmitter):
                 await self.stop_discovery()
 
     @property
-    def pairing_config_factory(self):
+    def pairing_config_factory(self) -> Callable[[Connection], PairingConfig]:
         return self.smp_manager.pairing_config_factory
 
     @pairing_config_factory.setter
-    def pairing_config_factory(self, pairing_config_factory):
+    def pairing_config_factory(
+        self, pairing_config_factory: Callable[[Connection], PairingConfig]
+    ) -> None:
         self.smp_manager.pairing_config_factory = pairing_config_factory
 
     async def pair(self, connection):
@@ -2232,7 +2235,7 @@ class Device(CompositeEventEmitter):
                 if connection.role == BT_PERIPHERAL_ROLE and keys.ltk_peripheral:
                     return keys.ltk_peripheral.value
 
-    async def get_link_key(self, address):
+    async def get_link_key(self, address: Address) -> Optional[bytes]:
         # Look for the key in the keystore
         if self.keystore is not None:
             keys = await self.keystore.get(str(address))
@@ -3074,18 +3077,15 @@ class Device(CompositeEventEmitter):
             connection.emit('role_change_failure', error)
         self.emit('role_change_failure', address, error)
 
-    @with_connection_from_handle
-    def on_pairing_start(self, connection):
+    def on_pairing_start(self, connection: Connection) -> None:
         connection.emit('pairing_start')
 
-    @with_connection_from_handle
-    def on_pairing(self, connection, keys, sc):
+    def on_pairing(self, connection: Connection, keys: PairingKeys, sc: bool) -> None:
         connection.sc = sc
         connection.authenticated = True
         connection.emit('pairing', keys)
 
-    @with_connection_from_handle
-    def on_pairing_failure(self, connection, reason):
+    def on_pairing_failure(self, connection: Connection, reason: int) -> None:
         connection.emit('pairing_failure', reason)
 
     @with_connection_from_handle
