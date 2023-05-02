@@ -75,7 +75,7 @@ def get_ini_dir() -> Optional[pathlib.Path]:
 
 # -----------------------------------------------------------------------------
 def find_grpc_port() -> int:
-    if not (ini_dir:= get_ini_dir()):
+    if not (ini_dir := get_ini_dir()):
         logger.debug('no known directory for .ini file')
         return 0
 
@@ -96,7 +96,7 @@ def find_grpc_port() -> int:
 
 # -----------------------------------------------------------------------------
 def publish_grpc_port(grpc_port) -> bool:
-    if not (ini_dir:= get_ini_dir()):
+    if not (ini_dir := get_ini_dir()):
         logger.debug('no known directory for .ini file')
         return False
 
@@ -108,6 +108,7 @@ def publish_grpc_port(grpc_port) -> bool:
     try:
         ini_file.write_text(f'grpc.port={grpc_port}\n')
         logger.debug(f"published gRPC port at {ini_file}")
+
         def cleanup():
             logger.debug("removing .ini file")
             ini_file.unlink()
