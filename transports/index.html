@@ -856,8 +856,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../apps_and_tools/link_relay.html" class="md-nav__link">
-        Link Relay
+      <a href="../apps_and_tools/bench.html" class="md-nav__link">
+        Bench
       </a>
     </li>
   
@@ -956,6 +956,20 @@
     <li class="md-nav__item">
       <a href="../apps_and_tools/usb_probe.html" class="md-nav__link">
         USB Probe
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../apps_and_tools/link_relay.html" class="md-nav__link">
+        Link Relay
       </a>
     </li>
   
@@ -1216,7 +1230,8 @@ Several types of transports are supported:</p>
 <li><a href="pty.html">PTY</a>: a PTY (pseudo terminal) is used to send/receive HCI packets. This is convenient to expose a virtual controller as if it were an HCI UART</li>
 <li><a href="vhci.html">VHCI</a>: used to attach a virtual controller to a Bluetooth stack on platforms that support it.</li>
 <li><a href="hci_socket.html">HCI Socket</a>: an HCI socket, on platforms that support it, to send/receive HCI packets to/from an HCI controller managed by the OS.</li>
-<li><a href="android_emulator.html">Android Emulator</a>: a gRPC connection to an Android emulator is used to setup either an HCI interface to the emulator's "Root Canal" virtual controller, or attach a virtual controller to the Android Bluetooth host stack.</li>
+<li><a href="android_emulator.html">Android Emulator</a>: a gRPC connection to the Android emulator's "netsim"
+  virtual controller, or from the Android emulator, is used to setup either an HCI interface to the emulator's "netsim" virtual controller, or serve as a virtual controller for the Android Bluetooth host stack.</li>
 <li><a href="file.html">File</a>: HCI packets are read/written to a file-like node in the filesystem.</li>
 </ul>
 
@@ -1274,7 +1289,7 @@ Several types of transports are supported:</p>
       <div class="md-footer-copyright">
         
           <div class="md-footer-copyright__highlight">
-            Copyright 2021-2022 Google LLC
+            Copyright 2021-2023 Google LLC
           </div>
         
       </div>

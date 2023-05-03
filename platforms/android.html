@@ -844,8 +844,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../apps_and_tools/link_relay.html" class="md-nav__link">
-        Link Relay
+      <a href="../apps_and_tools/bench.html" class="md-nav__link">
+        Bench
       </a>
     </li>
   
@@ -944,6 +944,20 @@
     <li class="md-nav__item">
       <a href="../apps_and_tools/usb_probe.html" class="md-nav__link">
         USB Probe
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../apps_and_tools/link_relay.html" class="md-nav__link">
+        Link Relay
       </a>
     </li>
   
@@ -1137,9 +1151,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#connecting-to-root-canal" class="md-nav__link">
-    Connecting to Root Canal
+  <a href="#connecting-to-netsim" class="md-nav__link">
+    Connecting to Netsim
   </a>
+  
+    <nav class="md-nav" aria-label="Connecting to Netsim">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiple-instances" class="md-nav__link">
+    Multiple Instances
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1254,9 +1281,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#connecting-to-root-canal" class="md-nav__link">
-    Connecting to Root Canal
+  <a href="#connecting-to-netsim" class="md-nav__link">
+    Connecting to Netsim
   </a>
+  
+    <nav class="md-nav" aria-label="Connecting to Netsim">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiple-instances" class="md-nav__link">
+    Multiple Instances
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1296,20 +1336,21 @@ emulator.</p>
 <ul>
 <li>Connecting the Bumble host stack to the Android emulator's virtual controller.</li>
 <li>Using Bumble as an HCI bridge to connect the Android emulator to a physical
-    Bluetooth controller, such as a USB dongle</li>
+    Bluetooth controller, such as a USB dongle, or other HCI transport.</li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>Bluetooth support in the Android emulator is a recent feature that may still
 be evolving. The information contained here be somewhat out of sync with the
 version of the emulator you are using.
-You will need version 31.3.8.0 or later.</p>
+You will need version 33.1.4.0 or later.</p>
 </div>
 <p>The Android emulator supports Bluetooth in two ways: either by exposing virtual
 Bluetooth controllers to which you can connect a virtual Bluetooth host stack, or
-by exposing an way to connect your own virtual controller to the Android Bluetooth
+by exposing a way to connect your own virtual controller to the Android Bluetooth
 stack via a virtual HCI interface.
-Both ways are controlled via gRPC requests to the Android emulator.</p>
+Both ways are controlled via gRPC requests to the Android emulator controller and/or
+from the Android emulator.</p>
 <h2 id="launching-the-emulator">Launching the Emulator<a class="headerlink" href="#launching-the-emulator" title="Permanent link">&para;</a></h2>
 <p>If the version of the emulator you are running does not yet support enabling
 Bluetooth support by default or automatically, you must launch the emulator from
@@ -1319,42 +1360,68 @@ the command line.</p>
 <p>For details on how to launch the Android emulator from the command line,
 visit <a href="https://developer.android.com/studio/run/emulator-commandline">this Android Studio user guide page</a></p>
 </div>
-<p>The <code>-grpc &lt;port&gt;</code> command line option may be used to select a gRPC port other than the default.</p>
-<h2 id="connecting-to-root-canal">Connecting to Root Canal<a class="headerlink" href="#connecting-to-root-canal" title="Permanent link">&para;</a></h2>
-<p>The Android emulator's virtual Bluetooth controller is called <strong>Root Canal</strong>.
-Multiple instances of Root Canal virtual controllers can be instantiated, they
-communicate link layer packets between them, thus creating a virtual radio network.
-Configuring a Bumble Device instance to use Root Canal as a virtual controller
+<p>The <code>-packet-streamer-endpoint &lt;endpoint&gt;</code> command line option may be used to enable
+Bluetooth emulation and tell the emulator which virtual controller to connect to. </p>
+<h2 id="connecting-to-netsim">Connecting to Netsim<a class="headerlink" href="#connecting-to-netsim" title="Permanent link">&para;</a></h2>
+<p>If the emulator doesn't have Bluetooth emulation enabled by default, use the 
+<code>-packet-streamer-endpoint default</code> option to tell it to connect to Netsim.
+If Netsim is not running, the emulator will start it automatically.</p>
+<p>The Android emulator's virtual Bluetooth controller is called <strong>Netsim</strong>.
+Netsim runs as a background process and allows multiple clients to connect to it,
+each connecting to its own virtual controller instance hosted by Netsim. All the
+clients connected to the same Netsim process can then "talk" to each other over a
+virtual radio link layer.
+Netsim supports other wireless protocols than Bluetooth, but the relevant part here
+is Bluetooth. The virtual Bluetooth controller used by Netsim is sometimes referred to
+as <strong>Root Canal</strong>.</p>
+<p>Configuring a Bumble Device instance to use netsim as a virtual controller
 allows that virtual device to communicate with the Android Bluetooth stack, and
 through it with Android applications as well as system-managed profiles.
-To connect a Bumble host stack to a Root Canal virtual controller instance, use
-the bumble <code>android-emulator</code> transport in <code>host</code> mode (the default).</p>
+To connect a Bumble host stack to a netsim virtual controller instance, use
+the Bumble <code>android-netsim</code> transport in <code>host</code> mode (the default).</p>
 <div class="admonition example">
-<p class="admonition-title">Run the example GATT server connected to the emulator</p>
-<div class="highlight"><pre><span></span><code>$ python run_gatt_server.py device1.json android-emulator
+<p class="admonition-title">Run the example GATT server connected to the emulator via Netsim</p>
+<div class="highlight"><pre><span></span><code>$ python run_gatt_server.py device1.json android-netsim
 </code></pre></div>
 </div>
+<p>By default, the Bumble <code>android-netsim</code> transport will try to automatically discover
+the port number on which the netsim process is exposing its gRPC server interface. If
+that discovery process fails, or if you want to specify the interface manually, you 
+can pass a <code>hostname</code> and <code>port</code> as parameters to the transport, as: <code>android-netsim:&lt;host&gt;:&lt;port&gt;</code>.</p>
+<div class="admonition example">
+<p class="admonition-title">Run the example GATT server connected to the emulator via Netsim on a localhost, port 8877</p>
+<div class="highlight"><pre><span></span><code>$ python run_gatt_server.py device1.json android-netsim:localhost:8877
+</code></pre></div>
+</div>
+<h3 id="multiple-instances">Multiple Instances<a class="headerlink" href="#multiple-instances" title="Permanent link">&para;</a></h3>
+<p>If you want to connect multiple Bumble devices to netsim, it may be useful to give each one
+a netsim controller with a specific name. This can be done using the <code>name=&lt;name&gt;</code> transport option.
+For example: <code>android-netsim:localhost:8877,name=bumble1</code></p>
 <h2 id="connecting-a-custom-virtual-controller">Connecting a Custom Virtual Controller<a class="headerlink" href="#connecting-a-custom-virtual-controller" title="Permanent link">&para;</a></h2>
 <p>This is an advanced use case, which may not be officially supported, but should work in recent
-versions of the emulator.
-You will likely need to start the emulator from the command line, in order to specify the <code>-forward-vhci</code> option (unless the emulator offers a way to control that feature from a user/ui menu).</p>
+versions of the emulator.</p>
+<p>The first step is to run the Bumble HCI bridge, specifying netsim as the "host" end of the 
+bridge, and another controller (typically a USB Bluetooth dongle, but any other supported
+transport can work as well) as the "controller" end of the bridge.</p>
+<p>To connect a virtual controller to the Android Bluetooth stack, use the bumble <code>android-netsim</code> transport in <code>controller</code> mode. For example, with port number 8877, the transport name would be: <code>android-netsim:_:8877,mode=controller</code>.</p>
 <div class="admonition example">
-<p class="admonition-title">Launch the emulator with VHCI forwarding</p>
-<p>In this example, we launch an emulator AVD named "Tiramisu"
-<div class="highlight"><pre><span></span><code>$ emulator -forward-vhci -avd Tiramisu
+<p class="admonition-title">Connect the Android emulator to the first USB Bluetooth dongle, using the <code>hci_bridge</code> application</p>
+<div class="highlight"><pre><span></span><code>$ bumble-hci-bridge android-netsim:_:8877,mode<span class="o">=</span>controller usb:0
+</code></pre></div>
+</div>
+<p>Then, you can start the emulator and tell it to connect to this bridge, instead of netsim.
+You will likely need to start the emulator from the command line, in order to specify the <code>-packet-streamer-endpoint &lt;hostname&gt;:&lt;port&gt;</code> option (unless the emulator offers a way to control that feature from a user/ui menu).</p>
+<div class="admonition example">
+<p class="admonition-title">Launch the emulator with a netsim replacement</p>
+<p>In this example, we launch an emulator AVD named "Tiramisu", with a Bumble HCI bridge running
+on port 8877.
+<div class="highlight"><pre><span></span><code>$ emulator -packet-streamer-endpoint localhost:8877 -avd Tiramisu
 </code></pre></div></p>
 </div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
-<p>Attaching a virtual controller use the VHCI forwarder while the Android Bluetooth stack
-is running isn't supported. So you need to disable Bluetooth in your running Android guest
+<p>Attaching a virtual controller while the Android Bluetooth stack is running may not be well supported. So you may need to disable Bluetooth in your running Android guest
 before attaching the virtual controller, then re-enable it once attached.</p>
-</div>
-<p>To connect a virtual controller to the Android Bluetooth stack, use the bumble <code>android-emulator</code> transport in <code>controller</code> mode. For example, using the default gRPC port, the transport name would be: <code>android-emulator:mode=controller</code>.</p>
-<div class="admonition example">
-<p class="admonition-title">Connect the Android emulator to the first USB Bluetooth dongle, using the <code>hci_bridge</code> application</p>
-<div class="highlight"><pre><span></span><code>$ bumble-hci-bridge android-emulator:mode<span class="o">=</span>controller usb:0
-</code></pre></div>
 </div>
 <h2 id="other-tools">Other Tools<a class="headerlink" href="#other-tools" title="Permanent link">&para;</a></h2>
 <p>The <code>show</code> application that's included with Bumble can be used to parse and pretty-print the HCI packets
@@ -1421,7 +1488,7 @@ Use the <code>--format snoop</code> option to specify that the file is in that s
       <div class="md-footer-copyright">
         
           <div class="md-footer-copyright__highlight">
-            Copyright 2021-2022 Google LLC
+            Copyright 2021-2023 Google LLC
           </div>
         
       </div>

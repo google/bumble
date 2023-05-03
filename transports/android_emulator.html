@@ -887,8 +887,8 @@
   
   
     <li class="md-nav__item">
-      <a href="../apps_and_tools/link_relay.html" class="md-nav__link">
-        Link Relay
+      <a href="../apps_and_tools/bench.html" class="md-nav__link">
+        Bench
       </a>
     </li>
   
@@ -987,6 +987,20 @@
     <li class="md-nav__item">
       <a href="../apps_and_tools/usb_probe.html" class="md-nav__link">
         USB Probe
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../apps_and_tools/link_relay.html" class="md-nav__link">
+        Link Relay
       </a>
     </li>
   
@@ -1247,26 +1261,46 @@
 
 
 <h1 id="android-emulator-transport">ANDROID EMULATOR TRANSPORT<a class="headerlink" href="#android-emulator-transport" title="Permanent link">&para;</a></h1>
-<p>The Android emulator transport either connects, as a host, to a "Root Canal" virtual controller
-("host" mode), or attaches a virtual controller to the Android Bluetooth host stack ("controller" mode).</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Bluetooth support in the Android emulator has recently changed. The older mode, using
+the <code>android-emulator</code> transport name with Bumble, while still implemented, is now
+obsolete, and may not be supported by recent versions of the emulator.
+Use the <code>android-netsim</code> transport name instead.</p>
+</div>
+<p>The Android "netsim" transport either connects, as a host, to a <strong>Netsim</strong> virtual controller
+("host" mode), or acts as a virtual controller itself ("controller" mode) accepting host
+connections.</p>
 <h2 id="moniker">Moniker<a class="headerlink" href="#moniker" title="Permanent link">&para;</a></h2>
-<p>The moniker syntax for an Android Emulator transport is: <code>android-emulator:[mode=&lt;host|controller&gt;][&lt;hostname&gt;:&lt;port&gt;]</code>, where
-the <code>mode</code> parameter can specify running as a host or a controller, and <code>&lt;hostname&gt;:&lt;port&gt;</code> can specify a host name (or IP address) and TCP port number on which to reach the gRPC server for the emulator.
-Both the <code>mode=&lt;host|controller&gt;</code> and <code>&lt;hostname&gt;:&lt;port&gt;</code> parameters are optional (so the moniker <code>android-emulator</code> by itself is a valid moniker, which will create a transport in <code>host</code> mode, connected to <code>localhost</code> on the default gRPC port for the emulator).</p>
+<p>The moniker syntax for an Android Emulator "netsim" transport is: <code>android-netsim:[&lt;host&gt;:&lt;port&gt;][&lt;options&gt;]</code>,
+where <code>&lt;options&gt;</code> is a ','-separated list of <code>&lt;name&gt;=&lt;value&gt;</code> pairs<code>.
+The</code>mode<code>parameter name can specify running as a host or a controller, and</code><hostname>:<port><code>can specify a host name (or IP address) and TCP port number on which to reach the gRPC server for the emulator (in "host" mode), or to accept gRPC connections (in "controller" mode).
+Both the</code>mode=<host|controller><code>and</code><hostname>:<port><code>parameters are optional (so the moniker</code>android-netsim<code>by itself is a valid moniker, which will create a transport in</code>host<code>mode, connected to</code>localhost` on the default gRPC port for the Netsim background process).</p>
 <div class="admonition example example">
 <p class="admonition-title">Example</p>
-<p><code>android-emulator</code>
-connect as a host to the emulator on localhost:8554</p>
+<p><code>android-netsim</code>
+connect as a host to Netsim on the gRPC port discovered automatically.</p>
 </div>
 <div class="admonition example example">
 <p class="admonition-title">Example</p>
-<p><code>android-emulator:mode=controller</code>
-connect as a controller to the emulator on localhost:8554</p>
+<p><code>android-netsim:_:8555,mode=controller</code>
+Run as a controller, accepting gRPC connection on port 8555.</p>
 </div>
 <div class="admonition example example">
 <p class="admonition-title">Example</p>
-<p><code>android-emulator:localhost:8555</code>
-connect as a host to the emulator on localhost:8555</p>
+<p><code>android-netsim:localhost:8555</code>
+connect as a host to Netsim on localhost:8555</p>
+</div>
+<div class="admonition example example">
+<p class="admonition-title">Example</p>
+<p><code>android-netsim:localhost:8555</code>
+connect as a host to Netsim on localhost:8555</p>
+</div>
+<div class="admonition example example">
+<p class="admonition-title">Example</p>
+<p><code>android-netsim:name=bumble1234</code>
+connect as a host to Netsim on the discovered gRPC port, using <code>bumble1234</code> as the 
+controller instance name.</p>
 </div>
 
 
@@ -1323,7 +1357,7 @@ connect as a host to the emulator on localhost:8555</p>
       <div class="md-footer-copyright">
         
           <div class="md-footer-copyright__highlight">
-            Copyright 2021-2022 Google LLC
+            Copyright 2021-2023 Google LLC
           </div>
         
       </div>
