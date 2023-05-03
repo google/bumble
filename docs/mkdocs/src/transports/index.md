@@ -16,5 +16,6 @@ Several types of transports are supported:
   * [PTY](pty.md): a PTY (pseudo terminal) is used to send/receive HCI packets. This is convenient to expose a virtual controller as if it were an HCI UART
   * [VHCI](vhci.md): used to attach a virtual controller to a Bluetooth stack on platforms that support it.
   * [HCI Socket](hci_socket.md): an HCI socket, on platforms that support it, to send/receive HCI packets to/from an HCI controller managed by the OS.
-  * [Android Emulator](android_emulator.md): a gRPC connection to an Android emulator is used to setup either an HCI interface to the emulator's "Root Canal" virtual controller, or attach a virtual controller to the Android Bluetooth host stack.
+  * [Android Emulator](android_emulator.md): a gRPC connection to the Android emulator's "netsim"
+  virtual controller, or from the Android emulator, is used to setup either an HCI interface to the emulator's "netsim" virtual controller, or serve as a virtual controller for the Android Bluetooth host stack.
   * [File](file.md): HCI packets are read/written to a file-like node in the filesystem.
