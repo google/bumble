@@ -65,8 +65,9 @@ class PairingDelegate:
         DISTRIBUTE_SIGNING_KEY = SMP_SIGN_KEY_DISTRIBUTION_FLAG
         DISTRIBUTE_LINK_KEY = SMP_LINK_KEY_DISTRIBUTION_FLAG
 
-    DEFAULT_KEY_DISTRIBUTION: int = (
-        SMP_ENC_KEY_DISTRIBUTION_FLAG | SMP_ID_KEY_DISTRIBUTION_FLAG
+    DEFAULT_KEY_DISTRIBUTION: KeyDistribution = (
+        KeyDistribution.DISTRIBUTE_ENCRYPTION_KEY
+        | KeyDistribution.DISTRIBUTE_IDENTITY_KEY
     )
 
     # Default mapping from abstract to Classic I/O capabilities.
@@ -85,9 +86,9 @@ class PairingDelegate:
 
     def __init__(
         self,
-        io_capability=NO_OUTPUT_NO_INPUT,
-        local_initiator_key_distribution=DEFAULT_KEY_DISTRIBUTION,
-        local_responder_key_distribution=DEFAULT_KEY_DISTRIBUTION,
+        io_capability: IoCapability = NO_OUTPUT_NO_INPUT,
+        local_initiator_key_distribution: KeyDistribution = DEFAULT_KEY_DISTRIBUTION,
+        local_responder_key_distribution: KeyDistribution = DEFAULT_KEY_DISTRIBUTION,
     ) -> None:
         self.io_capability = io_capability
         self.local_initiator_key_distribution = local_initiator_key_distribution
@@ -113,8 +114,11 @@ class PairingDelegate:
         """Accept or reject a Pairing request."""
         return True
 
-    async def confirm(self) -> bool:
-        """Respond yes or no to a Pairing confirmation question."""
+    async def confirm(self, auto: bool = False) -> bool:
+        """
+        Respond yes or no to a Pairing confirmation question.
+        The `auto` parameter stands for automatic confirmation.
+        """
         return True
 
     # pylint: disable-next=unused-argument
@@ -129,7 +133,7 @@ class PairingDelegate:
         """
         return 0
 
-    async def get_string(self, max_length) -> Optional[str]:
+    async def get_string(self, max_length: int) -> Optional[str]:
         """
         Return a string whose utf-8 encoding is up to max_length bytes.
         """

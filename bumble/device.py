@@ -23,7 +23,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
@@ -528,6 +528,7 @@ class Connection(CompositeEventEmitter):
     transport: int
     self_address: Address
     peer_address: Address
+    peer_resolvable_address: Optional[Address]
     role: int
     encryption: int
     authenticated: bool
@@ -2196,12 +2197,22 @@ class Device(CompositeEventEmitter):
                 await self.stop_discovery()
 
     @property
-    def pairing_config_factory(self):
+    def pairing_config_factory(self) -> Callable[[Connection], PairingConfig]:
         return self.smp_manager.pairing_config_factory
 
     @pairing_config_factory.setter
-    def pairing_config_factory(self, pairing_config_factory):
+    def pairing_config_factory(
+        self, pairing_config_factory: Callable[[Connection], PairingConfig]
+    ) -> None:
         self.smp_manager.pairing_config_factory = pairing_config_factory
+
+    @property
+    def smp_session_proxy(self) -> Type[smp.Session]:
+        return self.smp_manager.session_proxy
+
+    @smp_session_proxy.setter
+    def smp_session_proxy(self, session_proxy: Type[smp.Session]) -> None:
+        self.smp_manager.session_proxy = session_proxy
 
     async def pair(self, connection):
         return await self.smp_manager.pair(connection)
@@ -2232,7 +2243,7 @@ class Device(CompositeEventEmitter):
                 if connection.role == BT_PERIPHERAL_ROLE and keys.ltk_peripheral:
                     return keys.ltk_peripheral.value
 
-    async def get_link_key(self, address):
+    async def get_link_key(self, address: Address) -> Optional[bytes]:
         # Look for the key in the keystore
         if self.keystore is not None:
             keys = await self.keystore.get(str(address))
@@ -2243,6 +2254,7 @@ class Device(CompositeEventEmitter):
                     return None
 
                 return keys.link_key.value
+        return None
 
     # [Classic only]
     async def authenticate(self, connection):
@@ -2772,89 +2784,103 @@ class Device(CompositeEventEmitter):
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
-    def on_authentication_user_confirmation_request(self, connection, code):
+    def on_authentication_user_confirmation_request(self, connection, code) -> None:
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
         io_capability = pairing_config.delegate.classic_io_capability
+        peer_io_capability = connection.peer_pairing_io_capability
 
-        # Respond
-        if io_capability == HCI_DISPLAY_YES_NO_IO_CAPABILITY:
-            if connection.peer_pairing_io_capability in (
-                HCI_DISPLAY_YES_NO_IO_CAPABILITY,
-                HCI_DISPLAY_ONLY_IO_CAPABILITY,
-            ):
-                # Display the code and ask the user to compare
-                async def prompt():
-                    return (
-                        await pairing_config.delegate.compare_numbers(code, digits=6),
+        async def confirm() -> bool:
+            # Ask the user to confirm the pairing, without display
+            return await pairing_config.delegate.confirm()
+
+        async def auto_confirm() -> bool:
+            # Ask the user to auto-confirm the pairing, without display
+            return await pairing_config.delegate.confirm(auto=True)
+
+        async def display_confirm() -> bool:
+            # Display the code and ask the user to compare
+            return await pairing_config.delegate.compare_numbers(code, digits=6)
+
+        async def display_auto_confirm() -> bool:
+            # Display the code to the user and ask the delegate to auto-confirm
+            await pairing_config.delegate.display_number(code, digits=6)
+            return await pairing_config.delegate.confirm(auto=True)
+
+        async def na() -> bool:
+            assert False, "N/A: unreachable"
+
+        # See Bluetooth spec @ Vol 3, Part C 5.2.2.6
+        methods = {
+            HCI_DISPLAY_ONLY_IO_CAPABILITY: {
+                HCI_DISPLAY_ONLY_IO_CAPABILITY: display_auto_confirm,
+                HCI_DISPLAY_YES_NO_IO_CAPABILITY: display_confirm,
+                HCI_KEYBOARD_ONLY_IO_CAPABILITY: na,
+                HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: auto_confirm,
+            },
+            HCI_DISPLAY_YES_NO_IO_CAPABILITY: {
+                HCI_DISPLAY_ONLY_IO_CAPABILITY: display_auto_confirm,
+                HCI_DISPLAY_YES_NO_IO_CAPABILITY: display_confirm,
+                HCI_KEYBOARD_ONLY_IO_CAPABILITY: na,
+                HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: auto_confirm,
+            },
+            HCI_KEYBOARD_ONLY_IO_CAPABILITY: {
+                HCI_DISPLAY_ONLY_IO_CAPABILITY: na,
+                HCI_DISPLAY_YES_NO_IO_CAPABILITY: na,
+                HCI_KEYBOARD_ONLY_IO_CAPABILITY: na,
+                HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: auto_confirm,
+            },
+            HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: {
+                HCI_DISPLAY_ONLY_IO_CAPABILITY: confirm,
+                HCI_DISPLAY_YES_NO_IO_CAPABILITY: confirm,
+                HCI_KEYBOARD_ONLY_IO_CAPABILITY: auto_confirm,
+                HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: auto_confirm,
+            },
+        }
+
+        method = methods[peer_io_capability][io_capability]
+
+        async def reply() -> None:
+            if await connection.abort_on('disconnection', method()):
+                await self.host.send_command(
+                    HCI_User_Confirmation_Request_Reply_Command(  # type: ignore[call-arg]
+                        bd_addr=connection.peer_address
                     )
-
+                )
             else:
-                # Ask the user to confirm the pairing, without showing a code
-                async def prompt():
-                    return await pairing_config.delegate.confirm()
-
-            async def confirm():
-                if await prompt():
-                    await self.host.send_command(
-                        HCI_User_Confirmation_Request_Reply_Command(
-                            bd_addr=connection.peer_address
-                        )
+                await self.host.send_command(
+                    HCI_User_Confirmation_Request_Negative_Reply_Command(  # type: ignore[call-arg]
+                        bd_addr=connection.peer_address
                     )
-                else:
-                    await self.host.send_command(
-                        HCI_User_Confirmation_Request_Negative_Reply_Command(
-                            bd_addr=connection.peer_address
-                        )
-                    )
+                )
 
-            AsyncRunner.spawn(connection.abort_on('disconnection', confirm()))
-            return
-
-        if io_capability == HCI_DISPLAY_ONLY_IO_CAPABILITY:
-            # Display the code to the user
-            AsyncRunner.spawn(pairing_config.delegate.display_number(code, 6))
-
-        # Automatic confirmation
-        self.host.send_command_sync(
-            HCI_User_Confirmation_Request_Reply_Command(bd_addr=connection.peer_address)
-        )
+        AsyncRunner.spawn(reply())
 
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
-    def on_authentication_user_passkey_request(self, connection):
+    def on_authentication_user_passkey_request(self, connection) -> None:
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
-        io_capability = pairing_config.delegate.classic_io_capability
 
-        # Respond
-        if io_capability == HCI_KEYBOARD_ONLY_IO_CAPABILITY:
-            # Ask the user to input a number
-            async def get_number():
-                number = await connection.abort_on(
-                    'disconnection', pairing_config.delegate.get_number()
-                )
-                if number is not None:
-                    await self.host.send_command(
-                        HCI_User_Passkey_Request_Reply_Command(
-                            bd_addr=connection.peer_address, numeric_value=number
-                        )
-                    )
-                else:
-                    await self.host.send_command(
-                        HCI_User_Passkey_Request_Negative_Reply_Command(
-                            bd_addr=connection.peer_address
-                        )
-                    )
-
-            asyncio.create_task(get_number())
-        else:
-            self.host.send_command_sync(
-                HCI_User_Passkey_Request_Negative_Reply_Command(
-                    bd_addr=connection.peer_address
-                )
+        async def reply() -> None:
+            number = await connection.abort_on(
+                'disconnection', pairing_config.delegate.get_number()
             )
+            if number is not None:
+                await self.host.send_command(
+                    HCI_User_Passkey_Request_Reply_Command(  # type: ignore[call-arg]
+                        bd_addr=connection.peer_address, numeric_value=number
+                    )
+                )
+            else:
+                await self.host.send_command(
+                    HCI_User_Passkey_Request_Negative_Reply_Command(  # type: ignore[call-arg]
+                        bd_addr=connection.peer_address
+                    )
+                )
+
+        AsyncRunner.spawn(reply())
 
     # [Classic only]
     @host_event_handler
@@ -3059,18 +3085,15 @@ class Device(CompositeEventEmitter):
             connection.emit('role_change_failure', error)
         self.emit('role_change_failure', address, error)
 
-    @with_connection_from_handle
-    def on_pairing_start(self, connection):
+    def on_pairing_start(self, connection: Connection) -> None:
         connection.emit('pairing_start')
 
-    @with_connection_from_handle
-    def on_pairing(self, connection, keys, sc):
+    def on_pairing(self, connection: Connection, keys: PairingKeys, sc: bool) -> None:
         connection.sc = sc
         connection.authenticated = True
         connection.emit('pairing', keys)
 
-    @with_connection_from_handle
-    def on_pairing_failure(self, connection, reason):
+    def on_pairing_failure(self, connection: Connection, reason: int) -> None:
         connection.emit('pairing_failure', reason)
 
     @with_connection_from_handle

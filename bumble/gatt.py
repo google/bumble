@@ -247,7 +247,7 @@ class TemplateService(Service):
     to expose their UUID as a class property
     '''
 
-    UUID = None
+    UUID: Optional[UUID] = None
 
     def __init__(self, characteristics, primary=True):
         super().__init__(self.UUID, characteristics, primary)
