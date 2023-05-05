@@ -3088,7 +3088,16 @@ class Device(CompositeEventEmitter):
     def on_pairing_start(self, connection: Connection) -> None:
         connection.emit('pairing_start')
 
-    def on_pairing(self, connection: Connection, keys: PairingKeys, sc: bool) -> None:
+    def on_pairing(
+        self,
+        connection: Connection,
+        identity_address: Address,
+        keys: PairingKeys,
+        sc: bool,
+    ) -> None:
+        if identity_address is not None:
+            connection.peer_resolvable_address = connection.peer_address
+            connection.peer_address = identity_address
         connection.sc = sc
         connection.authenticated = True
         connection.emit('pairing', keys)
