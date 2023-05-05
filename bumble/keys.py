@@ -256,10 +256,11 @@ class JsonKeyStore(KeyStore):
     @staticmethod
     def from_device(device: Device, filename=None) -> Optional[JsonKeyStore]:
         if not filename:
-            # Extract the filename from the config
-            params = device.config.keystore.split(':', 1)[1:]
-            if params:
-                filename = params[0]
+            # Extract the filename from the config if there is one
+            if device.config.keystore is not None:
+                params = device.config.keystore.split(':', 1)[1:]
+                if params:
+                    filename = params[0]
 
         # Use a namespace based on the device address
         if device.public_address not in (Address.ANY, Address.ANY_RANDOM):

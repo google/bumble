@@ -3091,7 +3091,7 @@ class Device(CompositeEventEmitter):
     def on_pairing(
         self,
         connection: Connection,
-        identity_address: Address,
+        identity_address: Optional[Address],
         keys: PairingKeys,
         sc: bool,
     ) -> None:
