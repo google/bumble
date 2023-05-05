@@ -63,6 +63,7 @@ from .gatt import (
     GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
     GATT_REQUEST_TIMEOUT,
     GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
+    GATT_INCLUDE_ATTRIBUTE_TYPE,
     Characteristic,
     ClientCharacteristicConfigurationBits,
 )
@@ -109,6 +110,7 @@ class AttributeProxy(EventEmitter):
 class ServiceProxy(AttributeProxy):
     uuid: UUID
     characteristics: List[CharacteristicProxy]
+    included_services: List[ServiceProxy]
 
     @staticmethod
     def from_client(service_class, client, service_uuid):
@@ -502,12 +504,69 @@ class Client:
 
         return services
 
-    async def discover_included_services(self, _service):
+    async def discover_included_services(
+        self, service: ServiceProxy
+    ) -> List[ServiceProxy]:
         '''
         See Vol 3, Part G - 4.5.1 Find Included Services
         '''
-        # TODO
-        return []
+
+        starting_handle = service.handle
+        ending_handle = service.end_group_handle
+
+        included_services: List[ServiceProxy] = []
+        while starting_handle <= ending_handle:
+            response = await self.send_request(
+                ATT_Read_By_Type_Request(
+                    starting_handle=starting_handle,
+                    ending_handle=ending_handle,
+                    attribute_type=GATT_INCLUDE_ATTRIBUTE_TYPE,
+                )
+            )
+            if response is None:
+                # TODO raise appropriate exception
+                return []
+
+            # Check if we reached the end of the iteration
+            if response.op_code == ATT_ERROR_RESPONSE:
+                if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
+                    # Unexpected end
+                    logger.warning(
+                        '!!! unexpected error while discovering included services: '
+                        f'{HCI_Constant.error_name(response.error_code)}'
+                    )
+                    raise ATT_Error(
+                        error_code=response.error_code,
+                        message='Unexpected error while discovering included services',
+                    )
+                break
+
+            # Stop if for some reason the list was empty
+            if not response.attributes:
+                break
+
+            # Process all included services returned in this iteration
+            for attribute_handle, attribute_value in response.attributes:
+                if attribute_handle < starting_handle:
+                    # Something's not right
+                    logger.warning(f'bogus handle value: {attribute_handle}')
+                    return []
+
+                group_starting_handle, group_ending_handle = struct.unpack_from(
+                    '<HH', attribute_value
+                )
+                service_uuid = UUID.from_bytes(attribute_value[4:])
+                included_service = ServiceProxy(
+                    self, group_starting_handle, group_ending_handle, service_uuid, True
+                )
+
+                included_services.append(included_service)
+
+            # Move on to the next included services
+            starting_handle = response.attributes[-1][0] + 1
+
+        service.included_services = included_services
+        return included_services
 
     async def discover_characteristics(
         self, uuids, service: Optional[ServiceProxy]
