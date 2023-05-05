@@ -68,6 +68,7 @@ from .gatt import (
     Characteristic,
     CharacteristicDeclaration,
     CharacteristicValue,
+    IncludedServiceDeclaration,
     Descriptor,
     Service,
 )
@@ -94,6 +95,7 @@ class Server(EventEmitter):
     def __init__(self, device):
         super().__init__()
         self.device = device
+        self.services = []
         self.attributes = []  # Attributes, ordered by increasing handle values
         self.attributes_by_handle = {}  # Map for fast attribute access by handle
         self.max_mtu = (
@@ -222,7 +224,14 @@ class Server(EventEmitter):
         # Add the service attribute to the DB
         self.add_attribute(service)
 
-        # TODO: add included services
+        # Add all included service
+        for included_service in service.included_services:
+            # Not registered yet, register the included service first.
+            if included_service not in self.services:
+                self.add_service(included_service)
+                # TODO: Handle circular service reference
+            include_declaration = IncludedServiceDeclaration(included_service)
+            self.add_attribute(include_declaration)
 
         # Add all characteristics
         for characteristic in service.characteristics:
@@ -274,6 +283,7 @@ class Server(EventEmitter):
 
         # Update the service group end
         service.end_group_handle = self.attributes[-1].handle
+        self.services.append(service)
 
     def add_services(self, services):
         for service in services:
