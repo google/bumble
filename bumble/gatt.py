@@ -206,7 +206,7 @@ class Service(Attribute):
 
     uuid: UUID
 
-    def __init__(self, uuid, characteristics: list[Characteristic], primary=True):
+    def __init__(self, uuid, characteristics: List[Characteristic], primary=True):
         # Convert the uuid to a UUID object if it isn't already
         if isinstance(uuid, str):
             uuid = UUID(uuid)

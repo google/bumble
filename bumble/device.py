@@ -889,7 +889,7 @@ def host_event_handler(function):
 # List of host event handlers for the Device class.
 # (we define this list outside the class, because referencing a class in method
 #  decorators is not straightforward)
-device_host_event_handlers: list[str] = []
+device_host_event_handlers: List[str] = []
 
 
 # -----------------------------------------------------------------------------
