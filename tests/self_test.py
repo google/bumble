@@ -190,7 +190,9 @@ async def test_self_gatt():
 
     s1 = Service('8140E247-04F0-42C1-BC34-534C344DAFCA', [c1, c2, c3])
     s2 = Service('97210A0F-1875-4D05-9E5D-326EB171257A', [c4])
-    two_devices.devices[1].add_services([s1, s2])
+    s3 = Service('1853', [])
+    s4 = Service('3A12C182-14E2-4FE0-8C5B-65D7C569F9DB', [], included_services=[s2, s3])
+    two_devices.devices[1].add_services([s1, s2, s4])
 
     # Start
     await two_devices.devices[0].power_on()
@@ -224,6 +226,13 @@ async def test_self_gatt():
     result = await peer.read_value(c)
     assert result is not None
     assert result == c1.value
+
+    result = await peer.discover_service(s4.uuid)
+    assert len(result) == 1
+    result = await peer.discover_included_services(result[0])
+    assert len(result) == 2
+    # Service UUID is only present when the UUID is 16-bit Bluetooth UUID
+    assert result[1].uuid.to_bytes() == s3.uuid.to_bytes()
 
 
 # -----------------------------------------------------------------------------

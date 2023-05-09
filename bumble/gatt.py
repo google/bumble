@@ -205,8 +205,16 @@ class Service(Attribute):
     '''
 
     uuid: UUID
+    characteristics: List[Characteristic]
+    included_services: List[Service]
 
-    def __init__(self, uuid, characteristics: list[Characteristic], primary=True):
+    def __init__(
+        self,
+        uuid,
+        characteristics: List[Characteristic],
+        included_services: List[Service] = [],
+        primary=True,
+    ):
         # Convert the uuid to a UUID object if it isn't already
         if isinstance(uuid, str):
             uuid = UUID(uuid)
@@ -219,7 +227,7 @@ class Service(Attribute):
             uuid.to_pdu_bytes(),
         )
         self.uuid = uuid
-        # self.included_services = []
+        self.included_services = included_services[:]
         self.characteristics = characteristics[:]
         self.primary = primary
 
@@ -251,6 +259,33 @@ class TemplateService(Service):
 
     def __init__(self, characteristics, primary=True):
         super().__init__(self.UUID, characteristics, primary)
+
+
+# -----------------------------------------------------------------------------
+class IncludedServiceDeclaration(Attribute):
+    '''
+    See Vol 3, Part G - 3.2 INCLUDE DEFINITION
+    '''
+
+    service: Service
+
+    def __init__(self, service):
+        declaration_bytes = struct.pack(
+            '<HH2s', service.handle, service.end_group_handle, service.uuid.to_bytes()
+        )
+        super().__init__(
+            GATT_INCLUDE_ATTRIBUTE_TYPE, Attribute.READABLE, declaration_bytes
+        )
+        self.service = service
+
+    def __str__(self):
+        return (
+            f'IncludedServiceDefinition(handle=0x{self.handle:04X}, '
+            f'group_starting_handle=0x{self.service.handle:04X}, '
+            f'group_ending_handle=0x{self.service.end_group_handle:04X}, '
+            f'uuid={self.service.uuid}, '
+            f'{self.service.properties!s})'
+        )
 
 
 # -----------------------------------------------------------------------------
