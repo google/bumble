@@ -591,6 +591,7 @@ class Connection(CompositeEventEmitter):
         self.parameters = parameters
         self.encryption = 0
         self.authenticated = False
+        self.authenticating = False
         self.sc = False
         self.link_key_type = None
         self.phy = phy
@@ -2285,8 +2286,10 @@ class Device(CompositeEventEmitter):
                 raise HCI_StatusError(result)
 
             # Wait for the authentication to complete
+            connection.authenticating = True
             await connection.abort_on('disconnection', pending_authentication)
         finally:
+            connection.authenticating = False
             connection.remove_listener('connection_authentication', on_authentication)
             connection.remove_listener(
                 'connection_authentication_failure', on_authentication_failure

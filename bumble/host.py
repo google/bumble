@@ -807,6 +807,19 @@ class Host(AbortableEventEmitter):
             f'simple pairing complete for {event.bd_addr}: '
             f'status={HCI_Constant.status_name(event.status)}'
         )
+        # Notify the client
+        if event.status == HCI_SUCCESS:
+            self.emit('ssp_complete', event.bd_addr)
+        else:
+            connection: Connection = self.find_connection_by_bd_addr(
+                event.bd_addr, BT_BR_EDR_TRANSPORT
+            )
+            if connection is not None:
+                self.emit(
+                    'connection_authentication_failure',
+                    connection.handle,
+                    event.status,
+                )
 
     def on_hci_pin_code_request_event(self, event):
         self.emit('pin_code_request', event.bd_addr)
