@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Audio WAV Player</title>
+  </head>
+  <body>
+    <h1>Audio WAV Player</h1>
+    <audio id="audioPlayer" controls>
+      <source src="" type="audio/wav">
+    </audio>
+
+    <script>
+      const audioPlayer = document.getElementById('audioPlayer');
+      const ws = new WebSocket('ws://localhost:8080');
+
+      let mediaSource = new MediaSource();
+      audioPlayer.src = URL.createObjectURL(mediaSource);
+
+      mediaSource.addEventListener('sourceopen', function(event) {
+        const sourceBuffer = mediaSource.addSourceBuffer('audio/wav');
+
+        ws.onmessage = function(event) {
+          sourceBuffer.appendBuffer(event.data);
+        };
+      });
+    </script>
+  </body>
+</html>
