@@ -41,17 +41,27 @@ body, h1, h2, h3, h4, h5, h6 {
     margin: 6px;
 }
 
+#connectionStateText {
+    background-color: rgb(112, 146, 206);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    display: inline-block;
+    margin: 6px;
+}
+
 #propertiesTable {
     border: grey;
     border-style: solid;
     border-radius: 4px;
     padding: 4px;
     margin: 6px;
+    margin-left: 0px;
 }
 
 th, td {
-    padding-left: 8px;
-    padding-right: 8px;
+    padding-left: 6px;
+    padding-right: 6px;
 }
 
 .properties td:nth-child(even) {

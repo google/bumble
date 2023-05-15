@@ -62,6 +62,7 @@ from .hci import (
     HCI_Read_Local_Version_Information_Command,
     HCI_Reset_Command,
     HCI_Set_Event_Mask_Command,
+    map_null_terminated_utf8_string,
 )
 from .core import (
     BT_BR_EDR_TRANSPORT,
@@ -887,7 +888,12 @@ class Host(AbortableEventEmitter):
         if event.status != HCI_SUCCESS:
             self.emit('remote_name_failure', event.bd_addr, event.status)
         else:
-            self.emit('remote_name', event.bd_addr, event.remote_name)
+            utf8_name = event.remote_name
+            terminator = utf8_name.find(0)
+            if terminator >= 0:
+                utf8_name = utf8_name[0:terminator]
+
+            self.emit('remote_name', event.bd_addr, utf8_name)
 
     def on_hci_remote_host_supported_features_notification_event(self, event):
         self.emit(

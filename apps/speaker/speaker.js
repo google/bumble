@@ -8,6 +8,7 @@ let codecText;
 let packetsReceivedText;
 let bytesReceivedText;
 let streamStateText;
+let connectionStateText;
 let controlsDiv;
 let audioOnButton;
 let mediaSource;
@@ -27,7 +28,7 @@ let fftCanvasContext;
 let bandwidthCanvas;
 let bandwidthCanvasContext;
 let bandwidthBinCount;
-let bandwidthBins;
+let bandwidthBins = [];
 
 const FFT_WIDTH = 800;
 const FFT_HEIGHT = 256;
@@ -56,11 +57,14 @@ function initUI() {
     packetsReceivedText = document.getElementById("packetsReceivedText");
     bytesReceivedText = document.getElementById("bytesReceivedText");
     streamStateText = document.getElementById("streamStateText");
+    connectionStateText = document.getElementById("connectionStateText");
     audioSupportMessageText = document.getElementById("audioSupportMessageText");
 
     audioOnButton.onclick = () => startAudio();
 
     setConnectionText("");
+
+    requestAnimationFrame(onAnimationFrame);
 }
 
 function initMediaSource() {
@@ -94,20 +98,20 @@ function initAnalyzer() {
 
 function startAnalyzer() {
     // FFT
-    audioContext = new AudioContext();
-    audioAnalyzer = audioContext.createAnalyser();
-    audioAnalyzer.fftSize = 128;
-    audioFrequencyBinCount = audioAnalyzer.frequencyBinCount;
-    audioFrequencyData = new Uint8Array(audioFrequencyBinCount);
-    const stream = audioElement.captureStream();
-    const source = audioContext.createMediaStreamSource(stream);
-    source.connect(audioAnalyzer);
+    if (audioElement.captureStream !== undefined) {
+        audioContext = new AudioContext();
+        audioAnalyzer = audioContext.createAnalyser();
+        audioAnalyzer.fftSize = 128;
+        audioFrequencyBinCount = audioAnalyzer.frequencyBinCount;
+        audioFrequencyData = new Uint8Array(audioFrequencyBinCount);
+        const stream = audioElement.captureStream();
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(audioAnalyzer);
+    }
 
     // Bandwidth
     bandwidthBinCount = BANDWIDTH_WIDTH / 2;
     bandwidthBins = [];
-
-    requestAnimationFrame(onAnimationFrame);
 }
 
 function setConnectionText(message) {
@@ -121,15 +125,17 @@ function setConnectionText(message) {
 
 function onAnimationFrame() {
     // FFT
-    audioAnalyzer.getByteFrequencyData(audioFrequencyData);
-    fftCanvasContext.fillStyle = "rgb(0, 0, 0)";
-    fftCanvasContext.fillRect(0, 0, FFT_WIDTH, FFT_HEIGHT);
-    const barCount = audioFrequencyBinCount;
-    const barWidth = (FFT_WIDTH / audioFrequencyBinCount) - 1;
-    for (let bar = 0; bar < barCount; bar++) {
-        const barHeight = audioFrequencyData[bar];
-        fftCanvasContext.fillStyle = `rgb(${barHeight / 256 * 200 + 50}, 50, ${50 + 2 * bar})`;
-        fftCanvasContext.fillRect(bar * (barWidth + 1), FFT_HEIGHT - barHeight, barWidth, barHeight);
+    if (audioAnalyzer !== undefined) {
+        audioAnalyzer.getByteFrequencyData(audioFrequencyData);
+        fftCanvasContext.fillStyle = "rgb(0, 0, 0)";
+        fftCanvasContext.fillRect(0, 0, FFT_WIDTH, FFT_HEIGHT);
+        const barCount = audioFrequencyBinCount;
+        const barWidth = (FFT_WIDTH / audioFrequencyBinCount) - 1;
+        for (let bar = 0; bar < barCount; bar++) {
+            const barHeight = audioFrequencyData[bar];
+            fftCanvasContext.fillStyle = `rgb(${barHeight / 256 * 200 + 50}, 50, ${50 + 2 * bar})`;
+            fftCanvasContext.fillRect(bar * (barWidth + 1), FFT_HEIGHT - barHeight, barWidth, barHeight);
+        }
     }
 
     // Bandwidth
@@ -175,13 +181,10 @@ async function startAudio() {
 }
 
 function onAudioPacket(packet) {
-    if (audioState == "stopped") {
-        // Drop the packet, we're not ready to play.
-        return;
+    if (audioState != "stopped") {
+        // Queue the audio packet.
+        sourceBuffer.appendBuffer(packet);
     }
-
-    // Queue the audio packet.
-    sourceBuffer.appendBuffer(packet);
 
     packetsReceived += 1;
     packetsReceivedText.innerText = packetsReceived;
@@ -268,6 +271,14 @@ function onSuspendMessage(params) {
     streamStateText.innerText = streamState;
 }
 
+function onConnectionMessage(params) {
+    connectionStateText.innerText = `CONNECTED: ${params.peer_name} (${params.peer_address})`;
+}
+
+function onDisconnectionMessage(params) {
+    connectionStateText.innerText = "DISCONNECTED";
+}
+
 function sendMessage(message) {
     channelSocket.send(JSON.stringify(message));
 }
@@ -287,7 +298,9 @@ const messageHandlers = {
     onHelloMessage,
     onStartMessage,
     onStopMessage,
-    onSuspendMessage
+    onSuspendMessage,
+    onConnectionMessage,
+    onDisconnectionMessage
 }
 
 window.onload = (event) => {

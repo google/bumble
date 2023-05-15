@@ -1,4 +1,4 @@
-# Copyright 2021-2022 Google LLC
+# Copyright 2021-2023 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import json
 import os
 import logging
 import pathlib
+import subprocess
 from typing import Dict, List, Optional
 import weakref
 
@@ -33,7 +34,7 @@ from aiohttp import web
 import bumble
 from bumble.colors import color
 from bumble.core import BT_BR_EDR_TRANSPORT
-from bumble.device import Device, DeviceConfiguration
+from bumble.device import Connection, Device, DeviceConfiguration, Peer
 from bumble.sdp import ServiceAttribute
 from bumble.transport import open_transport
 from bumble.avdtp import (
@@ -59,6 +60,12 @@ from bumble.a2dp import (
 )
 from bumble.utils import AsyncRunner
 from bumble.codecs import AacAudioRtpPacket
+
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
@@ -100,13 +107,22 @@ class SbcAudioExtractor:
 
 # -----------------------------------------------------------------------------
 class Output:
-    async def start(self):
+    async def start(self) -> None:
         pass
 
-    async def stop(self):
+    async def stop(self) -> None:
         pass
 
-    async def suspend(self):
+    async def suspend(self) -> None:
+        pass
+
+    async def on_connection(self, connection: Connection) -> None:
+        pass
+
+    async def on_disconnection(self, reason: int) -> None:
+        pass
+
+    def on_rtp_packet(self, packet: MediaPacket) -> None:
         pass
 
 
@@ -157,7 +173,7 @@ class QueuedOutput(Output):
 
     def on_rtp_packet(self, packet: MediaPacket) -> None:
         if self.packets.qsize() > self.MAX_QUEUE_SIZE:
-            print("queue full, dropping")
+            logger.debug("queue full, dropping")
             return
 
         self.packets.put_nowait(self.extractor.extract_audio(packet))
@@ -169,6 +185,19 @@ class WebSocketOutput(QueuedOutput):
         super().__init__(AudioExtractor.create(codec))
         self.send_audio = send_audio
         self.send_message = send_message
+
+    async def on_connection(self, connection: Connection) -> None:
+        await connection.request_remote_name()
+        peer_name = '' if connection.peer_name is None else connection.peer_name
+        peer_address = str(connection.peer_address).replace('/P', '')
+        await self.send_message(
+            'connection',
+            peer_address=peer_address,
+            peer_name=peer_name,
+        )
+
+    async def on_disconnection(self, reason) -> None:
+        await self.send_message('disconnection')
 
     async def on_audio_packet(self, packet: bytes) -> None:
         await self.send_audio(packet)
@@ -202,7 +231,7 @@ class FfplayOutput(QueuedOutput):
         if self.started:
             return
 
-        super().start()
+        await super().start()
 
         self.subprocess = await asyncio.create_subprocess_shell(
             'ffplay -acodec aac pipe:0',
@@ -225,7 +254,7 @@ class FfplayOutput(QueuedOutput):
         async def read_stream(name, stream):
             while True:
                 data = await stream.read()
-                print(f'{name}:', data)
+                logger.debug(f'{name}:', data)
 
         await asyncio.wait(
             [
@@ -238,13 +267,13 @@ class FfplayOutput(QueuedOutput):
                 asyncio.create_task(self.subprocess.wait()),
             ]
         )
-        print("FFPLAY done")
+        logger.debug("FFPLAY done")
 
     async def on_audio_packet(self, packet):
         try:
             self.subprocess.stdin.write(packet)
         except Exception:
-            print('!!!! exception while sending audio to ffplay pipe')
+            logger.warning('!!!! exception while sending audio to ffplay pipe')
 
 
 # -----------------------------------------------------------------------------
@@ -307,13 +336,15 @@ class UiServer:
         self.channel_socket = ws
         async for message in ws:
             if message.type == aiohttp.WSMsgType.TEXT:
-                print(f'<<< received message: {message.data}')
+                logger.debug(f'<<< received message: {message.data}')
                 await self.on_message(message.data)
             elif message.type == aiohttp.WSMsgType.ERROR:
-                print(f'channel connection closed with exception {ws.exception()}')
+                logger.debug(
+                    f'channel connection closed with exception {ws.exception()}'
+                )
 
         self.channel_socket = None
-        print('--- channel connection closed')
+        logger.debug('--- channel connection closed')
 
         return ws
 
@@ -329,10 +360,16 @@ class UiServer:
             await handler(**message_params)
 
     async def on_hello_message(self):
-        print('HELLO')
+        logger.debug('HELLO')
         await self.send_message(
             'hello', bumble_version=bumble.__version__, codec=self.speaker().codec
         )
+        if connection := self.speaker().connection:
+            await self.send_message(
+                'connection',
+                peer_address=str(connection.peer_address).replace('/P', ''),
+                peer_name=connection.peer_name,
+            )
 
     async def send_message(self, message_type: str, **kwargs) -> None:
         if self.channel_socket is None:
@@ -345,7 +382,10 @@ class UiServer:
         if self.channel_socket is None:
             return
 
-        await self.channel_socket.send_bytes(data)
+        try:
+            await self.channel_socket.send_bytes(data)
+        except Exception as error:
+            logger.warning(f'exception while sending audio packet: {error}')
 
 
 # -----------------------------------------------------------------------------
@@ -356,6 +396,7 @@ class Speaker:
         self.discover = discover
         self.ui_port = ui_port
         self.device = None
+        self.connection = None
         self.listener = None
         self.packets_received = 0
         self.bytes_received = 0
@@ -424,16 +465,28 @@ class Speaker:
             ),
         )
 
+    async def dispatch_to_outputs(self, function):
+        for output in self.outputs:
+            await function(output)
+
     def on_bluetooth_connection(self, connection):
-        print(f"Connection: {connection}")
+        print(f'Connection: {connection}')
+        self.connection = connection
         connection.on('disconnection', self.on_bluetooth_disconnection)
+        AsyncRunner.spawn(
+            self.dispatch_to_outputs(lambda output: output.on_connection(connection))
+        )
 
     def on_bluetooth_disconnection(self, reason):
-        print(f"Disconnection ({reason})")
+        print(f'Disconnection ({reason})')
+        self.connection = None
         AsyncRunner.spawn(self.advertise())
+        AsyncRunner.spawn(
+            self.dispatch_to_outputs(lambda output: output.on_disconnection(reason))
+        )
 
     def on_avdtp_connection(self, protocol):
-        print("Audio Stream Open")
+        print('Audio Stream Open')
 
         # Add a sink endpoint to the server
         sink = protocol.add_sink(self.codec_capabilities())
@@ -456,19 +509,16 @@ class Speaker:
         print("Audio Stream Closed")
 
     def on_sink_start(self):
-        print("Sink Start")
-        for output in self.outputs:
-            AsyncRunner.spawn(output.start())
+        print("Sink Started\u001b[0K")
+        AsyncRunner.spawn(self.dispatch_to_outputs(lambda output: output.start()))
 
     def on_sink_stop(self):
-        print("Sink Stop")
-        for output in self.outputs:
-            AsyncRunner.spawn(output.stop())
+        print("Sink Stopped\u001b[0K")
+        AsyncRunner.spawn(self.dispatch_to_outputs(lambda output: output.stop()))
 
     def on_sink_suspend(self):
-        print("Sink Suspend")
-        for output in self.outputs:
-            AsyncRunner.spawn(output.suspend())
+        print("Sink Suspended\u001b[0K")
+        AsyncRunner.spawn(self.dispatch_to_outputs(lambda output: output.suspend()))
 
     def on_sink_configuration(self, config):
         print("Sink Configuration:")
@@ -625,6 +675,16 @@ def play(ctx, transport, codec, connect_address, discover, output, ui_port):
         )
         output = list(filter(lambda x: x != '@ffplay', output))
 
+    if '@ffplay' in output:
+        # Check if ffplay is installed
+        try:
+            subprocess.run(['ffplay', '-version'], capture_output=True, check=True)
+        except FileNotFoundError:
+            print(
+                color('ffplay not installed, @ffplay output will be disabled', 'yellow')
+            )
+            output = list(filter(lambda x: x != '@ffplay', output))
+
     asyncio.run(
         Speaker(transport, codec, discover, output, ui_port).run(connect_address)
     )
@@ -632,7 +692,7 @@ def play(ctx, transport, codec, connect_address, discover, output, ui_port):
 
 # -----------------------------------------------------------------------------
 def main():
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
     speaker_cli()
 
 
