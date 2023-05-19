@@ -1795,6 +1795,16 @@ class Address:
     def to_bytes(self):
         return self.address_bytes
 
+    def to_string(self, with_type_qualifier=True):
+        '''
+        String representation of the address, MSB first, with an optional type
+        qualifier.
+        '''
+        result = ':'.join([f'{x:02X}' for x in reversed(self.address_bytes)])
+        if not with_type_qualifier or not self.is_public:
+            return result
+        return result + '/P'
+
     def __bytes__(self):
         return self.to_bytes()
 
@@ -1808,13 +1818,7 @@ class Address:
         )
 
     def __str__(self):
-        '''
-        String representation of the address, MSB first
-        '''
-        result = ':'.join([f'{x:02X}' for x in reversed(self.address_bytes)])
-        if not self.is_public:
-            return result
-        return result + '/P'
+        return self.to_string()
 
 
 # Predefined address values

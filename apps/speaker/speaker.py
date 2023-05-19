@@ -390,7 +390,8 @@ class UiServer:
 
 # -----------------------------------------------------------------------------
 class Speaker:
-    def __init__(self, transport, codec, discover, outputs, ui_port):
+    def __init__(self, device_config, transport, codec, discover, outputs, ui_port):
+        self.device_config = device_config
         self.transport = transport
         self.codec = codec
         self.discover = discover
@@ -573,7 +574,6 @@ class Speaker:
             print('@@@', endpoint)
 
     async def run(self, connect_address):
-        print(f'Speaker ready to play, codec={color(self.codec, "cyan")}')
         await self.ui_server.start_http()
         self.outputs.append(
             WebSocketOutput(
@@ -584,9 +584,13 @@ class Speaker:
         async with await open_transport(self.transport) as (hci_source, hci_sink):
             # Create a device
             device_config = DeviceConfiguration()
-            device_config.name = "Bumble Speaker"
-            device_config.class_of_device = 0x240404
-            device_config.keystore = "JsonKeyStore"
+            if self.device_config:
+                device_config.load_from_file(self.device_config)
+            else:
+                device_config.name = "Bumble Speaker"
+                device_config.class_of_device = 0x240404
+                device_config.keystore = "JsonKeyStore"
+
             device_config.classic_enabled = True
             device_config.le_enabled = False
             self.device = Device.from_config_with_hci(
@@ -599,12 +603,24 @@ class Speaker:
             # Start the controller
             await self.device.power_on()
 
+            # Print some of the config/properties
+            print("Speaker Name:", color(device_config.name, 'yellow'))
+            print(
+                "Speaker Bluetooth Address:",
+                color(
+                    self.device.public_address.to_string(with_type_qualifier=False),
+                    'yellow',
+                ),
+            )
+
             # Listen for Bluetooth connections
             self.device.on('connection', self.on_bluetooth_connection)
 
             # Create a listener to wait for AVDTP connections
             self.listener = Listener(Listener.create_registrar(self.device))
             self.listener.on('connection', self.on_avdtp_connection)
+
+            print(f'Speaker ready to play, codec={color(self.codec, "cyan")}')
 
             if connect_address:
                 # Connect to the source
@@ -686,7 +702,9 @@ def play(ctx, transport, codec, connect_address, discover, output, ui_port):
             output = list(filter(lambda x: x != '@ffplay', output))
 
     asyncio.run(
-        Speaker(transport, codec, discover, output, ui_port).run(connect_address)
+        Speaker(
+            ctx.obj['device_config'], transport, codec, discover, output, ui_port
+        ).run(connect_address)
     )
 
 
