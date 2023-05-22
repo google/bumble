@@ -212,8 +212,8 @@ class Service(Attribute):
         self,
         uuid,
         characteristics: List[Characteristic],
-        included_services: List[Service] = [],
         primary=True,
+        included_services: List[Service] = [],
     ):
         # Convert the uuid to a UUID object if it isn't already
         if isinstance(uuid, str):
