@@ -69,6 +69,7 @@ async def open_transport(name: str) -> Transport:
       * usb
       * pyusb
       * android-emulator
+      * android-netsim
     """
 
     return _wrap_transport(await _open_transport(name))

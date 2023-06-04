@@ -15,50 +15,38 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+import time
+
 from bumble.device import Device
-from bumble.transport.common import PacketParser
+
+
+# -----------------------------------------------------------------------------
+class ScanEntry:
+    def __init__(self, advertisement):
+        self.address = str(advertisement.address).replace("/P", "")
+        self.address_type = ('Public', 'Random', 'Public Identity', 'Random Identity')[
+            advertisement.address.address_type
+        ]
+        self.rssi = advertisement.rssi
+        self.data = advertisement.data.to_string("\n")
 
 
 # -----------------------------------------------------------------------------
 class ScannerListener(Device.Listener):
+    def __init__(self, callback):
+        self.callback = callback
+        self.entries = {}
+
     def on_advertisement(self, advertisement):
-        address_type_string = ('P', 'R', 'PI', 'RI')[advertisement.address.address_type]
-        print(
-            f'>>> {advertisement.address} [{address_type_string}]: RSSI={advertisement.rssi}, {advertisement.ad_data}'
-        )
-
-
-class HciSource:
-    def __init__(self, host_source):
-        self.parser = PacketParser()
-        host_source.delegate = self
-
-    def set_packet_sink(self, sink):
-        self.parser.set_packet_sink(sink)
-
-    # host source delegation
-    def data_received(self, data):
-        print('*** DATA from JS:', data)
-        buffer = bytes(data.to_py())
-        self.parser.feed_data(buffer)
-
-
-# class HciSink:
-#     def __init__(self, host_sink):
-#         self.host_sink = host_sink
-
-#     def on_packet(self, packet):
-#         print(f'>>> PACKET from Python: {packet}')
-#         self.host_sink.on_packet(packet)
+        self.entries[advertisement.address] = ScanEntry(advertisement)
+        self.callback(list(self.entries.values()))
 
 
 # -----------------------------------------------------------------------------
-async def main(host_source, host_sink):
+async def main(hci_source, hci_sink, callback):
     print('### Starting Scanner')
-    hci_source = HciSource(host_source)
-    hci_sink = host_sink
     device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
-    device.listener = ScannerListener()
+    device.listener = ScannerListener(callback)
     await device.power_on()
     await device.start_scanning()
 
