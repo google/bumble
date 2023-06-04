@@ -2439,7 +2439,7 @@ class Device(CompositeEventEmitter):
 
             if result.status != HCI_COMMAND_STATUS_PENDING:
                 logger.warning(
-                    'HCI_Set_Connection_Encryption_Command failed: '
+                    'HCI_Remote_Name_Request_Command failed: '
                     f'{HCI_Constant.error_name(result.status)}'
                 )
                 raise HCI_StatusError(result)
