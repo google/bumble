@@ -40,7 +40,6 @@ def test_reader():
         value = (value << 1) | reader.read(1)
     assert value == 0x78
 
-
     data = bytes([x & 0xFF for x in range(66 * 100)])
     reader = BitReader(data)
     value = 0
@@ -52,10 +51,14 @@ def test_reader():
 
 def test_aac_rtp():
     # pylint: disable=line-too-long
-    packet_data = bytes.fromhex('47fc0000b090800300202066000198000de120000000000000000000000000000000000000000000001c')
+    packet_data = bytes.fromhex(
+        '47fc0000b090800300202066000198000de120000000000000000000000000000000000000000000001c'
+    )
     packet = AacAudioRtpPacket(packet_data)
     adts = packet.to_adts()
-    assert adts == bytes.fromhex('fff1508004fffc2066000198000de120000000000000000000000000000000000000000000001c')
+    assert adts == bytes.fromhex(
+        'fff1508004fffc2066000198000de120000000000000000000000000000000000000000000001c'
+    )
 
 
 # -----------------------------------------------------------------------------

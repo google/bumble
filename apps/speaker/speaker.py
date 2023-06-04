@@ -679,7 +679,9 @@ def speaker_cli(ctx, device_config):
 )
 @click.option('--device-config', metavar='FILENAME', help='Device configuration file')
 @click.argument('transport')
-def speaker(transport, codec, connect_address, discover, output, ui_port, device_config):
+def speaker(
+    transport, codec, connect_address, discover, output, ui_port, device_config
+):
     """Run the speaker."""
 
     # ffplay only works with AAC for now
@@ -704,9 +706,9 @@ def speaker(transport, codec, connect_address, discover, output, ui_port, device
             output = list(filter(lambda x: x != '@ffplay', output))
 
     asyncio.run(
-        Speaker(
-            device_config, transport, codec, discover, output, ui_port
-        ).run(connect_address)
+        Speaker(device_config, transport, codec, discover, output, ui_port).run(
+            connect_address
+        )
     )
 
 
