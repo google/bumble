@@ -35,6 +35,7 @@ import bumble
 from bumble.colors import color
 from bumble.core import BT_BR_EDR_TRANSPORT
 from bumble.device import Connection, Device, DeviceConfiguration, Peer
+from bumble.hci import HCI_StatusError
 from bumble.sdp import ServiceAttribute
 from bumble.transport import open_transport
 from bumble.avdtp import (
@@ -187,7 +188,10 @@ class WebSocketOutput(QueuedOutput):
         self.send_message = send_message
 
     async def on_connection(self, connection: Connection) -> None:
-        await connection.request_remote_name()
+        try:
+            await connection.request_remote_name()
+        except HCI_StatusError:
+            pass
         peer_name = '' if connection.peer_name is None else connection.peer_name
         peer_address = str(connection.peer_address).replace('/P', '')
         await self.send_message(
@@ -551,7 +555,6 @@ class Speaker:
         print(f'=== Connecting to {address}...')
         connection = await self.device.connect(address, transport=BT_BR_EDR_TRANSPORT)
         print(f'=== Connected to {connection.peer_address}')
-        self.on_bluetooth_connection(connection)
 
         # Request authentication
         print('*** Authenticating...')
@@ -638,23 +641,15 @@ class Speaker:
 
 # -----------------------------------------------------------------------------
 @click.group()
-@click.option('--device-config', metavar='FILENAME', help='Device configuration file')
 @click.pass_context
 def speaker_cli(ctx, device_config):
     ctx.ensure_object(dict)
     ctx.obj['device_config'] = device_config
 
 
-@speaker_cli.command()
-@click.argument('transport')
+@click.command()
 @click.option(
     '--codec', type=click.Choice(['sbc', 'aac']), default='aac', show_default=True
-)
-@click.option(
-    '--connect',
-    'connect_address',
-    metavar='ADDRESS_OR_NAME',
-    help='Address or name to connect to',
 )
 @click.option(
     '--discover', is_flag=True, help='Discover remote endpoints once connected'
@@ -676,9 +671,16 @@ def speaker_cli(ctx, device_config):
     show_default=True,
     help='HTTP port for the UI server',
 )
-@click.pass_context
-def play(ctx, transport, codec, connect_address, discover, output, ui_port):
-    """Run the speaker in playback mode."""
+@click.option(
+    '--connect',
+    'connect_address',
+    metavar='ADDRESS_OR_NAME',
+    help='Address or name to connect to',
+)
+@click.option('--device-config', metavar='FILENAME', help='Device configuration file')
+@click.argument('transport')
+def speaker(transport, codec, connect_address, discover, output, ui_port, device_config):
+    """Run the speaker."""
 
     # ffplay only works with AAC for now
     if codec != 'aac' and '@ffplay' in output:
@@ -703,7 +705,7 @@ def play(ctx, transport, codec, connect_address, discover, output, ui_port):
 
     asyncio.run(
         Speaker(
-            ctx.obj['device_config'], transport, codec, discover, output, ui_port
+            device_config, transport, codec, discover, output, ui_port
         ).run(connect_address)
     )
 
@@ -711,7 +713,7 @@ def play(ctx, transport, codec, connect_address, discover, output, ui_port):
 # -----------------------------------------------------------------------------
 def main():
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
-    speaker_cli()
+    speaker()
 
 
 # -----------------------------------------------------------------------------
