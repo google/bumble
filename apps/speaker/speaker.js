@@ -123,6 +123,11 @@ function setConnectionText(message) {
     }
 }
 
+function setStreamState(state) {
+    streamState = state;
+    streamStateText.innerText = streamState;
+}
+
 function onAnimationFrame() {
     // FFT
     if (audioAnalyzer !== undefined) {
@@ -254,21 +259,21 @@ function onHelloMessage(params) {
         audioSupportMessageText.innerText = "";
         audioSupportMessageText.style.display = "none";
     }
+    if (params.streamState) {
+        setStreamState(params.streamState);
+    }
 }
 
 function onStartMessage(params) {
-    streamState = "STARTED";
-    streamStateText.innerText = streamState;
+    setStreamState("STARTED");
 }
 
 function onStopMessage(params) {
-    streamState = "STOPPED";
-    streamStateText.innerText = streamState;
+    setStreamState("STOPPED");
 }
 
 function onSuspendMessage(params) {
-    streamState = "SUSPENDED";
-    streamStateText.innerText = streamState;
+    setStreamState("SUSPENDED");
 }
 
 function onConnectionMessage(params) {

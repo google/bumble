@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import asyncio.subprocess
 from importlib import resources
+import enum
 import json
 import os
 import logging
@@ -364,9 +365,11 @@ class UiServer:
             await handler(**message_params)
 
     async def on_hello_message(self):
-        logger.debug('HELLO')
         await self.send_message(
-            'hello', bumble_version=bumble.__version__, codec=self.speaker().codec
+            'hello',
+            bumble_version=bumble.__version__,
+            codec=self.speaker().codec,
+            streamState=self.speaker().stream_state.name,
         )
         if connection := self.speaker().connection:
             await self.send_message(
@@ -394,6 +397,12 @@ class UiServer:
 
 # -----------------------------------------------------------------------------
 class Speaker:
+    class StreamState(enum.Enum):
+        IDLE = 0
+        STOPPED = 1
+        STARTED = 2
+        SUSPENDED = 3
+
     def __init__(self, device_config, transport, codec, discover, outputs, ui_port):
         self.device_config = device_config
         self.transport = transport
@@ -405,6 +414,7 @@ class Speaker:
         self.listener = None
         self.packets_received = 0
         self.bytes_received = 0
+        self.stream_state = Speaker.StreamState.IDLE
         self.outputs = []
         for output in outputs:
             if output == '@ffplay':
@@ -515,14 +525,17 @@ class Speaker:
 
     def on_sink_start(self):
         print("Sink Started\u001b[0K")
+        self.stream_state = self.StreamState.STARTED
         AsyncRunner.spawn(self.dispatch_to_outputs(lambda output: output.start()))
 
     def on_sink_stop(self):
         print("Sink Stopped\u001b[0K")
+        self.stream_state = self.StreamState.STOPPED
         AsyncRunner.spawn(self.dispatch_to_outputs(lambda output: output.stop()))
 
     def on_sink_suspend(self):
         print("Sink Suspended\u001b[0K")
+        self.stream_state = self.StreamState.SUSPENDED
         AsyncRunner.spawn(self.dispatch_to_outputs(lambda output: output.suspend()))
 
     def on_sink_configuration(self, config):
@@ -534,6 +547,7 @@ class Speaker:
 
     def on_rtp_channel_close(self):
         print("RTP Channel Closed")
+        self.stream_state = self.StreamState.IDLE
 
     def on_rtp_packet(self, packet):
         self.packets_received += 1
