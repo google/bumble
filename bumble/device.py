@@ -826,6 +826,12 @@ class DeviceConfiguration:
         advertising_data = config.get('advertising_data')
         if advertising_data:
             self.advertising_data = bytes.fromhex(advertising_data)
+        elif config.get('name') is not None:
+            self.advertising_data = bytes(
+                AdvertisingData(
+                    [(AdvertisingData.COMPLETE_LOCAL_NAME, bytes(self.name, 'utf-8'))]
+                )
+            )
 
     def load_from_file(self, filename):
         with open(filename, 'r', encoding='utf-8') as file:
