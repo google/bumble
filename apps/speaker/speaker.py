@@ -282,7 +282,7 @@ class FfplayOutput(QueuedOutput):
 
 # -----------------------------------------------------------------------------
 class UiServer:
-    speaker: Speaker
+    speaker: weakref.ReferenceType[Speaker]
     port: int
 
     def __init__(self, speaker: Speaker, port: int) -> None:
