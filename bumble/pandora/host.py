@@ -43,7 +43,8 @@ from bumble.hci import (
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     Address,
 )
-from google.protobuf import any_pb2, empty_pb2  # pytype: disable=pyi-error
+from google.protobuf import any_pb2  # pytype: disable=pyi-error
+from google.protobuf import empty_pb2  # pytype: disable=pyi-error
 from pandora.host_grpc_aio import HostServicer
 from pandora.host_pb2 import (
     NOT_CONNECTABLE,
