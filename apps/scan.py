@@ -133,23 +133,22 @@ async def scan(
                 'Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink
             )
 
+        await device.power_on()
+
         if keystore_file:
-            keystore = JsonKeyStore(namespace=None, filename=keystore_file)
-            device.keystore = keystore
-        else:
-            resolver = None
+            device.keystore = JsonKeyStore.from_device(device, filename=keystore_file)
 
         if device.keystore:
             resolving_keys = await device.keystore.get_resolving_keys()
             resolver = AddressResolver(resolving_keys)
+        else:
+            resolver = None
 
         printer = AdvertisementPrinter(min_rssi, resolver)
         if raw:
             device.host.on('advertising_report', printer.on_advertising_report)
         else:
             device.on('advertisement', printer.on_advertisement)
-
-        await device.power_on()
 
         if phy is None:
             scanning_phys = [HCI_LE_1M_PHY, HCI_LE_CODED_PHY]
