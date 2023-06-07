@@ -207,7 +207,7 @@ def on_connection(connection, request):
 
     # Listen for pairing events
     connection.on('pairing_start', on_pairing_start)
-    connection.on('pairing', on_pairing)
+    connection.on('pairing', lambda keys: on_pairing(connection.peer_address, keys))
     connection.on('pairing_failure', on_pairing_failure)
 
     # Listen for encryption changes
@@ -242,9 +242,9 @@ def on_pairing_start():
 
 
 # -----------------------------------------------------------------------------
-def on_pairing(keys):
+def on_pairing(address, keys):
     print(color('***-----------------------------------', 'cyan'))
-    print(color('*** Paired!', 'cyan'))
+    print(color(f'*** Paired! (peer identity={address})', 'cyan'))
     keys.print(prefix=color('*** ', 'cyan'))
     print(color('***-----------------------------------', 'cyan'))
     Waiter.instance.terminate()
@@ -283,17 +283,6 @@ async def pair(
         # Create a device to manage the host
         device = Device.from_config_file_with_hci(device_config, hci_source, hci_sink)
 
-        # Set a custom keystore if specified on the command line
-        if keystore_file:
-            device.keystore = JsonKeyStore(namespace=None, filename=keystore_file)
-
-        # Print the existing keys before pairing
-        if print_keys and device.keystore:
-            print(color('@@@-----------------------------------', 'blue'))
-            print(color('@@@ Pairing Keys:', 'blue'))
-            await device.keystore.print(prefix=color('@@@ ', 'blue'))
-            print(color('@@@-----------------------------------', 'blue'))
-
         # Expose a GATT characteristic that can be used to trigger pairing by
         # responding with an authentication error when read
         if mode == 'le':
@@ -322,6 +311,17 @@ async def pair(
 
         # Get things going
         await device.power_on()
+
+        # Set a custom keystore if specified on the command line
+        if keystore_file:
+            device.keystore = JsonKeyStore.from_device(device, filename=keystore_file)
+
+        # Print the existing keys before pairing
+        if print_keys and device.keystore:
+            print(color('@@@-----------------------------------', 'blue'))
+            print(color('@@@ Pairing Keys:', 'blue'))
+            await device.keystore.print(prefix=color('@@@ ', 'blue'))
+            print(color('@@@-----------------------------------', 'blue'))
 
         # Set up a pairing config factory
         device.pairing_config_factory = lambda connection: PairingConfig(

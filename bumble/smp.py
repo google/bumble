@@ -1805,7 +1805,7 @@ class Manager(EventEmitter):
             self.device.abort_on('flush', store_keys())
 
         # Notify the device
-        self.device.on_pairing(session.connection, keys, session.sc)
+        self.device.on_pairing(session.connection, identity_address, keys, session.sc)
 
     def on_pairing_failure(self, session: Session, reason: int) -> None:
         self.device.on_pairing_failure(session.connection, reason)
