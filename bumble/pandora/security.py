@@ -29,12 +29,9 @@ from bumble.device import Connection as BumbleConnection, Device
 from bumble.hci import HCI_Error
 from bumble.pairing import PairingConfig, PairingDelegate as BasePairingDelegate
 from contextlib import suppress
-from google.protobuf import (
-    any_pb2,
-    empty_pb2,
-    wrappers_pb2,
-)  # pytype: disable=pyi-error
-from google.protobuf.wrappers_pb2 import BoolValue  # pytype: disable=pyi-error
+from google.protobuf import any_pb2  # pytype: disable=pyi-error
+from google.protobuf import empty_pb2  # pytype: disable=pyi-error
+from google.protobuf import wrappers_pb2  # pytype: disable=pyi-error
 from pandora.host_pb2 import Connection
 from pandora.security_grpc_aio import SecurityServicer, SecurityStorageServicer
 from pandora.security_pb2 import (
@@ -513,7 +510,7 @@ class SecurityStorageService(SecurityStorageServicer):
         else:
             is_bonded = False
 
-        return BoolValue(value=is_bonded)
+        return wrappers_pb2.BoolValue(value=is_bonded)
 
     @utils.rpc
     async def DeleteBond(
