@@ -34,9 +34,10 @@ from aiohttp import web
 
 import bumble
 from bumble.colors import color
-from bumble.core import BT_BR_EDR_TRANSPORT
-from bumble.device import Connection, Device, DeviceConfiguration, Peer
+from bumble.core import BT_BR_EDR_TRANSPORT, CommandTimeoutError
+from bumble.device import Connection, Device, DeviceConfiguration
 from bumble.hci import HCI_StatusError
+from bumble.pairing import PairingConfig
 from bumble.sdp import ServiceAttribute
 from bumble.transport import open_transport
 from bumble.avdtp import (
@@ -605,7 +606,7 @@ class Speaker:
                 device_config.load_from_file(self.device_config)
             else:
                 device_config.name = "Bumble Speaker"
-                device_config.class_of_device = 0x240404
+                device_config.class_of_device = 0x240414
                 device_config.keystore = "JsonKeyStore"
 
             device_config.classic_enabled = True
@@ -616,6 +617,11 @@ class Speaker:
 
             # Setup the SDP to expose the sink service
             self.device.sdp_service_records = self.sdp_records()
+
+            # Don't require MITM when pairing.
+            self.device.pairing_config_factory = lambda connection: PairingConfig(
+                mitm=False
+            )
 
             # Start the controller
             await self.device.power_on()
@@ -641,7 +647,11 @@ class Speaker:
 
             if connect_address:
                 # Connect to the source
-                await self.connect(connect_address)
+                try:
+                    await self.connect(connect_address)
+                except CommandTimeoutError:
+                    print(color("Connection timed out", "red"))
+                    return
             else:
                 # Start being discoverable and connectable
                 print("Waiting for connection...")

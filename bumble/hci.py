@@ -62,7 +62,7 @@ def map_null_terminated_utf8_string(utf8_bytes):
     try:
         terminator = utf8_bytes.find(0)
         if terminator < 0:
-            return utf8_bytes
+            terminator = len(utf8_bytes)
         return utf8_bytes[0:terminator].decode('utf8')
     except UnicodeDecodeError:
         return utf8_bytes
