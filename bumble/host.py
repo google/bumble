@@ -21,7 +21,7 @@ import collections
 import logging
 import struct
 
-from typing import Optional, TYPE_CHECKING, Dict, Callable, Awaitable
+from typing import Optional, TYPE_CHECKING, Dict, Callable, Awaitable, cast
 
 from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
@@ -43,6 +43,7 @@ from .hci import (
     HCI_RESET_COMMAND,
     HCI_SUCCESS,
     HCI_SUPPORTED_COMMANDS_FLAGS,
+    HCI_SYNCHRONOUS_DATA_PACKET,
     HCI_VERSION_BLUETOOTH_CORE_4_0,
     HCI_AclDataPacket,
     HCI_AclDataPacketAssembler,
@@ -67,6 +68,7 @@ from .hci import (
     HCI_Read_Local_Version_Information_Command,
     HCI_Reset_Command,
     HCI_Set_Event_Mask_Command,
+    HCI_SynchronousDataPacket,
 )
 from .core import (
     BT_BR_EDR_TRANSPORT,
@@ -485,12 +487,14 @@ class Host(AbortableEventEmitter):
             self.snooper.snoop(bytes(packet), Snooper.Direction.CONTROLLER_TO_HOST)
 
         # If the packet is a command, invoke the handler for this packet
-        if isinstance(packet, HCI_Command):
-            self.on_hci_command_packet(packet)
-        elif isinstance(packet, HCI_Event):
-            self.on_hci_event_packet(packet)
-        elif isinstance(packet, HCI_AclDataPacket):
-            self.on_hci_acl_data_packet(packet)
+        if packet.hci_packet_type == HCI_COMMAND_PACKET:
+            self.on_hci_command_packet(cast(HCI_Command, packet))
+        elif packet.hci_packet_type == HCI_EVENT_PACKET:
+            self.on_hci_event_packet(cast(HCI_Event, packet))
+        elif packet.hci_packet_type == HCI_ACL_DATA_PACKET:
+            self.on_hci_acl_data_packet(cast(HCI_AclDataPacket, packet))
+        elif packet.hci_packet_type == HCI_SYNCHRONOUS_DATA_PACKET:
+            self.on_hci_sco_data_packet(cast(HCI_SynchronousDataPacket, packet))
         else:
             logger.warning(f'!!! unknown packet type {packet.hci_packet_type}')
 
@@ -506,6 +510,10 @@ class Host(AbortableEventEmitter):
         # Look for the connection to which this data belongs
         if connection := self.connections.get(packet.connection_handle):
             connection.on_hci_acl_data_packet(packet)
+
+    def on_hci_sco_data_packet(self, packet: HCI_SynchronousDataPacket) -> None:
+        # Experimental
+        self.emit('sco_packet', packet.connection_handle, packet)
 
     def on_l2cap_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
@@ -760,7 +768,25 @@ class Host(AbortableEventEmitter):
         asyncio.create_task(send_long_term_key())
 
     def on_hci_synchronous_connection_complete_event(self, event):
-        pass
+        if event.status == HCI_SUCCESS:
+            # Create/update the connection
+            logger.debug(
+                f'### SCO CONNECTION: [0x{event.connection_handle:04X}] '
+                f'{event.bd_addr}'
+            )
+
+            # Notify the client
+            self.emit(
+                'sco_connection',
+                event.bd_addr,
+                event.connection_handle,
+                event.link_type,
+            )
+        else:
+            logger.debug(f'### SCO CONNECTION FAILED: {event.status}')
+
+            # Notify the client
+            self.emit('sco_connection_failure', event.bd_addr, event.status)
 
     def on_hci_synchronous_connection_changed_event(self, event):
         pass

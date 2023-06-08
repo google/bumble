@@ -35,6 +35,7 @@ from bumble.core import (
     BT_L2CAP_PROTOCOL_ID,
     BT_RFCOMM_PROTOCOL_ID,
 )
+from bumble.hci import HCI_Enhanced_Setup_Synchronous_Connection_Command
 from bumble.sdp import (
     DataElement,
     ServiceAttribute,
@@ -819,3 +820,170 @@ def sdp_records(
             DataElement.unsigned_integer_16(hf_supported_features),
         ),
     ]
+
+
+# -----------------------------------------------------------------------------
+# ESCO Codec Default Parameters
+# -----------------------------------------------------------------------------
+
+
+# Hands-Free Profile v1.8, 5.7 Codec Interoperability Requirements
+class DefaultCodecParameters(enum.IntEnum):
+    SCO_CVSD_D0 = enum.auto()
+    SCO_CVSD_D1 = enum.auto()
+    ESCO_CVSD_S1 = enum.auto()
+    ESCO_CVSD_S2 = enum.auto()
+    ESCO_CVSD_S3 = enum.auto()
+    ESCO_CVSD_S4 = enum.auto()
+    ESCO_MSBC_T1 = enum.auto()
+    ESCO_MSBC_T2 = enum.auto()
+
+
+@dataclasses.dataclass
+class EscoParameters:
+    # Codec specific
+    transmit_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat
+    receive_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat
+    packet_type: HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType
+    retransmission_effort: HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort
+    max_latency: int
+
+    # Common
+    input_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat = (
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.TRANSPARENT
+    )
+    output_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat = (
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.TRANSPARENT
+    )
+    input_coded_data_size: int = 16
+    output_coded_data_size: int = 16
+    input_pcm_data_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.PcmDataFormat = (
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.PcmDataFormat.TWOS_COMPLEMENT
+    )
+    output_pcm_data_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.PcmDataFormat = (
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.PcmDataFormat.TWOS_COMPLEMENT
+    )
+    input_pcm_sample_payload_msb_position: int = 0
+    output_pcm_sample_payload_msb_position: int = 0
+    input_data_path: HCI_Enhanced_Setup_Synchronous_Connection_Command.DataPath = (
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.DataPath.HCI
+    )
+    output_data_path: HCI_Enhanced_Setup_Synchronous_Connection_Command.DataPath = (
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.DataPath.HCI
+    )
+    input_transport_unit_size: int = 0
+    output_transport_unit_size: int = 0
+    input_bandwidth: int = 16000
+    output_bandwidth: int = 16000
+    transmit_bandwidth: int = 8000
+    receive_bandwidth: int = 8000
+    transmit_codec_frame_size: int = 60
+    receive_codec_frame_size: int = 60
+
+
+_ESCO_PARAMETERS_CVSD_D0 = EscoParameters(
+    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    max_latency=0xFFFF,
+    packet_type=HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.HV1,
+    retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.NO_RETRANSMISSION,
+)
+
+_ESCO_PARAMETERS_CVSD_D1 = EscoParameters(
+    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    max_latency=0xFFFF,
+    packet_type=HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.HV3,
+    retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.NO_RETRANSMISSION,
+)
+
+_ESCO_PARAMETERS_CVSD_S1 = EscoParameters(
+    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    max_latency=0x0007,
+    packet_type=(
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5
+    ),
+    retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.OPTIMIZE_FOR_POWER,
+)
+
+_ESCO_PARAMETERS_CVSD_S2 = EscoParameters(
+    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    max_latency=0x0007,
+    packet_type=(
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5
+    ),
+    retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.OPTIMIZE_FOR_POWER,
+)
+
+_ESCO_PARAMETERS_CVSD_S3 = EscoParameters(
+    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    max_latency=0x000A,
+    packet_type=(
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5
+    ),
+    retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.OPTIMIZE_FOR_POWER,
+)
+
+_ESCO_PARAMETERS_CVSD_S4 = EscoParameters(
+    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    max_latency=0x000C,
+    packet_type=(
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5
+    ),
+    retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.OPTIMIZE_FOR_QUALITY,
+)
+
+_ESCO_PARAMETERS_MSBC_T1 = EscoParameters(
+    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.MSBC,
+    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.MSBC,
+    max_latency=0x0008,
+    packet_type=(
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5
+    ),
+    retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.OPTIMIZE_FOR_QUALITY,
+)
+
+_ESCO_PARAMETERS_MSBC_T2 = EscoParameters(
+    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.MSBC,
+    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.MSBC,
+    max_latency=0x000D,
+    packet_type=(
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5
+    ),
+    retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.OPTIMIZE_FOR_QUALITY,
+)
+
+ESCO_PERAMETERS = {
+    DefaultCodecParameters.SCO_CVSD_D0: _ESCO_PARAMETERS_CVSD_D0,
+    DefaultCodecParameters.SCO_CVSD_D1: _ESCO_PARAMETERS_CVSD_D1,
+    DefaultCodecParameters.ESCO_CVSD_S1: _ESCO_PARAMETERS_CVSD_S1,
+    DefaultCodecParameters.ESCO_CVSD_S2: _ESCO_PARAMETERS_CVSD_S2,
+    DefaultCodecParameters.ESCO_CVSD_S3: _ESCO_PARAMETERS_CVSD_S3,
+    DefaultCodecParameters.ESCO_CVSD_S4: _ESCO_PARAMETERS_CVSD_S4,
+    DefaultCodecParameters.ESCO_MSBC_T1: _ESCO_PARAMETERS_MSBC_T1,
+    DefaultCodecParameters.ESCO_MSBC_T2: _ESCO_PARAMETERS_MSBC_T2,
+}
