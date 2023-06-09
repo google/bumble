@@ -78,7 +78,9 @@ async def main():
                 attributes = await sdp_client.get_attributes(
                     service_record_handle, [SDP_ALL_ATTRIBUTES_RANGE]
                 )
-                print(color(f'SERVICE {service_record_handle:04X} attributes:', 'yellow'))
+                print(
+                    color(f'SERVICE {service_record_handle:04X} attributes:', 'yellow')
+                )
                 for attribute in attributes:
                     print('  ', attribute.to_string(with_colors=True))
 
