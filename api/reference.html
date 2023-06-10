@@ -870,6 +870,20 @@
   
   
     <li class="md-nav__item">
+      <a href="../apps_and_tools/speaker.html" class="md-nav__link">
+        Speaker
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../apps_and_tools/hci_bridge.html" class="md-nav__link">
         HCI Bridge
       </a>
@@ -1370,7 +1384,11 @@ address[0] is the LSB of the address, address[5] is the MSB.</p>
 <span class="normal">1814</span>
 <span class="normal">1815</span>
 <span class="normal">1816</span>
-<span class="normal">1817</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">Address</span><span class="p">:</span>
+<span class="normal">1817</span>
+<span class="normal">1818</span>
+<span class="normal">1819</span>
+<span class="normal">1820</span>
+<span class="normal">1821</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">Address</span><span class="p">:</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Bluetooth Address (see Bluetooth spec Vol 6, Part B - 1.3 DEVICE ADDRESS)</span>
 <span class="sd">    NOTE: the address bytes are stored in little-endian byte order here, so</span>
@@ -1488,6 +1506,16 @@ address[0] is the LSB of the address, address[5] is the MSB.</p>
     <span class="k">def</span> <span class="nf">to_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">address_bytes</span>
 
+    <span class="k">def</span> <span class="nf">to_string</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">with_type_qualifier</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        String representation of the address, MSB first, with an optional type</span>
+<span class="sd">        qualifier.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="s1">&#39;:&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">x</span><span class="si">:</span><span class="s1">02X</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">address_bytes</span><span class="p">)])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">with_type_qualifier</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_public</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="n">result</span> <span class="o">+</span> <span class="s1">&#39;/P&#39;</span>
+
     <span class="k">def</span> <span class="fm">__bytes__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()</span>
 
@@ -1501,13 +1529,7 @@ address[0] is the LSB of the address, address[5] is the MSB.</p>
         <span class="p">)</span>
 
     <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">        String representation of the address, MSB first</span>
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="s1">&#39;:&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">x</span><span class="si">:</span><span class="s1">02X</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">address_bytes</span><span class="p">)])</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_public</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">result</span>
-        <span class="k">return</span> <span class="n">result</span> <span class="o">+</span> <span class="s1">&#39;/P&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
         </details>
 
@@ -1606,31 +1628,34 @@ the type is set to PUBLIC_DEVICE_ADDRESS.</p>
 
 
 
-<h2 id="bumble.hci.Address.__str__" class="doc doc-heading">
-<code class="highlight language-python"><span class="fm">__str__</span><span class="p">()</span></code>
+<h2 id="bumble.hci.Address.to_string" class="doc doc-heading">
+<code class="highlight language-python"><span class="n">to_string</span><span class="p">(</span><span class="n">with_type_qualifier</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
-<a href="#bumble.hci.Address.__str__" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#bumble.hci.Address.to_string" class="headerlink" title="Permanent link">&para;</a></h2>
 
 
   <div class="doc doc-contents ">
   
-      <p>String representation of the address, MSB first</p>
+      <p>String representation of the address, MSB first, with an optional type
+qualifier.</p>
 
       <details class="quote">
         <summary>Source code in <code>bumble/hci.py</code></summary>
-        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1810</span>
-<span class="normal">1811</span>
-<span class="normal">1812</span>
-<span class="normal">1813</span>
-<span class="normal">1814</span>
-<span class="normal">1815</span>
-<span class="normal">1816</span>
-<span class="normal">1817</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1798</span>
+<span class="normal">1799</span>
+<span class="normal">1800</span>
+<span class="normal">1801</span>
+<span class="normal">1802</span>
+<span class="normal">1803</span>
+<span class="normal">1804</span>
+<span class="normal">1805</span>
+<span class="normal">1806</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">to_string</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">with_type_qualifier</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
-<span class="sd">    String representation of the address, MSB first</span>
+<span class="sd">    String representation of the address, MSB first, with an optional type</span>
+<span class="sd">    qualifier.</span>
 <span class="sd">    &#39;&#39;&#39;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="s1">&#39;:&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">x</span><span class="si">:</span><span class="s1">02X</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">address_bytes</span><span class="p">)])</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_public</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">with_type_qualifier</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_public</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">result</span>
     <span class="k">return</span> <span class="n">result</span> <span class="o">+</span> <span class="s1">&#39;/P&#39;</span>
 </code></pre></div></td></tr></table></div>
@@ -1660,11 +1685,7 @@ the type is set to PUBLIC_DEVICE_ADDRESS.</p>
 
         <details class="quote">
           <summary>Source code in <code>bumble/hci.py</code></summary>
-          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1848</span>
-<span class="normal">1849</span>
-<span class="normal">1850</span>
-<span class="normal">1851</span>
-<span class="normal">1852</span>
+          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1852</span>
 <span class="normal">1853</span>
 <span class="normal">1854</span>
 <span class="normal">1855</span>
@@ -1689,7 +1710,11 @@ the type is set to PUBLIC_DEVICE_ADDRESS.</p>
 <span class="normal">1874</span>
 <span class="normal">1875</span>
 <span class="normal">1876</span>
-<span class="normal">1877</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">HCI_Packet</span><span class="p">:</span>
+<span class="normal">1877</span>
+<span class="normal">1878</span>
+<span class="normal">1879</span>
+<span class="normal">1880</span>
+<span class="normal">1881</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">HCI_Packet</span><span class="p">:</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Abstract Base class for HCI packets</span>
 <span class="sd">    &#39;&#39;&#39;</span>
@@ -1758,11 +1783,7 @@ the type is set to PUBLIC_DEVICE_ADDRESS.</p>
 
         <details class="quote">
           <summary>Source code in <code>bumble/hci.py</code></summary>
-          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1892</span>
-<span class="normal">1893</span>
-<span class="normal">1894</span>
-<span class="normal">1895</span>
-<span class="normal">1896</span>
+          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1896</span>
 <span class="normal">1897</span>
 <span class="normal">1898</span>
 <span class="normal">1899</span>
@@ -1854,7 +1875,11 @@ the type is set to PUBLIC_DEVICE_ADDRESS.</p>
 <span class="normal">1985</span>
 <span class="normal">1986</span>
 <span class="normal">1987</span>
-<span class="normal">1988</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">HCI_Command</span><span class="p">(</span><span class="n">HCI_Packet</span><span class="p">):</span>
+<span class="normal">1988</span>
+<span class="normal">1989</span>
+<span class="normal">1990</span>
+<span class="normal">1991</span>
+<span class="normal">1992</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">HCI_Command</span><span class="p">(</span><span class="n">HCI_Packet</span><span class="p">):</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    See Bluetooth spec @ Vol 2, Part E - 5.4.1 HCI Command Packet</span>
 <span class="sd">    &#39;&#39;&#39;</span>
@@ -1986,11 +2011,7 @@ the type is set to PUBLIC_DEVICE_ADDRESS.</p>
 
       <details class="quote">
         <summary>Source code in <code>bumble/hci.py</code></summary>
-        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1900</span>
-<span class="normal">1901</span>
-<span class="normal">1902</span>
-<span class="normal">1903</span>
-<span class="normal">1904</span>
+        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1904</span>
 <span class="normal">1905</span>
 <span class="normal">1906</span>
 <span class="normal">1907</span>
@@ -2013,7 +2034,11 @@ the type is set to PUBLIC_DEVICE_ADDRESS.</p>
 <span class="normal">1924</span>
 <span class="normal">1925</span>
 <span class="normal">1926</span>
-<span class="normal">1927</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">1927</span>
+<span class="normal">1928</span>
+<span class="normal">1929</span>
+<span class="normal">1930</span>
+<span class="normal">1931</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">command</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">(),</span> <span class="n">return_parameters_fields</span><span class="o">=</span><span class="p">()):</span>
     <span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Decorator used to declare and register subclasses</span>
@@ -2070,16 +2095,16 @@ the type is set to PUBLIC_DEVICE_ADDRESS.</p>
 
         <details class="quote">
           <summary>Source code in <code>bumble/hci.py</code></summary>
-          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2031</span>
-<span class="normal">2032</span>
-<span class="normal">2033</span>
-<span class="normal">2034</span>
-<span class="normal">2035</span>
+          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2035</span>
 <span class="normal">2036</span>
 <span class="normal">2037</span>
 <span class="normal">2038</span>
 <span class="normal">2039</span>
-<span class="normal">2040</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@HCI_Command</span><span class="o">.</span><span class="n">command</span><span class="p">(</span>
+<span class="normal">2040</span>
+<span class="normal">2041</span>
+<span class="normal">2042</span>
+<span class="normal">2043</span>
+<span class="normal">2044</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@HCI_Command</span><span class="o">.</span><span class="n">command</span><span class="p">(</span>
     <span class="p">[</span>
         <span class="p">(</span><span class="s1">&#39;connection_handle&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
         <span class="p">(</span><span class="s1">&#39;reason&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;mapper&#39;</span><span class="p">:</span> <span class="n">HCI_Constant</span><span class="o">.</span><span class="n">error_name</span><span class="p">}),</span>
