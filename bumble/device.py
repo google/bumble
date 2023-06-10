@@ -955,11 +955,15 @@ class Device(CompositeEventEmitter):
         return cls(config=config)
 
     @classmethod
+    def from_config_with_hci(cls, config, hci_source, hci_sink):
+        host = Host(controller_source=hci_source, controller_sink=hci_sink)
+        return cls(config=config, host=host)
+
+    @classmethod
     def from_config_file_with_hci(cls, filename, hci_source, hci_sink):
         config = DeviceConfiguration()
         config.load_from_file(filename)
-        host = Host(controller_source=hci_source, controller_sink=hci_sink)
-        return cls(config=config, host=host)
+        return cls.from_config_with_hci(config, hci_source, hci_sink)
 
     def __init__(
         self,
@@ -2441,7 +2445,7 @@ class Device(CompositeEventEmitter):
 
             if result.status != HCI_COMMAND_STATUS_PENDING:
                 logger.warning(
-                    'HCI_Set_Connection_Encryption_Command failed: '
+                    'HCI_Remote_Name_Request_Command failed: '
                     f'{HCI_Constant.error_name(result.status)}'
                 )
                 raise HCI_StatusError(result)

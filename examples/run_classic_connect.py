@@ -23,7 +23,7 @@ from bumble.colors import color
 
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
-from bumble.core import BT_BR_EDR_TRANSPORT, BT_L2CAP_PROTOCOL_ID
+from bumble.core import BT_BR_EDR_TRANSPORT, BT_L2CAP_PROTOCOL_ID, CommandTimeoutError
 from bumble.sdp import (
     Client as SDP_Client,
     SDP_PUBLIC_BROWSE_ROOT,
@@ -48,62 +48,70 @@ async def main():
         # Create a device
         device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
         device.classic_enabled = True
+        device.le_enabled = False
         await device.power_on()
 
-    async def connect(target_address):
-        print(f'=== Connecting to {target_address}...')
-        connection = await device.connect(target_address, transport=BT_BR_EDR_TRANSPORT)
-        print(f'=== Connected to {connection.peer_address}!')
-
-        # Connect to the SDP Server
-        sdp_client = SDP_Client(device)
-        await sdp_client.connect(connection)
-
-        # List all services in the root browse group
-        service_record_handles = await sdp_client.search_services(
-            [SDP_PUBLIC_BROWSE_ROOT]
-        )
-        print(color('\n==================================', 'blue'))
-        print(color('SERVICES:', 'yellow'), service_record_handles)
-
-        # For each service in the root browse group, get all its attributes
-        for service_record_handle in service_record_handles:
-            attributes = await sdp_client.get_attributes(
-                service_record_handle, [SDP_ALL_ATTRIBUTES_RANGE]
-            )
-            print(color(f'SERVICE {service_record_handle:04X} attributes:', 'yellow'))
-            for attribute in attributes:
-                print('  ', attribute.to_string(with_colors=True))
-
-        # Search for services with an L2CAP service attribute
-        search_result = await sdp_client.search_attributes(
-            [BT_L2CAP_PROTOCOL_ID], [SDP_ALL_ATTRIBUTES_RANGE]
-        )
-        print(color('\n==================================', 'blue'))
-        print(color('SEARCH RESULTS:', 'yellow'))
-        for attribute_list in search_result:
-            print(color('SERVICE:', 'green'))
-            print(
-                '  '
-                + '\n  '.join(
-                    [
-                        attribute.to_string(with_colors=True)
-                        for attribute in attribute_list
-                    ]
+        async def connect(target_address):
+            print(f'=== Connecting to {target_address}...')
+            try:
+                connection = await device.connect(
+                    target_address, transport=BT_BR_EDR_TRANSPORT
                 )
+            except CommandTimeoutError:
+                print('!!! Connection timed out')
+                return
+            print(f'=== Connected to {connection.peer_address}!')
+
+            # Connect to the SDP Server
+            sdp_client = SDP_Client(device)
+            await sdp_client.connect(connection)
+
+            # List all services in the root browse group
+            service_record_handles = await sdp_client.search_services(
+                [SDP_PUBLIC_BROWSE_ROOT]
             )
+            print(color('\n==================================', 'blue'))
+            print(color('SERVICES:', 'yellow'), service_record_handles)
 
-        await sdp_client.disconnect()
-        await hci_source.wait_for_termination()
+            # For each service in the root browse group, get all its attributes
+            for service_record_handle in service_record_handles:
+                attributes = await sdp_client.get_attributes(
+                    service_record_handle, [SDP_ALL_ATTRIBUTES_RANGE]
+                )
+                print(
+                    color(f'SERVICE {service_record_handle:04X} attributes:', 'yellow')
+                )
+                for attribute in attributes:
+                    print('  ', attribute.to_string(with_colors=True))
 
-    # Connect to a peer
-    target_addresses = sys.argv[3:]
-    await asyncio.wait(
-        [
-            asyncio.create_task(connect(target_address))
-            for target_address in target_addresses
-        ]
-    )
+            # Search for services with an L2CAP service attribute
+            search_result = await sdp_client.search_attributes(
+                [BT_L2CAP_PROTOCOL_ID], [SDP_ALL_ATTRIBUTES_RANGE]
+            )
+            print(color('\n==================================', 'blue'))
+            print(color('SEARCH RESULTS:', 'yellow'))
+            for attribute_list in search_result:
+                print(color('SERVICE:', 'green'))
+                print(
+                    '  '
+                    + '\n  '.join(
+                        [
+                            attribute.to_string(with_colors=True)
+                            for attribute in attribute_list
+                        ]
+                    )
+                )
+
+            await sdp_client.disconnect()
+
+        # Connect to a peer
+        target_addresses = sys.argv[3:]
+        await asyncio.wait(
+            [
+                asyncio.create_task(connect(target_address))
+                for target_address in target_addresses
+            ]
+        )
 
 
 # -----------------------------------------------------------------------------

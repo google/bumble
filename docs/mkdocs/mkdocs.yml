@@ -44,6 +44,7 @@ nav:
     - Overview: apps_and_tools/index.md
     - Console: apps_and_tools/console.md
     - Bench: apps_and_tools/bench.md
+    - Speaker: apps_and_tools/speaker.md
     - HCI Bridge: apps_and_tools/hci_bridge.md
     - Golden Gate Bridge: apps_and_tools/gg_bridge.md
     - Show: apps_and_tools/show.md

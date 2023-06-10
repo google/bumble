@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bumble Speaker</title>
+  <script type="text/javascript" src="speaker.js"></script>
+  <link rel="stylesheet" href="speaker.css">
+</head>
+<body>
+  <h1><img src="logo.svg" width=100 height=100 style="vertical-align:middle" alt=""/>Bumble Virtual Speaker</h1>
+  <div id="connectionText"></div>
+  <div id="speaker">
+    <table><tr>
+      <td>
+        <table id="propertiesTable" class="properties">
+          <tr><td>Codec</td><td><span id="codecText"></span></td></tr>
+          <tr><td>Packets</td><td><span id="packetsReceivedText"></span></td></tr>
+          <tr><td>Bytes</td><td><span id="bytesReceivedText"></span></td></tr>
+        </table>
+      </td>
+      <td>
+        <canvas id="bandwidthCanvas" width="500", height="100">Bandwidth Graph</canvas>
+      </td>
+    </tr></table>
+    <span id="streamStateText">IDLE</span>
+    <span id="connectionStateText">NOT CONNECTED</span>
+    <div id="controlsDiv">
+        <button id="audioOnButton">Audio On</button>
+        <span id="audioSupportMessageText"></span>
+    </div>
+    <canvas id="fftCanvas" width="1024", height="300">Audio Frequencies Animation</canvas>
+    <audio id="audio"></audio>
+  </div>
+</body>
+</html>

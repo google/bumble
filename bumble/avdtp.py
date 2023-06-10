@@ -1207,7 +1207,7 @@ class DelayReport_Reject(Simple_Reject):
 
 
 # -----------------------------------------------------------------------------
-class Protocol:
+class Protocol(EventEmitter):
     SINGLE_PACKET = 0
     START_PACKET = 1
     CONTINUE_PACKET = 2
@@ -1234,6 +1234,7 @@ class Protocol:
         return protocol
 
     def __init__(self, l2cap_channel, version=(1, 3)):
+        super().__init__()
         self.l2cap_channel = l2cap_channel
         self.version = version
         self.rtx_sig_timer = AVDTP_DEFAULT_RTX_SIG_TIMER
@@ -1250,6 +1251,7 @@ class Protocol:
         # Register to receive PDUs from the channel
         l2cap_channel.sink = self.on_pdu
         l2cap_channel.on('open', self.on_l2cap_channel_open)
+        l2cap_channel.on('close', self.on_l2cap_channel_close)
 
     def get_local_endpoint_by_seid(self, seid):
         if 0 < seid <= len(self.local_endpoints):
@@ -1392,11 +1394,18 @@ class Protocol:
 
     def on_l2cap_connection(self, channel):
         # Forward the channel to the endpoint that's expecting it
-        if self.channel_acceptor:
-            self.channel_acceptor.on_l2cap_connection(channel)
+        if self.channel_acceptor is None:
+            logger.warning(color('!!! l2cap connection with no acceptor', 'red'))
+            return
+        self.channel_acceptor.on_l2cap_connection(channel)
 
     def on_l2cap_channel_open(self):
         logger.debug(color('<<< L2CAP channel open', 'magenta'))
+        self.emit('open')
+
+    def on_l2cap_channel_close(self):
+        logger.debug(color('<<< L2CAP channel close', 'magenta'))
+        self.emit('close')
 
     def send_message(self, transaction_label, message):
         logger.debug(
@@ -1651,6 +1660,10 @@ class Listener(EventEmitter):
     def set_server(self, connection, server):
         self.servers[connection.handle] = server
 
+    def remove_server(self, connection):
+        if connection.handle in self.servers:
+            del self.servers[connection.handle]
+
     def __init__(self, registrar, version=(1, 3)):
         super().__init__()
         self.version = version
@@ -1669,11 +1682,17 @@ class Listener(EventEmitter):
         else:
             # This is a new command/response channel
             def on_channel_open():
+                logger.debug('setting up new Protocol for the connection')
                 server = Protocol(channel, self.version)
                 self.set_server(channel.connection, server)
                 self.emit('connection', server)
 
+            def on_channel_close():
+                logger.debug('removing Protocol for the connection')
+                self.remove_server(channel.connection)
+
             channel.on('open', on_channel_open)
+            channel.on('close', on_channel_close)
 
 
 # -----------------------------------------------------------------------------
@@ -1967,11 +1986,12 @@ class DiscoveredStreamEndPoint(StreamEndPoint, StreamEndPointProxy):
 
 
 # -----------------------------------------------------------------------------
-class LocalStreamEndPoint(StreamEndPoint):
+class LocalStreamEndPoint(StreamEndPoint, EventEmitter):
     def __init__(
         self, protocol, seid, media_type, tsep, capabilities, configuration=None
     ):
-        super().__init__(seid, media_type, tsep, 0, capabilities)
+        StreamEndPoint.__init__(self, seid, media_type, tsep, 0, capabilities)
+        EventEmitter.__init__(self)
         self.protocol = protocol
         self.configuration = configuration if configuration is not None else []
         self.stream = None
@@ -1988,40 +2008,47 @@ class LocalStreamEndPoint(StreamEndPoint):
     def on_reconfigure_command(self, command):
         pass
 
+    def on_set_configuration_command(self, configuration):
+        logger.debug(
+            '<<< received configuration: '
+            f'{",".join([str(capability) for capability in configuration])}'
+        )
+        self.configuration = configuration
+        self.emit('configuration')
+
     def on_get_configuration_command(self):
         return Get_Configuration_Response(self.configuration)
 
     def on_open_command(self):
-        pass
+        self.emit('open')
 
     def on_start_command(self):
-        pass
+        self.emit('start')
 
     def on_suspend_command(self):
-        pass
+        self.emit('suspend')
 
     def on_close_command(self):
-        pass
+        self.emit('close')
 
     def on_abort_command(self):
-        pass
+        self.emit('abort')
 
     def on_rtp_channel_open(self):
-        pass
+        self.emit('rtp_channel_open')
 
     def on_rtp_channel_close(self):
-        pass
+        self.emit('rtp_channel_close')
 
 
 # -----------------------------------------------------------------------------
-class LocalSource(LocalStreamEndPoint, EventEmitter):
+class LocalSource(LocalStreamEndPoint):
     def __init__(self, protocol, seid, codec_capabilities, packet_pump):
         capabilities = [
             ServiceCapabilities(AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY),
             codec_capabilities,
         ]
-        LocalStreamEndPoint.__init__(
-            self,
+        super().__init__(
             protocol,
             seid,
             codec_capabilities.media_type,
@@ -2029,25 +2056,19 @@ class LocalSource(LocalStreamEndPoint, EventEmitter):
             capabilities,
             capabilities,
         )
-        EventEmitter.__init__(self)
         self.packet_pump = packet_pump
 
     async def start(self):
         if self.packet_pump:
             return await self.packet_pump.start(self.stream.rtp_channel)
 
-        self.emit('start', self.stream.rtp_channel)
+        self.emit('start')
 
     async def stop(self):
         if self.packet_pump:
             return await self.packet_pump.stop()
 
         self.emit('stop')
-
-    def on_set_configuration_command(self, configuration):
-        # For now, blindly accept the configuration
-        logger.debug(f'<<< received source configuration: {configuration}')
-        self.configuration = configuration
 
     def on_start_command(self):
         asyncio.create_task(self.start())
@@ -2057,30 +2078,28 @@ class LocalSource(LocalStreamEndPoint, EventEmitter):
 
 
 # -----------------------------------------------------------------------------
-class LocalSink(LocalStreamEndPoint, EventEmitter):
+class LocalSink(LocalStreamEndPoint):
     def __init__(self, protocol, seid, codec_capabilities):
         capabilities = [
             ServiceCapabilities(AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY),
             codec_capabilities,
         ]
-        LocalStreamEndPoint.__init__(
-            self,
+        super().__init__(
             protocol,
             seid,
             codec_capabilities.media_type,
             AVDTP_TSEP_SNK,
             capabilities,
         )
-        EventEmitter.__init__(self)
-
-    def on_set_configuration_command(self, configuration):
-        # For now, blindly accept the configuration
-        logger.debug(f'<<< received sink configuration: {configuration}')
-        self.configuration = configuration
 
     def on_rtp_channel_open(self):
         logger.debug(color('<<< RTP channel open', 'magenta'))
         self.stream.rtp_channel.sink = self.on_avdtp_packet
+        super().on_rtp_channel_open()
+
+    def on_rtp_channel_close(self):
+        logger.debug(color('<<< RTP channel close', 'magenta'))
+        super().on_rtp_channel_close()
 
     def on_avdtp_packet(self, packet):
         rtp_packet = MediaPacket.from_bytes(packet)

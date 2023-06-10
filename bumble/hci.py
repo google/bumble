@@ -62,7 +62,7 @@ def map_null_terminated_utf8_string(utf8_bytes):
     try:
         terminator = utf8_bytes.find(0)
         if terminator < 0:
-            return utf8_bytes
+            terminator = len(utf8_bytes)
         return utf8_bytes[0:terminator].decode('utf8')
     except UnicodeDecodeError:
         return utf8_bytes
@@ -1795,6 +1795,16 @@ class Address:
     def to_bytes(self):
         return self.address_bytes
 
+    def to_string(self, with_type_qualifier=True):
+        '''
+        String representation of the address, MSB first, with an optional type
+        qualifier.
+        '''
+        result = ':'.join([f'{x:02X}' for x in reversed(self.address_bytes)])
+        if not with_type_qualifier or not self.is_public:
+            return result
+        return result + '/P'
+
     def __bytes__(self):
         return self.to_bytes()
 
@@ -1808,13 +1818,7 @@ class Address:
         )
 
     def __str__(self):
-        '''
-        String representation of the address, MSB first
-        '''
-        result = ':'.join([f'{x:02X}' for x in reversed(self.address_bytes)])
-        if not self.is_public:
-            return result
-        return result + '/P'
+        return self.to_string()
 
 
 # Predefined address values
@@ -5373,7 +5377,7 @@ class HCI_AclDataPacket:
     def __str__(self):
         return (
             f'{color("ACL", "blue")}: '
-            f'handle=0x{self.connection_handle:04x}'
+            f'handle=0x{self.connection_handle:04x}, '
             f'pb={self.pb_flag}, bc={self.bc_flag}, '
             f'data_total_length={self.data_total_length}, '
             f'data={self.data.hex()}'
