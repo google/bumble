@@ -157,6 +157,26 @@ class Delegate(PairingDelegate):
         self.print(f'### PIN: {number:0{digits}}')
         self.print('###-----------------------------------')
 
+    async def get_string(self, max_length: int):
+        await self.update_peer_name()
+
+        # Prompt a PIN (for legacy pairing in classic)
+        self.print('###-----------------------------------')
+        self.print(f'### Pairing with {self.peer_name}')
+        self.print('###-----------------------------------')
+        count = 0
+        while True:
+            response = await self.prompt('>>> Enter PIN (1-6 chars):')
+            if len(response) == 0:
+                count += 1
+                if count > 3:
+                    self.print('too many tries, stopping the pairing')
+                    return None
+
+                self.print('no PIN was entered, try again')
+                continue
+            return response
+
 
 # -----------------------------------------------------------------------------
 async def get_peer_name(peer, mode):
