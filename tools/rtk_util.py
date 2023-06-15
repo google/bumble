@@ -1,4 +1,4 @@
-# Copyright 2021-2022 Google LLC
+# Copyright 2021-2023 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +36,10 @@ def do_parse(firmware_path):
     with open(firmware_path, 'rb') as firmware_file:
         firmware_data = firmware_file.read()
         firmware = rtk.Firmware(firmware_data)
-        print(f'Firmware: version=0x{firmware.version:08X} project_id=0x{firmware.project_id:04X}')
+        print(
+            f"Firmware: version=0x{firmware.version:08X} "
+            f"project_id=0x{firmware.project_id:04X}"
+        )
         for patch in firmware.patches:
             print(
                 f"  Patch: chip_id=0x{patch[0]:04X}, "
@@ -110,7 +113,7 @@ async def do_info(usb_transport, force):
 # -----------------------------------------------------------------------------
 @click.group()
 def main():
-    pass
+    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
 
 
 @main.command
@@ -155,5 +158,4 @@ def info(usb_transport, force):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     main()
