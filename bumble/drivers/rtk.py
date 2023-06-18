@@ -414,7 +414,7 @@ class Driver:
             return None
 
         # Then, look in the package's driver directory
-        directory = pathlib.Path(__file__).parent / "rtl"
+        directory = pathlib.Path(__file__).parent / "rtk_fw"
         if directory.is_dir() and (path := (directory / file_name)).is_file():
             logger.debug(f"{file_name} found in package dir")
             return path
@@ -482,7 +482,8 @@ class Driver:
         # Load the firmware
         firmware_path = cls.find_binary_path(driver_info.fw_name)
         if not firmware_path:
-            logger.warning("Firmware file not found")
+            logger.warning(f"Firmware file {driver_info.fw_name} not found")
+            logger.warning("See https://google.github.io/bumble/drivers/realtek.html")
             return None
         with open(firmware_path, "rb") as firmware_file:
             firmware = firmware_file.read()
