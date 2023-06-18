@@ -256,7 +256,7 @@ class Firmware:
                     chip_id,
                     firmware[patch_offset : patch_offset + patch_length - 4]
                     + struct.pack("<I", self.version),
-                    svn_version
+                    svn_version,
                 )
             )
 

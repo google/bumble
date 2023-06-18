@@ -61,7 +61,7 @@ async def get_driver_for_host(host):
     """Probe all known diver classes until one returns a valid instance for a host,
     or none is found.
     """
-    if (driver := await rtk.Driver.for_host(host)):
+    if driver := await rtk.Driver.for_host(host):
         logger.debug("Instantiated RTK driver")
         return driver
 

@@ -46,7 +46,7 @@ REALTEK_OPENSOURCE_SOURCE = (
 )
 LINUX_FROM_SCRATCH_SOURCE = (
     "https://anduin.linuxfromscratch.org/sources/linux-firmware/rtl_bt",
-    False
+    False,
 )
 
 # -----------------------------------------------------------------------------
@@ -92,7 +92,7 @@ def main(output_dir, source, single, force, parse):
     base_url, remove_suffix = {
         "linux-kernel": LINUX_KERNEL_GIT_SOURCE,
         "realtek-opensource": REALTEK_OPENSOURCE_SOURCE,
-        "linux-from-scratch": LINUX_FROM_SCRATCH_SOURCE
+        "linux-from-scratch": LINUX_FROM_SCRATCH_SOURCE,
     }[source]
 
     print("Downloading")
@@ -103,11 +103,7 @@ def main(output_dir, source, single, force, parse):
         images = [(f"{single}_fw.bin", f"{single}_config.bin", True)]
     else:
         images = [
-            (
-                driver_info.fw_name,
-                driver_info.config_name,
-                driver_info.config_needed
-            )
+            (driver_info.fw_name, driver_info.config_name, driver_info.config_needed)
             for driver_info in rtk.Driver.DRIVER_INFOS
         ]
 

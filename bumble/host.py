@@ -175,7 +175,7 @@ class Host(AbortableEventEmitter):
         self.emit('flush')
         self.command_semaphore.release()
 
-    async def reset(self, raw=False):
+    async def reset(self, driver_factory=drivers.get_driver_for_host):
         if self.ready:
             self.ready = False
             await self.flush()
@@ -188,8 +188,8 @@ class Host(AbortableEventEmitter):
         # currently have a need for the driver later on. But if the driver interface
         # evolves, it may be required, then, to store a reference to the driver in
         # an object property.
-        if not raw:
-            if (driver :=  await drivers.get_driver_for_host(self)):
+        if driver_factory is not None:
+            if driver := await driver_factory(self):
                 await driver.init_controller()
 
         response = await self.send_command(
