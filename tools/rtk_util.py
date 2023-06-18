@@ -56,7 +56,7 @@ async def do_load(usb_transport, force):
     ):
         # Create a host to communicate with the device
         host = Host(hci_source, hci_sink)
-        await host.reset(raw=True)
+        await host.reset(driver_factory=None)
 
         # Get the driver.
         driver = await rtk.Driver.for_host(host, force)
@@ -76,7 +76,7 @@ async def do_drop(usb_transport):
     ):
         # Create a host to communicate with the device
         host = Host(hci_source, hci_sink)
-        await host.reset(raw=True)
+        await host.reset(driver_factory=None)
 
         # Tell the device to reset/drop any loaded patch
         await rtk.Driver.drop_firmware(host)
@@ -90,7 +90,7 @@ async def do_info(usb_transport, force):
     ):
         # Create a host to communicate with the device
         host = Host(hci_source, hci_sink)
-        await host.reset(raw=True)
+        await host.reset(driver_factory=None)
 
         # Check if this is a supported device.
         if not force and not rtk.Driver.check(host):

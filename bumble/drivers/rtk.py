@@ -115,34 +115,61 @@ RTK_USB_PRODUCTS = {
     (0x0BDA, 0xB009),
     (0x2FF8, 0xB011),
     # Realtek 8761BUV
-    (0x2357, 0x0604),
     (0x0B05, 0x190E),
-    (0x2550, 0x8761),
     (0x0BDA, 0x8771),
-    (0x7392, 0xC611),
-    (0x2B89, 0x8761),
     (0x2230, 0x0016),
+    (0x2357, 0x0604),
+    (0x2550, 0x8761),
+    (0x2B89, 0x8761),
+    (0x7392, 0xC611),
     # Realtek 8821AE
     (0x0B05, 0x17DC),
     (0x13D3, 0x3414),
     (0x13D3, 0x3458),
     (0x13D3, 0x3461),
     (0x13D3, 0x3462),
+    # Realtek 8821CE
+    (0x0BDA, 0xB00C),
+    (0x0BDA, 0xC822),
+    (0x13D3, 0x3529),
     # Realtek 8822BE
-    (0x13D3, 0x3526),
     (0x0B05, 0x185C),
+    (0x13D3, 0x3526),
     # Realtek 8822CE
-    (0x04CA, 0x4005),
     (0x04C5, 0x161F),
+    (0x04CA, 0x4005),
     (0x0B05, 0x18EF),
+    (0x0BDA, 0xB00C),
+    (0x0BDA, 0xC123),
+    (0x0BDA, 0xC822),
+    (0x0CB5, 0xC547),
+    (0x1358, 0xC123),
     (0x13D3, 0x3548),
     (0x13D3, 0x3549),
     (0x13D3, 0x3553),
     (0x13D3, 0x3555),
     (0x2FF8, 0x3051),
-    (0x1358, 0xC123),
-    (0x0BDA, 0xC123),
-    (0x0CB5, 0xC547),
+    # Realtek 8822CU
+    (0x13D3, 0x3549),
+    # Realtek 8852AE
+    (0x04C5, 0x165C),
+    (0x04CA, 0x4006),
+    (0x0BDA, 0x2852),
+    (0x0BDA, 0x385A),
+    (0x0BDA, 0x4852),
+    (0x0BDA, 0xC852),
+    (0x0CB8, 0xC549),
+    # Realtek 8852BE
+    (0x0BDA, 0x887B),
+    (0x0CB8, 0xC559),
+    (0x13D3, 0x3571),
+    # Realtek 8852CE
+    (0x04C5, 0x1675),
+    (0x04CA, 0x4007),
+    (0x0CB8, 0xC558),
+    (0x13D3, 0x3586),
+    (0x13D3, 0x3587),
+    (0x13D3, 0x3592),
 }
 
 # -----------------------------------------------------------------------------
@@ -406,7 +433,9 @@ class Driver:
     def find_binary_path(file_name):
         # First check if an environment variable is set
         if RTK_FIRMWARE_DIR_ENV in os.environ:
-            if (path := pathlib.Path(os.environ[RTK_FIRMWARE_DIR_ENV])).is_file():
+            if (
+                path := pathlib.Path(os.environ[RTK_FIRMWARE_DIR_ENV]) / file_name
+            ).is_file():
                 logger.debug(f"{file_name} found in env dir")
                 return path
 
@@ -414,13 +443,12 @@ class Driver:
             return None
 
         # Then, look in the package's driver directory
-        directory = pathlib.Path(__file__).parent / "rtk_fw"
-        if directory.is_dir() and (path := (directory / file_name)).is_file():
+        if (path := pathlib.Path(__file__).parent / "rtk_fw" / file_name).is_file():
             logger.debug(f"{file_name} found in package dir")
             return path
 
         # Finally look in the current directory
-        if (path := (pathlib.Path.cwd() / file_name)).is_file():
+        if (path := pathlib.Path.cwd() / file_name).is_file():
             logger.debug(f"{file_name} found in CWD")
             return path
 
@@ -439,7 +467,9 @@ class Driver:
             return False
 
         if (vendor_id, product_id) not in RTK_USB_PRODUCTS:
-            logger.debug("USB device not in known list")
+            logger.debug(
+                f"USB device ({vendor_id:04X}, {product_id:04X}) " "not in known list"
+            )
             return False
 
         return True
@@ -493,7 +523,7 @@ class Driver:
         if driver_info.config_name:
             config_path = cls.find_binary_path(driver_info.config_name)
             if config_path:
-                with open(driver_info.config_name, "rb") as config_file:
+                with open(config_path, "rb") as config_file:
                     config = config_file.read()
         if driver_info.config_needed and not config:
             logger.warning("Config needed, but no config file available")
