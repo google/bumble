@@ -185,7 +185,7 @@ HCI_IO_CAPABILITY_REQUEST_EVENT                                  = 0x31
 HCI_IO_CAPABILITY_RESPONSE_EVENT                                 = 0x32
 HCI_USER_CONFIRMATION_REQUEST_EVENT                              = 0x33
 HCI_USER_PASSKEY_REQUEST_EVENT                                   = 0x34
-HCI_REMOTE_OOB_DATA_REQUEST                                      = 0x35
+HCI_REMOTE_OOB_DATA_REQUEST_EVENT                                = 0x35
 HCI_SIMPLE_PAIRING_COMPLETE_EVENT                                = 0x36
 HCI_LINK_SUPERVISION_TIMEOUT_CHANGED_EVENT                       = 0x38
 HCI_ENHANCED_FLUSH_COMPLETE_EVENT                                = 0x39
@@ -2288,6 +2288,55 @@ class HCI_User_Passkey_Request_Negative_Reply_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
+    fields=[
+        ('bd_addr', Address.parse_address),
+        ('c', 16),
+        ('r', 16),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
+)
+class HCI_Remote_OOB_Data_Request_Reply_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.34 Remote OOB Data Request Reply Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[('bd_addr', Address.parse_address)],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
+)
+class HCI_Remote_OOB_Data_Request_Negative_Reply_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.35 Remote OOB Data Request Negative Reply Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('bd_addr', Address.parse_address),
+        ('reason', 1),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
+)
+class HCI_IO_Capability_Request_Negative_Reply_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.36 IO Capability Request Negative Reply Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
     [
         ('connection_handle', 2),
         ('transmit_bandwidth', 4),
@@ -2318,6 +2367,161 @@ class HCI_User_Passkey_Request_Negative_Reply_Command(HCI_Command):
 class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.45 Enhanced Setup Synchronous Connection Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('bd_addr', Address.parse_address),
+        ('transmit_bandwidth', 4),
+        ('receive_bandwidth', 4),
+        ('transmit_coding_format', 5),
+        ('receive_coding_format', 5),
+        ('transmit_codec_frame_size', 2),
+        ('receive_codec_frame_size', 2),
+        ('input_bandwidth', 4),
+        ('output_bandwidth', 4),
+        ('input_coding_format', 5),
+        ('output_coding_format', 5),
+        ('input_coded_data_size', 2),
+        ('output_coded_data_size', 2),
+        ('input_pcm_data_format', 1),
+        ('output_pcm_data_format', 1),
+        ('input_pcm_sample_payload_msb_position', 1),
+        ('output_pcm_sample_payload_msb_position', 1),
+        ('input_data_path', 1),
+        ('output_data_path', 1),
+        ('input_transport_unit_size', 1),
+        ('output_transport_unit_size', 1),
+        ('max_latency', 2),
+        ('packet_type', 2),
+        ('retransmission_effort', 1),
+    ]
+)
+class HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.46 Enhanced Accept Synchronous Connection Request Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('bd_addr', Address.parse_address),
+        ('page_scan_repetition_mode', 1),
+        ('clock_offset', 2),
+    ]
+)
+class HCI_Truncated_Page_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.47 Truncated Page Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[('bd_addr', Address.parse_address)],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
+)
+class HCI_Truncated_Page_Cancel_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.48 Truncated Page Cancel Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('enable', 1),
+        ('lt_addr', 1),
+        ('lpo_allowed', 1),
+        ('packet_type', 2),
+        ('interval_min', 2),
+        ('interval_max', 2),
+        ('supervision_timeout', 2),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('lt_addr', 1),
+        ('interval', 2),
+    ],
+)
+class HCI_Set_Connectionless_Peripheral_Broadcast_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.49 Set Connectionless Peripheral Broadcast Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('enable', 1),
+        ('bd_addr', Address.parse_address),
+        ('lt_addr', 1),
+        ('interval', 2),
+        ('clock_offset', 4),
+        ('next_connectionless_peripheral_broadcast_clock', 4),
+        ('supervision_timeout', 2),
+        ('remote_timing_accuracy', 1),
+        ('skip', 1),
+        ('packet_type', 2),
+        ('afh_channel_map', 10),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+        ('lt_addr', 1),
+    ],
+)
+class HCI_Set_Connectionless_Peripheral_Broadcast_Receive_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.50 Set Connectionless Peripheral Broadcast Receive Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+class HCI_Start_Synchronization_Train_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.51 Start Synchronization Train Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('bd_addr', Address.parse_address),
+        ('sync_scan_timeout', 2),
+        ('sync_scan_window', 2),
+        ('sync_scan_interval', 2),
+    ],
+)
+class HCI_Receive_Synchronization_Train_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.52 Receive Synchronization Train Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('bd_addr', Address.parse_address),
+        ('c_192', 16),
+        ('r_192', 16),
+        ('c_256', 16),
+        ('r_256', 16),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ],
+)
+class HCI_Remote_OOB_Extended_Data_Request_Reply_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.53 Remote OOB Extended Data Request Reply Command
     '''
 
 
@@ -2689,6 +2893,20 @@ class HCI_Write_Simple_Pairing_Mode_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('c', 16),
+        ('r', 16),
+    ]
+)
+class HCI_Read_Local_OOB_Data_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.3.60 Read Local OOB Data Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
     return_parameters_fields=[('status', STATUS_SPEC), ('tx_power', -1)]
 )
 class HCI_Read_Inquiry_Response_Transmit_Power_Level_Command(HCI_Command):
@@ -2744,6 +2962,22 @@ class HCI_Write_Secure_Connections_Host_Support_Command(HCI_Command):
 class HCI_Write_Authenticated_Payload_Timeout_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.94 Write Authenticated Payload Timeout Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('c_192', 16),
+        ('r_192', 16),
+        ('c_256', 16),
+        ('r_256', 16),
+    ]
+)
+class HCI_Read_Local_OOB_Extended_Data_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.3.95 Read Local OOB Extended Data Command
     '''
 
 
@@ -5304,6 +5538,14 @@ class HCI_User_Passkey_Request_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
+@HCI_Event.event([('bd_addr', Address.parse_address)])
+class HCI_Remote_OOB_Data_Request_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 7.7.44 Remote OOB Data Request Event
+    '''
+
+
+# -----------------------------------------------------------------------------
 @HCI_Event.event([('status', STATUS_SPEC), ('bd_addr', Address.parse_address)])
 class HCI_Simple_Pairing_Complete_Event(HCI_Event):
     '''
@@ -5320,10 +5562,26 @@ class HCI_Link_Supervision_Timeout_Changed_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
+@HCI_Event.event([('handle', 2)])
+class HCI_Enhanced_Flush_Complete_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 7.7.47 Enhanced Flush Complete Event
+    '''
+
+
+# -----------------------------------------------------------------------------
 @HCI_Event.event([('bd_addr', Address.parse_address), ('passkey', 4)])
 class HCI_User_Passkey_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.48 User Passkey Notification Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Event.event([('bd_addr', Address.parse_address), ('notification_type', 1)])
+class HCI_Keypress_Notification_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 7.7.49 Keypress Notification Event
     '''
 
 
