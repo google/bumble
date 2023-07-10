@@ -27,6 +27,7 @@ import logging
 import math
 import os
 import pathlib
+import platform
 import struct
 from typing import Tuple
 import weakref
@@ -65,6 +66,7 @@ RTK_EPATCH_SIGNATURE = b"Realtech"
 RTK_FRAGMENT_LENGTH = 252
 
 RTK_FIRMWARE_DIR_ENV = "BUMBLE_RTK_FIRMWARE_DIR"
+RTK_LINUX_FIRMWARE_DIR = "/lib/firmware/rtl_bt"
 
 
 class RtlProjectId(enum.IntEnum):
@@ -448,6 +450,14 @@ class Driver:
             logger.debug(f"{file_name} found in package dir")
             return path
 
+        # On Linux, check the system's FW directory
+        if (
+            platform.system() == "Linux"
+            and (path := pathlib.Path(RTK_LINUX_FIRMWARE_DIR) / file_name).is_file()
+        ):
+            logger.debug(f"{file_name} found in Linux system FW dir")
+            return path
+
         # Finally look in the current directory
         if (path := pathlib.Path.cwd() / file_name).is_file():
             logger.debug(f"{file_name} found in CWD")
@@ -507,7 +517,8 @@ class Driver:
             return None
 
         # Get the driver info
-        if (driver_info := await cls.driver_info_for_host(host)) is None:
+        driver_info = await cls.driver_info_for_host(host)
+        if driver_info is None:
             return None
 
         # Load the firmware
