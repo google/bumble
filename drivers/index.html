@@ -9,17 +9,17 @@
       
       
       
-        <link rel="prev" href="python_environments.html">
+        <link rel="prev" href="../transports/file.html">
       
       
-        <link rel="next" href="code_style.html">
+        <link rel="next" href="realtek.html">
       
       <link rel="icon" href="../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.4.3, mkdocs-material-9.1.16">
     
     
       
-        <title>Contributing - Bumble</title>
+        <title>Overview - Bumble</title>
       
     
     
@@ -63,7 +63,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#contributing-to-the-project" class="md-skip">
+        <a href="#drivers" class="md-skip">
           Skip to content
         </a>
       
@@ -97,7 +97,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Contributing
+              Overview
             
           </span>
         </div>
@@ -201,16 +201,14 @@
 
   
   
-    
-  
   
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
       
       
       
@@ -219,7 +217,7 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
         <label class="md-nav__title" for="__nav_3">
           <span class="md-nav__icon md-icon"></span>
           Development
@@ -232,7 +230,7 @@
   
   
     <li class="md-nav__item">
-      <a href="python_environments.html" class="md-nav__link">
+      <a href="../development/python_environments.html" class="md-nav__link">
         Python Environments
       </a>
     </li>
@@ -244,21 +242,11 @@
               
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="contributing.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../development/contributing.html" class="md-nav__link">
         Contributing
       </a>
-      
     </li>
   
 
@@ -270,7 +258,7 @@
   
   
     <li class="md-nav__item">
-      <a href="code_style.html" class="md-nav__link">
+      <a href="../development/code_style.html" class="md-nav__link">
         Code Style
       </a>
     </li>
@@ -731,14 +719,16 @@
 
   
   
+    
+  
   
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
       
       
       
-      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+      <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
       
       
       
@@ -747,7 +737,7 @@
           <span class="md-nav__icon md-icon"></span>
         </label>
       
-      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+      <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
         <label class="md-nav__title" for="__nav_7">
           <span class="md-nav__icon md-icon"></span>
           Drivers
@@ -758,11 +748,21 @@
               
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../drivers/index.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="index.html" class="md-nav__link md-nav__link--active">
         Overview
       </a>
+      
     </li>
   
 
@@ -774,7 +774,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../drivers/realtek.html" class="md-nav__link">
+      <a href="realtek.html" class="md-nav__link">
         Realtek
       </a>
     </li>
@@ -1304,12 +1304,14 @@
                   
 
 
-<h1 id="contributing-to-the-project">CONTRIBUTING TO THE PROJECT<a class="headerlink" href="#contributing-to-the-project" title="Permanent link">&para;</a></h1>
-<p>To contribute some code to the project, you will need to submit a GitHub Pull Request (a.k.a PR). Please familiarize yourself with how that works (see <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests">GitHub Pull Requests</a>)</p>
-<p>You should follow the project's <a href="code_style.html">code style</a>, and pre-check your code before submitting a PR. The GitHub project is set up with some <a href="https://github.com/features/actions">Actions</a> that will check that a PR passes at least the basic tests and complies with the coding style, but it is still recommended to check that for yourself before submitting a PR. 
-To run the basic checks (essentially: running the tests, the linter, and the formatter), use the <code>project.pre-commit</code> <code>invoke</code> command, and address any issues found:</p>
-<div class="highlight"><pre><span></span><code>$ invoke project.pre-commit
-</code></pre></div>
+<h1 id="drivers">DRIVERS<a class="headerlink" href="#drivers" title="Permanent link">&para;</a></h1>
+<p>Some Bluetooth controllers require a driver to function properly.
+This may include, for instance, loading a Firmware image or patch,
+loading a configuration.</p>
+<p>Drivers included in the module are:</p>
+<ul>
+<li><a href="realtek.html">Realtek</a>: Loading of Firmware and Config for Realtek USB dongles.</li>
+</ul>
 
 
 
@@ -1330,7 +1332,7 @@ To run the basic checks (essentially: running the tests, the linter, and the for
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
         
-          <a href="python_environments.html" title="Python Environments" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+          <a href="../transports/file.html" title="File" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
             <div class="md-flex__cell md-flex__cell--shrink">
               <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
             </div>
@@ -1339,19 +1341,19 @@ To run the basic checks (essentially: running the tests, the linter, and the for
                 <span class="md-footer-nav__direction">
                   Previous
                 </span>
-                Python Environments
+                File
               </span>
             </div>
           </a>
         
         
-          <a href="code_style.html" title="Code Style" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
+          <a href="realtek.html" title="Realtek" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
               <span class="md-flex__ellipsis">
                 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                Code Style
+                Realtek
               </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink">
