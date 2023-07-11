@@ -1641,9 +1641,11 @@ class HCI_Object:
             # Get the value for the field
             value = hci_object[key]
 
-            # Map the value if needed
+            # Check if there's a matching mapper passed
             if value_mappers:
                 value_mapper = value_mappers.get(key, value_mapper)
+
+            # Map the value if we have a mapper
             if value_mapper is not None:
                 value = value_mapper(value)
 

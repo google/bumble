@@ -36,6 +36,9 @@ nav:
     - HCI Socket: transports/hci_socket.md
     - Android Emulator: transports/android_emulator.md
     - File: transports/file.md
+  - Drivers:
+    - Overview: drivers/index.md
+    - Realtek: drivers/realtek.md
   - API:
     - Guide: api/guide.md
     - Examples: api/examples.md
