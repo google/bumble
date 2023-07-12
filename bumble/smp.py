@@ -1701,6 +1701,13 @@ class Session:
         self.peer_signature_key = command.signature_key
         self.check_key_distribution(SMP_Signing_Information_Command)
 
+    def on_smp_security_request_command(
+        self, _command: SMP_Security_Request_Command
+    ) -> None:
+        # TODO: should check for `command.auth_req` being supported
+        # TODO: should check for current state (ie. not already pairing)
+        self.send_pairing_request_command()
+
 
 # -----------------------------------------------------------------------------
 class Manager(EventEmitter):
