@@ -858,10 +858,13 @@ class Session:
             self.tk = self.passkey.to_bytes(16, byteorder='little')
             logger.debug(f'TK from passkey = {self.tk.hex()}')
 
-        self.connection.abort_on(
-            'disconnection',
-            self.pairing_config.delegate.display_number(self.passkey, digits=6),
-        )
+        try:
+            self.connection.abort_on(
+                'disconnection',
+                self.pairing_config.delegate.display_number(self.passkey, digits=6),
+            )
+        except Exception as error:
+            logger.warning(f'exception while displaying number: {error}')
 
     def input_passkey(self, next_steps: Optional[Callable[[], None]] = None) -> None:
         # Prompt the user for the passkey displayed on the peer
@@ -1300,7 +1303,11 @@ class Session:
         self, command: SMP_Pairing_Request_Command
     ) -> None:
         # Check if the request should proceed
-        accepted = await self.pairing_config.delegate.accept()
+        try:
+            accepted = await self.pairing_config.delegate.accept()
+        except Exception as error:
+            logger.warning(f'exception while accepting: {error}')
+            accepted = False
         if not accepted:
             logger.debug('pairing rejected by delegate')
             self.send_pairing_failed(SMP_PAIRING_NOT_SUPPORTED_ERROR)

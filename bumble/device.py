@@ -2851,18 +2851,22 @@ class Device(CompositeEventEmitter):
         method = methods[peer_io_capability][io_capability]
 
         async def reply() -> None:
-            if await connection.abort_on('disconnection', method()):
-                await self.host.send_command(
-                    HCI_User_Confirmation_Request_Reply_Command(  # type: ignore[call-arg]
-                        bd_addr=connection.peer_address
+            try:
+                if await connection.abort_on('disconnection', method()):
+                    await self.host.send_command(
+                        HCI_User_Confirmation_Request_Reply_Command(  # type: ignore[call-arg]
+                            bd_addr=connection.peer_address
+                        )
                     )
+                    return
+            except Exception as error:
+                logger.warning(f'exception while confirming: {error}')
+
+            await self.host.send_command(
+                HCI_User_Confirmation_Request_Negative_Reply_Command(  # type: ignore[call-arg]
+                    bd_addr=connection.peer_address
                 )
-            else:
-                await self.host.send_command(
-                    HCI_User_Confirmation_Request_Negative_Reply_Command(  # type: ignore[call-arg]
-                        bd_addr=connection.peer_address
-                    )
-                )
+            )
 
         AsyncRunner.spawn(reply())
 
@@ -2874,21 +2878,25 @@ class Device(CompositeEventEmitter):
         pairing_config = self.pairing_config_factory(connection)
 
         async def reply() -> None:
-            number = await connection.abort_on(
-                'disconnection', pairing_config.delegate.get_number()
+            try:
+                number = await connection.abort_on(
+                    'disconnection', pairing_config.delegate.get_number()
+                )
+                if number is not None:
+                    await self.host.send_command(
+                        HCI_User_Passkey_Request_Reply_Command(  # type: ignore[call-arg]
+                            bd_addr=connection.peer_address, numeric_value=number
+                        )
+                    )
+                    return
+            except Exception as error:
+                logger.warning(f'exception while asking for pass-key: {error}')
+
+            await self.host.send_command(
+                HCI_User_Passkey_Request_Negative_Reply_Command(  # type: ignore[call-arg]
+                    bd_addr=connection.peer_address
+                )
             )
-            if number is not None:
-                await self.host.send_command(
-                    HCI_User_Passkey_Request_Reply_Command(  # type: ignore[call-arg]
-                        bd_addr=connection.peer_address, numeric_value=number
-                    )
-                )
-            else:
-                await self.host.send_command(
-                    HCI_User_Passkey_Request_Negative_Reply_Command(  # type: ignore[call-arg]
-                        bd_addr=connection.peer_address
-                    )
-                )
 
         AsyncRunner.spawn(reply())
 
