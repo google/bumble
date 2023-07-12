@@ -58,7 +58,7 @@ from .hci import (
     HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
     HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
     HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
-    HCI_R2_PAGE_SCAN_REPETITION_MODE,
+    HCI_R0_PAGE_SCAN_REPETITION_MODE,
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     HCI_SUCCESS,
     HCI_WRITE_LE_HOST_SUPPORT_COMMAND,
@@ -1842,7 +1842,7 @@ class Device(CompositeEventEmitter):
                     HCI_Create_Connection_Command(
                         bd_addr=peer_address,
                         packet_type=0xCC18,  # FIXME: change
-                        page_scan_repetition_mode=HCI_R2_PAGE_SCAN_REPETITION_MODE,
+                        page_scan_repetition_mode=HCI_R0_PAGE_SCAN_REPETITION_MODE,
                         clock_offset=0x0000,
                         allow_role_switch=0x01,
                         reserved=0,
