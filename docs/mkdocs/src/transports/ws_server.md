@@ -1,11 +1,13 @@
-UDP TRANSPORT
-=============
+WEBSOCKET SERVER TRANSPORT
+==========================
 
-The UDP transport is a UDP socket, receiving packets on a specified port number, and sending packets to a specified host and port number.
+The WebSocket Server transport is WebSocket server that accepts connections from a WebSocket
+client. HCI packets are sent and received over the connection.
 
 ## Moniker
-The moniker syntax for a UDP transport is: `udp:<local-host>:<local-port>,<remote-host>:<remote-port>`.
+The moniker syntax for a WebSocket Server transport is: `ws-server:<host>:<port>`,
+where `<host>` may be the address of a local network interface, or `_`to accept connections on all local network interfaces. `<port>` is the TCP port number on which to accept connections.
+
 
 !!! example
-    `udp:0.0.0.0:9000,127.0.0.1:9001`
-    UDP transport where packets are received on port `9000` and sent to `127.0.0.1` on port `9001`
+    `ws-server:_:9001`
