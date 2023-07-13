@@ -62,7 +62,7 @@ async def main():
             print(
                 f'>>> {color(advertisement.address, address_color)} '
                 f'[{color(address_type_string, type_color)}]'
-                f'{address_qualifier}:{separator}RSSI:{advertisement.rssi}'
+                f'{address_qualifier}:{separator}RSSI: {advertisement.rssi}'
                 f'{separator}'
                 f'{advertisement.data.to_string(separator)}'
             )
