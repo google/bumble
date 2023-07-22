@@ -825,6 +825,15 @@ class Controller:
             ret = HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR
         return bytes([ret])
 
+    def on_hci_set_controller_to_host_flow_control_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.3.38 Set Controller To Host Flow Control
+        Command
+        '''
+        # For now we just accept the command but ignore the values.
+        # TODO: respect the passed in values.
+        return bytes([HCI_SUCCESS])
+
     def on_hci_host_buffer_size_command(self, _command):
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.39 Host Buffer Size Command
