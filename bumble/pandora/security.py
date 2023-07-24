@@ -119,7 +119,7 @@ class PairingDelegate(BasePairingDelegate):
         )
 
         if self.service.event_queue is None or self.service.event_answer is None:
-            raise RuntimeError('security: unhandled number comparison request')
+            return True
 
         event = self.add_origin(PairingEvent(numeric_comparison=number))
         self.service.event_queue.put_nowait(event)
