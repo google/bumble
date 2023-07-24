@@ -111,7 +111,7 @@ class PairingDelegate:
         return self.io_capability
 
     async def accept(self) -> bool:
-        """Accept or reject a Pairing request."""
+        """Accept or reject an SMP Pairing request."""
         return True
 
     async def confirm(self, auto: bool = False) -> bool:

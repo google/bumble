@@ -80,7 +80,19 @@ class PairingDelegate(BasePairingDelegate):
         )
 
     async def accept(self) -> bool:
-        return True
+        self.log.info(
+            f"Pairing event: `smp_pairing_request`"
+        )
+
+        if self.service.event_queue is None or self.service.event_answer is None:
+            return True
+
+        event = self.add_origin(PairingEvent(smp_pairing_request=empty_pb2.Empty()))
+        self.service.event_queue.put_nowait(event)
+        answer = await anext(self.service.event_answer)  # pytype: disable=name-error
+        assert answer.event == event
+        assert answer.answer_variant() == 'confirm' and answer.confirm is not None
+        return answer.confirm
 
     def add_origin(self, ev: PairingEvent) -> PairingEvent:
         if not self.connection.is_incomplete:
