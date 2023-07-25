@@ -559,6 +559,7 @@ class PairingMethod(enum.IntEnum):
     NUMERIC_COMPARISON = 1
     PASSKEY = 2
     OOB = 3
+    CTKD_OVER_CLASSIC = 4
 
     def __str__(self) -> str:
         return {
@@ -566,6 +567,7 @@ class PairingMethod(enum.IntEnum):
             PairingMethod.NUMERIC_COMPARISON: 'NUMERIC_COMPARISON',
             PairingMethod.PASSKEY: 'PASSKEY',
             PairingMethod.OOB: 'OOB',
+            PairingMethod.CTKD_OVER_CLASSIC: 'CTKD_OVER_CLASSIC',
         }[self]
 
 
@@ -777,6 +779,9 @@ class Session:
     def decide_pairing_method(
         self, auth_req: int, initiator_io_capability: int, responder_io_capability: int
     ) -> None:
+        if self.connection.transport == BT_BR_EDR_TRANSPORT:
+            self.pairing_method = PairingMethod.CTKD_OVER_CLASSIC
+            return
         if (not self.mitm) and (auth_req & SMP_MITM_AUTHREQ == 0):
             self.pairing_method = PairingMethod.JUST_WORKS
             return
@@ -1414,7 +1419,10 @@ class Session:
         self.compute_peer_expected_distributions(self.responder_key_distribution)
 
         # Start phase 2
-        if self.sc:
+        if self.pairing_method == PairingMethod.CTKD_OVER_CLASSIC:
+            # Authentication is already done in SMP, so remote shall start keys distribution immediately
+            return
+        elif self.sc:
             if self.pairing_method == PairingMethod.PASSKEY:
                 self.display_or_input_passkey()
 
