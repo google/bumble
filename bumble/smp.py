@@ -561,19 +561,9 @@ class PairingMethod(enum.IntEnum):
     OOB = 3
     CTKD_OVER_CLASSIC = 4
 
-    def __str__(self) -> str:
-        return {
-            PairingMethod.JUST_WORKS: 'JUST_WORKS',
-            PairingMethod.NUMERIC_COMPARISON: 'NUMERIC_COMPARISON',
-            PairingMethod.PASSKEY: 'PASSKEY',
-            PairingMethod.OOB: 'OOB',
-            PairingMethod.CTKD_OVER_CLASSIC: 'CTKD_OVER_CLASSIC',
-        }[self]
-
 
 # -----------------------------------------------------------------------------
 class Session:
-
     # I/O Capability to pairing method decision matrix
     #
     # See Bluetooth spec @ Vol 3, part H - Table 2.8: Mapping of IO Capabilities to Key
@@ -674,7 +664,7 @@ class Session:
         self.passkey_ready = asyncio.Event()
         self.passkey_step = 0
         self.passkey_display = False
-        self.pairing_method = 0
+        self.pairing_method: PairingMethod = PairingMethod.JUST_WORKS
         self.pairing_config = pairing_config
         self.wait_before_continuing: Optional[asyncio.Future[None]] = None
         self.completed = False
@@ -790,11 +780,12 @@ class Session:
         if isinstance(details, tuple) and len(details) == 2:
             # One entry for legacy pairing and one for secure connections
             details = details[1 if self.sc else 0]
-        if isinstance(details, int):
+        if isinstance(details, PairingMethod):
             # Just a method ID
             self.pairing_method = details
         else:
             # PASSKEY method, with a method ID and display/input flags
+            assert isinstance(details[0], PairingMethod)
             self.pairing_method = details[0]
             self.passkey_display = details[1 if self.is_initiator else 2]
 
@@ -1346,7 +1337,7 @@ class Session:
         self.decide_pairing_method(
             command.auth_req, command.io_capability, self.io_capability
         )
-        logger.debug(f'pairing method: {self.pairing_method}')
+        logger.debug(f'pairing method: {self.pairing_method.name}')
 
         # Key distribution
         (
@@ -1403,7 +1394,7 @@ class Session:
         self.decide_pairing_method(
             command.auth_req, self.io_capability, command.io_capability
         )
-        logger.debug(f'pairing method: {self.pairing_method}')
+        logger.debug(f'pairing method: {self.pairing_method.name}')
 
         # Key distribution
         if (
