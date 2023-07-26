@@ -21,7 +21,7 @@ import logging
 import os
 import pytest
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from bumble.controller import Controller
 from bumble.core import BT_BR_EDR_TRANSPORT, BT_PERIPHERAL_ROLE, BT_CENTRAL_ROLE
@@ -539,22 +539,21 @@ async def test_self_smp_over_classic():
     two_devices.connections[1].on('pairing', lambda keys: on_pairing(1, keys))
 
     # Mock SMP
-    from bumble.smp import Session as SmpSession
+    with patch('bumble.smp.Session', spec=True) as MockSmpSession:
+        MockSmpSession.send_pairing_confirm_command = MagicMock()
+        MockSmpSession.send_pairing_dhkey_check_command = MagicMock()
+        MockSmpSession.send_public_key_command = MagicMock()
+        MockSmpSession.send_pairing_random_command = MagicMock()
 
-    SmpSession.send_pairing_confirm_command = MagicMock()
-    SmpSession.send_pairing_dhkey_check_command = MagicMock()
-    SmpSession.send_public_key_command = MagicMock()
-    SmpSession.send_pairing_random_command = MagicMock()
+        # Start CTKD
+        await two_devices.connections[0].pair()
+        await asyncio.gather(*paired)
 
-    # Start CTKD
-    await two_devices.connections[0].pair()
-    await asyncio.gather(*paired)
-
-    # Phase 2 commands should not be invoked
-    SmpSession.send_pairing_confirm_command.assert_not_called()
-    SmpSession.send_pairing_dhkey_check_command.assert_not_called()
-    SmpSession.send_public_key_command.assert_not_called()
-    SmpSession.send_pairing_random_command.assert_not_called()
+        # Phase 2 commands should not be invoked
+        MockSmpSession.send_pairing_confirm_command.assert_not_called()
+        MockSmpSession.send_pairing_dhkey_check_command.assert_not_called()
+        MockSmpSession.send_public_key_command.assert_not_called()
+        MockSmpSession.send_pairing_random_command.assert_not_called()
 
 
 # -----------------------------------------------------------------------------
