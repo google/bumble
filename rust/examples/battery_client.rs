@@ -33,7 +33,7 @@
 
 use bumble::wrapper::{
     device::{Device, Peer},
-    profile::BatteryService,
+    profile::BatteryServiceProxy,
     transport::Transport,
     PyObjectExt,
 };
@@ -63,12 +63,11 @@ async fn main() -> PyResult<()> {
 
     let conn = device.connect(&cli.target_addr).await?;
     let mut peer = Peer::new(conn)?;
-    peer.discover_services().await?;
-    for mut s in peer.services()? {
+    for mut s in peer.discover_services().await? {
         s.discover_characteristics().await?;
     }
     let battery_service = peer
-        .create_service_proxy::<BatteryService>()?
+        .create_service_proxy::<BatteryServiceProxy>()?
         .ok_or(anyhow::anyhow!("No battery service found"))?;
 
     let mut battery_level_char = battery_service

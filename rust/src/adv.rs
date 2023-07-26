@@ -1,9 +1,7 @@
-//! Advertisements
+//! BLE advertisements.
 
-use crate::wrapper::{
-    assigned_numbers::{COMPANY_IDS, SERVICE_IDS},
-    core::{Uuid128, Uuid16, Uuid32},
-};
+use crate::wrapper::assigned_numbers::{COMPANY_IDS, SERVICE_IDS};
+use crate::wrapper::core::{Uuid128, Uuid16, Uuid32};
 use itertools::Itertools;
 use nom::{combinator, multi, number};
 use std::fmt;
@@ -151,7 +149,7 @@ impl CommonDataType {
     /// Apply type-specific human-oriented formatting to data, if any is applicable
     pub fn format_data(&self, data: &[u8]) -> Option<String> {
         match self {
-            Self::Flags => Some(Flags::matching(data).map(|f| format!("{:?}", f)).join(", ")),
+            Self::Flags => Some(Flags::matching(data).map(|f| format!("{:?}", f)).join(",")),
             Self::CompleteListOf16BitServiceClassUuids
             | Self::IncompleteListOf16BitServiceClassUuids
             | Self::ListOf16BitServiceSolicitationUuids => {
@@ -396,30 +394,12 @@ pub enum Flags {
 
 impl fmt::Debug for Flags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Flags::LeLimited => write!(f, "LE Limited"),
-            Flags::LeDiscoverable => write!(f, "LE General"),
-            Flags::NoBrEdr => write!(f, "No BR/EDR"),
-            Flags::BrEdrController => write!(f, "BR/EDR C"),
-            Flags::BrEdrHost => write!(f, "BR/EDR H"),
-        }
-    }
-}
-
-impl fmt::Display for Flags {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Flags::LeLimited => write!(f, "LE Limited Discoverable Mode"),
-            Flags::LeDiscoverable => write!(f, "LE General Discoverable Mode"),
-            Flags::NoBrEdr => write!(f, "BR/EDR Not Supported"),
-            Flags::BrEdrController => write!(f, "Simultaneous LE and BR/EDR (Controller)"),
-            Flags::BrEdrHost => write!(f, "Simultaneous LE and BR/EDR (Host)"),
-        }
+        write!(f, "{}", self.short_name())
     }
 }
 
 impl Flags {
-    /// Iterates over the flags that are present in the provided `flags` byte.
+    /// Iterates over the flags that are present in the provided `flags` bytes.
     pub fn matching(flags: &[u8]) -> impl Iterator<Item = Self> + '_ {
         // The encoding is not clear from the spec: do we look at the first byte? or the last?
         // In practice it's only one byte.
@@ -436,5 +416,31 @@ impl Flags {
 
             mask & first_byte > 0
         })
+    }
+
+    /// An abbreviated form of the flag name.
+    ///
+    /// See [Flags::name] for the full name.
+    pub fn short_name(&self) -> &'static str {
+        match self {
+            Flags::LeLimited => "LE Limited",
+            Flags::LeDiscoverable => "LE General",
+            Flags::NoBrEdr => "No BR/EDR",
+            Flags::BrEdrController => "BR/EDR C",
+            Flags::BrEdrHost => "BR/EDR H",
+        }
+    }
+
+    /// The human-readable name of the flag.
+    ///
+    /// See [Flags::short_name] for a shorter string for use if compactness is important.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Flags::LeLimited => "LE Limited Discoverable Mode",
+            Flags::LeDiscoverable => "LE General Discoverable Mode",
+            Flags::NoBrEdr => "BR/EDR Not Supported",
+            Flags::BrEdrController => "Simultaneous LE and BR/EDR (Controller)",
+            Flags::BrEdrHost => "Simultaneous LE and BR/EDR (Host)",
+        }
     }
 }

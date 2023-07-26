@@ -10,7 +10,7 @@ See the `examples` directory for usage.
 # Usage
 
 Set up a virtualenv for Bumble, or otherwise have an isolated Python environment
-fur Bumble and its dependencies.
+for Bumble and its dependencies.
 
 Due to Python being
 [picky about how its sys path is set up](https://github.com/PyO3/pyo3/issues/1741,

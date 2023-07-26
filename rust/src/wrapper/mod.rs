@@ -28,11 +28,9 @@ use pyo3::{
 };
 pub use pyo3_asyncio;
 
-pub mod adv;
 pub mod assigned_numbers;
 pub mod core;
 pub mod device;
-pub mod gatt;
 pub mod gatt_client;
 pub mod hci;
 pub mod logging;

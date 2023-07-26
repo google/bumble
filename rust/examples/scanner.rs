@@ -12,11 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Counterpart to the Python example `run_scanner.py`
+//! Counterpart to the Python example `run_scanner.py`.
+//!
+//! Device deduplication is done here rather than relying on the controller's filtering to provide
+//! for additional features, like the ability to make deduplication time-bounded.
 
-use bumble::wrapper::{
-    adv::CommonDataType, core::AdvertisementDataUnit, device::Device, hci::AddressType,
-    transport::Transport,
+use bumble::{
+    adv::CommonDataType,
+    wrapper::{
+        core::AdvertisementDataUnit, device::Device, hci::AddressType, transport::Transport,
+    },
 };
 use clap::Parser as _;
 use itertools::Itertools;

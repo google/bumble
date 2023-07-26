@@ -22,8 +22,10 @@
 //! typically do, making it good for prototyping, experimentation, test tools, etc.
 //!
 //! Bumble is primarily written in Python. Rust types that wrap the Python API, which is currently
-//! all of them, are in the [wrapper] module.
+//! the bulk of the code, are in the [wrapper] module.
 
 #![deny(missing_docs, unsafe_code)]
 
 pub mod wrapper;
+
+pub mod adv;

@@ -14,7 +14,58 @@
 
 //! GATT client support
 
-use pyo3::PyObject;
+use crate::wrapper::ClosureCallback;
+use pyo3::types::PyTuple;
+use pyo3::{intern, PyObject, PyResult, Python};
+
+/// A GATT service on a remote device
+pub struct ServiceProxy(pub(crate) PyObject);
+
+impl ServiceProxy {
+    /// Discover the characteristics in this service.
+    ///
+    /// Populates an internal cache of characteristics in this service.
+    pub async fn discover_characteristics(&mut self) -> PyResult<()> {
+        Python::with_gil(|py| {
+            self.0
+                .call_method0(py, intern!(py, "discover_characteristics"))
+                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+        })?
+        .await
+        .map(|_| ())
+    }
+}
+
+/// A GATT characteristic on a remote device
+pub struct CharacteristicProxy(pub(crate) PyObject);
+
+impl CharacteristicProxy {
+    /// Subscribe to changes to the characteristic, executing `callback` for each new value
+    pub async fn subscribe(
+        &mut self,
+        callback: impl Fn(Python, &PyTuple) -> PyResult<()> + Send + 'static,
+    ) -> PyResult<()> {
+        let boxed = ClosureCallback::new(move |py, args, _kwargs| callback(py, args));
+
+        Python::with_gil(|py| {
+            self.0
+                .call_method1(py, intern!(py, "subscribe"), (boxed,))
+                .and_then(|obj| pyo3_asyncio::tokio::into_future(obj.as_ref(py)))
+        })?
+        .await
+        .map(|_| ())
+    }
+
+    /// Read the current value of the characteristic
+    pub async fn read_value(&self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            self.0
+                .call_method0(py, intern!(py, "read_value"))
+                .and_then(|obj| pyo3_asyncio::tokio::into_future(obj.as_ref(py)))
+        })?
+        .await
+    }
+}
 
 /// Equivalent to the Python `ProfileServiceProxy`.
 pub trait ProfileServiceProxy {

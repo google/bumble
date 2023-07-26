@@ -14,14 +14,15 @@
 
 //! Devices and connections to them
 
-use crate::wrapper::{
+use crate::{
     adv::AdvertisementDataBuilder,
-    core::AdvertisingData,
-    gatt::Service,
-    gatt_client::ProfileServiceProxy,
-    hci::Address,
-    transport::{Sink, Source},
-    ClosureCallback,
+    wrapper::{
+        core::AdvertisingData,
+        gatt_client::{ProfileServiceProxy, ServiceProxy},
+        hci::Address,
+        transport::{Sink, Source},
+        ClosureCallback,
+    },
 };
 use pyo3::types::PyDict;
 use pyo3::{intern, types::PyModule, PyObject, PyResult, Python, ToPyObject};
@@ -111,7 +112,7 @@ impl Device {
     }
 
     /// Set the advertisement data to be used when [Device::start_advertising] is called.
-    pub fn set_advertisement(&mut self, adv_data: AdvertisementDataBuilder) -> PyResult<()> {
+    pub fn set_advertising_data(&mut self, adv_data: AdvertisementDataBuilder) -> PyResult<()> {
         Python::with_gil(|py| {
             self.0.setattr(
                 py,
@@ -166,29 +167,34 @@ impl Peer {
     }
 
     /// Populates the peer's cache of services.
-    pub async fn discover_services(&mut self) -> PyResult<()> {
+    ///
+    /// Returns the discovered services.
+    pub async fn discover_services(&mut self) -> PyResult<Vec<ServiceProxy>> {
         Python::with_gil(|py| {
             self.0
                 .call_method0(py, intern!(py, "discover_services"))
                 .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
         })?
         .await
-        .map(|_| ())
+        .and_then(|list| {
+            Python::with_gil(|py| {
+                list.as_ref(py)
+                    .iter()?
+                    .map(|r| r.map(|h| ServiceProxy(h.to_object(py))))
+                    .collect()
+            })
+        })
     }
 
     /// Returns a snapshot of the Services currently in the peer's cache
-    pub fn services(&self) -> PyResult<Vec<Service>> {
+    pub fn services(&self) -> PyResult<Vec<ServiceProxy>> {
         Python::with_gil(|py| {
-            let list = self.0.getattr(py, intern!(py, "services"))?;
-
-            // there's probably a better way to do this
-            Ok(list
+            self.0
+                .getattr(py, intern!(py, "services"))?
                 .as_ref(py)
                 .iter()?
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .map(|any| Service(any.to_object(py)))
-                .collect::<Vec<_>>())
+                .map(|r| r.map(|h| ServiceProxy(h.to_object(py))))
+                .collect()
         })
     }
 

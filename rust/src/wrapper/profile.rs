@@ -14,15 +14,15 @@
 
 //! GATT profiles
 
-use crate::wrapper::{gatt::Characteristic, gatt_client::ProfileServiceProxy};
+use crate::wrapper::gatt_client::{CharacteristicProxy, ProfileServiceProxy};
 use pyo3::{intern, PyObject, PyResult, Python};
 
 /// Exposes the battery GATT service
-pub struct BatteryService(PyObject);
+pub struct BatteryServiceProxy(PyObject);
 
-impl BatteryService {
+impl BatteryServiceProxy {
     /// Get the battery level, if available
-    pub fn battery_level(&self) -> PyResult<Option<Characteristic>> {
+    pub fn battery_level(&self) -> PyResult<Option<CharacteristicProxy>> {
         Python::with_gil(|py| {
             self.0
                 .getattr(py, intern!(py, "battery_level"))
@@ -30,14 +30,14 @@ impl BatteryService {
                     if level.is_none(py) {
                         None
                     } else {
-                        Some(Characteristic(level))
+                        Some(CharacteristicProxy(level))
                     }
                 })
         })
     }
 }
 
-impl ProfileServiceProxy for BatteryService {
+impl ProfileServiceProxy for BatteryServiceProxy {
     const PROXY_CLASS_MODULE: &'static str = "bumble.profiles.battery_service";
     const PROXY_CLASS_NAME: &'static str = "BatteryServiceProxy";
 

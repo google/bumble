@@ -13,11 +13,13 @@
 // limitations under the License.
 
 use anyhow::anyhow;
-use bumble::wrapper::{
+use bumble::{
     adv::{AdvertisementDataBuilder, CommonDataType},
-    device::Device,
-    logging::{bumble_env_logging_level, py_logging_basic_config},
-    transport::Transport,
+    wrapper::{
+        device::Device,
+        logging::{bumble_env_logging_level, py_logging_basic_config},
+        transport::Transport,
+    },
 };
 use clap::Parser as _;
 use pyo3::PyResult;
@@ -61,7 +63,7 @@ async fn main() -> PyResult<()> {
         )
         .map_err(|e| anyhow!(e))?;
 
-    device.set_advertisement(adv_data)?;
+    device.set_advertising_data(adv_data)?;
     device.power_on().await?;
 
     println!("Advertising...");

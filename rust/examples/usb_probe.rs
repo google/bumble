@@ -89,7 +89,7 @@ fn main() -> anyhow::Result<()> {
             transport_names.push(basic_transport_name.clone());
         } else {
             transport_names.push(format!(
-                "{}/{}",
+                "{}#{}",
                 basic_transport_name,
                 device_serials_by_id
                     .get(&device_id)
@@ -124,39 +124,39 @@ fn main() -> anyhow::Result<()> {
                 Style::new().red()
             };
             println!(
-                "{:26 }{}",
+                "{:26}{}",
                 "  Bumble Transport Names:".blue(),
                 transport_names.iter().map(|n| n.style(style)).join(" or ")
             )
         }
         println!(
-            "{:26 }{:03}/{:03}",
+            "{:26}{:03}/{:03}",
             "  Bus/Device:".green(),
             device.bus_number(),
             device.address()
         );
         println!(
-            "{:26 }{}",
+            "{:26}{}",
             "  Class:".green(),
             class_info.formatted_class_name()
         );
         println!(
-            "{:26 }{}",
+            "{:26}{}",
             "  Subclass/Protocol:".green(),
             class_info.formatted_subclass_protocol()
         );
         if let Some(s) = serial {
-            println!("{:26 }{}", "  Serial:".green(), s);
+            println!("{:26}{}", "  Serial:".green(), s);
             device_serials_by_id
                 .entry(device_id)
                 .or_insert(HashSet::new())
                 .insert(s);
         }
         if let Some(m) = mfg {
-            println!("{:26 }{}", "  Manufacturer:".green(), m);
+            println!("{:26}{}", "  Manufacturer:".green(), m);
         }
         if let Some(p) = product {
-            println!("{:26 }{}", "  Product:".green(), p);
+            println!("{:26}{}", "  Product:".green(), p);
         }
 
         if cli.verbose {
@@ -205,15 +205,15 @@ fn print_device_details<T: UsbContext>(
     for i in 0..device_desc.num_configurations() {
         println!("  Configuration {}", i + 1);
         for interface in device.config_descriptor(i)?.interfaces() {
-            let descriptors: Vec<_> = interface.descriptors().collect();
-            for d in &descriptors {
+            let interface_descriptors: Vec<_> = interface.descriptors().collect();
+            for d in &interface_descriptors {
                 let class_info =
                     ClassInfo::new(d.class_code(), d.sub_class_code(), d.protocol_code());
 
                 println!(
                     "      Interface: {}{} ({}, {})",
                     interface.number(),
-                    if descriptors.len() > 1 {
+                    if interface_descriptors.len() > 1 {
                         format!("/{}", d.setting_number())
                     } else {
                         String::new()

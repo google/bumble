@@ -14,7 +14,7 @@
 
 //! Core types
 
-use crate::wrapper::adv::CommonDataTypeCode;
+use crate::adv::CommonDataTypeCode;
 use lazy_static::lazy_static;
 use nom::{bytes, combinator};
 use pyo3::{intern, PyObject, PyResult, Python};
