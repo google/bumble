@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 import logging
 import asyncio
+import enum
 
 from pyee import EventEmitter
 from typing import Optional, Tuple, Callable, Dict, Union, TYPE_CHECKING
@@ -359,22 +360,13 @@ class RFCOMM_MCC_MSC:
 
 # -----------------------------------------------------------------------------
 class DLC(EventEmitter):
-    # States
-    INIT = 0x00
-    CONNECTING = 0x01
-    CONNECTED = 0x02
-    DISCONNECTING = 0x03
-    DISCONNECTED = 0x04
-    RESET = 0x05
-
-    STATE_NAMES = {
-        INIT: 'INIT',
-        CONNECTING: 'CONNECTING',
-        CONNECTED: 'CONNECTED',
-        DISCONNECTING: 'DISCONNECTING',
-        DISCONNECTED: 'DISCONNECTED',
-        RESET: 'RESET',
-    }
+    class State(enum.IntEnum):
+        INIT = 0x00
+        CONNECTING = 0x01
+        CONNECTED = 0x02
+        DISCONNECTING = 0x03
+        DISCONNECTED = 0x04
+        RESET = 0x05
 
     connection_result: Optional[asyncio.Future]
     sink: Optional[Callable[[bytes], None]]
@@ -393,7 +385,7 @@ class DLC(EventEmitter):
         self.rx_threshold = self.rx_credits // 2
         self.tx_credits = initial_tx_credits
         self.tx_buffer = b''
-        self.state = DLC.INIT
+        self.state = DLC.State.INIT
         self.role = multiplexer.role
         self.c_r = 1 if self.role == Multiplexer.INITIATOR else 0
         self.sink = None
@@ -405,14 +397,8 @@ class DLC(EventEmitter):
             max_frame_size, self.multiplexer.l2cap_channel.mtu - max_overhead
         )
 
-    @staticmethod
-    def state_name(state: int) -> str:
-        return DLC.STATE_NAMES[state]
-
-    def change_state(self, new_state: int) -> None:
-        logger.debug(
-            f'{self} state change -> {color(self.state_name(new_state), "magenta")}'
-        )
+    def change_state(self, new_state: State) -> None:
+        logger.debug(f'{self} state change -> {color(new_state.name, "magenta")}')
         self.state = new_state
 
     def send_frame(self, frame: RFCOMM_Frame) -> None:
@@ -423,7 +409,7 @@ class DLC(EventEmitter):
         handler(frame)
 
     def on_sabm_frame(self, _frame: RFCOMM_Frame) -> None:
-        if self.state != DLC.CONNECTING:
+        if self.state != DLC.State.CONNECTING:
             logger.warning(
                 color('!!! received SABM when not in CONNECTING state', 'red')
             )
@@ -439,11 +425,11 @@ class DLC(EventEmitter):
         logger.debug(f'>>> MCC MSC Command: {msc}')
         self.send_frame(RFCOMM_Frame.uih(c_r=self.c_r, dlci=0, information=mcc))
 
-        self.change_state(DLC.CONNECTED)
+        self.change_state(DLC.State.CONNECTED)
         self.emit('open')
 
     def on_ua_frame(self, _frame: RFCOMM_Frame) -> None:
-        if self.state != DLC.CONNECTING:
+        if self.state != DLC.State.CONNECTING:
             logger.warning(
                 color('!!! received SABM when not in CONNECTING state', 'red')
             )
@@ -457,7 +443,7 @@ class DLC(EventEmitter):
         logger.debug(f'>>> MCC MSC Command: {msc}')
         self.send_frame(RFCOMM_Frame.uih(c_r=self.c_r, dlci=0, information=mcc))
 
-        self.change_state(DLC.CONNECTED)
+        self.change_state(DLC.State.CONNECTED)
         self.multiplexer.on_dlc_open_complete(self)
 
     def on_dm_frame(self, frame: RFCOMM_Frame) -> None:
@@ -516,15 +502,15 @@ class DLC(EventEmitter):
             logger.debug(f'<<< MCC MSC Response: {msc}')
 
     def connect(self) -> None:
-        if self.state != DLC.INIT:
+        if self.state != DLC.State.INIT:
             raise InvalidStateError('invalid state')
 
-        self.change_state(DLC.CONNECTING)
+        self.change_state(DLC.State.CONNECTING)
         self.connection_result = asyncio.get_running_loop().create_future()
         self.send_frame(RFCOMM_Frame.sabm(c_r=self.c_r, dlci=self.dlci))
 
     def accept(self) -> None:
-        if self.state != DLC.INIT:
+        if self.state != DLC.State.INIT:
             raise InvalidStateError('invalid state')
 
         pn = RFCOMM_MCC_PN(
@@ -539,7 +525,7 @@ class DLC(EventEmitter):
         mcc = RFCOMM_Frame.make_mcc(mcc_type=RFCOMM_MCC_PN_TYPE, c_r=0, data=bytes(pn))
         logger.debug(f'>>> PN Response: {pn}')
         self.send_frame(RFCOMM_Frame.uih(c_r=self.c_r, dlci=0, information=mcc))
-        self.change_state(DLC.CONNECTING)
+        self.change_state(DLC.State.CONNECTING)
 
     def rx_credits_needed(self) -> int:
         if self.rx_credits <= self.rx_threshold:
@@ -602,7 +588,7 @@ class DLC(EventEmitter):
         pass
 
     def __str__(self) -> str:
-        return f'DLC(dlci={self.dlci},state={self.state_name(self.state)})'
+        return f'DLC(dlci={self.dlci},state={self.state.name})'
 
 
 # -----------------------------------------------------------------------------
@@ -611,24 +597,14 @@ class Multiplexer(EventEmitter):
     INITIATOR = 0x00
     RESPONDER = 0x01
 
-    # States
-    INIT = 0x00
-    CONNECTING = 0x01
-    CONNECTED = 0x02
-    OPENING = 0x03
-    DISCONNECTING = 0x04
-    DISCONNECTED = 0x05
-    RESET = 0x06
-
-    STATE_NAMES = {
-        INIT: 'INIT',
-        CONNECTING: 'CONNECTING',
-        CONNECTED: 'CONNECTED',
-        OPENING: 'OPENING',
-        DISCONNECTING: 'DISCONNECTING',
-        DISCONNECTED: 'DISCONNECTED',
-        RESET: 'RESET',
-    }
+    class State(enum.IntEnum):
+        INIT = 0x00
+        CONNECTING = 0x01
+        CONNECTED = 0x02
+        OPENING = 0x03
+        DISCONNECTING = 0x04
+        DISCONNECTED = 0x05
+        RESET = 0x06
 
     connection_result: Optional[asyncio.Future]
     disconnection_result: Optional[asyncio.Future]
@@ -640,7 +616,7 @@ class Multiplexer(EventEmitter):
         super().__init__()
         self.role = role
         self.l2cap_channel = l2cap_channel
-        self.state = Multiplexer.INIT
+        self.state = Multiplexer.State.INIT
         self.dlcs = {}  # DLCs, by DLCI
         self.connection_result = None
         self.disconnection_result = None
@@ -650,14 +626,8 @@ class Multiplexer(EventEmitter):
         # Become a sink for the L2CAP channel
         l2cap_channel.sink = self.on_pdu
 
-    @staticmethod
-    def state_name(state: int):
-        return Multiplexer.STATE_NAMES[state]
-
-    def change_state(self, new_state: int) -> None:
-        logger.debug(
-            f'{self} state change -> {color(self.state_name(new_state), "cyan")}'
-        )
+    def change_state(self, new_state: State) -> None:
+        logger.debug(f'{self} state change -> {color(new_state.name, "cyan")}')
         self.state = new_state
 
     def send_frame(self, frame: RFCOMM_Frame) -> None:
@@ -689,27 +659,27 @@ class Multiplexer(EventEmitter):
         handler(frame)
 
     def on_sabm_frame(self, _frame: RFCOMM_Frame) -> None:
-        if self.state != Multiplexer.INIT:
+        if self.state != Multiplexer.State.INIT:
             logger.debug('not in INIT state, ignoring SABM')
             return
-        self.change_state(Multiplexer.CONNECTED)
+        self.change_state(Multiplexer.State.CONNECTED)
         self.send_frame(RFCOMM_Frame.ua(c_r=1, dlci=0))
 
     def on_ua_frame(self, _frame: RFCOMM_Frame) -> None:
-        if self.state == Multiplexer.CONNECTING:
-            self.change_state(Multiplexer.CONNECTED)
+        if self.state == Multiplexer.State.CONNECTING:
+            self.change_state(Multiplexer.State.CONNECTED)
             if self.connection_result:
                 self.connection_result.set_result(0)
                 self.connection_result = None
-        elif self.state == Multiplexer.DISCONNECTING:
-            self.change_state(Multiplexer.DISCONNECTED)
+        elif self.state == Multiplexer.State.DISCONNECTING:
+            self.change_state(Multiplexer.State.DISCONNECTED)
             if self.disconnection_result:
                 self.disconnection_result.set_result(None)
                 self.disconnection_result = None
 
     def on_dm_frame(self, _frame: RFCOMM_Frame) -> None:
-        if self.state == Multiplexer.OPENING:
-            self.change_state(Multiplexer.CONNECTED)
+        if self.state == Multiplexer.State.OPENING:
+            self.change_state(Multiplexer.State.CONNECTED)
             if self.open_result:
                 self.open_result.set_exception(
                     core.ConnectionError(
@@ -723,7 +693,7 @@ class Multiplexer(EventEmitter):
             logger.warning(f'unexpected state for DM: {self}')
 
     def on_disc_frame(self, _frame: RFCOMM_Frame) -> None:
-        self.change_state(Multiplexer.DISCONNECTED)
+        self.change_state(Multiplexer.State.DISCONNECTED)
         self.send_frame(
             RFCOMM_Frame.ua(c_r=0 if self.role == Multiplexer.INITIATOR else 1, dlci=0)
         )
@@ -773,7 +743,7 @@ class Multiplexer(EventEmitter):
         else:
             # Response
             logger.debug(f'>>> PN Response: {pn}')
-            if self.state == Multiplexer.OPENING:
+            if self.state == Multiplexer.State.OPENING:
                 dlc = DLC(self, pn.dlci, pn.max_frame_size, pn.window_size)
                 self.dlcs[pn.dlci] = dlc
                 dlc.connect()
@@ -788,20 +758,20 @@ class Multiplexer(EventEmitter):
         dlc.on_mcc_msc(c_r, msc)
 
     async def connect(self) -> None:
-        if self.state != Multiplexer.INIT:
+        if self.state != Multiplexer.State.INIT:
             raise InvalidStateError('invalid state')
 
-        self.change_state(Multiplexer.CONNECTING)
+        self.change_state(Multiplexer.State.CONNECTING)
         self.connection_result = asyncio.get_running_loop().create_future()
         self.send_frame(RFCOMM_Frame.sabm(c_r=1, dlci=0))
         return await self.connection_result
 
     async def disconnect(self) -> None:
-        if self.state != Multiplexer.CONNECTED:
+        if self.state != Multiplexer.State.CONNECTED:
             return
 
         self.disconnection_result = asyncio.get_running_loop().create_future()
-        self.change_state(Multiplexer.DISCONNECTING)
+        self.change_state(Multiplexer.State.DISCONNECTING)
         self.send_frame(
             RFCOMM_Frame.disc(
                 c_r=1 if self.role == Multiplexer.INITIATOR else 0, dlci=0
@@ -810,8 +780,8 @@ class Multiplexer(EventEmitter):
         await self.disconnection_result
 
     async def open_dlc(self, channel: int) -> DLC:
-        if self.state != Multiplexer.CONNECTED:
-            if self.state == Multiplexer.OPENING:
+        if self.state != Multiplexer.State.CONNECTED:
+            if self.state == Multiplexer.State.OPENING:
                 raise InvalidStateError('open already in progress')
 
             raise InvalidStateError('not connected')
@@ -828,7 +798,7 @@ class Multiplexer(EventEmitter):
         mcc = RFCOMM_Frame.make_mcc(mcc_type=RFCOMM_MCC_PN_TYPE, c_r=1, data=bytes(pn))
         logger.debug(f'>>> Sending MCC: {pn}')
         self.open_result = asyncio.get_running_loop().create_future()
-        self.change_state(Multiplexer.OPENING)
+        self.change_state(Multiplexer.State.OPENING)
         self.send_frame(
             RFCOMM_Frame.uih(
                 c_r=1 if self.role == Multiplexer.INITIATOR else 0,
@@ -842,12 +812,12 @@ class Multiplexer(EventEmitter):
 
     def on_dlc_open_complete(self, dlc: DLC) -> None:
         logger.debug(f'DLC [{dlc.dlci}] open complete')
-        self.change_state(Multiplexer.CONNECTED)
+        self.change_state(Multiplexer.State.CONNECTED)
         if self.open_result:
             self.open_result.set_result(dlc)
 
     def __str__(self) -> str:
-        return f'Multiplexer(state={self.state_name(self.state)})'
+        return f'Multiplexer(state={self.state.name})'
 
 
 # -----------------------------------------------------------------------------
