@@ -63,6 +63,8 @@ async def serve(
     port = server.add_insecure_port(f'localhost:{port}')
 
     try:
+        # open device & start server loop.
+        await bumble.open()
         while True:
             # load server config from dict.
             config.load_from_dict(bumble.config.get('server', {}))
@@ -82,8 +84,8 @@ async def serve(
             for hook in _SERVICERS_HOOKS:
                 hook(bumble, config, server)
 
-            # open device.
-            await bumble.open()
+            # start device.
+            await bumble.start()
             try:
                 # Pandora require classic devices to be discoverable & connectable.
                 if bumble.device.classic_enabled:
@@ -94,12 +96,13 @@ async def serve(
                 await server.start()
                 await server.wait_for_termination()
             finally:
-                # close device.
-                await bumble.close()
+                # stop device.
+                await bumble.stop()
 
             # re-initialize the gRPC server.
             server = grpc.aio.server()
             server.add_insecure_port(f'localhost:{port}')
     finally:
-        # stop server.
+        # close device & stop server.
+        await bumble.close()
         await server.stop(None)

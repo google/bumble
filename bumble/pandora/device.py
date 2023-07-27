@@ -22,6 +22,7 @@ from bumble.core import (
     BT_RFCOMM_PROTOCOL_ID,
 )
 from bumble.device import Device, DeviceConfiguration
+from bumble.hci import HCI_Reset_Command
 from bumble.host import Host
 from bumble.sdp import (
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
@@ -58,35 +59,49 @@ class PandoraDevice:
 
     @property
     def idle(self) -> bool:
-        return self._hci is None
+        return self.device._host is None  # type: ignore
 
     async def open(self) -> None:
         if self._hci is not None:
             return
 
-        # open HCI transport & set device host.
+        # open HCI transport
         self._hci = await transport.open_transport(self._hci_name)
+
+    async def start(self) -> None:
+        if not self.idle:
+            return
+
+        # open HCI transport
+        await self.open()
+        assert self._hci is not None
+
+        # set device host.
         self.device.host = Host(controller_source=self._hci.source, controller_sink=self._hci.sink)  # type: ignore[no-untyped-call]
 
         # power-on.
         await self.device.power_on()
 
-    async def close(self) -> None:
-        if self._hci is None:
+    async def stop(self) -> None:
+        if self.idle:
             return
 
-        # flush & re-initialize device.
+        # reset, flush & re-initialize device.
+        await self.device.host.send_command(HCI_Reset_Command())  # type: ignore
         await self.device.host.flush()
         self.device.host = None  # type: ignore[assignment]
         self.device = _make_device(self.config)
 
-        # close HCI transport.
-        await self._hci.close()
-        self._hci = None
-
     async def reset(self) -> None:
-        await self.close()
-        await self.open()
+        await self.stop()
+        await self.start()
+
+    async def close(self) -> None:
+        if self._hci is None:
+            return
+
+        await self._hci.close()  # type: ignore
+        self._hci = None
 
     def info(self) -> Optional[Dict[str, str]]:
         return {
