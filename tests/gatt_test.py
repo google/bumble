@@ -803,14 +803,15 @@ async def test_mtu_exchange():
 # -----------------------------------------------------------------------------
 def test_char_property_to_string():
     # single
-    assert Characteristic.Properties(0x01).name == "BROADCAST"
-    assert Characteristic.Properties.BROADCAST.name == "BROADCAST"
+    assert str(Characteristic.Properties(0x01)) == "BROADCAST"
+    assert str(Characteristic.Properties.BROADCAST) == "BROADCAST"
 
     # double
-    assert Characteristic.Properties(0x03).name == "BROADCAST|READ"
+    assert str(Characteristic.Properties(0x03)) == "BROADCAST|READ"
     assert (
-        Characteristic.Properties.BROADCAST | Characteristic.Properties.READ
-    ).name == "BROADCAST|READ"
+        str(Characteristic.Properties.BROADCAST | Characteristic.Properties.READ)
+        == "BROADCAST|READ"
+    )
 
 
 # -----------------------------------------------------------------------------

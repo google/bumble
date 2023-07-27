@@ -326,6 +326,15 @@ class Characteristic(Attribute):
                     f"Characteristic.Properties::from_string() error:\nExpected a string containing any of the keys, separated by , or |: {enum_list_str}\nGot: {properties_str}"
                 )
 
+        def __str__(self):
+            # NOTE: we override this method to offer a consistent result between python
+            # versions: the value returned by IntFlag.__str__() changed in version 11.
+            return '|'.join(
+                flag.name
+                for flag in Characteristic.Properties
+                if self.value & flag.value and flag.name is not None
+            )
+
     # For backwards compatibility these are defined here
     # For new code, please use Characteristic.Properties.X
     BROADCAST = Properties.BROADCAST
@@ -365,7 +374,7 @@ class Characteristic(Attribute):
             f'Characteristic(handle=0x{self.handle:04X}, '
             f'end=0x{self.end_group_handle:04X}, '
             f'uuid={self.uuid}, '
-            f'{self.properties.name})'
+            f'{self.properties})'
         )
 
 
@@ -393,7 +402,7 @@ class CharacteristicDeclaration(Attribute):
             f'CharacteristicDeclaration(handle=0x{self.handle:04X}, '
             f'value_handle=0x{self.value_handle:04X}, '
             f'uuid={self.characteristic.uuid}, '
-            f'{self.characteristic.properties.name})'
+            f'{self.characteristic.properties})'
         )
 
 
