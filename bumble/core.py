@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import struct
-from typing import List, Optional, Tuple, Union, cast
+from typing import List, Optional, Tuple, Union, cast, Dict
 
 from .company_ids import COMPANY_IDENTIFIERS
 
@@ -53,7 +53,7 @@ def bit_flags_to_strings(bits, bit_flag_names):
     return names
 
 
-def name_or_number(dictionary, number, width=2):
+def name_or_number(dictionary: Dict[int, str], number: int, width: int = 2) -> str:
     name = dictionary.get(number)
     if name is not None:
         return name
