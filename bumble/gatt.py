@@ -283,8 +283,7 @@ class IncludedServiceDeclaration(Attribute):
             f'IncludedServiceDefinition(handle=0x{self.handle:04X}, '
             f'group_starting_handle=0x{self.service.handle:04X}, '
             f'group_ending_handle=0x{self.service.end_group_handle:04X}, '
-            f'uuid={self.service.uuid}, '
-            f'{self.service.properties!s})'
+            f'uuid={self.service.uuid})'
         )
 
 
@@ -309,30 +308,32 @@ class Characteristic(Attribute):
         AUTHENTICATED_SIGNED_WRITES = 0x40
         EXTENDED_PROPERTIES = 0x80
 
-        @staticmethod
-        def from_string(properties_str: str) -> Characteristic.Properties:
-            property_names: List[str] = []
-            for property in Characteristic.Properties:
-                if property.name is None:
-                    raise TypeError()
-                property_names.append(property.name)
-
-            def string_to_property(property_string) -> Characteristic.Properties:
-                for property in zip(Characteristic.Properties, property_names):
-                    if property_string == property[1]:
-                        return property[0]
-                raise TypeError(f"Unable to convert {property_string} to Property")
-
+        @classmethod
+        def from_string(cls, properties_str: str) -> Characteristic.Properties:
             try:
                 return functools.reduce(
-                    lambda x, y: x | string_to_property(y),
-                    properties_str.split(","),
+                    lambda x, y: x | cls[y],
+                    properties_str.replace("|", ",").split(","),
                     Characteristic.Properties(0),
                 )
-            except TypeError:
+            except (TypeError, KeyError):
+                # The check for `p.name is not None` here is needed because for InFlag
+                # enums, the .name property can be None, when the enum value is 0,
+                # so the type hint for .name is Optional[str].
+                enum_list: List[str] = [p.name for p in cls if p.name is not None]
+                enum_list_str = ",".join(enum_list)
                 raise TypeError(
-                    f"Characteristic.Properties::from_string() error:\nExpected a string containing any of the keys, separated by commas: {','.join(property_names)}\nGot: {properties_str}"
+                    f"Characteristic.Properties::from_string() error:\nExpected a string containing any of the keys, separated by , or |: {enum_list_str}\nGot: {properties_str}"
                 )
+
+        def __str__(self):
+            # NOTE: we override this method to offer a consistent result between python
+            # versions: the value returned by IntFlag.__str__() changed in version 11.
+            return '|'.join(
+                flag.name
+                for flag in Characteristic.Properties
+                if self.value & flag.value and flag.name is not None
+            )
 
     # For backwards compatibility these are defined here
     # For new code, please use Characteristic.Properties.X
@@ -373,7 +374,7 @@ class Characteristic(Attribute):
             f'Characteristic(handle=0x{self.handle:04X}, '
             f'end=0x{self.end_group_handle:04X}, '
             f'uuid={self.uuid}, '
-            f'{self.properties!s})'
+            f'{self.properties})'
         )
 
 
@@ -401,7 +402,7 @@ class CharacteristicDeclaration(Attribute):
             f'CharacteristicDeclaration(handle=0x{self.handle:04X}, '
             f'value_handle=0x{self.value_handle:04X}, '
             f'uuid={self.characteristic.uuid}, '
-            f'{self.characteristic.properties!s})'
+            f'{self.characteristic.properties})'
         )
 
 

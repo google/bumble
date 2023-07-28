@@ -803,14 +803,14 @@ async def test_mtu_exchange():
 # -----------------------------------------------------------------------------
 def test_char_property_to_string():
     # single
-    assert str(Characteristic.Properties(0x01)) == "Properties.BROADCAST"
-    assert str(Characteristic.Properties.BROADCAST) == "Properties.BROADCAST"
+    assert str(Characteristic.Properties(0x01)) == "BROADCAST"
+    assert str(Characteristic.Properties.BROADCAST) == "BROADCAST"
 
     # double
-    assert str(Characteristic.Properties(0x03)) == "Properties.READ|BROADCAST"
+    assert str(Characteristic.Properties(0x03)) == "BROADCAST|READ"
     assert (
         str(Characteristic.Properties.BROADCAST | Characteristic.Properties.READ)
-        == "Properties.READ|BROADCAST"
+        == "BROADCAST|READ"
     )
 
 
@@ -831,6 +831,10 @@ def test_characteristic_property_from_string():
         Characteristic.Properties.from_string("READ,BROADCAST")
         == Characteristic.Properties.BROADCAST | Characteristic.Properties.READ
     )
+    assert (
+        Characteristic.Properties.from_string("BROADCAST|READ")
+        == Characteristic.Properties.BROADCAST | Characteristic.Properties.READ
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -841,7 +845,7 @@ def test_characteristic_property_from_string_assert():
     assert (
         str(e_info.value)
         == """Characteristic.Properties::from_string() error:
-Expected a string containing any of the keys, separated by commas: BROADCAST,READ,WRITE_WITHOUT_RESPONSE,WRITE,NOTIFY,INDICATE,AUTHENTICATED_SIGNED_WRITES,EXTENDED_PROPERTIES
+Expected a string containing any of the keys, separated by , or |: BROADCAST,READ,WRITE_WITHOUT_RESPONSE,WRITE,NOTIFY,INDICATE,AUTHENTICATED_SIGNED_WRITES,EXTENDED_PROPERTIES
 Got: BROADCAST,HELLO"""
     )
 
@@ -866,13 +870,13 @@ async def test_server_string():
     assert (
         str(server.gatt_server)
         == """Service(handle=0x0001, end=0x0005, uuid=UUID-16:1800 (Generic Access))
-CharacteristicDeclaration(handle=0x0002, value_handle=0x0003, uuid=UUID-16:2A00 (Device Name), Properties.READ)
-Characteristic(handle=0x0003, end=0x0003, uuid=UUID-16:2A00 (Device Name), Properties.READ)
-CharacteristicDeclaration(handle=0x0004, value_handle=0x0005, uuid=UUID-16:2A01 (Appearance), Properties.READ)
-Characteristic(handle=0x0005, end=0x0005, uuid=UUID-16:2A01 (Appearance), Properties.READ)
+CharacteristicDeclaration(handle=0x0002, value_handle=0x0003, uuid=UUID-16:2A00 (Device Name), READ)
+Characteristic(handle=0x0003, end=0x0003, uuid=UUID-16:2A00 (Device Name), READ)
+CharacteristicDeclaration(handle=0x0004, value_handle=0x0005, uuid=UUID-16:2A01 (Appearance), READ)
+Characteristic(handle=0x0005, end=0x0005, uuid=UUID-16:2A01 (Appearance), READ)
 Service(handle=0x0006, end=0x0009, uuid=3A657F47-D34F-46B3-B1EC-698E29B6B829)
-CharacteristicDeclaration(handle=0x0007, value_handle=0x0008, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, Properties.NOTIFY|WRITE|READ)
-Characteristic(handle=0x0008, end=0x0009, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, Properties.NOTIFY|WRITE|READ)
+CharacteristicDeclaration(handle=0x0007, value_handle=0x0008, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, READ|WRITE|NOTIFY)
+Characteristic(handle=0x0008, end=0x0009, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, READ|WRITE|NOTIFY)
 Descriptor(handle=0x0009, type=UUID-16:2902 (Client Characteristic Configuration), value=0000)"""
     )
 
