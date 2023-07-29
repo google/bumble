@@ -38,6 +38,8 @@ from .hci import (
     HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
     HCI_LE_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
     HCI_READ_BUFFER_SIZE_COMMAND,
+    HCI_READ_LOCAL_SUPPORTED_CODECS_V1_COMMAND,
+    HCI_READ_LOCAL_SUPPORTED_CODECS_V2_COMMAND,
     HCI_READ_LOCAL_VERSION_INFORMATION_COMMAND,
     HCI_RESET_COMMAND,
     HCI_SUCCESS,
@@ -60,6 +62,8 @@ from .hci import (
     HCI_Packet,
     HCI_Read_Buffer_Size_Command,
     HCI_Read_Local_Supported_Commands_Command,
+    HCI_Read_Local_Supported_Codecs_V1_Command,
+    HCI_Read_Local_Supported_Codecs_V2_Command,
     HCI_Read_Local_Version_Information_Command,
     HCI_Reset_Command,
     HCI_Set_Event_Mask_Command,
@@ -131,6 +135,7 @@ class Host(AbortableEventEmitter):
         self.acl_packets_in_flight = 0
         self.local_version = None
         self.local_supported_commands = bytes(64)
+        self.local_supported_codecs = None
         self.local_le_features = 0
         self.suggested_max_tx_octets = 251  # Max allowed
         self.suggested_max_tx_time = 2120  # Max allowed
@@ -442,6 +447,55 @@ class Host(AbortableEventEmitter):
         return [
             feature for feature in range(64) if self.local_le_features & (1 << feature)
         ]
+
+    async def get_local_supported_codecs(self):
+        if self.local_supported_codecs is None:
+            if self.supports_command(HCI_READ_LOCAL_SUPPORTED_CODECS_V2_COMMAND):
+                response = self.send_command(
+                    HCI_Read_Local_Supported_Codecs_V2_Command(), check_result=True
+                )
+
+            elif self.supports_command(HCI_READ_LOCAL_SUPPORTED_CODECS_V1_COMMAND):
+                response = self.send_command(
+                    HCI_Read_Local_Supported_Codecs_V1_Command(), check_result=True
+                )
+            else:
+                logger.warning('no HCI commands for reading codec are supported')
+                return None
+
+            return_param = response.return_parameters
+
+            standard_codecs = []
+            for i in range(return_param.num_supported_standard_codecs):
+                standard_codec = {
+                    'standard_codec_id': return_param.standard_codec_id[i],
+                    'transport': return_param.standard_codec_transport[i]
+                    if hasattr(return_param, 'standard_codec_transport')
+                    else HCI_Read_Local_Supported_Codecs_V2_Command.CODEC_TRANSPORT_BR_EDR_ACL,
+                }
+                standard_codecs.append(standard_codec)
+
+            vendor_specific_codecs = []
+            for i in range(return_param.num_supported_vendor_specific_codecs):
+                vs_codec = {
+                    'vendor_id': struct.unpack_from(
+                        '<H', return_param.vendor_specific_codec_id, i * 4
+                    )[0],
+                    'vendor_codec_id': struct.unpack_from(
+                        '<H', return_param.vendor_specific_codec_id, i * 4 + 2
+                    )[0],
+                    'transport': return_param.vendor_specific_codec_transport[i]
+                    if hasattr(return_param, 'vendor_specific_codec_transport')
+                    else HCI_Read_Local_Supported_Codecs_V2_Command.CODEC_TRANSPORT_BR_EDR_ACL,
+                }
+                vendor_specific_codecs.append(vs_codec)
+
+            self.local_supported_codecs = {
+                'standard_codecs': standard_codecs,
+                "vendor_specific_codecs": vendor_specific_codecs,
+            }
+
+        return self.local_supported_codecs
 
     # Packet Sink protocol (packets coming from the controller via HCI)
     def on_packet(self, packet):
