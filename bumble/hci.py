@@ -1375,6 +1375,28 @@ HCI_LE_SUPPORTED_FEATURES_NAMES = {
     if feature_name.startswith('HCI_') and feature_name.endswith('_LE_SUPPORTED_FEATURE')
 }
 
+HCI_CODEC_ID_U_LAW_LOG                 = 0x00
+HCI_CODEC_ID_A_LAW_LOG                 = 0x01
+HCI_CODEC_ID_CVSD                      = 0x02
+HCI_CODEC_ID_TRANSPARENT               = 0x03
+HCI_CODEC_ID_LEAR_PCM                  = 0x04
+HCI_CODEC_ID_MSBC                      = 0x05
+HCI_CODEC_ID_LC3                       = 0x06
+HCI_CODEC_ID_G_729A                    = 0x07
+HCI_CODEC_ID_VENDOR_SPECIFIC           = 0xff
+
+HCI_CODEC_NAMES = {
+    HCI_CODEC_ID_U_LAW_LOG: 'u-law log',
+    HCI_CODEC_ID_A_LAW_LOG: 'a-law log',
+    HCI_CODEC_ID_CVSD: 'CVSD',
+    HCI_CODEC_ID_TRANSPARENT: 'Transparent',
+    HCI_CODEC_ID_LEAR_PCM: 'Lear PCM',
+    HCI_CODEC_ID_MSBC: 'mSBC',
+    HCI_CODEC_ID_LC3: 'LC3',
+    HCI_CODEC_ID_G_729A: 'G.729A',
+    HCI_CODEC_ID_VENDOR_SPECIFIC: 'VENDOR SPECIFIC',
+}
+
 # fmt: on
 # pylint: enable=line-too-long
 # pylint: disable=invalid-name
@@ -3154,6 +3176,22 @@ class HCI_Read_Local_Supported_Codecs_V2_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.4.8 Read Local Supported Codecs Command
     '''
+
+    CODEC_TRANSPORT_BR_EDR_ACL = 0x00
+    CODEC_TRANSPORT_BR_EDR_SCO_ESCO = 0x01
+    CODEC_TRANSPORT_LE_CIS = 0x02
+    CODEC_TRANSPORT_LE_BIS = 0x03
+
+    CODEC_TRANSPORT_NAMES = {
+        CODEC_TRANSPORT_BR_EDR_ACL: 'BR_EDR_ACL',
+        CODEC_TRANSPORT_BR_EDR_SCO_ESCO: 'BR_EDR_SCO_ESCO',
+        CODEC_TRANSPORT_LE_CIS: 'LE_CIS',
+        CODEC_TRANSPORT_LE_BIS: 'LE_BIS',
+    }
+
+    @classmethod
+    def codec_support_transport_name(cls, transport):
+        return name_or_number(cls.CODEC_TRANSPORT_NAMES, transport)
 
 
 # -----------------------------------------------------------------------------
