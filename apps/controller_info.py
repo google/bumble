@@ -26,6 +26,7 @@ from bumble.core import name_or_number
 from bumble.hci import (
     map_null_terminated_utf8_string,
     HCI_SUCCESS,
+    HCI_CODEC_NAMES,
     HCI_LE_SUPPORTED_FEATURES_NAMES,
     HCI_VERSION_NAMES,
     LMP_VERSION_NAMES,
@@ -36,6 +37,7 @@ from bumble.hci import (
     HCI_Read_BD_ADDR_Command,
     HCI_READ_LOCAL_NAME_COMMAND,
     HCI_Read_Local_Name_Command,
+    HCI_Read_Local_Supported_Codecs_V2_Command,
     HCI_LE_READ_MAXIMUM_DATA_LENGTH_COMMAND,
     HCI_LE_Read_Maximum_Data_Length_Command,
     HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND,
@@ -73,6 +75,59 @@ async def get_classic_info(host):
             print(
                 color('Local Name:', 'yellow'),
                 map_null_terminated_utf8_string(response.return_parameters.local_name),
+            )
+
+
+# -----------------------------------------------------------------------------
+async def get_codec_info(host):
+    codec_support = await host.get_local_supported_codecs()
+
+    if codec_support is None:
+        print(color('Codec Support: ', 'red'), 'None')
+        return
+
+    print(color('Codec Support: ', 'yellow'))
+
+    print(color('  Standard Codec:', 'green'))
+    if len(codec_support['standard_codec']) == 0:
+        print(color('    None', 'red'))
+    else:
+        standard_codec = codec_support['standard_standard']
+        for i in range(len(standard_codec)):
+            print(color(f'    codec[{i}]:', 'green'))
+            print(
+                color('      name: ', 'green'),
+                name_or_number(HCI_CODEC_NAMES, standard_codec[i]['standard_codec_id']),
+            )
+            print(
+                color('      transport: ', 'green'),
+                name_or_number(
+                    HCI_Read_Local_Supported_Codecs_V2_Command.CODEC_TRANSPORT_NAMES,
+                    standard_codec[i]['transport'],
+                ),
+            )
+
+    print(color('  Vendor Specific Codec:', 'green'))
+    if len(codec_support['vendor_specific_codecs']) == 0:
+        print(color('    None', 'red'))
+    else:
+        vs_codec = codec_support['vendor_specific_codecs']
+        for i in range(len(vs_codec)):
+            print(color(f'    codec[{i}]:', 'green'))
+            print(
+                color('      vendor_name: ', 'green'),
+                name_or_number(COMPANY_IDENTIFIERS, vs_codec[i]['vendor_id']),
+            )
+            print(
+                color('      codec_id: ', 'green'),
+                f"0x{vs_codec[i]['vendor_codec_id']:X}",
+            )
+            print(
+                color('      transport: ', 'green'),
+                name_or_number(
+                    HCI_Read_Local_Supported_Codecs_V2_Command.CODEC_TRANSPORT_NAMES,
+                    vs_codec[i]['transport'],
+                ),
             )
 
 
@@ -149,6 +204,8 @@ async def async_main(transport):
 
         # Get the Classic info
         await get_classic_info(host)
+
+        await get_codec_info(host)
 
         # Get the LE info
         await get_le_info(host)
