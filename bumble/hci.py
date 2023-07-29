@@ -115,6 +115,8 @@ HCI_VERSION_BLUETOOTH_CORE_5_0     = 9
 HCI_VERSION_BLUETOOTH_CORE_5_1     = 10
 HCI_VERSION_BLUETOOTH_CORE_5_2     = 11
 HCI_VERSION_BLUETOOTH_CORE_5_3     = 12
+HCI_VERSION_BLUETOOTH_CORE_5_4     = 13
+
 
 HCI_VERSION_NAMES = {
     HCI_VERSION_BLUETOOTH_CORE_1_0B:    'HCI_VERSION_BLUETOOTH_CORE_1_0B',
@@ -129,7 +131,8 @@ HCI_VERSION_NAMES = {
     HCI_VERSION_BLUETOOTH_CORE_5_0:     'HCI_VERSION_BLUETOOTH_CORE_5_0',
     HCI_VERSION_BLUETOOTH_CORE_5_1:     'HCI_VERSION_BLUETOOTH_CORE_5_1',
     HCI_VERSION_BLUETOOTH_CORE_5_2:     'HCI_VERSION_BLUETOOTH_CORE_5_2',
-    HCI_VERSION_BLUETOOTH_CORE_5_3:     'HCI_VERSION_BLUETOOTH_CORE_5_3'
+    HCI_VERSION_BLUETOOTH_CORE_5_3:     'HCI_VERSION_BLUETOOTH_CORE_5_3',
+    HCI_VERSION_BLUETOOTH_CORE_5_4:     'HCI_VERSION_BLUETOOTH_CORE_5_4',
 }
 
 # LMP Version
@@ -412,7 +415,7 @@ HCI_READ_LOCAL_EXTENDED_FEATURES_COMMAND                                 = hci_c
 HCI_READ_BUFFER_SIZE_COMMAND                                             = hci_command_op_code(0x04, 0x0005)
 HCI_READ_BD_ADDR_COMMAND                                                 = hci_command_op_code(0x04, 0x0009)
 HCI_READ_DATA_BLOCK_SIZE_COMMAND                                         = hci_command_op_code(0x04, 0x000A)
-HCI_READ_LOCAL_SUPPORTED_CODECS_COMMAND                                  = hci_command_op_code(0x04, 0x000B)
+HCI_READ_LOCAL_SUPPORTED_CODECS_V1_COMMAND                               = hci_command_op_code(0x04, 0x000B)
 HCI_READ_LOCAL_SIMPLE_PAIRING_OPTIONS_COMMAND                            = hci_command_op_code(0x04, 0x000C)
 HCI_READ_LOCAL_SUPPORTED_CODECS_V2_COMMAND                               = hci_command_op_code(0x04, 0x000D)
 HCI_READ_LOCAL_SUPPORTED_CODEC_CAPABILITIES_COMMAND                      = hci_command_op_code(0x04, 0x000E)
@@ -1132,7 +1135,7 @@ HCI_SUPPORTED_COMMANDS_FLAGS = (
         None,
         HCI_ENHANCED_SETUP_SYNCHRONOUS_CONNECTION_COMMAND,
         HCI_ENHANCED_ACCEPT_SYNCHRONOUS_CONNECTION_REQUEST_COMMAND,
-        HCI_READ_LOCAL_SUPPORTED_CODECS_COMMAND,
+        HCI_READ_LOCAL_SUPPORTED_CODECS_V1_COMMAND,
         HCI_SET_MWS_CHANNEL_PARAMETERS_COMMAND,
         HCI_SET_EXTERNAL_FRAME_CONFIGURATION_COMMAND
     ),
@@ -1460,15 +1463,55 @@ class HCI_Object:
     def dict_from_bytes(data, offset, fields):
         result = collections.OrderedDict()
         for (field_name, field_type) in fields:
+            variadic_field = False
             # The field_type may be a dictionary with a mapper, parser, and/or size
             if isinstance(field_type, dict):
                 if 'size' in field_type:
                     field_type = field_type['size']
                 elif 'parser' in field_type:
                     field_type = field_type['parser']
+                elif 'size_field' in field_type:
+                    variadic_field = True
+                    # this allows us to use another field
+                    # as size of this one
+                    # This is useful for variable length fields
+                    # whose sizes are saved in, or
+                    # can be derived from another field.
+                    # An optional customized transformer function is
+                    # accepted as, if provided, the value of the specified size field
+                    # will be passed as argument and its return value is used as the
+                    # size of this field.
+                    # E.g., see the return parameters of
+                    # HCI_Read_Local_Supported_Codecs and
+                    # HCI_Read_Local_Supported_Codec_Capabilities commands
+                    size_field_name = field_type['size_field']
+                    if size_field_name not in result:
+                        raise ValueError("size field not present")
+
+                    size_field_value = result['size_field_name']
+                    if 'transformer' in field_type and callable(
+                        field_type['transformer']
+                    ):
+                        field_type = field_type['transformer'](size_field_value)
+                    else:
+                        if not isinstance(size_field_value, int):
+                            raise ValueError(
+                                f"size_field value of {field_name} not an integer"
+                            )
+
+                        field_type = size_field_value
+
+                    if field_type + offset > len(data):
+                        raise ValueError(f"length of `{field_name}` trespasses data")
 
             # Parse the field
-            if field_type == '*':
+            if (
+                isinstance(field_type, int) and 4 < field_type <= 256
+            ) or variadic_field:
+                # Byte array (from 5 up to 256 bytes)
+                field_value = data[offset : offset + field_type]
+                offset += field_type
+            elif field_type == '*':
                 # The rest of the bytes
                 field_value = data[offset:]
                 offset += len(field_value)
@@ -1505,10 +1548,6 @@ class HCI_Object:
                 # 32-bit unsigned big-endian
                 field_value = struct.unpack_from('>I', data, offset)[0]
                 offset += 4
-            elif isinstance(field_type, int) and 4 < field_type <= 256:
-                # Byte array (from 5 up to 256 bytes)
-                field_value = data[offset : offset + field_type]
-                offset += field_type
             elif callable(field_type):
                 offset, field_value = field_type(data, offset)
             else:
@@ -3011,7 +3050,12 @@ class HCI_Read_Local_Supported_Commands_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command()
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('lmp_features', 8),
+    ]
+)
 class HCI_Read_Local_Supported_Features_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.4.3 Read Local Supported Features Command
@@ -3064,10 +3108,112 @@ class HCI_Read_BD_ADDR_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command()
-class HCI_Read_Local_Supported_Codecs_Command(HCI_Command):
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('num_supported_standard_codecs', 1),
+        ('standard_codec_id', {'size_field': 'num_supported_standard_codecs'}),
+        ('num_supported_vendor_specific_codecs', 1),
+        (
+            'vendor_specific_codec_id',
+            {
+                'size_field': 'num_supported_vendor_specific_codec',
+                'tranformer': lambda x: x * 4,
+            },
+        ),
+    ]
+)
+class HCI_Read_Local_Supported_Codecs_V1_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.4.8 Read Local Supported Codecs Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('num_supported_standard_codecs', 1),
+        ('standard_codec_id', {'size_field': 'num_supported_standard_codecs'}),
+        ('standard_codec_transport', {'size_field': 'num_supported_standard_codecs'}),
+        ('num_supported_vendor_specific_codecs', 1),
+        (
+            'vendor_specific_codec_id',
+            {
+                'size_field': 'num_supported_vendor_specific_codec',
+                'transformer': lambda x: x * 4,
+            },
+        ),
+        (
+            'vendor_specific_codec_transport',
+            {'size_field': 'num_supported_vendor_specific_codecs'},
+        ),
+    ]
+)
+class HCI_Read_Local_Supported_Codecs_V2_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.4.8 Read Local Supported Codecs Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('simple_pairing_options', 1),
+        ('max_encryption_key_size', 1),
+    ]
+)
+class HCI_Read_Local_Simple_Pairing_Options_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.4.9 Read Local Simple Pairing Options Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('codec_id', 5),
+        ('logical_transport_type', 1),
+        ('direction', 1),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('num_codec_capabilities', 1),
+        ('codec_capability_length', {'size_field': 'num_codec_capabilities'}),
+        (
+            'codec_capability',
+            {
+                'size_field': 'codec_capability_length',
+                'transformer': lambda len_bytes: sum(len_bytes),
+            },
+        ),
+    ],
+)
+class HCI_Read_Local_Supported_Codec_Capabilities_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.4.10 Read Local Supported Codec Capabilities command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('codec_id', 5),
+        ('logical_transport_type', 1),
+        ('direction', 1),
+        ('codec_configuration_length', 1),
+        ('codec_configuration', {'size_field': 'codec_configuration_length'}),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('min_controller_delay', 3),
+        ('max_controller_delay', 3),
+    ],
+)
+class HCI_Read_Local_Supported_Controller_Delay_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.4.11 Read Local Supported Controller Delay Command
     '''
 
 
