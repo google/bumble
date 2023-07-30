@@ -1250,6 +1250,50 @@ class Controller:
         }
         return bytes([HCI_SUCCESS])
 
+    def on_hci_le_set_advertising_set_random_address_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.52 LE Set Random Address Command
+        '''
+        # For now we just accept the command but ignore the values.
+        # TODO: respect the passed in values.
+        return bytes([HCI_SUCCESS])
+
+    def on_hci_le_set_extended_advertising_parameters_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.53 LE Set Extended Advertising Parameters
+        Command
+        '''
+        # For now we just accept the command but ignore the values.
+        # TODO: respect the passed in values.
+        return bytes([HCI_SUCCESS])
+
+    def on_hci_le_set_extended_advertising_data_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.54 LE Set Extended Advertising Data
+        Command
+        '''
+        # For now we just accept the command but ignore the values.
+        # TODO: respect the passed in values.
+        return bytes([HCI_SUCCESS])
+
+    def on_hci_le_set_extended_scan_response_data_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.55 LE Set Extended Scan Response Data
+        Command
+        '''
+        # For now we just accept the command but ignore the values.
+        # TODO: respect the passed in values.
+        return bytes([HCI_SUCCESS])
+
+    def on_hci_le_set_extended_advertising_enable_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.56 LE Set Extended Advertising Enable
+        Command
+        '''
+        # For now we just accept the command but ignore the values.
+        # TODO: respect the passed in values.
+        return bytes([HCI_SUCCESS])
+
     def on_hci_le_read_transmit_power_command(self, _command):
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.74 LE Read Transmit Power Command
