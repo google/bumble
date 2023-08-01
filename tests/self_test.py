@@ -557,6 +557,26 @@ async def test_self_smp_over_classic():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_self_smp_public_address():
+    pairing_config = PairingConfig(
+        mitm=True,
+        sc=True,
+        bonding=True,
+        identity_address_type=PairingConfig.AddressType.PUBLIC,
+        delegate=PairingDelegate(
+            PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_YES_NO_INPUT,
+            PairingDelegate.KeyDistribution.DISTRIBUTE_ENCRYPTION_KEY
+            | PairingDelegate.KeyDistribution.DISTRIBUTE_IDENTITY_KEY
+            | PairingDelegate.KeyDistribution.DISTRIBUTE_SIGNING_KEY
+            | PairingDelegate.KeyDistribution.DISTRIBUTE_LINK_KEY,
+        ),
+    )
+
+    await _test_self_smp_with_configs(pairing_config, pairing_config)
+
+
+# -----------------------------------------------------------------------------
 async def run_test_self():
     await test_self_connection()
     await test_self_gatt()
@@ -565,6 +585,7 @@ async def run_test_self():
     await test_self_smp_reject()
     await test_self_smp_wrong_pin()
     await test_self_smp_over_classic()
+    await test_self_smp_public_address()
 
 
 # -----------------------------------------------------------------------------
