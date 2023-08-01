@@ -19,6 +19,7 @@ import enum
 from typing import Optional, Tuple
 
 from .hci import (
+    Address,
     HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
     HCI_DISPLAY_ONLY_IO_CAPABILITY,
     HCI_DISPLAY_YES_NO_IO_CAPABILITY,
@@ -168,21 +169,28 @@ class PairingDelegate:
 class PairingConfig:
     """Configuration for the Pairing protocol."""
 
+    class AddressType(enum.IntEnum):
+        PUBLIC = Address.PUBLIC_DEVICE_ADDRESS
+        RANDOM = Address.RANDOM_DEVICE_ADDRESS
+
     def __init__(
         self,
         sc: bool = True,
         mitm: bool = True,
         bonding: bool = True,
         delegate: Optional[PairingDelegate] = None,
+        identity_address_type: Optional[AddressType] = None,
     ) -> None:
         self.sc = sc
         self.mitm = mitm
         self.bonding = bonding
         self.delegate = delegate or PairingDelegate()
+        self.identity_address_type = identity_address_type
 
     def __str__(self) -> str:
         return (
             f'PairingConfig(sc={self.sc}, '
             f'mitm={self.mitm}, bonding={self.bonding}, '
+            f'identity_address_type={self.identity_address_type}, '
             f'delegate[{self.delegate.io_capability}])'
         )

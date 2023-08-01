@@ -993,6 +993,19 @@ class Session:
             )
         )
 
+    def send_identity_address_command(self) -> None:
+        identity_address = {
+            None: self.connection.self_address,
+            Address.PUBLIC_DEVICE_ADDRESS: self.manager.device.public_address,
+            Address.RANDOM_DEVICE_ADDRESS: self.manager.device.random_address,
+        }[self.pairing_config.identity_address_type]
+        self.send_command(
+            SMP_Identity_Address_Information_Command(
+                addr_type=identity_address.address_type,
+                bd_addr=identity_address,
+            )
+        )
+
     def start_encryption(self, key: bytes) -> None:
         # We can now encrypt the connection with the short term key, so that we can
         # distribute the long term and/or other keys over an encrypted connection
@@ -1016,6 +1029,7 @@ class Session:
         self.ltk = crypto.h6(ilk, b'brle')
 
     def distribute_keys(self) -> None:
+
         # Distribute the keys as required
         if self.is_initiator:
             # CTKD: Derive LTK from LinkKey
@@ -1045,12 +1059,7 @@ class Session:
                         identity_resolving_key=self.manager.device.irk
                     )
                 )
-                self.send_command(
-                    SMP_Identity_Address_Information_Command(
-                        addr_type=self.connection.self_address.address_type,
-                        bd_addr=self.connection.self_address,
-                    )
-                )
+                self.send_identity_address_command()
 
             # Distribute CSRK
             csrk = bytes(16)  # FIXME: testing
@@ -1094,12 +1103,7 @@ class Session:
                         identity_resolving_key=self.manager.device.irk
                     )
                 )
-                self.send_command(
-                    SMP_Identity_Address_Information_Command(
-                        addr_type=self.connection.self_address.address_type,
-                        bd_addr=self.connection.self_address,
-                    )
-                )
+                self.send_identity_address_command()
 
             # Distribute CSRK
             csrk = bytes(16)  # FIXME: testing
