@@ -46,6 +46,7 @@ from bumble.hci import (
     HCI_LE_Set_Advertising_Parameters_Command,
     HCI_LE_Set_Default_PHY_Command,
     HCI_LE_Set_Event_Mask_Command,
+    HCI_LE_Set_Extended_Advertising_Enable_Command,
     HCI_LE_Set_Extended_Scan_Parameters_Command,
     HCI_LE_Set_Random_Address_Command,
     HCI_LE_Set_Scan_Enable_Command,
@@ -423,6 +424,25 @@ def test_HCI_LE_Set_Extended_Scan_Parameters_Command():
 
 
 # -----------------------------------------------------------------------------
+def test_HCI_LE_Set_Extended_Advertising_Enable_Command():
+    command = HCI_Packet.from_bytes(
+        bytes.fromhex('0139200e010301050008020600090307000a')
+    )
+    assert command.enable == 1
+    assert command.advertising_handles == [1, 2, 3]
+    assert command.durations == [5, 6, 7]
+    assert command.max_extended_advertising_events == [8, 9, 10]
+
+    command = HCI_LE_Set_Extended_Advertising_Enable_Command(
+        enable=1,
+        advertising_handles=[1, 2, 3],
+        durations=[5, 6, 7],
+        max_extended_advertising_events=[8, 9, 10],
+    )
+    basic_check(command)
+
+
+# -----------------------------------------------------------------------------
 def test_address():
     a = Address('C4:F2:17:1A:1D:BB')
     assert not a.is_public
@@ -478,6 +498,7 @@ def run_test_commands():
     test_HCI_LE_Read_Remote_Features_Command()
     test_HCI_LE_Set_Default_PHY_Command()
     test_HCI_LE_Set_Extended_Scan_Parameters_Command()
+    test_HCI_LE_Set_Extended_Advertising_Enable_Command()
 
 
 # -----------------------------------------------------------------------------
