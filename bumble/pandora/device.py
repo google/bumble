@@ -34,6 +34,10 @@ from bumble.sdp import (
 from typing import Any, Dict, List, Optional
 
 
+# Default rootcanal HCI TCP address
+ROOTCANAL_HCI_ADDRESS = "localhost:6402"
+
+
 class PandoraDevice:
     """
     Small wrapper around a Bumble device and it's HCI transport.
@@ -53,7 +57,9 @@ class PandoraDevice:
     def __init__(self, config: Dict[str, Any]) -> None:
         self.config = config
         self.device = _make_device(config)
-        self._hci_name = config.get('transport', '')
+        self._hci_name = config.get(
+            'transport', f"tcp-client:{config.get('tcp', ROOTCANAL_HCI_ADDRESS)}"
+        )
         self._hci = None
 
     @property
