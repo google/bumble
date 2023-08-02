@@ -1272,7 +1272,7 @@ class Session:
             keys.link_key = PairingKeys.Key(
                 value=self.link_key, authenticated=authenticated
             )
-        self.manager.on_pairing(self, peer_address, keys)
+        await self.manager.on_pairing(self, peer_address, keys)
 
     def on_pairing_failure(self, reason: int) -> None:
         logger.warning(f'pairing failure ({error_name(reason)})')
@@ -1827,20 +1827,13 @@ class Manager(EventEmitter):
     def on_session_start(self, session: Session) -> None:
         self.device.on_pairing_start(session.connection)
 
-    def on_pairing(
+    async def on_pairing(
         self, session: Session, identity_address: Optional[Address], keys: PairingKeys
     ) -> None:
         # Store the keys in the key store
         if self.device.keystore and identity_address is not None:
-
-            async def store_keys():
-                try:
-                    assert self.device.keystore
-                    await self.device.keystore.update(str(identity_address), keys)
-                except Exception as error:
-                    logger.warning(f'!!! error while storing keys: {error}')
-
-            self.device.abort_on('flush', store_keys())
+            await self.device.keystore.update(str(identity_address), keys)
+            await self.device.refresh_resolving_list()
 
         # Notify the device
         self.device.on_pairing(session.connection, identity_address, keys, session.sc)
