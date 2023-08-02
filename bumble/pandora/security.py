@@ -99,7 +99,7 @@ class PairingDelegate(BasePairingDelegate):
         return ev
 
     async def confirm(self, auto: bool = False) -> bool:
-        self.log.info(
+        self.log.debug(
             f"Pairing event: `just_works` (io_capability: {self.io_capability})"
         )
 
@@ -114,7 +114,7 @@ class PairingDelegate(BasePairingDelegate):
         return answer.confirm
 
     async def compare_numbers(self, number: int, digits: int = 6) -> bool:
-        self.log.info(
+        self.log.debug(
             f"Pairing event: `numeric_comparison` (io_capability: {self.io_capability})"
         )
 
@@ -129,7 +129,7 @@ class PairingDelegate(BasePairingDelegate):
         return answer.confirm
 
     async def get_number(self) -> Optional[int]:
-        self.log.info(
+        self.log.debug(
             f"Pairing event: `passkey_entry_request` (io_capability: {self.io_capability})"
         )
 
@@ -146,7 +146,7 @@ class PairingDelegate(BasePairingDelegate):
         return answer.passkey
 
     async def get_string(self, max_length: int) -> Optional[str]:
-        self.log.info(
+        self.log.debug(
             f"Pairing event: `pin_code_request` (io_capability: {self.io_capability})"
         )
 
@@ -177,7 +177,7 @@ class PairingDelegate(BasePairingDelegate):
         ):
             return
 
-        self.log.info(
+        self.log.debug(
             f"Pairing event: `passkey_entry_notification` (io_capability: {self.io_capability})"
         )
 
@@ -247,7 +247,7 @@ class SecurityService(SecurityServicer):
     async def OnPairing(
         self, request: AsyncIterator[PairingEventAnswer], context: grpc.ServicerContext
     ) -> AsyncGenerator[PairingEvent, None]:
-        self.log.info('OnPairing')
+        self.log.debug('OnPairing')
 
         if self.event_queue is not None:
             raise RuntimeError('already streaming pairing events')
@@ -273,7 +273,7 @@ class SecurityService(SecurityServicer):
         self, request: SecureRequest, context: grpc.ServicerContext
     ) -> SecureResponse:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-        self.log.info(f"Secure: {connection_handle}")
+        self.log.debug(f"Secure: {connection_handle}")
 
         connection = self.device.lookup_connection(connection_handle)
         assert connection
@@ -291,7 +291,7 @@ class SecurityService(SecurityServicer):
         # trigger pairing if needed
         if self.need_pairing(connection, level):
             try:
-                self.log.info('Pair...')
+                self.log.debug('Pair...')
 
                 if (
                     connection.transport == BT_LE_TRANSPORT
@@ -309,7 +309,7 @@ class SecurityService(SecurityServicer):
                 else:
                     await connection.pair()
 
-                self.log.info('Paired')
+                self.log.debug('Paired')
             except asyncio.CancelledError:
                 self.log.warning("Connection died during encryption")
                 return SecureResponse(connection_died=empty_pb2.Empty())
@@ -320,9 +320,9 @@ class SecurityService(SecurityServicer):
         # trigger authentication if needed
         if self.need_authentication(connection, level):
             try:
-                self.log.info('Authenticate...')
+                self.log.debug('Authenticate...')
                 await connection.authenticate()
-                self.log.info('Authenticated')
+                self.log.debug('Authenticated')
             except asyncio.CancelledError:
                 self.log.warning("Connection died during authentication")
                 return SecureResponse(connection_died=empty_pb2.Empty())
@@ -333,9 +333,9 @@ class SecurityService(SecurityServicer):
         # trigger encryption if needed
         if self.need_encryption(connection, level):
             try:
-                self.log.info('Encrypt...')
+                self.log.debug('Encrypt...')
                 await connection.encrypt()
-                self.log.info('Encrypted')
+                self.log.debug('Encrypted')
             except asyncio.CancelledError:
                 self.log.warning("Connection died during encryption")
                 return SecureResponse(connection_died=empty_pb2.Empty())
@@ -353,7 +353,7 @@ class SecurityService(SecurityServicer):
         self, request: WaitSecurityRequest, context: grpc.ServicerContext
     ) -> WaitSecurityResponse:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-        self.log.info(f"WaitSecurity: {connection_handle}")
+        self.log.debug(f"WaitSecurity: {connection_handle}")
 
         connection = self.device.lookup_connection(connection_handle)
         assert connection
@@ -390,7 +390,7 @@ class SecurityService(SecurityServicer):
 
         def set_failure(name: str) -> Callable[..., None]:
             def wrapper(*args: Any) -> None:
-                self.log.info(f'Wait for security: error `{name}`: {args}')
+                self.log.debug(f'Wait for security: error `{name}`: {args}')
                 wait_for_security.set_result(name)
 
             return wrapper
@@ -398,13 +398,13 @@ class SecurityService(SecurityServicer):
         def try_set_success(*_: Any) -> None:
             assert connection
             if self.reached_security_level(connection, level):
-                self.log.info('Wait for security: done')
+                self.log.debug('Wait for security: done')
                 wait_for_security.set_result('success')
 
         def on_encryption_change(*_: Any) -> None:
             assert connection
             if self.reached_security_level(connection, level):
-                self.log.info('Wait for security: done')
+                self.log.debug('Wait for security: done')
                 wait_for_security.set_result('success')
             elif (
                 connection.transport == BT_BR_EDR_TRANSPORT
@@ -432,7 +432,7 @@ class SecurityService(SecurityServicer):
         if self.reached_security_level(connection, level):
             return WaitSecurityResponse(success=empty_pb2.Empty())
 
-        self.log.info('Wait for security...')
+        self.log.debug('Wait for security...')
         kwargs = {}
         kwargs[await wait_for_security] = empty_pb2.Empty()
 
@@ -442,12 +442,12 @@ class SecurityService(SecurityServicer):
 
         # wait for `authenticate` to finish if any
         if authenticate_task is not None:
-            self.log.info('Wait for authentication...')
+            self.log.debug('Wait for authentication...')
             try:
                 await authenticate_task  # type: ignore
             except:
                 pass
-            self.log.info('Authenticated')
+            self.log.debug('Authenticated')
 
         return WaitSecurityResponse(**kwargs)
 
@@ -503,7 +503,7 @@ class SecurityStorageService(SecurityStorageServicer):
         self, request: IsBondedRequest, context: grpc.ServicerContext
     ) -> wrappers_pb2.BoolValue:
         address = utils.address_from_request(request, request.WhichOneof("address"))
-        self.log.info(f"IsBonded: {address}")
+        self.log.debug(f"IsBonded: {address}")
 
         if self.device.keystore is not None:
             is_bonded = await self.device.keystore.get(str(address)) is not None
@@ -517,7 +517,7 @@ class SecurityStorageService(SecurityStorageServicer):
         self, request: DeleteBondRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
         address = utils.address_from_request(request, request.WhichOneof("address"))
-        self.log.info(f"DeleteBond: {address}")
+        self.log.debug(f"DeleteBond: {address}")
 
         if self.device.keystore is not None:
             with suppress(KeyError):
