@@ -232,6 +232,7 @@ class SecurityService(SecurityServicer):
                 sc=config.pairing_sc_enable,
                 mitm=config.pairing_mitm_enable,
                 bonding=config.pairing_bonding_enable,
+                identity_address_type=config.identity_address_type,
                 delegate=PairingDelegate(
                     connection,
                     self,
