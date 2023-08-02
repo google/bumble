@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from bumble.pairing import PairingDelegate
+from bumble.pairing import PairingConfig, PairingDelegate
 from dataclasses import dataclass
 from typing import Any, Dict
 
@@ -20,6 +20,7 @@ from typing import Any, Dict
 @dataclass
 class Config:
     io_capability: PairingDelegate.IoCapability = PairingDelegate.NO_OUTPUT_NO_INPUT
+    identity_address_type: PairingConfig.AddressType = PairingConfig.AddressType.RANDOM
     pairing_sc_enable: bool = True
     pairing_mitm_enable: bool = True
     pairing_bonding_enable: bool = True
@@ -35,6 +36,12 @@ class Config:
             'io_capability', 'no_output_no_input'
         ).upper()
         self.io_capability = getattr(PairingDelegate, io_capability_name)
+        identity_address_type_name: str = config.get(
+            'identity_address_type', 'random'
+        ).upper()
+        self.identity_address_type = getattr(
+            PairingConfig.AddressType, identity_address_type_name
+        )
         self.pairing_sc_enable = config.get('pairing_sc_enable', True)
         self.pairing_mitm_enable = config.get('pairing_mitm_enable', True)
         self.pairing_bonding_enable = config.get('pairing_bonding_enable', True)
