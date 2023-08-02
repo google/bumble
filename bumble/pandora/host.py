@@ -112,7 +112,7 @@ class HostService(HostServicer):
     async def FactoryReset(
         self, request: empty_pb2.Empty, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
-        self.log.info('FactoryReset')
+        self.log.debug('FactoryReset')
 
         # delete all bonds
         if self.device.keystore is not None:
@@ -126,7 +126,7 @@ class HostService(HostServicer):
     async def Reset(
         self, request: empty_pb2.Empty, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
-        self.log.info('Reset')
+        self.log.debug('Reset')
 
         # clear service.
         self.waited_connections.clear()
@@ -139,7 +139,7 @@ class HostService(HostServicer):
     async def ReadLocalAddress(
         self, request: empty_pb2.Empty, context: grpc.ServicerContext
     ) -> ReadLocalAddressResponse:
-        self.log.info('ReadLocalAddress')
+        self.log.debug('ReadLocalAddress')
         return ReadLocalAddressResponse(
             address=bytes(reversed(bytes(self.device.public_address)))
         )
@@ -152,7 +152,7 @@ class HostService(HostServicer):
         address = Address(
             bytes(reversed(request.address)), address_type=Address.PUBLIC_DEVICE_ADDRESS
         )
-        self.log.info(f"Connect to {address}")
+        self.log.debug(f"Connect to {address}")
 
         try:
             connection = await self.device.connect(
@@ -167,7 +167,7 @@ class HostService(HostServicer):
                 return ConnectResponse(connection_already_exists=empty_pb2.Empty())
             raise e
 
-        self.log.info(f"Connect to {address} done (handle={connection.handle})")
+        self.log.debug(f"Connect to {address} done (handle={connection.handle})")
 
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectResponse(connection=Connection(cookie=cookie))
@@ -186,7 +186,7 @@ class HostService(HostServicer):
         if address in (Address.NIL, Address.ANY):
             raise ValueError('Invalid address')
 
-        self.log.info(f"WaitConnection from {address}...")
+        self.log.debug(f"WaitConnection from {address}...")
 
         connection = self.device.find_connection_by_bd_addr(
             address, transport=BT_BR_EDR_TRANSPORT
@@ -201,7 +201,7 @@ class HostService(HostServicer):
         # save connection has waited and respond.
         self.waited_connections.add(id(connection))
 
-        self.log.info(
+        self.log.debug(
             f"WaitConnection from {address} done (handle={connection.handle})"
         )
 
@@ -216,7 +216,7 @@ class HostService(HostServicer):
         if address in (Address.NIL, Address.ANY):
             raise ValueError('Invalid address')
 
-        self.log.info(f"ConnectLE to {address}...")
+        self.log.debug(f"ConnectLE to {address}...")
 
         try:
             connection = await self.device.connect(
@@ -233,7 +233,7 @@ class HostService(HostServicer):
                 return ConnectLEResponse(connection_already_exists=empty_pb2.Empty())
             raise e
 
-        self.log.info(f"ConnectLE to {address} done (handle={connection.handle})")
+        self.log.debug(f"ConnectLE to {address} done (handle={connection.handle})")
 
         cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
         return ConnectLEResponse(connection=Connection(cookie=cookie))
@@ -243,12 +243,12 @@ class HostService(HostServicer):
         self, request: DisconnectRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-        self.log.info(f"Disconnect: {connection_handle}")
+        self.log.debug(f"Disconnect: {connection_handle}")
 
-        self.log.info("Disconnecting...")
+        self.log.debug("Disconnecting...")
         if connection := self.device.lookup_connection(connection_handle):
             await connection.disconnect(HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR)
-        self.log.info("Disconnected")
+        self.log.debug("Disconnected")
 
         return empty_pb2.Empty()
 
@@ -257,7 +257,7 @@ class HostService(HostServicer):
         self, request: WaitDisconnectionRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
         connection_handle = int.from_bytes(request.connection.cookie.value, 'big')
-        self.log.info(f"WaitDisconnection: {connection_handle}")
+        self.log.debug(f"WaitDisconnection: {connection_handle}")
 
         if connection := self.device.lookup_connection(connection_handle):
             disconnection_future: asyncio.Future[
@@ -270,7 +270,7 @@ class HostService(HostServicer):
             connection.on('disconnection', on_disconnection)
             try:
                 await disconnection_future
-                self.log.info("Disconnected")
+                self.log.debug("Disconnected")
             finally:
                 connection.remove_listener('disconnection', on_disconnection)  # type: ignore
 
@@ -378,7 +378,7 @@ class HostService(HostServicer):
         try:
             while True:
                 if not self.device.is_advertising:
-                    self.log.info('Advertise')
+                    self.log.debug('Advertise')
                     await self.device.start_advertising(
                         target=target,
                         advertising_type=advertising_type,
@@ -393,10 +393,10 @@ class HostService(HostServicer):
                     bumble.device.Connection
                 ] = asyncio.get_running_loop().create_future()
 
-                self.log.info('Wait for LE connection...')
+                self.log.debug('Wait for LE connection...')
                 connection = await pending_connection
 
-                self.log.info(
+                self.log.debug(
                     f"Advertise: Connected to {connection.peer_address} (handle={connection.handle})"
                 )
 
@@ -410,7 +410,7 @@ class HostService(HostServicer):
                 self.device.remove_listener('connection', on_connection)  # type: ignore
 
             try:
-                self.log.info('Stop advertising')
+                self.log.debug('Stop advertising')
                 await self.device.abort_on('flush', self.device.stop_advertising())
             except:
                 pass
@@ -423,7 +423,7 @@ class HostService(HostServicer):
         if request.phys:
             raise NotImplementedError("TODO: add support for `request.phys`")
 
-        self.log.info('Scan')
+        self.log.debug('Scan')
 
         scan_queue: asyncio.Queue[Advertisement] = asyncio.Queue()
         handler = self.device.on('advertisement', scan_queue.put_nowait)
@@ -470,7 +470,7 @@ class HostService(HostServicer):
         finally:
             self.device.remove_listener('advertisement', handler)  # type: ignore
             try:
-                self.log.info('Stop scanning')
+                self.log.debug('Stop scanning')
                 await self.device.abort_on('flush', self.device.stop_scanning())
             except:
                 pass
@@ -479,7 +479,7 @@ class HostService(HostServicer):
     async def Inquiry(
         self, request: empty_pb2.Empty, context: grpc.ServicerContext
     ) -> AsyncGenerator[InquiryResponse, None]:
-        self.log.info('Inquiry')
+        self.log.debug('Inquiry')
 
         inquiry_queue: asyncio.Queue[
             Optional[Tuple[Address, int, AdvertisingData, int]]
@@ -510,7 +510,7 @@ class HostService(HostServicer):
             self.device.remove_listener('inquiry_complete', complete_handler)  # type: ignore
             self.device.remove_listener('inquiry_result', result_handler)  # type: ignore
             try:
-                self.log.info('Stop inquiry')
+                self.log.debug('Stop inquiry')
                 await self.device.abort_on('flush', self.device.stop_discovery())
             except:
                 pass
@@ -519,7 +519,7 @@ class HostService(HostServicer):
     async def SetDiscoverabilityMode(
         self, request: SetDiscoverabilityModeRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
-        self.log.info("SetDiscoverabilityMode")
+        self.log.debug("SetDiscoverabilityMode")
         await self.device.set_discoverable(request.mode != NOT_DISCOVERABLE)
         return empty_pb2.Empty()
 
@@ -527,7 +527,7 @@ class HostService(HostServicer):
     async def SetConnectabilityMode(
         self, request: SetConnectabilityModeRequest, context: grpc.ServicerContext
     ) -> empty_pb2.Empty:
-        self.log.info("SetConnectabilityMode")
+        self.log.debug("SetConnectabilityMode")
         await self.device.set_connectable(request.mode != NOT_CONNECTABLE)
         return empty_pb2.Empty()
 
