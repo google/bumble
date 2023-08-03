@@ -40,3 +40,17 @@ Check lints:
 ```
 cargo clippy --all-targets
 ```
+
+## Code gen
+
+To have the fastest startup while keeping the build simple, code gen for 
+assigned numbers is done with the `gen_assigned_numbers` tool. It should
+be re-run whenever the Python assigned numbers are changed. To ensure that the
+generated code is kept up to date, the Rust data is compared to the Python
+in tests at `pytests/assigned_numbers.rs`.
+
+To regenerate the assigned number tables based on the Python codebase:
+
+```
+PYTHONPATH=.. cargo run --bin gen-assigned-numbers --features bumble-dev-tools
+```

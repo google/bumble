@@ -59,7 +59,7 @@ impl AdvertisingData {
 }
 
 /// 16-bit UUID
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Uuid16 {
     /// Big-endian bytes
     uuid: [u8; 2],

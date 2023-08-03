@@ -14,40 +14,8 @@
 
 //! Assigned numbers from the Bluetooth spec.
 
-use crate::wrapper::core::Uuid16;
-use lazy_static::lazy_static;
-use pyo3::{
-    intern,
-    types::{PyDict, PyModule},
-    PyResult, Python,
-};
-use std::collections;
-
+mod company_ids;
 mod services;
 
+pub use company_ids::COMPANY_IDS;
 pub use services::SERVICE_IDS;
-
-lazy_static! {
-    /// Assigned company IDs
-    pub static ref COMPANY_IDS: collections::HashMap<Uuid16, String> = load_company_ids()
-    .expect("Could not load company ids -- are Bumble's Python sources available?");
-
-}
-
-fn load_company_ids() -> PyResult<collections::HashMap<Uuid16, String>> {
-    // this takes about 4ms on a fast machine -- slower than constructing in rust, but not slow
-    // enough to worry about
-    Python::with_gil(|py| {
-        PyModule::import(py, intern!(py, "bumble.company_ids"))?
-            .getattr(intern!(py, "COMPANY_IDENTIFIERS"))?
-            .downcast::<PyDict>()?
-            .into_iter()
-            .map(|(k, v)| {
-                Ok((
-                    Uuid16::from_be_bytes(k.extract::<u16>()?.to_be_bytes()),
-                    v.str()?.to_str()?.to_string(),
-                ))
-            })
-            .collect::<PyResult<collections::HashMap<_, _>>>()
-    })
-}

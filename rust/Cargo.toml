@@ -23,6 +23,7 @@ hex = "0.4.3"
 itertools = "0.11.0"
 lazy_static = "1.4.0"
 thiserror = "1.0.41"
+anyhow = { version = "1.0.71", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.28.2", features = ["full"] }
@@ -38,6 +39,11 @@ env_logger = "0.10.0"
 rusb = "0.9.2"
 rand = "0.8.5"
 
+[[bin]]
+name = "gen-assigned-numbers"
+path = "tools/gen_assigned_numbers.rs"
+required-features = ["bumble-dev-tools"]
+
 # test entry point that uses pyo3_asyncio's test harness
 [[test]]
 name = "pytests"
@@ -47,3 +53,4 @@ harness = false
 [features]
 anyhow = ["pyo3/anyhow"]
 pyo3-asyncio-attributes = ["pyo3-asyncio/attributes"]
+bumble-dev-tools = ["dep:anyhow"]
