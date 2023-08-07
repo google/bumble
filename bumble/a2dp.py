@@ -184,8 +184,12 @@ def make_audio_source_service_sdp_records(service_record_handle, version=(1, 3))
             SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
             DataElement.sequence(
                 [
-                    DataElement.uuid(BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE),
-                    DataElement.unsigned_integer_16(version_int),
+                    DataElement.sequence(
+                        [
+                            DataElement.uuid(BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE),
+                            DataElement.unsigned_integer_16(version_int),
+                        ]
+                    )
                 ]
             ),
         ),
@@ -234,8 +238,12 @@ def make_audio_sink_service_sdp_records(service_record_handle, version=(1, 3)):
             SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
             DataElement.sequence(
                 [
-                    DataElement.uuid(BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE),
-                    DataElement.unsigned_integer_16(version_int),
+                    DataElement.sequence(
+                        [
+                            DataElement.uuid(BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE),
+                            DataElement.unsigned_integer_16(version_int),
+                        ]
+                    )
                 ]
             ),
         ),

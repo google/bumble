@@ -17,9 +17,10 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import asyncio
-import logging
-import traceback
 import collections
+import enum
+import functools
+import logging
 import sys
 import warnings
 from typing import (
@@ -34,7 +35,8 @@ from typing import (
     Union,
     overload,
 )
-from functools import wraps, partial
+import traceback
+
 from pyee import EventEmitter
 
 from .colors import color
@@ -131,13 +133,14 @@ class EventWatcher:
         Args:
             emitter: EventEmitter to watch
             event: Event name
-            handler: (Optional) Event handler. When nothing is passed, this method works as a decorator.
+            handler: (Optional) Event handler. When nothing is passed, this method
+            works as a decorator.
         '''
 
-        def wrapper(f: _Handler) -> _Handler:
-            self.handlers.append((emitter, event, f))
-            emitter.on(event, f)
-            return f
+        def wrapper(wrapped: _Handler) -> _Handler:
+            self.handlers.append((emitter, event, wrapped))
+            emitter.on(event, wrapped)
+            return wrapped
 
         return wrapper if handler is None else wrapper(handler)
 
@@ -157,13 +160,14 @@ class EventWatcher:
         Args:
             emitter: EventEmitter to watch
             event: Event name
-            handler: (Optional) Event handler. When nothing passed, this method works as a decorator.
+            handler: (Optional) Event handler. When nothing passed, this method works
+            as a decorator.
         '''
 
-        def wrapper(f: _Handler) -> _Handler:
-            self.handlers.append((emitter, event, f))
-            emitter.once(event, f)
-            return f
+        def wrapper(wrapped: _Handler) -> _Handler:
+            self.handlers.append((emitter, event, wrapped))
+            emitter.once(event, wrapped)
+            return wrapped
 
         return wrapper if handler is None else wrapper(handler)
 
@@ -276,7 +280,7 @@ class AsyncRunner:
         """
 
         def decorator(func):
-            @wraps(func)
+            @functools.wraps(func)
             def wrapper(*args, **kwargs):
                 coroutine = func(*args, **kwargs)
                 if queue is None:
@@ -410,30 +414,35 @@ class FlowControlAsyncPipe:
             self.check_pump()
 
 
+# -----------------------------------------------------------------------------
 async def async_call(function, *args, **kwargs):
     """
-    Immediately calls the function with provided args and kwargs, wrapping it in an async function.
-    Rust's `pyo3_asyncio` library needs functions to be marked async to properly inject a running loop.
+    Immediately calls the function with provided args and kwargs, wrapping it in an
+    async function.
+    Rust's `pyo3_asyncio` library needs functions to be marked async to properly inject
+    a running loop.
 
     result = await async_call(some_function, ...)
     """
     return function(*args, **kwargs)
 
 
+# -----------------------------------------------------------------------------
 def wrap_async(function):
     """
     Wraps the provided function in an async function.
     """
-    return partial(async_call, function)
+    return functools.partial(async_call, function)
 
 
+# -----------------------------------------------------------------------------
 def deprecated(msg: str):
     """
     Throw deprecation warning before execution.
     """
 
     def wrapper(function):
-        @wraps(function)
+        @functools.wraps(function)
         def inner(*args, **kwargs):
             warnings.warn(msg, DeprecationWarning)
             return function(*args, **kwargs)
@@ -443,6 +452,7 @@ def deprecated(msg: str):
     return wrapper
 
 
+# -----------------------------------------------------------------------------
 def experimental(msg: str):
     """
     Throws a future warning before execution.
@@ -457,3 +467,22 @@ def experimental(msg: str):
         return inner
 
     return wrapper
+
+
+# -----------------------------------------------------------------------------
+class OpenIntEnum(enum.IntEnum):
+    """
+    Subclass of enum.IntEnum that can hold integer values outside the set of
+    predefined values. This is convenient for implementing protocols where some
+    integer constants may be added over time.
+    """
+
+    @classmethod
+    def _missing_(cls, value):
+        if not isinstance(value, int):
+            return None
+
+        obj = int.__new__(cls, value)
+        obj._value_ = value
+        obj._name_ = f"{cls.__name__}[{value}]"
+        return obj

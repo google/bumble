@@ -12,15 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# -----------------------------------------------------------------------------
+# Imports
+# -----------------------------------------------------------------------------
 import contextlib
 import logging
 import os
-
-from bumble import utils
-from pyee import EventEmitter
 from unittest.mock import MagicMock
 
+from pyee import EventEmitter
 
+from bumble import utils
+
+
+# -----------------------------------------------------------------------------
 def test_on() -> None:
     emitter = EventEmitter()
     with contextlib.closing(utils.EventWatcher()) as context:
@@ -33,6 +38,7 @@ def test_on() -> None:
     assert mock.call_count == 1
 
 
+# -----------------------------------------------------------------------------
 def test_on_decorator() -> None:
     emitter = EventEmitter()
     with contextlib.closing(utils.EventWatcher()) as context:
@@ -48,6 +54,7 @@ def test_on_decorator() -> None:
     assert mock.call_count == 1
 
 
+# -----------------------------------------------------------------------------
 def test_multiple_handlers() -> None:
     emitter = EventEmitter()
     with contextlib.closing(utils.EventWatcher()) as context:
@@ -65,6 +72,30 @@ def test_multiple_handlers() -> None:
 
 
 # -----------------------------------------------------------------------------
+def test_open_int_enums():
+    class Foo(utils.OpenIntEnum):
+        FOO = 1
+        BAR = 2
+        BLA = 3
+
+    x = Foo(1)
+    assert x.name == "FOO"
+    assert x.value == 1
+    assert int(x) == 1
+    assert x == 1
+    assert x + 1 == 2
+
+    x = Foo(4)
+    assert x.name == "Foo[4]"
+    assert x.value == 4
+    assert int(x) == 4
+    assert x == 4
+    assert x + 1 == 5
+
+    print(list(Foo))
+
+
+# -----------------------------------------------------------------------------
 def run_tests():
     test_on()
     test_on_decorator()
@@ -75,3 +106,4 @@ def run_tests():
 if __name__ == '__main__':
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     run_tests()
+    test_open_int_enums()

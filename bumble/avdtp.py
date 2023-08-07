@@ -241,7 +241,10 @@ async def find_avdtp_service_with_sdp_client(
         )
         if profile_descriptor_list:
             for profile_descriptor in profile_descriptor_list.value:
-                if len(profile_descriptor.value) >= 2:
+                if (
+                    profile_descriptor.type == sdp.DataElement.SEQUENCE
+                    and len(profile_descriptor.value) >= 2
+                ):
                     avdtp_version_major = profile_descriptor.value[1].value >> 8
                     avdtp_version_minor = profile_descriptor.value[1].value & 0xFF
                     return (avdtp_version_major, avdtp_version_minor)
@@ -511,7 +514,8 @@ class MessageAssembler:
         try:
             self.callback(self.transaction_label, message)
         except Exception as error:
-            logger.warning(color(f'!!! exception in callback: {error}'))
+            logger.exception(color(f'!!! exception in callback: {error}', 'red'))
+
         self.reset()
 
 

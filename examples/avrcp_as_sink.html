@@ -1,0 +1,274 @@
+<html>
+
+<head>
+    <style>
+        * {
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+    Server Port <input id="port" type="text" value="8989"></input> <button id="connectButton" onclick="connect()">Connect</button><br>
+    <div id="socketState"></div>
+    <br>
+    <div id="buttons"></div><br>
+    <hr>
+    <button onclick="onGetPlayStatusButtonClicked()">Get Play Status</button><br>
+    <div id="getPlayStatusResponseTable"></div>
+    <hr>
+    <button onclick="onGetElementAttributesButtonClicked()">Get Element Attributes</button><br>
+    <div id="getElementAttributesResponseTable"></div>
+    <hr>
+    <table>
+        <tr>
+            <b>VOLUME</b>:
+            <button onclick="onVolumeDownButtonClicked()">-</button>
+            <button onclick="onVolumeUpButtonClicked()">+</button>&nbsp;
+            <span id="volumeText"></span><br>
+        </tr>
+        <tr>
+            <td><b>PLAYBACK STATUS</b></td><td><span id="playbackStatusText"></span></td>
+        </tr>
+        <tr>
+            <td><b>POSITION</b></td><td><span id="positionText"></span></td>
+        </tr>
+        <tr>
+            <td><b>TRACK</b></td><td><span id="trackText"></span></td>
+        </tr>
+        <tr>
+            <td><b>ADDRESSED PLAYER</b></td><td><span id="addressedPlayerText"></span></td>
+        </tr>
+        <tr>
+            <td><b>UID COUNTER</b></td><td><span id="uidCounterText"></span></td>
+        </tr>
+        <tr>
+            <td><b>SUPPORTED EVENTS</b></td><td><span id="supportedEventsText"></span></td>
+        </tr>
+        <tr>
+            <td><b>PLAYER SETTINGS</b></td><td><div id="playerSettingsTable"></div></td>
+        </tr>
+    </table>
+    <script>
+        const portInput = document.getElementById("port")
+        const connectButton = document.getElementById("connectButton")
+        const socketState = document.getElementById("socketState")
+        const volumeText = document.getElementById("volumeText")
+        const positionText = document.getElementById("positionText")
+        const trackText = document.getElementById("trackText")
+        const playbackStatusText = document.getElementById("playbackStatusText")
+        const addressedPlayerText = document.getElementById("addressedPlayerText")
+        const uidCounterText = document.getElementById("uidCounterText")
+        const supportedEventsText = document.getElementById("supportedEventsText")
+        const playerSettingsTable = document.getElementById("playerSettingsTable")
+        const getPlayStatusResponseTable = document.getElementById("getPlayStatusResponseTable")
+        const getElementAttributesResponseTable = document.getElementById("getElementAttributesResponseTable")
+        let socket
+        let volume = 0
+
+        const keyNames = [
+            "SELECT",
+            "UP",
+            "DOWN",
+            "LEFT",
+            "RIGHT",
+            "RIGHT_UP",
+            "RIGHT_DOWN",
+            "LEFT_UP",
+            "LEFT_DOWN",
+            "ROOT_MENU",
+            "SETUP_MENU",
+            "CONTENTS_MENU",
+            "FAVORITE_MENU",
+            "EXIT",
+            "NUMBER_0",
+            "NUMBER_1",
+            "NUMBER_2",
+            "NUMBER_3",
+            "NUMBER_4",
+            "NUMBER_5",
+            "NUMBER_6",
+            "NUMBER_7",
+            "NUMBER_8",
+            "NUMBER_9",
+            "DOT",
+            "ENTER",
+            "CLEAR",
+            "CHANNEL_UP",
+            "CHANNEL_DOWN",
+            "PREVIOUS_CHANNEL",
+            "SOUND_SELECT",
+            "INPUT_SELECT",
+            "DISPLAY_INFORMATION",
+            "HELP",
+            "PAGE_UP",
+            "PAGE_DOWN",
+            "POWER",
+            "VOLUME_UP",
+            "VOLUME_DOWN",
+            "MUTE",
+            "PLAY",
+            "STOP",
+            "PAUSE",
+            "RECORD",
+            "REWIND",
+            "FAST_FORWARD",
+            "EJECT",
+            "FORWARD",
+            "BACKWARD",
+            "ANGLE",
+            "SUBPICTURE",
+            "F1",
+            "F2",
+            "F3",
+            "F4",
+            "F5",
+        ]
+
+        document.addEventListener('keydown', onKeyDown)
+        document.addEventListener('keyup', onKeyUp)
+
+        const buttons = document.getElementById("buttons")
+        keyNames.forEach(name => {
+            const button = document.createElement("BUTTON")
+            button.appendChild(document.createTextNode(name))
+            button.addEventListener("mousedown", event => {
+                send({type: 'send-key-down', key: name})
+            })
+            button.addEventListener("mouseup", event => {
+                send({type: 'send-key-up', key: name})
+            })
+            buttons.appendChild(button)
+        })
+
+        updateVolume(0)
+
+        function connect() {
+            socket = new WebSocket(`ws://localhost:${portInput.value}`);
+            socket.onopen = _ => {
+                socketState.innerText = 'OPEN'
+                connectButton.disabled = true
+            }
+            socket.onclose = _ => {
+                socketState.innerText = 'CLOSED'
+                connectButton.disabled = false
+            }
+            socket.onerror = (error) => {
+                socketState.innerText = 'ERROR'
+                console.log(`ERROR: ${error}`)
+                connectButton.disabled = false
+            }
+            socket.onmessage = (message) => {
+                onMessage(JSON.parse(message.data))
+            }
+        }
+
+        function send(message) {
+            if (socket && socket.readyState == WebSocket.OPEN) {
+                socket.send(JSON.stringify(message))
+            }
+        }
+
+        function hmsText(position) {
+            const h_1 = 1000 * 60 * 60
+            const h = Math.floor(position / h_1)
+            position -= h * h_1
+            const m_1 = 1000 * 60
+            const m = Math.floor(position / m_1)
+            position -= m * m_1
+            const s_1 = 1000
+            const s = Math.floor(position / s_1)
+            position -= s * s_1
+
+            return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}:${position}`
+        }
+
+        function setTableHead(table, columns) {
+            let thead = table.createTHead()
+            let row = thead.insertRow()
+            for (let column of columns) {
+                let th = document.createElement("th")
+                let text = document.createTextNode(column)
+                th.appendChild(text)
+                row.appendChild(th)
+            }
+        }
+
+        function createTable(rows) {
+            const table = document.createElement("table")
+
+            if (rows.length != 0) {
+                columns = Object.keys(rows[0])
+                setTableHead(table, columns)
+            }
+            for (let element of rows) {
+                let row = table.insertRow()
+                for (key in element) {
+                    let cell = row.insertCell()
+                    let text = document.createTextNode(element[key])
+                    cell.appendChild(text)
+                }
+            }
+            return table
+        }
+
+        function onMessage(message) {
+            console.log(message)
+            if (message.type == "set-volume") {
+                updateVolume(message.params.volume)
+            } else if (message.type == "supported-events") {
+                supportedEventsText.innerText = JSON.stringify(message.params.events)
+            } else if (message.type == "playback-position-changed") {
+                positionText.innerText = hmsText(message.params.position)
+            } else if (message.type == "playback-status-changed") {
+                playbackStatusText.innerText = message.params.status
+            } else if (message.type == "player-settings-changed") {
+                playerSettingsTable.replaceChildren(message.params.settings)
+            } else if (message.type == "track-changed") {
+                trackText.innerText = message.params.identifier
+            } else if (message.type == "addressed-player-changed") {
+                addressedPlayerText.innerText = JSON.stringify(message.params.player)
+            } else if (message.type == "uids-changed") {
+                uidCounterText.innerText = message.params.uid_counter
+            } else if (message.type == "get-play-status-response") {
+                getPlayStatusResponseTable.replaceChildren(message.params)
+            } else if (message.type == "get-element-attributes-response") {
+                getElementAttributesResponseTable.replaceChildren(createTable(message.params))
+            }
+        }
+
+        function updateVolume(newVolume) {
+            volume = newVolume
+            volumeText.innerText = `${volume} (${Math.round(100*volume/0x7F)}%)`
+        }
+
+        function onKeyDown(event) {
+            console.log(event)
+            send({ type: 'send-key-down', key: event.key })
+        }
+
+        function onKeyUp(event) {
+            console.log(event)
+            send({ type: 'send-key-up', key: event.key })
+        }
+
+        function onVolumeUpButtonClicked() {
+            updateVolume(Math.min(volume + 5, 0x7F))
+            send({ type: 'set-volume', volume })
+        }
+
+        function onVolumeDownButtonClicked() {
+            updateVolume(Math.max(volume - 5, 0))
+            send({ type: 'set-volume', volume })
+        }
+
+        function onGetPlayStatusButtonClicked() {
+            send({ type: 'get-play-status', volume })
+        }
+
+        function onGetElementAttributesButtonClicked() {
+            send({ type: 'get-element-attributes' })
+        }
+</script>
+</body>
+
+</html>
