@@ -68,13 +68,16 @@ class TwoDevices:
             ),
         ]
 
-        self.paired = [None, None]
+        self.paired = [
+            asyncio.get_event_loop().create_future(),
+            asyncio.get_event_loop().create_future(),
+        ]
 
     def on_connection(self, which, connection):
         self.connections[which] = connection
 
-    def on_paired(self, which, keys):
-        self.paired[which] = keys
+    def on_paired(self, which: int, keys: PairingKeys):
+        self.paired[which].set_result(keys)
 
 
 # -----------------------------------------------------------------------------
@@ -323,8 +326,8 @@ async def _test_self_smp_with_configs(pairing_config1, pairing_config2):
     # Pair
     await two_devices.devices[0].pair(connection)
     assert connection.is_encrypted
-    assert two_devices.paired[0] is not None
-    assert two_devices.paired[1] is not None
+    assert await two_devices.paired[0] is not None
+    assert await two_devices.paired[1] is not None
 
 
 # -----------------------------------------------------------------------------
@@ -527,16 +530,12 @@ async def test_self_smp_over_classic():
     two_devices.connections[0].encryption = 1
     two_devices.connections[1].encryption = 1
 
-    paired = [
-        asyncio.get_event_loop().create_future(),
-        asyncio.get_event_loop().create_future(),
-    ]
-
-    def on_pairing(which: int, keys: PairingKeys):
-        paired[which].set_result(keys)
-
-    two_devices.connections[0].on('pairing', lambda keys: on_pairing(0, keys))
-    two_devices.connections[1].on('pairing', lambda keys: on_pairing(1, keys))
+    two_devices.connections[0].on(
+        'pairing', lambda keys: two_devices.on_paired(0, keys)
+    )
+    two_devices.connections[1].on(
+        'pairing', lambda keys: two_devices.on_paired(1, keys)
+    )
 
     # Mock SMP
     with patch('bumble.smp.Session', spec=True) as MockSmpSession:
@@ -547,7 +546,7 @@ async def test_self_smp_over_classic():
 
         # Start CTKD
         await two_devices.connections[0].pair()
-        await asyncio.gather(*paired)
+        await asyncio.gather(*two_devices.paired)
 
         # Phase 2 commands should not be invoked
         MockSmpSession.send_pairing_confirm_command.assert_not_called()
