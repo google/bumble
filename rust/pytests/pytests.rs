@@ -17,4 +17,5 @@ async fn main() -> pyo3::PyResult<()> {
     pyo3_asyncio::testing::main().await
 }
 
+mod assigned_numbers;
 mod wrapper;
