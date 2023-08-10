@@ -22,11 +22,17 @@ import os
 import pytest
 
 from unittest.mock import MagicMock, patch
+from typing import Optional, List
 
 from bumble.controller import Controller
-from bumble.core import BT_BR_EDR_TRANSPORT, BT_PERIPHERAL_ROLE, BT_CENTRAL_ROLE
+from bumble.core import (
+    BT_LE_TRANSPORT,
+    BT_BR_EDR_TRANSPORT,
+    BT_PERIPHERAL_ROLE,
+    BT_CENTRAL_ROLE,
+)
 from bumble.link import LocalLink
-from bumble.device import Device, Peer
+from bumble.device import Device, Peer, Connection
 from bumble.host import Host
 from bumble.gatt import Service, Characteristic
 from bumble.transport import AsyncPipeSink
@@ -48,6 +54,8 @@ logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
 class TwoDevices:
+    connections: List[Optional[Connection]]
+
     def __init__(self):
         self.connections = [None, None]
 
@@ -78,6 +86,30 @@ class TwoDevices:
 
     def on_paired(self, which: int, keys: PairingKeys):
         self.paired[which].set_result(keys)
+
+    async def setup_connection(self, transport: int) -> None:
+        # Start
+        await self.devices[0].power_on()
+        await self.devices[1].power_on()
+
+        # Attach listeners
+        self.devices[0].on(
+            'connection', lambda connection: self.on_connection(0, connection)
+        )
+        self.devices[1].on(
+            'connection', lambda connection: self.on_connection(1, connection)
+        )
+
+        # Connect the two devices
+        if transport == BT_BR_EDR_TRANSPORT:
+            await asyncio.gather(
+                self.devices[0].connect(
+                    self.devices[1].public_address, transport=BT_BR_EDR_TRANSPORT
+                ),
+                self.devices[1].accept(self.devices[0].public_address),
+            )
+        else:
+            await self.devices[0].connect(self.devices[1].random_address)
 
 
 # -----------------------------------------------------------------------------
@@ -573,6 +605,28 @@ async def test_self_smp_public_address():
     )
 
     await _test_self_smp_with_configs(pairing_config, pairing_config)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_self_request_security():
+    # Setup connections
+    two_devices = TwoDevices()
+    await two_devices.setup_connection(BT_LE_TRANSPORT)
+
+    # Setup pairing events
+    two_devices.connections[0].on(
+        'pairing', lambda keys: two_devices.on_paired(0, keys)
+    )
+    two_devices.connections[1].on(
+        'pairing', lambda keys: two_devices.on_paired(1, keys)
+    )
+
+    # When request security
+    two_devices.devices[1].request_pairing(two_devices.connections[1])
+
+    # Then paired
+    await asyncio.gather(*two_devices.paired)
 
 
 # -----------------------------------------------------------------------------

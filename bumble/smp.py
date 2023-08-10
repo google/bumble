@@ -626,6 +626,11 @@ class Session:
         },
     }
 
+    class State(enum.IntEnum):
+        IDLE = enum.auto()
+        PAIRING = enum.auto()
+        PAIRED = enum.auto()
+
     def __init__(
         self,
         manager: Manager,
@@ -667,7 +672,7 @@ class Session:
         self.pairing_method: PairingMethod = PairingMethod.JUST_WORKS
         self.pairing_config = pairing_config
         self.wait_before_continuing: Optional[asyncio.Future[None]] = None
-        self.completed = False
+        self.state = Session.State.IDLE
         self.ctkd_task: Optional[Awaitable[None]] = None
 
         # Decide if we're the initiator or the responder
@@ -758,7 +763,7 @@ class Session:
         return smp_auth_req(self.bonding, self.mitm, self.sc, self.keypress, self.ct2)
 
     def get_long_term_key(self, rand: bytes, ediv: int) -> Optional[bytes]:
-        if not self.sc and not self.completed:
+        if not self.sc and self.state != Session.State.PAIRED:
             if rand == self.ltk_rand and ediv == self.ltk_ediv:
                 return self.stk
         else:
@@ -1029,7 +1034,6 @@ class Session:
         self.ltk = crypto.h6(ilk, b'brle')
 
     def distribute_keys(self) -> None:
-
         # Distribute the keys as required
         if self.is_initiator:
             # CTKD: Derive LTK from LinkKey
@@ -1172,7 +1176,8 @@ class Session:
 
     async def pair(self) -> None:
         # Start pairing as an initiator
-        # TODO: check that this session isn't already active
+        assert self.state != Session.State.PAIRING
+        self.state = Session.State.PAIRING
 
         # Send the pairing request to start the process
         self.send_pairing_request_command()
@@ -1200,7 +1205,7 @@ class Session:
         self.connection.abort_on('disconnection', self.on_pairing())
 
     def on_connection_encryption_change(self) -> None:
-        if self.connection.is_encrypted:
+        if self.connection.is_encrypted and self.state == Session.State.PAIRING:
             if self.is_responder:
                 # The responder distributes its keys first, the initiator later
                 self.distribute_keys()
@@ -1216,10 +1221,10 @@ class Session:
     async def on_pairing(self) -> None:
         logger.debug('pairing complete')
 
-        if self.completed:
+        if self.state != Session.State.PAIRING:
             return
 
-        self.completed = True
+        self.state = Session.State.PAIRED
 
         if self.pairing_result is not None and not self.pairing_result.done():
             self.pairing_result.set_result(None)
@@ -1277,10 +1282,10 @@ class Session:
     def on_pairing_failure(self, reason: int) -> None:
         logger.warning(f'pairing failure ({error_name(reason)})')
 
-        if self.completed:
+        if self.state != Session.State.PAIRING:
             return
 
-        self.completed = True
+        self.state = Session.State.IDLE
 
         error = ProtocolError(reason, 'smp', error_name(reason))
         if self.pairing_result is not None and not self.pairing_result.done():
@@ -1313,6 +1318,8 @@ class Session:
     async def on_smp_pairing_request_command_async(
         self, command: SMP_Pairing_Request_Command
     ) -> None:
+        assert self.state != Session.State.PAIRING
+        self.state = Session.State.PAIRING
         # Check if the request should proceed
         try:
             accepted = await self.pairing_config.delegate.accept()
@@ -1738,6 +1745,50 @@ class Session:
     ) -> None:
         self.peer_signature_key = command.signature_key
         self.check_key_distribution(SMP_Signing_Information_Command)
+
+    def on_smp_security_request_command(
+        self, command: SMP_Security_Request_Command
+    ) -> None:
+        # Bluetooth Core Specification Version 5.2+ Vol 3, Part H, Section 2.4.6
+        if not self.connection.role == BT_CENTRAL_ROLE:
+            logger.warn('Received SMP_Security_Request as peripheral, ignore')
+            return
+
+        if self.state == Session.State.PAIRING:
+            logger.warn(
+                'Received SMP_Security_Request while pairing in progress, ignore'
+            )
+            return
+
+        async def on_smp_security_request_command_async() -> None:
+            # TODO: Determine security level of LTK
+            if (
+                await self.manager.device.get_long_term_key(
+                    self.connection.handle, None, None
+                )
+                is None
+            ):
+                if await self.pairing_config.delegate.accept():
+                    logger.info(
+                        'Received SMP_Security_Request without LTK, start pairing'
+                    )
+
+                    # Reset SMP session because direction might be wrong
+                    self.manager.on_session_end(self)
+                    await self.manager.pair(self.connection)
+                else:
+                    self.send_pairing_failed(SMP_UNSPECIFIED_REASON_ERROR)
+
+            # If already paired, encrypt the connection
+            elif not self.connection.is_encrypted:
+                logger.info('Received SMP_Security_Request with LTK, start encrpytion')
+                await self.connection.encrypt(True)
+
+            # TODO: Refresh LTK (How to do this?)
+
+        self.connection.abort_on(
+            'disconnection', on_smp_security_request_command_async()
+        )
 
 
 # -----------------------------------------------------------------------------
