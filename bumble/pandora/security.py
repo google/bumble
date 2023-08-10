@@ -291,6 +291,23 @@ class SecurityService(SecurityServicer):
 
         # trigger pairing if needed
         if self.need_pairing(connection, level):
+            wait_for_security: asyncio.Future[
+                str
+            ] = asyncio.get_running_loop().create_future()
+
+            def set_security_result(result: str):
+                return lambda *_: wait_for_security.set_result(result)
+
+            listeners = {
+                "pairing": set_security_result('success'),
+                "pairing_failure": set_security_result('pairing_failure'),
+                "disconnection": set_security_result('connection_died'),
+            }
+
+            # register event handlers
+            for event, listener in listeners.items():
+                connection.on(event, listener)
+
             try:
                 self.log.debug('Pair...')
 
@@ -298,18 +315,12 @@ class SecurityService(SecurityServicer):
                     connection.transport == BT_LE_TRANSPORT
                     and connection.role == BT_PERIPHERAL_ROLE
                 ):
-                    wait_for_security: asyncio.Future[
-                        bool
-                    ] = asyncio.get_running_loop().create_future()
-                    connection.on("pairing", lambda *_: wait_for_security.set_result(True))  # type: ignore
-                    connection.on("pairing_failure", wait_for_security.set_exception)
-
                     connection.request_pairing()
 
-                    await wait_for_security
                 else:
                     await connection.pair()
 
+                await wait_for_security
                 self.log.debug('Paired')
             except asyncio.CancelledError:
                 self.log.warning("Connection died during encryption")
@@ -317,6 +328,10 @@ class SecurityService(SecurityServicer):
             except (HCI_Error, ProtocolError) as e:
                 self.log.warning(f"Pairing failure: {e}")
                 return SecureResponse(pairing_failure=empty_pb2.Empty())
+
+            # Remove listeners
+            for event, listener in listeners.items():
+                connection.remove_listener(event, listener)
 
         # trigger authentication if needed
         if self.need_authentication(connection, level):
