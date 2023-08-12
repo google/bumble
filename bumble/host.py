@@ -20,12 +20,12 @@ import collections
 import logging
 import struct
 
+from typing import Optional
+
 from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
 from bumble.snoop import Snooper
 from bumble import drivers
-
-from typing import Optional
 
 from .hci import (
     Address,
@@ -63,16 +63,15 @@ from .hci import (
     HCI_Read_Local_Version_Information_Command,
     HCI_Reset_Command,
     HCI_Set_Event_Mask_Command,
-    map_null_terminated_utf8_string,
 )
 from .core import (
     BT_BR_EDR_TRANSPORT,
-    BT_CENTRAL_ROLE,
     BT_LE_TRANSPORT,
     ConnectionPHY,
     ConnectionParameters,
 )
 from .utils import AbortableEventEmitter
+from .transport.common import TransportLostError
 
 
 # -----------------------------------------------------------------------------
@@ -349,7 +348,7 @@ class Host(AbortableEventEmitter):
                 return response
             except Exception as error:
                 logger.warning(
-                    f'{color("!!! Exception while sending HCI packet:", "red")} {error}'
+                    f'{color("!!! Exception while sending command:", "red")} {error}'
                 )
                 raise error
             finally:
@@ -454,6 +453,11 @@ class Host(AbortableEventEmitter):
             self.on_hci_packet(hci_packet)
         else:
             logger.debug('reset not done, ignoring packet from controller')
+
+    def on_transport_lost(self):
+        # Called by the source when the transport has been lost.
+        if self.pending_response:
+            self.pending_response.set_exception(TransportLostError('transport lost'))
 
     def on_hci_packet(self, packet):
         logger.debug(f'{color("### CONTROLLER -> HOST", "green")}: {packet}')

@@ -188,6 +188,8 @@ class Controller:
         if link:
             link.add_controller(self)
 
+        self.terminated = asyncio.get_running_loop().create_future()
+
     @property
     def host(self):
         return self.hci_sink
@@ -288,10 +290,9 @@ class Controller:
         if self.host:
             self.host.on_packet(packet.to_bytes())
 
-    # This method allow the controller to emulate the same API as a transport source
+    # This method allows the controller to emulate the same API as a transport source
     async def wait_for_termination(self):
-        # For now, just wait forever
-        await asyncio.get_running_loop().create_future()
+        await self.terminated
 
     ############################################################
     # Link connections

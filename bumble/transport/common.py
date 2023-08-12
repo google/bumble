@@ -45,10 +45,17 @@ HCI_PACKET_INFO = {
 
 
 # -----------------------------------------------------------------------------
+class TransportLostError(Exception):
+    """
+    The Transport has been lost/disconnected.
+    """
+
+
+# -----------------------------------------------------------------------------
 class PacketPump:
-    '''
-    Pump HCI packets from a reader to a sink
-    '''
+    """
+    Pump HCI packets from a reader to a sink.
+    """
 
     def __init__(self, reader, sink):
         self.reader = reader
@@ -68,10 +75,10 @@ class PacketPump:
 
 # -----------------------------------------------------------------------------
 class PacketParser:
-    '''
+    """
     In-line parser that accepts data and emits 'on_packet' when a full packet has been
-    parsed
-    '''
+    parsed.
+    """
 
     # pylint: disable=attribute-defined-outside-init
 
@@ -134,9 +141,9 @@ class PacketParser:
 
 # -----------------------------------------------------------------------------
 class PacketReader:
-    '''
-    Reader that reads HCI packets from a sync source
-    '''
+    """
+    Reader that reads HCI packets from a sync source.
+    """
 
     def __init__(self, source):
         self.source = source
@@ -169,9 +176,9 @@ class PacketReader:
 
 # -----------------------------------------------------------------------------
 class AsyncPacketReader:
-    '''
-    Reader that reads HCI packets from an async source
-    '''
+    """
+    Reader that reads HCI packets from an async source.
+    """
 
     def __init__(self, source):
         self.source = source
@@ -198,9 +205,9 @@ class AsyncPacketReader:
 
 # -----------------------------------------------------------------------------
 class AsyncPipeSink:
-    '''
-    Sink that forwards packets asynchronously to another sink
-    '''
+    """
+    Sink that forwards packets asynchronously to another sink.
+    """
 
     def __init__(self, sink):
         self.sink = sink
@@ -216,6 +223,9 @@ class ParserSource:
     Base class designed to be subclassed by transport-specific source classes
     """
 
+    terminated: asyncio.Future
+    parser: PacketParser
+
     def __init__(self):
         self.parser = PacketParser()
         self.terminated = asyncio.get_running_loop().create_future()
@@ -223,7 +233,19 @@ class ParserSource:
     def set_packet_sink(self, sink):
         self.parser.set_packet_sink(sink)
 
+    def on_transport_lost(self):
+        self.terminated.set_result(None)
+        if self.parser.sink:
+            try:
+                self.parser.sink.on_transport_lost()
+            except AttributeError:
+                pass
+
     async def wait_for_termination(self):
+        """
+        Convenience method for backward compatibility. Prefer using the `terminated`
+        attribute instead.
+        """
         return await self.terminated
 
     def close(self):
