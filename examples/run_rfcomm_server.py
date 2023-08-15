@@ -33,10 +33,11 @@ from bumble.sdp import (
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
 )
+from bumble.utils import AsyncRunner
 
 
 # -----------------------------------------------------------------------------
-def sdp_records(channel):
+def sdp_records(channel, uuid):
     return {
         0x00010001: [
             ServiceAttribute(
@@ -49,9 +50,7 @@ def sdp_records(channel):
             ),
             ServiceAttribute(
                 SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [DataElement.uuid(UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'))]
-                ),
+                DataElement.sequence([DataElement.uuid(UUID(uuid))]),
             ),
             ServiceAttribute(
                 SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
@@ -72,30 +71,89 @@ def sdp_records(channel):
 
 
 # -----------------------------------------------------------------------------
-def on_dlc(dlc):
-    print('*** DLC connected', dlc)
-    dlc.sink = lambda data: on_rfcomm_data_received(dlc, data)
+def on_rfcomm_session(rfcomm_session, tcp_server):
+    print('*** RFComm session connected', rfcomm_session)
+    tcp_server.attach_session(rfcomm_session)
 
 
 # -----------------------------------------------------------------------------
-def on_rfcomm_data_received(dlc, data):
-    print(f'<<< Data received: {data.hex()}')
-    try:
-        message = data.decode('utf-8')
-        print(f'<<< Message = {message}')
-    except Exception:
-        pass
+class TcpServerProtocol(asyncio.Protocol):
+    def __init__(self, server):
+        self.server = server
 
-    # Echo everything back
-    dlc.write(data)
+    def connection_made(self, transport):
+        peer_name = transport.get_extra_info('peer_name')
+        print(f'<<< TCP Server: connection from {peer_name}')
+        if self.server:
+            self.server.tcp_transport = transport
+        else:
+            transport.close()
+
+    def connection_lost(self, exc):
+        print('<<< TCP Server: connection lost')
+        if self.server:
+            self.server.tcp_transport = None
+
+    def data_received(self, data):
+        print(f'<<< TCP Server: data received: {len(data)} bytes - {data.hex()}')
+        if self.server:
+            self.server.tcp_data_received(data)
+
+
+# -----------------------------------------------------------------------------
+class TcpServer:
+    def __init__(self, port):
+        self.rfcomm_session = None
+        self.tcp_transport = None
+        AsyncRunner.spawn(self.run(port))
+
+    def attach_session(self, rfcomm_session):
+        if self.rfcomm_session:
+            self.rfcomm_session.sink = None
+
+        self.rfcomm_session = rfcomm_session
+        rfcomm_session.sink = self.rfcomm_data_received
+
+    def rfcomm_data_received(self, data):
+        print(f'<<< RFCOMM Data: {data.hex()}')
+        if self.tcp_transport:
+            self.tcp_transport.write(data)
+        else:
+            print('!!! no TCP connection, dropping data')
+
+    def tcp_data_received(self, data):
+        if self.rfcomm_session:
+            self.rfcomm_session.write(data)
+        else:
+            print('!!! no RFComm session, dropping data')
+
+    async def run(self, port):
+        print(f'$$$ Starting TCP server on port {port}')
+
+        server = await asyncio.get_running_loop().create_server(
+            lambda: TcpServerProtocol(self), '127.0.0.1', port
+        )
+
+        async with server:
+            await server.serve_forever()
 
 
 # -----------------------------------------------------------------------------
 async def main():
-    if len(sys.argv) < 3:
-        print('Usage: run_rfcomm_server.py <device-config> <transport-spec>')
-        print('example: run_rfcomm_server.py classic2.json usb:04b4:f901')
+    if len(sys.argv) < 4:
+        print(
+            'Usage: run_rfcomm_server.py <device-config> <transport-spec> '
+            '<tcp-port> [<uuid>]'
+        )
+        print('example: run_rfcomm_server.py classic2.json usb:0 8888')
         return
+
+    tcp_port = int(sys.argv[3])
+
+    if len(sys.argv) >= 5:
+        uuid = sys.argv[4]
+    else:
+        uuid = 'E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'
 
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
@@ -105,15 +163,20 @@ async def main():
         device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
         device.classic_enabled = True
 
-        # Create and register a server
+        # Create a TCP server
+        tcp_server = TcpServer(tcp_port)
+
+        # Create and register an RFComm server
         rfcomm_server = Server(device)
 
         # Listen for incoming DLC connections
-        channel_number = rfcomm_server.listen(on_dlc)
-        print(f'### Listening for connection on channel {channel_number}')
+        channel_number = rfcomm_server.listen(
+            lambda session: on_rfcomm_session(session, tcp_server)
+        )
+        print(f'### Listening for RFComm connections on channel {channel_number}')
 
         # Setup the SDP to advertise this channel
-        device.sdp_service_records = sdp_records(channel_number)
+        device.sdp_service_records = sdp_records(channel_number, uuid)
 
         # Start the controller
         await device.power_on()
