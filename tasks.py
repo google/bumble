@@ -195,9 +195,11 @@ def serve(ctx, port=8000):
     import http.server
 
     address = ("", port)
+
     class Handler(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory="web", **kwargs)
+
     server = http.server.HTTPServer(address, Handler)
     print(f"Now serving on port {port} 🕸️")
     server.serve_forever()
