@@ -1,8 +1,10 @@
 import asyncio
 import click
 import logging
+import json
 
 from bumble.pandora import PandoraDevice, serve
+from typing import Dict, Any
 
 BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300
@@ -18,12 +20,29 @@ ROOTCANAL_PORT_CUTTLEFISH = 7300
     help='HCI transport',
     default=f'tcp-client:127.0.0.1:<rootcanal-port>',
 )
-def main(grpc_port: int, rootcanal_port: int, transport: str) -> None:
+@click.option(
+    '--config',
+    help='Bumble json configuration file',
+)
+def main(grpc_port: int, rootcanal_port: int, transport: str, config: str) -> None:
     if '<rootcanal-port>' in transport:
         transport = transport.replace('<rootcanal-port>', str(rootcanal_port))
-    device = PandoraDevice({'transport': transport})
+
+    bumble_config = retrieve_config(config)
+    if 'transport' not in bumble_config.keys():
+        bumble_config.update({'transport': transport})
+    device = PandoraDevice(bumble_config)
+
     logging.basicConfig(level=logging.DEBUG)
     asyncio.run(serve(device, port=grpc_port))
+
+
+def retrieve_config(config: str) -> Dict[str, Any]:
+    if not config:
+        return {}
+
+    with open(config, 'r') as f:
+        return json.load(f)
 
 
 if __name__ == '__main__':
