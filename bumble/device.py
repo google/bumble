@@ -2401,7 +2401,7 @@ class Device(CompositeEventEmitter):
 
         try:
             await self.keystore.update(address, keys)
-            await self.device.refresh_resolving_list()
+            await self.refresh_resolving_list()
         except Exception as error:
             logger.warning(f'!!! error while storing keys: {error}')
         else:
