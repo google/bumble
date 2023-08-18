@@ -459,6 +459,8 @@ class Host(AbortableEventEmitter):
         if self.pending_response:
             self.pending_response.set_exception(TransportLostError('transport lost'))
 
+        self.emit('flush')
+
     def on_hci_packet(self, packet):
         logger.debug(f'{color("### CONTROLLER -> HOST", "green")}: {packet}')
 
