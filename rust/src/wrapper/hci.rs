@@ -15,7 +15,40 @@
 //! HCI
 
 use itertools::Itertools as _;
-use pyo3::{exceptions::PyException, intern, types::PyModule, PyErr, PyObject, PyResult, Python};
+use pyo3::{
+    exceptions::PyException, intern, types::PyModule, FromPyObject, PyAny, PyErr, PyObject,
+    PyResult, Python, ToPyObject,
+};
+
+/// HCI error code.
+pub struct HciErrorCode(u8);
+
+impl<'source> FromPyObject<'source> for HciErrorCode {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        Ok(HciErrorCode(ob.extract()?))
+    }
+}
+
+impl ToPyObject for HciErrorCode {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        self.0.to_object(py)
+    }
+}
+
+/// Provides helpers for interacting with HCI
+pub struct HciConstant;
+
+impl HciConstant {
+    /// Human-readable error name
+    pub fn error_name(status: HciErrorCode) -> PyResult<String> {
+        Python::with_gil(|py| {
+            PyModule::import(py, intern!(py, "bumble.hci"))?
+                .getattr(intern!(py, "HCI_Constant"))?
+                .call_method1(intern!(py, "error_name"), (status.0,))?
+                .extract()
+        })
+    }
+}
 
 /// A Bluetooth address
 pub struct Address(pub(crate) PyObject);

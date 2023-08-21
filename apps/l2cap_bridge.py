@@ -105,7 +105,7 @@ class ServerBridge:
                             asyncio.create_task(self.pipe.l2cap_channel.disconnect())
 
                     def data_received(self, data):
-                        print(f'<<< Received on TCP: {len(data)}')
+                        print(color(f'<<< [TCP DATA]: {len(data)} bytes', 'blue'))
                         self.pipe.l2cap_channel.write(data)
 
                 try:
@@ -123,6 +123,7 @@ class ServerBridge:
                     await self.l2cap_channel.disconnect()
 
             def on_l2cap_close(self):
+                print(color('*** L2CAP channel closed', 'red'))
                 self.l2cap_channel = None
                 if self.tcp_transport is not None:
                     self.tcp_transport.close()

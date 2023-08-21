@@ -31,11 +31,11 @@ pub use pyo3_asyncio;
 pub mod assigned_numbers;
 pub mod core;
 pub mod device;
-
 pub mod drivers;
 pub mod gatt_client;
 pub mod hci;
 pub mod host;
+pub mod l2cap;
 pub mod logging;
 pub mod profile;
 pub mod transport;
@@ -68,6 +68,21 @@ pub trait PyObjectExt: Sized {
 impl PyObjectExt for PyObject {
     fn gil_ref<'py>(&'py self, py: Python<'py>) -> &'py PyAny {
         self.as_ref(py)
+    }
+}
+
+/// Convenience extensions to [PyDict]
+pub trait PyDictExt {
+    /// Set item in dict only if value is Some, otherwise do nothing.
+    fn set_opt_item<K: ToPyObject, V: ToPyObject>(&self, key: K, value: Option<V>) -> PyResult<()>;
+}
+
+impl PyDictExt for PyDict {
+    fn set_opt_item<K: ToPyObject, V: ToPyObject>(&self, key: K, value: Option<V>) -> PyResult<()> {
+        if let Some(value) = value {
+            self.set_item(key, value)?
+        }
+        Ok(())
     }
 }
 
