@@ -828,6 +828,10 @@ class Host(AbortableEventEmitter):
             f'simple pairing complete for {event.bd_addr}: '
             f'status={HCI_Constant.status_name(event.status)}'
         )
+        if event.status == HCI_SUCCESS:
+            self.emit('classic_pairing', event.bd_addr)
+        else:
+            self.emit('classic_pairing_failure', event.bd_addr, event.status)
 
     def on_hci_pin_code_request_event(self, event):
         self.emit('pin_code_request', event.bd_addr)

@@ -2743,20 +2743,6 @@ class Device(CompositeEventEmitter):
         )
         connection.emit('connection_authentication_failure', error)
 
-    @host_event_handler
-    @with_connection_from_address
-    def on_ssp_complete(self, connection):
-        # On Secure Simple Pairing complete, in case:
-        # - Connection isn't already authenticated
-        # - AND we are not the initiator of the authentication
-        # We must trigger authentication to know if we are truly authenticated
-        if not connection.authenticating and not connection.authenticated:
-            logger.debug(
-                f'*** Trigger Connection Authentication: [0x{connection.handle:04X}] '
-                f'{connection.peer_address}'
-            )
-            asyncio.create_task(connection.authenticate())
-
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
@@ -3110,6 +3096,18 @@ class Device(CompositeEventEmitter):
         if connection:
             connection.emit('role_change_failure', error)
         self.emit('role_change_failure', address, error)
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    def on_classic_pairing(self, connection: Connection) -> None:
+        connection.emit('classic_pairing')
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    def on_classic_pairing_failure(self, connection: Connection, status) -> None:
+        connection.emit('classic_pairing_failure', status)
 
     def on_pairing_start(self, connection: Connection) -> None:
         connection.emit('pairing_start')
