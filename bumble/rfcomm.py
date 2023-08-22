@@ -15,6 +15,8 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
+
 import logging
 import asyncio
 import enum
@@ -196,7 +198,7 @@ class RFCOMM_Frame:
         )
 
     @staticmethod
-    def from_bytes(data: bytes):
+    def from_bytes(data: bytes) -> RFCOMM_Frame:
         # Extract fields
         dlci = (data[0] >> 2) & 0x3F
         c_r = (data[0] >> 1) & 0x01
@@ -267,7 +269,7 @@ class RFCOMM_MCC_PN:
         self.window_size = window_size
 
     @staticmethod
-    def from_bytes(data: bytes) -> 'RFCOMM_MCC_PN':
+    def from_bytes(data: bytes) -> RFCOMM_MCC_PN:
         return RFCOMM_MCC_PN(
             dlci=data[0],
             cl=data[1],
@@ -324,7 +326,7 @@ class RFCOMM_MCC_MSC:
         self.dv = dv
 
     @staticmethod
-    def from_bytes(data: bytes) -> 'RFCOMM_MCC_MSC':
+    def from_bytes(data: bytes) -> RFCOMM_MCC_MSC:
         return RFCOMM_MCC_MSC(
             dlci=data[0] >> 2,
             fc=data[1] >> 1 & 1,
@@ -373,7 +375,7 @@ class DLC(EventEmitter):
 
     def __init__(
         self,
-        multiplexer: 'Multiplexer',
+        multiplexer: Multiplexer,
         dlci: int,
         max_frame_size: int,
         initial_tx_credits: int,
@@ -827,7 +829,7 @@ class Client:
     multiplexer: Optional[Multiplexer]
     l2cap_channel: Optional[l2cap.Channel]
 
-    def __init__(self, device: 'Device', connection: 'Connection') -> None:
+    def __init__(self, device: Device, connection: Connection) -> None:
         self.device = device
         self.connection = connection
         self.l2cap_channel = None
@@ -867,7 +869,7 @@ class Client:
 class Server(EventEmitter):
     acceptors: Dict[int, Callable[[DLC], None]]
 
-    def __init__(self, device: 'Device') -> None:
+    def __init__(self, device: Device) -> None:
         super().__init__()
         self.device = device
         self.multiplexer = None
