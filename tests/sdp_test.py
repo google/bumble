@@ -23,7 +23,7 @@ from bumble.sdp import DataElement
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-def basic_check(x):
+def basic_check(x: DataElement) -> None:
     serialized = bytes(x)
     if len(serialized) < 500:
         print('Original:', x)
@@ -41,7 +41,7 @@ def basic_check(x):
 
 
 # -----------------------------------------------------------------------------
-def test_data_elements():
+def test_data_elements() -> None:
     e = DataElement(DataElement.NIL, None)
     basic_check(e)
 
