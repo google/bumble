@@ -21,13 +21,9 @@ import os
 import random
 import pytest
 
-from bumble.controller import Controller
-from bumble.link import LocalLink
-from bumble.device import Device
-from bumble.host import Host
-from bumble.transport import AsyncPipeSink
 from bumble.core import ProtocolError
 from bumble.l2cap import L2CAP_Connection_Request
+from .test_utils import TwoDevices
 
 
 # -----------------------------------------------------------------------------
@@ -37,60 +33,6 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-class TwoDevices:
-    def __init__(self):
-        self.connections = [None, None]
-
-        self.link = LocalLink()
-        self.controllers = [
-            Controller('C1', link=self.link),
-            Controller('C2', link=self.link),
-        ]
-        self.devices = [
-            Device(
-                address='F0:F1:F2:F3:F4:F5',
-                host=Host(self.controllers[0], AsyncPipeSink(self.controllers[0])),
-            ),
-            Device(
-                address='F5:F4:F3:F2:F1:F0',
-                host=Host(self.controllers[1], AsyncPipeSink(self.controllers[1])),
-            ),
-        ]
-
-        self.paired = [None, None]
-
-    def on_connection(self, which, connection):
-        self.connections[which] = connection
-
-    def on_paired(self, which, keys):
-        self.paired[which] = keys
-
-
-# -----------------------------------------------------------------------------
-async def setup_connection():
-    # Create two devices, each with a controller, attached to the same link
-    two_devices = TwoDevices()
-
-    # Attach listeners
-    two_devices.devices[0].on(
-        'connection', lambda connection: two_devices.on_connection(0, connection)
-    )
-    two_devices.devices[1].on(
-        'connection', lambda connection: two_devices.on_connection(1, connection)
-    )
-
-    # Start
-    await two_devices.devices[0].power_on()
-    await two_devices.devices[1].power_on()
-
-    # Connect the two devices
-    await two_devices.devices[0].connect(two_devices.devices[1].random_address)
-
-    # Check the post conditions
-    assert two_devices.connections[0] is not None
-    assert two_devices.connections[1] is not None
-
-    return two_devices
 
 
 # -----------------------------------------------------------------------------
@@ -132,7 +74,8 @@ def test_helpers():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_basic_connection():
-    devices = await setup_connection()
+    devices = TwoDevices()
+    await devices.setup_connection()
     psm = 1234
 
     # Check that if there's no one listening, we can't connect
@@ -184,7 +127,8 @@ async def test_basic_connection():
 
 # -----------------------------------------------------------------------------
 async def transfer_payload(max_credits, mtu, mps):
-    devices = await setup_connection()
+    devices = TwoDevices()
+    await devices.setup_connection()
 
     received = []
 
@@ -226,7 +170,8 @@ async def test_transfer():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_bidirectional_transfer():
-    devices = await setup_connection()
+    devices = TwoDevices()
+    await devices.setup_connection()
 
     client_received = []
     server_received = []
