@@ -2262,17 +2262,21 @@ class Device(CompositeEventEmitter):
                     return keys.ltk_peripheral.value
 
     async def get_link_key(self, address: Address) -> Optional[bytes]:
-        # Look for the key in the keystore
-        if self.keystore is not None:
-            keys = await self.keystore.get(str(address))
-            if keys is not None:
-                logger.debug('found keys in the key store')
-                if keys.link_key is None:
-                    logger.warning('no link key')
-                    return None
+        if self.keystore is None:
+            return None
 
-                return keys.link_key.value
-        return None
+        # Look for the key in the keystore
+        keys = await self.keystore.get(str(address))
+        if keys is None:
+            logger.debug(f'no keys found for {address}')
+            return None
+
+        logger.debug('found keys in the key store')
+        if keys.link_key is None:
+            logger.warning('no link key')
+            return None
+
+        return keys.link_key.value
 
     # [Classic only]
     async def authenticate(self, connection):
@@ -2391,6 +2395,18 @@ class Device(CompositeEventEmitter):
                 'connection_encryption_failure', on_encryption_failure
             )
 
+    async def update_keys(self, address: str, keys: PairingKeys) -> None:
+        if self.keystore is None:
+            return
+
+        try:
+            await self.keystore.update(address, keys)
+            await self.refresh_resolving_list()
+        except Exception as error:
+            logger.warning(f'!!! error while storing keys: {error}')
+        else:
+            self.emit('key_store_update')
+
     # [Classic only]
     async def switch_role(self, connection: Connection, role: int):
         pending_role_change = asyncio.get_running_loop().create_future()
@@ -2485,13 +2501,7 @@ class Device(CompositeEventEmitter):
                 value=link_key, authenticated=authenticated
             )
 
-            async def store_keys():
-                try:
-                    await self.keystore.update(str(bd_addr), pairing_keys)
-                except Exception as error:
-                    logger.warning(f'!!! error while storing keys: {error}')
-
-            self.abort_on('flush', store_keys())
+            self.abort_on('flush', self.update_keys(str(bd_addr), pairing_keys))
 
         if connection := self.find_connection_by_bd_addr(
             bd_addr, transport=BT_BR_EDR_TRANSPORT

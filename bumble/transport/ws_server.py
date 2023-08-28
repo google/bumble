@@ -43,7 +43,7 @@ async def open_ws_server_transport(spec):
         def __init__(self):
             source = ParserSource()
             sink = PumpedPacketSink(self.send_packet)
-            self.connection = asyncio.get_running_loop().create_future()
+            self.connection = None
             self.server = None
 
             super().__init__(source, sink)
@@ -63,7 +63,7 @@ async def open_ws_server_transport(spec):
                 f'new connection on {connection.local_address} '
                 f'from {connection.remote_address}'
             )
-            self.connection.set_result(connection)
+            self.connection = connection
             # pylint: disable=no-member
             try:
                 async for packet in connection:
@@ -74,12 +74,14 @@ async def open_ws_server_transport(spec):
             except websockets.WebSocketException as error:
                 logger.debug(f'exception while receiving packet: {error}')
 
-            # Wait for a new connection
-            self.connection = asyncio.get_running_loop().create_future()
+            # We're now disconnected
+            self.connection = None
 
         async def send_packet(self, packet):
-            connection = await self.connection
-            return await connection.send(packet)
+            if self.connection is None:
+                logger.debug('no connection, dropping packet')
+                return
+            return await self.connection.send(packet)
 
     local_host, local_port = spec.split(':')
     transport = WsServerTransport()

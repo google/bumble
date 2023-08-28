@@ -23,22 +23,18 @@
 # -----------------------------------------------------------------------------
 import logging
 import operator
-import platform
 
-if platform.system() != 'Emscripten':
-    import secrets
-    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-    from cryptography.hazmat.primitives.asymmetric.ec import (
-        generate_private_key,
-        ECDH,
-        EllipticCurvePublicNumbers,
-        EllipticCurvePrivateNumbers,
-        SECP256R1,
-    )
-    from cryptography.hazmat.primitives import cmac
-else:
-    # TODO: implement stubs
-    pass
+import secrets
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.asymmetric.ec import (
+    generate_private_key,
+    ECDH,
+    EllipticCurvePublicNumbers,
+    EllipticCurvePrivateNumbers,
+    SECP256R1,
+)
+from cryptography.hazmat.primitives import cmac
+
 
 # -----------------------------------------------------------------------------
 # Logging
