@@ -446,6 +446,11 @@ class Driver:
             # When the environment variable is set, don't look elsewhere
             return None
 
+        # Then, look where the firmware download tool writes by default
+        if (path := rtk_firmware_dir() / file_name).is_file():
+            logger.debug(f"{file_name} found in project data dir")
+            return path
+
         # Then, look in the package's driver directory
         if (path := pathlib.Path(__file__).parent / "rtk_fw" / file_name).is_file():
             logger.debug(f"{file_name} found in package dir")
@@ -646,3 +651,16 @@ class Driver:
         await self.download_firmware()
         await self.host.send_command(HCI_Reset_Command(), check_result=True)
         logger.info(f"loaded FW image {self.driver_info.fw_name}")
+
+
+def rtk_firmware_dir() -> pathlib.Path:
+    """
+    Returns:
+        A path to a subdir of the project data dir for Realtek firmware.
+         The directory is created if it doesn't exist.
+    """
+    from bumble.drivers import project_data_dir
+
+    p = project_data_dir() / "firmware" / "realtek"
+    p.mkdir(parents=True, exist_ok=True)
+    return p

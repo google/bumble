@@ -67,8 +67,9 @@ def download_file(base_url, name, remove_suffix):
 @click.command
 @click.option(
     "--output-dir",
-    default=".",
-    help="Output directory where the files will be saved",
+    default="",
+    help="Output directory where the files will be saved. Defaults to the OS-specific"
+    "app data dir, which the driver will check when trying to find firmware",
     show_default=True,
 )
 @click.option(
@@ -84,7 +85,10 @@ def main(output_dir, source, single, force, parse):
     """Download RTK firmware images and configs."""
 
     # Check that the output dir exists
-    output_dir = pathlib.Path(output_dir)
+    if output_dir == '':
+        output_dir = rtk.rtk_firmware_dir()
+    else:
+        output_dir = pathlib.Path(output_dir)
     if not output_dir.is_dir():
         print("Output dir does not exist or is not a directory")
         return

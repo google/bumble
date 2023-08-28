@@ -21,6 +21,9 @@ like loading firmware after a cold start.
 # -----------------------------------------------------------------------------
 import abc
 import logging
+import pathlib
+import platform
+import platformdirs
 from . import rtk
 
 
@@ -66,3 +69,22 @@ async def get_driver_for_host(host):
         return driver
 
     return None
+
+
+def project_data_dir() -> pathlib.Path:
+    """
+    Returns:
+        A path to an OS-specific directory for bumble data. The directory is created if
+         it doesn't exist.
+    """
+    if platform.system() == 'Darwin':
+        # platformdirs doesn't handle macOS right: it doesn't assemble a bundle id
+        # out of author & project
+        return platformdirs.user_data_path(
+            appname='com.google.bumble', ensure_exists=True
+        )
+    else:
+        # windows and linux don't use the com qualifier
+        return platformdirs.user_data_path(
+            appname='bumble', appauthor='google', ensure_exists=True
+        )

@@ -14,7 +14,10 @@
 
 //! GATT profiles
 
-use crate::wrapper::gatt_client::{CharacteristicProxy, ProfileServiceProxy};
+use crate::wrapper::{
+    gatt_client::{CharacteristicProxy, ProfileServiceProxy},
+    PyObjectExt,
+};
 use pyo3::{intern, PyObject, PyResult, Python};
 
 /// Exposes the battery GATT service
@@ -26,13 +29,7 @@ impl BatteryServiceProxy {
         Python::with_gil(|py| {
             self.0
                 .getattr(py, intern!(py, "battery_level"))
-                .map(|level| {
-                    if level.is_none(py) {
-                        None
-                    } else {
-                        Some(CharacteristicProxy(level))
-                    }
-                })
+                .map(|level| level.into_option(CharacteristicProxy))
         })
     }
 }
