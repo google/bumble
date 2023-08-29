@@ -652,7 +652,7 @@ class Connection(CompositeEventEmitter):
     def is_incomplete(self) -> bool:
         return self.handle is None
 
-    def send_l2cap_pdu(self, cid, pdu):
+    def send_l2cap_pdu(self, cid: int, pdu: bytes) -> None:
         self.device.send_l2cap_pdu(self.handle, cid, pdu)
 
     def create_l2cap_connector(self, psm):
@@ -1096,7 +1096,7 @@ class Device(CompositeEventEmitter):
         return self._host
 
     @host.setter
-    def host(self, host):
+    def host(self, host: Host) -> None:
         # Unsubscribe from events from the current host
         if self._host:
             for event_name in device_host_event_handlers:
@@ -1183,7 +1183,7 @@ class Device(CompositeEventEmitter):
             connection, psm, max_credits, mtu, mps
         )
 
-    def send_l2cap_pdu(self, connection_handle, cid, pdu):
+    def send_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes) -> None:
         self.host.send_l2cap_pdu(connection_handle, cid, pdu)
 
     async def send_command(self, command, check_result=False):
@@ -3167,7 +3167,7 @@ class Device(CompositeEventEmitter):
 
     @host_event_handler
     @with_connection_from_handle
-    def on_l2cap_pdu(self, connection, cid, pdu):
+    def on_l2cap_pdu(self, connection: Connection, cid: int, pdu: bytes):
         self.l2cap_channel_manager.on_pdu(connection, cid, pdu)
 
     def __str__(self):
