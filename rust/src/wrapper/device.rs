@@ -180,10 +180,10 @@ impl Device {
     }
 
     /// Registers an L2CAP connection oriented channel server. When a client connects to the server,
-    /// the `server` callback returns a handle to the established channel. When optional arguments
+    /// the `server` callback is passed a handle to the established channel. When optional arguments
     /// are not specified, the Python module specifies the defaults.
     pub fn register_l2cap_channel_server(
-        &self,
+        &mut self,
         psm: u16,
         server: impl Fn(Python, LeConnectionOrientedChannel) -> PyResult<()> + Send + 'static,
         max_credits: Option<u16>,
@@ -222,7 +222,7 @@ impl Connection {
     /// Open an L2CAP channel using this connection. When optional arguments are not specified, the
     /// Python module specifies the defaults.
     pub async fn open_l2cap_channel(
-        &self,
+        &mut self,
         psm: u16,
         max_credits: Option<u16>,
         mtu: Option<u16>,
@@ -244,7 +244,7 @@ impl Connection {
 
     /// Disconnect from device with provided reason. When optional arguments are not specified, the
     /// Python module specifies the defaults.
-    pub async fn disconnect(self, reason: Option<HciErrorCode>) -> PyResult<()> {
+    pub async fn disconnect(&mut self, reason: Option<HciErrorCode>) -> PyResult<()> {
         Python::with_gil(|py| {
             let kwargs = PyDict::new(py);
             kwargs.set_opt_item("reason", reason)?;

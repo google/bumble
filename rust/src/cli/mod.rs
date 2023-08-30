@@ -15,3 +15,5 @@
 pub(crate) mod firmware;
 
 pub(crate) mod usb;
+
+pub(crate) mod l2cap;

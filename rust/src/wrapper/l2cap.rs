@@ -32,7 +32,7 @@ impl LeConnectionOrientedChannel {
     }
 
     /// Wait for queued data to be sent on this channel.
-    pub async fn drain(&self) -> PyResult<()> {
+    pub async fn drain(&mut self) -> PyResult<()> {
         Python::with_gil(|py| {
             self.0
                 .call_method0(py, intern!(py, "drain"))
@@ -72,7 +72,7 @@ impl LeConnectionOrientedChannel {
     /// `tokio::main` and `async_std::main`.
     ///
     /// For more info, see https://awestlake87.github.io/pyo3-asyncio/master/doc/pyo3_asyncio/#event-loop-references-and-contextvars.
-    pub async fn disconnect(self) -> PyResult<()> {
+    pub async fn disconnect(&mut self) -> PyResult<()> {
         Python::with_gil(|py| {
             self.0
                 .call_method0(py, intern!(py, "disconnect"))

@@ -49,6 +49,26 @@ async fn main() -> PyResult<()> {
                 Realtek::Parse { firmware_path } => cli::firmware::rtk::parse(&firmware_path)?,
             },
         },
+        Subcommand::L2cap {
+            subcommand,
+            device_config,
+            transport,
+            psm,
+            l2cap_coc_max_credits,
+            l2cap_coc_mtu,
+            l2cap_coc_mps,
+        } => {
+            cli::l2cap::run(
+                subcommand,
+                device_config,
+                transport,
+                psm,
+                l2cap_coc_max_credits,
+                l2cap_coc_mtu,
+                l2cap_coc_mps,
+            )
+            .await?
+        }
         Subcommand::Usb { subcommand } => match subcommand {
             Usb::Probe(probe) => cli::usb::probe(probe.verbose)?,
         },
@@ -69,6 +89,46 @@ enum Subcommand {
     Firmware {
         #[clap(subcommand)]
         subcommand: Firmware,
+    },
+    /// L2cap client/server operations
+    L2cap {
+        #[command(subcommand)]
+        subcommand: L2cap,
+
+        /// Device configuration file.
+        ///
+        /// See, for instance, `examples/device1.json` in the Python project.
+        #[arg(long)]
+        device_config: path::PathBuf,
+        /// Bumble transport spec.
+        ///
+        /// <https://google.github.io/bumble/transports/index.html>
+        #[arg(long)]
+        transport: String,
+
+        /// PSM for L2CAP Connection-oriented Channel.
+        ///
+        /// Must be in the range [0, 65535].
+        #[arg(long)]
+        psm: u16,
+
+        /// Maximum L2CAP CoC Credits. When not specified, lets Bumble set the default.
+        ///
+        /// Must be in the range [1, 65535].
+        #[arg(long, value_parser = clap::value_parser!(u16).range(1..))]
+        l2cap_coc_max_credits: Option<u16>,
+
+        /// L2CAP CoC MTU. When not specified, lets Bumble set the default.
+        ///
+        /// Must be in the range [23, 65535].
+        #[arg(long, value_parser = clap::value_parser!(u16).range(23..))]
+        l2cap_coc_mtu: Option<u16>,
+
+        /// L2CAP CoC MPS. When not specified, lets Bumble set the default.
+        ///
+        /// Must be in the range [23, 65535].
+        #[arg(long, value_parser = clap::value_parser!(u16).range(23..))]
+        l2cap_coc_mps: Option<u16>,
     },
     /// USB operations
     Usb {
@@ -163,6 +223,38 @@ impl fmt::Display for Source {
             Source::LinuxFromScratch => write!(f, "linux-from-scratch"),
         }
     }
+}
+
+#[derive(clap::Subcommand, Debug, Clone)]
+enum L2cap {
+    /// Starts an L2CAP server
+    Server {
+        /// TCP host that the l2cap server will connect to.
+        /// Data is bridged like so:
+        ///     TCP server <-> (TCP client / **L2CAP server**) <-> (L2CAP client / TCP server) <-> TCP client
+        #[arg(long, default_value = "localhost")]
+        tcp_host: String,
+        /// TCP port that the server will connect to.
+        ///
+        /// Must be in the range [1, 65535].
+        #[arg(long, default_value_t = 9544)]
+        tcp_port: u16,
+    },
+    /// Starts an L2CAP client
+    Client {
+        /// L2cap server address that this l2cap client will connect to.
+        bluetooth_address: String,
+        /// TCP host that the l2cap client will bind to and listen for incoming TCP connections.
+        /// Data is bridged like so:
+        ///     TCP client <-> (TCP server / **L2CAP client**) <-> (L2CAP server / TCP client) <-> TCP server
+        #[arg(long, default_value = "localhost")]
+        tcp_host: String,
+        /// TCP port that the client will connect to.
+        ///
+        /// Must be in the range [1, 65535].
+        #[arg(long, default_value_t = 9543)]
+        tcp_port: u16,
+    },
 }
 
 #[derive(clap::Subcommand, Debug, Clone)]
