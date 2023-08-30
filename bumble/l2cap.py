@@ -33,6 +33,7 @@ from typing import (
     Union,
     Deque,
     Iterable,
+    SupportsBytes,
     TYPE_CHECKING,
 )
 
@@ -47,6 +48,7 @@ from .hci import (
 
 if TYPE_CHECKING:
     from bumble.device import Connection
+    from bumble.host import Host
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -728,7 +730,7 @@ class Channel(EventEmitter):
 
     def __init__(
         self,
-        manager: 'ChannelManager',
+        manager: ChannelManager,
         connection: Connection,
         signaling_cid: int,
         psm: int,
@@ -755,13 +757,13 @@ class Channel(EventEmitter):
         )
         self.state = new_state
 
-    def send_pdu(self, pdu) -> None:
+    def send_pdu(self, pdu: SupportsBytes | bytes) -> None:
         self.manager.send_pdu(self.connection, self.destination_cid, pdu)
 
-    def send_control_frame(self, frame) -> None:
+    def send_control_frame(self, frame: L2CAP_Control_Frame) -> None:
         self.manager.send_control_frame(self.connection, self.signaling_cid, frame)
 
-    async def send_request(self, request) -> bytes:
+    async def send_request(self, request: SupportsBytes) -> bytes:
         # Check that there isn't already a request pending
         if self.response:
             raise InvalidStateError('request already pending')
@@ -772,7 +774,7 @@ class Channel(EventEmitter):
         self.send_pdu(request)
         return await self.response
 
-    def on_pdu(self, pdu) -> None:
+    def on_pdu(self, pdu: bytes) -> None:
         if self.response:
             self.response.set_result(pdu)
             self.response = None
@@ -1041,7 +1043,7 @@ class LeConnectionOrientedChannel(EventEmitter):
 
     def __init__(
         self,
-        manager: 'ChannelManager',
+        manager: ChannelManager,
         connection: Connection,
         le_psm: int,
         source_cid: int,
@@ -1096,10 +1098,10 @@ class LeConnectionOrientedChannel(EventEmitter):
         elif new_state == self.DISCONNECTED:
             self.emit('close')
 
-    def send_pdu(self, pdu) -> None:
+    def send_pdu(self, pdu: SupportsBytes | bytes) -> None:
         self.manager.send_pdu(self.connection, self.destination_cid, pdu)
 
-    def send_control_frame(self, frame) -> None:
+    def send_control_frame(self, frame: L2CAP_Control_Frame) -> None:
         self.manager.send_control_frame(self.connection, L2CAP_LE_SIGNALING_CID, frame)
 
     async def connect(self) -> LeConnectionOrientedChannel:
@@ -1154,7 +1156,7 @@ class LeConnectionOrientedChannel(EventEmitter):
         if self.state == self.CONNECTED:
             self.change_state(self.DISCONNECTED)
 
-    def on_pdu(self, pdu) -> None:
+    def on_pdu(self, pdu: bytes) -> None:
         if self.sink is None:
             logger.warning('received pdu without a sink')
             return
@@ -1384,6 +1386,7 @@ class ChannelManager:
     ]
     le_coc_requests: Dict[int, L2CAP_LE_Credit_Based_Connection_Request]
     fixed_channels: Dict[int, Optional[Callable[[int, bytes], Any]]]
+    _host: Optional[Host]
 
     def __init__(
         self,
@@ -1407,11 +1410,12 @@ class ChannelManager:
         self.connectionless_mtu = connectionless_mtu
 
     @property
-    def host(self):
+    def host(self) -> Host:
+        assert self._host
         return self._host
 
     @host.setter
-    def host(self, host):
+    def host(self, host: Host) -> None:
         if self._host is not None:
             self._host.remove_listener('disconnection', self.on_disconnection)
         self._host = host
@@ -1565,7 +1569,7 @@ class ChannelManager:
         if connection_handle in self.identifiers:
             del self.identifiers[connection_handle]
 
-    def send_pdu(self, connection, cid: int, pdu) -> None:
+    def send_pdu(self, connection, cid: int, pdu: SupportsBytes | bytes) -> None:
         pdu_str = pdu.hex() if isinstance(pdu, bytes) else str(pdu)
         logger.debug(
             f'{color(">>> Sending L2CAP PDU", "blue")} '
@@ -1574,7 +1578,7 @@ class ChannelManager:
         )
         self.host.send_l2cap_pdu(connection.handle, cid, bytes(pdu))
 
-    def on_pdu(self, connection: Connection, cid: int, pdu) -> None:
+    def on_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         if cid in (L2CAP_SIGNALING_CID, L2CAP_LE_SIGNALING_CID):
             # Parse the L2CAP payload into a Control Frame object
             control_frame = L2CAP_Control_Frame.from_bytes(pdu)
@@ -1596,7 +1600,7 @@ class ChannelManager:
             channel.on_pdu(pdu)
 
     def send_control_frame(
-        self, connection: Connection, cid: int, control_frame
+        self, connection: Connection, cid: int, control_frame: L2CAP_Control_Frame
     ) -> None:
         logger.debug(
             f'{color(">>> Sending L2CAP Signaling Control Frame", "blue")} '
@@ -1605,7 +1609,9 @@ class ChannelManager:
         )
         self.host.send_l2cap_pdu(connection.handle, cid, bytes(control_frame))
 
-    def on_control_frame(self, connection: Connection, cid: int, control_frame) -> None:
+    def on_control_frame(
+        self, connection: Connection, cid: int, control_frame: L2CAP_Control_Frame
+    ) -> None:
         logger.debug(
             f'{color("<<< Received L2CAP Signaling Control Frame", "green")} '
             f'on connection [0x{connection.handle:04X}] (CID={cid}) '

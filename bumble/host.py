@@ -15,6 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import asyncio
 import collections
 import logging
@@ -30,8 +31,8 @@ from bumble import drivers
 from .hci import (
     Address,
     HCI_ACL_DATA_PACKET,
-    HCI_COMMAND_COMPLETE_EVENT,
     HCI_COMMAND_PACKET,
+    HCI_COMMAND_COMPLETE_EVENT,
     HCI_EVENT_PACKET,
     HCI_LE_READ_BUFFER_SIZE_COMMAND,
     HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND,
@@ -45,8 +46,11 @@ from .hci import (
     HCI_VERSION_BLUETOOTH_CORE_4_0,
     HCI_AclDataPacket,
     HCI_AclDataPacketAssembler,
+    HCI_Command,
+    HCI_Command_Complete_Event,
     HCI_Constant,
     HCI_Error,
+    HCI_Event,
     HCI_LE_Long_Term_Key_Request_Negative_Reply_Command,
     HCI_LE_Long_Term_Key_Request_Reply_Command,
     HCI_LE_Read_Buffer_Size_Command,
@@ -95,17 +99,17 @@ HOST_HC_TOTAL_NUM_ACL_DATA_PACKETS        = 1
 
 # -----------------------------------------------------------------------------
 class Connection:
-    def __init__(self, host, handle, peer_address, transport):
+    def __init__(self, host: Host, handle: int, peer_address: Address, transport: int):
         self.host = host
         self.handle = handle
         self.peer_address = peer_address
         self.assembler = HCI_AclDataPacketAssembler(self.on_acl_pdu)
         self.transport = transport
 
-    def on_hci_acl_data_packet(self, packet):
+    def on_hci_acl_data_packet(self, packet: HCI_AclDataPacket) -> None:
         self.assembler.feed_packet(packet)
 
-    def on_acl_pdu(self, pdu):
+    def on_acl_pdu(self, pdu: bytes) -> None:
         l2cap_pdu = L2CAP_PDU.from_bytes(pdu)
         self.host.on_l2cap_pdu(self, l2cap_pdu.cid, l2cap_pdu.payload)
 
@@ -307,7 +311,7 @@ class Host(AbortableEventEmitter):
     def set_packet_sink(self, sink):
         self.hci_sink = sink
 
-    def send_hci_packet(self, packet):
+    def send_hci_packet(self, packet: HCI_Packet) -> None:
         if self.snooper:
             self.snooper.snoop(bytes(packet), Snooper.Direction.HOST_TO_CONTROLLER)
 
@@ -356,13 +360,13 @@ class Host(AbortableEventEmitter):
                 self.pending_response = None
 
     # Use this method to send a command from a task
-    def send_command_sync(self, command):
-        async def send_command(command):
+    def send_command_sync(self, command: HCI_Command) -> None:
+        async def send_command(command: HCI_Command) -> None:
             await self.send_command(command)
 
         asyncio.create_task(send_command(command))
 
-    def send_l2cap_pdu(self, connection_handle, cid, pdu):
+    def send_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes) -> None:
         l2cap_pdu = bytes(L2CAP_PDU(cid, pdu))
 
         # Send the data to the controller via ACL packets
@@ -387,7 +391,7 @@ class Host(AbortableEventEmitter):
             offset += data_total_length
             bytes_remaining -= data_total_length
 
-    def queue_acl_packet(self, acl_packet):
+    def queue_acl_packet(self, acl_packet: HCI_AclDataPacket) -> None:
         self.acl_packet_queue.appendleft(acl_packet)
         self.check_acl_packet_queue()
 
@@ -397,7 +401,7 @@ class Host(AbortableEventEmitter):
                 f'{len(self.acl_packet_queue)} in queue'
             )
 
-    def check_acl_packet_queue(self):
+    def check_acl_packet_queue(self) -> None:
         # Send all we can (TODO: support different LE/Classic limits)
         while (
             len(self.acl_packet_queue) > 0
@@ -443,11 +447,10 @@ class Host(AbortableEventEmitter):
         ]
 
     # Packet Sink protocol (packets coming from the controller via HCI)
-    def on_packet(self, packet):
+    def on_packet(self, packet: bytes) -> None:
         hci_packet = HCI_Packet.from_bytes(packet)
         if self.ready or (
-            hci_packet.hci_packet_type == HCI_EVENT_PACKET
-            and hci_packet.event_code == HCI_COMMAND_COMPLETE_EVENT
+            isinstance(hci_packet, HCI_Command_Complete_Event)
             and hci_packet.command_opcode == HCI_RESET_COMMAND
         ):
             self.on_hci_packet(hci_packet)
@@ -461,36 +464,36 @@ class Host(AbortableEventEmitter):
 
         self.emit('flush')
 
-    def on_hci_packet(self, packet):
+    def on_hci_packet(self, packet: HCI_Packet) -> None:
         logger.debug(f'{color("### CONTROLLER -> HOST", "green")}: {packet}')
 
         if self.snooper:
             self.snooper.snoop(bytes(packet), Snooper.Direction.CONTROLLER_TO_HOST)
 
         # If the packet is a command, invoke the handler for this packet
-        if packet.hci_packet_type == HCI_COMMAND_PACKET:
+        if isinstance(packet, HCI_Command):
             self.on_hci_command_packet(packet)
-        elif packet.hci_packet_type == HCI_EVENT_PACKET:
+        elif isinstance(packet, HCI_Event):
             self.on_hci_event_packet(packet)
-        elif packet.hci_packet_type == HCI_ACL_DATA_PACKET:
+        elif isinstance(packet, HCI_AclDataPacket):
             self.on_hci_acl_data_packet(packet)
         else:
             logger.warning(f'!!! unknown packet type {packet.hci_packet_type}')
 
-    def on_hci_command_packet(self, command):
+    def on_hci_command_packet(self, command: HCI_Command) -> None:
         logger.warning(f'!!! unexpected command packet: {command}')
 
-    def on_hci_event_packet(self, event):
+    def on_hci_event_packet(self, event: HCI_Event) -> None:
         handler_name = f'on_{event.name.lower()}'
         handler = getattr(self, handler_name, self.on_hci_event)
         handler(event)
 
-    def on_hci_acl_data_packet(self, packet):
+    def on_hci_acl_data_packet(self, packet: HCI_AclDataPacket) -> None:
         # Look for the connection to which this data belongs
         if connection := self.connections.get(packet.connection_handle):
             connection.on_hci_acl_data_packet(packet)
 
-    def on_l2cap_pdu(self, connection, cid, pdu):
+    def on_l2cap_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
 
     def on_command_processed(self, event):
