@@ -228,10 +228,11 @@ class FfplayOutput(QueuedOutput):
     subprocess: Optional[asyncio.subprocess.Process]
     ffplay_task: Optional[asyncio.Task]
 
-    def __init__(self) -> None:
-        super().__init__(AacAudioExtractor())
+    def __init__(self, codec: str) -> None:
+        super().__init__(AudioExtractor.create(codec))
         self.subprocess = None
         self.ffplay_task = None
+        self.codec = codec
 
     async def start(self):
         if self.started:
@@ -240,7 +241,7 @@ class FfplayOutput(QueuedOutput):
         await super().start()
 
         self.subprocess = await asyncio.create_subprocess_shell(
-            'ffplay -acodec aac pipe:0',
+            f'ffplay -f {self.codec} pipe:0',
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -419,7 +420,7 @@ class Speaker:
         self.outputs = []
         for output in outputs:
             if output == '@ffplay':
-                self.outputs.append(FfplayOutput())
+                self.outputs.append(FfplayOutput(codec))
                 continue
 
             # Default to FileOutput
@@ -707,17 +708,6 @@ def speaker(
     transport, codec, connect_address, discover, output, ui_port, device_config
 ):
     """Run the speaker."""
-
-    # ffplay only works with AAC for now
-    if codec != 'aac' and '@ffplay' in output:
-        print(
-            color(
-                f'{codec} not supported with @ffplay output, '
-                '@ffplay output will be skipped',
-                'yellow',
-            )
-        )
-        output = list(filter(lambda x: x != '@ffplay', output))
 
     if '@ffplay' in output:
         # Check if ffplay is installed

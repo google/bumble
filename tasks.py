@@ -177,3 +177,33 @@ project_tasks.add_task(lint)
 project_tasks.add_task(format_code, name="format")
 project_tasks.add_task(check_types, name="check-types")
 project_tasks.add_task(pre_commit)
+
+
+# -----------------------------------------------------------------------------
+# Web
+# -----------------------------------------------------------------------------
+web_tasks = Collection()
+ns.add_collection(web_tasks, name="web")
+
+
+# -----------------------------------------------------------------------------
+@task
+def serve(ctx, port=8000):
+    """
+    Run a simple HTTP server for the examples under the `web` directory.
+    """
+    import http.server
+
+    address = ("", port)
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory="web", **kwargs)
+
+    server = http.server.HTTPServer(address, Handler)
+    print(f"Now serving on port {port} 🕸️")
+    server.serve_forever()
+
+
+# -----------------------------------------------------------------------------
+web_tasks.add_task(serve)

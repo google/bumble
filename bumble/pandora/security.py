@@ -423,6 +423,8 @@ class SecurityService(SecurityServicer):
             'pairing': try_set_success,
             'connection_authentication': try_set_success,
             'connection_encryption_change': on_encryption_change,
+            'classic_pairing': try_set_success,
+            'classic_pairing_failure': set_failure('pairing_failure'),
         }
 
         # register event handlers
