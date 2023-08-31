@@ -102,9 +102,19 @@ class SnoopPacketReader:
     default='h4',
     help='Format of the input file',
 )
+@click.option(
+    '--vendors',
+    type=click.Choice(['android']),
+    multiple=True,
+    help='Support vendor-specific commands (list one or more)',
+)
 @click.argument('filename')
 # pylint: disable=redefined-builtin
-def main(format, filename):
+def main(format, vendors, filename):
+    for vendor in vendors:
+        if vendor == 'android':
+            import bumble.vendor.android.hci
+
     input = open(filename, 'rb')
     if format == 'h4':
         packet_reader = PacketReader(input)
@@ -124,7 +134,6 @@ def main(format, filename):
             if packet is None:
                 break
             tracer.trace(hci.HCI_Packet.from_bytes(packet), direction)
-
         except Exception as error:
             print(color(f'!!! {error}', 'red'))
 
