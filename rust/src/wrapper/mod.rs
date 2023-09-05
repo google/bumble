@@ -31,14 +31,17 @@ pub use pyo3_asyncio;
 pub mod assigned_numbers;
 pub mod core;
 pub mod device;
+
+pub mod drivers;
 pub mod gatt_client;
 pub mod hci;
+pub mod host;
 pub mod logging;
 pub mod profile;
 pub mod transport;
 
 /// Convenience extensions to [PyObject]
-pub trait PyObjectExt {
+pub trait PyObjectExt: Sized {
     /// Get a GIL-bound reference
     fn gil_ref<'py>(&'py self, py: Python<'py>) -> &'py PyAny;
 
@@ -48,6 +51,17 @@ pub trait PyObjectExt {
         T: for<'a> FromPyObject<'a>,
     {
         Python::with_gil(|py| self.gil_ref(py).extract::<T>())
+    }
+
+    /// If the Python object is a Python `None`, return a Rust `None`, otherwise `Some` with the mapped type
+    fn into_option<T>(self, map_obj: impl Fn(Self) -> T) -> Option<T> {
+        Python::with_gil(|py| {
+            if self.gil_ref(py).is_none() {
+                None
+            } else {
+                Some(map_obj(self))
+            }
+        })
     }
 }
 

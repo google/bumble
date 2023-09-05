@@ -20,12 +20,17 @@ use crate::{
         core::AdvertisingData,
         gatt_client::{ProfileServiceProxy, ServiceProxy},
         hci::Address,
+        host::Host,
         transport::{Sink, Source},
-        ClosureCallback,
+        ClosureCallback, PyObjectExt,
     },
 };
-use pyo3::types::PyDict;
-use pyo3::{intern, types::PyModule, PyObject, PyResult, Python, ToPyObject};
+use pyo3::{
+    intern,
+    types::{PyDict, PyModule},
+    PyObject, PyResult, Python, ToPyObject,
+};
+use pyo3_asyncio::tokio::into_future;
 use std::path;
 
 /// A device that can send/receive HCI frames.
@@ -65,7 +70,7 @@ impl Device {
         Python::with_gil(|py| {
             self.0
                 .call_method0(py, intern!(py, "power_on"))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .map(|_| ())
@@ -76,7 +81,7 @@ impl Device {
         Python::with_gil(|py| {
             self.0
                 .call_method1(py, intern!(py, "connect"), (peer_addr,))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .map(Connection)
@@ -89,7 +94,7 @@ impl Device {
             kwargs.set_item("filter_duplicates", filter_duplicates)?;
             self.0
                 .call_method(py, intern!(py, "start_scanning"), (), Some(kwargs))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .map(|_| ())
@@ -123,6 +128,15 @@ impl Device {
         .map(|_| ())
     }
 
+    /// Returns the host used by the device, if any
+    pub fn host(&mut self) -> PyResult<Option<Host>> {
+        Python::with_gil(|py| {
+            self.0
+                .getattr(py, intern!(py, "host"))
+                .map(|obj| obj.into_option(Host::from))
+        })
+    }
+
     /// Start advertising the data set with [Device.set_advertisement].
     pub async fn start_advertising(&mut self, auto_restart: bool) -> PyResult<()> {
         Python::with_gil(|py| {
@@ -131,7 +145,7 @@ impl Device {
 
             self.0
                 .call_method(py, intern!(py, "start_advertising"), (), Some(kwargs))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .map(|_| ())
@@ -142,7 +156,7 @@ impl Device {
         Python::with_gil(|py| {
             self.0
                 .call_method0(py, intern!(py, "stop_advertising"))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .map(|_| ())
@@ -173,7 +187,7 @@ impl Peer {
         Python::with_gil(|py| {
             self.0
                 .call_method0(py, intern!(py, "discover_services"))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .and_then(|list| {
@@ -207,13 +221,7 @@ impl Peer {
             let class = module.getattr(P::PROXY_CLASS_NAME)?;
             self.0
                 .call_method1(py, intern!(py, "create_service_proxy"), (class,))
-                .map(|obj| {
-                    if obj.is_none(py) {
-                        None
-                    } else {
-                        Some(P::wrap(obj))
-                    }
-                })
+                .map(|obj| obj.into_option(P::wrap))
         })
     }
 }

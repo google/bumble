@@ -23,7 +23,6 @@
 //! whether it is a Bluetooth device that uses a non-standard Class, or some other
 //! type of device (there's no way to tell).
 
-use clap::Parser as _;
 use itertools::Itertools as _;
 use owo_colors::{OwoColorize, Style};
 use rusb::{Device, DeviceDescriptor, Direction, TransferType, UsbContext};
@@ -31,15 +30,12 @@ use std::{
     collections::{HashMap, HashSet},
     time::Duration,
 };
-
 const USB_DEVICE_CLASS_DEVICE: u8 = 0x00;
 const USB_DEVICE_CLASS_WIRELESS_CONTROLLER: u8 = 0xE0;
 const USB_DEVICE_SUBCLASS_RF_CONTROLLER: u8 = 0x01;
 const USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER: u8 = 0x01;
 
-fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-
+pub(crate) fn probe(verbose: bool) -> anyhow::Result<()> {
     let mut bt_dev_count = 0;
     let mut device_serials_by_id: HashMap<(u16, u16), HashSet<String>> = HashMap::new();
     for device in rusb::devices()?.iter() {
@@ -159,7 +155,7 @@ fn main() -> anyhow::Result<()> {
             println!("{:26}{}", "  Product:".green(), p);
         }
 
-        if cli.verbose {
+        if verbose {
             print_device_details(&device, &device_desc)?;
         }
 
@@ -331,12 +327,4 @@ impl From<&DeviceDescriptor> for ClassInfo {
             value.protocol_code(),
         )
     }
-}
-
-#[derive(clap::Parser)]
-#[command(author, version, about, long_about = None)]
-struct Cli {
-    /// Show additional info for each USB device
-    #[arg(long, default_value_t = false)]
-    verbose: bool,
 }

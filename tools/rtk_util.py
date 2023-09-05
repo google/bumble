@@ -61,9 +61,8 @@ async def do_load(usb_transport, force):
         # Get the driver.
         driver = await rtk.Driver.for_host(host, force)
         if driver is None:
-            if not force:
-                print("Firmware already loaded or no supported driver for this device.")
-                return
+            print("Firmware already loaded or no supported driver for this device.")
+            return
 
         await driver.download_firmware()
 

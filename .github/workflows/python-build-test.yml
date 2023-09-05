@@ -45,7 +45,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ "3.8", "3.9", "3.10" ]
+        python-version: [ "3.8", "3.9", "3.10", "3.11" ]
+        rust-version: [ "1.70.0", "stable" ]
       fail-fast: false
     steps:
       - name: Check out from Git
@@ -62,9 +63,15 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: clippy,rustfmt
-      - name: Rust Lints
-        run: cd rust && cargo fmt --check && cargo clippy --all-targets -- --deny warnings
+          toolchain: ${{ matrix.rust-version }}
       - name: Rust Build
-        run: cd rust && cargo build --all-targets
+        run: cd rust && cargo build --all-targets && cargo build --all-features --all-targets
+      # Lints after build so what clippy needs is already built
+      - name: Rust Lints
+        run: cd rust && cargo fmt --check && cargo clippy --all-targets -- --deny warnings && cargo clippy --all-features --all-targets -- --deny warnings
       - name: Rust Tests
         run: cd rust && cargo test
+      # At some point, hook up publishing the binary. For now, just make sure it builds.
+      # Once we're ready to publish binaries, this should be built with `--release`.
+      - name: Build Bumble CLI
+        run: cd rust && cargo build --features bumble-tools --bin bumble
