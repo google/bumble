@@ -22,51 +22,18 @@ import logging
 
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
-from bumble.core import BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID, UUID
 from bumble.rfcomm import Server
-from bumble.sdp import (
-    DataElement,
-    ServiceAttribute,
-    SDP_PUBLIC_BROWSE_ROOT,
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-)
 from bumble.utils import AsyncRunner
+from bumble.rfcomm import make_service_sdp_records
 
 
 # -----------------------------------------------------------------------------
 def sdp_records(channel, uuid):
+    service_record_handle = 0x00010001
     return {
-        0x00010001: [
-            ServiceAttribute(
-                SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_32(0x00010001),
-            ),
-            ServiceAttribute(
-                SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-                DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
-            ),
-            ServiceAttribute(
-                SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-                DataElement.sequence([DataElement.uuid(UUID(uuid))]),
-            ),
-            ServiceAttribute(
-                SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.sequence([DataElement.uuid(BT_L2CAP_PROTOCOL_ID)]),
-                        DataElement.sequence(
-                            [
-                                DataElement.uuid(BT_RFCOMM_PROTOCOL_ID),
-                                DataElement.unsigned_integer_8(channel),
-                            ]
-                        ),
-                    ]
-                ),
-            ),
-        ]
+        service_record_handle: make_service_sdp_records(
+            service_record_handle, channel, uuid
+        )
     }
 
 
