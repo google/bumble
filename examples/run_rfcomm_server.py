@@ -20,6 +20,7 @@ import sys
 import os
 import logging
 
+from bumble.core import UUID
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.rfcomm import Server
@@ -32,7 +33,7 @@ def sdp_records(channel, uuid):
     service_record_handle = 0x00010001
     return {
         service_record_handle: make_service_sdp_records(
-            service_record_handle, channel, uuid
+            service_record_handle, channel, UUID(uuid)
         )
     }
 

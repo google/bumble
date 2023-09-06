@@ -129,8 +129,12 @@ RFCOMM_DYNAMIC_CHANNEL_NUMBER_END   = 30
 
 # -----------------------------------------------------------------------------
 def make_service_sdp_records(
-    service_record_handle: int, channel: int, uuid: UUID = None
+    service_record_handle: int, channel: int, uuid: Optional[UUID] = None
 ) -> List[ServiceAttribute]:
+    """
+    Create SDP records for an RFComm service given a channel number and an
+    optional UUID. A Service Class Attribute is included only if the UUID is not None.
+    """
     records = [
         ServiceAttribute(
             SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
@@ -160,7 +164,7 @@ def make_service_sdp_records(
         records.append(
             ServiceAttribute(
                 SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-                DataElement.sequence([DataElement.uuid(UUID(uuid))]),
+                DataElement.sequence([DataElement.uuid(uuid)]),
             )
         )
 
