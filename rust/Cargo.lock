@@ -138,6 +138,7 @@ dependencies = [
  "clap 4.4.1",
  "directories",
  "env_logger",
+ "futures",
  "hex",
  "itertools",
  "lazy_static",
