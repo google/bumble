@@ -78,7 +78,13 @@ def get_dict_key_by_value(dictionary, value):
 class BaseError(Exception):
     """Base class for errors with an error code, error name and namespace"""
 
-    def __init__(self, error_code, error_namespace='', error_name='', details=''):
+    def __init__(
+        self,
+        error_code: int | None,
+        error_namespace: str = '',
+        error_name: str = '',
+        details: str = '',
+    ):
         super().__init__()
         self.error_code = error_code
         self.error_namespace = error_namespace
@@ -90,12 +96,14 @@ class BaseError(Exception):
             namespace = f'{self.error_namespace}/'
         else:
             namespace = ''
-        if self.error_name:
-            name = f'{self.error_name} [0x{self.error_code:X}]'
-        else:
-            name = f'0x{self.error_code:X}'
+        error_text = {
+            (True, True): f'{self.error_name} [0x{self.error_code:X}]',
+            (True, False): self.error_name,
+            (False, True): f'0x{self.error_code:X}',
+            (False, False): '',
+        }[(self.error_name != '', self.error_code is not None)]
 
-        return f'{type(self).__name__}({namespace}{name})'
+        return f'{type(self).__name__}({namespace}{error_text})'
 
 
 class ProtocolError(BaseError):

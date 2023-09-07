@@ -22,7 +22,7 @@ import dataclasses
 import enum
 import traceback
 import warnings
-from typing import Dict, List, Union, Set
+from typing import Dict, List, Union, Set, TYPE_CHECKING
 
 from . import at
 from . import rfcomm
@@ -50,6 +50,15 @@ from bumble.sdp import (
 # Logging
 # -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
+
+# -----------------------------------------------------------------------------
+# Error
+# -----------------------------------------------------------------------------
+
+
+class HfpProtocolError(ProtocolError):
+    def __init__(self, error_name: str = '', details: str = ''):
+        super().__init__(None, 'hfp', error_name, details)
 
 
 # -----------------------------------------------------------------------------
@@ -361,8 +370,12 @@ class HfProtocol:
 
     dlc: rfcomm.DLC
     command_lock: asyncio.Lock
-    response_queue: asyncio.Queue
-    unsolicited_queue: asyncio.Queue
+    if TYPE_CHECKING:
+        response_queue: asyncio.Queue[AtResponse]
+        unsolicited_queue: asyncio.Queue[AtResponse]
+    else:
+        response_queue: asyncio.Queue
+        unsolicited_queue: asyncio.Queue
     read_buffer: bytearray
 
     def __init__(self, dlc: rfcomm.DLC, configuration: Configuration):
@@ -427,7 +440,7 @@ class HfProtocol:
         else:
             logger.warning(f"dropping unexpected response with code '{response.code}'")
 
-    # Send an AT command and wait for the peer resposne.
+    # Send an AT command and wait for the peer response.
     # Wait for the AT responses sent by the peer, to the status code.
     # Raises asyncio.TimeoutError if the status is not received
     # after a timeout (default 1 second).
@@ -449,7 +462,7 @@ class HfProtocol:
                 )
                 if result.code == 'OK':
                     if response_type == AtResponseType.SINGLE and len(responses) != 1:
-                        raise ProtocolError("NO ANSWER")
+                        raise HfpProtocolError("NO ANSWER")
 
                     if response_type == AtResponseType.MULTIPLE:
                         return responses
@@ -457,7 +470,7 @@ class HfProtocol:
                         return responses[0]
                     return None
                 if result.code in STATUS_CODES:
-                    raise ProtocolError(result.code)
+                    raise HfpProtocolError(result.code)
                 responses.append(result)
 
     # 4.2.1 Service Level Connection Initialization.

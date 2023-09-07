@@ -56,7 +56,7 @@ body, h1, h2, h3, h4, h5, h6 {
     border-radius: 4px;
     padding: 4px;
     margin: 6px;
-    margin-left: 0px;
+    margin-left: 0;
 }
 
 th, td {
@@ -65,7 +65,7 @@ th, td {
 }
 
 .properties td:nth-child(even) {
-    background-color: #D6EEEE;
+    background-color: #d6eeee;
     font-family: monospace;
 }
 
