@@ -2078,7 +2078,8 @@ class ChannelManager:
         # Connect
         try:
             await channel.connect()
-        except Exception:
+        except Exception as e:
             del connection_channels[source_cid]
+            raise e
 
         return channel
