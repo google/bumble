@@ -15,7 +15,6 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-import asyncio
 import logging
 import websockets
 
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_ws_server_transport(spec):
+async def open_ws_server_transport(spec: str) -> Transport:
     '''
     Open a WebSocket server transport.
     The parameter string has this syntax:

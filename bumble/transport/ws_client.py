@@ -16,9 +16,9 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-import websockets
+import websockets.client
 
-from .common import PumpedPacketSource, PumpedPacketSink, PumpedTransport
+from .common import PumpedPacketSource, PumpedPacketSink, PumpedTransport, Transport
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_ws_client_transport(spec):
+async def open_ws_client_transport(spec: str) -> Transport:
     '''
     Open a WebSocket client transport.
     The parameter string has this syntax:
@@ -38,7 +38,7 @@ async def open_ws_client_transport(spec):
 
     remote_host, remote_port = spec.split(':')
     uri = f'ws://{remote_host}:{remote_port}'
-    websocket = await websockets.connect(uri)
+    websocket = await websockets.client.connect(uri)
 
     transport = PumpedTransport(
         PumpedPacketSource(websocket.recv),

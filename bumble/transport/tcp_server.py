@@ -15,6 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import asyncio
 import logging
 
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_tcp_server_transport(spec):
+async def open_tcp_server_transport(spec: str) -> Transport:
     '''
     Open a TCP server transport.
     The parameter string has this syntax:
@@ -42,7 +43,7 @@ async def open_tcp_server_transport(spec):
         async def close(self):
             await super().close()
 
-    class TcpServerProtocol:
+    class TcpServerProtocol(asyncio.BaseProtocol):
         def __init__(self, packet_source, packet_sink):
             self.packet_source = packet_source
             self.packet_sink = packet_sink

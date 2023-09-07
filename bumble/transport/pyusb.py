@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_pyusb_transport(spec):
+async def open_pyusb_transport(spec: str) -> Transport:
     '''
     Open a USB transport. [Implementation based on PyUSB]
     The parameter string has this syntax:

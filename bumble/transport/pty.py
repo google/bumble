@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_pty_transport(spec):
+async def open_pty_transport(spec: str | None) -> Transport:
     '''
     Open a PTY transport.
     The parameter string may be empty, or a path name where a symbolic link

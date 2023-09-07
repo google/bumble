@@ -15,6 +15,8 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
+
 import logging
 import asyncio
 import itertools
@@ -58,8 +60,10 @@ from bumble.hci import (
     HCI_Packet,
     HCI_Role_Change_Event,
 )
-from typing import Optional, Union, Dict
+from typing import Optional, Union, Dict, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from bumble.transport.common import TransportSink, TransportSource
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -104,7 +108,7 @@ class Controller:
         self,
         name,
         host_source=None,
-        host_sink=None,
+        host_sink: Optional[TransportSink] = None,
         link=None,
         public_address: Optional[Union[bytes, str, Address]] = None,
     ):

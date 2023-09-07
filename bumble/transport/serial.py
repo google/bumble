@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_serial_transport(spec):
+async def open_serial_transport(spec: str) -> Transport:
     '''
     Open a serial port transport.
     The parameter string has this syntax:

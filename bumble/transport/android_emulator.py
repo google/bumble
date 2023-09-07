@@ -18,7 +18,7 @@
 import logging
 import grpc.aio
 
-from .common import PumpedTransport, PumpedPacketSource, PumpedPacketSink
+from .common import PumpedTransport, PumpedPacketSource, PumpedPacketSink, Transport
 
 # pylint: disable=no-name-in-module
 from .grpc_protobuf.emulated_bluetooth_pb2_grpc import EmulatedBluetoothServiceStub
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_android_emulator_transport(spec):
+async def open_android_emulator_transport(spec: str | None) -> Transport:
     '''
     Open a transport connection to an Android emulator via its gRPC interface.
     The parameter string has this syntax:
@@ -66,7 +66,7 @@ async def open_android_emulator_transport(spec):
     # Parse the parameters
     mode = 'host'
     server_host = 'localhost'
-    server_port = 8554
+    server_port = '8554'
     if spec is not None:
         params = spec.split(',')
         for param in params:
@@ -82,6 +82,7 @@ async def open_android_emulator_transport(spec):
     logger.debug(f'connecting to gRPC server at {server_address}')
     channel = grpc.aio.insecure_channel(server_address)
 
+    service: EmulatedBluetoothServiceStub | VhciForwardingServiceStub
     if mode == 'host':
         # Connect as a host
         service = EmulatedBluetoothServiceStub(channel)

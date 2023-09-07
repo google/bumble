@@ -121,7 +121,9 @@ def publish_grpc_port(grpc_port) -> bool:
 
 
 # -----------------------------------------------------------------------------
-async def open_android_netsim_controller_transport(server_host, server_port):
+async def open_android_netsim_controller_transport(
+    server_host: str | None, server_port: int
+) -> Transport:
     if not server_port:
         raise ValueError('invalid port')
     if server_host == '_' or not server_host:
