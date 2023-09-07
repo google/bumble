@@ -20,13 +20,29 @@ from __future__ import annotations
 import logging
 import asyncio
 import enum
+from typing import Callable, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from pyee import EventEmitter
-from typing import Optional, Tuple, Callable, Dict, Union, TYPE_CHECKING
 
 from . import core, l2cap
 from .colors import color
-from .core import BT_BR_EDR_TRANSPORT, InvalidStateError, ProtocolError
+from .core import (
+    UUID,
+    BT_RFCOMM_PROTOCOL_ID,
+    BT_BR_EDR_TRANSPORT,
+    BT_L2CAP_PROTOCOL_ID,
+    InvalidStateError,
+    ProtocolError,
+)
+from .sdp import (
+    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_PUBLIC_BROWSE_ROOT,
+    DataElement,
+    ServiceAttribute,
+)
 
 if TYPE_CHECKING:
     from bumble.device import Device, Connection
@@ -109,6 +125,50 @@ RFCOMM_DYNAMIC_CHANNEL_NUMBER_START = 1
 RFCOMM_DYNAMIC_CHANNEL_NUMBER_END   = 30
 
 # fmt: on
+
+
+# -----------------------------------------------------------------------------
+def make_service_sdp_records(
+    service_record_handle: int, channel: int, uuid: Optional[UUID] = None
+) -> List[ServiceAttribute]:
+    """
+    Create SDP records for an RFComm service given a channel number and an
+    optional UUID. A Service Class Attribute is included only if the UUID is not None.
+    """
+    records = [
+        ServiceAttribute(
+            SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+            DataElement.unsigned_integer_32(service_record_handle),
+        ),
+        ServiceAttribute(
+            SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+            DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
+        ),
+        ServiceAttribute(
+            SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+            DataElement.sequence(
+                [
+                    DataElement.sequence([DataElement.uuid(BT_L2CAP_PROTOCOL_ID)]),
+                    DataElement.sequence(
+                        [
+                            DataElement.uuid(BT_RFCOMM_PROTOCOL_ID),
+                            DataElement.unsigned_integer_8(channel),
+                        ]
+                    ),
+                ]
+            ),
+        ),
+    ]
+
+    if uuid:
+        records.append(
+            ServiceAttribute(
+                SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+                DataElement.sequence([DataElement.uuid(uuid)]),
+            )
+        )
+
+    return records
 
 
 # -----------------------------------------------------------------------------
