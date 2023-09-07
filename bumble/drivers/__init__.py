@@ -23,7 +23,6 @@ import abc
 import logging
 import pathlib
 import platform
-import platformdirs
 from . import rtk
 
 
@@ -77,6 +76,8 @@ def project_data_dir() -> pathlib.Path:
         A path to an OS-specific directory for bumble data. The directory is created if
          it doesn't exist.
     """
+    import platformdirs
+
     if platform.system() == 'Darwin':
         # platformdirs doesn't handle macOS right: it doesn't assemble a bundle id
         # out of author & project
