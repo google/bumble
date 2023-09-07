@@ -16,11 +16,9 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import collections
 import sys
 import os
 import logging
-from typing import Union
 
 from bumble.colors import color
 
@@ -32,8 +30,7 @@ from bumble.core import (
     BT_RFCOMM_PROTOCOL_ID,
     BT_BR_EDR_TRANSPORT,
 )
-from bumble import rfcomm
-from bumble.rfcomm import Client
+from bumble import rfcomm, hfp
 from bumble.sdp import (
     Client as SDP_Client,
     DataElement,
@@ -45,61 +42,6 @@ from bumble.sdp import (
 
 
 logger = logging.getLogger(__name__)
-
-
-# -----------------------------------------------------------------------------
-# Protocol Support
-# -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
-class HfpProtocol:
-    dlc: rfcomm.DLC
-    buffer: str
-    lines: collections.deque
-    lines_available: asyncio.Event
-
-    def __init__(self, dlc: rfcomm.DLC) -> None:
-        self.dlc = dlc
-        self.buffer = ''
-        self.lines = collections.deque()
-        self.lines_available = asyncio.Event()
-
-        dlc.sink = self.feed
-
-    def feed(self, data: Union[bytes, str]) -> None:
-        # Convert the data to a string if needed
-        if isinstance(data, bytes):
-            data = data.decode('utf-8')
-
-        logger.debug(f'<<< Data received: {data}')
-
-        # Add to the buffer and look for lines
-        self.buffer += data
-        while (separator := self.buffer.find('\r')) >= 0:
-            line = self.buffer[:separator].strip()
-            self.buffer = self.buffer[separator + 1 :]
-            if len(line) > 0:
-                self.on_line(line)
-
-    def on_line(self, line: str) -> None:
-        self.lines.append(line)
-        self.lines_available.set()
-
-    def send_command_line(self, line: str) -> None:
-        logger.debug(color(f'>>> {line}', 'yellow'))
-        self.dlc.write(line + '\r')
-
-    def send_response_line(self, line: str) -> None:
-        logger.debug(color(f'>>> {line}', 'yellow'))
-        self.dlc.write('\r\n' + line + '\r\n')
-
-    async def next_line(self) -> str:
-        await self.lines_available.wait()
-        line = self.lines.popleft()
-        if not self.lines:
-            self.lines_available.clear()
-        logger.debug(color(f'<<< {line}', 'green'))
-        return line
 
 
 # -----------------------------------------------------------------------------
@@ -241,7 +183,7 @@ async def main():
 
         # Create a client and start it
         print('@@@ Starting to RFCOMM client...')
-        rfcomm_client = Client(device, connection)
+        rfcomm_client = rfcomm.Client(device, connection)
         rfcomm_mux = await rfcomm_client.start()
         print('@@@ Started')
 
@@ -256,7 +198,7 @@ async def main():
             return
 
         # Protocol loop (just for testing at this point)
-        protocol = HfpProtocol(session)
+        protocol = hfp.HfpProtocol(session)
         while True:
             line = await protocol.next_line()
 
