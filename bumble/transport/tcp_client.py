@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_tcp_client_transport(spec):
+async def open_tcp_client_transport(spec: str) -> Transport:
     '''
     Open a TCP client transport.
     The parameter string has this syntax:

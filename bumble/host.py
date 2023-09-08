@@ -21,7 +21,7 @@ import collections
 import logging
 import struct
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING, Dict, Callable, Awaitable
 
 from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
@@ -73,9 +73,13 @@ from .core import (
     BT_LE_TRANSPORT,
     ConnectionPHY,
     ConnectionParameters,
+    InvalidStateError,
 )
 from .utils import AbortableEventEmitter
 from .transport.common import TransportLostError
+
+if TYPE_CHECKING:
+    from .transport.common import TransportSink, TransportSource
 
 
 # -----------------------------------------------------------------------------
@@ -116,10 +120,21 @@ class Connection:
 
 # -----------------------------------------------------------------------------
 class Host(AbortableEventEmitter):
-    def __init__(self, controller_source=None, controller_sink=None):
+    connections: Dict[int, Connection]
+    acl_packet_queue: collections.deque[HCI_AclDataPacket]
+    hci_sink: TransportSink
+    long_term_key_provider: Optional[
+        Callable[[int, bytes, int], Awaitable[Optional[bytes]]]
+    ]
+    link_key_provider: Optional[Callable[[Address], Awaitable[Optional[bytes]]]]
+
+    def __init__(
+        self,
+        controller_source: Optional[TransportSource] = None,
+        controller_sink: Optional[TransportSink] = None,
+    ) -> None:
         super().__init__()
 
-        self.hci_sink = None
         self.hci_metadata = None
         self.ready = False  # True when we can accept incoming packets
         self.reset_done = False
@@ -299,7 +314,7 @@ class Host(AbortableEventEmitter):
         self.reset_done = True
 
     @property
-    def controller(self):
+    def controller(self) -> TransportSink:
         return self.hci_sink
 
     @controller.setter
@@ -308,13 +323,12 @@ class Host(AbortableEventEmitter):
         if controller:
             controller.set_packet_sink(self)
 
-    def set_packet_sink(self, sink):
+    def set_packet_sink(self, sink: TransportSink) -> None:
         self.hci_sink = sink
 
     def send_hci_packet(self, packet: HCI_Packet) -> None:
         if self.snooper:
             self.snooper.snoop(bytes(packet), Snooper.Direction.HOST_TO_CONTROLLER)
-
         self.hci_sink.on_packet(bytes(packet))
 
     async def send_command(self, command, check_result=False):

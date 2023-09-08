@@ -23,7 +23,18 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    TYPE_CHECKING,
+)
 
 from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
@@ -151,6 +162,9 @@ from . import smp
 from . import sdp
 from . import l2cap
 from . import core
+
+if TYPE_CHECKING:
+    from .transport.common import TransportSource, TransportSink
 
 
 # -----------------------------------------------------------------------------
@@ -942,7 +956,13 @@ class Device(CompositeEventEmitter):
             pass
 
     @classmethod
-    def with_hci(cls, name, address, hci_source, hci_sink):
+    def with_hci(
+        cls,
+        name: str,
+        address: Address,
+        hci_source: TransportSource,
+        hci_sink: TransportSink,
+    ) -> Device:
         '''
         Create a Device instance with a Host configured to communicate with a controller
         through an HCI source/sink
@@ -951,18 +971,25 @@ class Device(CompositeEventEmitter):
         return cls(name=name, address=address, host=host)
 
     @classmethod
-    def from_config_file(cls, filename):
+    def from_config_file(cls, filename: str) -> Device:
         config = DeviceConfiguration()
         config.load_from_file(filename)
         return cls(config=config)
 
     @classmethod
-    def from_config_with_hci(cls, config, hci_source, hci_sink):
+    def from_config_with_hci(
+        cls,
+        config: DeviceConfiguration,
+        hci_source: TransportSource,
+        hci_sink: TransportSink,
+    ) -> Device:
         host = Host(controller_source=hci_source, controller_sink=hci_sink)
         return cls(config=config, host=host)
 
     @classmethod
-    def from_config_file_with_hci(cls, filename, hci_source, hci_sink):
+    def from_config_file_with_hci(
+        cls, filename: str, hci_source: TransportSource, hci_sink: TransportSink
+    ) -> Device:
         config = DeviceConfiguration()
         config.load_from_file(filename)
         return cls.from_config_with_hci(config, hci_source, hci_sink)
@@ -2238,9 +2265,11 @@ class Device(CompositeEventEmitter):
     def request_pairing(self, connection):
         return self.smp_manager.request_pairing(connection)
 
-    async def get_long_term_key(self, connection_handle, rand, ediv):
+    async def get_long_term_key(
+        self, connection_handle: int, rand: bytes, ediv: int
+    ) -> Optional[bytes]:
         if (connection := self.lookup_connection(connection_handle)) is None:
-            return
+            return None
 
         # Start by looking for the key in an SMP session
         ltk = self.smp_manager.get_long_term_key(connection, rand, ediv)
@@ -2260,6 +2289,7 @@ class Device(CompositeEventEmitter):
 
                 if connection.role == BT_PERIPHERAL_ROLE and keys.ltk_peripheral:
                     return keys.ltk_peripheral.value
+        return None
 
     async def get_link_key(self, address: Address) -> Optional[bytes]:
         if self.keystore is None:

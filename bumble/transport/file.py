@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_file_transport(spec):
+async def open_file_transport(spec: str) -> Transport:
     '''
     Open a File transport (typically not for a real file, but for a PTY or other unix
     virtual files).

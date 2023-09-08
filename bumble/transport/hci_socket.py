@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_hci_socket_transport(spec):
+async def open_hci_socket_transport(spec: str | None) -> Transport:
     '''
     Open an HCI Socket (only available on some platforms).
     The parameter string is either empty (to use the first/default Bluetooth adapter)
@@ -47,7 +47,7 @@ async def open_hci_socket_transport(spec):
         hci_socket = socket.socket(
             socket.AF_BLUETOOTH,
             socket.SOCK_RAW | socket.SOCK_NONBLOCK,
-            socket.BTPROTO_HCI,
+            socket.BTPROTO_HCI,  # type: ignore
         )
     except AttributeError as error:
         # Not supported on this platform

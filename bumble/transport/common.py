@@ -20,11 +20,12 @@ import contextlib
 import struct
 import asyncio
 import logging
-from typing import ContextManager
+import io
+from typing import ContextManager, Tuple, Optional, Protocol, Dict
 
-from .. import hci
-from ..colors import color
-from ..snoop import Snooper
+from bumble import hci
+from bumble.colors import color
+from bumble.snoop import Snooper
 
 
 # -----------------------------------------------------------------------------
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 # Information needed to parse HCI packets with a generic parser:
 # For each packet type, the info represents:
 # (length-size, length-offset, unpack-type)
-HCI_PACKET_INFO = {
+HCI_PACKET_INFO: Dict[int, Tuple[int, int, str]] = {
     hci.HCI_COMMAND_PACKET: (1, 2, 'B'),
     hci.HCI_ACL_DATA_PACKET: (2, 2, 'H'),
     hci.HCI_SYNCHRONOUS_DATA_PACKET: (1, 2, 'B'),
@@ -45,10 +46,25 @@ HCI_PACKET_INFO = {
 
 
 # -----------------------------------------------------------------------------
+# Errors
+# -----------------------------------------------------------------------------
 class TransportLostError(Exception):
     """
     The Transport has been lost/disconnected.
     """
+
+
+# -----------------------------------------------------------------------------
+# Typing Protocols
+# -----------------------------------------------------------------------------
+class TransportSink(Protocol):
+    def on_packet(self, packet: bytes) -> None:
+        ...
+
+
+class TransportSource(Protocol):
+    def set_packet_sink(self, sink: TransportSink) -> None:
+        ...
 
 
 # -----------------------------------------------------------------------------
@@ -57,18 +73,15 @@ class PacketPump:
     Pump HCI packets from a reader to a sink.
     """
 
-    def __init__(self, reader, sink):
+    def __init__(self, reader: AsyncPacketReader, sink: TransportSink) -> None:
         self.reader = reader
         self.sink = sink
 
-    async def run(self):
+    async def run(self) -> None:
         while True:
             try:
-                # Get a packet from the source
-                packet = hci.HCI_Packet.from_bytes(await self.reader.next_packet())
-
                 # Deliver the packet to the sink
-                self.sink.on_packet(packet)
+                self.sink.on_packet(await self.reader.next_packet())
             except Exception as error:
                 logger.warning(f'!!! {error}')
 
@@ -86,18 +99,22 @@ class PacketParser:
     NEED_LENGTH = 1
     NEED_BODY = 2
 
-    def __init__(self, sink=None):
+    sink: Optional[TransportSink]
+    extended_packet_info: Dict[int, Tuple[int, int, str]]
+    packet_info: Optional[Tuple[int, int, str]] = None
+
+    def __init__(self, sink: Optional[TransportSink] = None) -> None:
         self.sink = sink
         self.extended_packet_info = {}
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         self.state = PacketParser.NEED_TYPE
         self.bytes_needed = 1
         self.packet = bytearray()
         self.packet_info = None
 
-    def feed_data(self, data):
+    def feed_data(self, data: bytes) -> None:
         data_offset = 0
         data_left = len(data)
         while data_left and self.bytes_needed:
@@ -118,6 +135,7 @@ class PacketParser:
                     self.state = PacketParser.NEED_LENGTH
                     self.bytes_needed = self.packet_info[0] + self.packet_info[1]
                 elif self.state == PacketParser.NEED_LENGTH:
+                    assert self.packet_info is not None
                     body_length = struct.unpack_from(
                         self.packet_info[2], self.packet, 1 + self.packet_info[1]
                     )[0]
@@ -135,7 +153,7 @@ class PacketParser:
                             )
                     self.reset()
 
-    def set_packet_sink(self, sink):
+    def set_packet_sink(self, sink: TransportSink) -> None:
         self.sink = sink
 
 
@@ -145,10 +163,10 @@ class PacketReader:
     Reader that reads HCI packets from a sync source.
     """
 
-    def __init__(self, source):
+    def __init__(self, source: io.BufferedReader) -> None:
         self.source = source
 
-    def next_packet(self):
+    def next_packet(self) -> Optional[bytes]:
         # Get the packet type
         packet_type = self.source.read(1)
         if len(packet_type) != 1:
@@ -157,7 +175,7 @@ class PacketReader:
         # Get the packet info based on its type
         packet_info = HCI_PACKET_INFO.get(packet_type[0])
         if packet_info is None:
-            raise ValueError(f'invalid packet type {packet_type} found')
+            raise ValueError(f'invalid packet type {packet_type[0]} found')
 
         # Read the header (that includes the length)
         header_size = packet_info[0] + packet_info[1]
@@ -180,17 +198,17 @@ class AsyncPacketReader:
     Reader that reads HCI packets from an async source.
     """
 
-    def __init__(self, source):
+    def __init__(self, source: asyncio.StreamReader) -> None:
         self.source = source
 
-    async def next_packet(self):
+    async def next_packet(self) -> bytes:
         # Get the packet type
         packet_type = await self.source.readexactly(1)
 
         # Get the packet info based on its type
         packet_info = HCI_PACKET_INFO.get(packet_type[0])
         if packet_info is None:
-            raise ValueError(f'invalid packet type {packet_type} found')
+            raise ValueError(f'invalid packet type {packet_type[0]} found')
 
         # Read the header (that includes the length)
         header_size = packet_info[0] + packet_info[1]
@@ -209,11 +227,11 @@ class AsyncPipeSink:
     Sink that forwards packets asynchronously to another sink.
     """
 
-    def __init__(self, sink):
+    def __init__(self, sink: TransportSink) -> None:
         self.sink = sink
         self.loop = asyncio.get_running_loop()
 
-    def on_packet(self, packet):
+    def on_packet(self, packet: bytes) -> None:
         self.loop.call_soon(self.sink.on_packet, packet)
 
 
@@ -223,50 +241,48 @@ class ParserSource:
     Base class designed to be subclassed by transport-specific source classes
     """
 
-    terminated: asyncio.Future
+    terminated: asyncio.Future[None]
     parser: PacketParser
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.parser = PacketParser()
         self.terminated = asyncio.get_running_loop().create_future()
 
-    def set_packet_sink(self, sink):
+    def set_packet_sink(self, sink: TransportSink) -> None:
         self.parser.set_packet_sink(sink)
 
-    def on_transport_lost(self):
+    def on_transport_lost(self) -> None:
         self.terminated.set_result(None)
         if self.parser.sink:
-            try:
+            if hasattr(self.parser.sink, 'on_transport_lost'):
                 self.parser.sink.on_transport_lost()
-            except AttributeError:
-                pass
 
-    async def wait_for_termination(self):
+    async def wait_for_termination(self) -> None:
         """
         Convenience method for backward compatibility. Prefer using the `terminated`
         attribute instead.
         """
         return await self.terminated
 
-    def close(self):
+    def close(self) -> None:
         pass
 
 
 # -----------------------------------------------------------------------------
 class StreamPacketSource(asyncio.Protocol, ParserSource):
-    def data_received(self, data):
+    def data_received(self, data: bytes) -> None:
         self.parser.feed_data(data)
 
 
 # -----------------------------------------------------------------------------
 class StreamPacketSink:
-    def __init__(self, transport):
+    def __init__(self, transport: asyncio.WriteTransport) -> None:
         self.transport = transport
 
-    def on_packet(self, packet):
+    def on_packet(self, packet: bytes) -> None:
         self.transport.write(packet)
 
-    def close(self):
+    def close(self) -> None:
         self.transport.close()
 
 
@@ -286,7 +302,7 @@ class Transport:
         ...
     """
 
-    def __init__(self, source, sink):
+    def __init__(self, source: TransportSource, sink: TransportSink) -> None:
         self.source = source
         self.sink = sink
 
@@ -300,19 +316,23 @@ class Transport:
         return iter((self.source, self.sink))
 
     async def close(self) -> None:
-        self.source.close()
-        self.sink.close()
+        if hasattr(self.source, 'close'):
+            self.source.close()
+        if hasattr(self.sink, 'close'):
+            self.sink.close()
 
 
 # -----------------------------------------------------------------------------
 class PumpedPacketSource(ParserSource):
-    def __init__(self, receive):
+    pump_task: Optional[asyncio.Task[None]]
+
+    def __init__(self, receive) -> None:
         super().__init__()
         self.receive_function = receive
         self.pump_task = None
 
-    def start(self):
-        async def pump_packets():
+    def start(self) -> None:
+        async def pump_packets() -> None:
             while True:
                 try:
                     packet = await self.receive_function()
@@ -322,12 +342,12 @@ class PumpedPacketSource(ParserSource):
                     break
                 except Exception as error:
                     logger.warning(f'exception while waiting for packet: {error}')
-                    self.terminated.set_result(error)
+                    self.terminated.set_exception(error)
                     break
 
         self.pump_task = asyncio.create_task(pump_packets())
 
-    def close(self):
+    def close(self) -> None:
         if self.pump_task:
             self.pump_task.cancel()
 
@@ -339,7 +359,7 @@ class PumpedPacketSink:
         self.packet_queue = asyncio.Queue()
         self.pump_task = None
 
-    def on_packet(self, packet):
+    def on_packet(self, packet: bytes) -> None:
         self.packet_queue.put_nowait(packet)
 
     def start(self):
@@ -364,15 +384,23 @@ class PumpedPacketSink:
 
 # -----------------------------------------------------------------------------
 class PumpedTransport(Transport):
-    def __init__(self, source, sink, close_function):
+    source: PumpedPacketSource
+    sink: PumpedPacketSink
+
+    def __init__(
+        self,
+        source: PumpedPacketSource,
+        sink: PumpedPacketSink,
+        close_function,
+    ) -> None:
         super().__init__(source, sink)
         self.close_function = close_function
 
-    def start(self):
+    def start(self) -> None:
         self.source.start()
         self.sink.start()
 
-    async def close(self):
+    async def close(self) -> None:
         await super().close()
         await self.close_function()
 
@@ -397,31 +425,37 @@ class SnoopingTransport(Transport):
         raise RuntimeError('unexpected code path')  # Satisfy the type checker
 
     class Source:
-        def __init__(self, source, snooper):
+        sink: TransportSink
+
+        def __init__(self, source: TransportSource, snooper: Snooper):
             self.source = source
             self.snooper = snooper
-            self.sink = None
 
-        def set_packet_sink(self, sink):
+        def set_packet_sink(self, sink: TransportSink) -> None:
             self.sink = sink
             self.source.set_packet_sink(self)
 
-        def on_packet(self, packet):
+        def on_packet(self, packet: bytes) -> None:
             self.snooper.snoop(packet, Snooper.Direction.CONTROLLER_TO_HOST)
             if self.sink:
                 self.sink.on_packet(packet)
 
     class Sink:
-        def __init__(self, sink, snooper):
+        def __init__(self, sink: TransportSink, snooper: Snooper) -> None:
             self.sink = sink
             self.snooper = snooper
 
-        def on_packet(self, packet):
+        def on_packet(self, packet: bytes) -> None:
             self.snooper.snoop(packet, Snooper.Direction.HOST_TO_CONTROLLER)
             if self.sink:
                 self.sink.on_packet(packet)
 
-    def __init__(self, transport, snooper, close_snooper=None):
+    def __init__(
+        self,
+        transport: Transport,
+        snooper: Snooper,
+        close_snooper=None,
+    ) -> None:
         super().__init__(
             self.Source(transport.source, snooper), self.Sink(transport.sink, snooper)
         )

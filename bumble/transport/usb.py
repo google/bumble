@@ -60,7 +60,7 @@ def load_libusb():
             usb1.loadLibrary(libusb_dll)
 
 
-async def open_usb_transport(spec):
+async def open_usb_transport(spec: str) -> Transport:
     '''
     Open a USB transport.
     The moniker string has this syntax:
