@@ -34,10 +34,9 @@ import weakref
 
 
 from bumble.hci import (
-    hci_command_op_code,
+    hci_vendor_command_op_code,
     STATUS_SPEC,
     HCI_SUCCESS,
-    HCI_COMMAND_NAMES,
     HCI_Command,
     HCI_Reset_Command,
     HCI_Read_Local_Version_Information_Command,
@@ -179,17 +178,15 @@ RTK_USB_PRODUCTS = {
 # -----------------------------------------------------------------------------
 # HCI Commands
 # -----------------------------------------------------------------------------
-HCI_RTK_READ_ROM_VERSION_COMMAND = hci_command_op_code(0x3F, 0x6D)
-HCI_COMMAND_NAMES[HCI_RTK_READ_ROM_VERSION_COMMAND] = "HCI_RTK_READ_ROM_VERSION_COMMAND"
+HCI_RTK_READ_ROM_VERSION_COMMAND = hci_vendor_command_op_code(0x6D)
+HCI_RTK_DOWNLOAD_COMMAND = hci_vendor_command_op_code(0x20)
+HCI_RTK_DROP_FIRMWARE_COMMAND = hci_vendor_command_op_code(0x66)
+HCI_Command.register_commands(globals())
 
 
 @HCI_Command.command(return_parameters_fields=[("status", STATUS_SPEC), ("version", 1)])
 class HCI_RTK_Read_ROM_Version_Command(HCI_Command):
     pass
-
-
-HCI_RTK_DOWNLOAD_COMMAND = hci_command_op_code(0x3F, 0x20)
-HCI_COMMAND_NAMES[HCI_RTK_DOWNLOAD_COMMAND] = "HCI_RTK_DOWNLOAD_COMMAND"
 
 
 @HCI_Command.command(
@@ -198,10 +195,6 @@ HCI_COMMAND_NAMES[HCI_RTK_DOWNLOAD_COMMAND] = "HCI_RTK_DOWNLOAD_COMMAND"
 )
 class HCI_RTK_Download_Command(HCI_Command):
     pass
-
-
-HCI_RTK_DROP_FIRMWARE_COMMAND = hci_command_op_code(0x3F, 0x66)
-HCI_COMMAND_NAMES[HCI_RTK_DROP_FIRMWARE_COMMAND] = "HCI_RTK_DROP_FIRMWARE_COMMAND"
 
 
 @HCI_Command.command()
