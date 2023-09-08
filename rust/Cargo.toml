@@ -24,6 +24,10 @@ itertools = "0.11.0"
 lazy_static = "1.4.0"
 thiserror = "1.0.41"
 
+# Dev tools
+file-header = { version = "0.1.2", optional = true }
+globset = { version = "0.4.13", optional = true }
+
 # CLI
 anyhow = { version = "1.0.71", optional = true }
 clap = { version = "4.3.3", features = ["derive"], optional = true }
@@ -53,9 +57,14 @@ env_logger = "0.10.0"
 rustdoc-args = ["--generate-link-to-definition"]
 
 [[bin]]
+name = "file-header"
+path = "tools/file_header.rs"
+required-features = ["dev-tools"]
+
+[[bin]]
 name = "gen-assigned-numbers"
 path = "tools/gen_assigned_numbers.rs"
-required-features = ["bumble-codegen"]
+required-features = ["dev-tools"]
 
 [[bin]]
 name = "bumble"
@@ -71,7 +80,7 @@ harness = false
 [features]
 anyhow = ["pyo3/anyhow"]
 pyo3-asyncio-attributes = ["pyo3-asyncio/attributes"]
-bumble-codegen = ["dep:anyhow"]
+dev-tools = ["dep:anyhow", "dep:clap", "dep:file-header", "dep:globset"]
 # separate feature for CLI so that dependencies don't spend time building these
 bumble-tools = ["dep:clap", "anyhow", "dep:anyhow", "dep:directories", "pyo3-asyncio-attributes", "dep:owo-colors", "dep:reqwest", "dep:rusb", "dep:log", "dep:env_logger", "dep:futures"]
 default = []

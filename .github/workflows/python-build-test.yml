@@ -64,6 +64,8 @@ jobs:
         with:
           components: clippy,rustfmt
           toolchain: ${{ matrix.rust-version }}
+      - name: Check License Headers
+        run: cd rust && cargo run --features dev-tools --bin file-header check-all
       - name: Rust Build
         run: cd rust && cargo build --all-targets && cargo build --all-features --all-targets
       # Lints after build so what clippy needs is already built
