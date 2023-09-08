@@ -104,7 +104,7 @@ class SnoopPacketReader:
 )
 @click.option(
     '--vendors',
-    type=click.Choice(['android']),
+    type=click.Choice(['android', 'zephyr']),
     multiple=True,
     help='Support vendor-specific commands (list one or more)',
 )
@@ -114,6 +114,8 @@ def main(format, vendors, filename):
     for vendor in vendors:
         if vendor == 'android':
             import bumble.vendor.android.hci
+        elif vendor == 'zephyr':
+            import bumble.vendor.zephyr.hci
 
     input = open(filename, 'rb')
     if format == 'h4':
