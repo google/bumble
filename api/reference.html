@@ -1323,62 +1323,7 @@ address[0] is the LSB of the address, address[5] is the MSB.</p>
 
         <details class="quote">
           <summary>Source code in <code>bumble/hci.py</code></summary>
-          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1682</span>
-<span class="normal">1683</span>
-<span class="normal">1684</span>
-<span class="normal">1685</span>
-<span class="normal">1686</span>
-<span class="normal">1687</span>
-<span class="normal">1688</span>
-<span class="normal">1689</span>
-<span class="normal">1690</span>
-<span class="normal">1691</span>
-<span class="normal">1692</span>
-<span class="normal">1693</span>
-<span class="normal">1694</span>
-<span class="normal">1695</span>
-<span class="normal">1696</span>
-<span class="normal">1697</span>
-<span class="normal">1698</span>
-<span class="normal">1699</span>
-<span class="normal">1700</span>
-<span class="normal">1701</span>
-<span class="normal">1702</span>
-<span class="normal">1703</span>
-<span class="normal">1704</span>
-<span class="normal">1705</span>
-<span class="normal">1706</span>
-<span class="normal">1707</span>
-<span class="normal">1708</span>
-<span class="normal">1709</span>
-<span class="normal">1710</span>
-<span class="normal">1711</span>
-<span class="normal">1712</span>
-<span class="normal">1713</span>
-<span class="normal">1714</span>
-<span class="normal">1715</span>
-<span class="normal">1716</span>
-<span class="normal">1717</span>
-<span class="normal">1718</span>
-<span class="normal">1719</span>
-<span class="normal">1720</span>
-<span class="normal">1721</span>
-<span class="normal">1722</span>
-<span class="normal">1723</span>
-<span class="normal">1724</span>
-<span class="normal">1725</span>
-<span class="normal">1726</span>
-<span class="normal">1727</span>
-<span class="normal">1728</span>
-<span class="normal">1729</span>
-<span class="normal">1730</span>
-<span class="normal">1731</span>
-<span class="normal">1732</span>
-<span class="normal">1733</span>
-<span class="normal">1734</span>
-<span class="normal">1735</span>
-<span class="normal">1736</span>
-<span class="normal">1737</span>
+          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1737</span>
 <span class="normal">1738</span>
 <span class="normal">1739</span>
 <span class="normal">1740</span>
@@ -1464,7 +1409,62 @@ address[0] is the LSB of the address, address[5] is the MSB.</p>
 <span class="normal">1820</span>
 <span class="normal">1821</span>
 <span class="normal">1822</span>
-<span class="normal">1823</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">Address</span><span class="p">:</span>
+<span class="normal">1823</span>
+<span class="normal">1824</span>
+<span class="normal">1825</span>
+<span class="normal">1826</span>
+<span class="normal">1827</span>
+<span class="normal">1828</span>
+<span class="normal">1829</span>
+<span class="normal">1830</span>
+<span class="normal">1831</span>
+<span class="normal">1832</span>
+<span class="normal">1833</span>
+<span class="normal">1834</span>
+<span class="normal">1835</span>
+<span class="normal">1836</span>
+<span class="normal">1837</span>
+<span class="normal">1838</span>
+<span class="normal">1839</span>
+<span class="normal">1840</span>
+<span class="normal">1841</span>
+<span class="normal">1842</span>
+<span class="normal">1843</span>
+<span class="normal">1844</span>
+<span class="normal">1845</span>
+<span class="normal">1846</span>
+<span class="normal">1847</span>
+<span class="normal">1848</span>
+<span class="normal">1849</span>
+<span class="normal">1850</span>
+<span class="normal">1851</span>
+<span class="normal">1852</span>
+<span class="normal">1853</span>
+<span class="normal">1854</span>
+<span class="normal">1855</span>
+<span class="normal">1856</span>
+<span class="normal">1857</span>
+<span class="normal">1858</span>
+<span class="normal">1859</span>
+<span class="normal">1860</span>
+<span class="normal">1861</span>
+<span class="normal">1862</span>
+<span class="normal">1863</span>
+<span class="normal">1864</span>
+<span class="normal">1865</span>
+<span class="normal">1866</span>
+<span class="normal">1867</span>
+<span class="normal">1868</span>
+<span class="normal">1869</span>
+<span class="normal">1870</span>
+<span class="normal">1871</span>
+<span class="normal">1872</span>
+<span class="normal">1873</span>
+<span class="normal">1874</span>
+<span class="normal">1875</span>
+<span class="normal">1876</span>
+<span class="normal">1877</span>
+<span class="normal">1878</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">Address</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Bluetooth Address (see Bluetooth spec Vol 6, Part B - 1.3 DEVICE ADDRESS)</span>
 <span class="sd">    NOTE: the address bytes are stored in little-endian byte order here, so</span>
@@ -1641,33 +1641,33 @@ the type is set to PUBLIC_DEVICE_ADDRESS.</p>
 
       <details class="quote">
         <summary>Source code in <code>bumble/hci.py</code></summary>
-        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1738</span>
-<span class="normal">1739</span>
-<span class="normal">1740</span>
-<span class="normal">1741</span>
-<span class="normal">1742</span>
-<span class="normal">1743</span>
-<span class="normal">1744</span>
-<span class="normal">1745</span>
-<span class="normal">1746</span>
-<span class="normal">1747</span>
-<span class="normal">1748</span>
-<span class="normal">1749</span>
-<span class="normal">1750</span>
-<span class="normal">1751</span>
-<span class="normal">1752</span>
-<span class="normal">1753</span>
-<span class="normal">1754</span>
-<span class="normal">1755</span>
-<span class="normal">1756</span>
-<span class="normal">1757</span>
-<span class="normal">1758</span>
-<span class="normal">1759</span>
-<span class="normal">1760</span>
-<span class="normal">1761</span>
-<span class="normal">1762</span>
-<span class="normal">1763</span>
-<span class="normal">1764</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1793</span>
+<span class="normal">1794</span>
+<span class="normal">1795</span>
+<span class="normal">1796</span>
+<span class="normal">1797</span>
+<span class="normal">1798</span>
+<span class="normal">1799</span>
+<span class="normal">1800</span>
+<span class="normal">1801</span>
+<span class="normal">1802</span>
+<span class="normal">1803</span>
+<span class="normal">1804</span>
+<span class="normal">1805</span>
+<span class="normal">1806</span>
+<span class="normal">1807</span>
+<span class="normal">1808</span>
+<span class="normal">1809</span>
+<span class="normal">1810</span>
+<span class="normal">1811</span>
+<span class="normal">1812</span>
+<span class="normal">1813</span>
+<span class="normal">1814</span>
+<span class="normal">1815</span>
+<span class="normal">1816</span>
+<span class="normal">1817</span>
+<span class="normal">1818</span>
+<span class="normal">1819</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">address</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">address_type</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">RANDOM_DEVICE_ADDRESS</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
@@ -1717,15 +1717,15 @@ qualifier.</p>
 
       <details class="quote">
         <summary>Source code in <code>bumble/hci.py</code></summary>
-        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1800</span>
-<span class="normal">1801</span>
-<span class="normal">1802</span>
-<span class="normal">1803</span>
-<span class="normal">1804</span>
-<span class="normal">1805</span>
-<span class="normal">1806</span>
-<span class="normal">1807</span>
-<span class="normal">1808</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">to_string</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">with_type_qualifier</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1855</span>
+<span class="normal">1856</span>
+<span class="normal">1857</span>
+<span class="normal">1858</span>
+<span class="normal">1859</span>
+<span class="normal">1860</span>
+<span class="normal">1861</span>
+<span class="normal">1862</span>
+<span class="normal">1863</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">to_string</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">with_type_qualifier</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    String representation of the address, MSB first, with an optional type</span>
 <span class="sd">    qualifier.</span>
@@ -1761,36 +1761,36 @@ qualifier.</p>
 
         <details class="quote">
           <summary>Source code in <code>bumble/hci.py</code></summary>
-          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1854</span>
-<span class="normal">1855</span>
-<span class="normal">1856</span>
-<span class="normal">1857</span>
-<span class="normal">1858</span>
-<span class="normal">1859</span>
-<span class="normal">1860</span>
-<span class="normal">1861</span>
-<span class="normal">1862</span>
-<span class="normal">1863</span>
-<span class="normal">1864</span>
-<span class="normal">1865</span>
-<span class="normal">1866</span>
-<span class="normal">1867</span>
-<span class="normal">1868</span>
-<span class="normal">1869</span>
-<span class="normal">1870</span>
-<span class="normal">1871</span>
-<span class="normal">1872</span>
-<span class="normal">1873</span>
-<span class="normal">1874</span>
-<span class="normal">1875</span>
-<span class="normal">1876</span>
-<span class="normal">1877</span>
-<span class="normal">1878</span>
-<span class="normal">1879</span>
-<span class="normal">1880</span>
-<span class="normal">1881</span>
-<span class="normal">1882</span>
-<span class="normal">1883</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">HCI_Packet</span><span class="p">:</span>
+          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1909</span>
+<span class="normal">1910</span>
+<span class="normal">1911</span>
+<span class="normal">1912</span>
+<span class="normal">1913</span>
+<span class="normal">1914</span>
+<span class="normal">1915</span>
+<span class="normal">1916</span>
+<span class="normal">1917</span>
+<span class="normal">1918</span>
+<span class="normal">1919</span>
+<span class="normal">1920</span>
+<span class="normal">1921</span>
+<span class="normal">1922</span>
+<span class="normal">1923</span>
+<span class="normal">1924</span>
+<span class="normal">1925</span>
+<span class="normal">1926</span>
+<span class="normal">1927</span>
+<span class="normal">1928</span>
+<span class="normal">1929</span>
+<span class="normal">1930</span>
+<span class="normal">1931</span>
+<span class="normal">1932</span>
+<span class="normal">1933</span>
+<span class="normal">1934</span>
+<span class="normal">1935</span>
+<span class="normal">1936</span>
+<span class="normal">1937</span>
+<span class="normal">1938</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">HCI_Packet</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Abstract Base class for HCI packets</span>
 <span class="sd">    &#39;&#39;&#39;</span>
@@ -1798,7 +1798,7 @@ qualifier.</p>
     <span class="n">hci_packet_type</span><span class="p">:</span> <span class="nb">int</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">from_bytes</span><span class="p">(</span><span class="n">packet</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">from_bytes</span><span class="p">(</span><span class="n">packet</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HCI_Packet</span><span class="p">:</span>
         <span class="n">packet_type</span> <span class="o">=</span> <span class="n">packet</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="n">packet_type</span> <span class="o">==</span> <span class="n">HCI_COMMAND_PACKET</span><span class="p">:</span>
@@ -1859,62 +1859,7 @@ qualifier.</p>
 
         <details class="quote">
           <summary>Source code in <code>bumble/hci.py</code></summary>
-          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1898</span>
-<span class="normal">1899</span>
-<span class="normal">1900</span>
-<span class="normal">1901</span>
-<span class="normal">1902</span>
-<span class="normal">1903</span>
-<span class="normal">1904</span>
-<span class="normal">1905</span>
-<span class="normal">1906</span>
-<span class="normal">1907</span>
-<span class="normal">1908</span>
-<span class="normal">1909</span>
-<span class="normal">1910</span>
-<span class="normal">1911</span>
-<span class="normal">1912</span>
-<span class="normal">1913</span>
-<span class="normal">1914</span>
-<span class="normal">1915</span>
-<span class="normal">1916</span>
-<span class="normal">1917</span>
-<span class="normal">1918</span>
-<span class="normal">1919</span>
-<span class="normal">1920</span>
-<span class="normal">1921</span>
-<span class="normal">1922</span>
-<span class="normal">1923</span>
-<span class="normal">1924</span>
-<span class="normal">1925</span>
-<span class="normal">1926</span>
-<span class="normal">1927</span>
-<span class="normal">1928</span>
-<span class="normal">1929</span>
-<span class="normal">1930</span>
-<span class="normal">1931</span>
-<span class="normal">1932</span>
-<span class="normal">1933</span>
-<span class="normal">1934</span>
-<span class="normal">1935</span>
-<span class="normal">1936</span>
-<span class="normal">1937</span>
-<span class="normal">1938</span>
-<span class="normal">1939</span>
-<span class="normal">1940</span>
-<span class="normal">1941</span>
-<span class="normal">1942</span>
-<span class="normal">1943</span>
-<span class="normal">1944</span>
-<span class="normal">1945</span>
-<span class="normal">1946</span>
-<span class="normal">1947</span>
-<span class="normal">1948</span>
-<span class="normal">1949</span>
-<span class="normal">1950</span>
-<span class="normal">1951</span>
-<span class="normal">1952</span>
-<span class="normal">1953</span>
+          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1953</span>
 <span class="normal">1954</span>
 <span class="normal">1955</span>
 <span class="normal">1956</span>
@@ -1955,12 +1900,91 @@ qualifier.</p>
 <span class="normal">1991</span>
 <span class="normal">1992</span>
 <span class="normal">1993</span>
-<span class="normal">1994</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">HCI_Command</span><span class="p">(</span><span class="n">HCI_Packet</span><span class="p">):</span>
+<span class="normal">1994</span>
+<span class="normal">1995</span>
+<span class="normal">1996</span>
+<span class="normal">1997</span>
+<span class="normal">1998</span>
+<span class="normal">1999</span>
+<span class="normal">2000</span>
+<span class="normal">2001</span>
+<span class="normal">2002</span>
+<span class="normal">2003</span>
+<span class="normal">2004</span>
+<span class="normal">2005</span>
+<span class="normal">2006</span>
+<span class="normal">2007</span>
+<span class="normal">2008</span>
+<span class="normal">2009</span>
+<span class="normal">2010</span>
+<span class="normal">2011</span>
+<span class="normal">2012</span>
+<span class="normal">2013</span>
+<span class="normal">2014</span>
+<span class="normal">2015</span>
+<span class="normal">2016</span>
+<span class="normal">2017</span>
+<span class="normal">2018</span>
+<span class="normal">2019</span>
+<span class="normal">2020</span>
+<span class="normal">2021</span>
+<span class="normal">2022</span>
+<span class="normal">2023</span>
+<span class="normal">2024</span>
+<span class="normal">2025</span>
+<span class="normal">2026</span>
+<span class="normal">2027</span>
+<span class="normal">2028</span>
+<span class="normal">2029</span>
+<span class="normal">2030</span>
+<span class="normal">2031</span>
+<span class="normal">2032</span>
+<span class="normal">2033</span>
+<span class="normal">2034</span>
+<span class="normal">2035</span>
+<span class="normal">2036</span>
+<span class="normal">2037</span>
+<span class="normal">2038</span>
+<span class="normal">2039</span>
+<span class="normal">2040</span>
+<span class="normal">2041</span>
+<span class="normal">2042</span>
+<span class="normal">2043</span>
+<span class="normal">2044</span>
+<span class="normal">2045</span>
+<span class="normal">2046</span>
+<span class="normal">2047</span>
+<span class="normal">2048</span>
+<span class="normal">2049</span>
+<span class="normal">2050</span>
+<span class="normal">2051</span>
+<span class="normal">2052</span>
+<span class="normal">2053</span>
+<span class="normal">2054</span>
+<span class="normal">2055</span>
+<span class="normal">2056</span>
+<span class="normal">2057</span>
+<span class="normal">2058</span>
+<span class="normal">2059</span>
+<span class="normal">2060</span>
+<span class="normal">2061</span>
+<span class="normal">2062</span>
+<span class="normal">2063</span>
+<span class="normal">2064</span>
+<span class="normal">2065</span>
+<span class="normal">2066</span>
+<span class="normal">2067</span>
+<span class="normal">2068</span>
+<span class="normal">2069</span>
+<span class="normal">2070</span>
+<span class="normal">2071</span>
+<span class="normal">2072</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span> <span class="nc">HCI_Command</span><span class="p">(</span><span class="n">HCI_Packet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    See Bluetooth spec @ Vol 2, Part E - 5.4.1 HCI Command Packet</span>
 <span class="sd">    &#39;&#39;&#39;</span>
 
     <span class="n">hci_packet_type</span> <span class="o">=</span> <span class="n">HCI_COMMAND_PACKET</span>
+    <span class="n">command_names</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">command_classes</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Type</span><span class="p">[</span><span class="n">HCI_Command</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
 
     <span class="nd">@staticmethod</span>
@@ -1971,9 +1995,9 @@ qualifier.</p>
 
         <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
             <span class="bp">cls</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
-            <span class="bp">cls</span><span class="o">.</span><span class="n">op_code</span> <span class="o">=</span> <span class="n">key_with_value</span><span class="p">(</span><span class="n">HCI_COMMAND_NAMES</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">op_code</span> <span class="o">=</span> <span class="n">key_with_value</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">command_names</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
             <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">op_code</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;command </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> not found in HCI_COMMAND_NAMES&#39;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;command </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> not found in command_names&#39;</span><span class="p">)</span>
             <span class="bp">cls</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="n">fields</span>
             <span class="bp">cls</span><span class="o">.</span><span class="n">return_parameters_fields</span> <span class="o">=</span> <span class="n">return_parameters_fields</span>
 
@@ -1993,7 +2017,19 @@ qualifier.</p>
         <span class="k">return</span> <span class="n">inner</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">from_bytes</span><span class="p">(</span><span class="n">packet</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">command_map</span><span class="p">(</span><span class="n">symbols</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="n">command_code</span><span class="p">:</span> <span class="n">command_name</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">command_name</span><span class="p">,</span> <span class="n">command_code</span><span class="p">)</span> <span class="ow">in</span> <span class="n">symbols</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">command_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;HCI_&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">command_name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;_COMMAND&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">register_commands</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">symbols</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">command_names</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">command_map</span><span class="p">(</span><span class="n">symbols</span><span class="p">))</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">from_bytes</span><span class="p">(</span><span class="n">packet</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HCI_Command</span><span class="p">:</span>
         <span class="n">op_code</span><span class="p">,</span> <span class="n">length</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack_from</span><span class="p">(</span><span class="s1">&#39;&lt;HB&#39;</span><span class="p">,</span> <span class="n">packet</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
         <span class="n">parameters</span> <span class="o">=</span> <span class="n">packet</span><span class="p">[</span><span class="mi">4</span><span class="p">:]</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span> <span class="o">!=</span> <span class="n">length</span><span class="p">:</span>
@@ -2012,11 +2048,11 @@ qualifier.</p>
             <span class="n">HCI_Object</span><span class="o">.</span><span class="n">init_from_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">fields</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span>
 
-        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_parameters</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_parameters</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">command_name</span><span class="p">(</span><span class="n">op_code</span><span class="p">):</span>
-        <span class="n">name</span> <span class="o">=</span> <span class="n">HCI_COMMAND_NAMES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">op_code</span><span class="p">)</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">HCI_Command</span><span class="o">.</span><span class="n">command_names</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">op_code</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">name</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s1">&#39;[OGF=0x</span><span class="si">{</span><span class="n">op_code</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="mi">10</span><span class="si">:</span><span class="s1">02x</span><span class="si">}</span><span class="s1">, OCF=0x</span><span class="si">{</span><span class="n">op_code</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="mh">0x3FF</span><span class="si">:</span><span class="s1">04x</span><span class="si">}</span><span class="s1">]&#39;</span>
@@ -2024,6 +2060,16 @@ qualifier.</p>
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">create_return_parameters</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">HCI_Object</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">return_parameters_fields</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">parse_return_parameters</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">return_parameters_fields</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">return_parameters</span> <span class="o">=</span> <span class="n">HCI_Object</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span>
+            <span class="n">parameters</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">return_parameters_fields</span>
+        <span class="p">)</span>
+        <span class="n">return_parameters</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">return_parameters_fields</span>
+        <span class="k">return</span> <span class="n">return_parameters</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op_code</span><span class="p">,</span> <span class="n">parameters</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">HCI_Command</span><span class="o">.</span><span class="n">command_name</span><span class="p">(</span><span class="n">op_code</span><span class="p">))</span>
@@ -2087,34 +2133,34 @@ qualifier.</p>
 
       <details class="quote">
         <summary>Source code in <code>bumble/hci.py</code></summary>
-        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1906</span>
-<span class="normal">1907</span>
-<span class="normal">1908</span>
-<span class="normal">1909</span>
-<span class="normal">1910</span>
-<span class="normal">1911</span>
-<span class="normal">1912</span>
-<span class="normal">1913</span>
-<span class="normal">1914</span>
-<span class="normal">1915</span>
-<span class="normal">1916</span>
-<span class="normal">1917</span>
-<span class="normal">1918</span>
-<span class="normal">1919</span>
-<span class="normal">1920</span>
-<span class="normal">1921</span>
-<span class="normal">1922</span>
-<span class="normal">1923</span>
-<span class="normal">1924</span>
-<span class="normal">1925</span>
-<span class="normal">1926</span>
-<span class="normal">1927</span>
-<span class="normal">1928</span>
-<span class="normal">1929</span>
-<span class="normal">1930</span>
-<span class="normal">1931</span>
-<span class="normal">1932</span>
-<span class="normal">1933</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+        <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1962</span>
+<span class="normal">1963</span>
+<span class="normal">1964</span>
+<span class="normal">1965</span>
+<span class="normal">1966</span>
+<span class="normal">1967</span>
+<span class="normal">1968</span>
+<span class="normal">1969</span>
+<span class="normal">1970</span>
+<span class="normal">1971</span>
+<span class="normal">1972</span>
+<span class="normal">1973</span>
+<span class="normal">1974</span>
+<span class="normal">1975</span>
+<span class="normal">1976</span>
+<span class="normal">1977</span>
+<span class="normal">1978</span>
+<span class="normal">1979</span>
+<span class="normal">1980</span>
+<span class="normal">1981</span>
+<span class="normal">1982</span>
+<span class="normal">1983</span>
+<span class="normal">1984</span>
+<span class="normal">1985</span>
+<span class="normal">1986</span>
+<span class="normal">1987</span>
+<span class="normal">1988</span>
+<span class="normal">1989</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">command</span><span class="p">(</span><span class="n">fields</span><span class="o">=</span><span class="p">(),</span> <span class="n">return_parameters_fields</span><span class="o">=</span><span class="p">()):</span>
 <span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
 <span class="sd">    Decorator used to declare and register subclasses</span>
@@ -2122,9 +2168,9 @@ qualifier.</p>
 
     <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
         <span class="bp">cls</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
-        <span class="bp">cls</span><span class="o">.</span><span class="n">op_code</span> <span class="o">=</span> <span class="n">key_with_value</span><span class="p">(</span><span class="n">HCI_COMMAND_NAMES</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">op_code</span> <span class="o">=</span> <span class="n">key_with_value</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">command_names</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">op_code</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;command </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> not found in HCI_COMMAND_NAMES&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;command </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1"> not found in command_names&#39;</span><span class="p">)</span>
         <span class="bp">cls</span><span class="o">.</span><span class="n">fields</span> <span class="o">=</span> <span class="n">fields</span>
         <span class="bp">cls</span><span class="o">.</span><span class="n">return_parameters_fields</span> <span class="o">=</span> <span class="n">return_parameters_fields</span>
 
@@ -2171,16 +2217,16 @@ qualifier.</p>
 
         <details class="quote">
           <summary>Source code in <code>bumble/hci.py</code></summary>
-          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2037</span>
-<span class="normal">2038</span>
-<span class="normal">2039</span>
-<span class="normal">2040</span>
-<span class="normal">2041</span>
-<span class="normal">2042</span>
-<span class="normal">2043</span>
-<span class="normal">2044</span>
-<span class="normal">2045</span>
-<span class="normal">2046</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@HCI_Command</span><span class="o">.</span><span class="n">command</span><span class="p">(</span>
+          <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">2118</span>
+<span class="normal">2119</span>
+<span class="normal">2120</span>
+<span class="normal">2121</span>
+<span class="normal">2122</span>
+<span class="normal">2123</span>
+<span class="normal">2124</span>
+<span class="normal">2125</span>
+<span class="normal">2126</span>
+<span class="normal">2127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@HCI_Command</span><span class="o">.</span><span class="n">command</span><span class="p">(</span>
     <span class="p">[</span>
         <span class="p">(</span><span class="s1">&#39;connection_handle&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
         <span class="p">(</span><span class="s1">&#39;reason&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;mapper&#39;</span><span class="p">:</span> <span class="n">HCI_Constant</span><span class="o">.</span><span class="n">error_name</span><span class="p">}),</span>

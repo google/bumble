@@ -63,7 +63,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#udp-transport" class="md-skip">
+        <a href="#websocket-client-transport" class="md-skip">
           Skip to content
         </a>
       
@@ -1350,14 +1350,14 @@
                   
 
 
-<h1 id="udp-transport">UDP TRANSPORT<a class="headerlink" href="#udp-transport" title="Permanent link">&para;</a></h1>
-<p>The UDP transport is a UDP socket, receiving packets on a specified port number, and sending packets to a specified host and port number.</p>
+<h1 id="websocket-client-transport">WEBSOCKET CLIENT TRANSPORT<a class="headerlink" href="#websocket-client-transport" title="Permanent link">&para;</a></h1>
+<p>The WebSocket Client transport is WebSocket connection to a WebSocket server over which HCI packets
+are sent and received.</p>
 <h2 id="moniker">Moniker<a class="headerlink" href="#moniker" title="Permanent link">&para;</a></h2>
-<p>The moniker syntax for a UDP transport is: <code>udp:&lt;local-host&gt;:&lt;local-port&gt;,&lt;remote-host&gt;:&lt;remote-port&gt;</code>.</p>
+<p>The moniker syntax for a WebSocket Client transport is: <code>ws-client:&lt;ws-url&gt;</code></p>
 <div class="admonition example">
 <p class="admonition-title">Example</p>
-<p><code>udp:0.0.0.0:9000,127.0.0.1:9001</code>
-UDP transport where packets are received on port <code>9000</code> and sent to <code>127.0.0.1</code> on port <code>9001</code></p>
+<p><code>ws-client:ws://localhost:1234/some/path</code></p>
 </div>
 
 
