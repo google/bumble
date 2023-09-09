@@ -1387,6 +1387,7 @@ class ChannelManager:
     le_coc_requests: Dict[int, L2CAP_LE_Credit_Based_Connection_Request]
     fixed_channels: Dict[int, Optional[Callable[[int, bytes], Any]]]
     _host: Optional[Host]
+    connection_parameters_update_response: Optional[asyncio.Future[int]]
 
     def __init__(
         self,
@@ -1408,6 +1409,7 @@ class ChannelManager:
         self.le_coc_requests = {}  # LE CoC connection requests, by identifier
         self.extended_features = extended_features
         self.connectionless_mtu = connectionless_mtu
+        self.connection_parameters_update_response = None
 
     @property
     def host(self) -> Host:
@@ -1865,11 +1867,45 @@ class ChannelManager:
                 ),
             )
 
+    async def update_connection_parameters(
+        self,
+        connection: Connection,
+        interval_min: int,
+        interval_max: int,
+        latency: int,
+        timeout: int,
+    ) -> int:
+        # Check that there isn't already a request pending
+        if self.connection_parameters_update_response:
+            raise InvalidStateError('request already pending')
+        self.connection_parameters_update_response = (
+            asyncio.get_running_loop().create_future()
+        )
+        self.send_control_frame(
+            connection,
+            L2CAP_LE_SIGNALING_CID,
+            L2CAP_Connection_Parameter_Update_Request(
+                interval_min=interval_min,
+                interval_max=interval_max,
+                latency=latency,
+                timeout=timeout,
+            ),
+        )
+        return await self.connection_parameters_update_response
+
     def on_l2cap_connection_parameter_update_response(
         self, connection: Connection, cid: int, response
     ) -> None:
-        # TODO: check response
-        pass
+        if self.connection_parameters_update_response:
+            self.connection_parameters_update_response.set_result(response.result)
+            self.connection_parameters_update_response = None
+        else:
+            logger.warning(
+                color(
+                    'received l2cap_connection_parameter_update_response without a pending request',
+                    'red',
+                )
+            )
 
     def on_l2cap_le_credit_based_connection_request(
         self, connection: Connection, cid: int, request
