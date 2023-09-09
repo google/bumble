@@ -142,6 +142,10 @@ class ConnectionError(BaseError):  # pylint: disable=redefined-builtin
         self.peer_address = peer_address
 
 
+class ConnectionParameterUpdateError(BaseError):
+    """Connection Parameter Update Error"""
+
+
 # -----------------------------------------------------------------------------
 # UUID
 #

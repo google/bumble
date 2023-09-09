@@ -141,6 +141,7 @@ from .core import (
     BT_LE_TRANSPORT,
     BT_PERIPHERAL_ROLE,
     AdvertisingData,
+    ConnectionParameterUpdateError,
     CommandTimeoutError,
     ConnectionPHY,
     InvalidStateError,
@@ -723,6 +724,7 @@ class Connection(CompositeEventEmitter):
         connection_interval_max,
         max_latency,
         supervision_timeout,
+        use_l2cap=False,
     ):
         return await self.device.update_connection_parameters(
             self,
@@ -730,6 +732,7 @@ class Connection(CompositeEventEmitter):
             connection_interval_max,
             max_latency,
             supervision_timeout,
+            use_l2cap=use_l2cap,
         )
 
     async def set_phy(self, tx_phys=None, rx_phys=None, phy_options=None):
@@ -2110,11 +2113,30 @@ class Device(CompositeEventEmitter):
         supervision_timeout,
         min_ce_length=0,
         max_ce_length=0,
-    ):
+        use_l2cap=False,
+    ) -> None:
         '''
         NOTE: the name of the parameters may look odd, but it just follows the names
         used in the Bluetooth spec.
         '''
+
+        if use_l2cap:
+            if connection.role != BT_PERIPHERAL_ROLE:
+                raise InvalidStateError(
+                    'only peripheral can update connection parameters with l2cap'
+                )
+            l2cap_result = (
+                await self.l2cap_channel_manager.update_connection_parameters(
+                    connection,
+                    connection_interval_min,
+                    connection_interval_max,
+                    max_latency,
+                    supervision_timeout,
+                )
+            )
+            if l2cap_result != l2cap.L2CAP_CONNECTION_PARAMETERS_ACCEPTED_RESULT:
+                raise ConnectionParameterUpdateError(l2cap_result)
+
         result = await self.send_command(
             HCI_LE_Connection_Update_Command(
                 connection_handle=connection.handle,
@@ -2124,7 +2146,7 @@ class Device(CompositeEventEmitter):
                 supervision_timeout=supervision_timeout,
                 min_ce_length=min_ce_length,
                 max_ce_length=max_ce_length,
-            )
+            )  # type: ignore[call-arg]
         )
         if result.status != HCI_Command_Status_Event.PENDING:
             raise HCI_StatusError(result)
