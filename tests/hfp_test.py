@@ -53,7 +53,7 @@ async def make_hfp_connections(
     client_dlc = await client_mux.open_dlc(rfcomm_channel)
     server_dlc = await wait_dlc
 
-    # Setup HFP connnection
+    # Setup HFP connection
     hf = hfp.HfProtocol(client_dlc, hf_config)
     ag = hfp.HfpProtocol(server_dlc)
     return hf, ag
