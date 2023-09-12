@@ -89,93 +89,91 @@ JSON3 = """
 def temporary_file():
     file = tempfile.NamedTemporaryFile(delete=False)
     file.close()
-    temp_file = pathlib.Path(file.name)
-    yield temp_file
-    temp_file.unlink()
+    yield file.name
+    pathlib.Path(file.name).unlink()
 
 
 # -----------------------------------------------------------------------------
 async def test_basic(temporary_file):
-    with temporary_file.open(mode='w', encoding='utf-8') as file:
-        keystore = JsonKeyStore('my_namespace', file.name)
+    with open(temporary_file, mode='w', encoding='utf-8') as file:
         file.write("{}")
         file.flush()
 
-        keys = await keystore.get_all()
-        assert len(keys) == 0
+    keystore = JsonKeyStore('my_namespace', temporary_file)
 
-        keys = PairingKeys()
-        await keystore.update('foo', keys)
-        foo = await keystore.get('foo')
-        assert foo is not None
-        assert foo.ltk is None
-        ltk = bytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
-        keys.ltk = PairingKeys.Key(ltk)
-        await keystore.update('foo', keys)
-        foo = await keystore.get('foo')
-        assert foo is not None
-        assert foo.ltk is not None
-        assert foo.ltk.value == ltk
+    keys = await keystore.get_all()
+    assert len(keys) == 0
 
-        file.flush()
-        with open(file.name, "r", encoding="utf-8") as json_file:
-            json_data = json.load(json_file)
-            assert 'my_namespace' in json_data
-            assert 'foo' in json_data['my_namespace']
-            assert 'ltk' in json_data['my_namespace']['foo']
+    keys = PairingKeys()
+    await keystore.update('foo', keys)
+    foo = await keystore.get('foo')
+    assert foo is not None
+    assert foo.ltk is None
+    ltk = bytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+    keys.ltk = PairingKeys.Key(ltk)
+    await keystore.update('foo', keys)
+    foo = await keystore.get('foo')
+    assert foo is not None
+    assert foo.ltk is not None
+    assert foo.ltk.value == ltk
+
+    with open(file.name, "r", encoding="utf-8") as json_file:
+        json_data = json.load(json_file)
+        assert 'my_namespace' in json_data
+        assert 'foo' in json_data['my_namespace']
+        assert 'ltk' in json_data['my_namespace']['foo']
 
 
 # -----------------------------------------------------------------------------
 async def test_parsing(temporary_file):
-    with temporary_file.open(mode='w', encoding='utf-8') as file:
-        keystore = JsonKeyStore('my_namespace', file.name)
+    with open(temporary_file, mode='w', encoding='utf-8') as file:
         file.write(JSON1)
         file.flush()
 
-        foo = await keystore.get('14:7D:DA:4E:53:A8/P')
-        assert foo is not None
-        assert foo.ltk.value == bytes.fromhex('d1897ee10016eb1a08e4e037fd54c683')
+    keystore = JsonKeyStore('my_namespace', file.name)
+    foo = await keystore.get('14:7D:DA:4E:53:A8/P')
+    assert foo is not None
+    assert foo.ltk.value == bytes.fromhex('d1897ee10016eb1a08e4e037fd54c683')
 
 
 # -----------------------------------------------------------------------------
 async def test_default_namespace(temporary_file):
-    with temporary_file.open(mode='w', encoding='utf-8') as file:
-        keystore = JsonKeyStore(None, file.name)
+    with open(temporary_file, mode='w', encoding='utf-8') as file:
         file.write(JSON1)
         file.flush()
 
-        all_keys = await keystore.get_all()
-        assert len(all_keys) == 1
-        name, keys = all_keys[0]
-        assert name == '14:7D:DA:4E:53:A8/P'
-        assert keys.irk.value == bytes.fromhex('e7b2543b206e4e46b44f9e51dad22bd1')
+    keystore = JsonKeyStore(None, file.name)
+    all_keys = await keystore.get_all()
+    assert len(all_keys) == 1
+    name, keys = all_keys[0]
+    assert name == '14:7D:DA:4E:53:A8/P'
+    assert keys.irk.value == bytes.fromhex('e7b2543b206e4e46b44f9e51dad22bd1')
 
-    with temporary_file.open(mode='w', encoding='utf-8') as file:
-        keystore = JsonKeyStore(None, file.name)
+    with open(temporary_file, mode='w', encoding='utf-8') as file:
         file.write(JSON2)
         file.flush()
 
-        keys = PairingKeys()
-        ltk = bytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
-        keys.ltk = PairingKeys.Key(ltk)
-        await keystore.update('foo', keys)
-        file.flush()
-        with open(file.name, "r", encoding="utf-8") as json_file:
-            json_data = json.load(json_file)
-            assert '__DEFAULT__' in json_data
-            assert 'foo' in json_data['__DEFAULT__']
-            assert 'ltk' in json_data['__DEFAULT__']['foo']
+    keystore = JsonKeyStore(None, file.name)
+    keys = PairingKeys()
+    ltk = bytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+    keys.ltk = PairingKeys.Key(ltk)
+    await keystore.update('foo', keys)
+    with open(file.name, "r", encoding="utf-8") as json_file:
+        json_data = json.load(json_file)
+        assert '__DEFAULT__' in json_data
+        assert 'foo' in json_data['__DEFAULT__']
+        assert 'ltk' in json_data['__DEFAULT__']['foo']
 
-    with temporary_file.open(mode='w', encoding='utf-8') as file:
-        keystore = JsonKeyStore(None, file.name)
+    with open(temporary_file, mode='w', encoding='utf-8') as file:
         file.write(JSON3)
         file.flush()
 
-        all_keys = await keystore.get_all()
-        assert len(all_keys) == 1
-        name, keys = all_keys[0]
-        assert name == '14:7D:DA:4E:53:A8/P'
-        assert keys.irk.value == bytes.fromhex('e7b2543b206e4e46b44f9e51dad22bd1')
+    keystore = JsonKeyStore(None, file.name)
+    all_keys = await keystore.get_all()
+    assert len(all_keys) == 1
+    name, keys = all_keys[0]
+    assert name == '14:7D:DA:4E:53:A8/P'
+    assert keys.irk.value == bytes.fromhex('e7b2543b206e4e46b44f9e51dad22bd1')
 
 
 # -----------------------------------------------------------------------------
