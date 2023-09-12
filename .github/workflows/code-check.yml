@@ -14,6 +14,10 @@ jobs:
   check:
     name: Check Code
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+      fail-fast: false
 
     steps:
     - name: Check out from Git
