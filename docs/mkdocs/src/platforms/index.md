@@ -9,3 +9,4 @@ For platform-specific information, see the following pages:
   * :material-linux: Linux - see the [Linux platform page](linux.md)
   * :material-microsoft-windows: Windows - see the [Windows platform page](windows.md)
   * :material-android: Android - see the [Android platform page](android.md)
+  * :material-memory: Zephyr - see the [Zephyr platform page](zephyr.md)
