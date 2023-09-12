@@ -18,6 +18,8 @@
 import asyncio
 import json
 import logging
+import pathlib
+import pytest
 import tempfile
 import os
 
@@ -83,8 +85,18 @@ JSON3 = """
 
 
 # -----------------------------------------------------------------------------
-async def test_basic():
-    with tempfile.NamedTemporaryFile(mode="r+", encoding='utf-8') as file:
+@pytest.fixture
+def temporary_file():
+    file = tempfile.NamedTemporaryFile(delete=False)
+    file.close()
+    temp_file = pathlib.Path(file.name)
+    yield temp_file
+    temp_file.unlink()
+
+
+# -----------------------------------------------------------------------------
+async def test_basic(temporary_file):
+    with temporary_file.open(mode='w', encoding='utf-8') as file:
         keystore = JsonKeyStore('my_namespace', file.name)
         file.write("{}")
         file.flush()
@@ -114,8 +126,8 @@ async def test_basic():
 
 
 # -----------------------------------------------------------------------------
-async def test_parsing():
-    with tempfile.NamedTemporaryFile(mode="w", encoding='utf-8') as file:
+async def test_parsing(temporary_file):
+    with temporary_file.open(mode='w', encoding='utf-8') as file:
         keystore = JsonKeyStore('my_namespace', file.name)
         file.write(JSON1)
         file.flush()
@@ -126,8 +138,8 @@ async def test_parsing():
 
 
 # -----------------------------------------------------------------------------
-async def test_default_namespace():
-    with tempfile.NamedTemporaryFile(mode="w", encoding='utf-8') as file:
+async def test_default_namespace(temporary_file):
+    with temporary_file.open(mode='w', encoding='utf-8') as file:
         keystore = JsonKeyStore(None, file.name)
         file.write(JSON1)
         file.flush()
@@ -138,7 +150,7 @@ async def test_default_namespace():
         assert name == '14:7D:DA:4E:53:A8/P'
         assert keys.irk.value == bytes.fromhex('e7b2543b206e4e46b44f9e51dad22bd1')
 
-    with tempfile.NamedTemporaryFile(mode="w", encoding='utf-8') as file:
+    with temporary_file.open(mode='w', encoding='utf-8') as file:
         keystore = JsonKeyStore(None, file.name)
         file.write(JSON2)
         file.flush()
@@ -154,7 +166,7 @@ async def test_default_namespace():
             assert 'foo' in json_data['__DEFAULT__']
             assert 'ltk' in json_data['__DEFAULT__']['foo']
 
-    with tempfile.NamedTemporaryFile(mode="w", encoding='utf-8') as file:
+    with temporary_file.open(mode='w', encoding='utf-8') as file:
         keystore = JsonKeyStore(None, file.name)
         file.write(JSON3)
         file.flush()
