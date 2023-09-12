@@ -63,6 +63,8 @@ class TransportSink(Protocol):
 
 
 class TransportSource(Protocol):
+    terminated: asyncio.Future[None]
+
     def set_packet_sink(self, sink: TransportSink) -> None:
         ...
 
@@ -430,6 +432,7 @@ class SnoopingTransport(Transport):
         def __init__(self, source: TransportSource, snooper: Snooper):
             self.source = source
             self.snooper = snooper
+            self.terminated = source.terminated
 
         def set_packet_sink(self, sink: TransportSink) -> None:
             self.sink = sink
