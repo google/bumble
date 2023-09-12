@@ -757,7 +757,7 @@ class Channel(EventEmitter):
         )
         self.state = new_state
 
-    def send_pdu(self, pdu: SupportsBytes | bytes) -> None:
+    def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
         self.manager.send_pdu(self.connection, self.destination_cid, pdu)
 
     def send_control_frame(self, frame: L2CAP_Control_Frame) -> None:
@@ -1098,7 +1098,7 @@ class LeConnectionOrientedChannel(EventEmitter):
         elif new_state == self.DISCONNECTED:
             self.emit('close')
 
-    def send_pdu(self, pdu: SupportsBytes | bytes) -> None:
+    def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
         self.manager.send_pdu(self.connection, self.destination_cid, pdu)
 
     def send_control_frame(self, frame: L2CAP_Control_Frame) -> None:
@@ -1569,7 +1569,7 @@ class ChannelManager:
         if connection_handle in self.identifiers:
             del self.identifiers[connection_handle]
 
-    def send_pdu(self, connection, cid: int, pdu: SupportsBytes | bytes) -> None:
+    def send_pdu(self, connection, cid: int, pdu: Union[SupportsBytes, bytes]) -> None:
         pdu_str = pdu.hex() if isinstance(pdu, bytes) else str(pdu)
         logger.debug(
             f'{color(">>> Sending L2CAP PDU", "blue")} '

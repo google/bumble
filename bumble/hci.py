@@ -4397,7 +4397,7 @@ class HCI_Event(HCI_Packet):
         if len(parameters) != length:
             raise ValueError('invalid packet length')
 
-        cls: Type[HCI_Event | HCI_LE_Meta_Event] | None
+        cls: Any
         if event_code == HCI_LE_META_EVENT:
             # We do this dispatch here and not in the subclass in order to avoid call
             # loops

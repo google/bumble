@@ -80,7 +80,7 @@ class BaseError(Exception):
 
     def __init__(
         self,
-        error_code: int | None,
+        error_code: Optional[int],
         error_namespace: str = '',
         error_name: str = '',
         details: str = '',
