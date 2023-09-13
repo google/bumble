@@ -23,6 +23,8 @@ import atexit
 import os
 import logging
 
+from typing import Optional
+
 from .common import Transport, StreamPacketSource, StreamPacketSink
 
 # -----------------------------------------------------------------------------
@@ -32,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_pty_transport(spec: str | None) -> Transport:
+async def open_pty_transport(spec: Optional[str]) -> Transport:
     '''
     Open a PTY transport.
     The parameter string may be empty, or a path name where a symbolic link

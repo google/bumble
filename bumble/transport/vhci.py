@@ -17,6 +17,8 @@
 # -----------------------------------------------------------------------------
 import logging
 
+from typing import Optional
+
 from .common import Transport
 from .file import open_file_transport
 
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_vhci_transport(spec: str | None) -> Transport:
+async def open_vhci_transport(spec: Optional[str]) -> Transport:
     '''
     Open a VHCI transport (only available on some platforms).
     The parameter string is either empty (to use the default VHCI device

@@ -23,6 +23,8 @@ import socket
 import ctypes
 import collections
 
+from typing import Optional
+
 from .common import Transport, ParserSource
 
 
@@ -33,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_hci_socket_transport(spec: str | None) -> Transport:
+async def open_hci_socket_transport(spec: Optional[str]) -> Transport:
     '''
     Open an HCI Socket (only available on some platforms).
     The parameter string is either empty (to use the first/default Bluetooth adapter)
