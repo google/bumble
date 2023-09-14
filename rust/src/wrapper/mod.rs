@@ -29,6 +29,8 @@ use pyo3::{
 pub use pyo3_asyncio;
 
 pub mod assigned_numbers;
+pub mod common;
+pub mod controller;
 pub mod core;
 pub mod device;
 pub mod drivers;
@@ -36,6 +38,7 @@ pub mod gatt_client;
 pub mod hci;
 pub mod host;
 pub mod l2cap;
+pub mod link;
 pub mod logging;
 pub mod profile;
 pub mod transport;

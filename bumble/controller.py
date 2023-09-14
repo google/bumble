@@ -194,6 +194,21 @@ class Controller:
 
         self.terminated = asyncio.get_running_loop().create_future()
 
+    @classmethod
+    async def create(
+        cls,
+        name,
+        host_source=None,
+        host_sink: Optional[TransportSink] = None,
+        link=None,
+        public_address: Optional[Union[bytes, str, Address]] = None,
+    ):
+        '''
+        Rust's pyo3_asyncio needs the constructor to be async in order to properly
+        inject a running loop for creating the `terminated` future.
+        '''
+        return Controller(name, host_source, host_sink, link, public_address)
+
     @property
     def host(self):
         return self.hci_sink

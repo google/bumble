@@ -15,7 +15,7 @@
 //! Host-side types
 
 use crate::wrapper::transport::{Sink, Source};
-use pyo3::{intern, prelude::PyModule, types::PyDict, PyObject, PyResult, Python};
+use pyo3::{intern, prelude::PyModule, types::PyDict, PyObject, PyResult, Python, ToPyObject};
 
 /// Host HCI commands
 pub struct Host {
@@ -58,6 +58,12 @@ impl Host {
         })?
         .await
         .map(|_| ())
+    }
+}
+
+impl ToPyObject for Host {
+    fn to_object(&self, _py: Python<'_>) -> PyObject {
+        self.obj.clone()
     }
 }
 

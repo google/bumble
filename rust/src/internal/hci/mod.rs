@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! It's not clear where to put Rust code that isn't simply a wrapper around Python. Until we have
-//! a good answer for what to do there, the idea is to put it in this (non-public) module, and
-//! `pub use` it into the relevant areas of the `wrapper` module so that it's still easy for users
-//! to discover.
+use pdl_derive::pdl;
 
-pub(crate) mod drivers;
-pub(crate) mod hci;
+#[allow(missing_docs, warnings, clippy::all)]
+#[pdl("src/internal/hci/packets.pdl")]
+pub mod packets {}
