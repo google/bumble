@@ -47,9 +47,9 @@ async def open_hci_socket_transport(spec: Optional[str]) -> Transport:
     # Create a raw HCI socket
     try:
         hci_socket = socket.socket(
-            socket.AF_BLUETOOTH,
-            socket.SOCK_RAW | socket.SOCK_NONBLOCK,
-            socket.BTPROTO_HCI,  # type: ignore
+            socket.AF_BLUETOOTH,  # type: ignore[attr-defined]
+            socket.SOCK_RAW | socket.SOCK_NONBLOCK,  # type: ignore[attr-defined]
+            socket.BTPROTO_HCI,  # type: ignore[attr-defined]
         )
     except AttributeError as error:
         # Not supported on this platform
@@ -80,7 +80,7 @@ async def open_hci_socket_transport(spec: Optional[str]) -> Transport:
     bind_address = struct.pack(
         # pylint: disable=no-member
         '<HHH',
-        socket.AF_BLUETOOTH,
+        socket.AF_BLUETOOTH,  # type: ignore[attr-defined]
         adapter_index,
         HCI_CHANNEL_USER,
     )
