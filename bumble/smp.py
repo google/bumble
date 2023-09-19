@@ -37,6 +37,7 @@ from typing import (
     Optional,
     Tuple,
     Type,
+    cast,
 )
 
 from pyee import EventEmitter
@@ -1771,7 +1772,26 @@ class Manager(EventEmitter):
         cid = SMP_BR_CID if connection.transport == BT_BR_EDR_TRANSPORT else SMP_CID
         connection.send_l2cap_pdu(cid, command.to_bytes())
 
+    def on_smp_security_request_command(
+        self, connection: Connection, request: SMP_Security_Request_Command
+    ) -> None:
+        connection.emit('security_request', request.auth_req)
+
     def on_smp_pdu(self, connection: Connection, pdu: bytes) -> None:
+        # Parse the L2CAP payload into an SMP Command object
+        command = SMP_Command.from_bytes(pdu)
+        logger.debug(
+            f'<<< Received SMP Command on connection [0x{connection.handle:04X}] '
+            f'{connection.peer_address}: {command}'
+        )
+
+        # Security request is more than just pairing, so let applications handle them
+        if command.code == SMP_SECURITY_REQUEST_COMMAND:
+            self.on_smp_security_request_command(
+                connection, cast(SMP_Security_Request_Command, command)
+            )
+            return
+
         # Look for a session with this connection, and create one if none exists
         if not (session := self.sessions.get(connection.handle)):
             if connection.role == BT_CENTRAL_ROLE:
@@ -1781,13 +1801,6 @@ class Manager(EventEmitter):
                 self, connection, pairing_config, is_initiator=False
             )
             self.sessions[connection.handle] = session
-
-        # Parse the L2CAP payload into an SMP Command object
-        command = SMP_Command.from_bytes(pdu)
-        logger.debug(
-            f'<<< Received SMP Command on connection [0x{connection.handle:04X}] '
-            f'{connection.peer_address}: {command}'
-        )
 
         # Delegate the handling of the command to the session
         session.on_smp_command(command)
