@@ -47,6 +47,7 @@ from bumble.a2dp import (
 )
 from bumble.utils import AsyncRunner
 from bumble.codecs import AacAudioRtpPacket
+from bumble.hci import HCI_Reset_Command
 
 
 # -----------------------------------------------------------------------------
@@ -95,15 +96,15 @@ class Speaker:
         STARTED = 2
         SUSPENDED = 3
 
-    def __init__(self, hci_source, hci_sink, emit_event, codec, discover):
+    def __init__(self, hci_source, hci_sink, codec, discover):
         self.hci_source = hci_source
         self.hci_sink = hci_sink
-        self.emit_event = emit_event
+        self.js_listeners = {}
         self.codec = codec
         self.discover = discover
         self.device = None
         self.connection = None
-        self.listener = None
+        self.avdtp_listener = None
         self.packets_received = 0
         self.bytes_received = 0
         self.stream_state = Speaker.StreamState.IDLE
@@ -164,7 +165,7 @@ class Speaker:
 
     def on_key_store_update(self):
         print("Key Store updated")
-        self.emit_event('keystoreupdate', None)
+        self.emit('key_store_update')
 
     def on_bluetooth_connection(self, connection):
         print(f'Connection: {connection}')
@@ -172,7 +173,7 @@ class Speaker:
         connection.on('disconnection', self.on_bluetooth_disconnection)
         peer_name = '' if connection.peer_name is None else connection.peer_name
         peer_address = connection.peer_address.to_string(False)
-        self.emit_event(
+        self.emit(
             'connection', {'peer_name': peer_name, 'peer_address': peer_address}
         )
 
@@ -180,7 +181,7 @@ class Speaker:
         print(f'Disconnection ({reason})')
         self.connection = None
         AsyncRunner.spawn(self.advertise())
-        self.emit_event('disconnection', None)
+        self.emit('disconnection', None)
 
     def on_avdtp_connection(self, protocol):
         print('Audio Stream Open')
@@ -198,7 +199,7 @@ class Speaker:
         # Listen for close events
         protocol.on('close', self.on_avdtp_close)
 
-        # Discover all endpoints on the remote device is requested
+        # Discoverall endpoints on the remote device is requested
         if self.discover:
             AsyncRunner.spawn(self.discover_remote_endpoints(protocol))
 
@@ -208,17 +209,17 @@ class Speaker:
     def on_sink_start(self):
         print("Sink Started")
         self.stream_state = self.StreamState.STARTED
-        self.emit_event('start', None)
+        self.emit('start', None)
 
     def on_sink_stop(self):
         print("Sink Stopped")
         self.stream_state = self.StreamState.STOPPED
-        self.emit_event('stop', None)
+        self.emit('stop', None)
 
     def on_sink_suspend(self):
         print("Sink Suspended")
         self.stream_state = self.StreamState.SUSPENDED
-        self.emit_event('suspend', None)
+        self.emit('suspend', None)
 
     def on_sink_configuration(self, config):
         print("Sink Configuration:")
@@ -234,7 +235,7 @@ class Speaker:
     def on_rtp_packet(self, packet):
         self.packets_received += 1
         self.bytes_received += len(packet.payload)
-        self.emit_event("audio", self.audio_extractor.extract_audio(packet))
+        self.emit("audio", self.audio_extractor.extract_audio(packet))
 
     async def advertise(self):
         await self.device.set_discoverable(True)
@@ -257,7 +258,7 @@ class Speaker:
         print('*** Encryption on')
 
         protocol = await Protocol.connect(connection)
-        self.listener.set_server(connection, protocol)
+        self.avdtp_listener.set_server(connection, protocol)
         self.on_avdtp_connection(protocol)
 
     async def discover_remote_endpoints(self, protocol):
@@ -265,6 +266,13 @@ class Speaker:
         print(f'@@@ Found {len(endpoints)} endpoints')
         for endpoint in endpoints:
             print('@@@', endpoint)
+
+    def on(self, event_name, listener):
+        self.js_listeners[event_name] = listener
+
+    def emit(self, event_name, event=None):
+        if listener := self.js_listeners.get(event_name):
+            listener(event)
 
     async def run(self, connect_address):
         # Create a device
@@ -296,8 +304,8 @@ class Speaker:
         self.device.on('key_store_update', self.on_key_store_update)
 
         # Create a listener to wait for AVDTP connections
-        self.listener = Listener.for_device(self.device)
-        self.listener.on('connection', self.on_avdtp_connection)
+        self.avdtp_listener = Listener.for_device(self.device)
+        self.avdtp_listener.on('connection', self.on_avdtp_connection)
 
         print(f'Speaker ready to play, codec={self.codec}')
 
@@ -310,12 +318,19 @@ class Speaker:
                 return
         else:
             # Start being discoverable and connectable
-            print("Waiting for connection...")
             await self.advertise()
+            print("Waiting for connection...")
+
+    async def start(self):
+        await self.run(None)
+
+    async def stop(self):
+        # TODO: replace this once a proper reset is implemented in the lib.
+        await self.device.host.send_command(HCI_Reset_Command())
+        await self.device.power_off()
+        print('Speaker stopped')
 
 
 # -----------------------------------------------------------------------------
-async def main(hci_source, hci_sink, emit_event):
-    # logging.basicConfig(level='DEBUG')
-    speaker = Speaker(hci_source, hci_sink, emit_event, "aac", False)
-    await speaker.run(None)
+def main(hci_source, hci_sink):
+    return Speaker(hci_source, hci_sink, "aac", False)

@@ -1,0 +1,27 @@
+<html>
+
+<head>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css">
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.23.2/full/pyodide.js"></script>
+  <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
+  <script type="module" src="../ui.js"></script>
+  <script type="module" src="heart_rate_monitor.js"></script>
+  <style>
+    #hr-value {
+      font-family: sans-serif;
+      font-size: xx-large;
+    }
+
+  </style>
+</head>
+
+<body>
+    <bumble-controls id="bumble-controls"></bumble-controls><hr>
+    <textarea id="log-output" style="width: 100%;" rows="10" disabled></textarea><hr>
+
+    <span id="hr-value">60</span>
+    <br>
+    <button id="hr-up-button">+</button>
+    <button id="hr-down-button">-</button>
+  </body>

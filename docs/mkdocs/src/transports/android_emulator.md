@@ -14,7 +14,7 @@ connections.
 
 ## Moniker
 The moniker syntax for an Android Emulator "netsim" transport is: `android-netsim:[<host>:<port>][<options>]`,
-where `<options>` is a ','-separated list of `<name>=<value>` pairs`.
+where `<options>` is a comma-separated list of `<name>=<value>` pairs.
 The `mode` parameter name can specify running as a host or a controller, and `<hostname>:<port>` can specify a host name (or IP address) and TCP port number on which to reach the gRPC server for the emulator (in "host" mode), or to accept gRPC connections (in "controller" mode).
 Both the `mode=<host|controller>` and `<hostname>:<port>` parameters are optional (so the moniker `android-netsim` by itself is a valid moniker, which will create a transport in `host` mode, connected to `localhost` on the default gRPC port for the Netsim background process).
 

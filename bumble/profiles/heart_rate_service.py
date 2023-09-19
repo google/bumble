@@ -42,12 +42,12 @@ class HeartRateService(TemplateService):
     RESET_ENERGY_EXPENDED = 0x01
 
     class BodySensorLocation(IntEnum):
-        OTHER = (0,)
-        CHEST = (1,)
-        WRIST = (2,)
-        FINGER = (3,)
-        HAND = (4,)
-        EAR_LOBE = (5,)
+        OTHER = 0
+        CHEST = 1
+        WRIST = 2
+        FINGER = 3
+        HAND = 4
+        EAR_LOBE = 5
         FOOT = 6
 
     class HeartRateMeasurement:

@@ -67,9 +67,16 @@ nav:
     - Zephyr: platforms/zephyr.md
   - Examples:
     - Overview: examples/index.md
+<<<<<<< HEAD
   - Extras:
     - Overview: extras/index.md
     - Android Remote HCI: extras/android_remote_hci.md
+=======
+  - Hive:
+    - Overview: hive/index.md
+    - Speaker: hive/web/speaker/speaker.html
+    - Scanner: hive/web/scanner/scanner.html
+>>>>>>> 2e9fb96 (wip (+5 squashed commits))
 
 copyright: Copyright 2021-2023 Google LLC
 

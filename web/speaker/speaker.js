@@ -1,4 +1,4 @@
-import { loadBumble, connectWebSocketTransport } from "../bumble.js";
+import {setupSimpleApp} from '../bumble.js';
 
 (function () {
     'use strict';
@@ -8,7 +8,6 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
     let bytesReceivedText;
     let streamStateText;
     let connectionStateText;
-    let errorText;
     let audioOnButton;
     let mediaSource;
     let sourceBuffer;
@@ -19,15 +18,14 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
     let audioFrequencyData;
     let packetsReceived = 0;
     let bytesReceived = 0;
-    let audioState = "stopped";
-    let streamState = "IDLE";
+    let audioState = 'stopped';
+    let streamState = 'IDLE';
     let fftCanvas;
     let fftCanvasContext;
     let bandwidthCanvas;
     let bandwidthCanvasContext;
     let bandwidthBinCount;
     let bandwidthBins = [];
-    let pyodide;
 
     const FFT_WIDTH = 800;
     const FFT_HEIGHT = 256;
@@ -44,18 +42,16 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
     }
 
     function initUI() {
-        audioOnButton = document.getElementById("audioOnButton");
-        codecText = document.getElementById("codecText");
-        packetsReceivedText = document.getElementById("packetsReceivedText");
-        bytesReceivedText = document.getElementById("bytesReceivedText");
-        streamStateText = document.getElementById("streamStateText");
-        errorText = document.getElementById("errorText");
-        connectionStateText = document.getElementById("connectionStateText");
+        audioOnButton = document.getElementById('audioOnButton');
+        codecText = document.getElementById('codecText');
+        packetsReceivedText = document.getElementById('packetsReceivedText');
+        bytesReceivedText = document.getElementById('bytesReceivedText');
+        streamStateText = document.getElementById('streamStateText');
+        connectionStateText = document.getElementById('connectionStateText');
 
-        audioOnButton.onclick = () => startAudio();
+        audioOnButton.onclick = startAudio;
 
-        codecText.innerText = "AAC";
-        setErrorText("");
+        codecText.innerText = 'AAC';
 
         requestAnimationFrame(onAnimationFrame);
     }
@@ -68,62 +64,36 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
     }
 
     function initAudioElement() {
-        audioElement = document.getElementById("audio");
+        audioElement = document.getElementById('audio');
         audioElement.src = URL.createObjectURL(mediaSource);
         // audioElement.controls = true;
     }
 
     function initAnalyzer() {
-        fftCanvas = document.getElementById("fftCanvas");
+        fftCanvas = document.getElementById('fftCanvas');
         fftCanvas.width = FFT_WIDTH
         fftCanvas.height = FFT_HEIGHT
         fftCanvasContext = fftCanvas.getContext('2d');
-        fftCanvasContext.fillStyle = "rgb(0, 0, 0)";
+        fftCanvasContext.fillStyle = 'rgb(0, 0, 0)';
         fftCanvasContext.fillRect(0, 0, FFT_WIDTH, FFT_HEIGHT);
 
-        bandwidthCanvas = document.getElementById("bandwidthCanvas");
+        bandwidthCanvas = document.getElementById('bandwidthCanvas');
         bandwidthCanvas.width = BANDWIDTH_WIDTH
         bandwidthCanvas.height = BANDWIDTH_HEIGHT
         bandwidthCanvasContext = bandwidthCanvas.getContext('2d');
-        bandwidthCanvasContext.fillStyle = "rgb(255, 255, 255)";
+        bandwidthCanvasContext.fillStyle = 'rgb(255, 255, 255)';
         bandwidthCanvasContext.fillRect(0, 0, BANDWIDTH_WIDTH, BANDWIDTH_HEIGHT);
     }
 
     async function initBumble() {
-        // Load pyodide
-        console.log("Loading Pyodide");
-        pyodide = await loadPyodide();
-
-        // Load Bumble
-        console.log("Loading Bumble");
-        const params = (new URL(document.location)).searchParams;
-        const bumblePackage = params.get("package") || "bumble";
-        await loadBumble(pyodide, bumblePackage);
-
-        console.log("Ready!")
-
-        const hciWsUrl = params.get("hci") || "ws://localhost:9922/hci";
-        try {
-            // Create a WebSocket HCI transport
-            let transport
-            try {
-                transport = await connectWebSocketTransport(pyodide, hciWsUrl);
-            } catch (error) {
-                console.error(error);
-                setErrorText(error);
-                return;
-            }
-
-            // Run the scanner example
-            const script = await (await fetch("speaker.py")).text();
-            await pyodide.runPythonAsync(script);
-            const pythonMain = pyodide.globals.get("main");
-            console.log("Starting speaker...");
-            await pythonMain(transport.packet_source, transport.packet_sink, onEvent);
-            console.log("Speaker running");
-        } catch (err) {
-            console.log(err);
-        }
+        const bumbleControls = document.querySelector('#bumble-controls');
+        const app = await setupSimpleApp('speaker.py', bumbleControls, console.log);
+        app.on('start', onStart);
+        app.on('stop', onStop);
+        app.on('suspend', onSuspend);
+        app.on('connection', onConnection);
+        app.on('disconnection', onDisconnection);
+        app.on('audio', onAudio);
     }
 
     function startAnalyzer() {
@@ -144,15 +114,6 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
         bandwidthBins = [];
     }
 
-    function setErrorText(message) {
-        errorText.innerText = message;
-        if (message.length == 0) {
-            errorText.style.display = "none";
-        } else {
-            errorText.style.display = "inline-block";
-        }
-    }
-
     function setStreamState(state) {
         streamState = state;
         streamStateText.innerText = streamState;
@@ -162,7 +123,7 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
         // FFT
         if (audioAnalyzer !== undefined) {
             audioAnalyzer.getByteFrequencyData(audioFrequencyData);
-            fftCanvasContext.fillStyle = "rgb(0, 0, 0)";
+            fftCanvasContext.fillStyle = 'rgb(0, 0, 0)';
             fftCanvasContext.fillRect(0, 0, FFT_WIDTH, FFT_HEIGHT);
             const barCount = audioFrequencyBinCount;
             const barWidth = (FFT_WIDTH / audioFrequencyBinCount) - 1;
@@ -174,7 +135,7 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
         }
 
         // Bandwidth
-        bandwidthCanvasContext.fillStyle = "rgb(255, 255, 255)";
+        bandwidthCanvasContext.fillStyle = 'rgb(255, 255, 255)';
         bandwidthCanvasContext.fillRect(0, 0, BANDWIDTH_WIDTH, BANDWIDTH_HEIGHT);
         bandwidthCanvasContext.fillStyle = `rgb(100, 100, 100)`;
         for (let t = 0; t < bandwidthBins.length; t++) {
@@ -188,7 +149,7 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
 
     function onMediaSourceOpen() {
         console.log(this.readyState);
-        sourceBuffer = mediaSource.addSourceBuffer("audio/aac");
+        sourceBuffer = mediaSource.addSourceBuffer('audio/aac');
     }
 
     function onMediaSourceClose() {
@@ -201,41 +162,30 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
 
     async function startAudio() {
         try {
-            console.log("starting audio...");
+            console.log('starting audio...');
             audioOnButton.disabled = true;
-            audioState = "starting";
+            audioState = 'starting';
             await audioElement.play();
-            console.log("audio started");
-            audioState = "playing";
+            console.log('audio started');
+            audioState = 'playing';
             startAnalyzer();
         } catch (error) {
             console.error(`play failed: ${error}`);
-            audioState = "stopped";
+            audioState = 'stopped';
             audioOnButton.disabled = false;
         }
     }
 
-    async function onEvent(name, params) {
-        // Dispatch the message.
-        const handlerName = `on${name.charAt(0).toUpperCase()}${name.slice(1)}`
-        const handler = eventHandlers[handlerName];
-        if (handler !== undefined) {
-            handler(params);
-        } else {
-            console.warn(`unhandled event: ${name}`)
-        }
-    }
-
     function onStart() {
-        setStreamState("STARTED");
+        setStreamState('STARTED');
     }
 
     function onStop() {
-        setStreamState("STOPPED");
+        setStreamState('STOPPED');
     }
 
     function onSuspend() {
-        setStreamState("SUSPENDED");
+        setStreamState('SUSPENDED');
     }
 
     function onConnection(params) {
@@ -243,13 +193,13 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
     }
 
     function onDisconnection(params) {
-        connectionStateText.innerText = "DISCONNECTED";
+        connectionStateText.innerText = 'DISCONNECTED';
     }
 
     function onAudio(python_packet) {
         const packet = python_packet.toJs({create_proxies : false});
         python_packet.destroy();
-        if (audioState != "stopped") {
+        if (audioState != 'stopped') {
             // Queue the audio packet.
             sourceBuffer.appendBuffer(packet);
         }
@@ -265,25 +215,7 @@ import { loadBumble, connectWebSocketTransport } from "../bumble.js";
         }
     }
 
-    function onKeystoreupdate() {
-        // Sync the FS
-        pyodide.FS.syncfs(() => {
-            console.log("FS synced out")
-        });
-    }
-
-    const eventHandlers = {
-        onStart,
-        onStop,
-        onSuspend,
-        onConnection,
-        onDisconnection,
-        onAudio,
-        onKeystoreupdate
-    }
-
     window.onload = (event) => {
         init();
     }
-
 }());
