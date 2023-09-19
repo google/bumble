@@ -19,9 +19,19 @@ import asyncio
 import logging
 import traceback
 import collections
+from contextlib import ExitStack
 import sys
-from typing import Awaitable, Set, TypeVar
-from functools import wraps
+from typing import (
+    Awaitable,
+    Callable,
+    ContextManager,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+)
+import functools
 from pyee import EventEmitter
 
 from .colors import color
@@ -167,7 +177,7 @@ class AsyncRunner:
         """
 
         def decorator(func):
-            @wraps(func)
+            @functools.wraps(func)
             def wrapper(*args, **kwargs):
                 coroutine = func(*args, **kwargs)
                 if queue is None:
@@ -302,3 +312,77 @@ class FlowControlAsyncPipe:
                     self.resume_source()
 
             self.check_pump()
+
+
+# -----------------------------------------------------------------------------
+def event_emitter_once_for_group(
+    emitter: EventEmitter,
+    handlers: Mapping[str, Callable],
+    context: Optional[ContextManager] = None,
+) -> None:
+    """
+    Register event listeners as a group, with optional context manager.
+
+    For each entry in the map, an event listener is registered with the emitter.
+    When any of the event names in the handlers map is emitted by the emitter,
+    the corresponding handler is invoked, then all of the listeners are removed from
+    the emitter.
+    If a context manager is specified, it will be entered prior to registering the
+    listeners, and exited when any of the events is emitted.
+
+    Args:
+      emitter:
+        The event emitter with which to register the event listeners.
+      handlers:
+        A map that associates an event name with an event handler.
+      context:
+        A context manager to manager resources, or None if not needed.
+    """
+    event_emitters_once_for_group(
+        {(emitter, event_name): handler for event_name, handler in handlers.items()},
+        context,
+    )
+
+
+# -----------------------------------------------------------------------------
+def event_emitters_once_for_group(
+    handlers: Mapping[Tuple[EventEmitter, str], Callable],
+    context: Optional[ContextManager] = None,
+) -> None:
+    """
+    Register event listeners as a group, with optional context manager.
+
+    Similar to event_emitter_once_for_group, but instead of registering the listeners
+    with a single emitter, each event may by associate with a different emitter.
+
+    Args:
+      handlers:
+        A map that associates an (emitter, event_name) pair with an event handler.
+      context:
+        A context manager to manager resources, or None if not needed.
+    """
+    # Setup an exit stack to enter and exit the context, if any.
+    if context is not None:
+        exit_stack = ExitStack()
+        exit_stack.enter_context(context)
+    else:
+        exit_stack = None
+
+    def on_event(handler, *args, **kwargs) -> None:
+        # Invoke the handler.
+        handler(*args, **kwargs)
+
+        # Release the context, if any.
+        if exit_stack is not None:
+            exit_stack.close()
+
+        # Remove all listeners.
+        for (emitter, event_name), listener in listeners.items():
+            emitter.remove_listener(event_name, listener)
+
+    listeners = {
+        (emitter, event_name): emitter.on(
+            event_name, functools.partial(on_event, handler)
+        )
+        for (emitter, event_name), handler in handlers.items()
+    }
