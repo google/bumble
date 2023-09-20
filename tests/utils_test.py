@@ -21,7 +21,7 @@ from pyee import EventEmitter
 from unittest.mock import MagicMock
 
 
-def test_on():
+def test_on() -> None:
     emitter = EventEmitter()
     with contextlib.closing(utils.EventWatcher()) as context:
         mock = MagicMock()
@@ -33,13 +33,13 @@ def test_on():
     assert mock.call_count == 1
 
 
-def test_on_decorator():
+def test_on_decorator() -> None:
     emitter = EventEmitter()
     with contextlib.closing(utils.EventWatcher()) as context:
         mock = MagicMock()
 
         @context.on(emitter, 'event')
-        def on_event(*_):
+        def on_event(*_) -> None:
             mock()
 
         emitter.emit('event')
@@ -48,7 +48,7 @@ def test_on_decorator():
     assert mock.call_count == 1
 
 
-def test_multiple_handlers():
+def test_multiple_handlers() -> None:
     emitter = EventEmitter()
     with contextlib.closing(utils.EventWatcher()) as context:
         mock = MagicMock()
