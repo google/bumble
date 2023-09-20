@@ -62,5 +62,5 @@ in tests at `pytests/assigned_numbers.rs`.
 To regenerate the assigned number tables based on the Python codebase:
 
 ```
-PYTHONPATH=.. cargo run --bin gen-assigned-numbers --features bumble-codegen
+PYTHONPATH=.. cargo run --bin gen-assigned-numbers --features dev-tools
 ```
