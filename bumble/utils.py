@@ -21,7 +21,18 @@ import logging
 import traceback
 import collections
 import sys
-from typing import Awaitable, Set, TypeVar, List, Tuple, Callable, Any, Optional, Union
+from typing import (
+    Awaitable,
+    Set,
+    TypeVar,
+    List,
+    Tuple,
+    Callable,
+    Any,
+    Optional,
+    Union,
+    overload,
+)
 from functools import wraps
 from pyee import EventEmitter
 
@@ -65,13 +76,15 @@ def composite_listener(cls):
     return cls
 
 
+# -----------------------------------------------------------------------------
 _Handler = TypeVar('_Handler', bound=Callable)
 
-# -----------------------------------------------------------------------------
+
 class EventWatcher:
     '''A wrapper class to control the lifecycle of event handlers better.
 
     Usage:
+    ```
     watcher = EventWatcher()
 
     def on_foo():
@@ -84,19 +97,30 @@ class EventWatcher:
 
     # Close all event handlers watching through this watcher
     watcher.close()
+    ```
 
     As context:
+    ```
     with contextlib.closing(EventWatcher()) as context:
         @context.on(emitter, 'foo')
         def on_foo():
             ...
     # on_foo() has been removed here!
+    ```
     '''
 
     handlers: List[Tuple[EventEmitter, str, Callable[..., Any]]]
 
     def __init__(self) -> None:
         self.handlers = []
+
+    @overload
+    def on(self, emitter: EventEmitter, event: str) -> Callable[[_Handler], _Handler]:
+        ...
+
+    @overload
+    def on(self, emitter: EventEmitter, event: str, handler: _Handler) -> _Handler:
+        ...
 
     def on(
         self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None
@@ -109,11 +133,20 @@ class EventWatcher:
             handler: (Optional) Event handler. When nothing passed, this method works as a decorator.
         '''
 
-        def wrapper(f: _Handler):
+        def wrapper(f: _Handler) -> _Handler:
             self.handlers.append((emitter, event, f))
             emitter.on(event, f)
+            return f
 
         return wrapper if handler is None else wrapper(handler)
+
+    @overload
+    def once(self, emitter: EventEmitter, event: str) -> Callable[[_Handler], _Handler]:
+        ...
+
+    @overload
+    def once(self, emitter: EventEmitter, event: str, handler: _Handler) -> _Handler:
+        ...
 
     def once(
         self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None
@@ -126,9 +159,10 @@ class EventWatcher:
             handler: (Optional) Event handler. When nothing passed, this method works as a decorator.
         '''
 
-        def wrapper(f: _Handler):
+        def wrapper(f: _Handler) -> _Handler:
             self.handlers.append((emitter, event, f))
             emitter.once(event, f)
+            return f
 
         return wrapper if handler is None else wrapper(handler)
 
