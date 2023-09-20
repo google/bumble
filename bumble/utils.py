@@ -125,12 +125,12 @@ class EventWatcher:
     def on(
         self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None
     ) -> Union[_Handler, Callable[[_Handler], _Handler]]:
-        '''Watch a event until the context is destroyed.
+        '''Watch an event until the context is closed.
 
         Args:
             emitter: EventEmitter to watch
-            event: Event string
-            handler: (Optional) Event handler. When nothing passed, this method works as a decorator.
+            event: Event name
+            handler: (Optional) Event handler. When nothing is passed, this method works as a decorator.
         '''
 
         def wrapper(f: _Handler) -> _Handler:
@@ -151,11 +151,11 @@ class EventWatcher:
     def once(
         self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None
     ) -> Union[_Handler, Callable[[_Handler], _Handler]]:
-        '''Watch a event for once.
+        '''Watch an event for once.
 
         Args:
             emitter: EventEmitter to watch
-            event: Event string
+            event: Event name
             handler: (Optional) Event handler. When nothing passed, this method works as a decorator.
         '''
 
