@@ -38,10 +38,14 @@ async def open_ws_client_transport(spec: str) -> Transport:
 
     websocket = await websockets.client.connect(spec)
 
-    transport = PumpedTransport(
+    class WsTransport(PumpedTransport):
+        async def close(self):
+            await super().close()
+            await websocket.close()
+
+    transport = WsTransport(
         PumpedPacketSource(websocket.recv),
         PumpedPacketSink(websocket.send),
-        websocket.close,
     )
     transport.start()
     return transport
