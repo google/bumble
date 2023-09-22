@@ -21,8 +21,7 @@
 /// TCP client to connect.
 /// When the L2CAP CoC channel is closed, the TCP connection is closed as well.
 use crate::cli::l2cap::{
-    proxy_l2cap_rx_to_tcp_tx, proxy_tcp_rx_to_l2cap_tx, run_future_with_current_task_locals,
-    BridgeData,
+    inject_py_event_loop, proxy_l2cap_rx_to_tcp_tx, proxy_tcp_rx_to_l2cap_tx, BridgeData,
 };
 use bumble::wrapper::{
     device::{Connection, Device},
@@ -85,11 +84,12 @@ pub async fn start(args: &Args, device: &mut Device) -> PyResult<()> {
     let mtu = args.mtu;
     let mps = args.mps;
     let ble_connection = Arc::new(Mutex::new(ble_connection));
-    // Ensure Python event loop is available to l2cap `disconnect`
-    let _ = run_future_with_current_task_locals(async move {
+    // spawn thread to handle incoming tcp connections
+    tokio::spawn(inject_py_event_loop(async move {
         while let Ok((tcp_stream, addr)) = listener.accept().await {
             let ble_connection = ble_connection.clone();
-            let _ = run_future_with_current_task_locals(proxy_data_between_tcp_and_l2cap(
+            // spawn thread to handle this specific tcp connection
+            if let Ok(future) = inject_py_event_loop(proxy_data_between_tcp_and_l2cap(
                 ble_connection,
                 tcp_stream,
                 addr,
@@ -97,10 +97,11 @@ pub async fn start(args: &Args, device: &mut Device) -> PyResult<()> {
                 max_credits,
                 mtu,
                 mps,
-            ));
+            )) {
+                tokio::spawn(future);
+            }
         }
-        Ok(())
-    });
+    })?);
     Ok(())
 }
 

@@ -19,10 +19,7 @@
 /// When the L2CAP CoC channel is closed, the bridge disconnects the TCP socket
 /// and waits for a new L2CAP CoC channel to be connected.
 /// When the TCP connection is closed by the TCP server, the L2CAP connection is closed as well.
-use crate::cli::l2cap::{
-    proxy_l2cap_rx_to_tcp_tx, proxy_tcp_rx_to_l2cap_tx, run_future_with_current_task_locals,
-    BridgeData,
-};
+use crate::cli::l2cap::{proxy_l2cap_rx_to_tcp_tx, proxy_tcp_rx_to_l2cap_tx, BridgeData};
 use bumble::wrapper::{device::Device, hci::HciConstant, l2cap::LeConnectionOrientedChannel};
 use futures::executor::block_on;
 use owo_colors::OwoColorize;
@@ -49,19 +46,19 @@ pub async fn start(args: &Args, device: &mut Device) -> PyResult<()> {
     let port = args.tcp_port;
     device.register_l2cap_channel_server(
         args.psm,
-        move |_py, l2cap_channel| {
+        move |py, l2cap_channel| {
             let channel_info = l2cap_channel
                 .debug_string()
                 .unwrap_or_else(|e| format!("failed to get l2cap channel info ({e})"));
             println!("{} {channel_info}", "*** L2CAP channel:".cyan());
 
             let host = host.clone();
-            // Ensure Python event loop is available to l2cap `disconnect`
-            let _ = run_future_with_current_task_locals(proxy_data_between_l2cap_and_tcp(
-                l2cap_channel,
-                host,
-                port,
-            ));
+            // Handles setting up a tokio runtime that runs this future to completion while also
+            // containing the necessary context vars.
+            pyo3_asyncio::tokio::future_into_py(
+                py,
+                proxy_data_between_l2cap_and_tcp(l2cap_channel, host, port),
+            )?;
             Ok(())
         },
         args.max_credits,
