@@ -22,7 +22,7 @@ import grpc.aio
 import os
 import pathlib
 import sys
-from typing import Optional
+from typing import Dict, Optional
 
 from .common import (
     ParserSource,
@@ -130,7 +130,7 @@ def publish_grpc_port(grpc_port: int, instance_number: int = 0) -> bool:
 
 # -----------------------------------------------------------------------------
 async def open_android_netsim_controller_transport(
-    server_host: Optional[str], server_port: int
+    server_host: Optional[str], server_port: int, options: Dict[str, str]
 ) -> Transport:
     if not server_port:
         raise ValueError('invalid port')
@@ -273,7 +273,9 @@ async def open_android_netsim_controller_transport(
 
 
 # -----------------------------------------------------------------------------
-async def open_android_netsim_host_transport(server_host, server_port, options):
+async def open_android_netsim_host_transport(
+    server_host: Optional[str], server_port: int, options: Dict[str, str]
+):
     # Wrapper for I/O operations
     class HciDevice:
         def __init__(self, name, manufacturer, hci_device):
@@ -354,7 +356,7 @@ async def open_android_netsim_host_transport(server_host, server_port, options):
 
 
 # -----------------------------------------------------------------------------
-async def open_android_netsim_transport(spec):
+async def open_android_netsim_transport(spec: Optional[str]) -> Transport:
     '''
     Open a transport connection as a client or server, implementing Android's `netsim`
     simulator protocol over gRPC.
@@ -401,14 +403,15 @@ async def open_android_netsim_transport(spec):
     params = spec.split(',') if spec else []
     if params and ':' in params[0]:
         # Explicit <host>:<port>
-        host, port = params[0].split(':')
+        host, port_str = params[0].split(':')
+        port = int(port_str)
         params_offset = 1
     else:
         host = None
         port = 0
         params_offset = 0
 
-    options = {}
+    options: Dict[str, str] = {}
     for param in params[params_offset:]:
         if '=' not in param:
             raise ValueError('invalid parameter, expected <name>=<value>')
@@ -421,6 +424,6 @@ async def open_android_netsim_transport(spec):
     if mode == 'controller':
         if host is None:
             raise ValueError('<host>:<port> missing')
-        return await open_android_netsim_controller_transport(host, port)
+        return await open_android_netsim_controller_transport(host, port, options)
 
     raise ValueError('invalid mode option')

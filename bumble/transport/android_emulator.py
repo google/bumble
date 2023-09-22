@@ -103,8 +103,7 @@ async def open_android_emulator_transport(spec: Optional[str]) -> Transport:
             await channel.close()
 
     transport = EmulatorTransport(
-        PumpedPacketSource(hci_device.read),
-        PumpedPacketSink(hci_device.write)
+        PumpedPacketSource(hci_device.read), PumpedPacketSink(hci_device.write)
     )
     transport.start()
 
