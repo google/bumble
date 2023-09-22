@@ -31,14 +31,12 @@ async def open_ws_client_transport(spec: str) -> Transport:
     '''
     Open a WebSocket client transport.
     The parameter string has this syntax:
-    <remote-host>:<remote-port>
+    <websocket-url>
 
-    Example: 127.0.0.1:9001
+    Example: ws://localhost:7681/v1/websocket/bt
     '''
 
-    remote_host, remote_port = spec.split(':')
-    uri = f'ws://{remote_host}:{remote_port}'
-    websocket = await websockets.client.connect(uri)
+    websocket = await websockets.client.connect(spec)
 
     transport = PumpedTransport(
         PumpedPacketSource(websocket.recv),
