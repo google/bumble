@@ -2758,7 +2758,9 @@ class Device(CompositeEventEmitter):
             self.abort_on(
                 'flush',
                 self.start_advertising(
-                    advertising_type=self.advertising_type, auto_restart=True
+                    advertising_type=self.advertising_type,
+                    own_address_type=self.advertising_own_address_type,
+                    auto_restart=True,
                 ),
             )
 
