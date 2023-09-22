@@ -23,7 +23,7 @@ from bumble.device import Device
 # -----------------------------------------------------------------------------
 class ScanEntry:
     def __init__(self, advertisement):
-        self.address = str(advertisement.address).replace("/P", "")
+        self.address = advertisement.address.to_string(False)
         self.address_type = ('Public', 'Random', 'Public Identity', 'Random Identity')[
             advertisement.address.address_type
         ]

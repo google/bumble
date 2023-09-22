@@ -195,7 +195,7 @@ class WebSocketOutput(QueuedOutput):
         except HCI_StatusError:
             pass
         peer_name = '' if connection.peer_name is None else connection.peer_name
-        peer_address = str(connection.peer_address).replace('/P', '')
+        peer_address = connection.peer_address.to_string(False)
         await self.send_message(
             'connection',
             peer_address=peer_address,
@@ -376,7 +376,7 @@ class UiServer:
         if connection := self.speaker().connection:
             await self.send_message(
                 'connection',
-                peer_address=str(connection.peer_address).replace('/P', ''),
+                peer_address=connection.peer_address.to_string(False),
                 peer_name=connection.peer_name,
             )
 
