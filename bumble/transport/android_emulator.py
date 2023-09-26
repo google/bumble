@@ -97,10 +97,13 @@ async def open_android_emulator_transport(spec: Optional[str]) -> Transport:
         raise ValueError('invalid mode')
 
     # Create the transport object
-    transport = PumpedTransport(
-        PumpedPacketSource(hci_device.read),
-        PumpedPacketSink(hci_device.write),
-        channel.close,
+    class EmulatorTransport(PumpedTransport):
+        async def close(self):
+            await super().close()
+            await channel.close()
+
+    transport = EmulatorTransport(
+        PumpedPacketSource(hci_device.read), PumpedPacketSink(hci_device.write)
     )
     transport.start()
 
