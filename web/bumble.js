@@ -74,7 +74,6 @@ export async function loadBumble(pyodide, bumblePackage) {
     await pyodide.loadPackage("micropip");
     await pyodide.runPythonAsync(`
         import micropip
-        await micropip.install("cryptography")
         await micropip.install("${bumblePackage}")
         package_list = micropip.list()
         print(package_list)
