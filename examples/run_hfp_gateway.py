@@ -31,6 +31,7 @@ from bumble.core import (
     BT_BR_EDR_TRANSPORT,
 )
 from bumble import rfcomm, hfp
+from bumble.hci import HCI_SynchronousDataPacket
 from bumble.sdp import (
     Client as SDP_Client,
     DataElement,
@@ -196,6 +197,13 @@ async def main():
             await rfcomm_mux.disconnect()
             print('@@@ Disconnected from RFCOMM server')
             return
+
+        def on_sco(connection_handle: int, packet: HCI_SynchronousDataPacket):
+            # Reset packet and loopback
+            packet.packet_status = 0
+            device.host.send_hci_packet(packet)
+
+        device.host.on('sco_packet', on_sco)
 
         # Protocol loop (just for testing at this point)
         protocol = hfp.HfpProtocol(session)
