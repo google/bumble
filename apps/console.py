@@ -1172,7 +1172,7 @@ class ScanResult:
             name = ''
 
         # Remove any '/P' qualifier suffix from the address string
-        address_str = str(self.address).replace('/P', '')
+        address_str = self.address.to_string(with_type_qualifier=False)
 
         # RSSI bar
         bar_string = rssi_bar(self.rssi)
