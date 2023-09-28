@@ -1368,6 +1368,17 @@ HCI_LE_SUPPORTED_FEATURES_NAMES = {
     if feature_name.startswith('HCI_') and feature_name.endswith('_LE_SUPPORTED_FEATURE')
 }
 
+
+HCI_PIN_TYPE_VARIABLE      = 0x00
+HCI_PIN_TYPE_FIXED         = 0x01
+
+HCI_PIN_TYPE_NAMES = {
+    HCI_PIN_TYPE_VARIABLE: "HCI_PIN_TYPE_VARIABLE",
+    HCI_PIN_TYPE_FIXED:    "HCI_PIN_TYPE_FIXED",
+}
+
+PIN_TYPE_SPEC = {'size' : 1, 'mapper': lambda x:HCI_Constant.pin_type_name(x)}
+
 # fmt: on
 # pylint: enable=line-too-long
 # pylint: disable=invalid-name
@@ -1412,6 +1423,10 @@ class HCI_Constant:
     @staticmethod
     def link_key_type_name(link_key_type):
         return HCI_LINK_TYPE_NAMES.get(link_key_type, f'0x{link_key_type:02X}')
+
+    @staticmethod
+    def pin_type_name(pin_type):
+        return HCI_PIN_TYPE_NAMES.get(pin_type, f"0x{pin_type:02X}")
 
 
 # -----------------------------------------------------------------------------
@@ -2707,6 +2722,31 @@ class HCI_Reset_Command(HCI_Command):
 class HCI_Set_Event_Filter_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.3 Set Event Filter Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('pin_type', PIN_TYPE_SPEC)],
+)
+class HCI_Read_PIN_Type_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.3.5 Read PIN Type Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('pin_type', PIN_TYPE_SPEC),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+    ],
+)
+class HCI_Write_PIN_Type_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.3.6 Write PIN Type Command
     '''
 
 
