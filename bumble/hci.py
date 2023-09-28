@@ -2694,10 +2694,15 @@ class HCI_Reset_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    [
+    fields=[
         ('filter_type', 1),
-        ('filter_condition', '*'),
-    ]
+        # filter_condition_type and condition fields
+        # are complicated and thus hard to be defined like others.
+        # The two fields are treated as one raw field and parsed
+        # in upper layers
+        ('filter_condition_type_and_condition', '*'),
+    ],
+    return_parameters_fields=[('status', STATUS_SPEC)],
 )
 class HCI_Set_Event_Filter_Command(HCI_Command):
     '''
