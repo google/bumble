@@ -16,8 +16,9 @@
 
 pub use crate::internal::hci::packets;
 
-use crate::wrapper::hci::packets::{
-    Acl, AddressType, Command, Error, ErrorCode, Event, Packet, Sco,
+use crate::{
+    internal::hci::WithPacketType,
+    wrapper::hci::packets::{AddressType, Command, ErrorCode},
 };
 use itertools::Itertools as _;
 use pyo3::{
@@ -26,7 +27,6 @@ use pyo3::{
     types::{PyBytes, PyModule},
     FromPyObject, IntoPy, PyAny, PyErr, PyObject, PyResult, Python, ToPyObject,
 };
-use std::fmt::{Display, Formatter};
 
 /// Provides helpers for interacting with HCI
 pub struct HciConstant;
@@ -134,182 +134,6 @@ impl HciCommandWrapper {
     #[getter]
     fn op_code(&self) -> u16 {
         self.0.get_op_code().into()
-    }
-}
-
-/// HCI Packet type, prepended to the packet.
-/// Rootcanal's PDL declaration excludes this from ser/deser and instead is implemented in code.
-/// To maintain the ability to easily use future versions of their packet PDL, packet type is
-/// implemented here.
-#[derive(Debug)]
-pub(crate) enum PacketType {
-    Command = 0x01,
-    Acl = 0x02,
-    Sco = 0x03,
-    Event = 0x04,
-}
-
-impl From<PacketType> for u8 {
-    fn from(packet_type: PacketType) -> Self {
-        match packet_type {
-            PacketType::Command => 0x01,
-            PacketType::Acl => 0x02,
-            PacketType::Sco => 0x03,
-            PacketType::Event => 0x04,
-        }
-    }
-}
-
-impl TryFrom<u8> for PacketType {
-    type Error = PacketTypeParseError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0x01 => Ok(PacketType::Command),
-            0x02 => Ok(PacketType::Acl),
-            0x03 => Ok(PacketType::Sco),
-            0x04 => Ok(PacketType::Event),
-            _ => Err(PacketTypeParseError::NonexistentPacketType(value)),
-        }
-    }
-}
-
-/// Allows for smoother interoperability between a [Packet] and a bytes representation of it that
-/// includes its type as a header
-pub(crate) trait WithPacketType<T: Packet> {
-    /// Converts the [Packet] into bytes, prefixed with its type
-    fn to_vec_with_packet_type(self) -> Vec<u8>;
-
-    /// Parses a [Packet] out of bytes that are prefixed with the packet's type
-    fn parse_with_packet_type(bytes: &[u8]) -> Result<T, PacketTypeParseError>;
-}
-
-/// Errors that may arise when parsing a packet that is prefixed with its type
-pub(crate) enum PacketTypeParseError {
-    EmptySlice,
-    NoPacketBytes,
-    PacketTypeMismatch {
-        expected: PacketType,
-        actual: PacketType,
-    },
-    NonexistentPacketType(u8),
-    PacketParse(packets::Error),
-}
-
-impl Display for PacketTypeParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PacketTypeParseError::EmptySlice => write!(f, "The slice being parsed was empty"),
-            PacketTypeParseError::NoPacketBytes => write!(
-                f,
-                "There were no bytes left after parsing the packet type header"
-            ),
-            PacketTypeParseError::PacketTypeMismatch { expected, actual } => {
-                write!(f, "Expected type: {expected:?}, but got: {actual:?}")
-            }
-            PacketTypeParseError::NonexistentPacketType(packet_byte) => {
-                write!(f, "Packet type ({packet_byte:X}) does not exist")
-            }
-            PacketTypeParseError::PacketParse(e) => f.write_str(&e.to_string()),
-        }
-    }
-}
-
-impl From<packets::Error> for PacketTypeParseError {
-    fn from(value: Error) -> Self {
-        Self::PacketParse(value)
-    }
-}
-
-impl WithPacketType<Self> for Command {
-    fn to_vec_with_packet_type(self) -> Vec<u8> {
-        let mut bytes = Vec::<u8>::new();
-        bytes.push(PacketType::Command.into());
-        bytes.append(&mut self.to_vec());
-        bytes
-    }
-
-    fn parse_with_packet_type(bytes: &[u8]) -> Result<Self, PacketTypeParseError> {
-        let first_byte = bytes.first().ok_or(PacketTypeParseError::EmptySlice)?;
-        match PacketType::try_from(*first_byte)? {
-            PacketType::Command => {
-                let packet_bytes = bytes.get(1..).ok_or(PacketTypeParseError::NoPacketBytes)?;
-                Ok(Command::parse(packet_bytes)?)
-            }
-            packet_type => Err(PacketTypeParseError::PacketTypeMismatch {
-                expected: PacketType::Command,
-                actual: packet_type,
-            }),
-        }
-    }
-}
-
-impl WithPacketType<Self> for Acl {
-    fn to_vec_with_packet_type(self) -> Vec<u8> {
-        let mut bytes = Vec::<u8>::new();
-        bytes.push(PacketType::Acl.into());
-        bytes.append(&mut self.to_vec());
-        bytes
-    }
-
-    fn parse_with_packet_type(bytes: &[u8]) -> Result<Self, PacketTypeParseError> {
-        let first_byte = bytes.first().ok_or(PacketTypeParseError::EmptySlice)?;
-        match PacketType::try_from(*first_byte)? {
-            PacketType::Acl => {
-                let packet_bytes = bytes.get(1..).ok_or(PacketTypeParseError::NoPacketBytes)?;
-                Ok(Acl::parse(packet_bytes)?)
-            }
-            packet_type => Err(PacketTypeParseError::PacketTypeMismatch {
-                expected: PacketType::Acl,
-                actual: packet_type,
-            }),
-        }
-    }
-}
-
-impl WithPacketType<Self> for Sco {
-    fn to_vec_with_packet_type(self) -> Vec<u8> {
-        let mut bytes = Vec::<u8>::new();
-        bytes.push(PacketType::Sco.into());
-        bytes.append(&mut self.to_vec());
-        bytes
-    }
-
-    fn parse_with_packet_type(bytes: &[u8]) -> Result<Self, PacketTypeParseError> {
-        let first_byte = bytes.first().ok_or(PacketTypeParseError::EmptySlice)?;
-        match PacketType::try_from(*first_byte)? {
-            PacketType::Sco => {
-                let packet_bytes = bytes.get(1..).ok_or(PacketTypeParseError::NoPacketBytes)?;
-                Ok(Sco::parse(packet_bytes)?)
-            }
-            packet_type => Err(PacketTypeParseError::PacketTypeMismatch {
-                expected: PacketType::Sco,
-                actual: packet_type,
-            }),
-        }
-    }
-}
-
-impl WithPacketType<Self> for Event {
-    fn to_vec_with_packet_type(self) -> Vec<u8> {
-        let mut bytes = Vec::<u8>::new();
-        bytes.push(PacketType::Event.into());
-        bytes.append(&mut self.to_vec());
-        bytes
-    }
-
-    fn parse_with_packet_type(bytes: &[u8]) -> Result<Self, PacketTypeParseError> {
-        let first_byte = bytes.first().ok_or(PacketTypeParseError::EmptySlice)?;
-        match PacketType::try_from(*first_byte)? {
-            PacketType::Event => {
-                let packet_bytes = bytes.get(1..).ok_or(PacketTypeParseError::NoPacketBytes)?;
-                Ok(Event::parse(packet_bytes)?)
-            }
-            packet_type => Err(PacketTypeParseError::PacketTypeMismatch {
-                expected: PacketType::Event,
-                actual: packet_type,
-            }),
-        }
     }
 }
 

@@ -14,6 +14,7 @@
 
 //! Devices and connections to them
 
+use crate::internal::hci::WithPacketType;
 use crate::{
     adv::AdvertisementDataBuilder,
     wrapper::{
@@ -21,7 +22,7 @@ use crate::{
         gatt_client::{ProfileServiceProxy, ServiceProxy},
         hci::{
             packets::{Command, ErrorCode, Event},
-            Address, HciCommandWrapper, WithPacketType,
+            Address, HciCommandWrapper,
         },
         host::Host,
         l2cap::LeConnectionOrientedChannel,
@@ -317,7 +318,7 @@ impl Connection {
             kwargs.set_opt_item("mps", mps)?;
             self.0
                 .call_method(py, intern!(py, "open_l2cap_channel"), (), Some(kwargs))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .map(LeConnectionOrientedChannel::from)
@@ -331,7 +332,7 @@ impl Connection {
             kwargs.set_opt_item("reason", reason)?;
             self.0
                 .call_method(py, intern!(py, "disconnect"), (), Some(kwargs))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .map(|_| ())

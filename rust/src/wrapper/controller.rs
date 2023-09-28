@@ -17,7 +17,7 @@ use crate::wrapper::{
     common::{TransportSink, TransportSource},
     hci::Address,
     link::Link,
-    PyDictExt,
+    wrap_python_async, PyDictExt,
 };
 use pyo3::{
     intern,
@@ -44,6 +44,9 @@ impl Controller {
         public_address: Option<Address>,
     ) -> PyResult<Self> {
         Python::with_gil(|py| {
+            let controller_ctr = PyModule::import(py, intern!(py, "bumble.controller"))?
+                .getattr(intern!(py, "Controller"))?;
+
             let kwargs = PyDict::new(py);
             kwargs.set_item("name", name)?;
             kwargs.set_opt_item("host_source", host_source)?;
@@ -51,9 +54,10 @@ impl Controller {
             kwargs.set_opt_item("link", link)?;
             kwargs.set_opt_item("public_address", public_address)?;
 
-            PyModule::import(py, intern!(py, "bumble.controller"))?
-                .getattr(intern!(py, "Controller"))?
-                .call_method("create", (), Some(kwargs))
+            // Controller constructor (`__init__`) is not (and can't be) marked async, but calls
+            // `get_running_loop`, and thus needs wrapped in an async function.
+            wrap_python_async(py, controller_ctr)?
+                .call((), Some(kwargs))
                 .and_then(into_future)
         })?
         .await

@@ -56,7 +56,7 @@ async fn hci_command_wrapper_has_correct_methods() -> PyResult<()> {
     let address = Address::new("F0:F1:F2:F3:F4:F5", &AddressType::RandomDeviceAddress)?;
     let link = Link::new_local_link()?;
     let controller = Controller::new("C1", None, None, Some(link), Some(address.clone())).await?;
-    let host = Host::new(controller.clone().into(), controller.into())?;
+    let host = Host::new(controller.clone().into(), controller.into()).await?;
     let device = Device::new(None, Some(address), None, Some(host), None)?;
 
     device.power_on().await?;
