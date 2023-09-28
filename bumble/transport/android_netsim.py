@@ -18,11 +18,12 @@
 import asyncio
 import atexit
 import logging
-import grpc.aio
 import os
 import pathlib
 import sys
 from typing import Dict, Optional
+
+import grpc.aio
 
 from .common import (
     ParserSource,
@@ -33,8 +34,8 @@ from .common import (
 )
 
 # pylint: disable=no-name-in-module
-from .grpc_protobuf.packet_streamer_pb2_grpc import PacketStreamerStub
 from .grpc_protobuf.packet_streamer_pb2_grpc import (
+    PacketStreamerStub,
     PacketStreamerServicer,
     add_PacketStreamerServicer_to_server,
 )
@@ -42,6 +43,7 @@ from .grpc_protobuf.packet_streamer_pb2 import PacketRequest, PacketResponse
 from .grpc_protobuf.hci_packet_pb2 import HCIPacket
 from .grpc_protobuf.startup_pb2 import Chip, ChipInfo
 from .grpc_protobuf.common_pb2 import ChipKind
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -103,7 +105,7 @@ def find_grpc_port(instance_number: int) -> int:
 
 
 # -----------------------------------------------------------------------------
-def publish_grpc_port(grpc_port: int, instance_number: int = 0) -> bool:
+def publish_grpc_port(grpc_port: int, instance_number: int) -> bool:
     if not (ini_dir := get_ini_dir()):
         logger.debug('no known directory for .ini file')
         return False
@@ -273,8 +275,35 @@ async def open_android_netsim_controller_transport(
 
 
 # -----------------------------------------------------------------------------
-async def open_android_netsim_host_transport(
-    server_host: Optional[str], server_port: int, options: Dict[str, str]
+async def open_android_netsim_host_transport_with_address(
+    server_host: Optional[str],
+    server_port: int,
+    options: Optional[Dict[str, str]] = None,
+):
+    if server_host == '_' or not server_host:
+        server_host = 'localhost'
+
+    if not server_port:
+        # Look for the gRPC config in a .ini file
+        instance_number = 0 if options is None else int(options.get('instance', '0'))
+        server_port = find_grpc_port(instance_number)
+        if not server_port:
+            raise RuntimeError('gRPC server port not found')
+
+    # Connect to the gRPC server
+    server_address = f'{server_host}:{server_port}'
+    logger.debug(f'Connecting to gRPC server at {server_address}')
+    channel = grpc.aio.insecure_channel(server_address)
+
+    return await open_android_netsim_host_transport_with_channel(
+        channel,
+        options,
+    )
+
+
+# -----------------------------------------------------------------------------
+async def open_android_netsim_host_transport_with_channel(
+    channel, options: Optional[Dict[str, str]] = None
 ):
     # Wrapper for I/O operations
     class HciDevice:
@@ -294,10 +323,12 @@ async def open_android_netsim_host_transport(
         async def read(self):
             response = await self.hci_device.read()
             response_type = response.WhichOneof('response_type')
+
             if response_type == 'error':
                 logger.warning(f'received error: {response.error}')
                 raise RuntimeError(response.error)
-            elif response_type == 'hci_packet':
+
+            if response_type == 'hci_packet':
                 return (
                     bytes([response.hci_packet.packet_type])
                     + response.hci_packet.packet
@@ -312,24 +343,8 @@ async def open_android_netsim_host_transport(
                 )
             )
 
-    name = options.get('name', DEFAULT_NAME)
+    name = DEFAULT_NAME if options is None else options.get('name', DEFAULT_NAME)
     manufacturer = DEFAULT_MANUFACTURER
-    instance_number = int(options.get('instance', "0"))
-
-    if server_host == '_' or not server_host:
-        server_host = 'localhost'
-
-    if not server_port:
-        # Look for the gRPC config in a .ini file
-        server_host = 'localhost'
-        server_port = find_grpc_port(instance_number)
-        if not server_port:
-            raise RuntimeError('gRPC server port not found')
-
-    # Connect to the gRPC server
-    server_address = f'{server_host}:{server_port}'
-    logger.debug(f'Connecting to gRPC server at {server_address}')
-    channel = grpc.aio.insecure_channel(server_address)
 
     # Connect as a host
     service = PacketStreamerStub(channel)
@@ -420,7 +435,9 @@ async def open_android_netsim_transport(spec: Optional[str]) -> Transport:
 
     mode = options.get('mode', 'host')
     if mode == 'host':
-        return await open_android_netsim_host_transport(host, port, options)
+        return await open_android_netsim_host_transport_with_address(
+            host, port, options
+        )
     if mode == 'controller':
         if host is None:
             raise ValueError('<host>:<port> missing')
