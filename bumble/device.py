@@ -69,6 +69,7 @@ from .hci import (
     HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
     HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
     HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
+    HCI_PIN_TYPE_VARIABLE,
     HCI_R2_PAGE_SCAN_REPETITION_MODE,
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     HCI_SUCCESS,
@@ -786,6 +787,9 @@ class DeviceConfiguration:
         self.classic_ssp_enabled = True
         self.classic_smp_enabled = True
         self.classic_accept_any = True
+        # pin type, a host configuration used in BR/EDR legacy pairing
+        # default to VARIABLE
+        self.classic_pin_type = HCI_PIN_TYPE_VARIABLE
         self.connectable = True
         self.discoverable = True
         self.advertising_data = bytes(
@@ -826,6 +830,8 @@ class DeviceConfiguration:
         self.classic_accept_any = config.get(
             'classic_accept_any', self.classic_accept_any
         )
+        self.classic_pin_type = config.get('classic_pin_type', self.classic_pin_type)
+
         self.connectable = config.get('connectable', self.connectable)
         self.discoverable = config.get('discoverable', self.discoverable)
         self.gatt_services = config.get('gatt_services', self.gatt_services)
