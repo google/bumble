@@ -105,7 +105,7 @@ def find_grpc_port(instance_number: int) -> int:
 
 
 # -----------------------------------------------------------------------------
-def publish_grpc_port(grpc_port: int, instance_number: int = 0) -> bool:
+def publish_grpc_port(grpc_port: int, instance_number: int) -> bool:
     if not (ini_dir := get_ini_dir()):
         logger.debug('no known directory for .ini file')
         return False
@@ -285,8 +285,7 @@ async def open_android_netsim_host_transport_with_address(
 
     if not server_port:
         # Look for the gRPC config in a .ini file
-        instance_number = int(options.get('instance', "0"))
-        server_host = 'localhost'
+        instance_number = 0 if options is None else int(options.get('instance', '0'))
         server_port = find_grpc_port(instance_number)
         if not server_port:
             raise RuntimeError('gRPC server port not found')
