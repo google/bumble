@@ -74,6 +74,7 @@ from .hci import (
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     HCI_SUCCESS,
     HCI_WRITE_LE_HOST_SUPPORT_COMMAND,
+    HCI_WRITE_PIN_TYPE_COMMAND,
     Address,
     HCI_Accept_Connection_Request_Command,
     HCI_Authentication_Requested_Command,
@@ -128,6 +129,7 @@ from .hci import (
     HCI_Write_Inquiry_Mode_Command,
     HCI_Write_LE_Host_Support_Command,
     HCI_Write_Local_Name_Command,
+    HCI_Write_PIN_Type_Command,
     HCI_Write_Scan_Enable_Command,
     HCI_Write_Secure_Connections_Host_Support_Command,
     HCI_Write_Simple_Pairing_Mode_Command,
@@ -1307,6 +1309,11 @@ class Device(CompositeEventEmitter):
                 )
 
         if self.classic_enabled:
+            if self.host.supports_command(HCI_WRITE_PIN_TYPE_COMMAND):
+                # setup pin type for legacy pairing
+                await self.send_command(
+                    HCI_Write_PIN_Type_Command(pin_type=self.config.classic_pin_type)
+                )
             await self.send_command(
                 HCI_Write_Local_Name_Command(local_name=self.name.encode('utf8'))  # type: ignore[call-arg]
             )
