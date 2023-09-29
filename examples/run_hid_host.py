@@ -33,7 +33,7 @@ from bumble.core import (
     BT_BR_EDR_TRANSPORT,
 )
 from bumble.hci import Address
-from bumble.hid import HIDHost, HID_INPUT_REPORT, HID_OTHER_REPORT, HID_BOOT_PROTOCOL_MODE, HID_REPORT_PROTOCOL_MODE
+from bumble.hid import Host, Message
 from bumble.sdp import (
     Client as SDP_Client,
     DataElement,
@@ -243,13 +243,13 @@ async def main():
         report_length = len(pdu[1:])
         report_id = pdu[1]
 
-        if (report_type != HID_OTHER_REPORT):
+        if (report_type != Message.ReportType.HID_OTHER_REPORT):
             print(color(f' Report type = {report_type}, Report length = {report_length}, Report id = {report_id}', 'blue', None, 'bold'))
 
         if ((report_length <= 1) or (report_id == 0)):
             return
 
-        if report_type == HID_INPUT_REPORT:
+        if report_type == Message.ReportType.HID_INPUT_REPORT:
             ReportParser.parse_input_report(pdu[1:])  #type: ignore
 
     async def handle_virtual_cable_unplug():
@@ -290,7 +290,7 @@ async def main():
 
         # Create HID host and start it
         print('@@@ Starting HID Host...')
-        hid_host = HIDHost(device, connection)
+        hid_host = Host(device, connection)
 
         # Register for HID data call back
         hid_host.on('data', on_hid_data_cb)
@@ -383,10 +383,10 @@ async def main():
                     choice1 = choice1.decode('utf-8').strip()
 
                     if choice1 == '0':
-                        hid_host.set_protocol(HID_BOOT_PROTOCOL_MODE)
+                        hid_host.set_protocol(Message.ProtocolMode.HID_BOOT_PROTOCOL_MODE)
 
                     elif choice1 == '1':
-                        hid_host.set_protocol(HID_REPORT_PROTOCOL_MODE)
+                        hid_host.set_protocol(Message.ProtocolMode.HID_REPORT_PROTOCOL_MODE)
 
                     else:
                         print('Incorrect option selected')
