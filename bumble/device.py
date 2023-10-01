@@ -1425,10 +1425,10 @@ class Device(CompositeEventEmitter):
             check_result=True,
         )
 
-        self.advertising_own_address_type = own_address_type
-        self.auto_restart_advertising = auto_restart
         self.advertising_type = advertising_type
+        self.advertising_own_address_type = own_address_type
         self.advertising = True
+        self.auto_restart_advertising = auto_restart
 
     async def stop_advertising(self) -> None:
         # Disable advertising
@@ -1438,9 +1438,9 @@ class Device(CompositeEventEmitter):
                 check_result=True,
             )
 
+            self.advertising_type = None
             self.advertising_own_address_type = None
             self.advertising = False
-            self.advertising_type = None
             self.auto_restart_advertising = False
 
     @property
@@ -2630,7 +2630,6 @@ class Device(CompositeEventEmitter):
                 own_address_type = self.advertising_own_address_type
 
             # We are no longer advertising
-            self.advertising_own_address_type = None
             self.advertising = False
 
             if own_address_type in (
@@ -2687,7 +2686,6 @@ class Device(CompositeEventEmitter):
             and self.advertising
             and self.advertising_type.is_directed
         ):
-            self.advertising_own_address_type = None
             self.advertising = False
 
         # Notify listeners
