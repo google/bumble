@@ -65,3 +65,4 @@ const bumbleControls = document.querySelector('#bumble-controls');
 // Setup the app
 const app = await setupSimpleApp('scanner.py', bumbleControls, logToOutput);
 app.on('update', onUpdate);
+logToOutput('Click the Bluetooth button to start');

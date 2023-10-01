@@ -26,4 +26,5 @@ document.querySelector('#hr-down-button').addEventListener('click', () => {
 
 // Setup the app
 const app = await setupSimpleApp('heart_rate_monitor.py', bumbleControls, logToOutput);
+logToOutput('Click the Bluetooth button to start');
 

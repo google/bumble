@@ -96,12 +96,11 @@ class Speaker:
         STARTED = 2
         SUSPENDED = 3
 
-    def __init__(self, hci_source, hci_sink, codec, discover):
+    def __init__(self, hci_source, hci_sink, codec):
         self.hci_source = hci_source
         self.hci_sink = hci_sink
         self.js_listeners = {}
         self.codec = codec
-        self.discover = discover
         self.device = None
         self.connection = None
         self.avdtp_listener = None
@@ -180,7 +179,6 @@ class Speaker:
     def on_bluetooth_disconnection(self, reason):
         print(f'Disconnection ({reason})')
         self.connection = None
-        AsyncRunner.spawn(self.advertise())
         self.emit('disconnection', None)
 
     def on_avdtp_connection(self, protocol):
@@ -198,10 +196,6 @@ class Speaker:
 
         # Listen for close events
         protocol.on('close', self.on_avdtp_close)
-
-        # Discoverall endpoints on the remote device is requested
-        if self.discover:
-            AsyncRunner.spawn(self.discover_remote_endpoints(protocol))
 
     def on_avdtp_close(self):
         print("Audio Stream Closed")
@@ -236,10 +230,6 @@ class Speaker:
         self.packets_received += 1
         self.bytes_received += len(packet.payload)
         self.emit("audio", self.audio_extractor.extract_audio(packet))
-
-    async def advertise(self):
-        await self.device.set_discoverable(True)
-        await self.device.set_connectable(True)
 
     async def connect(self, address):
         # Connect to the source
@@ -317,8 +307,7 @@ class Speaker:
                 print("Connection timed out")
                 return
         else:
-            # Start being discoverable and connectable
-            await self.advertise()
+            # We'll wait for a connection
             print("Waiting for connection...")
 
     async def start(self):
@@ -333,4 +322,4 @@ class Speaker:
 
 # -----------------------------------------------------------------------------
 def main(hci_source, hci_sink):
-    return Speaker(hci_source, hci_sink, "aac", False)
+    return Speaker(hci_source, hci_sink, "aac")

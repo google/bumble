@@ -13,3 +13,9 @@ name = "scanner"
 description = "Simple Scanner Application"
 type = "Application"
 url = "scanner/scanner.html"
+
+[[index]]
+name = "heart-rate-monitor"
+description = "Virtual Heart Rate Monitor"
+type = "Device"
+url = "heart_rate_monitor/heart_rate_monitor.html"

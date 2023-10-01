@@ -57,10 +57,10 @@ export class Bumble extends EventTarget {
         }
 
         // Load the Bumble module
-        this.log('Installing micropip');
-        await this.pyodide.loadPackage('micropip');
         bumblePackage ||= 'bumble';
+        console.log('Installing micropip');
         this.log(`Installing ${bumblePackage}`)
+        await this.pyodide.loadPackage('micropip');
         await this.pyodide.runPythonAsync(`
             import micropip
             await micropip.install('${bumblePackage}')
@@ -76,7 +76,7 @@ export class Bumble extends EventTarget {
         // Sync previously persisted filesystem data into memory
         await new Promise(resolve => {
             this.pyodide.FS.syncfs(true, () => {
-                this.log('FS synced in');
+                console.log('FS synced in');
                 resolve();
             });
         })
@@ -128,7 +128,7 @@ export class Bumble extends EventTarget {
     }
 
     async loadApp(appUrl) {
-        this.log('Loading script');
+        this.log('Loading app');
         const script = await (await fetch(appUrl)).text();
         await this.pyodide.runPythonAsync(script);
         const pythonMain = this.pyodide.globals.get('main');
@@ -136,14 +136,14 @@ export class Bumble extends EventTarget {
         if (app.on) {
             app.on('key_store_update', this.onKeystoreUpdate.bind(this));
         }
-
+        this.log('App is ready!');
         return app;
     }
 
     onKeystoreUpdate() {
         // Sync the FS
         this.pyodide.FS.syncfs(() => {
-            this.log('FS synced out');
+            console.log('FS synced out');
         });
     }
 }

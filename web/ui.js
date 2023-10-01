@@ -10,7 +10,7 @@ class BumbleControls extends LitElement {
     render() {
         return html`
             <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-            <dialog id="settings-dialog" @close=${this.onSettingsDialogClose}>
+            <dialog id="settings-dialog" @close=${this.onSettingsDialogClose} style="font-family:sans-serif">
                 <p>WebSocket URL for HCI transport</p>
                 <form>
                     <input id="settings-hci-url-input" type="text" size="50"></input>

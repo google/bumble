@@ -26,4 +26,5 @@ Virtual Devices
 ---------------
 
   * [Speaker](web/speaker/speaker.html) - Virtual speaker that plays audio in a browser page.
+  * [Heart Rate Monitor](web/heart_rate_monitor/heart_rate_monitor.html) - Virtual heart rate monitor.
 
