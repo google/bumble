@@ -53,7 +53,9 @@ class HeartRateMonitor:
         )
 
         # Notify subscribers of the current value as soon as they subscribe
-        @self.heart_rate_service.heart_rate_measurement_characteristic.on('subscription')
+        @self.heart_rate_service.heart_rate_measurement_characteristic.on(
+            'subscription'
+        )
         def on_subscription(_, notify_enabled, indicate_enabled):
             if notify_enabled or indicate_enabled:
                 self.notify_heart_rate()
@@ -63,6 +65,15 @@ class HeartRateMonitor:
         self.device.advertising_data = bytes(
             AdvertisingData(
                 [
+                    (
+                        AdvertisingData.FLAGS,
+                        bytes(
+                            [
+                                AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
+                                | AdvertisingData.BR_EDR_NOT_SUPPORTED_FLAG
+                            ]
+                        ),
+                    ),
                     (
                         AdvertisingData.COMPLETE_LOCAL_NAME,
                         bytes('Bumble Heart', 'utf-8'),
