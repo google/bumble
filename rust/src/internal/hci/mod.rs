@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::internal::hci::packets::{Acl, Command, Error, Event, Packet, Sco};
+pub use pdl_runtime::{Error, Packet};
+
+use crate::internal::hci::packets::{Acl, Command, Event, Sco};
 use pdl_derive::pdl;
 
 #[allow(missing_docs, warnings, clippy::all)]
@@ -81,87 +83,10 @@ pub(crate) enum PacketTypeParseError {
         actual: PacketType,
     },
     #[error("Failed to parse packet after header: {error}")]
-    PacketParse { error: packets::Error },
+    PacketParse { error: Error },
 }
 
-// TODO: remove if/when PDL derives this for their Error enum (https://github.com/google/pdl/issues/71)
-impl PartialEq<Self> for packets::Error {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Error::InvalidPacketError, Error::InvalidPacketError) => true,
-            (
-                Error::ConstraintOutOfBounds {
-                    field: field1,
-                    value: value1,
-                },
-                Error::ConstraintOutOfBounds {
-                    field: field2,
-                    value: value2,
-                },
-            ) => field1 == field2 && value1 == value2,
-            (
-                Error::InvalidFixedValue {
-                    expected: expected1,
-                    actual: actual1,
-                },
-                Error::InvalidFixedValue {
-                    expected: expected2,
-                    actual: actual2,
-                },
-            ) => expected1 == expected2 && actual1 == actual2,
-            (
-                Error::InvalidLengthError {
-                    obj: obj1,
-                    wanted: wanted1,
-                    got: got1,
-                },
-                Error::InvalidLengthError {
-                    obj: obj2,
-                    wanted: wanted2,
-                    got: got2,
-                },
-            ) => obj1 == obj2 && wanted1 == wanted2 && got1 == got2,
-            (
-                Error::InvalidArraySize {
-                    array: array1,
-                    element: element1,
-                },
-                Error::InvalidArraySize {
-                    array: array2,
-                    element: element2,
-                },
-            ) => array1 == array2 && element1 == element2,
-            (Error::ImpossibleStructError, Error::ImpossibleStructError) => true,
-            (
-                Error::InvalidEnumValueError {
-                    obj: obj1,
-                    field: field1,
-                    value: value1,
-                    type_: type_1,
-                },
-                Error::InvalidEnumValueError {
-                    obj: obj2,
-                    field: field2,
-                    value: value2,
-                    type_: type_2,
-                },
-            ) => obj1 == obj2 && field1 == field2 && value1 == value2 && type_1 == type_2,
-            (
-                Error::InvalidChildError {
-                    expected: expected1,
-                    actual: actual1,
-                },
-                Error::InvalidChildError {
-                    expected: expected2,
-                    actual: actual2,
-                },
-            ) => expected1 == expected2 && actual1 == actual2,
-            _ => false,
-        }
-    }
-}
-
-impl From<packets::Error> for PacketTypeParseError {
+impl From<Error> for PacketTypeParseError {
     fn from(error: Error) -> Self {
         Self::PacketParse { error }
     }

@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crate::internal::hci::{
-    packets::{self, Event, EventBuilder, EventCode, Packet, Sco},
-    parse_with_expected_packet_type, prepend_packet_type, PacketType, PacketTypeParseError,
-    WithPacketType,
+    packets::{Event, EventBuilder, EventCode, Sco},
+    parse_with_expected_packet_type, prepend_packet_type, Error, Packet, PacketType,
+    PacketTypeParseError, WithPacketType,
 };
 use bytes::Bytes;
 
@@ -78,7 +78,7 @@ fn test_packet_roundtrip_with_type() {
 struct FakePacket;
 
 impl FakePacket {
-    fn parse(_bytes: &[u8]) -> Result<Self, packets::Error> {
+    fn parse(_bytes: &[u8]) -> Result<Self, Error> {
         Ok(Self)
     }
 }

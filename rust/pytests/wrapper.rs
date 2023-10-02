@@ -16,11 +16,13 @@ use bumble::wrapper::{
     controller::Controller,
     device::Device,
     drivers::rtk::DriverInfo,
-    hci::packets::{
-        AddressType, Error, ErrorCode, ReadLocalVersionInformationBuilder,
-        ReadLocalVersionInformationComplete,
+    hci::{
+        packets::{
+            AddressType, ErrorCode, ReadLocalVersionInformationBuilder,
+            ReadLocalVersionInformationComplete,
+        },
+        Address, Error,
     },
-    hci::Address,
     host::Host,
     link::Link,
     transport::Transport,

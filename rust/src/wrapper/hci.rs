@@ -14,7 +14,7 @@
 
 //! HCI
 
-pub use crate::internal::hci::packets;
+pub use crate::internal::hci::{packets, Error, Packet};
 
 use crate::{
     internal::hci::WithPacketType,

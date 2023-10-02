@@ -200,6 +200,7 @@ dependencies = [
  "nom",
  "owo-colors",
  "pdl-derive",
+ "pdl-runtime",
  "pyo3",
  "pyo3-asyncio",
  "rand",
@@ -1157,9 +1158,9 @@ dependencies = [
 
 [[package]]
 name = "pdl-compiler"
-version = "0.1.7"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f99a9ac3d6a426c6fc0b85903a16d77bf148e20ddf755361f76e230d1b6d72cf"
+checksum = "ee66995739fb9ddd9155767990a54aadd226ee32408a94f99f94883ff445ceba"
 dependencies = [
  "argh",
  "codespan-reporting",
@@ -1176,9 +1177,9 @@ dependencies = [
 
 [[package]]
 name = "pdl-derive"
-version = "0.1.7"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ad882bdd3b2584b42180b7a216bfccc7c05e714de2789ee25ea622c85064ef7"
+checksum = "113e4a1215c407466b36d2c2f6a6318819d6b22ccdd3acb7bb35e27a68806034"
 dependencies = [
  "codespan-reporting",
  "pdl-compiler",
@@ -1186,6 +1187,16 @@ dependencies = [
  "quote",
  "syn 2.0.29",
  "termcolor",
+]
+
+[[package]]
+name = "pdl-runtime"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d36c2f9799613babe78eb5cd9a353d527daaba6c3d1f39a1175657a35790732"
+dependencies = [
+ "bytes",
+ "thiserror",
 ]
 
 [[package]]
