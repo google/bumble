@@ -23,6 +23,9 @@ hex = "0.4.3"
 itertools = "0.11.0"
 lazy_static = "1.4.0"
 thiserror = "1.0.41"
+bytes = "1.5.0"
+pdl-derive = "0.2.0"
+pdl-runtime = "0.2.0"
 
 # Dev tools
 file-header = { version = "0.1.2", optional = true }

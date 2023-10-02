@@ -12,9 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bumble::wrapper::{drivers::rtk::DriverInfo, transport::Transport};
+use bumble::wrapper::{
+    controller::Controller,
+    device::Device,
+    drivers::rtk::DriverInfo,
+    hci::{
+        packets::{
+            AddressType, ErrorCode, ReadLocalVersionInformationBuilder,
+            ReadLocalVersionInformationComplete,
+        },
+        Address, Error,
+    },
+    host::Host,
+    link::Link,
+    transport::Transport,
+};
 use nix::sys::stat::Mode;
-use pyo3::PyResult;
+use pyo3::{
+    exceptions::PyException,
+    {PyErr, PyResult},
+};
 
 #[pyo3_asyncio::tokio::test]
 async fn fifo_transport_can_open() -> PyResult<()> {
@@ -33,5 +50,28 @@ async fn fifo_transport_can_open() -> PyResult<()> {
 #[pyo3_asyncio::tokio::test]
 async fn realtek_driver_info_all_drivers() -> PyResult<()> {
     assert_eq!(12, DriverInfo::all_drivers()?.len());
+    Ok(())
+}
+
+#[pyo3_asyncio::tokio::test]
+async fn hci_command_wrapper_has_correct_methods() -> PyResult<()> {
+    let address = Address::new("F0:F1:F2:F3:F4:F5", &AddressType::RandomDeviceAddress)?;
+    let link = Link::new_local_link()?;
+    let controller = Controller::new("C1", None, None, Some(link), Some(address.clone())).await?;
+    let host = Host::new(controller.clone().into(), controller.into()).await?;
+    let device = Device::new(None, Some(address), None, Some(host), None)?;
+
+    device.power_on().await?;
+
+    // Send some simple command. A successful response means [HciCommandWrapper] has the minimum
+    // required interface for the Python code to think its an [HCI_Command] object.
+    let command = ReadLocalVersionInformationBuilder {};
+    let event: ReadLocalVersionInformationComplete = device
+        .send_command(&command.into(), true)
+        .await?
+        .try_into()
+        .map_err(|e: Error| PyErr::new::<PyException, _>(e.to_string()))?;
+
+    assert_eq!(ErrorCode::Success, event.get_status());
     Ok(())
 }

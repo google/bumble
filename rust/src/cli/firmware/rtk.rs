@@ -179,7 +179,7 @@ pub(crate) fn parse(firmware_path: &path::Path) -> PyResult<()> {
 pub(crate) async fn info(transport: &str, force: bool) -> PyResult<()> {
     let transport = Transport::open(transport).await?;
 
-    let mut host = Host::new(transport.source()?, transport.sink()?)?;
+    let mut host = Host::new(transport.source()?, transport.sink()?).await?;
     host.reset(DriverFactory::None).await?;
 
     if !force && !Driver::check(&host).await? {
@@ -203,7 +203,7 @@ pub(crate) async fn info(transport: &str, force: bool) -> PyResult<()> {
 pub(crate) async fn load(transport: &str, force: bool) -> PyResult<()> {
     let transport = Transport::open(transport).await?;
 
-    let mut host = Host::new(transport.source()?, transport.sink()?)?;
+    let mut host = Host::new(transport.source()?, transport.sink()?).await?;
     host.reset(DriverFactory::None).await?;
 
     match Driver::for_host(&host, force).await? {
@@ -219,7 +219,7 @@ pub(crate) async fn load(transport: &str, force: bool) -> PyResult<()> {
 pub(crate) async fn drop(transport: &str) -> PyResult<()> {
     let transport = Transport::open(transport).await?;
 
-    let mut host = Host::new(transport.source()?, transport.sink()?)?;
+    let mut host = Host::new(transport.source()?, transport.sink()?).await?;
     host.reset(DriverFactory::None).await?;
 
     Driver::drop_firmware(&mut host).await?;

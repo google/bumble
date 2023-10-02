@@ -33,7 +33,7 @@ from typing import (
     Union,
     overload,
 )
-from functools import wraps
+from functools import wraps, partial
 from pyee import EventEmitter
 
 from .colors import color
@@ -410,3 +410,20 @@ class FlowControlAsyncPipe:
                     self.resume_source()
 
             self.check_pump()
+
+
+async def async_call(function, *args, **kwargs):
+    """
+    Immediately calls the function with provided args and kwargs, wrapping it in an async function.
+    Rust's `pyo3_asyncio` library needs functions to be marked async to properly inject a running loop.
+
+    result = await async_call(some_function, ...)
+    """
+    return function(*args, **kwargs)
+
+
+def wrap_async(function):
+    """
+    Wraps the provided function in an async function.
+    """
+    return partial(async_call, function)

@@ -14,84 +14,62 @@
 
 //! HCI
 
+pub use crate::internal::hci::{packets, Error, Packet};
+
+use crate::{
+    internal::hci::WithPacketType,
+    wrapper::hci::packets::{AddressType, Command, ErrorCode},
+};
 use itertools::Itertools as _;
 use pyo3::{
-    exceptions::PyException, intern, types::PyModule, FromPyObject, PyAny, PyErr, PyObject,
-    PyResult, Python, ToPyObject,
+    exceptions::PyException,
+    intern, pyclass, pymethods,
+    types::{PyBytes, PyModule},
+    FromPyObject, IntoPy, PyAny, PyErr, PyObject, PyResult, Python, ToPyObject,
 };
-
-/// HCI error code.
-pub struct HciErrorCode(u8);
-
-impl<'source> FromPyObject<'source> for HciErrorCode {
-    fn extract(ob: &'source PyAny) -> PyResult<Self> {
-        Ok(HciErrorCode(ob.extract()?))
-    }
-}
-
-impl ToPyObject for HciErrorCode {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        self.0.to_object(py)
-    }
-}
 
 /// Provides helpers for interacting with HCI
 pub struct HciConstant;
 
 impl HciConstant {
     /// Human-readable error name
-    pub fn error_name(status: HciErrorCode) -> PyResult<String> {
+    pub fn error_name(status: ErrorCode) -> PyResult<String> {
         Python::with_gil(|py| {
             PyModule::import(py, intern!(py, "bumble.hci"))?
                 .getattr(intern!(py, "HCI_Constant"))?
-                .call_method1(intern!(py, "error_name"), (status.0,))?
+                .call_method1(intern!(py, "error_name"), (status.to_object(py),))?
                 .extract()
         })
     }
 }
 
 /// A Bluetooth address
+#[derive(Clone)]
 pub struct Address(pub(crate) PyObject);
 
 impl Address {
+    /// Creates a new [Address] object
+    pub fn new(address: &str, address_type: &AddressType) -> PyResult<Self> {
+        Python::with_gil(|py| {
+            PyModule::import(py, intern!(py, "bumble.device"))?
+                .getattr(intern!(py, "Address"))?
+                .call1((address, address_type.to_object(py)))
+                .map(|any| Self(any.into()))
+        })
+    }
+
     /// The type of address
     pub fn address_type(&self) -> PyResult<AddressType> {
         Python::with_gil(|py| {
-            let addr_type = self
-                .0
+            self.0
                 .getattr(py, intern!(py, "address_type"))?
-                .extract::<u32>(py)?;
-
-            let module = PyModule::import(py, intern!(py, "bumble.hci"))?;
-            let klass = module.getattr(intern!(py, "Address"))?;
-
-            if addr_type
-                == klass
-                    .getattr(intern!(py, "PUBLIC_DEVICE_ADDRESS"))?
-                    .extract::<u32>()?
-            {
-                Ok(AddressType::PublicDevice)
-            } else if addr_type
-                == klass
-                    .getattr(intern!(py, "RANDOM_DEVICE_ADDRESS"))?
-                    .extract::<u32>()?
-            {
-                Ok(AddressType::RandomDevice)
-            } else if addr_type
-                == klass
-                    .getattr(intern!(py, "PUBLIC_IDENTITY_ADDRESS"))?
-                    .extract::<u32>()?
-            {
-                Ok(AddressType::PublicIdentity)
-            } else if addr_type
-                == klass
-                    .getattr(intern!(py, "RANDOM_IDENTITY_ADDRESS"))?
-                    .extract::<u32>()?
-            {
-                Ok(AddressType::RandomIdentity)
-            } else {
-                Err(PyErr::new::<PyException, _>("Invalid address type"))
-            }
+                .extract::<u8>(py)?
+                .try_into()
+                .map_err(|addr_type| {
+                    PyErr::new::<PyException, _>(format!(
+                        "Failed to convert {addr_type} to AddressType"
+                    ))
+                })
         })
     }
 
@@ -134,12 +112,45 @@ impl Address {
     }
 }
 
-/// BT address types
-#[allow(missing_docs)]
-#[derive(PartialEq, Eq, Debug)]
-pub enum AddressType {
-    PublicDevice,
-    RandomDevice,
-    PublicIdentity,
-    RandomIdentity,
+impl ToPyObject for Address {
+    fn to_object(&self, _py: Python<'_>) -> PyObject {
+        self.0.clone()
+    }
+}
+
+/// Implements minimum necessary interface to be treated as bumble's [HCI_Command].
+/// While pyo3's macros do not support generics, this could probably be refactored to allow multiple
+/// implementations of the HCI_Command methods in the future, if needed.
+#[pyclass]
+pub(crate) struct HciCommandWrapper(pub(crate) Command);
+
+#[pymethods]
+impl HciCommandWrapper {
+    fn __bytes__(&self, py: Python) -> PyResult<PyObject> {
+        let bytes = PyBytes::new(py, &self.0.clone().to_vec_with_packet_type());
+        Ok(bytes.into_py(py))
+    }
+
+    #[getter]
+    fn op_code(&self) -> u16 {
+        self.0.get_op_code().into()
+    }
+}
+
+impl ToPyObject for AddressType {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        u8::from(self).to_object(py)
+    }
+}
+
+impl<'source> FromPyObject<'source> for ErrorCode {
+    fn extract(ob: &'source PyAny) -> PyResult<Self> {
+        ob.extract()
+    }
+}
+
+impl ToPyObject for ErrorCode {
+    fn to_object(&self, py: Python<'_>) -> PyObject {
+        u8::from(self).to_object(py)
+    }
 }

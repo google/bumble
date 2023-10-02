@@ -20,7 +20,8 @@
 use bumble::{
     adv::CommonDataType,
     wrapper::{
-        core::AdvertisementDataUnit, device::Device, hci::AddressType, transport::Transport,
+        core::AdvertisementDataUnit, device::Device, hci::packets::AddressType,
+        transport::Transport,
     },
 };
 use clap::Parser as _;
@@ -102,7 +103,9 @@ async fn main() -> PyResult<()> {
         };
 
         let (type_style, qualifier) = match adv.address()?.address_type()? {
-            AddressType::PublicIdentity | AddressType::PublicDevice => (Style::new().cyan(), ""),
+            AddressType::PublicIdentityAddress | AddressType::PublicDeviceAddress => {
+                (Style::new().cyan(), "")
+            }
             _ => {
                 if addr.is_static()? {
                     (Style::new().green(), "(static)")

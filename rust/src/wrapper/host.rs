@@ -14,8 +14,12 @@
 
 //! Host-side types
 
-use crate::wrapper::transport::{Sink, Source};
-use pyo3::{intern, prelude::PyModule, types::PyDict, PyObject, PyResult, Python};
+use crate::wrapper::{
+    transport::{Sink, Source},
+    wrap_python_async,
+};
+use pyo3::{intern, prelude::PyModule, types::PyDict, PyObject, PyResult, Python, ToPyObject};
+use pyo3_asyncio::tokio::into_future;
 
 /// Host HCI commands
 pub struct Host {
@@ -29,13 +33,23 @@ impl Host {
     }
 
     /// Create a new Host
-    pub fn new(source: Source, sink: Sink) -> PyResult<Self> {
+    pub async fn new(source: Source, sink: Sink) -> PyResult<Self> {
         Python::with_gil(|py| {
-            PyModule::import(py, intern!(py, "bumble.host"))?
-                .getattr(intern!(py, "Host"))?
-                .call((source.0, sink.0), None)
-                .map(|any| Self { obj: any.into() })
-        })
+            let host_ctr =
+                PyModule::import(py, intern!(py, "bumble.host"))?.getattr(intern!(py, "Host"))?;
+
+            let kwargs = PyDict::new(py);
+            kwargs.set_item("controller_source", source.0)?;
+            kwargs.set_item("controller_sink", sink.0)?;
+
+            // Needed for Python 3.8-3.9, in which the Semaphore object, when constructed, calls
+            // `get_event_loop`.
+            wrap_python_async(py, host_ctr)?
+                .call((), Some(kwargs))
+                .and_then(into_future)
+        })?
+        .await
+        .map(|any| Self { obj: any })
     }
 
     /// Send a reset command and perform other reset tasks.
@@ -58,6 +72,12 @@ impl Host {
         })?
         .await
         .map(|_| ())
+    }
+}
+
+impl ToPyObject for Host {
+    fn to_object(&self, _py: Python<'_>) -> PyObject {
+        self.obj.clone()
     }
 }
 

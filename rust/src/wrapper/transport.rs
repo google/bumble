@@ -14,6 +14,7 @@
 
 //! HCI packet transport
 
+use crate::wrapper::controller::Controller;
 use pyo3::{intern, types::PyModule, PyObject, PyResult, Python};
 
 /// A source/sink pair for HCI packet I/O.
@@ -67,6 +68,18 @@ impl Drop for Transport {
 #[derive(Clone)]
 pub struct Source(pub(crate) PyObject);
 
+impl From<Controller> for Source {
+    fn from(value: Controller) -> Self {
+        Self(value.0)
+    }
+}
+
 /// The sink side of a [Transport].
 #[derive(Clone)]
 pub struct Sink(pub(crate) PyObject);
+
+impl From<Controller> for Sink {
+    fn from(value: Controller) -> Self {
+        Self(value.0)
+    }
+}
