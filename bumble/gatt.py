@@ -99,12 +99,21 @@ GATT_VOLUME_CONTROL_SERVICE                 = UUID.from_16_bits(0x1844, 'Volume 
 GATT_VOLUME_OFFSET_CONTROL_SERVICE          = UUID.from_16_bits(0x1845, 'Volume Offset Control')
 GATT_COORDINATED_SET_IDENTIFICATION_SERVICE = UUID.from_16_bits(0x1846, 'Coordinated Set Identification Service')
 GATT_DEVICE_TIME_SERVICE                    = UUID.from_16_bits(0x1847, 'Device Time')
-GATT_MEDIA_CONTROL_SERVICE                  = UUID.from_16_bits(0x1848, 'Media Control Service')
-GATT_GENERIC_MEDIA_CONTROL_SERVICE          = UUID.from_16_bits(0x1849, 'Generic Media Control Service')
+GATT_MEDIA_CONTROL_SERVICE                  = UUID.from_16_bits(0x1848, '[LE Audio] Media Control Service')
+GATT_GENERIC_MEDIA_CONTROL_SERVICE          = UUID.from_16_bits(0x1849, '[LE Audio] Generic Media Control Service')
 GATT_CONSTANT_TONE_EXTENSION_SERVICE        = UUID.from_16_bits(0x184A, 'Constant Tone Extension')
-GATT_TELEPHONE_BEARER_SERVICE               = UUID.from_16_bits(0x184B, 'Telephone Bearer Service')
-GATT_GENERIC_TELEPHONE_BEARER_SERVICE       = UUID.from_16_bits(0x184C, 'Generic Telephone Bearer Service')
-GATT_MICROPHONE_CONTROL_SERVICE             = UUID.from_16_bits(0x184D, 'Microphone Control')
+GATT_TELEPHONE_BEARER_SERVICE               = UUID.from_16_bits(0x184B, '[LE Audio] Telephone Bearer Service')
+GATT_GENERIC_TELEPHONE_BEARER_SERVICE       = UUID.from_16_bits(0x184C, '[LE Audio] Generic Telephone Bearer Service')
+GATT_MICROPHONE_CONTROL_SERVICE             = UUID.from_16_bits(0x184D, '[LE Audio] Microphone Control')
+GATT_AUDIO_STREAM_CONTROL_SERVICE           = UUID.from_16_bits(0x184E, '[LE Audio] Audio Stream Control Service')
+GATT_BROADCAST_AUDIO_SCAN_SERVICE           = UUID.from_16_bits(0x184F, '[LE Audio] Broadcast Audio Scan Service')
+GATT_PUBLISHED_AUDIO_CAPABILITIES_SERVICE   = UUID.from_16_bits(0x1850, '[LE Audio] Published Audio Capabilities Service')
+GATT_BASIC_AUDIO_ANNOUNCEMENT_SERVICE       = UUID.from_16_bits(0x1851, '[LE Audio] Basic Audio Announcement Service')
+GATT_BROADCAST_AUDIO_ANNOUNCEMENT_SERVICE   = UUID.from_16_bits(0x1852, '[LE Audio] Broadcast Audio Announcement Service')
+GATT_COMMON_AUDIO_SERVICE                   = UUID.from_16_bits(0x1853, '[LE Audio] Common Audio Service')
+GATT_HEARING_AID_SERVICE                    = UUID.from_16_bits(0x1854, '[LE Audio] Hearing Aid Service')
+GATT_TELEPHONY_AND_MEDIA_AUDIO_SERVICE      = UUID.from_16_bits(0x1855, '[LE Audio] Telephony and Media Audio Service')
+GATT_PUBLIC_BROADCAST_ANNOUNCEMENT_SERVICE  = UUID.from_16_bits(0x1856, '[LE Audio] Public Broadcast Announcement Service')
 
 # Types
 GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE   = UUID.from_16_bits(0x2800, 'Primary Service')
@@ -155,6 +164,31 @@ GATT_HEART_RATE_CONTROL_POINT_CHARACTERISTIC = UUID.from_16_bits(0x2A39, 'Heart 
 
 # Battery Service
 GATT_BATTERY_LEVEL_CHARACTERISTIC = UUID.from_16_bits(0x2A19, 'Battery Level')
+
+# Coordinated Set Identification Service
+GATT_SET_IDENTITY_RESOLVING_KEY_CHARACTERISTIC  = UUID.from_16_bits(0x2B84, '[CSIS] Set Identity Resolving Key')
+GATT_COORDINATED_SET_SIZE_CHARACTERISTIC        = UUID.from_16_bits(0x2B85, '[CSIS] Coordinated Set Size')
+GATT_SET_MEMBER_LOCK_CHARACTERISTIC             = UUID.from_16_bits(0x2B86, '[CSIS] Set Member Lock')
+GATT_SET_MEMBER_RANK_CHARACTERISTIC             = UUID.from_16_bits(0x2B87, '[CSIS] Set Member Rank')
+
+# Audio Stream Control Service
+GATT_SINK_ASE_CHARACTERISTIC                    = UUID.from_16_bits(0x2BC4, '[ASCS] Sink ASE')
+GATT_SOURCE_ASE_CHARACTERISTIC                  = UUID.from_16_bits(0x2BC5, '[ASCS] Source ASE')
+GATT_ASE_CONTROL_POINT_CHARACTERISTIC           = UUID.from_16_bits(0x2BC6, '[ASCS] ASE Control Point')
+
+# Published Audio Capabilities Service
+GATT_SINK_PAC_CHARACTERISTIC                    = UUID.from_16_bits(0x2BC9, '[PACS] Sink PAC')
+GATT_SINK_AUDIO_LOCATION_CHARACTERISTIC         = UUID.from_16_bits(0x2BCA, '[PACS] Sink Audio Location')
+GATT_SOURCE_PAC_CHARACTERISTIC                  = UUID.from_16_bits(0x2BCB, '[PACS] Source PAC')
+GATT_SOURCE_AUDIO_LOCATION_CHARACTERISTIC       = UUID.from_16_bits(0x2BCC, '[PACS] Source Audio Location')
+GATT_AVAILABLE_AUDIO_CONTEXTS_CHARACTERISTIC    = UUID.from_16_bits(0x2BCD, '[PACS] Available Audio Contexts')
+GATT_SUPPORTED_AUDIO_CONTEXTS_CHARACTERISTIC    = UUID.from_16_bits(0x2BCE, '[PACS] Supported Audio Contexts')
+
+# Volume Control Service
+GATT_VOLUME_STATE_CHARACTERISTIC                = UUID.from_16_bits(0x2B7D, '[VCS] Volume State')
+GATT_VOLUME_CONTROL_POINT_CHARACTERISTIC        = UUID.from_16_bits(0x2B7E, '[VCS] Volume Control Point')
+GATT_VOLUME_FLAGS_CHARACTERISTIC                = UUID.from_16_bits(0x2B7F, '[VCS] Volume Flags')
+GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC         = UUID.from_16_bits(0x2B80, '[VCS] Volume Offset State')
 
 # ASHA Service
 GATT_ASHA_SERVICE                             = UUID.from_16_bits(0xFDF0, 'Audio Streaming for Hearing Aid')
