@@ -32,6 +32,7 @@ from ..gatt import (
     Characteristic,
     CharacteristicValue,
 )
+from ..l2cap import Channel
 from ..utils import AsyncRunner
 
 # -----------------------------------------------------------------------------
@@ -52,46 +53,48 @@ class AshaService(TemplateService):
     SUPPORTED_CODEC_ID = [0x02, 0x01]  # Codec IDs [G.722 at 16 kHz]
     RENDER_DELAY = [00, 00]
 
-    def __init__(self, capability: int, hisyncid: List[int], device: Device, psm=0):
+    def __init__(
+        self, capability: int, hisyncid: List[int], device: Device, psm: int = 0
+    ) -> None:
         self.hisyncid = hisyncid
         self.capability = capability  # Device Capabilities [Left, Monaural]
         self.device = device
-        self.audio_out_data = b''
-        self.psm = psm  # a non-zero psm is mainly for testing purpose
+        self.audio_out_data = b""
+        self.psm: int = psm  # a non-zero psm is mainly for testing purpose
 
         # Handler for volume control
-        def on_volume_write(connection, value):
-            logger.info(f'--- VOLUME Write:{value[0]}')
-            self.emit('volume', connection, value[0])
+        def on_volume_write(connection: Connection, value: bytes) -> None:
+            logger.info(f"--- VOLUME Write:{value[0]}")
+            self.emit("volume", connection, value[0])
 
         # Handler for audio control commands
-        def on_audio_control_point_write(connection: Connection, value):
-            logger.info(f'--- AUDIO CONTROL POINT Write:{value.hex()}')
+        def on_audio_control_point_write(connection: Connection, value: bytes) -> None:
+            logger.info(f"--- AUDIO CONTROL POINT Write:{value.hex()}")
             opcode = value[0]
             if opcode == AshaService.OPCODE_START:
                 # Start
-                audio_type = ('Unknown', 'Ringtone', 'Phone Call', 'Media')[value[2]]
+                audio_type = ("Unknown", "Ringtone", "Phone Call", "Media")[value[2]]
                 logger.info(
-                    f'### START: codec={value[1]}, '
-                    f'audio_type={audio_type}, '
-                    f'volume={value[3]}, '
-                    f'otherstate={value[4]}'
+                    f"### START: codec={value[1]}, "
+                    f"audio_type={audio_type}, "
+                    f"volume={value[3]}, "
+                    f"otherstate={value[4]}"
                 )
                 self.emit(
-                    'start',
+                    "start",
                     connection,
                     {
-                        'codec': value[1],
-                        'audiotype': value[2],
-                        'volume': value[3],
-                        'otherstate': value[4],
+                        "codec": value[1],
+                        "audiotype": value[2],
+                        "volume": value[3],
+                        "otherstate": value[4],
                     },
                 )
             elif opcode == AshaService.OPCODE_STOP:
-                logger.info('### STOP')
-                self.emit('stop', connection)
+                logger.info("### STOP")
+                self.emit("stop", connection)
             elif opcode == AshaService.OPCODE_STATUS:
-                logger.info(f'### STATUS: connected={value[1]}')
+                logger.info(f"### STATUS: connected={value[1]}")
 
             # OPCODE_STATUS does not need audio status point update
             if opcode != AshaService.OPCODE_STATUS:
@@ -101,49 +104,59 @@ class AshaService(TemplateService):
                     )
                 )
 
+        def on_read_only_properties_read(connection: Connection) -> bytes:
+            value = (
+                bytes(
+                    [
+                        AshaService.PROTOCOL_VERSION,  # Version
+                        self.capability,
+                    ]
+                )
+                + bytes(self.hisyncid)
+                + bytes(AshaService.FEATURE_MAP)
+                + bytes(AshaService.RENDER_DELAY)
+                + bytes(AshaService.RESERVED_FOR_FUTURE_USE)
+                + bytes(AshaService.SUPPORTED_CODEC_ID)
+            )
+            self.emit("read_only_properties", connection, value)
+            return value
+
+        def on_le_psm_out_read(connection: Connection) -> bytes:
+            self.emit("le_psm_out", connection, self.psm)
+            return struct.pack("<H", self.psm)
+
         self.read_only_properties_characteristic = Characteristic(
             GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC,
-            Characteristic.Properties.READ,
+            Characteristic.READ,
             Characteristic.READABLE,
-            bytes(
-                [
-                    AshaService.PROTOCOL_VERSION,  # Version
-                    self.capability,
-                ]
-            )
-            + bytes(self.hisyncid)
-            + bytes(AshaService.FEATURE_MAP)
-            + bytes(AshaService.RENDER_DELAY)
-            + bytes(AshaService.RESERVED_FOR_FUTURE_USE)
-            + bytes(AshaService.SUPPORTED_CODEC_ID),
+            CharacteristicValue(read=on_read_only_properties_read),
         )
 
         self.audio_control_point_characteristic = Characteristic(
             GATT_ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC,
-            Characteristic.Properties.WRITE
-            | Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
+            Characteristic.WRITE | Characteristic.WRITE_WITHOUT_RESPONSE,
             Characteristic.WRITEABLE,
             CharacteristicValue(write=on_audio_control_point_write),
         )
         self.audio_status_characteristic = Characteristic(
             GATT_ASHA_AUDIO_STATUS_CHARACTERISTIC,
-            Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
+            Characteristic.READ | Characteristic.NOTIFY,
             Characteristic.READABLE,
             bytes([0]),
         )
         self.volume_characteristic = Characteristic(
             GATT_ASHA_VOLUME_CHARACTERISTIC,
-            Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
+            Characteristic.WRITE_WITHOUT_RESPONSE,
             Characteristic.WRITEABLE,
             CharacteristicValue(write=on_volume_write),
         )
 
         # Register an L2CAP CoC server
-        def on_coc(channel):
-            def on_data(data):
-                logging.debug(f'<<< data received:{data}')
+        def on_coc(channel: Channel) -> None:
+            def on_data(data: bytes) -> None:
+                logging.debug(f"data received:{data.hex()}")
 
-                self.emit('data', channel.connection, data)
+                self.emit("data", channel.connection, data)
                 self.audio_out_data += data
 
             channel.sink = on_data
@@ -152,9 +165,9 @@ class AshaService(TemplateService):
         self.psm = self.device.register_l2cap_channel_server(self.psm, on_coc, 8)
         self.le_psm_out_characteristic = Characteristic(
             GATT_ASHA_LE_PSM_OUT_CHARACTERISTIC,
-            Characteristic.Properties.READ,
+            Characteristic.READ,
             Characteristic.READABLE,
-            struct.pack('<H', self.psm),
+            CharacteristicValue(read=on_le_psm_out_read),
         )
 
         characteristics = [
@@ -167,7 +180,7 @@ class AshaService(TemplateService):
 
         super().__init__(characteristics)
 
-    def get_advertising_data(self):
+    def get_advertising_data(self) -> bytes:
         # Advertisement only uses 4 least significant bytes of the HiSyncId.
         return bytes(
             AdvertisingData(

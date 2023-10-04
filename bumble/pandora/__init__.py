@@ -24,8 +24,10 @@ import grpc.aio
 
 from .config import Config
 from .device import PandoraDevice
+from .asha import AshaService
 from .host import HostService
 from .security import SecurityService, SecurityStorageService
+from pandora.asha_grpc_aio import add_ASHAServicer_to_server
 from pandora.host_grpc_aio import add_HostServicer_to_server
 from pandora.security_grpc_aio import (
     add_SecurityServicer_to_server,
@@ -68,6 +70,7 @@ async def serve(
             config.load_from_dict(bumble.config.get('server', {}))
 
             # add Pandora services to the gRPC server.
+            add_ASHAServicer_to_server(AshaService(bumble.device), server)
             add_HostServicer_to_server(
                 HostService(server, bumble.device, config), server
             )
