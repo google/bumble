@@ -21,6 +21,7 @@ import logging
 import traceback
 import collections
 import sys
+import warnings
 from typing import (
     Awaitable,
     Set,
@@ -427,3 +428,19 @@ def wrap_async(function):
     Wraps the provided function in an async function.
     """
     return partial(async_call, function)
+
+
+def deprecated(msg: str):
+    """
+    Throw deprecation warning before execution
+    """
+
+    def wrapper(function):
+        @wraps(function)
+        def inner(*args, **kwargs):
+            warnings.warn(msg, DeprecationWarning)
+            return function(*args, **kwargs)
+
+        return inner
+
+    return wrapper
