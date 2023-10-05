@@ -100,13 +100,13 @@ def test_data_elements() -> None:
     e = DataElement(DataElement.UUID, UUID('61A3512C-09BE-4DDC-A6A6-0B03667AAFC6'))
     basic_check(e)
 
-    e = DataElement(DataElement.TEXT_STRING, 'hello')
+    e = DataElement(DataElement.TEXT_STRING, b'hello')
     basic_check(e)
 
-    e = DataElement(DataElement.TEXT_STRING, 'hello' * 60)
+    e = DataElement(DataElement.TEXT_STRING, b'hello' * 60)
     basic_check(e)
 
-    e = DataElement(DataElement.TEXT_STRING, 'hello' * 20000)
+    e = DataElement(DataElement.TEXT_STRING, b'hello' * 20000)
     basic_check(e)
 
     e = DataElement(DataElement.BOOLEAN, True)
@@ -122,7 +122,7 @@ def test_data_elements() -> None:
         DataElement.SEQUENCE,
         [
             DataElement(DataElement.BOOLEAN, True),
-            DataElement(DataElement.TEXT_STRING, 'hello'),
+            DataElement(DataElement.TEXT_STRING, b'hello'),
         ],
     )
     basic_check(e)
@@ -134,7 +134,7 @@ def test_data_elements() -> None:
         DataElement.ALTERNATIVE,
         [
             DataElement(DataElement.BOOLEAN, True),
-            DataElement(DataElement.TEXT_STRING, 'hello'),
+            DataElement(DataElement.TEXT_STRING, b'hello'),
         ],
     )
     basic_check(e)
@@ -152,19 +152,19 @@ def test_data_elements() -> None:
     e = DataElement.uuid(UUID.from_16_bits(1234))
     basic_check(e)
 
-    e = DataElement.text_string('hello')
+    e = DataElement.text_string(b'hello')
     basic_check(e)
 
     e = DataElement.boolean(True)
     basic_check(e)
 
     e = DataElement.sequence(
-        [DataElement.signed_integer(0, 1), DataElement.text_string('hello')]
+        [DataElement.signed_integer(0, 1), DataElement.text_string(b'hello')]
     )
     basic_check(e)
 
     e = DataElement.alternative(
-        [DataElement.signed_integer(0, 1), DataElement.text_string('hello')]
+        [DataElement.signed_integer(0, 1), DataElement.text_string(b'hello')]
     )
     basic_check(e)
 

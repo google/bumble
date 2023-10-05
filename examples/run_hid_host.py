@@ -169,7 +169,7 @@ async def get_hid_device_sdp_record(device, connection):
 
             elif  attribute.id == SDP_HID_DESCRIPTOR_LIST_ATTRIBUTE_ID :
                 print(color('  HID Report Descriptor type: ', 'cyan'), hex(attribute.value.value[0].value[0].value))
-                print(color('  HID Report DescriptorList: ', 'cyan'), (attribute.value.value[0].value[1].value).encode('latin-1'))                
+                print(color('  HID Report DescriptorList: ', 'cyan'), attribute.value.value[0].value[1].value)
                 HID_Descriptor_Type = attribute.value.value[0].value[0].value
                 HID_Report_Descriptor_List = attribute.value.value[0].value[1].value
 
@@ -243,13 +243,13 @@ async def main():
         report_length = len(pdu[1:])
         report_id = pdu[1]
 
-        if (report_type != Message.ReportType.HID_OTHER_REPORT):
+        if (report_type != Message.ReportType.OTHER_REPORT):
             print(color(f' Report type = {report_type}, Report length = {report_length}, Report id = {report_id}', 'blue', None, 'bold'))
 
         if ((report_length <= 1) or (report_id == 0)):
             return
 
-        if report_type == Message.ReportType.HID_INPUT_REPORT:
+        if report_type == Message.ReportType.INPUT_REPORT:
             ReportParser.parse_input_report(pdu[1:])  #type: ignore
 
     async def handle_virtual_cable_unplug():
@@ -383,10 +383,10 @@ async def main():
                     choice1 = choice1.decode('utf-8').strip()
 
                     if choice1 == '0':
-                        hid_host.set_protocol(Message.ProtocolMode.HID_BOOT_PROTOCOL_MODE)
+                        hid_host.set_protocol(Message.ProtocolMode.BOOT_PROTOCOL)
 
                     elif choice1 == '1':
-                        hid_host.set_protocol(Message.ProtocolMode.HID_REPORT_PROTOCOL_MODE)
+                        hid_host.set_protocol(Message.ProtocolMode.REPORT_PROTOCOL)
 
                     else:
                         print('Incorrect option selected')
