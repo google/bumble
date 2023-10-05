@@ -167,7 +167,7 @@ class DataElement:
         UUID: lambda x: DataElement(
             DataElement.UUID, core.UUID.from_bytes(bytes(reversed(x)))
         ),
-        TEXT_STRING: lambda x: DataElement(DataElement.TEXT_STRING, x.decode('latin1')),
+        TEXT_STRING: lambda x: DataElement(DataElement.TEXT_STRING, x),
         BOOLEAN: lambda x: DataElement(DataElement.BOOLEAN, x[0] == 1),
         SEQUENCE: lambda x: DataElement(
             DataElement.SEQUENCE, DataElement.list_from_bytes(x)
@@ -376,8 +376,6 @@ class DataElement:
                 raise ValueError('invalid value_size')
         elif self.type == DataElement.UUID:
             data = bytes(reversed(bytes(self.value)))
-        elif self.type == DataElement.TEXT_STRING:
-            data = self.value.encode('latin1')
         elif self.type == DataElement.URL:
             data = self.value.encode('utf8')
         elif self.type == DataElement.BOOLEAN:
