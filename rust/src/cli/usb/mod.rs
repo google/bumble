@@ -143,10 +143,7 @@ pub(crate) fn probe(verbose: bool) -> anyhow::Result<()> {
         );
         if let Some(s) = serial {
             println!("{:26}{}", "  Serial:".green(), s);
-            device_serials_by_id
-                .entry(device_id)
-                .or_insert(HashSet::new())
-                .insert(s);
+            device_serials_by_id.entry(device_id).or_default().insert(s);
         }
         if let Some(m) = mfg {
             println!("{:26}{}", "  Manufacturer:".green(), m);
@@ -314,7 +311,7 @@ impl ClassInfo {
             self.protocol,
             self.protocol_name()
                 .map(|s| format!(" [{}]", s))
-                .unwrap_or_else(String::new)
+                .unwrap_or_default()
         )
     }
 }
