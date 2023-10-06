@@ -70,9 +70,7 @@ async fn main() -> PyResult<()> {
             let mut seen_adv_cache = seen_adv_clone.lock().unwrap();
             let expiry_duration = time::Duration::from_secs(cli.dedup_expiry_secs);
 
-            let advs_from_addr = seen_adv_cache
-                .entry(addr_bytes)
-                .or_insert_with(collections::HashMap::new);
+            let advs_from_addr = seen_adv_cache.entry(addr_bytes).or_default();
             // we expect cache hits to be the norm, so we do a separate lookup to avoid cloning
             // on every lookup with entry()
             let show = if let Some(prev) = advs_from_addr.get_mut(&data_units) {
