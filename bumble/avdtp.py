@@ -587,6 +587,8 @@ class ServiceCapabilities:
 # -----------------------------------------------------------------------------
 class MediaCodecCapabilities(ServiceCapabilities):
     media_codec_information: Union[bytes, SupportsBytes]
+    media_type: int
+    media_codec_type: int
 
     def init_from_bytes(self) -> None:
         self.media_type = self.service_capabilities_bytes[0]
