@@ -450,21 +450,18 @@ class SecurityService(SecurityServicer):
             'security_request': pair,
         }
 
-        # register event handlers
-        for event, listener in listeners.items():
-            connection.on(event, listener)
+        with contextlib.closing(EventWatcher()) as watcher:
+            # register event handlers
+            for event, listener in listeners.items():
+                watcher.on(connection, event, listener)
 
-        # security level already reached
-        if self.reached_security_level(connection, level):
-            return WaitSecurityResponse(success=empty_pb2.Empty())
+            # security level already reached
+            if self.reached_security_level(connection, level):
+                return WaitSecurityResponse(success=empty_pb2.Empty())
 
-        self.log.debug('Wait for security...')
-        kwargs = {}
-        kwargs[await wait_for_security] = empty_pb2.Empty()
-
-        # remove event handlers
-        for event, listener in listeners.items():
-            connection.remove_listener(event, listener)  # type: ignore
+            self.log.debug('Wait for security...')
+            kwargs = {}
+            kwargs[await wait_for_security] = empty_pb2.Empty()
 
         # wait for `authenticate` to finish if any
         if authenticate_task is not None:
