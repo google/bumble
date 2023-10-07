@@ -45,12 +45,14 @@ def test_messages():
     ]
     message = Get_Capabilities_Response(capabilities)
     parsed = Message.create(
-        AVDTP_GET_CAPABILITIES, Message.RESPONSE_ACCEPT, message.payload
+        AVDTP_GET_CAPABILITIES, Message.MessageType.RESPONSE_ACCEPT, message.payload
     )
     assert message.payload == parsed.payload
 
     message = Set_Configuration_Command(3, 4, capabilities)
-    parsed = Message.create(AVDTP_SET_CONFIGURATION, Message.COMMAND, message.payload)
+    parsed = Message.create(
+        AVDTP_SET_CONFIGURATION, Message.MessageType.COMMAND, message.payload
+    )
     assert message.payload == parsed.payload
 
 
