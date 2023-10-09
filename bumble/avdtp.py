@@ -21,6 +21,7 @@ import struct
 import time
 import logging
 import enum
+import warnings
 from pyee import EventEmitter
 from typing import (
     Any,
@@ -368,7 +369,7 @@ class MediaPacketPump:
         self.clock = clock
         self.pump_task = None
 
-    async def start(self, rtp_channel: l2cap.Channel) -> None:
+    async def start(self, rtp_channel: l2cap.ClassicChannel) -> None:
         async def pump_packets():
             start_time = 0
             start_timestamp = 0
@@ -1254,7 +1255,7 @@ class Protocol(EventEmitter):
     remote_endpoints: Dict[int, DiscoveredStreamEndPoint]
     streams: Dict[int, Stream]
     transaction_results: List[Optional[asyncio.Future[Message]]]
-    channel_connector: Callable[[], Awaitable[l2cap.Channel]]
+    channel_connector: Callable[[], Awaitable[l2cap.ClassicChannel]]
 
     class PacketType(enum.IntEnum):
         SINGLE_PACKET = 0
@@ -1263,18 +1264,22 @@ class Protocol(EventEmitter):
         END_PACKET = 3
 
     @staticmethod
+    def packet_type_name(packet_type):
+        return name_or_number(Protocol.PACKET_TYPE_NAMES, packet_type)
+
+    @staticmethod
     async def connect(
         connection: device.Connection, version: Tuple[int, int] = (1, 3)
     ) -> Protocol:
-        connector = connection.create_l2cap_connector(AVDTP_PSM)
-        channel = await connector()
+        channel = await connection.create_l2cap_channel(
+            spec=l2cap.ClassicChannelSpec(psm=AVDTP_PSM)
+        )
         protocol = Protocol(channel, version)
-        protocol.channel_connector = connector
 
         return protocol
 
     def __init__(
-        self, l2cap_channel: l2cap.Channel, version: Tuple[int, int] = (1, 3)
+        self, l2cap_channel: l2cap.ClassicChannel, version: Tuple[int, int] = (1, 3)
     ) -> None:
         super().__init__()
         self.l2cap_channel = l2cap_channel
@@ -1712,8 +1717,13 @@ class Listener(EventEmitter):
     servers: Dict[int, Protocol]
 
     @staticmethod
-    def create_registrar(device):
-        return device.create_l2cap_registrar(AVDTP_PSM)
+    def create_registrar(device: device.Device):
+        warnings.warn("Please use Listener.for_device()", DeprecationWarning)
+
+        def wrapper(handler: Callable[[l2cap.ClassicChannel], None]) -> None:
+            device.create_l2cap_server(l2cap.ClassicChannelSpec(psm=AVDTP_PSM), handler)
+
+        return wrapper
 
     def set_server(self, connection: device.Connection, server: Protocol) -> None:
         self.servers[connection.handle] = server
@@ -1722,15 +1732,28 @@ class Listener(EventEmitter):
         if connection.handle in self.servers:
             del self.servers[connection.handle]
 
-    def __init__(self, registrar, version=(1, 3)):
+    def __init__(self, registrar=None, version=(1, 3)):
         super().__init__()
         self.version = version
         self.servers = {}  # Servers, by connection handle
 
         # Listen for incoming L2CAP connections
-        registrar(self.on_l2cap_connection)
+        if registrar:
+            warnings.warn("Please use Listener.for_device()", DeprecationWarning)
+            registrar(self.on_l2cap_connection)
 
-    def on_l2cap_connection(self, channel: l2cap.Channel) -> None:
+    @classmethod
+    def for_device(
+        cls, device: device.Device, version: Tuple[int, int] = (1, 3)
+    ) -> Listener:
+        listener = Listener(registrar=None, version=version)
+        l2cap_server = device.create_l2cap_server(
+            spec=l2cap.ClassicChannelSpec(psm=AVDTP_PSM)
+        )
+        l2cap_server.on('connection', listener.on_l2cap_connection)
+        return listener
+
+    def on_l2cap_connection(self, channel: l2cap.ClassicChannel) -> None:
         logger.debug(f'{color("<<< incoming L2CAP connection:", "magenta")} {channel}')
 
         if channel.connection.handle in self.servers:
@@ -1759,7 +1782,7 @@ class Stream:
     Pair of a local and a remote stream endpoint that can stream from one to the other
     '''
 
-    rtp_channel: Optional[l2cap.Channel]
+    rtp_channel: Optional[l2cap.ClassicChannel]
 
     @staticmethod
     def state_name(state: int) -> str:
@@ -1792,7 +1815,11 @@ class Stream:
         self.change_state(AVDTP_OPEN_STATE)
 
         # Create a channel for RTP packets
-        self.rtp_channel = await self.protocol.channel_connector()
+        self.rtp_channel = (
+            await self.protocol.l2cap_channel.connection.create_l2cap_channel(
+                l2cap.ClassicChannelSpec(psm=AVDTP_PSM)
+            )
+        )
 
     async def start(self) -> None:
         # Auto-open if needed
