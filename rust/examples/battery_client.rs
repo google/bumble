@@ -33,6 +33,7 @@
 
 use bumble::wrapper::{
     device::{Device, Peer},
+    hci::{packets::AddressType, Address},
     profile::BatteryServiceProxy,
     transport::Transport,
     PyObjectExt,
@@ -52,12 +53,8 @@ async fn main() -> PyResult<()> {
 
     let transport = Transport::open(cli.transport).await?;
 
-    let device = Device::with_hci(
-        "Bumble",
-        "F0:F1:F2:F3:F4:F5",
-        transport.source()?,
-        transport.sink()?,
-    )?;
+    let address = Address::new("F0:F1:F2:F3:F4:F5", AddressType::RandomDeviceAddress)?;
+    let device = Device::with_hci("Bumble", address, transport.source()?, transport.sink()?)?;
 
     device.power_on().await?;
 

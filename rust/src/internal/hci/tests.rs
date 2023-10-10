@@ -22,9 +22,8 @@ use bytes::Bytes;
 #[test]
 fn prepends_packet_type() {
     let packet_type = PacketType::Event;
-    let packet_bytes = vec![0x00, 0x00, 0x00, 0x00];
-    let actual = prepend_packet_type(packet_type, packet_bytes);
-    assert_eq!(vec![0x04, 0x00, 0x00, 0x00, 0x00], actual);
+    let actual = prepend_packet_type(packet_type, FakePacket { bytes: vec![0xFF] });
+    assert_eq!(vec![0x04, 0xFF], actual);
 }
 
 #[test]
@@ -75,11 +74,15 @@ fn test_packet_roundtrip_with_type() {
 }
 
 #[derive(Debug, PartialEq)]
-struct FakePacket;
+struct FakePacket {
+    bytes: Vec<u8>,
+}
 
 impl FakePacket {
-    fn parse(_bytes: &[u8]) -> Result<Self, Error> {
-        Ok(Self)
+    fn parse(bytes: &[u8]) -> Result<Self, Error> {
+        Ok(Self {
+            bytes: bytes.to_vec(),
+        })
     }
 }
 
@@ -89,6 +92,6 @@ impl Packet for FakePacket {
     }
 
     fn to_vec(self) -> Vec<u8> {
-        Vec::new()
+        self.bytes
     }
 }

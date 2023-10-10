@@ -74,6 +74,11 @@ name = "bumble"
 path = "src/main.rs"
 required-features = ["bumble-tools"]
 
+[[example]]
+name = "broadcast"
+path = "examples/broadcast.rs"
+required-features = ["unstable_extended_adv"]
+
 # test entry point that uses pyo3_asyncio's test harness
 [[test]]
 name = "pytests"
@@ -86,4 +91,9 @@ pyo3-asyncio-attributes = ["pyo3-asyncio/attributes"]
 dev-tools = ["dep:anyhow", "dep:clap", "dep:file-header", "dep:globset"]
 # separate feature for CLI so that dependencies don't spend time building these
 bumble-tools = ["dep:clap", "anyhow", "dep:anyhow", "dep:directories", "pyo3-asyncio-attributes", "dep:owo-colors", "dep:reqwest", "dep:rusb", "dep:log", "dep:env_logger", "dep:futures"]
+
+# all the unstable features
+unstable = ["unstable_extended_adv"]
+unstable_extended_adv = []
+
 default = []

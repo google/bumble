@@ -132,3 +132,12 @@ pub(crate) fn wrap_python_async<'a>(py: Python<'a>, function: &'a PyAny) -> PyRe
         .getattr(intern!(py, "wrap_async"))?
         .call1((function,))
 }
+
+/// Represents the two major kinds of errors that can occur when converting between Rust and Python.
+pub enum ConversionError<T> {
+    /// Occurs across the Python/native boundary.
+    Python(PyErr),
+    /// Occurs within the native ecosystem, such as when performing more transformations before
+    /// finally converting to the native type.
+    Native(T),
+}
