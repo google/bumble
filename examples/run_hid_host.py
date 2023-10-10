@@ -20,7 +20,6 @@ import sys
 import os
 import logging
 
-
 from bumble.colors import color
 
 import bumble.core
@@ -72,16 +71,18 @@ SDP_HID_BOOT_DEVICE_ATTRIBUTE_ID = 0x020E
 SDP_HID_SSR_HOST_MAX_LATENCY_ATTRIBUTE_ID = 0x020F
 SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID = 0x0210
 
+
 # -----------------------------------------------------------------------------
+
 async def get_hid_device_sdp_record(device, connection):
 
     # Connect to the SDP Server
     sdp_client = SDP_Client(device)
     await sdp_client.connect(connection)
     if sdp_client:
-        print(color('Connected ith SDP Server', 'blue'))
+        print(color('Connected to SDP Server', 'blue'))
     else:
-        print(color('Failed to connect with SDP Server', 'red'))
+        print(color('Failed to connect to SDP Server', 'red'))
 
 	# List BT HID Device service in the root browse group
     service_record_handles = await sdp_client.search_services(
@@ -89,9 +90,8 @@ async def get_hid_device_sdp_record(device, connection):
     )
 
     if (len(service_record_handles) < 1):
-        print(color('BT HID Device service not found on peer device!!!!','red'))
         await sdp_client.disconnect()
-        return
+        raise Exception(color(f'BT HID Device service not found on peer device!!!!','red'))
 
     # For BT_HUMAN_INTERFACE_DEVICE_SERVICE service, get all its attributes
     for service_record_handle in service_record_handles:
@@ -133,88 +133,68 @@ async def get_hid_device_sdp_record(device, connection):
 
             elif  attribute.id == SDP_HID_SERVICE_NAME_ATTRIBUTE_ID :
                 print(color('  Service Name: ', 'cyan'), attribute.value.value)
-                HID_Service_Name = attribute.value.value
 
             elif  attribute.id == SDP_HID_SERVICE_DESCRIPTION_ATTRIBUTE_ID :
                 print(color('  Service Description: ', 'cyan'), attribute.value.value)
-                HID_Service_Description = attribute.value.value
 
             elif  attribute.id == SDP_HID_PROVIDER_NAME_ATTRIBUTE_ID :
                 print(color('  Provider Name: ', 'cyan'), attribute.value.value)
-                HID_Provider_Name = attribute.value.value
 
             elif  attribute.id == SDP_HID_DEVICE_RELEASE_NUMBER_ATTRIBUTE_ID :
                 print(color('  Release Number: ', 'cyan'), hex(attribute.value.value))
-                HID_Device_Release_Number = attribute.value.value
 
             elif  attribute.id == SDP_HID_PARSER_VERSION_ATTRIBUTE_ID :
                 print(color('  HID Parser Version: ', 'cyan'), hex(attribute.value.value))
-                HID_Parser_Version = attribute.value.value
 
             elif  attribute.id == SDP_HID_DEVICE_SUBCLASS_ATTRIBUTE_ID :
                 print(color('  HIDDeviceSubclass: ', 'cyan'), hex(attribute.value.value))
-                HID_Device_Subclass = attribute.value.value
 
             elif  attribute.id == SDP_HID_COUNTRY_CODE_ATTRIBUTE_ID :
                 print(color('  HIDCountryCode: ', 'cyan'), hex(attribute.value.value))
-                HID_Country_Code = attribute.value.value
 
             elif  attribute.id == SDP_HID_VIRTUAL_CABLE_ATTRIBUTE_ID :
                 print(color('  HIDVirtualCable: ', 'cyan'), attribute.value.value)
-                HID_Virtual_Cable = attribute.value.value
 
             elif  attribute.id == SDP_HID_RECONNECT_INITIATE_ATTRIBUTE_ID :
                 print(color('  HIDReconnectInitiate: ', 'cyan'), attribute.value.value)
-                HID_Reconnect_Initiate = attribute.value.value
 
             elif  attribute.id == SDP_HID_DESCRIPTOR_LIST_ATTRIBUTE_ID :
                 print(color('  HID Report Descriptor type: ', 'cyan'), hex(attribute.value.value[0].value[0].value))
                 print(color('  HID Report DescriptorList: ', 'cyan'), attribute.value.value[0].value[1].value)
-                HID_Descriptor_Type = attribute.value.value[0].value[0].value
-                HID_Report_Descriptor_List = attribute.value.value[0].value[1].value
 
             elif  attribute.id == SDP_HID_LANGID_BASE_LIST_ATTRIBUTE_ID :
                 print(color('  HID LANGID Base Language: ', 'cyan'), hex(attribute.value.value[0].value[0].value))
                 print(color('  HID LANGID Base Bluetooth String Offset: ', 'cyan'), hex(attribute.value.value[0].value[1].value))
-                HID_LANGID_Base_Language = attribute.value.value[0].value[0].value
-                HID_LANGID_Base_Bluetooth_String_Offset = attribute.value.value[0].value[1].value
 
             elif  attribute.id == SDP_HID_BATTERY_POWER_ATTRIBUTE_ID :
                 print(color('  HIDBatteryPower: ', 'cyan'), attribute.value.value)
-                HID_Battery_Power = attribute.value.value
 
             elif  attribute.id == SDP_HID_REMOTE_WAKE_ATTRIBUTE_ID :
                 print(color('  HIDRemoteWake: ', 'cyan'), attribute.value.value)
-                HID_Remote_Wake = attribute.value.value
 
             elif  attribute.id == SDP_HID_PROFILE_VERSION_ATTRIBUTE_ID :
                 print(color('  HIDProfileVersion : ', 'cyan'), hex(attribute.value.value))
-                HID_Profile_Version  = attribute.value.value
 
             elif  attribute.id == SDP_HID_SUPERVISION_TIMEOUT_ATTRIBUTE_ID :
                 print(color('  HIDSupervisionTimeout: ', 'cyan'), hex(attribute.value.value))
-                HID_Supervision_Timeout = attribute.value.value
 
             elif  attribute.id == SDP_HID_NORMALLY_CONNECTABLE_ATTRIBUTE_ID :
                 print(color('  HIDNormallyConnectable: ', 'cyan'), attribute.value.value)
-                HID_Normally_Connectable = attribute.value.value
 
             elif  attribute.id == SDP_HID_BOOT_DEVICE_ATTRIBUTE_ID :
                 print(color('  HIDBootDevice: ', 'cyan'), attribute.value.value)
-                HID_Boot_Device = attribute.value.value
 
             elif  attribute.id == SDP_HID_SSR_HOST_MAX_LATENCY_ATTRIBUTE_ID :
                 print(color('  HIDSSRHostMaxLatency: ', 'cyan'), hex(attribute.value.value))
-                HID_SSR_Host_Max_Latency = attribute.value.value
 
             elif  attribute.id == SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID :
                 print(color('  HIDSSRHostMinTimeout: ', 'cyan'), hex(attribute.value.value))
-                HID_SSR_Host_Min_Timeout = attribute.value.value
 
             else:
                 print(color(f'  Warning: Attribute ID: {attribute.id} match not found.\n  Attribute Info: {attribute}', 'yellow'))
 
     await sdp_client.disconnect()
+
 
 # -----------------------------------------------------------------------------
 async def get_stream_reader(pipe) -> asyncio.StreamReader:
@@ -223,6 +203,7 @@ async def get_stream_reader(pipe) -> asyncio.StreamReader:
     protocol = asyncio.StreamReaderProtocol(reader)
     await loop.connect_read_pipe(lambda: protocol, pipe)
     return reader
+
 
 # -----------------------------------------------------------------------------
 async def main():
@@ -461,5 +442,7 @@ async def main():
 
 
 # -----------------------------------------------------------------------------
+
 logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())
+
