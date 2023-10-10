@@ -53,7 +53,7 @@ from hid_report_parser import ReportParser
 SDP_HID_SERVICE_NAME_ATTRIBUTE_ID = 0x0100
 SDP_HID_SERVICE_DESCRIPTION_ATTRIBUTE_ID = 0x0101
 SDP_HID_PROVIDER_NAME_ATTRIBUTE_ID = 0x0102
-SDP_HID_DEVICE_RELEASE_NUMBER_ATTRIBUTE_ID = 0x0200 # [DEPRECATED]
+SDP_HID_DEVICE_RELEASE_NUMBER_ATTRIBUTE_ID = 0x0200  # [DEPRECATED]
 SDP_HID_PARSER_VERSION_ATTRIBUTE_ID = 0x0201
 SDP_HID_DEVICE_SUBCLASS_ATTRIBUTE_ID = 0x0202
 SDP_HID_COUNTRY_CODE_ATTRIBUTE_ID = 0x0203
@@ -61,18 +61,19 @@ SDP_HID_VIRTUAL_CABLE_ATTRIBUTE_ID = 0x0204
 SDP_HID_RECONNECT_INITIATE_ATTRIBUTE_ID = 0x0205
 SDP_HID_DESCRIPTOR_LIST_ATTRIBUTE_ID = 0x0206
 SDP_HID_LANGID_BASE_LIST_ATTRIBUTE_ID = 0x0207
-SDP_HID_SDP_DISABLE_ATTRIBUTE_ID = 0x0208 # [DEPRECATED]
+SDP_HID_SDP_DISABLE_ATTRIBUTE_ID = 0x0208  # [DEPRECATED]
 SDP_HID_BATTERY_POWER_ATTRIBUTE_ID = 0x0209
 SDP_HID_REMOTE_WAKE_ATTRIBUTE_ID = 0x020A
-SDP_HID_PROFILE_VERSION_ATTRIBUTE_ID  = 0x020B # DEPRECATED]
+SDP_HID_PROFILE_VERSION_ATTRIBUTE_ID = 0x020B  # DEPRECATED]
 SDP_HID_SUPERVISION_TIMEOUT_ATTRIBUTE_ID = 0x020C
-SDP_HID_NORMALLY_CONNECTABLE_ATTRIBUTE_ID  = 0x020D
+SDP_HID_NORMALLY_CONNECTABLE_ATTRIBUTE_ID = 0x020D
 SDP_HID_BOOT_DEVICE_ATTRIBUTE_ID = 0x020E
 SDP_HID_SSR_HOST_MAX_LATENCY_ATTRIBUTE_ID = 0x020F
 SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID = 0x0210
 
 
 # -----------------------------------------------------------------------------
+
 
 async def get_hid_device_sdp_record(device, connection):
 
@@ -84,114 +85,187 @@ async def get_hid_device_sdp_record(device, connection):
     else:
         print(color('Failed to connect to SDP Server', 'red'))
 
-	# List BT HID Device service in the root browse group
+    # List BT HID Device service in the root browse group
     service_record_handles = await sdp_client.search_services(
         [BT_HUMAN_INTERFACE_DEVICE_SERVICE]
     )
 
-    if (len(service_record_handles) < 1):
+    if len(service_record_handles) < 1:
         await sdp_client.disconnect()
-        raise Exception(color(f'BT HID Device service not found on peer device!!!!','red'))
+        raise Exception(
+            color(f'BT HID Device service not found on peer device!!!!', 'red')
+        )
 
     # For BT_HUMAN_INTERFACE_DEVICE_SERVICE service, get all its attributes
     for service_record_handle in service_record_handles:
         attributes = await sdp_client.get_attributes(
             service_record_handle, [SDP_ALL_ATTRIBUTES_RANGE]
         )
-        print(
-            color(f'SERVICE {service_record_handle:04X} attributes:', 'yellow')
-        )
-        print(color(f'SDP attributes for HID device','magenta'))
+        print(color(f'SERVICE {service_record_handle:04X} attributes:', 'yellow'))
+        print(color(f'SDP attributes for HID device', 'magenta'))
         for attribute in attributes:
-            if  attribute.id == SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID :
-                print(color('  Service Record Handle : ', 'cyan'), hex(attribute.value.value))
+            if attribute.id == SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID:
+                print(
+                    color('  Service Record Handle : ', 'cyan'),
+                    hex(attribute.value.value),
+                )
 
-            elif  attribute.id == SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID :
-                print(color('  Service Class : ', 'cyan'), attribute.value.value[0].value)
+            elif attribute.id == SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID:
+                print(
+                    color('  Service Class : ', 'cyan'), attribute.value.value[0].value
+                )
 
-            elif  attribute.id == SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID :
-                print(color('  SDP Browse Group List : ', 'cyan'), attribute.value.value[0].value)
+            elif attribute.id == SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID:
+                print(
+                    color('  SDP Browse Group List : ', 'cyan'),
+                    attribute.value.value[0].value,
+                )
 
-            elif  attribute.id == SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID :
-                print(color('  BT_L2CAP_PROTOCOL_ID : ', 'cyan'), attribute.value.value[0].value[0].value)
-                print(color('  PSM for Bluetooth HID Control channel : ', 'cyan'), hex(attribute.value.value[0].value[1].value))
-                print(color('  BT_HIDP_PROTOCOL_ID : ', 'cyan'), attribute.value.value[1].value[0].value)
+            elif attribute.id == SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID:
+                print(
+                    color('  BT_L2CAP_PROTOCOL_ID : ', 'cyan'),
+                    attribute.value.value[0].value[0].value,
+                )
+                print(
+                    color('  PSM for Bluetooth HID Control channel : ', 'cyan'),
+                    hex(attribute.value.value[0].value[1].value),
+                )
+                print(
+                    color('  BT_HIDP_PROTOCOL_ID : ', 'cyan'),
+                    attribute.value.value[1].value[0].value,
+                )
 
-            elif  attribute.id == SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID :
-                print(color('  Lanugage : ', 'cyan'), hex(attribute.value.value[0].value))
-                print(color('  Encoding : ', 'cyan'), hex(attribute.value.value[1].value))
-                print(color('  PrimaryLanguageBaseID : ', 'cyan'), hex(attribute.value.value[2].value))
+            elif attribute.id == SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID:
+                print(
+                    color('  Lanugage : ', 'cyan'), hex(attribute.value.value[0].value)
+                )
+                print(
+                    color('  Encoding : ', 'cyan'), hex(attribute.value.value[1].value)
+                )
+                print(
+                    color('  PrimaryLanguageBaseID : ', 'cyan'),
+                    hex(attribute.value.value[2].value),
+                )
 
-            elif  attribute.id == SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID :
-                print(color('  BT_HUMAN_INTERFACE_DEVICE_SERVICE ', 'cyan'), attribute.value.value[0].value[0].value)
-                print(color('  HID Profileversion number : ', 'cyan'), hex(attribute.value.value[0].value[1].value))
+            elif attribute.id == SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID:
+                print(
+                    color('  BT_HUMAN_INTERFACE_DEVICE_SERVICE ', 'cyan'),
+                    attribute.value.value[0].value[0].value,
+                )
+                print(
+                    color('  HID Profileversion number : ', 'cyan'),
+                    hex(attribute.value.value[0].value[1].value),
+                )
 
-            elif  attribute.id == SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID :
-                print(color('  BT_L2CAP_PROTOCOL_ID : ', 'cyan'), attribute.value.value[0].value[0].value[0].value)
-                print(color('  PSM for Bluetooth HID Interrupt channel : ', 'cyan'), hex(attribute.value.value[0].value[0].value[1].value))
-                print(color('  BT_HIDP_PROTOCOL_ID : ', 'cyan'), attribute.value.value[0].value[1].value[0].value)
+            elif attribute.id == SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID:
+                print(
+                    color('  BT_L2CAP_PROTOCOL_ID : ', 'cyan'),
+                    attribute.value.value[0].value[0].value[0].value,
+                )
+                print(
+                    color('  PSM for Bluetooth HID Interrupt channel : ', 'cyan'),
+                    hex(attribute.value.value[0].value[0].value[1].value),
+                )
+                print(
+                    color('  BT_HIDP_PROTOCOL_ID : ', 'cyan'),
+                    attribute.value.value[0].value[1].value[0].value,
+                )
 
-            elif  attribute.id == SDP_HID_SERVICE_NAME_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_SERVICE_NAME_ATTRIBUTE_ID:
                 print(color('  Service Name: ', 'cyan'), attribute.value.value)
 
-            elif  attribute.id == SDP_HID_SERVICE_DESCRIPTION_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_SERVICE_DESCRIPTION_ATTRIBUTE_ID:
                 print(color('  Service Description: ', 'cyan'), attribute.value.value)
 
-            elif  attribute.id == SDP_HID_PROVIDER_NAME_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_PROVIDER_NAME_ATTRIBUTE_ID:
                 print(color('  Provider Name: ', 'cyan'), attribute.value.value)
 
-            elif  attribute.id == SDP_HID_DEVICE_RELEASE_NUMBER_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_DEVICE_RELEASE_NUMBER_ATTRIBUTE_ID:
                 print(color('  Release Number: ', 'cyan'), hex(attribute.value.value))
 
-            elif  attribute.id == SDP_HID_PARSER_VERSION_ATTRIBUTE_ID :
-                print(color('  HID Parser Version: ', 'cyan'), hex(attribute.value.value))
+            elif attribute.id == SDP_HID_PARSER_VERSION_ATTRIBUTE_ID:
+                print(
+                    color('  HID Parser Version: ', 'cyan'), hex(attribute.value.value)
+                )
 
-            elif  attribute.id == SDP_HID_DEVICE_SUBCLASS_ATTRIBUTE_ID :
-                print(color('  HIDDeviceSubclass: ', 'cyan'), hex(attribute.value.value))
+            elif attribute.id == SDP_HID_DEVICE_SUBCLASS_ATTRIBUTE_ID:
+                print(
+                    color('  HIDDeviceSubclass: ', 'cyan'), hex(attribute.value.value)
+                )
 
-            elif  attribute.id == SDP_HID_COUNTRY_CODE_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_COUNTRY_CODE_ATTRIBUTE_ID:
                 print(color('  HIDCountryCode: ', 'cyan'), hex(attribute.value.value))
 
-            elif  attribute.id == SDP_HID_VIRTUAL_CABLE_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_VIRTUAL_CABLE_ATTRIBUTE_ID:
                 print(color('  HIDVirtualCable: ', 'cyan'), attribute.value.value)
 
-            elif  attribute.id == SDP_HID_RECONNECT_INITIATE_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_RECONNECT_INITIATE_ATTRIBUTE_ID:
                 print(color('  HIDReconnectInitiate: ', 'cyan'), attribute.value.value)
 
-            elif  attribute.id == SDP_HID_DESCRIPTOR_LIST_ATTRIBUTE_ID :
-                print(color('  HID Report Descriptor type: ', 'cyan'), hex(attribute.value.value[0].value[0].value))
-                print(color('  HID Report DescriptorList: ', 'cyan'), attribute.value.value[0].value[1].value)
+            elif attribute.id == SDP_HID_DESCRIPTOR_LIST_ATTRIBUTE_ID:
+                print(
+                    color('  HID Report Descriptor type: ', 'cyan'),
+                    hex(attribute.value.value[0].value[0].value),
+                )
+                print(
+                    color('  HID Report DescriptorList: ', 'cyan'),
+                    attribute.value.value[0].value[1].value,
+                )
 
-            elif  attribute.id == SDP_HID_LANGID_BASE_LIST_ATTRIBUTE_ID :
-                print(color('  HID LANGID Base Language: ', 'cyan'), hex(attribute.value.value[0].value[0].value))
-                print(color('  HID LANGID Base Bluetooth String Offset: ', 'cyan'), hex(attribute.value.value[0].value[1].value))
+            elif attribute.id == SDP_HID_LANGID_BASE_LIST_ATTRIBUTE_ID:
+                print(
+                    color('  HID LANGID Base Language: ', 'cyan'),
+                    hex(attribute.value.value[0].value[0].value),
+                )
+                print(
+                    color('  HID LANGID Base Bluetooth String Offset: ', 'cyan'),
+                    hex(attribute.value.value[0].value[1].value),
+                )
 
-            elif  attribute.id == SDP_HID_BATTERY_POWER_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_BATTERY_POWER_ATTRIBUTE_ID:
                 print(color('  HIDBatteryPower: ', 'cyan'), attribute.value.value)
 
-            elif  attribute.id == SDP_HID_REMOTE_WAKE_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_REMOTE_WAKE_ATTRIBUTE_ID:
                 print(color('  HIDRemoteWake: ', 'cyan'), attribute.value.value)
 
-            elif  attribute.id == SDP_HID_PROFILE_VERSION_ATTRIBUTE_ID :
-                print(color('  HIDProfileVersion : ', 'cyan'), hex(attribute.value.value))
+            elif attribute.id == SDP_HID_PROFILE_VERSION_ATTRIBUTE_ID:
+                print(
+                    color('  HIDProfileVersion : ', 'cyan'), hex(attribute.value.value)
+                )
 
-            elif  attribute.id == SDP_HID_SUPERVISION_TIMEOUT_ATTRIBUTE_ID :
-                print(color('  HIDSupervisionTimeout: ', 'cyan'), hex(attribute.value.value))
+            elif attribute.id == SDP_HID_SUPERVISION_TIMEOUT_ATTRIBUTE_ID:
+                print(
+                    color('  HIDSupervisionTimeout: ', 'cyan'),
+                    hex(attribute.value.value),
+                )
 
-            elif  attribute.id == SDP_HID_NORMALLY_CONNECTABLE_ATTRIBUTE_ID :
-                print(color('  HIDNormallyConnectable: ', 'cyan'), attribute.value.value)
+            elif attribute.id == SDP_HID_NORMALLY_CONNECTABLE_ATTRIBUTE_ID:
+                print(
+                    color('  HIDNormallyConnectable: ', 'cyan'), attribute.value.value
+                )
 
-            elif  attribute.id == SDP_HID_BOOT_DEVICE_ATTRIBUTE_ID :
+            elif attribute.id == SDP_HID_BOOT_DEVICE_ATTRIBUTE_ID:
                 print(color('  HIDBootDevice: ', 'cyan'), attribute.value.value)
 
-            elif  attribute.id == SDP_HID_SSR_HOST_MAX_LATENCY_ATTRIBUTE_ID :
-                print(color('  HIDSSRHostMaxLatency: ', 'cyan'), hex(attribute.value.value))
+            elif attribute.id == SDP_HID_SSR_HOST_MAX_LATENCY_ATTRIBUTE_ID:
+                print(
+                    color('  HIDSSRHostMaxLatency: ', 'cyan'),
+                    hex(attribute.value.value),
+                )
 
-            elif  attribute.id == SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID :
-                print(color('  HIDSSRHostMinTimeout: ', 'cyan'), hex(attribute.value.value))
+            elif attribute.id == SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID:
+                print(
+                    color('  HIDSSRHostMinTimeout: ', 'cyan'),
+                    hex(attribute.value.value),
+                )
 
             else:
-                print(color(f'  Warning: Attribute ID: {attribute.id} match not found.\n  Attribute Info: {attribute}', 'yellow'))
+                print(
+                    color(
+                        f'  Warning: Attribute ID: {attribute.id} match not found.\n  Attribute Info: {attribute}',
+                        'yellow',
+                    )
+                )
 
     await sdp_client.disconnect()
 
@@ -217,26 +291,33 @@ async def main():
         return
 
     def on_hid_data_cb(pdu):
-        report_type = pdu[0] & 0x0f
-        if (len(pdu) == 1):
-            print(color(f'Warning: No report received','yellow'))
+        report_type = pdu[0] & 0x0F
+        if len(pdu) == 1:
+            print(color(f'Warning: No report received', 'yellow'))
             return
         report_length = len(pdu[1:])
         report_id = pdu[1]
 
-        if (report_type != Message.ReportType.OTHER_REPORT):
-            print(color(f' Report type = {report_type}, Report length = {report_length}, Report id = {report_id}', 'blue', None, 'bold'))
+        if report_type != Message.ReportType.OTHER_REPORT:
+            print(
+                color(
+                    f' Report type = {report_type}, Report length = {report_length}, Report id = {report_id}',
+                    'blue',
+                    None,
+                    'bold',
+                )
+            )
 
-        if ((report_length <= 1) or (report_id == 0)):
+        if (report_length <= 1) or (report_id == 0):
             return
 
         if report_type == Message.ReportType.INPUT_REPORT:
-            ReportParser.parse_input_report(pdu[1:])  #type: ignore
+            ReportParser.parse_input_report(pdu[1:])  # type: ignore
 
     async def handle_virtual_cable_unplug():
         await hid_host.disconnect_interrupt_channel()
         await hid_host.disconnect_control_channel()
-        await device.keystore.delete(target_address)  #type: ignore
+        await device.keystore.delete(target_address)  # type: ignore
         await connection.disconnect()
 
     def on_hid_virtual_cable_unplug_cb():
@@ -282,7 +363,9 @@ async def main():
         async def menu():
             reader = await get_stream_reader(sys.stdin)
             while True:
-                print("\n************************ HID Host Menu *****************************\n")
+                print(
+                    "\n************************ HID Host Menu *****************************\n"
+                )
                 print(" 1. Connect Control Channel")
                 print(" 2. Connect Interrupt Channel")
                 print(" 3. Disconnect Control Channel")
@@ -343,15 +426,17 @@ async def main():
 
                     if choice1 == '1':
                         # data includes first octet as report id
-                        data =  bytearray([0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01])
+                        data = bytearray(
+                            [0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01]
+                        )
                         hid_host.set_report(1, data)
 
                     elif choice1 == '2':
-                        data =  bytearray([0x03, 0x01, 0x01])
+                        data = bytearray([0x03, 0x01, 0x01])
                         hid_host.set_report(2, data)
 
                     elif choice1 == '3':
-                        data =  bytearray([0x05, 0x01, 0x01, 0x01])
+                        data = bytearray([0x05, 0x01, 0x01, 0x01])
                         hid_host.set_report(3, data)
 
                     else:
@@ -382,11 +467,13 @@ async def main():
                     choice1 = choice1.decode('utf-8').strip()
 
                     if choice1 == '1':
-                        data =  bytearray([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                        data = bytearray(
+                            [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+                        )
                         hid_host.send_data(data)
 
                     elif choice1 == '2':
-                        data =  bytearray([0x03, 0x00, 0x0d, 0xfd, 0x00, 0x00])
+                        data = bytearray([0x03, 0x00, 0x0D, 0xFD, 0x00, 0x00])
                         hid_host.send_data(data)
 
                     else:
@@ -406,8 +493,12 @@ async def main():
                         print('Device not found or Device already unpaired.')
 
                 elif choice == '13':
-                    peer_address = Address.from_string_for_transport(target_address, transport=BT_BR_EDR_TRANSPORT)
-                    connection = device.find_connection_by_bd_addr(peer_address, transport=BT_BR_EDR_TRANSPORT)
+                    peer_address = Address.from_string_for_transport(
+                        target_address, transport=BT_BR_EDR_TRANSPORT
+                    )
+                    connection = device.find_connection_by_bd_addr(
+                        peer_address, transport=BT_BR_EDR_TRANSPORT
+                    )
                     if connection is not None:
                         await connection.disconnect()
                     else:
@@ -421,7 +512,9 @@ async def main():
                         print('Device not found or Device already unpaired.')
 
                 elif choice == '15':
-                    connection = await device.connect(target_address, transport=BT_BR_EDR_TRANSPORT)
+                    connection = await device.connect(
+                        target_address, transport=BT_BR_EDR_TRANSPORT
+                    )
                     await connection.authenticate()
                     await connection.encrypt()
 
@@ -445,4 +538,3 @@ async def main():
 
 logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
 asyncio.run(main())
-
