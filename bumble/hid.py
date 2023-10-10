@@ -30,6 +30,8 @@ from .core import BT_BR_EDR_TRANSPORT, InvalidStateError, ProtocolError  # type:
 
 if TYPE_CHECKING:
     from bumble.device import Device, Connection
+
+
 # -----------------------------------------------------------------------------
 # Logging
 # -----------------------------------------------------------------------------
@@ -45,7 +47,7 @@ HID_INTERRUPT_PSM          = 0x0013
 
 
 class Message():
-
+    message_type: MessageType
     # Report types
     class ReportType(enum.IntEnum):
         OTHER_REPORT        = 0x00
@@ -83,6 +85,11 @@ class Message():
         EXIT_SUSPEND         = 0x04
         VIRTUAL_CABLE_UNPLUG = 0x05
 
+    # Class Method to derive header
+    @classmethod
+    def header( cls , lower_bits : int = 0x00 ) -> bytes :
+        return bytes([(cls.message_type << 4) | lower_bits])
+
 
 # HIDP messages
 @dataclass
@@ -90,58 +97,54 @@ class GetReportMessage(Message):
     report_type : int
     report_id : int
     buffer_size : int
+    message_type = Message.MessageType.GET_REPORT
 
     def __bytes__(self) -> bytes:
-        if(self.report_type == Message.ReportType.OTHER_REPORT):
-            param = self.report_type
-        else:
-            param = 0x08 | self.report_type
-        header = ((Message.MessageType.GET_REPORT << 4) | param)
         packet_bytes = bytearray()
-        packet_bytes.append(header)
         packet_bytes.append(self.report_id)
         packet_bytes.extend([(self.buffer_size & 0xff), ((self.buffer_size >> 8) & 0xff)])
-        return bytes(packet_bytes)
+        if(self.report_type == Message.ReportType.OTHER_REPORT):
+            return self.header(self.report_type) + packet_bytes
+        else:
+            return self.header(0x08 | self.report_type) + packet_bytes
+
+
 @dataclass
 class SetReportMessage(Message):
     report_type: int
     data : bytes
+    message_type = Message.MessageType.SET_REPORT
 
     def __bytes__(self) -> bytes:
-        header = ((Message.MessageType.SET_REPORT << 4) | self.report_type)
-        packet_bytes = bytearray()
-        packet_bytes.append(header)
-        packet_bytes.extend(self.data)
-        return bytes(packet_bytes)
+        return self.header(self.report_type) + self.data
+
+
 @dataclass
 class GetProtocolMessage(Message):
+    message_type = Message.MessageType.GET_PROTOCOL
 
     def __bytes__(self) -> bytes:
-        header = (Message.MessageType.GET_PROTOCOL << 4)
-        packet_bytes = bytearray()
-        packet_bytes.append(header)
-        return bytes(packet_bytes)
+        return self.header()
+
+
 @dataclass
 class SetProtocolMessage(Message):
     protocol_mode: int
+    message_type = Message.MessageType.SET_PROTOCOL
 
     def __bytes__(self) -> bytes:
-        header = (Message.MessageType.SET_PROTOCOL << 4 | self.protocol_mode)
-        packet_bytes = bytearray()
-        packet_bytes.append(header)
-        packet_bytes.append(self.protocol_mode)
-        return bytes(packet_bytes)
+        return self.header(self.protocol_mode)
+
+
 @dataclass
 class SendData(Message):
-
+    message_type = Message.MessageType.DATA
     data : bytes
 
     def __bytes__(self) -> bytes:
-        header = ((Message.MessageType.DATA << 4) | Message.ReportType.OUTPUT_REPORT)
-        packet_bytes = bytearray()
-        packet_bytes.append(header)
-        packet_bytes.extend(self.data)
-        return bytes(packet_bytes)
+        return self.header(Message.ReportType.OUTPUT_REPORT) + self.data
+
+
 # -----------------------------------------------------------------------------
 class Host(EventEmitter):
     l2cap_channel: Optional[l2cap.Channel]
@@ -240,32 +243,31 @@ class Host(EventEmitter):
             logger.debug('<<< HID CONTROL DATA')
             self.emit('data', pdu)
 
-
     def on_intr_pdu(self, pdu: bytes) -> None:
         logger.debug(f'<<< HID INTERRUPT PDU: {pdu.hex()}')
         self.emit("data", pdu)
 
     def get_report(self, report_type: int, report_id: int, buffer_size: int) -> None:
         msg = GetReportMessage(report_type = report_type , report_id = report_id , buffer_size = buffer_size)
-        hid_message = msg.__bytes__()
+        hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL GET REPORT, PDU: {hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)  # type: ignore
 
     def set_report(self, report_type: int, data: bytes):
         msg = SetReportMessage(report_type= report_type,data = data)
-        hid_message = msg.__bytes__()
+        hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL SET REPORT, PDU:{hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)  # type: ignore
 
     def get_protocol(self):
         msg = GetProtocolMessage()
-        hid_message = msg.__bytes__()
+        hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL GET PROTOCOL, PDU: {hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)  # type: ignore
 
     def set_protocol(self, protocol_mode: int):
         msg = SetProtocolMessage(protocol_mode= protocol_mode)
-        hid_message = msg.__bytes__()
+        hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL SET PROTOCOL, PDU: {hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)  # type: ignore
 
@@ -277,7 +279,7 @@ class Host(EventEmitter):
 
     def send_data(self, data):
         msg = SendData(data)
-        hid_message = msg.__bytes__()
+        hid_message = bytes(msg)
         logger.debug(f'>>> HID INTERRUPT SEND DATA, PDU: {hid_message.hex()}')
         self.send_pdu_on_intr(hid_message)  # type: ignore
 
