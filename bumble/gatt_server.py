@@ -23,11 +23,12 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import asyncio
 import logging
 from collections import defaultdict
 import struct
-from typing import List, Tuple, Optional, TypeVar, Type
+from typing import List, Tuple, Optional, TypeVar, Type, Dict, Iterable, TYPE_CHECKING
 from pyee import EventEmitter
 
 from .colors import color
@@ -42,6 +43,7 @@ from .att import (
     ATT_INVALID_OFFSET_ERROR,
     ATT_REQUEST_NOT_SUPPORTED_ERROR,
     ATT_REQUESTS,
+    ATT_PDU,
     ATT_UNLIKELY_ERROR_ERROR,
     ATT_UNSUPPORTED_GROUP_TYPE_ERROR,
     ATT_Error,
@@ -73,6 +75,8 @@ from .gatt import (
     Service,
 )
 
+if TYPE_CHECKING:
+    from bumble.device import Device, Connection
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -91,8 +95,13 @@ GATT_SERVER_DEFAULT_MAX_MTU = 517
 # -----------------------------------------------------------------------------
 class Server(EventEmitter):
     attributes: List[Attribute]
+    services: List[Service]
+    attributes_by_handle: Dict[int, Attribute]
+    subscribers: Dict[int, Dict[int, bytes]]
+    indication_semaphores: defaultdict[int, asyncio.Semaphore]
+    pending_confirmations: defaultdict[int, Optional[asyncio.futures.Future]]
 
-    def __init__(self, device):
+    def __init__(self, device: Device) -> None:
         super().__init__()
         self.device = device
         self.services = []
@@ -107,16 +116,16 @@ class Server(EventEmitter):
         self.indication_semaphores = defaultdict(lambda: asyncio.Semaphore(1))
         self.pending_confirmations = defaultdict(lambda: None)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "\n".join(map(str, self.attributes))
 
-    def send_gatt_pdu(self, connection_handle, pdu):
+    def send_gatt_pdu(self, connection_handle: int, pdu: bytes) -> None:
         self.device.send_l2cap_pdu(connection_handle, ATT_CID, pdu)
 
-    def next_handle(self):
+    def next_handle(self) -> int:
         return 1 + len(self.attributes)
 
-    def get_advertising_service_data(self):
+    def get_advertising_service_data(self) -> Dict[Attribute, bytes]:
         return {
             attribute: data
             for attribute in self.attributes
@@ -124,7 +133,7 @@ class Server(EventEmitter):
             and (data := attribute.get_advertising_data())
         }
 
-    def get_attribute(self, handle):
+    def get_attribute(self, handle: int) -> Optional[Attribute]:
         attribute = self.attributes_by_handle.get(handle)
         if attribute:
             return attribute
@@ -173,12 +182,17 @@ class Server(EventEmitter):
 
         return next(
             (
-                (attribute, self.get_attribute(attribute.characteristic.handle))
+                (
+                    attribute,
+                    self.get_attribute(attribute.characteristic.handle),
+                )  # type: ignore
                 for attribute in map(
                     self.get_attribute,
                     range(service_handle.handle, service_handle.end_group_handle + 1),
                 )
-                if attribute.type == GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+                if attribute is not None
+                and attribute.type == GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+                and isinstance(attribute, CharacteristicDeclaration)
                 and attribute.characteristic.uuid == characteristic_uuid
             ),
             None,
@@ -197,7 +211,7 @@ class Server(EventEmitter):
 
         return next(
             (
-                attribute
+                attribute  # type: ignore
                 for attribute in map(
                     self.get_attribute,
                     range(
@@ -205,12 +219,12 @@ class Server(EventEmitter):
                         characteristic_value.end_group_handle + 1,
                     ),
                 )
-                if attribute.type == descriptor_uuid
+                if attribute is not None and attribute.type == descriptor_uuid
             ),
             None,
         )
 
-    def add_attribute(self, attribute):
+    def add_attribute(self, attribute: Attribute) -> None:
         # Assign a handle to this attribute
         attribute.handle = self.next_handle()
         attribute.end_group_handle = (
@@ -220,7 +234,7 @@ class Server(EventEmitter):
         # Add this attribute to the list
         self.attributes.append(attribute)
 
-    def add_service(self, service: Service):
+    def add_service(self, service: Service) -> None:
         # Add the service attribute to the DB
         self.add_attribute(service)
 
@@ -285,11 +299,13 @@ class Server(EventEmitter):
         service.end_group_handle = self.attributes[-1].handle
         self.services.append(service)
 
-    def add_services(self, services):
+    def add_services(self, services: Iterable[Service]) -> None:
         for service in services:
             self.add_service(service)
 
-    def read_cccd(self, connection, characteristic):
+    def read_cccd(
+        self, connection: Optional[Connection], characteristic: Characteristic
+    ) -> bytes:
         if connection is None:
             return bytes([0, 0])
 
@@ -300,7 +316,12 @@ class Server(EventEmitter):
 
         return cccd or bytes([0, 0])
 
-    def write_cccd(self, connection, characteristic, value):
+    def write_cccd(
+        self,
+        connection: Connection,
+        characteristic: Characteristic,
+        value: bytes,
+    ) -> None:
         logger.debug(
             f'Subscription update for connection=0x{connection.handle:04X}, '
             f'handle=0x{characteristic.handle:04X}: {value.hex()}'
@@ -327,13 +348,19 @@ class Server(EventEmitter):
             indicate_enabled,
         )
 
-    def send_response(self, connection, response):
+    def send_response(self, connection: Connection, response: ATT_PDU) -> None:
         logger.debug(
             f'GATT Response from server: [0x{connection.handle:04X}] {response}'
         )
         self.send_gatt_pdu(connection.handle, response.to_bytes())
 
-    async def notify_subscriber(self, connection, attribute, value=None, force=False):
+    async def notify_subscriber(
+        self,
+        connection: Connection,
+        attribute: Attribute,
+        value: Optional[bytes] = None,
+        force: bool = False,
+    ) -> None:
         # Check if there's a subscriber
         if not force:
             subscribers = self.subscribers.get(connection.handle)
@@ -370,7 +397,13 @@ class Server(EventEmitter):
         )
         self.send_gatt_pdu(connection.handle, bytes(notification))
 
-    async def indicate_subscriber(self, connection, attribute, value=None, force=False):
+    async def indicate_subscriber(
+        self,
+        connection: Connection,
+        attribute: Attribute,
+        value: Optional[bytes] = None,
+        force: bool = False,
+    ) -> None:
         # Check if there's a subscriber
         if not force:
             subscribers = self.subscribers.get(connection.handle)
@@ -411,15 +444,13 @@ class Server(EventEmitter):
             assert self.pending_confirmations[connection.handle] is None
 
             # Create a future value to hold the eventual response
-            self.pending_confirmations[
+            pending_confirmation = self.pending_confirmations[
                 connection.handle
             ] = asyncio.get_running_loop().create_future()
 
             try:
                 self.send_gatt_pdu(connection.handle, indication.to_bytes())
-                await asyncio.wait_for(
-                    self.pending_confirmations[connection.handle], GATT_REQUEST_TIMEOUT
-                )
+                await asyncio.wait_for(pending_confirmation, GATT_REQUEST_TIMEOUT)
             except asyncio.TimeoutError as error:
                 logger.warning(color('!!! GATT Indicate timeout', 'red'))
                 raise TimeoutError(f'GATT timeout for {indication.name}') from error
@@ -427,8 +458,12 @@ class Server(EventEmitter):
                 self.pending_confirmations[connection.handle] = None
 
     async def notify_or_indicate_subscribers(
-        self, indicate, attribute, value=None, force=False
-    ):
+        self,
+        indicate: bool,
+        attribute: Attribute,
+        value: Optional[bytes] = None,
+        force: bool = False,
+    ) -> None:
         # Get all the connections for which there's at least one subscription
         connections = [
             connection
@@ -450,13 +485,23 @@ class Server(EventEmitter):
                 ]
             )
 
-    async def notify_subscribers(self, attribute, value=None, force=False):
+    async def notify_subscribers(
+        self,
+        attribute: Attribute,
+        value: Optional[bytes] = None,
+        force: bool = False,
+    ):
         return await self.notify_or_indicate_subscribers(False, attribute, value, force)
 
-    async def indicate_subscribers(self, attribute, value=None, force=False):
+    async def indicate_subscribers(
+        self,
+        attribute: Attribute,
+        value: Optional[bytes] = None,
+        force: bool = False,
+    ):
         return await self.notify_or_indicate_subscribers(True, attribute, value, force)
 
-    def on_disconnection(self, connection):
+    def on_disconnection(self, connection: Connection) -> None:
         if connection.handle in self.subscribers:
             del self.subscribers[connection.handle]
         if connection.handle in self.indication_semaphores:
@@ -464,7 +509,7 @@ class Server(EventEmitter):
         if connection.handle in self.pending_confirmations:
             del self.pending_confirmations[connection.handle]
 
-    def on_gatt_pdu(self, connection, att_pdu):
+    def on_gatt_pdu(self, connection: Connection, att_pdu: ATT_PDU) -> None:
         logger.debug(f'GATT Request to server: [0x{connection.handle:04X}] {att_pdu}')
         handler_name = f'on_{att_pdu.name.lower()}'
         handler = getattr(self, handler_name, None)
@@ -506,7 +551,7 @@ class Server(EventEmitter):
     #######################################################
     # ATT handlers
     #######################################################
-    def on_att_request(self, connection, pdu):
+    def on_att_request(self, connection: Connection, pdu: ATT_PDU) -> None:
         '''
         Handler for requests without a more specific handler
         '''
@@ -679,7 +724,6 @@ class Server(EventEmitter):
             and attribute.handle <= request.ending_handle
             and pdu_space_available
         ):
-
             try:
                 attribute_value = attribute.read_value(connection)
             except ATT_Error as error:

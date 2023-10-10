@@ -18,7 +18,7 @@ use crate::L2cap;
 use anyhow::anyhow;
 use bumble::wrapper::{device::Device, l2cap::LeConnectionOrientedChannel, transport::Transport};
 use owo_colors::{colors::css::Orange, OwoColorize};
-use pyo3::{PyObject, PyResult, Python};
+use pyo3::{PyResult, Python};
 use std::{future::Future, path::PathBuf, sync::Arc};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -170,21 +170,12 @@ async fn proxy_tcp_rx_to_l2cap_tx(
     }
 }
 
-/// Copies the current thread's TaskLocals into a Python "awaitable" and encapsulates it in a Rust
-/// future, running it as a Python Task.
-/// `TaskLocals` stores the current event loop, and allows the user to copy the current Python
-/// context if necessary. In this case, the python event loop is used when calling `disconnect` on
-/// an l2cap connection, or else the call will fail.
-pub fn run_future_with_current_task_locals<F>(
-    fut: F,
-) -> PyResult<impl Future<Output = PyResult<PyObject>> + Send>
+/// Copies the current thread's Python even loop (contained in `TaskLocals`) into the given future.
+/// Useful when sending work to another thread that calls Python code which calls `get_running_loop()`.
+pub fn inject_py_event_loop<F, R>(fut: F) -> PyResult<impl Future<Output = R>>
 where
-    F: Future<Output = PyResult<()>> + Send + 'static,
+    F: Future<Output = R> + Send + 'static,
 {
-    Python::with_gil(|py| {
-        let locals = pyo3_asyncio::tokio::get_current_locals(py)?;
-        let future = pyo3_asyncio::tokio::scope(locals.clone(), fut);
-        pyo3_asyncio::tokio::future_into_py_with_locals(py, locals, future)
-            .and_then(pyo3_asyncio::tokio::into_future)
-    })
+    let locals = Python::with_gil(pyo3_asyncio::tokio::get_current_locals)?;
+    Ok(pyo3_asyncio::tokio::scope(locals, fut))
 }

@@ -339,8 +339,9 @@ class PumpedPacketSource(ParserSource):
                 try:
                     packet = await self.receive_function()
                     self.parser.feed_data(packet)
-                except asyncio.exceptions.CancelledError:
+                except asyncio.CancelledError:
                     logger.debug('source pump task done')
+                    self.terminated.set_result(None)
                     break
                 except Exception as error:
                     logger.warning(f'exception while waiting for packet: {error}')
@@ -370,7 +371,7 @@ class PumpedPacketSink:
                 try:
                     packet = await self.packet_queue.get()
                     await self.send_function(packet)
-                except asyncio.exceptions.CancelledError:
+                except asyncio.CancelledError:
                     logger.debug('sink pump task done')
                     break
                 except Exception as error:
@@ -393,18 +394,12 @@ class PumpedTransport(Transport):
         self,
         source: PumpedPacketSource,
         sink: PumpedPacketSink,
-        close_function,
     ) -> None:
         super().__init__(source, sink)
-        self.close_function = close_function
 
     def start(self) -> None:
         self.source.start()
         self.sink.start()
-
-    async def close(self) -> None:
-        await super().close()
-        await self.close_function()
 
 
 # -----------------------------------------------------------------------------

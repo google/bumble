@@ -171,7 +171,7 @@ class Speaker:
         self.connection = connection
         connection.on('disconnection', self.on_bluetooth_disconnection)
         peer_name = '' if connection.peer_name is None else connection.peer_name
-        peer_address = str(connection.peer_address).replace('/P', '')
+        peer_address = connection.peer_address.to_string(False)
         self.emit_event(
             'connection', {'peer_name': peer_name, 'peer_address': peer_address}
         )

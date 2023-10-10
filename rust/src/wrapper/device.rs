@@ -14,12 +14,16 @@
 
 //! Devices and connections to them
 
+use crate::internal::hci::WithPacketType;
 use crate::{
     adv::AdvertisementDataBuilder,
     wrapper::{
         core::AdvertisingData,
         gatt_client::{ProfileServiceProxy, ServiceProxy},
-        hci::{Address, HciErrorCode},
+        hci::{
+            packets::{Command, ErrorCode, Event},
+            Address, HciCommandWrapper,
+        },
         host::Host,
         l2cap::LeConnectionOrientedChannel,
         transport::{Sink, Source},
@@ -27,18 +31,73 @@ use crate::{
     },
 };
 use pyo3::{
+    exceptions::PyException,
     intern,
     types::{PyDict, PyModule},
-    IntoPy, PyObject, PyResult, Python, ToPyObject,
+    IntoPy, PyErr, PyObject, PyResult, Python, ToPyObject,
 };
 use pyo3_asyncio::tokio::into_future;
 use std::path;
+
+/// Represents the various properties of some device
+pub struct DeviceConfiguration(PyObject);
+
+impl DeviceConfiguration {
+    /// Creates a new configuration, letting the internal Python object set all the defaults
+    pub fn new() -> PyResult<DeviceConfiguration> {
+        Python::with_gil(|py| {
+            PyModule::import(py, intern!(py, "bumble.device"))?
+                .getattr(intern!(py, "DeviceConfiguration"))?
+                .call0()
+                .map(|any| Self(any.into()))
+        })
+    }
+
+    /// Creates a new configuration from the specified file
+    pub fn load_from_file(&mut self, device_config: &path::Path) -> PyResult<()> {
+        Python::with_gil(|py| {
+            self.0
+                .call_method1(py, intern!(py, "load_from_file"), (device_config,))
+        })
+        .map(|_| ())
+    }
+}
+
+impl ToPyObject for DeviceConfiguration {
+    fn to_object(&self, _py: Python<'_>) -> PyObject {
+        self.0.clone()
+    }
+}
 
 /// A device that can send/receive HCI frames.
 #[derive(Clone)]
 pub struct Device(PyObject);
 
 impl Device {
+    /// Creates a Device. When optional arguments are not specified, the Python object specifies the
+    /// defaults.
+    pub fn new(
+        name: Option<&str>,
+        address: Option<Address>,
+        config: Option<DeviceConfiguration>,
+        host: Option<Host>,
+        generic_access_service: Option<bool>,
+    ) -> PyResult<Self> {
+        Python::with_gil(|py| {
+            let kwargs = PyDict::new(py);
+            kwargs.set_opt_item("name", name)?;
+            kwargs.set_opt_item("address", address)?;
+            kwargs.set_opt_item("config", config)?;
+            kwargs.set_opt_item("host", host)?;
+            kwargs.set_opt_item("generic_access_service", generic_access_service)?;
+
+            PyModule::import(py, intern!(py, "bumble.device"))?
+                .getattr(intern!(py, "Device"))?
+                .call((), Some(kwargs))
+                .map(|any| Self(any.into()))
+        })
+    }
+
     /// Create a Device per the provided file configured to communicate with a controller through an HCI source/sink
     pub fn from_config_file_with_hci(
         device_config: &path::Path,
@@ -63,6 +122,29 @@ impl Device {
                 .getattr(intern!(py, "Device"))?
                 .call_method1(intern!(py, "with_hci"), (name, address, source.0, sink.0))
                 .map(|any| Self(any.into()))
+        })
+    }
+
+    /// Sends an HCI command on this Device, returning the command's event result.
+    pub async fn send_command(&self, command: &Command, check_result: bool) -> PyResult<Event> {
+        Python::with_gil(|py| {
+            self.0
+                .call_method1(
+                    py,
+                    intern!(py, "send_command"),
+                    (HciCommandWrapper(command.clone()), check_result),
+                )
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
+        })?
+        .await
+        .and_then(|event| {
+            Python::with_gil(|py| {
+                let py_bytes = event.call_method0(py, intern!(py, "__bytes__"))?;
+                let bytes: &[u8] = py_bytes.extract(py)?;
+                let event = Event::parse_with_packet_type(bytes)
+                    .map_err(|e| PyErr::new::<PyException, _>(e.to_string()))?;
+                Ok(event)
+            })
         })
     }
 
@@ -236,7 +318,7 @@ impl Connection {
             kwargs.set_opt_item("mps", mps)?;
             self.0
                 .call_method(py, intern!(py, "open_l2cap_channel"), (), Some(kwargs))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .map(LeConnectionOrientedChannel::from)
@@ -244,13 +326,13 @@ impl Connection {
 
     /// Disconnect from device with provided reason. When optional arguments are not specified, the
     /// Python module specifies the defaults.
-    pub async fn disconnect(&mut self, reason: Option<HciErrorCode>) -> PyResult<()> {
+    pub async fn disconnect(&mut self, reason: Option<ErrorCode>) -> PyResult<()> {
         Python::with_gil(|py| {
             let kwargs = PyDict::new(py);
             kwargs.set_opt_item("reason", reason)?;
             self.0
                 .call_method(py, intern!(py, "disconnect"), (), Some(kwargs))
-                .and_then(|coroutine| pyo3_asyncio::tokio::into_future(coroutine.as_ref(py)))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
         .map(|_| ())
@@ -259,7 +341,7 @@ impl Connection {
     /// Register a callback to be called on disconnection.
     pub fn on_disconnection(
         &mut self,
-        callback: impl Fn(Python, HciErrorCode) -> PyResult<()> + Send + 'static,
+        callback: impl Fn(Python, ErrorCode) -> PyResult<()> + Send + 'static,
     ) -> PyResult<()> {
         let boxed = ClosureCallback::new(move |py, args, _kwargs| {
             callback(py, args.get_item(0)?.extract()?)

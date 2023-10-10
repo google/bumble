@@ -33,6 +33,8 @@ from typing import (
     Tuple,
     Type,
     Union,
+    cast,
+    overload,
     TYPE_CHECKING,
 )
 
@@ -151,6 +153,7 @@ from .utils import (
     CompositeEventEmitter,
     setup_event_forwarding,
     composite_listener,
+    deprecated,
 )
 from .keys import (
     KeyStore,
@@ -670,9 +673,7 @@ class Connection(CompositeEventEmitter):
     def send_l2cap_pdu(self, cid: int, pdu: bytes) -> None:
         self.device.send_l2cap_pdu(self.handle, cid, pdu)
 
-    def create_l2cap_connector(self, psm):
-        return self.device.create_l2cap_connector(self, psm)
-
+    @deprecated("Please use create_l2cap_channel()")
     async def open_l2cap_channel(
         self,
         psm,
@@ -681,6 +682,23 @@ class Connection(CompositeEventEmitter):
         mps=DEVICE_DEFAULT_L2CAP_COC_MPS,
     ):
         return await self.device.open_l2cap_channel(self, psm, max_credits, mtu, mps)
+
+    @overload
+    async def create_l2cap_channel(
+        self, spec: l2cap.ClassicChannelSpec
+    ) -> l2cap.ClassicChannel:
+        ...
+
+    @overload
+    async def create_l2cap_channel(
+        self, spec: l2cap.LeCreditBasedChannelSpec
+    ) -> l2cap.LeCreditBasedChannel:
+        ...
+
+    async def create_l2cap_channel(
+        self, spec: Union[l2cap.ClassicChannelSpec, l2cap.LeCreditBasedChannelSpec]
+    ) -> Union[l2cap.ClassicChannel, l2cap.LeCreditBasedChannel]:
+        return await self.device.create_l2cap_channel(connection=self, spec=spec)
 
     async def disconnect(
         self, reason: int = HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
@@ -1180,15 +1198,11 @@ class Device(CompositeEventEmitter):
 
         return None
 
-    def create_l2cap_connector(self, connection, psm):
-        return lambda: self.l2cap_channel_manager.connect(connection, psm)
+    @deprecated("Please use create_l2cap_server()")
+    def register_l2cap_server(self, psm, server) -> int:
+        return self.l2cap_channel_manager.register_server(psm, server)
 
-    def create_l2cap_registrar(self, psm):
-        return lambda handler: self.register_l2cap_server(psm, handler)
-
-    def register_l2cap_server(self, psm, server):
-        self.l2cap_channel_manager.register_server(psm, server)
-
+    @deprecated("Please use create_l2cap_server()")
     def register_l2cap_channel_server(
         self,
         psm,
@@ -1201,6 +1215,7 @@ class Device(CompositeEventEmitter):
             psm, server, max_credits, mtu, mps
         )
 
+    @deprecated("Please use create_l2cap_channel()")
     async def open_l2cap_channel(
         self,
         connection,
@@ -1212,6 +1227,74 @@ class Device(CompositeEventEmitter):
         return await self.l2cap_channel_manager.open_le_coc(
             connection, psm, max_credits, mtu, mps
         )
+
+    @overload
+    async def create_l2cap_channel(
+        self,
+        connection: Connection,
+        spec: l2cap.ClassicChannelSpec,
+    ) -> l2cap.ClassicChannel:
+        ...
+
+    @overload
+    async def create_l2cap_channel(
+        self,
+        connection: Connection,
+        spec: l2cap.LeCreditBasedChannelSpec,
+    ) -> l2cap.LeCreditBasedChannel:
+        ...
+
+    async def create_l2cap_channel(
+        self,
+        connection: Connection,
+        spec: Union[l2cap.ClassicChannelSpec, l2cap.LeCreditBasedChannelSpec],
+    ) -> Union[l2cap.ClassicChannel, l2cap.LeCreditBasedChannel]:
+        if isinstance(spec, l2cap.ClassicChannelSpec):
+            return await self.l2cap_channel_manager.create_classic_channel(
+                connection=connection, spec=spec
+            )
+        if isinstance(spec, l2cap.LeCreditBasedChannelSpec):
+            return await self.l2cap_channel_manager.create_le_credit_based_channel(
+                connection=connection, spec=spec
+            )
+
+    @overload
+    def create_l2cap_server(
+        self,
+        spec: l2cap.ClassicChannelSpec,
+        handler: Optional[Callable[[l2cap.ClassicChannel], Any]] = None,
+    ) -> l2cap.ClassicChannelServer:
+        ...
+
+    @overload
+    def create_l2cap_server(
+        self,
+        spec: l2cap.LeCreditBasedChannelSpec,
+        handler: Optional[Callable[[l2cap.LeCreditBasedChannel], Any]] = None,
+    ) -> l2cap.LeCreditBasedChannelServer:
+        ...
+
+    def create_l2cap_server(
+        self,
+        spec: Union[l2cap.ClassicChannelSpec, l2cap.LeCreditBasedChannelSpec],
+        handler: Union[
+            Callable[[l2cap.ClassicChannel], Any],
+            Callable[[l2cap.LeCreditBasedChannel], Any],
+            None,
+        ] = None,
+    ) -> Union[l2cap.ClassicChannelServer, l2cap.LeCreditBasedChannelServer]:
+        if isinstance(spec, l2cap.ClassicChannelSpec):
+            return self.l2cap_channel_manager.create_classic_server(
+                spec=spec,
+                handler=cast(Callable[[l2cap.ClassicChannel], Any], handler),
+            )
+        elif isinstance(spec, l2cap.LeCreditBasedChannelSpec):
+            return self.l2cap_channel_manager.create_le_credit_based_server(
+                handler=cast(Callable[[l2cap.LeCreditBasedChannel], Any], handler),
+                spec=spec,
+            )
+        else:
+            raise ValueError(f'Unexpected mode {spec}')
 
     def send_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes) -> None:
         self.host.send_l2cap_pdu(connection_handle, cid, pdu)
@@ -1425,10 +1508,10 @@ class Device(CompositeEventEmitter):
             check_result=True,
         )
 
-        self.advertising_own_address_type = own_address_type
-        self.auto_restart_advertising = auto_restart
         self.advertising_type = advertising_type
+        self.advertising_own_address_type = own_address_type
         self.advertising = True
+        self.auto_restart_advertising = auto_restart
 
     async def stop_advertising(self) -> None:
         # Disable advertising
@@ -1438,9 +1521,9 @@ class Device(CompositeEventEmitter):
                 check_result=True,
             )
 
+            self.advertising_type = None
             self.advertising_own_address_type = None
             self.advertising = False
-            self.advertising_type = None
             self.auto_restart_advertising = False
 
     @property
@@ -2630,7 +2713,6 @@ class Device(CompositeEventEmitter):
                 own_address_type = self.advertising_own_address_type
 
             # We are no longer advertising
-            self.advertising_own_address_type = None
             self.advertising = False
 
             if own_address_type in (
@@ -2687,7 +2769,6 @@ class Device(CompositeEventEmitter):
             and self.advertising
             and self.advertising_type.is_directed
         ):
-            self.advertising_own_address_type = None
             self.advertising = False
 
         # Notify listeners
@@ -2758,7 +2839,9 @@ class Device(CompositeEventEmitter):
             self.abort_on(
                 'flush',
                 self.start_advertising(
-                    advertising_type=self.advertising_type, auto_restart=True
+                    advertising_type=self.advertising_type,
+                    own_address_type=self.advertising_own_address_type,
+                    auto_restart=True,
                 ),
             )
 

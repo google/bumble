@@ -15,13 +15,26 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import asyncio
 import logging
 import traceback
 import collections
 import sys
-from typing import Awaitable, Set, TypeVar
-from functools import wraps
+import warnings
+from typing import (
+    Awaitable,
+    Set,
+    TypeVar,
+    List,
+    Tuple,
+    Callable,
+    Any,
+    Optional,
+    Union,
+    overload,
+)
+from functools import wraps, partial
 from pyee import EventEmitter
 
 from .colors import color
@@ -62,6 +75,102 @@ def composite_listener(cls):
     cls._bumble_register_composite = register
     cls._bumble_deregister_composite = deregister
     return cls
+
+
+# -----------------------------------------------------------------------------
+_Handler = TypeVar('_Handler', bound=Callable)
+
+
+class EventWatcher:
+    '''A wrapper class to control the lifecycle of event handlers better.
+
+    Usage:
+    ```
+    watcher = EventWatcher()
+
+    def on_foo():
+        ...
+    watcher.on(emitter, 'foo', on_foo)
+
+    @watcher.on(emitter, 'bar')
+    def on_bar():
+        ...
+
+    # Close all event handlers watching through this watcher
+    watcher.close()
+    ```
+
+    As context:
+    ```
+    with contextlib.closing(EventWatcher()) as context:
+        @context.on(emitter, 'foo')
+        def on_foo():
+            ...
+    # on_foo() has been removed here!
+    ```
+    '''
+
+    handlers: List[Tuple[EventEmitter, str, Callable[..., Any]]]
+
+    def __init__(self) -> None:
+        self.handlers = []
+
+    @overload
+    def on(self, emitter: EventEmitter, event: str) -> Callable[[_Handler], _Handler]:
+        ...
+
+    @overload
+    def on(self, emitter: EventEmitter, event: str, handler: _Handler) -> _Handler:
+        ...
+
+    def on(
+        self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None
+    ) -> Union[_Handler, Callable[[_Handler], _Handler]]:
+        '''Watch an event until the context is closed.
+
+        Args:
+            emitter: EventEmitter to watch
+            event: Event name
+            handler: (Optional) Event handler. When nothing is passed, this method works as a decorator.
+        '''
+
+        def wrapper(f: _Handler) -> _Handler:
+            self.handlers.append((emitter, event, f))
+            emitter.on(event, f)
+            return f
+
+        return wrapper if handler is None else wrapper(handler)
+
+    @overload
+    def once(self, emitter: EventEmitter, event: str) -> Callable[[_Handler], _Handler]:
+        ...
+
+    @overload
+    def once(self, emitter: EventEmitter, event: str, handler: _Handler) -> _Handler:
+        ...
+
+    def once(
+        self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None
+    ) -> Union[_Handler, Callable[[_Handler], _Handler]]:
+        '''Watch an event for once.
+
+        Args:
+            emitter: EventEmitter to watch
+            event: Event name
+            handler: (Optional) Event handler. When nothing passed, this method works as a decorator.
+        '''
+
+        def wrapper(f: _Handler) -> _Handler:
+            self.handlers.append((emitter, event, f))
+            emitter.once(event, f)
+            return f
+
+        return wrapper if handler is None else wrapper(handler)
+
+    def close(self) -> None:
+        for emitter, event, handler in self.handlers:
+            if handler in emitter.listeners(event):
+                emitter.remove_listener(event, handler)
 
 
 # -----------------------------------------------------------------------------
@@ -302,3 +411,36 @@ class FlowControlAsyncPipe:
                     self.resume_source()
 
             self.check_pump()
+
+
+async def async_call(function, *args, **kwargs):
+    """
+    Immediately calls the function with provided args and kwargs, wrapping it in an async function.
+    Rust's `pyo3_asyncio` library needs functions to be marked async to properly inject a running loop.
+
+    result = await async_call(some_function, ...)
+    """
+    return function(*args, **kwargs)
+
+
+def wrap_async(function):
+    """
+    Wraps the provided function in an async function.
+    """
+    return partial(async_call, function)
+
+
+def deprecated(msg: str):
+    """
+    Throw deprecation warning before execution
+    """
+
+    def wrapper(function):
+        @wraps(function)
+        def inner(*args, **kwargs):
+            warnings.warn(msg, DeprecationWarning)
+            return function(*args, **kwargs)
+
+        return inner
+
+    return wrapper

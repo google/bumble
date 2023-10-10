@@ -63,7 +63,8 @@ async def get_classic_info(host):
         if command_succeeded(response):
             print()
             print(
-                color('Classic Address:', 'yellow'), response.return_parameters.bd_addr
+                color('Classic Address:', 'yellow'),
+                response.return_parameters.bd_addr.to_string(False),
             )
 
     if host.supports_command(HCI_READ_LOCAL_NAME_COMMAND):

@@ -891,10 +891,10 @@ async def async_main():
 
 
 # -----------------------------------------------------------------------------
-def test_attribute_string_to_permissions():
-    assert Attribute.string_to_permissions('READABLE') == 1
-    assert Attribute.string_to_permissions('WRITEABLE') == 2
-    assert Attribute.string_to_permissions('READABLE,WRITEABLE') == 3
+def test_permissions_from_string():
+    assert Attribute.Permissions.from_string('READABLE') == 1
+    assert Attribute.Permissions.from_string('WRITEABLE') == 2
+    assert Attribute.Permissions.from_string('READABLE,WRITEABLE') == 3
 
 
 # -----------------------------------------------------------------------------

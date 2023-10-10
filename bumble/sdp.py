@@ -758,7 +758,7 @@ class SDP_ServiceSearchAttributeResponse(SDP_PDU):
 
 # -----------------------------------------------------------------------------
 class Client:
-    channel: Optional[l2cap.Channel]
+    channel: Optional[l2cap.ClassicChannel]
 
     def __init__(self, device: Device) -> None:
         self.device = device
@@ -921,7 +921,7 @@ class Client:
 # -----------------------------------------------------------------------------
 class Server:
     CONTINUATION_STATE = bytes([0x01, 0x43])
-    channel: Optional[l2cap.Channel]
+    channel: Optional[l2cap.ClassicChannel]
     Service = NewType('Service', List[ServiceAttribute])
     service_records: Dict[int, Service]
     current_response: Union[None, bytes, Tuple[int, List[int]]]

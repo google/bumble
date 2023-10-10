@@ -20,7 +20,8 @@
 use bumble::{
     adv::CommonDataType,
     wrapper::{
-        core::AdvertisementDataUnit, device::Device, hci::AddressType, transport::Transport,
+        core::AdvertisementDataUnit, device::Device, hci::packets::AddressType,
+        transport::Transport,
     },
 };
 use clap::Parser as _;
@@ -69,9 +70,7 @@ async fn main() -> PyResult<()> {
             let mut seen_adv_cache = seen_adv_clone.lock().unwrap();
             let expiry_duration = time::Duration::from_secs(cli.dedup_expiry_secs);
 
-            let advs_from_addr = seen_adv_cache
-                .entry(addr_bytes)
-                .or_insert_with(collections::HashMap::new);
+            let advs_from_addr = seen_adv_cache.entry(addr_bytes).or_default();
             // we expect cache hits to be the norm, so we do a separate lookup to avoid cloning
             // on every lookup with entry()
             let show = if let Some(prev) = advs_from_addr.get_mut(&data_units) {
@@ -102,7 +101,9 @@ async fn main() -> PyResult<()> {
         };
 
         let (type_style, qualifier) = match adv.address()?.address_type()? {
-            AddressType::PublicIdentity | AddressType::PublicDevice => (Style::new().cyan(), ""),
+            AddressType::PublicIdentityAddress | AddressType::PublicDeviceAddress => {
+                (Style::new().cyan(), "")
+            }
             _ => {
                 if addr.is_static()? {
                     (Style::new().green(), "(static)")

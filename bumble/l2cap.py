@@ -17,6 +17,8 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import asyncio
+import dataclasses
+import enum
 import logging
 import struct
 
@@ -37,6 +39,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from .utils import deprecated
 from .colors import color
 from .core import BT_CENTRAL_ROLE, InvalidStateError, ProtocolError
 from .hci import (
@@ -164,6 +167,34 @@ L2CAP_MTU_CONFIGURATION_PARAMETER_TYPE = 0x01
 # Classes
 # -----------------------------------------------------------------------------
 # pylint: disable=invalid-name
+
+
+@dataclasses.dataclass
+class ClassicChannelSpec:
+    psm: Optional[int] = None
+    mtu: int = L2CAP_MIN_BR_EDR_MTU
+
+
+@dataclasses.dataclass
+class LeCreditBasedChannelSpec:
+    psm: Optional[int] = None
+    mtu: int = L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MTU
+    mps: int = L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS
+    max_credits: int = L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_INITIAL_CREDITS
+
+    def __post_init__(self):
+        if (
+            self.max_credits < 1
+            or self.max_credits > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_CREDITS
+        ):
+            raise ValueError('max credits out of range')
+        if self.mtu < L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MTU:
+            raise ValueError('MTU too small')
+        if (
+            self.mps < L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MPS
+            or self.mps > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MPS
+        ):
+            raise ValueError('MPS out of range')
 
 
 class L2CAP_PDU:
@@ -675,57 +706,36 @@ class L2CAP_LE_Flow_Control_Credit(L2CAP_Control_Frame):
 
 
 # -----------------------------------------------------------------------------
-class Channel(EventEmitter):
-    # States
-    CLOSED = 0x00
-    WAIT_CONNECT = 0x01
-    WAIT_CONNECT_RSP = 0x02
-    OPEN = 0x03
-    WAIT_DISCONNECT = 0x04
-    WAIT_CREATE = 0x05
-    WAIT_CREATE_RSP = 0x06
-    WAIT_MOVE = 0x07
-    WAIT_MOVE_RSP = 0x08
-    WAIT_MOVE_CONFIRM = 0x09
-    WAIT_CONFIRM_RSP = 0x0A
+class ClassicChannel(EventEmitter):
+    class State(enum.IntEnum):
+        # States
+        CLOSED = 0x00
+        WAIT_CONNECT = 0x01
+        WAIT_CONNECT_RSP = 0x02
+        OPEN = 0x03
+        WAIT_DISCONNECT = 0x04
+        WAIT_CREATE = 0x05
+        WAIT_CREATE_RSP = 0x06
+        WAIT_MOVE = 0x07
+        WAIT_MOVE_RSP = 0x08
+        WAIT_MOVE_CONFIRM = 0x09
+        WAIT_CONFIRM_RSP = 0x0A
 
-    # CONFIG substates
-    WAIT_CONFIG = 0x10
-    WAIT_SEND_CONFIG = 0x11
-    WAIT_CONFIG_REQ_RSP = 0x12
-    WAIT_CONFIG_RSP = 0x13
-    WAIT_CONFIG_REQ = 0x14
-    WAIT_IND_FINAL_RSP = 0x15
-    WAIT_FINAL_RSP = 0x16
-    WAIT_CONTROL_IND = 0x17
-
-    STATE_NAMES = {
-        CLOSED: 'CLOSED',
-        WAIT_CONNECT: 'WAIT_CONNECT',
-        WAIT_CONNECT_RSP: 'WAIT_CONNECT_RSP',
-        OPEN: 'OPEN',
-        WAIT_DISCONNECT: 'WAIT_DISCONNECT',
-        WAIT_CREATE: 'WAIT_CREATE',
-        WAIT_CREATE_RSP: 'WAIT_CREATE_RSP',
-        WAIT_MOVE: 'WAIT_MOVE',
-        WAIT_MOVE_RSP: 'WAIT_MOVE_RSP',
-        WAIT_MOVE_CONFIRM: 'WAIT_MOVE_CONFIRM',
-        WAIT_CONFIRM_RSP: 'WAIT_CONFIRM_RSP',
-        WAIT_CONFIG: 'WAIT_CONFIG',
-        WAIT_SEND_CONFIG: 'WAIT_SEND_CONFIG',
-        WAIT_CONFIG_REQ_RSP: 'WAIT_CONFIG_REQ_RSP',
-        WAIT_CONFIG_RSP: 'WAIT_CONFIG_RSP',
-        WAIT_CONFIG_REQ: 'WAIT_CONFIG_REQ',
-        WAIT_IND_FINAL_RSP: 'WAIT_IND_FINAL_RSP',
-        WAIT_FINAL_RSP: 'WAIT_FINAL_RSP',
-        WAIT_CONTROL_IND: 'WAIT_CONTROL_IND',
-    }
+        # CONFIG substates
+        WAIT_CONFIG = 0x10
+        WAIT_SEND_CONFIG = 0x11
+        WAIT_CONFIG_REQ_RSP = 0x12
+        WAIT_CONFIG_RSP = 0x13
+        WAIT_CONFIG_REQ = 0x14
+        WAIT_IND_FINAL_RSP = 0x15
+        WAIT_FINAL_RSP = 0x16
+        WAIT_CONTROL_IND = 0x17
 
     connection_result: Optional[asyncio.Future[None]]
     disconnection_result: Optional[asyncio.Future[None]]
     response: Optional[asyncio.Future[bytes]]
     sink: Optional[Callable[[bytes], Any]]
-    state: int
+    state: State
     connection: Connection
 
     def __init__(
@@ -741,7 +751,7 @@ class Channel(EventEmitter):
         self.manager = manager
         self.connection = connection
         self.signaling_cid = signaling_cid
-        self.state = Channel.CLOSED
+        self.state = self.State.CLOSED
         self.mtu = mtu
         self.psm = psm
         self.source_cid = source_cid
@@ -751,10 +761,8 @@ class Channel(EventEmitter):
         self.disconnection_result = None
         self.sink = None
 
-    def change_state(self, new_state: int) -> None:
-        logger.debug(
-            f'{self} state change -> {color(Channel.STATE_NAMES[new_state], "cyan")}'
-        )
+    def _change_state(self, new_state: State) -> None:
+        logger.debug(f'{self} state change -> {color(new_state.name, "cyan")}')
         self.state = new_state
 
     def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
@@ -767,7 +775,7 @@ class Channel(EventEmitter):
         # Check that there isn't already a request pending
         if self.response:
             raise InvalidStateError('request already pending')
-        if self.state != Channel.OPEN:
+        if self.state != self.State.OPEN:
             raise InvalidStateError('channel not open')
 
         self.response = asyncio.get_running_loop().create_future()
@@ -787,14 +795,14 @@ class Channel(EventEmitter):
             )
 
     async def connect(self) -> None:
-        if self.state != Channel.CLOSED:
+        if self.state != self.State.CLOSED:
             raise InvalidStateError('invalid state')
 
         # Check that we can start a new connection
         if self.connection_result:
             raise RuntimeError('connection already pending')
 
-        self.change_state(Channel.WAIT_CONNECT_RSP)
+        self._change_state(self.State.WAIT_CONNECT_RSP)
         self.send_control_frame(
             L2CAP_Connection_Request(
                 identifier=self.manager.next_identifier(self.connection),
@@ -814,10 +822,10 @@ class Channel(EventEmitter):
             self.connection_result = None
 
     async def disconnect(self) -> None:
-        if self.state != Channel.OPEN:
+        if self.state != self.State.OPEN:
             raise InvalidStateError('invalid state')
 
-        self.change_state(Channel.WAIT_DISCONNECT)
+        self._change_state(self.State.WAIT_DISCONNECT)
         self.send_control_frame(
             L2CAP_Disconnection_Request(
                 identifier=self.manager.next_identifier(self.connection),
@@ -832,8 +840,8 @@ class Channel(EventEmitter):
         return await self.disconnection_result
 
     def abort(self) -> None:
-        if self.state == self.OPEN:
-            self.change_state(self.CLOSED)
+        if self.state == self.State.OPEN:
+            self._change_state(self.State.CLOSED)
             self.emit('close')
 
     def send_configure_request(self) -> None:
@@ -856,7 +864,7 @@ class Channel(EventEmitter):
 
     def on_connection_request(self, request) -> None:
         self.destination_cid = request.source_cid
-        self.change_state(Channel.WAIT_CONNECT)
+        self._change_state(self.State.WAIT_CONNECT)
         self.send_control_frame(
             L2CAP_Connection_Response(
                 identifier=request.identifier,
@@ -866,24 +874,24 @@ class Channel(EventEmitter):
                 status=0x0000,
             )
         )
-        self.change_state(Channel.WAIT_CONFIG)
+        self._change_state(self.State.WAIT_CONFIG)
         self.send_configure_request()
-        self.change_state(Channel.WAIT_CONFIG_REQ_RSP)
+        self._change_state(self.State.WAIT_CONFIG_REQ_RSP)
 
     def on_connection_response(self, response):
-        if self.state != Channel.WAIT_CONNECT_RSP:
+        if self.state != self.State.WAIT_CONNECT_RSP:
             logger.warning(color('invalid state', 'red'))
             return
 
         if response.result == L2CAP_Connection_Response.CONNECTION_SUCCESSFUL:
             self.destination_cid = response.destination_cid
-            self.change_state(Channel.WAIT_CONFIG)
+            self._change_state(self.State.WAIT_CONFIG)
             self.send_configure_request()
-            self.change_state(Channel.WAIT_CONFIG_REQ_RSP)
+            self._change_state(self.State.WAIT_CONFIG_REQ_RSP)
         elif response.result == L2CAP_Connection_Response.CONNECTION_PENDING:
             pass
         else:
-            self.change_state(Channel.CLOSED)
+            self._change_state(self.State.CLOSED)
             self.connection_result.set_exception(
                 ProtocolError(
                     response.result,
@@ -895,9 +903,9 @@ class Channel(EventEmitter):
 
     def on_configure_request(self, request) -> None:
         if self.state not in (
-            Channel.WAIT_CONFIG,
-            Channel.WAIT_CONFIG_REQ,
-            Channel.WAIT_CONFIG_REQ_RSP,
+            self.State.WAIT_CONFIG,
+            self.State.WAIT_CONFIG_REQ,
+            self.State.WAIT_CONFIG_REQ_RSP,
         ):
             logger.warning(color('invalid state', 'red'))
             return
@@ -918,25 +926,28 @@ class Channel(EventEmitter):
                 options=request.options,  # TODO: don't accept everything blindly
             )
         )
-        if self.state == Channel.WAIT_CONFIG:
-            self.change_state(Channel.WAIT_SEND_CONFIG)
+        if self.state == self.State.WAIT_CONFIG:
+            self._change_state(self.State.WAIT_SEND_CONFIG)
             self.send_configure_request()
-            self.change_state(Channel.WAIT_CONFIG_RSP)
-        elif self.state == Channel.WAIT_CONFIG_REQ:
-            self.change_state(Channel.OPEN)
+            self._change_state(self.State.WAIT_CONFIG_RSP)
+        elif self.state == self.State.WAIT_CONFIG_REQ:
+            self._change_state(self.State.OPEN)
             if self.connection_result:
                 self.connection_result.set_result(None)
                 self.connection_result = None
             self.emit('open')
-        elif self.state == Channel.WAIT_CONFIG_REQ_RSP:
-            self.change_state(Channel.WAIT_CONFIG_RSP)
+        elif self.state == self.State.WAIT_CONFIG_REQ_RSP:
+            self._change_state(self.State.WAIT_CONFIG_RSP)
 
     def on_configure_response(self, response) -> None:
         if response.result == L2CAP_Configure_Response.SUCCESS:
-            if self.state == Channel.WAIT_CONFIG_REQ_RSP:
-                self.change_state(Channel.WAIT_CONFIG_REQ)
-            elif self.state in (Channel.WAIT_CONFIG_RSP, Channel.WAIT_CONTROL_IND):
-                self.change_state(Channel.OPEN)
+            if self.state == self.State.WAIT_CONFIG_REQ_RSP:
+                self._change_state(self.State.WAIT_CONFIG_REQ)
+            elif self.state in (
+                self.State.WAIT_CONFIG_RSP,
+                self.State.WAIT_CONTROL_IND,
+            ):
+                self._change_state(self.State.OPEN)
                 if self.connection_result:
                     self.connection_result.set_result(None)
                     self.connection_result = None
@@ -966,7 +977,7 @@ class Channel(EventEmitter):
             # TODO: decide how to fail gracefully
 
     def on_disconnection_request(self, request) -> None:
-        if self.state in (Channel.OPEN, Channel.WAIT_DISCONNECT):
+        if self.state in (self.State.OPEN, self.State.WAIT_DISCONNECT):
             self.send_control_frame(
                 L2CAP_Disconnection_Response(
                     identifier=request.identifier,
@@ -974,14 +985,14 @@ class Channel(EventEmitter):
                     source_cid=request.source_cid,
                 )
             )
-            self.change_state(Channel.CLOSED)
+            self._change_state(self.State.CLOSED)
             self.emit('close')
             self.manager.on_channel_closed(self)
         else:
             logger.warning(color('invalid state', 'red'))
 
     def on_disconnection_response(self, response) -> None:
-        if self.state != Channel.WAIT_DISCONNECT:
+        if self.state != self.State.WAIT_DISCONNECT:
             logger.warning(color('invalid state', 'red'))
             return
 
@@ -992,7 +1003,7 @@ class Channel(EventEmitter):
             logger.warning('unexpected source or destination CID')
             return
 
-        self.change_state(Channel.CLOSED)
+        self._change_state(self.State.CLOSED)
         if self.disconnection_result:
             self.disconnection_result.set_result(None)
             self.disconnection_result = None
@@ -1004,42 +1015,30 @@ class Channel(EventEmitter):
             f'Channel({self.source_cid}->{self.destination_cid}, '
             f'PSM={self.psm}, '
             f'MTU={self.mtu}, '
-            f'state={Channel.STATE_NAMES[self.state]})'
+            f'state={self.state.name})'
         )
 
 
 # -----------------------------------------------------------------------------
-class LeConnectionOrientedChannel(EventEmitter):
+class LeCreditBasedChannel(EventEmitter):
     """
     LE Credit-based Connection Oriented Channel
     """
 
-    INIT = 0
-    CONNECTED = 1
-    CONNECTING = 2
-    DISCONNECTING = 3
-    DISCONNECTED = 4
-    CONNECTION_ERROR = 5
-
-    STATE_NAMES = {
-        INIT: 'INIT',
-        CONNECTED: 'CONNECTED',
-        CONNECTING: 'CONNECTING',
-        DISCONNECTING: 'DISCONNECTING',
-        DISCONNECTED: 'DISCONNECTED',
-        CONNECTION_ERROR: 'CONNECTION_ERROR',
-    }
+    class State(enum.IntEnum):
+        INIT = 0
+        CONNECTED = 1
+        CONNECTING = 2
+        DISCONNECTING = 3
+        DISCONNECTED = 4
+        CONNECTION_ERROR = 5
 
     out_queue: Deque[bytes]
-    connection_result: Optional[asyncio.Future[LeConnectionOrientedChannel]]
+    connection_result: Optional[asyncio.Future[LeCreditBasedChannel]]
     disconnection_result: Optional[asyncio.Future[None]]
     out_sdu: Optional[bytes]
-    state: int
+    state: State
     connection: Connection
-
-    @staticmethod
-    def state_name(state: int) -> str:
-        return name_or_number(LeConnectionOrientedChannel.STATE_NAMES, state)
 
     def __init__(
         self,
@@ -1083,19 +1082,17 @@ class LeConnectionOrientedChannel(EventEmitter):
         self.drained.set()
 
         if connected:
-            self.state = LeConnectionOrientedChannel.CONNECTED
+            self.state = self.State.CONNECTED
         else:
-            self.state = LeConnectionOrientedChannel.INIT
+            self.state = self.State.INIT
 
-    def change_state(self, new_state: int) -> None:
-        logger.debug(
-            f'{self} state change -> {color(self.state_name(new_state), "cyan")}'
-        )
+    def _change_state(self, new_state: State) -> None:
+        logger.debug(f'{self} state change -> {color(new_state.name, "cyan")}')
         self.state = new_state
 
-        if new_state == self.CONNECTED:
+        if new_state == self.State.CONNECTED:
             self.emit('open')
-        elif new_state == self.DISCONNECTED:
+        elif new_state == self.State.DISCONNECTED:
             self.emit('close')
 
     def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
@@ -1104,9 +1101,9 @@ class LeConnectionOrientedChannel(EventEmitter):
     def send_control_frame(self, frame: L2CAP_Control_Frame) -> None:
         self.manager.send_control_frame(self.connection, L2CAP_LE_SIGNALING_CID, frame)
 
-    async def connect(self) -> LeConnectionOrientedChannel:
+    async def connect(self) -> LeCreditBasedChannel:
         # Check that we're in the right state
-        if self.state != self.INIT:
+        if self.state != self.State.INIT:
             raise InvalidStateError('not in a connectable state')
 
         # Check that we can start a new connection
@@ -1114,7 +1111,7 @@ class LeConnectionOrientedChannel(EventEmitter):
         if identifier in self.manager.le_coc_requests:
             raise RuntimeError('too many concurrent connection requests')
 
-        self.change_state(self.CONNECTING)
+        self._change_state(self.State.CONNECTING)
         request = L2CAP_LE_Credit_Based_Connection_Request(
             identifier=identifier,
             le_psm=self.le_psm,
@@ -1134,10 +1131,10 @@ class LeConnectionOrientedChannel(EventEmitter):
 
     async def disconnect(self) -> None:
         # Check that we're connected
-        if self.state != self.CONNECTED:
+        if self.state != self.State.CONNECTED:
             raise InvalidStateError('not connected')
 
-        self.change_state(self.DISCONNECTING)
+        self._change_state(self.State.DISCONNECTING)
         self.flush_output()
         self.send_control_frame(
             L2CAP_Disconnection_Request(
@@ -1153,15 +1150,15 @@ class LeConnectionOrientedChannel(EventEmitter):
         return await self.disconnection_result
 
     def abort(self) -> None:
-        if self.state == self.CONNECTED:
-            self.change_state(self.DISCONNECTED)
+        if self.state == self.State.CONNECTED:
+            self._change_state(self.State.DISCONNECTED)
 
     def on_pdu(self, pdu: bytes) -> None:
         if self.sink is None:
             logger.warning('received pdu without a sink')
             return
 
-        if self.state != self.CONNECTED:
+        if self.state != self.State.CONNECTED:
             logger.warning('received PDU while not connected, dropping')
 
         # Manage the peer credits
@@ -1240,7 +1237,7 @@ class LeConnectionOrientedChannel(EventEmitter):
             self.credits = response.initial_credits
             self.connected = True
             self.connection_result.set_result(self)
-            self.change_state(self.CONNECTED)
+            self._change_state(self.State.CONNECTED)
         else:
             self.connection_result.set_exception(
                 ProtocolError(
@@ -1251,7 +1248,7 @@ class LeConnectionOrientedChannel(EventEmitter):
                     ),
                 )
             )
-            self.change_state(self.CONNECTION_ERROR)
+            self._change_state(self.State.CONNECTION_ERROR)
 
         # Cleanup
         self.connection_result = None
@@ -1271,11 +1268,11 @@ class LeConnectionOrientedChannel(EventEmitter):
                 source_cid=request.source_cid,
             )
         )
-        self.change_state(self.DISCONNECTED)
+        self._change_state(self.State.DISCONNECTED)
         self.flush_output()
 
     def on_disconnection_response(self, response) -> None:
-        if self.state != self.DISCONNECTING:
+        if self.state != self.State.DISCONNECTING:
             logger.warning(color('invalid state', 'red'))
             return
 
@@ -1286,7 +1283,7 @@ class LeConnectionOrientedChannel(EventEmitter):
             logger.warning('unexpected source or destination CID')
             return
 
-        self.change_state(self.DISCONNECTED)
+        self._change_state(self.State.DISCONNECTED)
         if self.disconnection_result:
             self.disconnection_result.set_result(None)
             self.disconnection_result = None
@@ -1339,7 +1336,7 @@ class LeConnectionOrientedChannel(EventEmitter):
                 return
 
     def write(self, data: bytes) -> None:
-        if self.state != self.CONNECTED:
+        if self.state != self.State.CONNECTED:
             logger.warning('not connected, dropping data')
             return
 
@@ -1367,7 +1364,7 @@ class LeConnectionOrientedChannel(EventEmitter):
     def __str__(self) -> str:
         return (
             f'CoC({self.source_cid}->{self.destination_cid}, '
-            f'State={self.state_name(self.state)}, '
+            f'State={self.state.name}, '
             f'PSM={self.le_psm}, '
             f'MTU={self.mtu}/{self.peer_mtu}, '
             f'MPS={self.mps}/{self.peer_mps}, '
@@ -1376,14 +1373,66 @@ class LeConnectionOrientedChannel(EventEmitter):
 
 
 # -----------------------------------------------------------------------------
+class ClassicChannelServer(EventEmitter):
+    def __init__(
+        self,
+        manager: ChannelManager,
+        psm: int,
+        handler: Optional[Callable[[ClassicChannel], Any]],
+        mtu: int,
+    ) -> None:
+        super().__init__()
+        self.manager = manager
+        self.handler = handler
+        self.psm = psm
+        self.mtu = mtu
+
+    def on_connection(self, channel: ClassicChannel) -> None:
+        self.emit('connection', channel)
+        if self.handler:
+            self.handler(channel)
+
+    def close(self) -> None:
+        if self.psm in self.manager.servers:
+            del self.manager.servers[self.psm]
+
+
+# -----------------------------------------------------------------------------
+class LeCreditBasedChannelServer(EventEmitter):
+    def __init__(
+        self,
+        manager: ChannelManager,
+        psm: int,
+        handler: Optional[Callable[[LeCreditBasedChannel], Any]],
+        max_credits: int,
+        mtu: int,
+        mps: int,
+    ) -> None:
+        super().__init__()
+        self.manager = manager
+        self.handler = handler
+        self.psm = psm
+        self.max_credits = max_credits
+        self.mtu = mtu
+        self.mps = mps
+
+    def on_connection(self, channel: LeCreditBasedChannel) -> None:
+        self.emit('connection', channel)
+        if self.handler:
+            self.handler(channel)
+
+    def close(self) -> None:
+        if self.psm in self.manager.le_coc_servers:
+            del self.manager.le_coc_servers[self.psm]
+
+
+# -----------------------------------------------------------------------------
 class ChannelManager:
     identifiers: Dict[int, int]
-    channels: Dict[int, Dict[int, Union[Channel, LeConnectionOrientedChannel]]]
-    servers: Dict[int, Callable[[Channel], Any]]
-    le_coc_channels: Dict[int, Dict[int, LeConnectionOrientedChannel]]
-    le_coc_servers: Dict[
-        int, Tuple[Callable[[LeConnectionOrientedChannel], Any], int, int, int]
-    ]
+    channels: Dict[int, Dict[int, Union[ClassicChannel, LeCreditBasedChannel]]]
+    servers: Dict[int, ClassicChannelServer]
+    le_coc_channels: Dict[int, Dict[int, LeCreditBasedChannel]]
+    le_coc_servers: Dict[int, LeCreditBasedChannelServer]
     le_coc_requests: Dict[int, L2CAP_LE_Credit_Based_Connection_Request]
     fixed_channels: Dict[int, Optional[Callable[[int, bytes], Any]]]
     _host: Optional[Host]
@@ -1462,21 +1511,6 @@ class ChannelManager:
 
         raise RuntimeError('no free CID')
 
-    @staticmethod
-    def check_le_coc_parameters(max_credits: int, mtu: int, mps: int) -> None:
-        if (
-            max_credits < 1
-            or max_credits > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_CREDITS
-        ):
-            raise ValueError('max credits out of range')
-        if mtu < L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MTU:
-            raise ValueError('MTU too small')
-        if (
-            mps < L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MPS
-            or mps > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MPS
-        ):
-            raise ValueError('MPS out of range')
-
     def next_identifier(self, connection: Connection) -> int:
         identifier = (self.identifiers.setdefault(connection.handle, 0) + 1) % 256
         self.identifiers[connection.handle] = identifier
@@ -1491,8 +1525,22 @@ class ChannelManager:
         if cid in self.fixed_channels:
             del self.fixed_channels[cid]
 
-    def register_server(self, psm: int, server: Callable[[Channel], Any]) -> int:
-        if psm == 0:
+    @deprecated("Please use create_classic_channel_server")
+    def register_server(
+        self,
+        psm: int,
+        server: Callable[[ClassicChannel], Any],
+    ) -> int:
+        return self.create_classic_server(
+            handler=server, spec=ClassicChannelSpec(psm=psm)
+        ).psm
+
+    def create_classic_server(
+        self,
+        spec: ClassicChannelSpec,
+        handler: Optional[Callable[[ClassicChannel], Any]] = None,
+    ) -> ClassicChannelServer:
+        if spec.psm is None:
             # Find a free PSM
             for candidate in range(
                 L2CAP_PSM_DYNAMIC_RANGE_START, L2CAP_PSM_DYNAMIC_RANGE_END + 1, 2
@@ -1501,62 +1549,75 @@ class ChannelManager:
                     continue
                 if candidate in self.servers:
                     continue
-                psm = candidate
+                spec.psm = candidate
                 break
             else:
                 raise InvalidStateError('no free PSM')
         else:
             # Check that the PSM isn't already in use
-            if psm in self.servers:
+            if spec.psm in self.servers:
                 raise ValueError('PSM already in use')
 
             # Check that the PSM is valid
-            if psm % 2 == 0:
+            if spec.psm % 2 == 0:
                 raise ValueError('invalid PSM (not odd)')
-            check = psm >> 8
+            check = spec.psm >> 8
             while check:
                 if check % 2 != 0:
                     raise ValueError('invalid PSM')
                 check >>= 8
 
-        self.servers[psm] = server
+        self.servers[spec.psm] = ClassicChannelServer(self, spec.psm, handler, spec.mtu)
 
-        return psm
+        return self.servers[spec.psm]
 
+    @deprecated("Please use create_le_credit_based_server()")
     def register_le_coc_server(
         self,
         psm: int,
-        server: Callable[[LeConnectionOrientedChannel], Any],
-        max_credits: int = L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_INITIAL_CREDITS,
-        mtu: int = L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MTU,
-        mps: int = L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS,
+        server: Callable[[LeCreditBasedChannel], Any],
+        max_credits: int,
+        mtu: int,
+        mps: int,
     ) -> int:
-        self.check_le_coc_parameters(max_credits, mtu, mps)
+        return self.create_le_credit_based_server(
+            spec=LeCreditBasedChannelSpec(
+                psm=None if psm == 0 else psm, mtu=mtu, mps=mps, max_credits=max_credits
+            ),
+            handler=server,
+        ).psm
 
-        if psm == 0:
+    def create_le_credit_based_server(
+        self,
+        spec: LeCreditBasedChannelSpec,
+        handler: Optional[Callable[[LeCreditBasedChannel], Any]] = None,
+    ) -> LeCreditBasedChannelServer:
+        if spec.psm is None:
             # Find a free PSM
             for candidate in range(
                 L2CAP_LE_PSM_DYNAMIC_RANGE_START, L2CAP_LE_PSM_DYNAMIC_RANGE_END + 1
             ):
                 if candidate in self.le_coc_servers:
                     continue
-                psm = candidate
+                spec.psm = candidate
                 break
             else:
                 raise InvalidStateError('no free PSM')
         else:
             # Check that the PSM isn't already in use
-            if psm in self.le_coc_servers:
+            if spec.psm in self.le_coc_servers:
                 raise ValueError('PSM already in use')
 
-        self.le_coc_servers[psm] = (
-            server,
-            max_credits or L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_INITIAL_CREDITS,
-            mtu or L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MTU,
-            mps or L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS,
+        self.le_coc_servers[spec.psm] = LeCreditBasedChannelServer(
+            self,
+            spec.psm,
+            handler,
+            max_credits=spec.max_credits,
+            mtu=spec.mtu,
+            mps=spec.mps,
         )
 
-        return psm
+        return self.le_coc_servers[spec.psm]
 
     def on_disconnection(self, connection_handle: int, _reason: int) -> None:
         logger.debug(f'disconnection from {connection_handle}, cleaning up channels')
@@ -1683,13 +1744,13 @@ class ChannelManager:
             logger.debug(
                 f'creating server channel with cid={source_cid} for psm {request.psm}'
             )
-            channel = Channel(
-                self, connection, cid, request.psm, source_cid, L2CAP_MIN_BR_EDR_MTU
+            channel = ClassicChannel(
+                self, connection, cid, request.psm, source_cid, server.mtu
             )
             connection_channels[source_cid] = channel
 
             # Notify
-            server(channel)
+            server.on_connection(channel)
             channel.on_connection_request(request)
         else:
             logger.warning(
@@ -1911,7 +1972,7 @@ class ChannelManager:
         self, connection: Connection, cid: int, request
     ) -> None:
         if request.le_psm in self.le_coc_servers:
-            (server, max_credits, mtu, mps) = self.le_coc_servers[request.le_psm]
+            server = self.le_coc_servers[request.le_psm]
 
             # Check that the CID isn't already used
             le_connection_channels = self.le_coc_channels.setdefault(
@@ -1925,8 +1986,8 @@ class ChannelManager:
                     L2CAP_LE_Credit_Based_Connection_Response(
                         identifier=request.identifier,
                         destination_cid=0,
-                        mtu=mtu,
-                        mps=mps,
+                        mtu=server.mtu,
+                        mps=server.mps,
                         initial_credits=0,
                         # pylint: disable=line-too-long
                         result=L2CAP_LE_Credit_Based_Connection_Response.CONNECTION_REFUSED_SOURCE_CID_ALREADY_ALLOCATED,
@@ -1944,8 +2005,8 @@ class ChannelManager:
                     L2CAP_LE_Credit_Based_Connection_Response(
                         identifier=request.identifier,
                         destination_cid=0,
-                        mtu=mtu,
-                        mps=mps,
+                        mtu=server.mtu,
+                        mps=server.mps,
                         initial_credits=0,
                         # pylint: disable=line-too-long
                         result=L2CAP_LE_Credit_Based_Connection_Response.CONNECTION_REFUSED_NO_RESOURCES_AVAILABLE,
@@ -1958,18 +2019,18 @@ class ChannelManager:
                 f'creating LE CoC server channel with cid={source_cid} for psm '
                 f'{request.le_psm}'
             )
-            channel = LeConnectionOrientedChannel(
+            channel = LeCreditBasedChannel(
                 self,
                 connection,
                 request.le_psm,
                 source_cid,
                 request.source_cid,
-                mtu,
-                mps,
+                server.mtu,
+                server.mps,
                 request.initial_credits,
                 request.mtu,
                 request.mps,
-                max_credits,
+                server.max_credits,
                 True,
             )
             connection_channels[source_cid] = channel
@@ -1982,16 +2043,16 @@ class ChannelManager:
                 L2CAP_LE_Credit_Based_Connection_Response(
                     identifier=request.identifier,
                     destination_cid=source_cid,
-                    mtu=mtu,
-                    mps=mps,
-                    initial_credits=max_credits,
+                    mtu=server.mtu,
+                    mps=server.mps,
+                    initial_credits=server.max_credits,
                     # pylint: disable=line-too-long
                     result=L2CAP_LE_Credit_Based_Connection_Response.CONNECTION_SUCCESSFUL,
                 ),
             )
 
             # Notify
-            server(channel)
+            server.on_connection(channel)
         else:
             logger.info(
                 f'No LE server for connection 0x{connection.handle:04X} '
@@ -2046,37 +2107,51 @@ class ChannelManager:
 
         channel.on_credits(credit.credits)
 
-    def on_channel_closed(self, channel: Channel) -> None:
+    def on_channel_closed(self, channel: ClassicChannel) -> None:
         connection_channels = self.channels.get(channel.connection.handle)
         if connection_channels:
             if channel.source_cid in connection_channels:
                 del connection_channels[channel.source_cid]
 
+    @deprecated("Please use create_le_credit_based_channel()")
     async def open_le_coc(
         self, connection: Connection, psm: int, max_credits: int, mtu: int, mps: int
-    ) -> LeConnectionOrientedChannel:
-        self.check_le_coc_parameters(max_credits, mtu, mps)
+    ) -> LeCreditBasedChannel:
+        return await self.create_le_credit_based_channel(
+            connection=connection,
+            spec=LeCreditBasedChannelSpec(
+                psm=psm, max_credits=max_credits, mtu=mtu, mps=mps
+            ),
+        )
 
+    async def create_le_credit_based_channel(
+        self,
+        connection: Connection,
+        spec: LeCreditBasedChannelSpec,
+    ) -> LeCreditBasedChannel:
         # Find a free CID for the new channel
         connection_channels = self.channels.setdefault(connection.handle, {})
         source_cid = self.find_free_le_cid(connection_channels)
         if source_cid is None:  # Should never happen!
             raise RuntimeError('all CIDs already in use')
 
+        if spec.psm is None:
+            raise ValueError('PSM cannot be None')
+
         # Create the channel
-        logger.debug(f'creating coc channel with cid={source_cid} for psm {psm}')
-        channel = LeConnectionOrientedChannel(
+        logger.debug(f'creating coc channel with cid={source_cid} for psm {spec.psm}')
+        channel = LeCreditBasedChannel(
             manager=self,
             connection=connection,
-            le_psm=psm,
+            le_psm=spec.psm,
             source_cid=source_cid,
             destination_cid=0,
-            mtu=mtu,
-            mps=mps,
+            mtu=spec.mtu,
+            mps=spec.mps,
             credits=0,
             peer_mtu=0,
             peer_mps=0,
-            peer_credits=max_credits,
+            peer_credits=spec.max_credits,
             connected=False,
         )
         connection_channels[source_cid] = channel
@@ -2095,7 +2170,15 @@ class ChannelManager:
 
         return channel
 
-    async def connect(self, connection: Connection, psm: int) -> Channel:
+    @deprecated("Please use create_classic_channel()")
+    async def connect(self, connection: Connection, psm: int) -> ClassicChannel:
+        return await self.create_classic_channel(
+            connection=connection, spec=ClassicChannelSpec(psm=psm)
+        )
+
+    async def create_classic_channel(
+        self, connection: Connection, spec: ClassicChannelSpec
+    ) -> ClassicChannel:
         # NOTE: this implementation hard-codes BR/EDR
 
         # Find a free CID for a new channel
@@ -2104,10 +2187,20 @@ class ChannelManager:
         if source_cid is None:  # Should never happen!
             raise RuntimeError('all CIDs already in use')
 
+        if spec.psm is None:
+            raise ValueError('PSM cannot be None')
+
         # Create the channel
-        logger.debug(f'creating client channel with cid={source_cid} for psm {psm}')
-        channel = Channel(
-            self, connection, L2CAP_SIGNALING_CID, psm, source_cid, L2CAP_MIN_BR_EDR_MTU
+        logger.debug(
+            f'creating client channel with cid={source_cid} for psm {spec.psm}'
+        )
+        channel = ClassicChannel(
+            self,
+            connection,
+            L2CAP_SIGNALING_CID,
+            spec.psm,
+            source_cid,
+            spec.mtu,
         )
         connection_channels[source_cid] = channel
 
@@ -2119,3 +2212,20 @@ class ChannelManager:
             raise e
 
         return channel
+
+
+# -----------------------------------------------------------------------------
+# Deprecated Classes
+# -----------------------------------------------------------------------------
+
+
+class Channel(ClassicChannel):
+    @deprecated("Please use ClassicChannel")
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+
+class LeConnectionOrientedChannel(LeCreditBasedChannel):
+    @deprecated("Please use LeCreditBasedChannel")
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)

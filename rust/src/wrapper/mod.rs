@@ -22,13 +22,17 @@
 
 // Re-exported to make it easy for users to depend on the same `PyObject`, etc
 pub use pyo3;
+pub use pyo3_asyncio;
+
 use pyo3::{
+    intern,
     prelude::*,
     types::{PyDict, PyTuple},
 };
-pub use pyo3_asyncio;
 
 pub mod assigned_numbers;
+pub mod common;
+pub mod controller;
 pub mod core;
 pub mod device;
 pub mod drivers;
@@ -36,6 +40,7 @@ pub mod gatt_client;
 pub mod hci;
 pub mod host;
 pub mod l2cap;
+pub mod link;
 pub mod logging;
 pub mod profile;
 pub mod transport;
@@ -118,4 +123,12 @@ impl ClosureCallback {
     ) -> PyResult<Py<PyAny>> {
         (self.callback)(py, args, kwargs).map(|_| py.None())
     }
+}
+
+/// Wraps the Python function in a Python async function. `pyo3_asyncio` needs functions to be
+/// marked async to properly inject a running loop.
+pub(crate) fn wrap_python_async<'a>(py: Python<'a>, function: &'a PyAny) -> PyResult<&'a PyAny> {
+    PyModule::import(py, intern!(py, "bumble.utils"))?
+        .getattr(intern!(py, "wrap_async"))?
+        .call1((function,))
 }
