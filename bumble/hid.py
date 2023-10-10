@@ -208,11 +208,11 @@ class Host(EventEmitter):
 
     def on_l2cap_channel_open(self, l2cap_channel: l2cap.Channel) -> None:
         if l2cap_channel.psm == HID_CONTROL_PSM:
-            self.l2cap_ctrl_channel = l2cap_channel
-            self.l2cap_ctrl_channel.sink = self.on_ctrl_pdu
+            self.l2cap_ctrl_channel = l2cap_channel   # type: ignore
+            self.l2cap_ctrl_channel.sink = self.on_ctrl_pdu   # type: ignore
         else:
-            self.l2cap_intr_channel = l2cap_channel
-            self.l2cap_intr_channel.sink = self.on_intr_pdu
+            self.l2cap_intr_channel = l2cap_channel   # type: ignore
+            self.l2cap_intr_channel.sink = self.on_intr_pdu   # type: ignore
         logger.debug(f'$$$ L2CAP channel open: {l2cap_channel}')
 
     def on_ctrl_pdu(self, pdu: bytes) -> None:
@@ -300,4 +300,3 @@ class Host(EventEmitter):
         msg = bytearray([header])
         logger.debug(f'>>> HID CONTROL VIRTUAL CABLE UNPLUG, PDU: {msg.hex()}')
         self.l2cap_ctrl_channel.send_pdu(msg)  # type: ignore
-

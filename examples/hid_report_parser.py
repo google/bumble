@@ -23,7 +23,7 @@ def get_key(modifier: str, key: str) -> str:
 class Keyboard:
     def __init__(self):  # type: ignore
         self.report = [
-            [       # Bit array for Modifier keys
+            [  # Bit array for Modifier keys
                 0,  # Right GUI - (usually the Windows key)
                 0,  # Right ALT
                 0,  # Right Shift
@@ -33,8 +33,8 @@ class Keyboard:
                 0,  # Left Shift
                 0,  # Left Control
             ],
-            0x00,   # Vendor reserved
-            '',     # Rest is space for 6 keys
+            0x00,  # Vendor reserved
+            '',  # Rest is space for 6 keys
             '',
             '',
             '',
@@ -60,17 +60,27 @@ class Keyboard:
         print(color('\tKeyboard Input Received', 'green', None, 'bold'))
         print(color(f'Keys:', 'white', None, 'bold'))
         for i in range(1, 7):
-            print(color(f' Key{i}{" ":>8s}=  ', 'cyan', None, 'bold'), self.report[i + 1])
+            print(
+                color(f' Key{i}{" ":>8s}=  ', 'cyan', None, 'bold'), self.report[i + 1]
+            )
         print(color(f'\nModifier Keys:', 'white', None, 'bold'))
         print(
-            color(f'  Left Ctrl   : ', 'cyan'), f'{self.report[0][0] == 1!s:<5}',  # type: ignore
-            color(f'  Left Shift  : ', 'cyan'), f'{self.report[0][1] == 1!s:<5}',  # type: ignore
-            color(f'  Left ALT    : ', 'cyan'), f'{self.report[0][2] == 1!s:<5}',  # type: ignore
-            color(f'  Left GUI    : ', 'cyan'), f'{self.report[0][3] == 1!s:<5}\n',  # type: ignore
-            color(f' Right Ctrl  : ', 'cyan'), f'{self.report[0][4] == 1!s:<5}',  # type: ignore
-            color(f'  Right Shift : ', 'cyan'), f'{self.report[0][5] == 1!s:<5}',  # type: ignore
-            color(f'  Right ALT   : ', 'cyan'), f'{self.report[0][6] == 1!s:<5}',  # type: ignore
-            color(f'  Right GUI   : ', 'cyan'), f'{self.report[0][7] == 1!s:<5}',  # type: ignore
+            color(f'  Left Ctrl   : ', 'cyan'),
+            f'{self.report[0][0] == 1!s:<5}',  # type: ignore
+            color(f'  Left Shift  : ', 'cyan'),
+            f'{self.report[0][1] == 1!s:<5}',  # type: ignore
+            color(f'  Left ALT    : ', 'cyan'),
+            f'{self.report[0][2] == 1!s:<5}',  # type: ignore
+            color(f'  Left GUI    : ', 'cyan'),
+            f'{self.report[0][3] == 1!s:<5}\n',  # type: ignore
+            color(f' Right Ctrl  : ', 'cyan'),
+            f'{self.report[0][4] == 1!s:<5}',  # type: ignore
+            color(f'  Right Shift : ', 'cyan'),
+            f'{self.report[0][5] == 1!s:<5}',  # type: ignore
+            color(f'  Right ALT   : ', 'cyan'),
+            f'{self.report[0][6] == 1!s:<5}',  # type: ignore
+            color(f'  Right GUI   : ', 'cyan'),
+            f'{self.report[0][7] == 1!s:<5}',  # type: ignore
         )
 
 
@@ -78,7 +88,7 @@ class Keyboard:
 class Mouse:
     def __init__(self):  # type: ignore
         self.report = [
-            [       # Bit array for Buttons
+            [  # Bit array for Buttons
                 0,  # Button 1 (primary/trigger
                 0,  # Button 2 (secondary)
                 0,  # Button 3 (tertiary)
@@ -106,23 +116,32 @@ class Mouse:
     def print_mouse_report(self) -> None:
         print(color('\tMouse Input Received', 'green', None, 'bold'))
         print(
-            color(f' Button 1 (primary/trigger) = ', 'cyan'), self.report[0][0] == 1,  # type: ignore
-            color(f'\n Button 2 (secondary)       = ', 'cyan'), self.report[0][1] == 1,  # type: ignore
-            color(f'\n Button 3 (tertiary)        = ', 'cyan'), self.report[0][2] == 1,  # type: ignore
-            color(f'\n Button4                    = ', 'cyan'), self.report[0][3] == 1,  # type: ignore
-            color(f'\n Button5                    = ', 'cyan'), self.report[0][4] == 1,  # type: ignore
-            color(f'\n X (X-axis displacement)    = ', 'cyan'), self.report[1],
-            color(f'\n Y (Y-axis displacement)    = ', 'cyan'), self.report[2],
-            color(f'\n Wheel                      = ', 'cyan'), self.report[3],
-            color(f'\n AC PAN                     = ', 'cyan'), self.report[4],
+            color(f' Button 1 (primary/trigger) = ', 'cyan'),
+            self.report[0][0] == 1,  # type: ignore
+            color(f'\n Button 2 (secondary)       = ', 'cyan'),
+            self.report[0][1] == 1,  # type: ignore
+            color(f'\n Button 3 (tertiary)        = ', 'cyan'),
+            self.report[0][2] == 1,  # type: ignore
+            color(f'\n Button4                    = ', 'cyan'),
+            self.report[0][3] == 1,  # type: ignore
+            color(f'\n Button5                    = ', 'cyan'),
+            self.report[0][4] == 1,  # type: ignore
+            color(f'\n X (X-axis displacement)    = ', 'cyan'),
+            self.report[1],
+            color(f'\n Y (Y-axis displacement)    = ', 'cyan'),
+            self.report[2],
+            color(f'\n Wheel                      = ', 'cyan'),
+            self.report[3],
+            color(f'\n AC PAN                     = ', 'cyan'),
+            self.report[4],
         )
 
 
 # ------------------------------------------------------------------------------
 class ReportParser:
-    def parse_input_report(input_report: bytes) -> None:  # type: ignore
+    def parse_input_report(self, input_report: bytes) -> None:  # type: ignore
 
-        report_id = input_report[0]
+        report_id = input_report[0]  # pylint: disable=unsubscriptable-object
         report_length = len(input_report)
 
         # Keyboard input report (report id = 1)
