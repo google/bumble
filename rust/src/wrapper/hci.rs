@@ -157,6 +157,9 @@ impl TryInto<packets::Address> for Address {
     fn try_into(self) -> Result<packets::Address, Self::Error> {
         let addr_le_bytes = self.as_le_bytes().map_err(ConversionError::Python)?;
 
+        // packets::Address only supports converting from a u64 (TODO: update if/when it supports converting from [u8; 6] -- https://github.com/google/pdl/issues/75)
+        // So first we take the python `Address` little-endian bytes (6 bytes), copy them into a
+        // [u8; 8] in little-endian format, and finally convert it into a u64.
         let mut buf = [0_u8; 8];
         buf[0..6].copy_from_slice(&addr_le_bytes);
         let address_u64 = u64::from_le_bytes(buf);

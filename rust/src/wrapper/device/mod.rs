@@ -97,6 +97,9 @@ pub struct Device {
 }
 
 impl Device {
+    #[cfg(feature = "unstable_extended_adv")]
+    const ADVERTISING_HANDLE_EXTENDED: u8 = 0x00;
+
     /// Creates a Device. When optional arguments are not specified, the Python object specifies the
     /// defaults.
     pub fn new(
@@ -158,6 +161,9 @@ impl Device {
     }
 
     /// Sends an HCI command on this Device, returning the command's event result.
+    ///
+    /// When `check_result` is `true`, then an `Err` will be returned if the controller's response
+    /// did not have an event code of "success".
     pub async fn send_command(&self, command: Command, check_result: bool) -> PyResult<Event> {
         let bumble_hci_command = HciCommand::try_from(command)?;
         Python::with_gil(|py| {
@@ -270,10 +276,16 @@ impl Device {
     }
 
     /// Start advertising the data set with [Device.set_advertisement].
+    ///
+    /// When `auto_restart` is set to `true`, then the device will automatically restart advertising
+    /// when a connected device is disconnected.
     pub async fn start_advertising(&mut self, auto_restart: bool) -> PyResult<()> {
         if self.advertising_status == AdvertisingStatus::AdvertisingExtended {
             return Err(PyErr::new::<PyException, _>("Already advertising in extended mode. Stop the existing extended advertisement to start a legacy advertisement."));
         }
+        // Bumble allows (and currently ignores) calling `start_advertising` when already
+        // advertising. Because that behavior may change in the future, we continue to delegate the
+        // handling to bumble.
 
         Python::with_gil(|py| {
             let kwargs = PyDict::new(py);
@@ -309,9 +321,6 @@ impl Device {
             _ => {}
         }
 
-        // if you change this, don't forget to change the same handle in `stop_advertising_extended`
-        let advertising_handle = 0x00;
-
         // set extended params
         let properties = AdvertisingEventProperties {
             connectable: 0,
@@ -325,7 +334,7 @@ impl Device {
         let extended_advertising_params_cmd = LeSetExtendedAdvertisingParametersBuilder {
             advertising_event_properties: properties,
             advertising_filter_policy: AdvertisingFilterPolicy::AllDevices,
-            advertising_handle,
+            advertising_handle: Self::ADVERTISING_HANDLE_EXTENDED,
             advertising_sid: 0,
             advertising_tx_power: 0,
             own_address_type: OwnAddressType::RandomDeviceAddress,
@@ -349,7 +358,7 @@ impl Device {
                 ConversionError::Native(e) => PyErr::new::<PyException, _>(format!("{e:?}")),
             })?;
         let random_address_cmd = LeSetAdvertisingSetRandomAddressBuilder {
-            advertising_handle,
+            advertising_handle: Self::ADVERTISING_HANDLE_EXTENDED,
             random_address,
         };
         self.send_command(random_address_cmd.into(), true).await?;
@@ -357,7 +366,7 @@ impl Device {
         // set adv data
         let advertising_data_cmd = LeSetExtendedAdvertisingDataBuilder {
             advertising_data: adv_data.into_bytes(),
-            advertising_handle,
+            advertising_handle: Self::ADVERTISING_HANDLE_EXTENDED,
             fragment_preference: FragmentPreference::ControllerMayFragment,
             operation: Operation::CompleteAdvertisement,
         };
@@ -367,7 +376,7 @@ impl Device {
         let extended_advertising_enable_cmd = LeSetExtendedAdvertisingEnableBuilder {
             enable: Enable::Enabled,
             enabled_sets: vec![EnabledSet {
-                advertising_handle,
+                advertising_handle: Self::ADVERTISING_HANDLE_EXTENDED,
                 duration: 0,
                 max_extended_advertising_events: 0,
             }],
@@ -406,7 +415,7 @@ impl Device {
         let extended_advertising_enable_cmd = LeSetExtendedAdvertisingEnableBuilder {
             enable: Enable::Disabled,
             enabled_sets: vec![EnabledSet {
-                advertising_handle: 0x00,
+                advertising_handle: Self::ADVERTISING_HANDLE_EXTENDED,
                 duration: 0,
                 max_extended_advertising_events: 0,
             }],
