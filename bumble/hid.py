@@ -138,8 +138,8 @@ class SetProtocolMessage(Message):
 
 @dataclass
 class SendData(Message):
-    message_type = Message.MessageType.DATA
     data : bytes
+    message_type = Message.MessageType.DATA
 
     def __bytes__(self) -> bytes:
         return self.header(Message.ReportType.OUTPUT_REPORT) + self.data
