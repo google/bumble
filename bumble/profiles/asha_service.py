@@ -19,6 +19,8 @@
 import struct
 import logging
 from typing import List
+
+from bumble import l2cap
 from ..core import AdvertisingData
 from ..device import Device, Connection
 from ..gatt import (
@@ -149,7 +151,10 @@ class AshaService(TemplateService):
             channel.sink = on_data
 
         # let the server find a free PSM
-        self.psm = self.device.register_l2cap_channel_server(self.psm, on_coc, 8)
+        self.psm = device.create_l2cap_server(
+            spec=l2cap.LeCreditBasedChannelSpec(psm=self.psm, max_credits=8),
+            handler=on_coc,
+        ).psm
         self.le_psm_out_characteristic = Characteristic(
             GATT_ASHA_LE_PSM_OUT_CHARACTERISTIC,
             Characteristic.Properties.READ,

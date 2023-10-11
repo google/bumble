@@ -24,6 +24,7 @@ import time
 
 import click
 
+from bumble import l2cap
 from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     BT_LE_TRANSPORT,
@@ -84,6 +85,7 @@ DEFAULT_L2CAP_MPS = 1024
 DEFAULT_LINGER_TIME = 1.0
 
 DEFAULT_RFCOMM_CHANNEL = 8
+
 
 # -----------------------------------------------------------------------------
 # Utils
@@ -196,6 +198,7 @@ class PacketType(enum.IntEnum):
 
 
 PACKET_FLAG_LAST = 1
+
 
 # -----------------------------------------------------------------------------
 # Sender
@@ -659,17 +662,19 @@ class L2capClient(StreamedPacketIO):
         self.mps = mps
         self.ready = asyncio.Event()
 
-    async def on_connection(self, connection):
+    async def on_connection(self, connection: Connection) -> None:
         connection.on('disconnection', self.on_disconnection)
 
         # Connect a new L2CAP channel
         print(color(f'>>> Opening L2CAP channel on PSM = {self.psm}', 'yellow'))
         try:
-            l2cap_channel = await connection.open_l2cap_channel(
-                psm=self.psm,
-                max_credits=self.max_credits,
-                mtu=self.mtu,
-                mps=self.mps,
+            l2cap_channel = await connection.create_l2cap_channel(
+                spec=l2cap.LeCreditBasedChannelSpec(
+                    psm=self.psm,
+                    max_credits=self.max_credits,
+                    mtu=self.mtu,
+                    mps=self.mps,
+                )
             )
             print(color('*** L2CAP channel:', 'cyan'), l2cap_channel)
         except Exception as error:
@@ -695,7 +700,7 @@ class L2capClient(StreamedPacketIO):
 class L2capServer(StreamedPacketIO):
     def __init__(
         self,
-        device,
+        device: Device,
         psm=DEFAULT_L2CAP_PSM,
         max_credits=DEFAULT_L2CAP_MAX_CREDITS,
         mtu=DEFAULT_L2CAP_MTU,
@@ -706,12 +711,11 @@ class L2capServer(StreamedPacketIO):
         self.ready = asyncio.Event()
 
         # Listen for incoming L2CAP CoC connections
-        device.register_l2cap_channel_server(
-            psm=psm,
-            server=self.on_l2cap_channel,
-            max_credits=max_credits,
-            mtu=mtu,
-            mps=mps,
+        device.create_l2cap_server(
+            spec=l2cap.LeCreditBasedChannelSpec(
+                psm=psm, mtu=mtu, mps=mps, max_credits=max_credits
+            ),
+            handler=self.on_l2cap_channel,
         )
         print(color(f'### Listening for CoC connection on PSM {psm}', 'yellow'))
 

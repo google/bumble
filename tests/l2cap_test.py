@@ -22,7 +22,11 @@ import random
 import pytest
 
 from bumble.core import ProtocolError
-from bumble.l2cap import L2CAP_Connection_Request
+from bumble.l2cap import (
+    L2CAP_Connection_Request,
+    ClassicChannelSpec,
+    LeCreditBasedChannelSpec,
+)
 from .test_utils import TwoDevices
 
 
@@ -80,7 +84,9 @@ async def test_basic_connection():
 
     # Check that if there's no one listening, we can't connect
     with pytest.raises(ProtocolError):
-        l2cap_channel = await devices.connections[0].open_l2cap_channel(psm)
+        l2cap_channel = await devices.connections[0].create_l2cap_channel(
+            spec=LeCreditBasedChannelSpec(psm)
+        )
 
     # Now add a listener
     incoming_channel = None
@@ -95,8 +101,12 @@ async def test_basic_connection():
 
         channel.sink = on_data
 
-    devices.devices[1].register_l2cap_channel_server(psm, on_coc)
-    l2cap_channel = await devices.connections[0].open_l2cap_channel(psm)
+    devices.devices[1].create_l2cap_server(
+        spec=LeCreditBasedChannelSpec(psm=1234), handler=on_coc
+    )
+    l2cap_channel = await devices.connections[0].create_l2cap_channel(
+        spec=LeCreditBasedChannelSpec(psm)
+    )
 
     messages = (bytes([1, 2, 3]), bytes([4, 5, 6]), bytes(10000))
     for message in messages:
@@ -138,10 +148,13 @@ async def transfer_payload(max_credits, mtu, mps):
 
         channel.sink = on_data
 
-    psm = devices.devices[1].register_l2cap_channel_server(
-        psm=0, server=on_coc, max_credits=max_credits, mtu=mtu, mps=mps
+    server = devices.devices[1].create_l2cap_server(
+        spec=LeCreditBasedChannelSpec(max_credits=max_credits, mtu=mtu, mps=mps),
+        handler=on_coc,
     )
-    l2cap_channel = await devices.connections[0].open_l2cap_channel(psm)
+    l2cap_channel = await devices.connections[0].create_l2cap_channel(
+        spec=LeCreditBasedChannelSpec(server.psm)
+    )
 
     messages = [bytes([1, 2, 3, 4, 5, 6, 7]) * x for x in (3, 10, 100, 789)]
     for message in messages:
@@ -189,8 +202,12 @@ async def test_bidirectional_transfer():
     def on_client_data(data):
         client_received.append(data)
 
-    psm = devices.devices[1].register_l2cap_channel_server(psm=0, server=on_server_coc)
-    client_channel = await devices.connections[0].open_l2cap_channel(psm)
+    server = devices.devices[1].create_l2cap_server(
+        spec=LeCreditBasedChannelSpec(), handler=on_server_coc
+    )
+    client_channel = await devices.connections[0].create_l2cap_channel(
+        spec=LeCreditBasedChannelSpec(server.psm)
+    )
     client_channel.sink = on_client_data
 
     messages = [bytes([1, 2, 3, 4, 5, 6, 7]) * x for x in (3, 10, 100)]

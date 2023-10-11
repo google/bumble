@@ -1036,9 +1036,11 @@ class LeCreditBasedChannel(EventEmitter):
     out_queue: Deque[bytes]
     connection_result: Optional[asyncio.Future[LeCreditBasedChannel]]
     disconnection_result: Optional[asyncio.Future[None]]
+    in_sdu: Optional[bytes]
     out_sdu: Optional[bytes]
     state: State
     connection: Connection
+    sink: Optional[Callable[[bytes], Any]]
 
     def __init__(
         self,
@@ -1525,7 +1527,7 @@ class ChannelManager:
         if cid in self.fixed_channels:
             del self.fixed_channels[cid]
 
-    @deprecated("Please use create_classic_channel_server")
+    @deprecated("Please use create_classic_server")
     def register_server(
         self,
         psm: int,
@@ -1540,7 +1542,7 @@ class ChannelManager:
         spec: ClassicChannelSpec,
         handler: Optional[Callable[[ClassicChannel], Any]] = None,
     ) -> ClassicChannelServer:
-        if spec.psm is None:
+        if not spec.psm:
             # Find a free PSM
             for candidate in range(
                 L2CAP_PSM_DYNAMIC_RANGE_START, L2CAP_PSM_DYNAMIC_RANGE_END + 1, 2
@@ -1592,7 +1594,7 @@ class ChannelManager:
         spec: LeCreditBasedChannelSpec,
         handler: Optional[Callable[[LeCreditBasedChannel], Any]] = None,
     ) -> LeCreditBasedChannelServer:
-        if spec.psm is None:
+        if not spec.psm:
             # Find a free PSM
             for candidate in range(
                 L2CAP_LE_PSM_DYNAMIC_RANGE_START, L2CAP_LE_PSM_DYNAMIC_RANGE_END + 1

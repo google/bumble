@@ -21,6 +21,7 @@ import struct
 import logging
 import click
 
+from bumble import l2cap
 from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.core import AdvertisingData
@@ -204,7 +205,7 @@ class GattlinkHubBridge(GattlinkL2capEndpoint, Device.Listener):
 
 # -----------------------------------------------------------------------------
 class GattlinkNodeBridge(GattlinkL2capEndpoint, Device.Listener):
-    def __init__(self, device):
+    def __init__(self, device: Device):
         super().__init__()
         self.device = device
         self.peer = None
@@ -218,7 +219,12 @@ class GattlinkNodeBridge(GattlinkL2capEndpoint, Device.Listener):
 
         # Listen for incoming L2CAP CoC connections
         psm = 0xFB
-        device.register_l2cap_channel_server(0xFB, self.on_coc)
+        device.create_l2cap_server(
+            spec=l2cap.LeCreditBasedChannelSpec(
+                psm=0xFB,
+            ),
+            handler=self.on_coc,
+        )
         print(f'### Listening for CoC connection on PSM {psm}')
 
         # Setup the Gattlink service

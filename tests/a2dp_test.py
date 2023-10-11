@@ -185,7 +185,7 @@ async def test_source_sink_1():
         sink.on('rtp_packet', on_rtp_packet)
 
     # Create a listener to wait for AVDTP connections
-    listener = Listener(Listener.create_registrar(two_devices.devices[1]))
+    listener = Listener.for_device(two_devices.devices[1])
     listener.on('connection', on_avdtp_connection)
 
     async def make_connection():
