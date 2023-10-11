@@ -306,6 +306,7 @@ async def pair(
         # Expose a GATT characteristic that can be used to trigger pairing by
         # responding with an authentication error when read
         if mode == 'le':
+            device.le_enabled = True
             device.add_service(
                 Service(
                     '50DB505C-8AC4-4738-8448-3B1D9CC09CC5',
@@ -326,7 +327,6 @@ async def pair(
         # Select LE or Classic
         if mode == 'classic':
             device.classic_enabled = True
-            device.le_enabled = False
             device.classic_smp_enabled = ctkd
 
         # Get things going
