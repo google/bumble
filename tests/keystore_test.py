@@ -94,6 +94,7 @@ def temporary_file():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_basic(temporary_file):
     with open(temporary_file, mode='w', encoding='utf-8') as file:
         file.write("{}")
@@ -125,6 +126,7 @@ async def test_basic(temporary_file):
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_parsing(temporary_file):
     with open(temporary_file, mode='w', encoding='utf-8') as file:
         file.write(JSON1)
@@ -137,6 +139,7 @@ async def test_parsing(temporary_file):
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_default_namespace(temporary_file):
     with open(temporary_file, mode='w', encoding='utf-8') as file:
         file.write(JSON1)
