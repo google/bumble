@@ -18,6 +18,7 @@
 import asyncio
 import logging
 import os
+import pytest
 
 from bumble.core import UUID, BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID
 from bumble.sdp import (
@@ -202,6 +203,7 @@ def sdp_records():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_service_search():
     # Setup connections
     devices = TwoDevices()
@@ -224,6 +226,7 @@ async def test_service_search():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_service_attribute():
     # Setup connections
     devices = TwoDevices()
@@ -244,6 +247,7 @@ async def test_service_attribute():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_service_search_attribute():
     # Setup connections
     devices = TwoDevices()
