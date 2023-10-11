@@ -111,14 +111,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         appViewModel.loadPreferences(getPreferences(Context.MODE_PRIVATE))
 
+        val tcpPort = intent.getIntExtra("port", -1)
+        if (tcpPort >= 0) {
+            appViewModel.tcpPort = tcpPport
+        }
+
         setContent {
             MainView(appViewModel, ::startProxy)
         }
 
-        run()
-    }
-
-    private fun run() {
+        if (intent.getBooleanExtra("autostart", false)) {
+            startProxy()
+        }
     }
 
     private fun startProxy() {

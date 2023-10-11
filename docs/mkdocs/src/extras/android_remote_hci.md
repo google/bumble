@@ -79,10 +79,32 @@ Airplane Mode, then rebooting. The bluetooth process should, in theory, not rest
     $ adb shell cmd bluetooth_manager disable
     ```
 
-### Selecting a TCP port
+### Starting the app
+You can start the app from the Android launcher, from Android Studio, or with `adb`
+
+#### Launching from the launcher
+Just tap the app icon on the launcher, check the TCP port that is configured, and tap
+the "Start" button.
+
+#### Launching with `adb`
+Using the `am` command, you can start the activity, and pass it arguments so that you can
+automatically start the proxy, and/or set the port number.
+
+!!! tip "Launching from adb with auto-start"
+    ```bash
+    $ adb shell am start -n com.github.google.bumble.remotehci/.MainActivity --ez autostart true
+    ```
+
+!!! tip "Launching from adb with auto-start and a port"
+    In this example, we auto-start the proxy upon launch, with the port set to 9995
+    ```bash
+    $ adb shell am start -n com.github.google.bumble.remotehci/.MainActivity --ez autostart true --ei port 9995
+    ```
+
+#### Selecting a TCP port
 The RemoteHCI app's main activity has a "TCP Port" setting where you can change the port on
 which the proxy is accepting connections. If the default value isn't suitable, you can 
-change it there.
+change it there (you can also use the special value 0 to let the OS assign a port number for you).
 
 ### Connecting to the proxy
 To connect the Bumble stack to the proxy, you need to be able to reach the phone's network 

@@ -39,31 +39,30 @@ public class HciServer {
 
     private void loop() throws IOException {
         mListener.onHostConnectionState(false);
-        mListener.onMessage("Waiting for connection on port " + mPort);
-        try (
-            ServerSocket serverSocket = new ServerSocket(mPort);
-            Socket clientSocket = serverSocket.accept()
-        ) {
-            mListener.onHostConnectionState(true);
-            mListener.onMessage("Connected");
-            HciParser parser = new HciParser(mListener);
-            InputStream inputStream = clientSocket.getInputStream();
-            synchronized (this) {
-                mOutputStream = clientSocket.getOutputStream();
-            }
-            byte[] buffer = new byte[BUFFER_SIZE];
-
-            try {
-                for (;;) {
-                    int bytesRead = inputStream.read(buffer);
-                    if (bytesRead < 0) {
-                        Log.d(TAG, "end of stream");
-                        break;
-                    }
-                    parser.feedData(buffer, bytesRead);
+        try (ServerSocket serverSocket = new ServerSocket(mPort)) {
+            mListener.onMessage("Waiting for connection on port " + serverSocket.getLocalPort());
+            try (Socket clientSocket = serverSocket.accept()) {
+                mListener.onHostConnectionState(true);
+                mListener.onMessage("Connected");
+                HciParser parser = new HciParser(mListener);
+                InputStream inputStream = clientSocket.getInputStream();
+                synchronized (this) {
+                    mOutputStream = clientSocket.getOutputStream();
                 }
-            } catch (IOException error) {
-                Log.d(TAG, "exception in read loop: " + error);
+                byte[] buffer = new byte[BUFFER_SIZE];
+
+                try {
+                    for (; ; ) {
+                        int bytesRead = inputStream.read(buffer);
+                        if (bytesRead < 0) {
+                            Log.d(TAG, "end of stream");
+                            break;
+                        }
+                        parser.feedData(buffer, bytesRead);
+                    }
+                } catch (IOException error) {
+                    Log.d(TAG, "exception in read loop: " + error);
+                }
             }
         } finally {
             synchronized (this) {
