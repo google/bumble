@@ -178,7 +178,11 @@ impl IntoPy<PyObject> for AddressType {
 
 impl<'source> FromPyObject<'source> for ErrorCode {
     fn extract(ob: &'source PyAny) -> PyResult<Self> {
-        ob.extract()
+        // Bumble represents error codes simply as a single-byte number (in Rust, u8)
+        let value: u8 = ob.extract()?;
+        ErrorCode::try_from(value).map_err(|b| {
+            PyErr::new::<PyException, _>(format!("Failed to map {b} to an error code"))
+        })
     }
 }
 
