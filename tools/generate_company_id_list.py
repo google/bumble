@@ -28,7 +28,6 @@ import yaml
 # -----------------------------------------------------------------------------
 with open(sys.argv[1], "r") as yaml_file:
     root = yaml.safe_load(yaml_file)
-    #print(root)
     companies = {}
     for company in root["company_identifiers"]:
         companies[company["value"]] = company["name"]
