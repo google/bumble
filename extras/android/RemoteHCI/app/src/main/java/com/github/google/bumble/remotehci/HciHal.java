@@ -156,7 +156,7 @@ class HciAidlHal extends android.hardware.bluetooth.IBluetoothHciCallbacks.Stub 
     private static final String TAG = "HciAidlHal";
     private final android.hardware.bluetooth.IBluetoothHci mHciService;
     private final HciHalCallback mHciCallbacks;
-    private int mInitializationStatus = android.hardware.bluetooth.Status.SUCCESS; //-1;
+    private int mInitializationStatus = android.hardware.bluetooth.Status.SUCCESS;
 
     public static HciAidlHal create(HciHalCallback hciCallbacks) {
         IBinder binder = ServiceManager.getService("android.hardware.bluetooth.IBluetoothHci/default");
@@ -233,7 +233,7 @@ class HciAidlHal extends android.hardware.bluetooth.IBluetoothHciCallbacks.Stub 
 
     // IBluetoothHciCallbacks methods.
     @Override
-    public /* synchronized */ void initializationComplete(int status) throws RemoteException {
+    public synchronized void initializationComplete(int status) throws RemoteException {
         mInitializationStatus = status;
         notifyAll();
     }

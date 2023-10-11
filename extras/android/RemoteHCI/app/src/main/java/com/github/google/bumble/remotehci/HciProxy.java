@@ -24,6 +24,21 @@ public class HciProxy {
             @Override
             public void onPacket(HciPacket.Type type, byte[] packet) {
                 mServer.sendPacket(type, packet);
+
+                switch (type) {
+                    case EVENT:
+                        mEventPacketsSent += 1;
+                        break;
+
+                    case ACL_DATA:
+                        mAclPacketsSent += 1;
+                        break;
+
+                    case SCO_DATA:
+                        mScoPacketsSent += 1;
+                        break;
+                }
+                updateHciPacketCount();
             }
         });
         if (hciHal == null) {

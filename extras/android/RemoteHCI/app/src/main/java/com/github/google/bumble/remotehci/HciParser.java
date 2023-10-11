@@ -4,22 +4,10 @@ import static java.lang.Integer.min;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 
 class HciParser {
-    enum State {
-        NEED_TYPE,
-        NEED_LENGTH,
-        NEED_BODY
-    }
-
-    interface Sink {
-        void onPacket(HciPacket.Type type, byte[] packet);
-    }
-
-    static class InvalidFormatException extends RuntimeException {
-    }
-
     Sink sink;
     State state;
     int bytesNeeded;
@@ -51,7 +39,9 @@ class HciParser {
                     bytesNeeded = packetType.lengthOffset + packetType.lengthSize;
                     state = State.NEED_LENGTH;
                 } else if (state == State.NEED_LENGTH) {
-                    ByteBuffer lengthBuffer = ByteBuffer.wrap(packet.toByteArray());
+                    ByteBuffer lengthBuffer =
+                            ByteBuffer.wrap(packet.toByteArray())
+                                    .order(ByteOrder.LITTLE_ENDIAN);
                     bytesNeeded = packetType.lengthSize == 1 ?
                             lengthBuffer.get(packetType.lengthOffset) & 0xFF :
                             lengthBuffer.getShort(packetType.lengthOffset) & 0xFFFF;
@@ -78,5 +68,16 @@ class HciParser {
         bytesNeeded = 1;
         packet.reset();
         packetType = null;
+    }
+
+    enum State {
+        NEED_TYPE, NEED_LENGTH, NEED_BODY
+    }
+
+    interface Sink {
+        void onPacket(HciPacket.Type type, byte[] packet);
+    }
+
+    static class InvalidFormatException extends RuntimeException {
     }
 }
