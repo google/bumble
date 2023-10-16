@@ -14,25 +14,25 @@
 
 # -----------------------------------------------------------------------------
 # This script generates a python-syntax list of dictionary entries for the
-# company IDs listed at: https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers/
-# The input to this script is the CSV file that can be obtained at that URL
+# company IDs listed at:
+# https://bitbucket.org/bluetooth-SIG/public/src/main/assigned_numbers/company_identifiers/company_identifiers.yaml
+# The input to this script is the YAML file that can be obtained at that URL
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 import sys
-import csv
+import yaml
 
 # -----------------------------------------------------------------------------
-with open(sys.argv[1], newline='') as csvfile:
-    reader = csv.reader(csvfile, delimiter=',', quotechar='"')
-    lines = []
-    for row in reader:
-        if len(row) == 3 and row[1].startswith('0x'):
-            company_id = row[1]
-            company_name = row[2]
-            escaped_company_name = company_name.replace('"', '\\"')
-            lines.append(f'    {company_id}: "{escaped_company_name}"')
+with open(sys.argv[1], "r") as yaml_file:
+    root = yaml.safe_load(yaml_file)
+    companies = {}
+    for company in root["company_identifiers"]:
+        companies[company["value"]] = company["name"]
 
-    print(',\n'.join(reversed(lines)))
+    for company_id in sorted(companies.keys()):
+        company_name = companies[company_id]
+        escaped_company_name = company_name.replace('"', '\\"')
+        print(f'    0x{company_id:04X}: "{escaped_company_name}",')
