@@ -229,7 +229,7 @@ class DataElement:
         return DataElement(DataElement.UUID, value)
 
     @staticmethod
-    def text_string(value: str) -> DataElement:
+    def text_string(value: bytes) -> DataElement:
         return DataElement(DataElement.TEXT_STRING, value)
 
     @staticmethod
