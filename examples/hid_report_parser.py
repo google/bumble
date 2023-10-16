@@ -139,7 +139,9 @@ class Mouse:
 
 # ------------------------------------------------------------------------------
 class ReportParser:
-    def parse_input_report(self, input_report: bytes) -> None:  # type: ignore
+
+    @staticmethod
+    def parse_input_report(input_report: bytes) -> None:
 
         report_id = input_report[0]  # pylint: disable=unsubscriptable-object
         report_length = len(input_report)
