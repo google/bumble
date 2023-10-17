@@ -1,0 +1,44 @@
+/*
+ * Copyright (C) 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package android.hardware.bluetooth@1.1;
+
+import @1.0::HciPacket;
+import @1.0::IBluetoothHci;
+import IBluetoothHciCallbacks;
+
+/**
+ * The Host Controller Interface (HCI) is the layer defined by the Bluetooth
+ * specification between the software that runs on the host and the Bluetooth
+ * controller chip. This boundary is the natural choice for a Hardware
+ * Abstraction Layer (HAL). Dealing only in HCI packets and events simplifies
+ * the stack and abstracts away power management, initialization, and other
+ * implementation-specific details related to the hardware.
+ */
+interface IBluetoothHci extends @1.0::IBluetoothHci {
+    /**
+     * Same as @1.0, but uses 1.1 Callbacks version
+     */
+    initialize_1_1(@1.1::IBluetoothHciCallbacks callback);
+
+    /**
+     * Send an ISO data packet (as specified in the Bluetooth Core
+     * Specification v5.2) to the Bluetooth controller.
+     * Packets must be processed in order.
+     * @param data HCI data packet to be sent
+     */
+    sendIsoData(HciPacket data);
+};

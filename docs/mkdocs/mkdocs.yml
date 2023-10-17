@@ -67,6 +67,9 @@ nav:
     - Zephyr: platforms/zephyr.md
   - Examples:
     - Overview: examples/index.md
+  - Extras:
+    - Overview: extras/index.md
+    - Android Remote HCI: extras/android_remote_hci.md
 
 copyright: Copyright 2021-2023 Google LLC
 

@@ -3,7 +3,7 @@ HARDWARE
 
 The Bumble Host connects to a controller over an [HCI Transport](../transports/index.md).
 To use a hardware controller attached to the host on which the host application is running, the transport is typically either [HCI over UART](../transports/serial.md) or [HCI over USB](../transports/usb.md).
-On Linux, the [VHCI Transport](../transports/vhci.md) can be used to communicate with any controller hardware managed by the operating system. Alternatively, a remote controller (a phyiscal controller attached to a remote host) can be used by connecting one of the networked transports (such as the [TCP Client transport](../transports/tcp_client.md), the [TCP Server transport](../transports/tcp_server.md) or the [UDP Transport](../transports/udp.md)) to an [HCI Bridge](../apps_and_tools/hci_bridge) bridging the network transport to a physical controller on a remote host.
+On Linux, the [VHCI Transport](../transports/vhci.md) can be used to communicate with any controller hardware managed by the operating system. Alternatively, a remote controller (a phyiscal controller attached to a remote host) can be used by connecting one of the networked transports (such as the [TCP Client transport](../transports/tcp_client.md), the [TCP Server transport](../transports/tcp_server.md) or the [UDP Transport](../transports/udp.md)) to an [HCI Bridge](../apps_and_tools/hci_bridge.md) bridging the network transport to a physical controller on a remote host.
 
 In theory, any controller that is compliant with the HCI over UART or HCI over USB protocols can be used.
 
