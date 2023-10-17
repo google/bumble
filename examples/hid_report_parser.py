@@ -139,7 +139,6 @@ class Mouse:
 
 # ------------------------------------------------------------------------------
 class ReportParser:
-
     @staticmethod
     def parse_input_report(input_report: bytes) -> None:
 
