@@ -20,6 +20,7 @@ import logging
 import os
 import click
 
+from bumble import l2cap
 from bumble.colors import color
 from bumble.transport import open_transport_or_link
 from bumble.device import Device
@@ -47,14 +48,13 @@ class ServerBridge:
         self.tcp_host = tcp_host
         self.tcp_port = tcp_port
 
-    async def start(self, device):
+    async def start(self, device: Device) -> None:
         # Listen for incoming L2CAP CoC connections
-        device.register_l2cap_channel_server(
-            psm=self.psm,
-            server=self.on_coc,
-            max_credits=self.max_credits,
-            mtu=self.mtu,
-            mps=self.mps,
+        device.create_l2cap_server(
+            spec=l2cap.LeCreditBasedChannelSpec(
+                psm=self.psm, mtu=self.mtu, mps=self.mps, max_credits=self.max_credits
+            ),
+            handler=self.on_coc,
         )
         print(color(f'### Listening for CoC connection on PSM {self.psm}', 'yellow'))
 
@@ -195,11 +195,13 @@ class ClientBridge:
             # Connect a new L2CAP channel
             print(color(f'>>> Opening L2CAP channel on PSM = {self.psm}', 'yellow'))
             try:
-                l2cap_channel = await connection.open_l2cap_channel(
-                    psm=self.psm,
-                    max_credits=self.max_credits,
-                    mtu=self.mtu,
-                    mps=self.mps,
+                l2cap_channel = await connection.create_l2cap_channel(
+                    spec=l2cap.LeCreditBasedChannelSpec(
+                        psm=self.psm,
+                        max_credits=self.max_credits,
+                        mtu=self.mtu,
+                        mps=self.mps,
+                    )
                 )
                 print(color('*** L2CAP channel:', 'cyan'), l2cap_channel)
             except Exception as error:

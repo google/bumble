@@ -179,7 +179,7 @@ async def main():
                 await stream_packets(read, protocol)
             else:
                 # Create a listener to wait for AVDTP connections
-                listener = Listener(Listener.create_registrar(device), version=(1, 2))
+                listener = Listener.for_device(device=device, version=(1, 2))
                 listener.on(
                     'connection', lambda protocol: on_avdtp_connection(read, protocol)
                 )

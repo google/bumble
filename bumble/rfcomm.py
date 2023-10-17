@@ -898,8 +898,8 @@ class Client:
     async def start(self) -> Multiplexer:
         # Create a new L2CAP connection
         try:
-            self.l2cap_channel = await self.device.l2cap_channel_manager.connect(
-                self.connection, RFCOMM_PSM
+            self.l2cap_channel = await self.connection.create_l2cap_channel(
+                spec=l2cap.ClassicChannelSpec(RFCOMM_PSM)
             )
         except ProtocolError as error:
             logger.warning(f'L2CAP connection failed: {error}')
@@ -936,7 +936,9 @@ class Server(EventEmitter):
         self.acceptors = {}
 
         # Register ourselves with the L2CAP channel manager
-        device.register_l2cap_server(RFCOMM_PSM, self.on_connection)
+        device.create_l2cap_server(
+            spec=l2cap.ClassicChannelSpec(psm=RFCOMM_PSM), handler=self.on_connection
+        )
 
     def listen(self, acceptor: Callable[[DLC], None], channel: int = 0) -> int:
         if channel:

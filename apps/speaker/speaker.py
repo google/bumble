@@ -641,7 +641,7 @@ class Speaker:
             self.device.on('connection', self.on_bluetooth_connection)
 
             # Create a listener to wait for AVDTP connections
-            self.listener = Listener(Listener.create_registrar(self.device))
+            self.listener = Listener.for_device(self.device)
             self.listener.on('connection', self.on_avdtp_connection)
 
             print(f'Speaker ready to play, codec={color(self.codec, "cyan")}')

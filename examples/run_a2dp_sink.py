@@ -131,7 +131,7 @@ async def main():
             await device.power_on()
 
             # Create a listener to wait for AVDTP connections
-            listener = Listener(Listener.create_registrar(device))
+            listener = Listener.for_device(device)
             listener.on('connection', on_avdtp_connection)
 
             if len(sys.argv) >= 5:

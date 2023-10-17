@@ -766,8 +766,9 @@ class Client:
         self.channel = None
 
     async def connect(self, connection: Connection) -> None:
-        result = await self.device.l2cap_channel_manager.connect(connection, SDP_PSM)
-        self.channel = result
+        self.channel = await connection.create_l2cap_channel(
+            spec=l2cap.ClassicChannelSpec(SDP_PSM)
+        )
 
     async def disconnect(self) -> None:
         if self.channel:
@@ -933,7 +934,9 @@ class Server:
         self.current_response = None
 
     def register(self, l2cap_channel_manager: l2cap.ChannelManager) -> None:
-        l2cap_channel_manager.register_server(SDP_PSM, self.on_connection)
+        l2cap_channel_manager.create_classic_server(
+            spec=l2cap.ClassicChannelSpec(psm=SDP_PSM), handler=self.on_connection
+        )
 
     def send_response(self, response):
         logger.debug(f'{color(">>> Sending SDP Response", "blue")}: {response}')

@@ -21,6 +21,7 @@ import sys
 import os
 import logging
 
+from bumble import l2cap
 from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
@@ -95,8 +96,10 @@ async def main():
 
             channel.sink = on_data
 
-        psm = device.register_l2cap_channel_server(0, on_coc, 8)
-        print(f'### LE_PSM_OUT = {psm}')
+        server = device.create_l2cap_server(
+            spec=l2cap.LeCreditBasedChannelSpec(max_credits=8), handler=on_coc
+        )
+        print(f'### LE_PSM_OUT = {server.psm}')
 
         # Add the ASHA service to the GATT server
         read_only_properties_characteristic = Characteristic(
@@ -147,7 +150,7 @@ async def main():
             ASHA_LE_PSM_OUT_CHARACTERISTIC,
             Characteristic.Properties.READ,
             Characteristic.READABLE,
-            struct.pack('<H', psm),
+            struct.pack('<H', server.psm),
         )
         device.add_service(
             Service(
