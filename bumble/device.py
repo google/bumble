@@ -847,6 +847,9 @@ class DeviceConfiguration:
         self.connectable = config.get('connectable', self.connectable)
         self.discoverable = config.get('discoverable', self.discoverable)
         self.gatt_services = config.get('gatt_services', self.gatt_services)
+        self.address_resolution_offload = config.get(
+            'address_resolution_offload', self.address_resolution_offload
+        )
 
         # Load or synthesize an IRK
         irk = config.get('irk')
