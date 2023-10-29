@@ -77,6 +77,7 @@ SPEED_SERVICE_UUID = '50DB505C-8AC4-4738-8448-3B1D9CC09CC5'
 SPEED_TX_UUID = 'E789C754-41A1-45F4-A948-A0A1A90DBA53'
 SPEED_RX_UUID = '016A2CC7-E14B-4819-935F-1F56EAE4098D'
 
+DEFAULT_RFCOMM_UUID = 'E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'
 DEFAULT_L2CAP_PSM = 1234
 DEFAULT_L2CAP_MAX_CREDITS = 128
 DEFAULT_L2CAP_MTU = 1022
@@ -128,11 +129,16 @@ def print_connection(connection):
     if connection.transport == BT_LE_TRANSPORT:
         phy_state = (
             'PHY='
-            f'RX:{le_phy_name(connection.phy.rx_phy)}/'
-            f'TX:{le_phy_name(connection.phy.tx_phy)}'
+            f'TX:{le_phy_name(connection.phy.tx_phy)}/'
+            f'RX:{le_phy_name(connection.phy.rx_phy)}'
         )
 
-        data_length = f'DL={connection.data_length}'
+        data_length = (
+            'DL=('
+            f'TX:{connection.data_length[0]}/{connection.data_length[1]},'
+            f'RX:{connection.data_length[2]}/{connection.data_length[3]}'
+            ')'
+        )
         connection_parameters = (
             'Parameters='
             f'{connection.parameters.connection_interval * 1.25:.2f}/'
@@ -169,9 +175,7 @@ def make_sdp_records(channel):
             ),
             ServiceAttribute(
                 SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [DataElement.uuid(UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'))]
-                ),
+                DataElement.sequence([DataElement.uuid(UUID(DEFAULT_RFCOMM_UUID))]),
             ),
             ServiceAttribute(
                 SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
@@ -224,7 +228,7 @@ class Sender:
 
         if self.tx_start_delay:
             print(color(f'*** Startup delay: {self.tx_start_delay}', 'blue'))
-            await asyncio.sleep(self.tx_start_delay)  # FIXME
+            await asyncio.sleep(self.tx_start_delay)
 
         print(color('=== Sending RESET', 'magenta'))
         await self.packet_io.send_packet(bytes([PacketType.RESET]))
@@ -364,7 +368,7 @@ class Ping:
 
         if self.tx_start_delay:
             print(color(f'*** Startup delay: {self.tx_start_delay}', 'blue'))
-            await asyncio.sleep(self.tx_start_delay)  # FIXME
+            await asyncio.sleep(self.tx_start_delay)
 
         print(color('=== Sending RESET', 'magenta'))
         await self.packet_io.send_packet(bytes([PacketType.RESET]))
@@ -710,14 +714,14 @@ class L2capServer(StreamedPacketIO):
         self.l2cap_channel = None
         self.ready = asyncio.Event()
 
-        # Listen for incoming L2CAP CoC connections
+        # Listen for incoming L2CAP connections
         device.create_l2cap_server(
             spec=l2cap.LeCreditBasedChannelSpec(
                 psm=psm, mtu=mtu, mps=mps, max_credits=max_credits
             ),
             handler=self.on_l2cap_channel,
         )
-        print(color(f'### Listening for CoC connection on PSM {psm}', 'yellow'))
+        print(color(f'### Listening for L2CAP connection on PSM {psm}', 'yellow'))
 
     async def on_connection(self, connection):
         connection.on('disconnection', self.on_disconnection)
@@ -743,9 +747,10 @@ class L2capServer(StreamedPacketIO):
 # RfcommClient
 # -----------------------------------------------------------------------------
 class RfcommClient(StreamedPacketIO):
-    def __init__(self, device):
+    def __init__(self, device, channel):
         super().__init__()
         self.device = device
+        self.channel = channel
         self.ready = asyncio.Event()
 
     async def on_connection(self, connection):
@@ -757,10 +762,9 @@ class RfcommClient(StreamedPacketIO):
         rfcomm_mux = await rfcomm_client.start()
         print(color('*** Started', 'blue'))
 
-        channel = DEFAULT_RFCOMM_CHANNEL
-        print(color(f'### Opening session for channel {channel}...', 'yellow'))
+        print(color(f'### Opening session for channel {self.channel}...', 'yellow'))
         try:
-            rfcomm_session = await rfcomm_mux.open_dlc(channel)
+            rfcomm_session = await rfcomm_mux.open_dlc(self.channel)
             print(color('### Session open', 'yellow'), rfcomm_session)
         except bumble.core.ConnectionError as error:
             print(color(f'!!! Session open failed: {error}', 'red'))
@@ -780,7 +784,7 @@ class RfcommClient(StreamedPacketIO):
 # RfcommServer
 # -----------------------------------------------------------------------------
 class RfcommServer(StreamedPacketIO):
-    def __init__(self, device):
+    def __init__(self, device, channel):
         super().__init__()
         self.ready = asyncio.Event()
 
@@ -788,7 +792,7 @@ class RfcommServer(StreamedPacketIO):
         rfcomm_server = bumble.rfcomm.Server(device)
 
         # Listen for incoming DLC connections
-        channel_number = rfcomm_server.listen(self.on_dlc, DEFAULT_RFCOMM_CHANNEL)
+        channel_number = rfcomm_server.listen(self.on_dlc, channel)
 
         # Setup the SDP to advertise this channel
         device.sdp_service_records = make_sdp_records(channel_number)
@@ -825,6 +829,9 @@ class Central(Connection.Listener):
         mode_factory,
         connection_interval,
         phy,
+        authenticate,
+        encrypt,
+        extended_data_length,
     ):
         super().__init__()
         self.transport = transport
@@ -832,6 +839,9 @@ class Central(Connection.Listener):
         self.classic = classic
         self.role_factory = role_factory
         self.mode_factory = mode_factory
+        self.authenticate = authenticate
+        self.encrypt = encrypt or authenticate
+        self.extended_data_length = extended_data_length
         self.device = None
         self.connection = None
 
@@ -904,7 +914,26 @@ class Central(Connection.Listener):
             self.connection.listener = self
             print_connection(self.connection)
 
-            await mode.on_connection(self.connection)
+            # Request a new data length if requested
+            if self.extended_data_length:
+                print(color('+++ Requesting extended data length', 'cyan'))
+                await self.connection.set_data_length(
+                    self.extended_data_length[0], self.extended_data_length[1]
+                )
+
+            # Authenticate if requested
+            if self.authenticate:
+                # Request authentication
+                print(color('*** Authenticating...', 'cyan'))
+                await self.connection.authenticate()
+                print(color('*** Authenticated', 'cyan'))
+
+            # Encrypt if requested
+            if self.encrypt:
+                # Enable encryption
+                print(color('*** Enabling encryption...', 'cyan'))
+                await self.connection.encrypt()
+                print(color('*** Encryption on', 'cyan'))
 
             # Set the PHY if requested
             if self.phy is not None:
@@ -918,6 +947,8 @@ class Central(Connection.Listener):
                             f'!!! Unable to set the PHY: {error.error_name}', 'yellow'
                         )
                     )
+
+            await mode.on_connection(self.connection)
 
             await role.run()
             await asyncio.sleep(DEFAULT_LINGER_TIME)
@@ -943,9 +974,12 @@ class Central(Connection.Listener):
 # Peripheral
 # -----------------------------------------------------------------------------
 class Peripheral(Device.Listener, Connection.Listener):
-    def __init__(self, transport, classic, role_factory, mode_factory):
+    def __init__(
+        self, transport, classic, extended_data_length, role_factory, mode_factory
+    ):
         self.transport = transport
         self.classic = classic
+        self.extended_data_length = extended_data_length
         self.role_factory = role_factory
         self.role = None
         self.mode_factory = mode_factory
@@ -1006,6 +1040,15 @@ class Peripheral(Device.Listener, Connection.Listener):
         self.connection = connection
         self.connected.set()
 
+        # Request a new data length if needed
+        if self.extended_data_length:
+            print("+++ Requesting extended data length")
+            AsyncRunner.spawn(
+                connection.set_data_length(
+                    self.extended_data_length[0], self.extended_data_length[1]
+                )
+            )
+
     def on_disconnection(self, reason):
         print(color(f'!!! Disconnection: reason={reason}', 'red'))
         self.connection = None
@@ -1038,16 +1081,16 @@ def create_mode_factory(ctx, default_mode):
             return GattServer(device)
 
         if mode == 'l2cap-client':
-            return L2capClient(device)
+            return L2capClient(device, psm=ctx.obj['l2cap_psm'])
 
         if mode == 'l2cap-server':
-            return L2capServer(device)
+            return L2capServer(device, psm=ctx.obj['l2cap_psm'])
 
         if mode == 'rfcomm-client':
-            return RfcommClient(device)
+            return RfcommClient(device, channel=ctx.obj['rfcomm_channel'])
 
         if mode == 'rfcomm-server':
-            return RfcommServer(device)
+            return RfcommServer(device, channel=ctx.obj['rfcomm_channel'])
 
         raise ValueError('invalid mode')
 
@@ -1114,6 +1157,22 @@ def create_role_factory(ctx, default_role):
     help='GATT MTU (gatt-client mode)',
 )
 @click.option(
+    '--extended-data-length',
+    help='Request a data length upon connection, specified as tx_octets/tx_time',
+)
+@click.option(
+    '--rfcomm-channel',
+    type=int,
+    default=DEFAULT_RFCOMM_CHANNEL,
+    help='RFComm channel to use',
+)
+@click.option(
+    '--l2cap-psm',
+    type=int,
+    default=DEFAULT_L2CAP_PSM,
+    help='L2CAP PSM to use',
+)
+@click.option(
     '--packet-size',
     '-s',
     metavar='SIZE',
@@ -1139,17 +1198,34 @@ def create_role_factory(ctx, default_role):
 )
 @click.pass_context
 def bench(
-    ctx, device_config, role, mode, att_mtu, packet_size, packet_count, start_delay
+    ctx,
+    device_config,
+    role,
+    mode,
+    att_mtu,
+    extended_data_length,
+    packet_size,
+    packet_count,
+    start_delay,
+    rfcomm_channel,
+    l2cap_psm,
 ):
     ctx.ensure_object(dict)
     ctx.obj['device_config'] = device_config
     ctx.obj['role'] = role
     ctx.obj['mode'] = mode
     ctx.obj['att_mtu'] = att_mtu
+    ctx.obj['rfcomm_channel'] = rfcomm_channel
+    ctx.obj['l2cap_psm'] = l2cap_psm
     ctx.obj['packet_size'] = packet_size
     ctx.obj['packet_count'] = packet_count
     ctx.obj['start_delay'] = start_delay
 
+    ctx.obj['extended_data_length'] = (
+        [int(x) for x in extended_data_length.split('/')]
+        if extended_data_length
+        else None
+    )
     ctx.obj['classic'] = mode in ('rfcomm-client', 'rfcomm-server')
 
 
@@ -1170,8 +1246,12 @@ def bench(
     help='Connection interval (in ms)',
 )
 @click.option('--phy', type=click.Choice(['1m', '2m', 'coded']), help='PHY to use')
+@click.option('--authenticate', is_flag=True, help='Authenticate (RFComm only)')
+@click.option('--encrypt', is_flag=True, help='Encrypt the connection (RFComm only)')
 @click.pass_context
-def central(ctx, transport, peripheral_address, connection_interval, phy):
+def central(
+    ctx, transport, peripheral_address, connection_interval, phy, authenticate, encrypt
+):
     """Run as a central (initiates the connection)"""
     role_factory = create_role_factory(ctx, 'sender')
     mode_factory = create_mode_factory(ctx, 'gatt-client')
@@ -1186,6 +1266,9 @@ def central(ctx, transport, peripheral_address, connection_interval, phy):
             mode_factory,
             connection_interval,
             phy,
+            authenticate,
+            encrypt or authenticate,
+            ctx.obj['extended_data_length'],
         ).run()
     )
 
@@ -1199,7 +1282,13 @@ def peripheral(ctx, transport):
     mode_factory = create_mode_factory(ctx, 'gatt-server')
 
     asyncio.run(
-        Peripheral(transport, ctx.obj['classic'], role_factory, mode_factory).run()
+        Peripheral(
+            transport,
+            ctx.obj['classic'],
+            ctx.obj['extended_data_length'],
+            role_factory,
+            mode_factory,
+        ).run()
     )
 
 
