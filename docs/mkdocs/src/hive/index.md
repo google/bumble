@@ -20,7 +20,21 @@ each of the apps and devices, as well as their names and short descriptions.
     When the `netsimd` daemon is running (for example when using the Android Emulator that
     is included in Android Studio), the daemon listens for connections on a TCP port.
     To find out what this TCP port is, you can read the `netsim.ini` file that `netsimd`
-    creates, it includes a line with `web.port=<tcp-port>` (for example `web.port=7681`)
+    creates, it includes a line with `web.port=<tcp-port>` (for example `web.port=7681`).
+    The location of the `netsim.ini` file is platform-specific.
+
+    === "macOS"
+        On macOS, the directory where `netsim.ini` is stored is $TMPDIR
+        ```bash
+            $ cat $TMPDIR/netsim.ini
+        ```
+
+    === "Linux"
+        On Linux, the directory where `netsim.ini` is stored is $XDG_RUNTIME_DIR
+        ```bash
+            $ cat $XDG_RUNTIME_DIR/netsim.ini
+        ```
+
 
 !!! tip "Using a local radio"
     You can connect the hive virtual apps and devices to a local Bluetooth radio, like,
