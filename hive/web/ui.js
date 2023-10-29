@@ -59,8 +59,8 @@ class BumbleControls extends LitElement {
         if (hciUrl) {
             this.settingsHciUrlInput.value = hciUrl;
         } else {
-          // Start with a template.
-          this.settingsHciUrlInput.value = "ws://localhost:XYZW/v1/websocket/bt"
+          // Start with default, assuming port 7681.
+          this.settingsHciUrlInput.value = "ws://localhost:7681/v1/websocket/bt"
         }
         this.settingsDialog.showModal();
     }

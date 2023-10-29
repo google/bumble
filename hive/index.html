@@ -2005,10 +2005,27 @@ Pyodide is a Python distribution for the browser and Node.js based on WebAssembl
 Bluetooth controller.</p>
 <p>The apps and devices in the hive can be accessed by following the links below. Each
 page has a settings button that may be used to configure the WebSocket URL to use for
-the virutal HCI connection. This will typically be the WebSocket URL for a <code>netsim</code>
+the virtual HCI connection. This will typically be the WebSocket URL for a <code>netsim</code>
 daemon.
 There is also a <a href="index.toml">TOML index</a> that can be used by tools to know at which URL to access
-each of the apps and devices, as well as their names and short desciptions.</p>
+each of the apps and devices, as well as their names and short descriptions.</p>
+<div class="admonition tip">
+<p class="admonition-title">Using <code>netsim</code></p>
+<p>When the <code>netsimd</code> daemon is running (for example when using the Android Emulator that
+is included in Android Studio), the daemon listens for connections on a TCP port.
+To find out what this TCP port is, you can read the <code>netsim.ini</code> file that <code>netsimd</code>
+creates, it includes a line with <code>web.port=&lt;tcp-port&gt;</code> (for example <code>web.port=7681</code>)</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Using a local radio</p>
+<p>You can connect the hive virtual apps and devices to a local Bluetooth radio, like,
+for example, a USB dongle.
+For that, you need to run a local HCI bridge to bridge a local HCI device to a WebSocket
+that a web page can connect to.
+Use the <code>bumble-hci-bridge</code> app, with the host transport set to a WebSocket server on an
+available port (ex: <code>ws-server:_:7682</code>) and the controller transport set to the transport
+name for the radio you want to use (ex: <code>usb:0</code> for the first USB dongle)</p>
+</div>
 <h2 id="applications">Applications<a class="headerlink" href="#applications" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="web/scanner/scanner.html">Scanner</a> - Scans for BLE devices.</li>
