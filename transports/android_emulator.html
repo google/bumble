@@ -1728,6 +1728,212 @@
   
 
     
+      
+      
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Extras
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            Extras
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extras/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extras/android_remote_hci.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Android Remote HCI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Hive
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            Hive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hive/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hive/web/speaker/speaker.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Speaker
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hive/web/scanner/scanner.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Scanner
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hive/web/heart_rate_monitor/heart_rate_monitor.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Heart Rate Monitor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -1789,9 +1995,9 @@ Use the <code>android-netsim</code> transport name instead.</p>
 connections.</p>
 <h2 id="moniker">Moniker<a class="headerlink" href="#moniker" title="Permanent link">&para;</a></h2>
 <p>The moniker syntax for an Android Emulator "netsim" transport is: <code>android-netsim:[&lt;host&gt;:&lt;port&gt;][&lt;options&gt;]</code>,
-where <code>&lt;options&gt;</code> is a ','-separated list of <code>&lt;name&gt;=&lt;value&gt;</code> pairs<code>.
-The</code>mode<code>parameter name can specify running as a host or a controller, and</code><hostname>:<port><code>can specify a host name (or IP address) and TCP port number on which to reach the gRPC server for the emulator (in "host" mode), or to accept gRPC connections (in "controller" mode).
-Both the</code>mode=<host|controller><code>and</code><hostname>:<port><code>parameters are optional (so the moniker</code>android-netsim<code>by itself is a valid moniker, which will create a transport in</code>host<code>mode, connected to</code>localhost` on the default gRPC port for the Netsim background process).</p>
+where <code>&lt;options&gt;</code> is a comma-separated list of <code>&lt;name&gt;=&lt;value&gt;</code> pairs.
+The <code>mode</code> parameter name can specify running as a host or a controller, and <code>&lt;hostname&gt;:&lt;port&gt;</code> can specify a host name (or IP address) and TCP port number on which to reach the gRPC server for the emulator (in "host" mode), or to accept gRPC connections (in "controller" mode).
+Both the <code>mode=&lt;host|controller&gt;</code> and <code>&lt;hostname&gt;:&lt;port&gt;</code> parameters are optional (so the moniker <code>android-netsim</code> by itself is a valid moniker, which will create a transport in <code>host</code> mode, connected to <code>localhost</code> on the default gRPC port for the Netsim background process).</p>
 <div class="admonition example example">
 <p class="admonition-title">Example</p>
 <p><code>android-netsim</code>

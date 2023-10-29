@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bumble Speaker</title>
+  <link rel="stylesheet" href="speaker.css">
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+  <script type="module" src="speaker.js"></script>
+  <script type="module" src="../ui.js"></script>
+</head>
+<body>
+  <h1><img src="logo.svg" width=100 height=100 style="vertical-align:middle" alt=""/>Bumble Virtual Speaker</h1>
+  <div id="speaker">
+    <table><tr>
+      <td>
+        <table id="propertiesTable" class="properties">
+          <tr><td>Codec</td><td><span id="codecText"></span></td></tr>
+          <tr><td>Packets</td><td><span id="packetsReceivedText"></span></td></tr>
+          <tr><td>Bytes</td><td><span id="bytesReceivedText"></span></td></tr>
+        </table>
+      </td>
+      <td>
+        <canvas id="bandwidthCanvas" width="500", height="100">Bandwidth Graph</canvas>
+      </td>
+    </tr></table>
+    <span id="streamStateText">IDLE</span>
+    <span id="connectionStateText">NOT CONNECTED</span>
+    <div id="controlsDiv">
+      <bumble-controls id="bumble-controls"></bumble-controls>
+      <button id="audioOnButton" class="mdc-icon-button material-icons" ><div class="mdc-icon-button__ripple"></div>volume_up</button>
+    </div>
+    <canvas id="fftCanvas" width="1024", height="300">Audio Frequencies Animation</canvas>
+    <audio id="audio"></audio>
+  </div>
+</body>
+</html>

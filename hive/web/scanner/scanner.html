@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="scanner.css">
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+  <script type="module" src="../ui.js"></script>
+  <script type="module" src="scanner.js"></script>
+</style>
+  </style>
+</head>
+<body>
+    <script type="module">
+        import {LitElement, html} from 'https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js';
+    </script>
+
+    <bumble-controls id="bumble-controls"></bumble-controls><hr>
+    <textarea id="log-output" style="width: 100%;" rows="10" disabled></textarea><hr>
+    <scan-list id="scan-list"></scan-list>
+</body>
+</html>

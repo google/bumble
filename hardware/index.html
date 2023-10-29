@@ -1691,6 +1691,212 @@
   
 
     
+      
+      
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Extras
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            Extras
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extras/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extras/android_remote_hci.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Android Remote HCI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Hive
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            Hive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hive/index.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hive/web/speaker/speaker.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Speaker
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hive/web/scanner/scanner.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Scanner
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hive/web/heart_rate_monitor/heart_rate_monitor.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Heart Rate Monitor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -1727,7 +1933,7 @@
 <h1 id="hardware">HARDWARE<a class="headerlink" href="#hardware" title="Permanent link">&para;</a></h1>
 <p>The Bumble Host connects to a controller over an <a href="../transports/index.html">HCI Transport</a>.
 To use a hardware controller attached to the host on which the host application is running, the transport is typically either <a href="../transports/serial.html">HCI over UART</a> or <a href="../transports/usb.html">HCI over USB</a>.
-On Linux, the <a href="../transports/vhci.html">VHCI Transport</a> can be used to communicate with any controller hardware managed by the operating system. Alternatively, a remote controller (a phyiscal controller attached to a remote host) can be used by connecting one of the networked transports (such as the <a href="../transports/tcp_client.html">TCP Client transport</a>, the <a href="../transports/tcp_server.html">TCP Server transport</a> or the <a href="../transports/udp.html">UDP Transport</a>) to an <a href="../apps_and_tools/hci_bridge">HCI Bridge</a> bridging the network transport to a physical controller on a remote host.</p>
+On Linux, the <a href="../transports/vhci.html">VHCI Transport</a> can be used to communicate with any controller hardware managed by the operating system. Alternatively, a remote controller (a phyiscal controller attached to a remote host) can be used by connecting one of the networked transports (such as the <a href="../transports/tcp_client.html">TCP Client transport</a>, the <a href="../transports/tcp_server.html">TCP Server transport</a> or the <a href="../transports/udp.html">UDP Transport</a>) to an <a href="../apps_and_tools/hci_bridge.html">HCI Bridge</a> bridging the network transport to a physical controller on a remote host.</p>
 <p>In theory, any controller that is compliant with the HCI over UART or HCI over USB protocols can be used.</p>
 <p>HCI over USB is very common, implemented by a number of commercial Bluetooth dongles.</p>
 <p>It is also possible to use an embedded development board, running a specialized application, such as the <a href="https://docs.zephyrproject.org/latest/samples/bluetooth/hci_uart/README.html"><code>HCI UART</code></a> and <a href="https://docs.zephyrproject.org/latest/samples/bluetooth/hci_usb/README.html"><code>HCI USB</code></a> demo applications from the <a href="https://www.zephyrproject.org/">Zephyr project</a>, or the <a href="https://mynewt.apache.org/latest/tutorials/ble/blehci_project.html"><code>blehci</code></a> application from <a href="https://mynewt.apache.org/">mynewt/nimble</a></p>

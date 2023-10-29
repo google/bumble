@@ -1,0 +1,85 @@
+body, h1, h2, h3, h4, h5, h6 {
+    font-family: sans-serif;
+}
+
+#controlsDiv {
+    margin: 6px;
+}
+
+#errorText {
+    background-color: rgb(239, 89, 75);
+    border: none;
+    border-radius: 4px;
+    padding: 8px;
+    display: none;
+    margin: 4px;
+}
+
+#progressText {
+    background-color: rgb(179, 208, 146);
+    border: none;
+    border-radius: 4px;
+    padding: 8px;
+    display: none;
+    margin: 4px;
+}
+
+#startButton {
+    padding: 4px;
+    margin: 6px;
+}
+
+#fftCanvas {
+    border-radius: 16px;
+    margin: 6px;
+}
+
+#bandwidthCanvas {
+    border: grey;
+    border-style: solid;
+    border-radius: 8px;
+    margin: 6px;
+}
+
+#streamStateText {
+    background-color: rgb(93, 165, 93);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    display: inline-block;
+    margin: 6px;
+}
+
+#connectionStateText {
+    background-color: rgb(112, 146, 206);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    display: inline-block;
+    margin: 6px;
+}
+
+#propertiesTable {
+    border: grey;
+    border-style: solid;
+    border-radius: 4px;
+    padding: 4px;
+    margin: 6px;
+    margin-left: 0px;
+}
+
+th, td {
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.properties td:nth-child(even) {
+    background-color: #D6EEEE;
+    font-family: monospace;
+}
+
+.properties td:nth-child(odd) {
+    font-weight: bold;
+}
+
+.properties tr td:nth-child(2) { width: 150px; }
