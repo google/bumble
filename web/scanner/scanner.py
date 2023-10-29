@@ -67,6 +67,7 @@ class Scanner:
         self.scan_entries[advertisement.address] = self.ScanEntry(advertisement)
         self.emit_update()
 
+
 # -----------------------------------------------------------------------------
 def main(hci_source, hci_sink):
     return Scanner(hci_source, hci_sink)

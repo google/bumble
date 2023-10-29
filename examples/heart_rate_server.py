@@ -106,7 +106,7 @@ async def main():
                 AsyncRunner.spawn(
                     device.notify_subscriber(
                         connection,
-                        heart_rate_service.heart_rate_measurement_characteristic
+                        heart_rate_service.heart_rate_measurement_characteristic,
                     )
                 )
 

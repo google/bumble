@@ -125,7 +125,7 @@ def lint(ctx, disable='C,R', errors_only=False):
     print(f">>> Running the linter{qualifier}...")
     try:
         ctx.run(f"pylint {' '.join(options)} bumble apps examples tasks.py")
-        print("The linter is happy. ✅ 😊 🐝'")
+        print("The linter is happy. ✅ 😊 🐝")
     except UnexpectedExit as exc:
         print("Please check your code against the linter messages. ❌")
         raise Exit(code=1) from exc
