@@ -113,7 +113,7 @@ class MainActivity : ComponentActivity() {
 
         val tcpPort = intent.getIntExtra("port", -1)
         if (tcpPort >= 0) {
-            appViewModel.tcpPort = tcpPport
+            appViewModel.tcpPort = tcpPort
         }
 
         setContent {
