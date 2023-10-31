@@ -29,6 +29,7 @@ from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.profiles.device_information_service import DeviceInformationService
 from bumble.profiles.heart_rate_service import HeartRateService
+from bumble.utils import AsyncRunner
 
 
 # -----------------------------------------------------------------------------
@@ -97,6 +98,17 @@ async def main():
                 ]
             )
         )
+
+        # Notify subscribers of the current value as soon as they subscribe
+        @heart_rate_service.heart_rate_measurement_characteristic.on('subscription')
+        def on_subscription(connection, notify_enabled, indicate_enabled):
+            if notify_enabled or indicate_enabled:
+                AsyncRunner.spawn(
+                    device.notify_subscriber(
+                        connection,
+                        heart_rate_service.heart_rate_measurement_characteristic,
+                    )
+                )
 
         # Go!
         await device.power_on()

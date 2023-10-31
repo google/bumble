@@ -1,129 +1,21 @@
+<!DOCTYPE html>
 <html>
-
 <head>
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.23.2/full/pyodide.js"></script>
-  <style>
-    body {
-      font-family: monospace;
-    }
-
-    table, th, td {
-      padding: 2px;
-      white-space: pre;
-      border: 1px solid black;
-      border-collapse: collapse;
-    }
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="scanner.css">
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+  <script type="module" src="../ui.js"></script>
+  <script type="module" src="scanner.js"></script>
+</style>
   </style>
 </head>
-
 <body>
-  <button id="connectButton" disabled>Connect</button>
-  <br />
-  <br />
-  <div>Log Output</div><br>
-  <textarea id="output" style="width: 100%;" rows="10" disabled></textarea>
-  <div id="scanTableContainer"><table></table></div>
+    <script type="module">
+        import {LitElement, html} from 'https://cdn.jsdelivr.net/gh/lit/dist@2/core/lit-core.min.js';
+    </script>
 
-  <script type="module">
-    import { loadBumble, connectWebSocketTransport } from "../bumble.js"
-    let pyodide;
-    let output;
-
-    function logToOutput(s) {
-      output.value += s + "\n";
-      console.log(s);
-    }
-
-    async function run() {
-      const params = (new URL(document.location)).searchParams;
-      const hciWsUrl = params.get("hci") || "ws://localhost:9922/hci";
-
-      try {
-        // Create a WebSocket HCI transport
-        let transport
-        try {
-          transport = await connectWebSocketTransport(pyodide, hciWsUrl);
-        } catch (error) {
-          logToOutput(error);
-          return;
-        }
-
-        // Run the scanner example
-        const script = await (await fetch("scanner.py")).text();
-        await pyodide.runPythonAsync(script);
-        const pythonMain = pyodide.globals.get("main");
-        logToOutput("Starting scanner...");
-        await pythonMain(transport.packet_source, transport.packet_sink, onScanUpdate);
-        logToOutput("Scanner running");
-      } catch (err) {
-        logToOutput(err);
-      }
-    }
-
-    function onScanUpdate(scanEntries) {
-      scanEntries = scanEntries.toJs();
-
-      const scanTable = document.createElement("table");
-
-      const tableHeader = document.createElement("tr");
-      for (const name of ["Address", "Address Type", "RSSI", "Data"]) {
-        const header = document.createElement("th");
-        header.appendChild(document.createTextNode(name));
-        tableHeader.appendChild(header);
-      }
-      scanTable.appendChild(tableHeader);
-
-      scanEntries.forEach(entry => {
-        const row = document.createElement("tr");
-
-        const addressCell = document.createElement("td");
-        addressCell.appendChild(document.createTextNode(entry.address));
-        row.appendChild(addressCell);
-
-        const addressTypeCell = document.createElement("td");
-        addressTypeCell.appendChild(document.createTextNode(entry.address_type));
-        row.appendChild(addressTypeCell);
-
-        const rssiCell = document.createElement("td");
-        rssiCell.appendChild(document.createTextNode(entry.rssi));
-        row.appendChild(rssiCell);
-
-        const dataCell = document.createElement("td");
-        dataCell.appendChild(document.createTextNode(entry.data));
-        row.appendChild(dataCell);
-
-        scanTable.appendChild(row);
-      });
-
-      const scanTableContainer = document.getElementById("scanTableContainer");
-      scanTableContainer.replaceChild(scanTable, scanTableContainer.firstChild);
-
-      return true;
-    }
-
-    async function main() {
-      output = document.getElementById("output");
-
-      // Load pyodide
-      logToOutput("Loading Pyodide");
-      pyodide = await loadPyodide();
-
-      // Load Bumble
-      logToOutput("Loading Bumble");
-      const params = (new URL(document.location)).searchParams;
-      const bumblePackage = params.get("package") || "bumble";
-      await loadBumble(pyodide, bumblePackage);
-
-      logToOutput("Ready!")
-
-      // Enable the Connect button
-      const connectButton = document.getElementById("connectButton");
-      connectButton.disabled = false
-      connectButton.addEventListener("click", run)
-    }
-
-    main();
-  </script>
+    <bumble-controls id="bumble-controls"></bumble-controls><hr>
+    <textarea id="log-output" style="width: 100%;" rows="10" disabled></textarea><hr>
+    <scan-list id="scan-list"></scan-list>
 </body>
-
 </html>

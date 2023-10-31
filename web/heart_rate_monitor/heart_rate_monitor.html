@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+  <script type="module" src="../ui.js"></script>
+  <script type="module" src="heart_rate_monitor.js"></script>
+  <style>
+    #hr-value {
+      font-family: sans-serif;
+      font-size: xx-large;
+    }
+
+  </style>
+</head>
+<body>
+    <bumble-controls id="bumble-controls"></bumble-controls><hr>
+    <span class="material-symbols-outlined">
+      cardiology
+    </span>
+    <span id="hr-value">60</span>
+    <br>
+    <button id="hr-up-button" class="mdc-icon-button material-icons"><div class="mdc-icon-button__ripple"></div>arrow_upward</button>
+    <button id="hr-down-button" class="mdc-icon-button material-icons"><div class="mdc-icon-button__ripple"></div>arrow_downward</button>
+    <hr>
+    <textarea id="log-output" style="width: 100%;" rows="10" disabled></textarea><hr>
+</body>
+</html>

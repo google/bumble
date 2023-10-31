@@ -11,7 +11,16 @@ body, h1, h2, h3, h4, h5, h6 {
     border: none;
     border-radius: 4px;
     padding: 8px;
-    display: inline-block;
+    display: none;
+    margin: 4px;
+}
+
+#progressText {
+    background-color: rgb(179, 208, 146);
+    border: none;
+    border-radius: 4px;
+    padding: 8px;
+    display: none;
     margin: 4px;
 }
 

@@ -2,13 +2,14 @@
 <html>
 <head>
   <title>Bumble Speaker</title>
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.23.2/full/pyodide.js"></script>
-  <script type="module" src="speaker.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
   <link rel="stylesheet" href="speaker.css">
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+  <script type="module" src="speaker.js"></script>
+  <script type="module" src="../ui.js"></script>
 </head>
 <body>
   <h1><img src="logo.svg" width=100 height=100 style="vertical-align:middle" alt=""/>Bumble Virtual Speaker</h1>
-  <div id="errorText"></div>
   <div id="speaker">
     <table><tr>
       <td>
@@ -25,7 +26,8 @@
     <span id="streamStateText">IDLE</span>
     <span id="connectionStateText">NOT CONNECTED</span>
     <div id="controlsDiv">
-        <button id="audioOnButton">Audio On</button>
+      <bumble-controls id="bumble-controls"></bumble-controls>
+      <button id="audioOnButton" class="mdc-icon-button material-icons"><div class="mdc-icon-button__ripple"></div>volume_up</button>
     </div>
     <canvas id="fftCanvas" width="1024", height="300">Audio Frequencies Animation</canvas>
     <audio id="audio"></audio>

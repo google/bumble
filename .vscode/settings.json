@@ -47,6 +47,7 @@
         "protobuf",
         "psms",
         "pyee",
+        "Pyodide",
         "pyusb",
         "rfcomm",
         "ROHC",

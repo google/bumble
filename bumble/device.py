@@ -1308,7 +1308,7 @@ class Device(CompositeEventEmitter):
                 self.host.send_command(command, check_result), self.command_timeout
             )
         except asyncio.TimeoutError as error:
-            logger.warning('!!! Command timed out')
+            logger.warning(f'!!! Command {command.name} timed out')
             raise CommandTimeoutError() from error
 
     async def power_on(self) -> None:
@@ -1408,6 +1408,9 @@ class Device(CompositeEventEmitter):
 
         # Done
         self.powered_on = True
+
+    async def reset(self) -> None:
+        await self.host.reset()
 
     async def power_off(self) -> None:
         if self.powered_on:

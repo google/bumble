@@ -10,7 +10,7 @@ nav:
     - Contributing: development/contributing.md
     - Code Style: development/code_style.md
   - Use Cases:
-    - Overview: use_cases/index.md
+    - use_cases/index.md
     - Use Case 1: use_cases/use_case_1.md
     - Use Case 2: use_cases/use_case_2.md
     - Use Case 3: use_cases/use_case_3.md
@@ -23,7 +23,7 @@ nav:
     - GATT: components/gatt.md
     - Security Manager: components/security_manager.md
   - Transports:
-    - Overview: transports/index.md
+    - transports/index.md
     - Serial: transports/serial.md
     - USB: transports/usb.md
     - PTY: transports/pty.md
@@ -37,14 +37,14 @@ nav:
     - Android Emulator: transports/android_emulator.md
     - File: transports/file.md
   - Drivers:
-    - Overview: drivers/index.md
+    - drivers/index.md
     - Realtek: drivers/realtek.md
   - API:
     - Guide: api/guide.md
     - Examples: api/examples.md
     - Reference: api/reference.md
   - Apps & Tools:
-    - Overview: apps_and_tools/index.md
+    - apps_and_tools/index.md
     - Console: apps_and_tools/console.md
     - Bench: apps_and_tools/bench.md
     - Speaker: apps_and_tools/speaker.md
@@ -57,19 +57,24 @@ nav:
     - USB Probe: apps_and_tools/usb_probe.md
     - Link Relay: apps_and_tools/link_relay.md
   - Hardware:
-    - Overview: hardware/index.md
+    - hardware/index.md
   - Platforms:
-    - Overview: platforms/index.md
+    - platforms/index.md
     - macOS: platforms/macos.md
     - Linux: platforms/linux.md
     - Windows: platforms/windows.md
     - Android: platforms/android.md
     - Zephyr: platforms/zephyr.md
   - Examples:
-    - Overview: examples/index.md
+    - examples/index.md
   - Extras:
-    - Overview: extras/index.md
+    - extras/index.md
     - Android Remote HCI: extras/android_remote_hci.md
+  - Hive:
+    - hive/index.md
+    - Speaker: hive/web/speaker/speaker.html
+    - Scanner: hive/web/scanner/scanner.html
+    - Heart Rate Monitor: hive/web/heart_rate_monitor/heart_rate_monitor.html
 
 copyright: Copyright 2021-2023 Google LLC
 
@@ -78,6 +83,8 @@ theme:
   logo: 'images/logo.png'
   favicon: 'images/favicon.ico'
   custom_dir: 'theme'
+  features:
+    - navigation.indexes
 
 plugins:
   - mkdocstrings:
@@ -102,6 +109,8 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.tabbed:
+      alternate_style: true
   - codehilite:
       guess_lang: false
   - toc:
