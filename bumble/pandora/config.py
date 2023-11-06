@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
 from bumble.pairing import PairingConfig, PairingDelegate
 from dataclasses import dataclass
 from typing import Any, Dict
