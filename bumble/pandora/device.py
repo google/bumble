@@ -14,6 +14,7 @@
 
 """Generic & dependency free Bumble (reference) device."""
 
+from __future__ import annotations
 from bumble import transport
 from bumble.core import (
     BT_GENERIC_AUDIO_SERVICE,
