@@ -15,7 +15,9 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import enum
+from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from .hci import (
@@ -35,7 +37,50 @@ from .smp import (
     SMP_ID_KEY_DISTRIBUTION_FLAG,
     SMP_SIGN_KEY_DISTRIBUTION_FLAG,
     SMP_LINK_KEY_DISTRIBUTION_FLAG,
+    OobContext,
+    OobLegacyContext,
+    OobSharedData,
 )
+from .core import AdvertisingData, LeRole
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class OobData:
+    """OOB data that can be sent from one device to another."""
+    address: Optional[Address] = None
+    role: Optional[LeRole] = None
+    shared_data: Optional[OobSharedData] = None
+
+    @classmethod
+    def from_ad(cls, ad: AdvertisingData) -> OobData:
+        instance = cls()
+        shared_data_c = None
+        shared_data_r = None
+        for (ad_type, ad_data) in ad.ad_structures:
+            if ad_type == AdvertisingData.LE_BLUETOOTH_DEVICE_ADDRESS:
+                instance.address = Address(ad_data)
+            elif ad_type == AdvertisingData.LE_ROLE:
+                instance.role = LeRole(ad_data[0])
+            elif ad_type == AdvertisingData.LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE:
+                shared_data_c: bytes = AdvertisingData.ad_data_to_object(ad_type, ad_data)
+            elif ad_type == AdvertisingData.LE_SECURE_CONNECTIONS_RANDOM_VALUE:
+                shared_data_r: bytes = AdvertisingData.ad_data_to_object(ad_type, ad_data)
+        if shared_data_c or shared_data_r:
+            instance.shared_data = OobSharedData(c=shared_data_c, r=shared_data_r)
+
+        return instance
+
+    def to_ad(self):
+        ad_structures = []
+        if self.address is not None:
+            ad_structures.append((AdvertisingData.LE_BLUETOOTH_DEVICE_ADDRESS, bytes(self.address)))
+        if self.role is not None:
+            ad_structures.append((AdvertisingData.LE_ROLE, bytes([self.role])))
+        if self.shared_data is not None:
+            ad_structures.extend(self.shared_data.to_ad().ad_structures)
+
+        return AdvertisingData(ad_structures)
 
 
 # -----------------------------------------------------------------------------
@@ -173,6 +218,13 @@ class PairingConfig:
         PUBLIC = Address.PUBLIC_DEVICE_ADDRESS
         RANDOM = Address.RANDOM_DEVICE_ADDRESS
 
+    @dataclass
+    class OobConfig:
+        """Config for OOB pairing."""
+        our_context: Optional[OobContext]
+        peer_data: Optional[OobSharedData]
+        legacy_context: Optional[OobLegacyContext]
+
     def __init__(
         self,
         sc: bool = True,
@@ -180,17 +232,20 @@ class PairingConfig:
         bonding: bool = True,
         delegate: Optional[PairingDelegate] = None,
         identity_address_type: Optional[AddressType] = None,
+        oob: Optional[OobConfig] = None,
     ) -> None:
         self.sc = sc
         self.mitm = mitm
         self.bonding = bonding
         self.delegate = delegate or PairingDelegate()
         self.identity_address_type = identity_address_type
+        self.oob = oob
 
     def __str__(self) -> str:
         return (
             f'PairingConfig(sc={self.sc}, '
             f'mitm={self.mitm}, bonding={self.bonding}, '
             f'identity_address_type={self.identity_address_type}, '
-            f'delegate[{self.delegate.io_capability}])'
+            f'delegate[{self.delegate.io_capability}]), '
+            f'oob[{self.oob}])'
         )

@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+import enum
 import struct
 from typing import List, Optional, Tuple, Union, cast, Dict
 
@@ -975,6 +976,9 @@ class AdvertisingData:
         if ad_type == AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
             return (cast(int, struct.unpack_from('<H', ad_data, 0)[0]), ad_data[2:])
 
+        if ad_type == AdvertisingData.LE_BLUETOOTH_DEVICE_ADDRESS:
+            return Address(ad_data)
+
         return ad_data
 
     def append(self, data):
@@ -1051,3 +1055,13 @@ class ConnectionPHY:
 
     def __str__(self):
         return f'ConnectionPHY(tx_phy={self.tx_phy}, rx_phy={self.rx_phy})'
+
+
+# -----------------------------------------------------------------------------
+# LE Role
+# -----------------------------------------------------------------------------
+class LeRole(enum.IntEnum):
+    PERIPHERAL_ONLY = 0x00
+    CENTRAL_ONLY = 0x01
+    BOTH_PERIPHERAL_PREFERRED = 0x02
+    BOTH_CENTRAL_PREFERRED = 0x03

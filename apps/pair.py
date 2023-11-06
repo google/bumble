@@ -25,6 +25,7 @@ from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.transport import open_transport_or_link
 from bumble.pairing import PairingDelegate, PairingConfig
+from bumble.smp import OobContext
 from bumble.smp import error_name as smp_error_name
 from bumble.keys import JsonKeyStore
 from bumble.core import ProtocolError
@@ -60,7 +61,7 @@ class Waiter:
 class Delegate(PairingDelegate):
     def __init__(self, mode, connection, capability_string, do_prompt):
         super().__init__(
-            {
+            io_capability={
                 'keyboard': PairingDelegate.KEYBOARD_INPUT_ONLY,
                 'display': PairingDelegate.DISPLAY_OUTPUT_ONLY,
                 'display+keyboard': PairingDelegate.DISPLAY_OUTPUT_AND_KEYBOARD_INPUT,
@@ -286,6 +287,7 @@ async def pair(
     bond,
     ctkd,
     io,
+    oob,
     prompt,
     request,
     print_keys,
@@ -343,9 +345,25 @@ async def pair(
             await device.keystore.print(prefix=color('@@@ ', 'blue'))
             print(color('@@@-----------------------------------', 'blue'))
 
+        # Create an OOB context if needed
+        if oob:
+            our_oob_context = OobContext()
+            peer_oob_context = None  # TODO: parse from command line param
+            oob_contexts = PairingConfig.OobContexts(our_oob_context, peer_oob_context)
+            print(color('@@@-----------------------------------', 'yellow'))
+            print(color('@@@ OOB Data:', 'yellow'))
+            print(color(f'@@@ {our_oob_context.share()}', 'yellow'))
+            print(color('@@@-----------------------------------', 'yellow'))
+        else:
+            oob_contexts = None
+
         # Set up a pairing config factory
         device.pairing_config_factory = lambda connection: PairingConfig(
-            sc, mitm, bond, Delegate(mode, connection, io, prompt)
+            sc=sc,
+            mitm=mitm,
+            bonding=bond,
+            oob=oob_contexts,
+            delegate=Delegate(mode, connection, io, prompt),
         )
 
         # Connect to a peer or wait for a connection
@@ -421,6 +439,7 @@ class LogHandler(logging.Handler):
     default='display+keyboard',
     show_default=True,
 )
+@click.option('--oob', help='Use OOB pairing with this data from the peer')
 @click.option('--prompt', is_flag=True, help='Prompt to accept/reject pairing request')
 @click.option(
     '--request', is_flag=True, help='Request that the connecting peer initiate pairing'
@@ -441,6 +460,7 @@ def main(
     bond,
     ctkd,
     io,
+    oob,
     prompt,
     request,
     print_keys,
@@ -464,6 +484,7 @@ def main(
             bond,
             ctkd,
             io,
+            oob,
             prompt,
             request,
             print_keys,

@@ -27,6 +27,7 @@ import logging
 import asyncio
 import enum
 import secrets
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -53,6 +54,7 @@ from .core import (
     BT_BR_EDR_TRANSPORT,
     BT_CENTRAL_ROLE,
     BT_LE_TRANSPORT,
+    AdvertisingData,
     ProtocolError,
     name_or_number,
 )
@@ -564,6 +566,54 @@ class PairingMethod(enum.IntEnum):
 
 
 # -----------------------------------------------------------------------------
+class OobContext:
+    """Cryptographic context for LE SC OOB pairing."""
+
+    ecc_key: crypto.EccKey
+    r: bytes
+
+    def __init__(
+        self, ecc_key: Optional[crypto.EccKey] = None, r: Optional[bytes] = None
+    ) -> None:
+        self.ecc_key = crypto.EccKey.generate() if ecc_key is None else ecc_key
+        self.r = crypto.r() if r is None else r
+
+    def share(self) -> OobSharedData:
+        pkx = bytes(reversed(self.ecc_key.x))
+        return OobSharedData(c=crypto.f4(pkx, pkx, self.r, bytes(1)), r=self.r)
+
+
+# -----------------------------------------------------------------------------
+class OobLegacyContext:
+    """Cryptographic context for LE Legacy OOB pairing."""
+
+    tk: bytes
+
+    def __init__(self, tk: Optional[bytes] = None) -> None:
+        self.tk = crypto.r() if tk is None else tk
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class OobSharedData:
+    """Shareable data for LE SC OOB pairing."""
+
+    c: bytes
+    r: bytes
+
+    def to_ad(self) -> AdvertisingData:
+        return AdvertisingData(
+            [
+                (AdvertisingData.LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE, self.c),
+                (AdvertisingData.LE_SECURE_CONNECTIONS_RANDOM_VALUE, self.r),
+            ]
+        )
+
+    def __str__(self) -> str:
+        return f'OOB(C={self.c.hex()}, R={self.r.hex()})'
+
+
+# -----------------------------------------------------------------------------
 class Session:
     # I/O Capability to pairing method decision matrix
     #
@@ -640,8 +690,6 @@ class Session:
         self.pres: Optional[bytes] = None
         self.ea = None
         self.eb = None
-        self.tk = bytes(16)
-        self.r = bytes(16)
         self.stk = None
         self.ltk = None
         self.ltk_ediv = 0
@@ -659,7 +707,7 @@ class Session:
         self.peer_bd_addr: Optional[Address] = None
         self.peer_signature_key = None
         self.peer_expected_distributions: List[Type[SMP_Command]] = []
-        self.dh_key = None
+        self.dh_key = b''
         self.confirm_value = None
         self.passkey: Optional[int] = None
         self.passkey_ready = asyncio.Event()
@@ -712,8 +760,8 @@ class Session:
         self.io_capability = pairing_config.delegate.io_capability
         self.peer_io_capability = SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
 
-        # OOB (not supported yet)
-        self.oob = False
+        # OOB
+        self.oob_data_flag = 0 if pairing_config.oob is None else 1
 
         # Set up addresses
         self_address = connection.self_address
@@ -729,9 +777,37 @@ class Session:
             self.ia = bytes(peer_address)
             self.iat = 1 if peer_address.is_random else 0
 
+        # Select the ECC key, TK and r initial value
+        if pairing_config.oob:
+            self.peer_oob_data = pairing_config.oob.peer_data
+            if pairing_config.sc:
+                if pairing_config.oob.our_context is None:
+                    raise ValueError(
+                        "oob pairing config requires a context when sc is True"
+                    )
+                self.r = pairing_config.oob.our_context.r
+                self.ecc_key = pairing_config.oob.our_context.ecc_key
+                if pairing_config.oob.legacy_context is None:
+                    self.tk = None
+                else:
+                    self.tk = pairing_config.oob.legacy_context.tk
+            else:
+                if pairing_config.oob.legacy_context is None:
+                    raise ValueError(
+                        "oob pairing config requires a legacy context when sc is False"
+                    )
+                self.r = bytes(16)
+                self.ecc_key = manager.ecc_key
+                self.tk = pairing_config.oob.legacy_context.tk
+        else:
+            self.peer_oob_data = None
+            self.r = bytes(16)
+            self.ecc_key = manager.ecc_key
+            self.tk = bytes(16)
+
     @property
     def pkx(self) -> Tuple[bytes, bytes]:
-        return (bytes(reversed(self.manager.ecc_key.x)), self.peer_public_key_x)
+        return (bytes(reversed(self.ecc_key.x)), self.peer_public_key_x)
 
     @property
     def pka(self) -> bytes:
@@ -768,7 +844,10 @@ class Session:
         return None
 
     def decide_pairing_method(
-        self, auth_req: int, initiator_io_capability: int, responder_io_capability: int
+        self,
+        auth_req: int,
+        initiator_io_capability: int,
+        responder_io_capability: int,
     ) -> None:
         if self.connection.transport == BT_BR_EDR_TRANSPORT:
             self.pairing_method = PairingMethod.CTKD_OVER_CLASSIC
@@ -909,7 +988,7 @@ class Session:
 
         command = SMP_Pairing_Request_Command(
             io_capability=self.io_capability,
-            oob_data_flag=0,
+            oob_data_flag=self.oob_data_flag,
             auth_req=self.auth_req,
             maximum_encryption_key_size=16,
             initiator_key_distribution=self.initiator_key_distribution,
@@ -921,7 +1000,7 @@ class Session:
     def send_pairing_response_command(self) -> None:
         response = SMP_Pairing_Response_Command(
             io_capability=self.io_capability,
-            oob_data_flag=0,
+            oob_data_flag=self.oob_data_flag,
             auth_req=self.auth_req,
             maximum_encryption_key_size=16,
             initiator_key_distribution=self.initiator_key_distribution,
@@ -982,8 +1061,8 @@ class Session:
     def send_public_key_command(self) -> None:
         self.send_command(
             SMP_Pairing_Public_Key_Command(
-                public_key_x=bytes(reversed(self.manager.ecc_key.x)),
-                public_key_y=bytes(reversed(self.manager.ecc_key.y)),
+                public_key_x=bytes(reversed(self.ecc_key.x)),
+                public_key_y=bytes(reversed(self.ecc_key.y)),
             )
         )
 
@@ -1030,7 +1109,6 @@ class Session:
         self.ltk = crypto.h6(ilk, b'brle')
 
     def distribute_keys(self) -> None:
-
         # Distribute the keys as required
         if self.is_initiator:
             # CTKD: Derive LTK from LinkKey
@@ -1296,7 +1374,7 @@ class Session:
             try:
                 handler(command)
             except Exception as error:
-                logger.warning(f'{color("!!! Exception in handler:", "red")} {error}')
+                logger.exception(f'{color("!!! Exception in handler:", "red")} {error}')
                 response = SMP_Pairing_Failed_Command(
                     reason=SMP_UNSPECIFIED_REASON_ERROR
                 )
@@ -1333,15 +1411,28 @@ class Session:
         self.sc = self.sc and (command.auth_req & SMP_SC_AUTHREQ != 0)
         self.ct2 = self.ct2 and (command.auth_req & SMP_CT2_AUTHREQ != 0)
 
-        # Check for OOB
-        if command.oob_data_flag != 0:
-            self.send_pairing_failed(SMP_OOB_NOT_AVAILABLE_ERROR)
-            return
+        # Infer the pairing method
+        if (self.sc and (self.oob_data_flag != 0 or command.oob_data_flag != 0)) or (
+            not self.sc and (self.oob_data_flag != 0 and command.oob_data_flag != 0)
+        ):
+            # Use OOB
+            self.pairing_method = PairingMethod.OOB
+            if not self.sc and self.tk is None:
+                # For legacy OOB, TK is required.
+                logger.warning("legacy OOB without TK")
+                self.send_pairing_failed(SMP_OOB_NOT_AVAILABLE_ERROR)
+                return
+            if command.oob_data_flag == 0:
+                # The peer doesn't have OOB data, use r=0
+                self.r = bytes(16)
+        else:
+            # Decide which pairing method to use from the IO capability
+            self.decide_pairing_method(
+                command.auth_req,
+                command.io_capability,
+                self.io_capability,
+            )
 
-        # Decide which pairing method to use
-        self.decide_pairing_method(
-            command.auth_req, command.io_capability, self.io_capability
-        )
         logger.debug(f'pairing method: {self.pairing_method.name}')
 
         # Key distribution
@@ -1390,15 +1481,26 @@ class Session:
         self.bonding = self.bonding and (command.auth_req & SMP_BONDING_AUTHREQ != 0)
         self.sc = self.sc and (command.auth_req & SMP_SC_AUTHREQ != 0)
 
-        # Check for OOB
-        if self.sc and command.oob_data_flag:
-            self.send_pairing_failed(SMP_OOB_NOT_AVAILABLE_ERROR)
-            return
+        # Infer the pairing method
+        if (self.sc and (self.oob_data_flag != 0 or command.oob_data_flag != 0)) or (
+            not self.sc and (self.oob_data_flag != 0 and command.oob_data_flag != 0)
+        ):
+            # Use OOB
+            self.pairing_method = PairingMethod.OOB
+            if not self.sc and self.tk is None:
+                # For legacy OOB, TK is required.
+                logger.warning("legacy OOB without TK")
+                self.send_pairing_failed(SMP_OOB_NOT_AVAILABLE_ERROR)
+                return
+            if command.oob_data_flag == 0:
+                # The peer doesn't have OOB data, use r=0
+                self.r = bytes(16)
+        else:
+            # Decide which pairing method to use from the IO capability
+            self.decide_pairing_method(
+                command.auth_req, self.io_capability, command.io_capability
+            )
 
-        # Decide which pairing method to use
-        self.decide_pairing_method(
-            command.auth_req, self.io_capability, command.io_capability
-        )
         logger.debug(f'pairing method: {self.pairing_method.name}')
 
         # Key distribution
@@ -1549,12 +1651,13 @@ class Session:
                 if self.passkey_step < 20:
                     self.send_pairing_confirm_command()
                     return
-            else:
+            elif self.pairing_method != PairingMethod.OOB:
                 return
         else:
             if self.pairing_method in (
                 PairingMethod.JUST_WORKS,
                 PairingMethod.NUMERIC_COMPARISON,
+                PairingMethod.OOB,
             ):
                 self.send_pairing_random_command()
             elif self.pairing_method == PairingMethod.PASSKEY:
@@ -1591,6 +1694,7 @@ class Session:
         if self.pairing_method in (
             PairingMethod.JUST_WORKS,
             PairingMethod.NUMERIC_COMPARISON,
+            PairingMethod.OOB,
         ):
             ra = bytes(16)
             rb = ra
@@ -1599,7 +1703,6 @@ class Session:
             ra = self.passkey.to_bytes(16, byteorder='little')
             rb = ra
         else:
-            # OOB not implemented yet
             return
 
         assert self.preq and self.pres
@@ -1653,7 +1756,7 @@ class Session:
         # Compute the DH key
         self.dh_key = bytes(
             reversed(
-                self.manager.ecc_key.dh(
+                self.ecc_key.dh(
                     bytes(reversed(command.public_key_x)),
                     bytes(reversed(command.public_key_y)),
                 )
@@ -1661,8 +1764,27 @@ class Session:
         )
         logger.debug(f'DH key: {self.dh_key.hex()}')
 
+        if self.pairing_method == PairingMethod.OOB:
+            # Check against shared OOB data
+            if self.peer_oob_data:
+                confirm_verifier = crypto.f4(
+                    self.peer_public_key_x,
+                    self.peer_public_key_x,
+                    self.peer_oob_data.r,
+                    bytes(1),
+                )
+                if not self.check_expected_value(
+                    self.peer_oob_data.c,
+                    confirm_verifier,
+                    SMP_CONFIRM_VALUE_FAILED_ERROR,
+                ):
+                    return
+
         if self.is_initiator:
-            self.send_pairing_confirm_command()
+            if self.pairing_method == PairingMethod.OOB:
+                self.send_pairing_random_command()
+            else:
+                self.send_pairing_confirm_command()
         else:
             if self.pairing_method == PairingMethod.PASSKEY:
                 self.display_or_input_passkey()
@@ -1673,6 +1795,7 @@ class Session:
             if self.pairing_method in (
                 PairingMethod.JUST_WORKS,
                 PairingMethod.NUMERIC_COMPARISON,
+                PairingMethod.OOB,
             ):
                 # We can now send the confirmation value
                 self.send_pairing_confirm_command()

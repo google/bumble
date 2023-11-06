@@ -17,10 +17,15 @@
 # -----------------------------------------------------------------------------
 
 from bumble.crypto import EccKey, aes_cmac, ah, c1, f4, f5, f6, g2, h6, h7, s1
+from bumble.pairing import OobData, OobSharedData, LeRole
+from bumble.hci import Address
+from bumble.core import AdvertisingData
+
 
 # -----------------------------------------------------------------------------
 # pylint: disable=invalid-name
 # -----------------------------------------------------------------------------
+
 
 # -----------------------------------------------------------------------------
 def reversed_hex(hex_str):
@@ -234,6 +239,23 @@ def test_ah():
 
 
 # -----------------------------------------------------------------------------
+def test_oob_data():
+    oob_data = OobData(
+        address=Address("F0:F1:F2:F3:F4:F5"),
+        role=LeRole.BOTH_PERIPHERAL_PREFERRED,
+        shared_data=OobSharedData(c=bytes([1, 2]), r=bytes([3, 4])),
+    )
+    oob_data_ad = oob_data.to_ad()
+    oob_data_bytes = bytes(oob_data_ad)
+    oob_data_ad_parsed = AdvertisingData.from_bytes(oob_data_bytes)
+    oob_data_parsed = OobData.from_ad(oob_data_ad_parsed)
+    assert oob_data_parsed.address == oob_data.address
+    assert oob_data_parsed.role == oob_data.role
+    assert oob_data_parsed.shared_data.c == oob_data.shared_data.c
+    assert oob_data_parsed.shared_data.r == oob_data.shared_data.r
+
+
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     test_ecc()
     test_c1()
@@ -246,3 +268,4 @@ if __name__ == '__main__':
     test_h6()
     test_h7()
     test_ah()
+    test_oob_data()
