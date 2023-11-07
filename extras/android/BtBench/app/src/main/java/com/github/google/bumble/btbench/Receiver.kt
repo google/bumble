@@ -51,7 +51,9 @@ class Receiver(private val viewModel: AppViewModel, private val packetIO: Packet
         if (packet.flags and Packet.LAST_FLAG != 0) {
             Log.info("received last packet")
             val elapsed = now - startTime
-            viewModel.throughput = (bytesReceived / elapsed.toDouble(DurationUnit.SECONDS)).toInt()
+            val throughput = (bytesReceived / elapsed.toDouble(DurationUnit.SECONDS)).toInt()
+            Log.info("throughput: $throughput")
+            viewModel.throughput = throughput
             packetIO.sendPacket(AckPacket(packet.flags, packet.sequenceNumber))
         }
     }

@@ -23,7 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import java.util.UUID
 
-val DEFAULT_RFCOMM_UUID = UUID.fromString("0AF17D61-5DAE-4530-BE0D-6A8D54C3608B")
+val DEFAULT_RFCOMM_UUID = UUID.fromString("E6D55659-C8B4-4B85-96BB-B1143AF6D3AE")
 const val DEFAULT_PEER_BLUETOOTH_ADDRESS = "AA:BB:CC:DD:EE:FF"
 const val DEFAULT_SENDER_PACKET_COUNT = 100
 const val DEFAULT_SENDER_PACKET_SIZE = 1024
@@ -95,15 +95,15 @@ class AppViewModel : ViewModel() {
     }
 
     fun updateSenderPacketCount() {
-        if (senderPacketCountSlider < 0.2) {
+        if (senderPacketCountSlider < 0.1F) {
             senderPacketCount = 10
-        } else if (senderPacketCountSlider < 0.4) {
+        } else if (senderPacketCountSlider < 0.3F) {
             senderPacketCount = 50
-        } else if (senderPacketCountSlider < 0.6) {
+        } else if (senderPacketCountSlider < 0.5F) {
             senderPacketCount = 100
-        } else if (senderPacketCountSlider < 0.8) {
+        } else if (senderPacketCountSlider < 0.7F) {
             senderPacketCount = 500
-        } else if (senderPacketCountSlider < 1.0) {
+        } else if (senderPacketCountSlider < 0.9F) {
             senderPacketCount = 1000
         } else {
             senderPacketCount = 10000
@@ -137,15 +137,15 @@ class AppViewModel : ViewModel() {
     }
 
     fun updateSenderPacketSize() {
-        if (senderPacketSizeSlider < 0.2) {
+        if (senderPacketSizeSlider < 0.1F) {
             senderPacketSize = 1
-        } else if (senderPacketSizeSlider < 0.4) {
+        } else if (senderPacketSizeSlider < 0.3F) {
             senderPacketSize = 256
-        } else if (senderPacketSizeSlider < 0.6) {
+        } else if (senderPacketSizeSlider < 0.5F) {
             senderPacketSize = 512
-        } else if (senderPacketSizeSlider < 0.8) {
+        } else if (senderPacketSizeSlider < 0.7F) {
             senderPacketSize = 1024
-        } else if (senderPacketSizeSlider < 1.0) {
+        } else if (senderPacketSizeSlider < 0.9F) {
             senderPacketSize = 2048
         } else {
             senderPacketSize = 4096
