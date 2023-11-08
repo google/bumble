@@ -63,8 +63,8 @@ async def main():
             print(f'=== Connected to {connection.peer_address}!')
 
             # Connect to the SDP Server
-            sdp_client = SDP_Client(device)
-            await sdp_client.connect(connection)
+            sdp_client = SDP_Client(connection)
+            await sdp_client.connect()
 
             # List all services in the root browse group
             service_record_handles = await sdp_client.search_services(

@@ -215,8 +215,8 @@ async def test_service_search():
     devices.devices[0].sdp_server.service_records.update(sdp_records())
 
     # Search for service
-    client = Client(devices.devices[1])
-    await client.connect(devices.connections[1])
+    client = Client(devices.connections[1])
+    await client.connect()
     services = await client.search_services(
         [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE')]
     )
@@ -236,8 +236,8 @@ async def test_service_attribute():
     devices.devices[0].sdp_server.service_records.update(sdp_records())
 
     # Search for service
-    client = Client(devices.devices[1])
-    await client.connect(devices.connections[1])
+    client = Client(devices.connections[1])
+    await client.connect()
     attributes = await client.get_attributes(
         0x00010001, [SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID]
     )
@@ -257,8 +257,8 @@ async def test_service_search_attribute():
     devices.devices[0].sdp_server.service_records.update(sdp_records())
 
     # Search for service
-    client = Client(devices.devices[1])
-    await client.connect(devices.connections[1])
+    client = Client(devices.connections[1])
+    await client.connect()
     attributes = await client.search_attributes(
         [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE')], [(0x0000FFFF, 8)]
     )

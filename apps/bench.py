@@ -197,12 +197,10 @@ def make_sdp_records(channel):
     }
 
 
-async def find_rfcomm_channel_with_uuid(
-    device: Device, connection: Connection, uuid: str
-) -> int:
+async def find_rfcomm_channel_with_uuid(connection: Connection, uuid: str) -> int:
     # Connect to the SDP Server
-    sdp_client = SdpClient(device)
-    await sdp_client.connect(connection)
+    sdp_client = SdpClient(connection)
+    await sdp_client.connect()
 
     # Search for services with an L2CAP service attribute
     search_result = await sdp_client.search_attributes(
@@ -809,9 +807,7 @@ class RfcommClient(StreamedPacketIO):
             print(
                 color(f'@@@ Discovering channel number from UUID {self.uuid}', 'cyan')
             )
-            channel = await find_rfcomm_channel_with_uuid(
-                self.device, connection, self.uuid
-            )
+            channel = await find_rfcomm_channel_with_uuid(connection, self.uuid)
             print(color(f'@@@ Channel number = {channel}', 'cyan'))
             if channel == 0:
                 print(color('!!! No RFComm service with this UUID found', 'red'))
@@ -820,7 +816,7 @@ class RfcommClient(StreamedPacketIO):
 
         # Create a client and start it
         print(color('*** Starting RFCOMM client...', 'blue'))
-        rfcomm_client = bumble.rfcomm.Client(self.device, connection)
+        rfcomm_client = bumble.rfcomm.Client(connection)
         rfcomm_mux = await rfcomm_client.start()
         print(color('*** Started', 'blue'))
 

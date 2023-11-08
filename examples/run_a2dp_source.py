@@ -165,9 +165,7 @@ async def main():
                 print('*** Encryption on')
 
                 # Look for an A2DP service
-                avdtp_version = await find_avdtp_service_with_connection(
-                    device, connection
-                )
+                avdtp_version = await find_avdtp_service_with_connection(connection)
                 if not avdtp_version:
                     print(color('!!! no A2DP service found'))
                     return

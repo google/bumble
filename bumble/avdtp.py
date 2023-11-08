@@ -250,15 +250,15 @@ async def find_avdtp_service_with_sdp_client(
 
 # -----------------------------------------------------------------------------
 async def find_avdtp_service_with_connection(
-    device: device.Device, connection: device.Connection
+    connection: device.Connection,
 ) -> Optional[Tuple[int, int]]:
     '''
     Find an AVDTP service, for a connection, and return its version,
     or None if none is found
     '''
 
-    sdp_client = sdp.Client(device)
-    await sdp_client.connect(connection)
+    sdp_client = sdp.Client(connection)
+    await sdp_client.connect()
     service_version = await find_avdtp_service_with_sdp_client(sdp_client)
     await sdp_client.disconnect()
 

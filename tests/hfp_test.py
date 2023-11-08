@@ -43,12 +43,10 @@ async def make_hfp_connections(
 
     # Setup RFCOMM channel
     wait_dlc = asyncio.get_running_loop().create_future()
-    rfcomm_channel = rfcomm.Server(devices.devices[0]).listen(
-        lambda dlc: wait_dlc.set_result(dlc)
-    )
+    rfcomm_channel = rfcomm.Server(devices.devices[0]).listen(wait_dlc.set_result)
     assert devices.connections[0]
     assert devices.connections[1]
-    client_mux = await rfcomm.Client(devices.devices[1], devices.connections[1]).start()
+    client_mux = await rfcomm.Client(devices.connections[1]).start()
 
     client_dlc = await client_mux.open_dlc(rfcomm_channel)
     server_dlc = await wait_dlc
