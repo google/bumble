@@ -24,11 +24,16 @@ from prompt_toolkit.shortcuts import PromptSession
 from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.transport import open_transport_or_link
-from bumble.pairing import PairingDelegate, PairingConfig
-from bumble.smp import OobContext
+from bumble.pairing import OobData, PairingDelegate, PairingConfig
+from bumble.smp import OobContext, OobLegacyContext
 from bumble.smp import error_name as smp_error_name
 from bumble.keys import JsonKeyStore
-from bumble.core import ProtocolError
+from bumble.core import (
+    AdvertisingData,
+    ProtocolError,
+    BT_LE_TRANSPORT,
+    BT_BR_EDR_TRANSPORT,
+)
 from bumble.gatt import (
     GATT_DEVICE_NAME_CHARACTERISTIC,
     GATT_GENERIC_ACCESS_SERVICE,
@@ -348,11 +353,27 @@ async def pair(
         # Create an OOB context if needed
         if oob:
             our_oob_context = OobContext()
-            peer_oob_context = None  # TODO: parse from command line param
-            oob_contexts = PairingConfig.OobContexts(our_oob_context, peer_oob_context)
+            shared_data = (
+                None
+                if oob == '-'
+                else OobData.from_ad(AdvertisingData.from_bytes(bytes.fromhex(oob)))
+            )
+            legacy_context = OobLegacyContext()
+            oob_contexts = PairingConfig.OobConfig(
+                our_context=our_oob_context,
+                peer_data=shared_data,
+                legacy_context=legacy_context,
+            )
+            oob_data = OobData(
+                address=device.random_address,
+                shared_data=shared_data,
+                legacy_context=legacy_context,
+            )
             print(color('@@@-----------------------------------', 'yellow'))
             print(color('@@@ OOB Data:', 'yellow'))
-            print(color(f'@@@ {our_oob_context.share()}', 'yellow'))
+            print(color(f'@@@   {our_oob_context.share()}', 'yellow'))
+            print(color(f'@@@   TK={legacy_context.tk.hex()}', 'yellow'))
+            print(color(f'@@@   HEX: ({bytes(oob_data.to_ad()).hex()})', 'yellow'))
             print(color('@@@-----------------------------------', 'yellow'))
         else:
             oob_contexts = None
@@ -370,7 +391,10 @@ async def pair(
         device.on('connection', lambda connection: on_connection(connection, request))
         if address_or_name is not None:
             print(color(f'=== Connecting to {address_or_name}...', 'green'))
-            connection = await device.connect(address_or_name)
+            connection = await device.connect(
+                address_or_name,
+                transport=BT_LE_TRANSPORT if mode == 'le' else BT_BR_EDR_TRANSPORT,
+            )
 
             if not request:
                 try:
@@ -439,7 +463,11 @@ class LogHandler(logging.Handler):
     default='display+keyboard',
     show_default=True,
 )
-@click.option('--oob', help='Use OOB pairing with this data from the peer')
+@click.option(
+    '--oob',
+    metavar='<oob-data-hex>',
+    help='Use OOB pairing with this data from the peer',
+)
 @click.option('--prompt', is_flag=True, help='Prompt to accept/reject pairing request')
 @click.option(
     '--request', is_flag=True, help='Request that the connecting peer initiate pairing'
