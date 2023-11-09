@@ -94,7 +94,7 @@ impl From<Error> for PacketTypeParseError {
 
 impl WithPacketType<Self> for Command {
     fn to_vec_with_packet_type(self) -> Vec<u8> {
-        prepend_packet_type(PacketType::Command, self.to_vec())
+        prepend_packet_type(PacketType::Command, self)
     }
 
     fn parse_with_packet_type(bytes: &[u8]) -> Result<Self, PacketTypeParseError> {
@@ -104,7 +104,7 @@ impl WithPacketType<Self> for Command {
 
 impl WithPacketType<Self> for Acl {
     fn to_vec_with_packet_type(self) -> Vec<u8> {
-        prepend_packet_type(PacketType::Acl, self.to_vec())
+        prepend_packet_type(PacketType::Acl, self)
     }
 
     fn parse_with_packet_type(bytes: &[u8]) -> Result<Self, PacketTypeParseError> {
@@ -114,7 +114,7 @@ impl WithPacketType<Self> for Acl {
 
 impl WithPacketType<Self> for Sco {
     fn to_vec_with_packet_type(self) -> Vec<u8> {
-        prepend_packet_type(PacketType::Sco, self.to_vec())
+        prepend_packet_type(PacketType::Sco, self)
     }
 
     fn parse_with_packet_type(bytes: &[u8]) -> Result<Self, PacketTypeParseError> {
@@ -124,7 +124,7 @@ impl WithPacketType<Self> for Sco {
 
 impl WithPacketType<Self> for Event {
     fn to_vec_with_packet_type(self) -> Vec<u8> {
-        prepend_packet_type(PacketType::Event, self.to_vec())
+        prepend_packet_type(PacketType::Event, self)
     }
 
     fn parse_with_packet_type(bytes: &[u8]) -> Result<Self, PacketTypeParseError> {
@@ -132,7 +132,9 @@ impl WithPacketType<Self> for Event {
     }
 }
 
-fn prepend_packet_type(packet_type: PacketType, mut packet_bytes: Vec<u8>) -> Vec<u8> {
+fn prepend_packet_type<T: Packet>(packet_type: PacketType, packet: T) -> Vec<u8> {
+    // TODO: refactor if `pdl` crate adds API for writing into buffer (github.com/google/pdl/issues/74)
+    let mut packet_bytes = packet.to_vec();
     packet_bytes.insert(0, packet_type.into());
     packet_bytes
 }

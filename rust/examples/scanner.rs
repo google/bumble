@@ -20,7 +20,9 @@
 use bumble::{
     adv::CommonDataType,
     wrapper::{
-        core::AdvertisementDataUnit, device::Device, hci::packets::AddressType,
+        core::AdvertisementDataUnit,
+        device::Device,
+        hci::{packets::AddressType, Address},
         transport::Transport,
     },
 };
@@ -44,12 +46,8 @@ async fn main() -> PyResult<()> {
 
     let transport = Transport::open(cli.transport).await?;
 
-    let mut device = Device::with_hci(
-        "Bumble",
-        "F0:F1:F2:F3:F4:F5",
-        transport.source()?,
-        transport.sink()?,
-    )?;
+    let address = Address::new("F0:F1:F2:F3:F4:F5", AddressType::RandomDeviceAddress)?;
+    let mut device = Device::with_hci("Bumble", address, transport.source()?, transport.sink()?)?;
 
     // in practice, devices can send multiple advertisements from the same address, so we keep
     // track of a timestamp for each set of data

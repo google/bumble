@@ -1000,6 +1000,9 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.10 LE Set Scan Parameters Command
         '''
+        if self.le_scan_enable:
+            return bytes([HCI_COMMAND_DISALLOWED_ERROR])
+
         self.le_scan_type = command.le_scan_type
         self.le_scan_interval = command.le_scan_interval
         self.le_scan_window = command.le_scan_window

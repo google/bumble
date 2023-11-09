@@ -63,17 +63,28 @@ async fn main() -> PyResult<()> {
         )
         .map_err(|e| anyhow!(e))?;
 
-    device.set_advertising_data(adv_data)?;
     device.power_on().await?;
 
-    println!("Advertising...");
-    device.start_advertising(true).await?;
+    if cli.extended {
+        println!("Starting extended advertisement...");
+        device.start_advertising_extended(adv_data).await?;
+    } else {
+        device.set_advertising_data(adv_data)?;
+
+        println!("Starting legacy advertisement...");
+        device.start_advertising(true).await?;
+    }
 
     // wait until user kills the process
     tokio::signal::ctrl_c().await?;
 
-    println!("Stopping...");
-    device.stop_advertising().await?;
+    if cli.extended {
+        println!("Stopping extended advertisement...");
+        device.stop_advertising_extended().await?;
+    } else {
+        println!("Stopping legacy advertisement...");
+        device.stop_advertising().await?;
+    }
 
     Ok(())
 }
@@ -86,11 +97,16 @@ struct Cli {
     /// See, for instance, `examples/device1.json` in the Python project.
     #[arg(long)]
     device_config: path::PathBuf,
+
     /// Bumble transport spec.
     ///
     /// <https://google.github.io/bumble/transports/index.html>
     #[arg(long)]
     transport: String,
+
+    /// Whether to perform an extended (BT 5.0) advertisement
+    #[arg(long)]
+    extended: bool,
 
     /// Log HCI commands
     #[arg(long)]

@@ -56,7 +56,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[build,test,development,documentation]"
@@ -65,15 +65,17 @@ jobs:
         with:
           components: clippy,rustfmt
           toolchain: ${{ matrix.rust-version }}
+      - name: Install Rust dependencies
+        run: cargo install cargo-all-features # allows building/testing combinations of features
       - name: Check License Headers
         run: cd rust && cargo run --features dev-tools --bin file-header check-all
       - name: Rust Build
-        run: cd rust && cargo build --all-targets && cargo build --all-features --all-targets
+        run: cd rust && cargo build --all-targets && cargo build-all-features --all-targets
       # Lints after build so what clippy needs is already built
       - name: Rust Lints
         run: cd rust && cargo fmt --check && cargo clippy --all-targets -- --deny warnings && cargo clippy --all-features --all-targets -- --deny warnings
       - name: Rust Tests
-        run: cd rust && cargo test
+        run: cd rust && cargo test-all-features
       # At some point, hook up publishing the binary. For now, just make sure it builds.
       # Once we're ready to publish binaries, this should be built with `--release`.
       - name: Build Bumble CLI

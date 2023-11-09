@@ -14,18 +14,19 @@
 
 //! HCI
 
+// re-export here, and internal usages of these imports should refer to this mod, not the internal
+// mod
+pub(crate) use crate::internal::hci::WithPacketType;
 pub use crate::internal::hci::{packets, Error, Packet};
 
-use crate::{
-    internal::hci::WithPacketType,
-    wrapper::hci::packets::{AddressType, Command, ErrorCode},
+use crate::wrapper::{
+    hci::packets::{AddressType, Command, ErrorCode},
+    ConversionError,
 };
 use itertools::Itertools as _;
 use pyo3::{
-    exceptions::PyException,
-    intern, pyclass, pymethods,
-    types::{PyBytes, PyModule},
-    FromPyObject, IntoPy, PyAny, PyErr, PyObject, PyResult, Python, ToPyObject,
+    exceptions::PyException, intern, types::PyModule, FromPyObject, IntoPy, PyAny, PyErr, PyObject,
+    PyResult, Python, ToPyObject,
 };
 
 /// Provides helpers for interacting with HCI
@@ -43,17 +44,45 @@ impl HciConstant {
     }
 }
 
+/// Bumble's representation of an HCI command.
+pub(crate) struct HciCommand(pub(crate) PyObject);
+
+impl HciCommand {
+    fn from_bytes(bytes: &[u8]) -> PyResult<Self> {
+        Python::with_gil(|py| {
+            PyModule::import(py, intern!(py, "bumble.hci"))?
+                .getattr(intern!(py, "HCI_Command"))?
+                .call_method1(intern!(py, "from_bytes"), (bytes,))
+                .map(|obj| Self(obj.to_object(py)))
+        })
+    }
+}
+
+impl TryFrom<Command> for HciCommand {
+    type Error = PyErr;
+
+    fn try_from(value: Command) -> Result<Self, Self::Error> {
+        HciCommand::from_bytes(&value.to_vec_with_packet_type())
+    }
+}
+
+impl IntoPy<PyObject> for HciCommand {
+    fn into_py(self, _py: Python<'_>) -> PyObject {
+        self.0
+    }
+}
+
 /// A Bluetooth address
 #[derive(Clone)]
 pub struct Address(pub(crate) PyObject);
 
 impl Address {
-    /// Creates a new [Address] object
-    pub fn new(address: &str, address_type: &AddressType) -> PyResult<Self> {
+    /// Creates a new [Address] object.
+    pub fn new(address: &str, address_type: AddressType) -> PyResult<Self> {
         Python::with_gil(|py| {
             PyModule::import(py, intern!(py, "bumble.device"))?
                 .getattr(intern!(py, "Address"))?
-                .call1((address, address_type.to_object(py)))
+                .call1((address, address_type))
                 .map(|any| Self(any.into()))
         })
     }
@@ -118,27 +147,31 @@ impl ToPyObject for Address {
     }
 }
 
-/// Implements minimum necessary interface to be treated as bumble's [HCI_Command].
-/// While pyo3's macros do not support generics, this could probably be refactored to allow multiple
-/// implementations of the HCI_Command methods in the future, if needed.
-#[pyclass]
-pub(crate) struct HciCommandWrapper(pub(crate) Command);
+/// An error meaning that the u64 value did not represent a valid BT address.
+#[derive(Debug)]
+pub struct InvalidAddress(u64);
 
-#[pymethods]
-impl HciCommandWrapper {
-    fn __bytes__(&self, py: Python) -> PyResult<PyObject> {
-        let bytes = PyBytes::new(py, &self.0.clone().to_vec_with_packet_type());
-        Ok(bytes.into_py(py))
-    }
+impl TryInto<packets::Address> for Address {
+    type Error = ConversionError<InvalidAddress>;
 
-    #[getter]
-    fn op_code(&self) -> u16 {
-        self.0.get_op_code().into()
+    fn try_into(self) -> Result<packets::Address, Self::Error> {
+        let addr_le_bytes = self.as_le_bytes().map_err(ConversionError::Python)?;
+
+        // packets::Address only supports converting from a u64 (TODO: update if/when it supports converting from [u8; 6] -- https://github.com/google/pdl/issues/75)
+        // So first we take the python `Address` little-endian bytes (6 bytes), copy them into a
+        // [u8; 8] in little-endian format, and finally convert it into a u64.
+        let mut buf = [0_u8; 8];
+        buf[0..6].copy_from_slice(&addr_le_bytes);
+        let address_u64 = u64::from_le_bytes(buf);
+
+        packets::Address::try_from(address_u64)
+            .map_err(InvalidAddress)
+            .map_err(ConversionError::Native)
     }
 }
 
-impl ToPyObject for AddressType {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
+impl IntoPy<PyObject> for AddressType {
+    fn into_py(self, py: Python<'_>) -> PyObject {
         u8::from(self).to_object(py)
     }
 }
