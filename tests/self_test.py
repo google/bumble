@@ -35,7 +35,7 @@ from bumble.smp import (
     SMP_PAIRING_NOT_SUPPORTED_ERROR,
     SMP_CONFIRM_VALUE_FAILED_ERROR,
     OobContext,
-    OobLegacyContext
+    OobLegacyContext,
 )
 from bumble.core import ProtocolError
 from bumble.hci import HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE
@@ -587,14 +587,14 @@ async def test_self_smp_oob_sc():
         mitm=True,
         sc=True,
         bonding=True,
-        oob=PairingConfig.OobConfig(oob_context_1, oob_context_2.share(), None)
+        oob=PairingConfig.OobConfig(oob_context_1, oob_context_2.share(), None),
     )
 
     pairing_config_2 = PairingConfig(
         mitm=True,
         sc=True,
         bonding=True,
-        oob=PairingConfig.OobConfig(oob_context_2, oob_context_1.share(), None)
+        oob=PairingConfig.OobConfig(oob_context_2, oob_context_1.share(), None),
     )
 
     await _test_self_smp_with_configs(pairing_config_1, pairing_config_2)
@@ -603,7 +603,7 @@ async def test_self_smp_oob_sc():
         mitm=True,
         sc=True,
         bonding=True,
-        oob=PairingConfig.OobConfig(oob_context_2, None, None)
+        oob=PairingConfig.OobConfig(oob_context_2, None, None),
     )
 
     await _test_self_smp_with_configs(pairing_config_1, pairing_config_3)
@@ -613,7 +613,7 @@ async def test_self_smp_oob_sc():
         mitm=True,
         sc=True,
         bonding=True,
-        oob=PairingConfig.OobConfig(oob_context_2, oob_context_2.share(), None)
+        oob=PairingConfig.OobConfig(oob_context_2, oob_context_2.share(), None),
     )
 
     with pytest.raises(ProtocolError) as error:
@@ -634,14 +634,14 @@ async def test_self_smp_oob_legacy():
         mitm=True,
         sc=False,
         bonding=True,
-        oob=PairingConfig.OobConfig(None, None, legacy_context)
+        oob=PairingConfig.OobConfig(None, None, legacy_context),
     )
 
     pairing_config_2 = PairingConfig(
         mitm=True,
         sc=True,
         bonding=True,
-        oob=PairingConfig.OobConfig(OobContext(), None, legacy_context)
+        oob=PairingConfig.OobConfig(OobContext(), None, legacy_context),
     )
 
     await _test_self_smp_with_configs(pairing_config_1, pairing_config_2)

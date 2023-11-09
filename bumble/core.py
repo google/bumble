@@ -976,9 +976,6 @@ class AdvertisingData:
         if ad_type == AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
             return (cast(int, struct.unpack_from('<H', ad_data, 0)[0]), ad_data[2:])
 
-        if ad_type == AdvertisingData.LE_BLUETOOTH_DEVICE_ADDRESS:
-            return Address(ad_data)
-
         return ad_data
 
     def append(self, data):

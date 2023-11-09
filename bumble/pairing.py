@@ -65,11 +65,11 @@ class OobData:
             elif ad_type == AdvertisingData.LE_ROLE:
                 instance.role = LeRole(ad_data[0])
             elif ad_type == AdvertisingData.LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE:
-                shared_data_c: Optional[bytes] = AdvertisingData.ad_data_to_object(
+                shared_data_c = AdvertisingData.ad_data_to_object(
                     ad_type, ad_data
                 )
             elif ad_type == AdvertisingData.LE_SECURE_CONNECTIONS_RANDOM_VALUE:
-                shared_data_r: bytes = AdvertisingData.ad_data_to_object(
+                shared_data_r = AdvertisingData.ad_data_to_object(
                     ad_type, ad_data
                 )
             elif ad_type == AdvertisingData.SECURITY_MANAGER_TK_VALUE:
