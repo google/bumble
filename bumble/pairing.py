@@ -65,13 +65,9 @@ class OobData:
             elif ad_type == AdvertisingData.LE_ROLE:
                 instance.role = LeRole(ad_data[0])
             elif ad_type == AdvertisingData.LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE:
-                shared_data_c = AdvertisingData.ad_data_to_object(
-                    ad_type, ad_data
-                )
+                shared_data_c = ad_data
             elif ad_type == AdvertisingData.LE_SECURE_CONNECTIONS_RANDOM_VALUE:
-                shared_data_r = AdvertisingData.ad_data_to_object(
-                    ad_type, ad_data
-                )
+                shared_data_r = ad_data
             elif ad_type == AdvertisingData.SECURITY_MANAGER_TK_VALUE:
                 instance.legacy_context = OobLegacyContext(tk=ad_data)
         if shared_data_c and shared_data_r:
