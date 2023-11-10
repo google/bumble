@@ -351,15 +351,16 @@ class HostService(HostServicer):
             target = None
             advertising_type = AdvertisingType.UNDIRECTED
 
-        if request.target:
+        if target_variant := request.WhichOneof('target'):
             # Need to reverse bytes order since Bumble Address is using MSB.
-            target_bytes = bytes(reversed(request.target))
-            if request.target_variant() == "public":
+            if target_variant == 'public':
+                target_bytes = bytes(request.public[::-1])
                 target = Address(target_bytes, Address.PUBLIC_DEVICE_ADDRESS)
                 advertising_type = (
                     AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY
                 )  # FIXME: HIGH_DUTY ?
             else:
+                target_bytes = bytes(request.random[::-1])
                 target = Address(target_bytes, Address.RANDOM_DEVICE_ADDRESS)
                 advertising_type = (
                     AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY
