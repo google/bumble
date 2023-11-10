@@ -466,7 +466,10 @@ class LogHandler(logging.Handler):
 @click.option(
     '--oob',
     metavar='<oob-data-hex>',
-    help='Use OOB pairing with this data from the peer',
+    help=(
+        'Use OOB pairing with this data from the peer '
+        '(use "-" to enable OOB without peer data)'
+    ),
 )
 @click.option('--prompt', is_flag=True, help='Prompt to accept/reject pairing request')
 @click.option(
