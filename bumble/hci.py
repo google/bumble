@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import collections
+import enum
 import functools
 import logging
 import struct
@@ -1370,6 +1371,7 @@ HCI_LE_SUPPORTED_FEATURES_NAMES = {
     if feature_name.startswith('HCI_') and feature_name.endswith('_LE_SUPPORTED_FEATURE')
 }
 
+
 # fmt: on
 # pylint: enable=line-too-long
 # pylint: disable=invalid-name
@@ -1925,6 +1927,9 @@ class HCI_Packet:
         if packet_type == HCI_ACL_DATA_PACKET:
             return HCI_AclDataPacket.from_bytes(packet)
 
+        if packet_type == HCI_SYNCHRONOUS_DATA_PACKET:
+            return HCI_SynchronousDataPacket.from_bytes(packet)
+
         if packet_type == HCI_EVENT_PACKET:
             return HCI_Event.from_bytes(packet)
 
@@ -2297,6 +2302,19 @@ class HCI_Read_Clock_Offset_Command(HCI_Command):
 @HCI_Command.command(
     fields=[
         ('bd_addr', Address.parse_address),
+        ('reason', {'size': 1, 'mapper': HCI_Constant.error_name}),
+    ],
+)
+class HCI_Reject_Synchronous_Connection_Request_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.1.28 Reject Synchronous Connection Request Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('bd_addr', Address.parse_address),
         ('io_capability', {'size': 1, 'mapper': HCI_Constant.io_capability_name}),
         ('oob_data_present', 1),
         (
@@ -2453,6 +2471,51 @@ class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.45 Enhanced Setup Synchronous Connection Command
     '''
+
+    class CodingFormat(enum.IntEnum):
+        U_LOG = 0x00
+        A_LOG = 0x01
+        CVSD = 0x02
+        TRANSPARENT = 0x03
+        PCM = 0x04
+        MSBC = 0x05
+        LC3 = 0x06
+        G729A = 0x07
+
+        def to_bytes(self):
+            return self.value.to_bytes(5, 'little')
+
+        def __bytes__(self):
+            return self.to_bytes()
+
+    class PcmDataFormat(enum.IntEnum):
+        NA = 0x00
+        ONES_COMPLEMENT = 0x01
+        TWOS_COMPLEMENT = 0x02
+        SIGN_MAGNITUDE = 0x03
+        UNSIGNED = 0x04
+
+    class DataPath(enum.IntEnum):
+        HCI = 0x00
+        PCM = 0x01
+
+    class RetransmissionEffort(enum.IntEnum):
+        NO_RETRANSMISSION = 0x00
+        OPTIMIZE_FOR_POWER = 0x01
+        OPTIMIZE_FOR_QUALITY = 0x02
+        DONT_CARE = 0xFF
+
+    class PacketType(enum.IntFlag):
+        HV1 = 0x0001
+        HV2 = 0x0002
+        HV3 = 0x0004
+        EV3 = 0x0008
+        EV4 = 0x0010
+        EV5 = 0x0020
+        NO_2_EV3 = 0x0040
+        NO_3_EV3 = 0x0080
+        NO_2_EV5 = 0x0100
+        NO_3_EV5 = 0x0200
 
 
 # -----------------------------------------------------------------------------
@@ -5733,6 +5796,64 @@ class HCI_AclDataPacket(HCI_Packet):
             f'{color("ACL", "blue")}: '
             f'handle=0x{self.connection_handle:04x}, '
             f'pb={self.pb_flag}, bc={self.bc_flag}, '
+            f'data_total_length={self.data_total_length}, '
+            f'data={self.data.hex()}'
+        )
+
+
+# -----------------------------------------------------------------------------
+class HCI_SynchronousDataPacket(HCI_Packet):
+    '''
+    See Bluetooth spec @ 5.4.3 HCI SCO Data Packets
+    '''
+
+    hci_packet_type = HCI_SYNCHRONOUS_DATA_PACKET
+
+    @staticmethod
+    def from_bytes(packet: bytes) -> HCI_SynchronousDataPacket:
+        # Read the header
+        h, data_total_length = struct.unpack_from('<HB', packet, 1)
+        connection_handle = h & 0xFFF
+        packet_status = (h >> 12) & 0b11
+        rfu = (h >> 14) & 0b11
+        data = packet[4:]
+        if len(data) != data_total_length:
+            raise ValueError(
+                f'invalid packet length {len(data)} != {data_total_length}'
+            )
+        return HCI_SynchronousDataPacket(
+            connection_handle, packet_status, rfu, data_total_length, data
+        )
+
+    def to_bytes(self) -> bytes:
+        h = (self.packet_status << 12) | (self.rfu << 14) | self.connection_handle
+        return (
+            struct.pack('<BHB', HCI_SYNCHRONOUS_DATA_PACKET, h, self.data_total_length)
+            + self.data
+        )
+
+    def __init__(
+        self,
+        connection_handle: int,
+        packet_status: int,
+        rfu: int,
+        data_total_length: int,
+        data: bytes,
+    ) -> None:
+        self.connection_handle = connection_handle
+        self.packet_status = packet_status
+        self.rfu = rfu
+        self.data_total_length = data_total_length
+        self.data = data
+
+    def __bytes__(self) -> bytes:
+        return self.to_bytes()
+
+    def __str__(self) -> str:
+        return (
+            f'{color("SCO", "blue")}: '
+            f'handle=0x{self.connection_handle:04x}, '
+            f'ps={self.packet_status}, rfu={self.rfu}, '
             f'data_total_length={self.data_total_length}, '
             f'data={self.data.hex()}'
         )
