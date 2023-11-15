@@ -75,7 +75,7 @@ class OobData:
 
         return instance
 
-    def to_ad(self):
+    def to_ad(self) -> AdvertisingData:
         ad_structures = []
         if self.address is not None:
             ad_structures.append(
