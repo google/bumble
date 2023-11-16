@@ -3829,9 +3829,9 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
             'advertising_event_properties',
             {
                 'size': 2,
-                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.advertising_properties_string(
+                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties(
                     x
-                ),
+                ).name,
             },
         ),
         ('primary_advertising_interval_min', 3),
@@ -3840,9 +3840,9 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
             'primary_advertising_channel_map',
             {
                 'size': 1,
-                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.channel_map_string(
+                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap(
                     x
-                ),
+                ).name,
             },
         ),
         ('own_address_type', OwnAddressType.TYPE_SPEC),
@@ -3863,38 +3863,19 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
     See Bluetooth spec @ 7.8.53 LE Set Extended Advertising Parameters Command
     '''
 
-    CONNECTABLE_ADVERTISING = 0
-    SCANNABLE_ADVERTISING = 1
-    DIRECTED_ADVERTISING = 2
-    HIGH_DUTY_CYCLE_DIRECTED_CONNECTABLE_ADVERTISING = 3
-    USE_LEGACY_ADVERTISING_PDUS = 4
-    ANONYMOUS_ADVERTISING = 5
-    INCLUDE_TX_POWER = 6
+    class AdvertisingProperties(enum.IntFlag):
+        CONNECTABLE_ADVERTISING = 1 << 0
+        SCANNABLE_ADVERTISING = 1 << 1
+        DIRECTED_ADVERTISING = 1 << 2
+        HIGH_DUTY_CYCLE_DIRECTED_CONNECTABLE_ADVERTISING = 1 << 3
+        USE_LEGACY_ADVERTISING_PDUS = 1 << 4
+        ANONYMOUS_ADVERTISING = 1 << 5
+        INCLUDE_TX_POWER = 1 << 6
 
-    ADVERTISING_PROPERTIES_NAMES = (
-        'CONNECTABLE_ADVERTISING',
-        'SCANNABLE_ADVERTISING',
-        'DIRECTED_ADVERTISING',
-        'HIGH_DUTY_CYCLE_DIRECTED_CONNECTABLE_ADVERTISING',
-        'USE_LEGACY_ADVERTISING_PDUS',
-        'ANONYMOUS_ADVERTISING',
-        'INCLUDE_TX_POWER',
-    )
-
-    CHANNEL_37 = 0
-    CHANNEL_38 = 1
-    CHANNEL_39 = 2
-
-    CHANNEL_NAMES = ('37', '38', '39')
-
-    @classmethod
-    def advertising_properties_string(cls, properties):
-        # pylint: disable=line-too-long
-        return f'[{",".join(bit_flags_to_strings(properties, cls.ADVERTISING_PROPERTIES_NAMES))}]'
-
-    @classmethod
-    def channel_map_string(cls, channel_map):
-        return f'[{",".join(bit_flags_to_strings(channel_map, cls.CHANNEL_NAMES))}]'
+    class ChannelMap(enum.IntFlag):
+        CHANNEL_37 = 1 << 0
+        CHANNEL_38 = 1 << 1
+        CHANNEL_39 = 1 << 2
 
 
 # -----------------------------------------------------------------------------
@@ -3906,9 +3887,9 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
             'operation',
             {
                 'size': 1,
-                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Data_Command.operation_name(
+                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Data_Command.Operation(
                     x
-                ),
+                ).name,
             },
         ),
         ('fragment_preference', 1),
@@ -3926,23 +3907,12 @@ class HCI_LE_Set_Extended_Advertising_Data_Command(HCI_Command):
     See Bluetooth spec @ 7.8.54 LE Set Extended Advertising Data Command
     '''
 
-    INTERMEDIATE_FRAGMENT = 0x00
-    FIRST_FRAGMENT = 0x01
-    LAST_FRAGMENT = 0x02
-    COMPLETE_DATA = 0x03
-    UNCHANGED_DATA = 0x04
-
-    OPERATION_NAMES = {
-        INTERMEDIATE_FRAGMENT: 'INTERMEDIATE_FRAGMENT',
-        FIRST_FRAGMENT: 'FIRST_FRAGMENT',
-        LAST_FRAGMENT: 'LAST_FRAGMENT',
-        COMPLETE_DATA: 'COMPLETE_DATA',
-        UNCHANGED_DATA: 'UNCHANGED_DATA',
-    }
-
-    @classmethod
-    def operation_name(cls, operation):
-        return name_or_number(cls.OPERATION_NAMES, operation)
+    class Operation(enum.IntEnum):
+        INTERMEDIATE_FRAGMENT = 0x00
+        FIRST_FRAGMENT = 0x01
+        LAST_FRAGMENT = 0x02
+        COMPLETE_DATA = 0x03
+        UNCHANGED_DATA = 0x04
 
 
 # -----------------------------------------------------------------------------
@@ -3954,9 +3924,9 @@ class HCI_LE_Set_Extended_Advertising_Data_Command(HCI_Command):
             'operation',
             {
                 'size': 1,
-                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Data_Command.operation_name(
+                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Data_Command.Operation(
                     x
-                ),
+                ).name,
             },
         ),
         ('fragment_preference', 1),
@@ -3973,22 +3943,6 @@ class HCI_LE_Set_Extended_Scan_Response_Data_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.55 LE Set Extended Scan Response Data Command
     '''
-
-    INTERMEDIATE_FRAGMENT = 0x00
-    FIRST_FRAGMENT = 0x01
-    LAST_FRAGMENT = 0x02
-    COMPLETE_DATA = 0x03
-
-    OPERATION_NAMES = {
-        INTERMEDIATE_FRAGMENT: 'INTERMEDIATE_FRAGMENT',
-        FIRST_FRAGMENT: 'FIRST_FRAGMENT',
-        LAST_FRAGMENT: 'LAST_FRAGMENT',
-        COMPLETE_DATA: 'COMPLETE_DATA',
-    }
-
-    @classmethod
-    def operation_name(cls, operation):
-        return name_or_number(cls.OPERATION_NAMES, operation)
 
 
 # -----------------------------------------------------------------------------
