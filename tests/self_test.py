@@ -34,6 +34,8 @@ from bumble.pairing import PairingConfig, PairingDelegate
 from bumble.smp import (
     SMP_PAIRING_NOT_SUPPORTED_ERROR,
     SMP_CONFIRM_VALUE_FAILED_ERROR,
+    OobContext,
+    OobLegacyContext,
 )
 from bumble.core import ProtocolError
 from bumble.hci import HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE
@@ -576,6 +578,77 @@ async def test_self_smp_public_address():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_self_smp_oob_sc():
+    oob_context_1 = OobContext()
+    oob_context_2 = OobContext()
+
+    pairing_config_1 = PairingConfig(
+        mitm=True,
+        sc=True,
+        bonding=True,
+        oob=PairingConfig.OobConfig(oob_context_1, oob_context_2.share(), None),
+    )
+
+    pairing_config_2 = PairingConfig(
+        mitm=True,
+        sc=True,
+        bonding=True,
+        oob=PairingConfig.OobConfig(oob_context_2, oob_context_1.share(), None),
+    )
+
+    await _test_self_smp_with_configs(pairing_config_1, pairing_config_2)
+
+    pairing_config_3 = PairingConfig(
+        mitm=True,
+        sc=True,
+        bonding=True,
+        oob=PairingConfig.OobConfig(oob_context_2, None, None),
+    )
+
+    await _test_self_smp_with_configs(pairing_config_1, pairing_config_3)
+    await _test_self_smp_with_configs(pairing_config_3, pairing_config_1)
+
+    pairing_config_4 = PairingConfig(
+        mitm=True,
+        sc=True,
+        bonding=True,
+        oob=PairingConfig.OobConfig(oob_context_2, oob_context_2.share(), None),
+    )
+
+    with pytest.raises(ProtocolError) as error:
+        await _test_self_smp_with_configs(pairing_config_1, pairing_config_4)
+    assert error.value.error_code == SMP_CONFIRM_VALUE_FAILED_ERROR
+
+    with pytest.raises(ProtocolError):
+        await _test_self_smp_with_configs(pairing_config_4, pairing_config_1)
+    assert error.value.error_code == SMP_CONFIRM_VALUE_FAILED_ERROR
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_self_smp_oob_legacy():
+    legacy_context = OobLegacyContext()
+
+    pairing_config_1 = PairingConfig(
+        mitm=True,
+        sc=False,
+        bonding=True,
+        oob=PairingConfig.OobConfig(None, None, legacy_context),
+    )
+
+    pairing_config_2 = PairingConfig(
+        mitm=True,
+        sc=True,
+        bonding=True,
+        oob=PairingConfig.OobConfig(OobContext(), None, legacy_context),
+    )
+
+    await _test_self_smp_with_configs(pairing_config_1, pairing_config_2)
+    await _test_self_smp_with_configs(pairing_config_2, pairing_config_1)
+
+
+# -----------------------------------------------------------------------------
 async def run_test_self():
     await test_self_connection()
     await test_self_gatt()
@@ -585,6 +658,8 @@ async def run_test_self():
     await test_self_smp_wrong_pin()
     await test_self_smp_over_classic()
     await test_self_smp_public_address()
+    await test_self_smp_oob_sc()
+    await test_self_smp_oob_legacy()
 
 
 # -----------------------------------------------------------------------------

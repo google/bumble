@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+import enum
 import struct
 from typing import List, Optional, Tuple, Union, cast, Dict
 
@@ -1051,3 +1052,13 @@ class ConnectionPHY:
 
     def __str__(self):
         return f'ConnectionPHY(tx_phy={self.tx_phy}, rx_phy={self.rx_phy})'
+
+
+# -----------------------------------------------------------------------------
+# LE Role
+# -----------------------------------------------------------------------------
+class LeRole(enum.IntEnum):
+    PERIPHERAL_ONLY = 0x00
+    CENTRAL_ONLY = 0x01
+    BOTH_PERIPHERAL_PREFERRED = 0x02
+    BOTH_CENTRAL_PREFERRED = 0x03
