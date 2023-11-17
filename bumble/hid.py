@@ -18,15 +18,14 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import logging
-import asyncio
 import enum
 
 from pyee import EventEmitter
-from typing import Optional, Tuple, Callable, Dict, Union, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
-from . import core, l2cap  # type: ignore
-from .colors import color  # type: ignore
-from .core import BT_BR_EDR_TRANSPORT, InvalidStateError, ProtocolError  # type: ignore
+from bumble import l2cap
+from bumble.colors import color
+from bumble.core import InvalidStateError, ProtocolError
 
 if TYPE_CHECKING:
     from bumble.device import Device, Connection
@@ -302,10 +301,12 @@ class Host(EventEmitter):
         self.send_pdu_on_ctrl(hid_message)
 
     def send_pdu_on_ctrl(self, msg: bytes) -> None:
-        self.l2cap_ctrl_channel.send_pdu(msg)  # type: ignore
+        assert self.l2cap_ctrl_channel
+        self.l2cap_ctrl_channel.send_pdu(msg)
 
     def send_pdu_on_intr(self, msg: bytes) -> None:
-        self.l2cap_intr_channel.send_pdu(msg)  # type: ignore
+        assert self.l2cap_intr_channel
+        self.l2cap_intr_channel.send_pdu(msg)
 
     def send_data(self, data):
         msg = SendData(data)
