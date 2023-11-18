@@ -291,6 +291,7 @@ async def pair(
     mitm,
     bond,
     ctkd,
+    linger,
     io,
     oob,
     prompt,
@@ -395,6 +396,7 @@ async def pair(
                 address_or_name,
                 transport=BT_LE_TRANSPORT if mode == 'le' else BT_BR_EDR_TRANSPORT,
             )
+            pairing_failure = False
 
             if not request:
                 try:
@@ -402,10 +404,12 @@ async def pair(
                         await connection.pair()
                     else:
                         await connection.authenticate()
-                    return
                 except ProtocolError as error:
+                    pairing_failure = True
                     print(color(f'Pairing failed: {error}', 'red'))
-                    return
+
+            if not linger or pairing_failure:
+                return
         else:
             if mode == 'le':
                 # Advertise so that peers can find us and connect
@@ -455,6 +459,7 @@ class LogHandler(logging.Handler):
     help='Enable CTKD',
     show_default=True,
 )
+@click.option('--linger', default=True, is_flag=True, help='Linger after pairing')
 @click.option(
     '--io',
     type=click.Choice(
@@ -490,6 +495,7 @@ def main(
     mitm,
     bond,
     ctkd,
+    linger,
     io,
     oob,
     prompt,
@@ -514,6 +520,7 @@ def main(
             mitm,
             bond,
             ctkd,
+            linger,
             io,
             oob,
             prompt,
