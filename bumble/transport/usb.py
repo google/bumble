@@ -24,9 +24,10 @@ import platform
 
 import usb1
 
-from .common import Transport, ParserSource
-from .. import hci
-from ..colors import color
+from bumble.transport.common import Transport, ParserSource
+from bumble import hci
+from bumble.colors import color
+from bumble.utils import AsyncRunner
 
 
 # -----------------------------------------------------------------------------
@@ -271,6 +272,7 @@ async def open_usb_transport(spec: str) -> Transport:
                 logger.warning(
                     color(f'!!! IN transfer not completed: status={status}', 'red')
                 )
+                self.loop.call_soon_threadsafe(self.on_transport_lost)
 
         async def dequeue(self):
             while not self.closed:
