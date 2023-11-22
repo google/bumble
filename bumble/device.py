@@ -3138,7 +3138,15 @@ class Device(CompositeEventEmitter):
         connection.encryption = encryption
         if (
             not connection.authenticated
+            and connection.transport == BT_BR_EDR_TRANSPORT
             and encryption == HCI_Encryption_Change_Event.AES_CCM
+        ):
+            connection.authenticated = True
+            connection.sc = True
+        if (
+            not connection.authenticated
+            and connection.transport == BT_LE_TRANSPORT
+            and encryption == HCI_Encryption_Change_Event.E0_OR_AES_CCM
         ):
             connection.authenticated = True
             connection.sc = True
