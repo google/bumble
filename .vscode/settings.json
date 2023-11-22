@@ -29,6 +29,7 @@
         "deregistration",
         "dhkey",
         "diversifier",
+        "endianness",
         "Fitbit",
         "GATTLINK",
         "HANDSFREE",

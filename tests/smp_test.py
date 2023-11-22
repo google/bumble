@@ -16,6 +16,9 @@
 # Imports
 # -----------------------------------------------------------------------------
 
+import pytest
+
+from bumble import smp
 from bumble.crypto import EccKey, aes_cmac, ah, c1, f4, f5, f6, g2, h6, h7, s1
 from bumble.pairing import OobData, OobSharedData, LeRole
 from bumble.hci import Address
@@ -28,8 +31,8 @@ from bumble.core import AdvertisingData
 
 
 # -----------------------------------------------------------------------------
-def reversed_hex(hex_str):
-    return bytes(reversed(bytes.fromhex(hex_str)))
+def reversed_hex(hex_str: str) -> bytes:
+    return bytes.fromhex(hex_str)[::-1]
 
 
 # -----------------------------------------------------------------------------
@@ -129,112 +132,79 @@ def test_aes_cmac():
 
 # -----------------------------------------------------------------------------
 def test_f4():
-    u = bytes(
-        reversed(
-            bytes.fromhex(
-                '20b003d2 f297be2c 5e2c83a7 e9f9a5b9'
-                + 'eff49111 acf4fddb cc030148 0e359de6'
-            )
-        )
+    u = reversed_hex(
+        '20b003d2 f297be2c 5e2c83a7 e9f9a5b9 eff49111 acf4fddb cc030148 0e359de6'
     )
-    v = bytes(
-        reversed(
-            bytes.fromhex(
-                '55188b3d 32f6bb9a 900afcfb eed4e72a'
-                + '59cb9ac2 f19d7cfb 6b4fdd49 f47fc5fd'
-            )
-        )
+    v = reversed_hex(
+        '55188b3d 32f6bb9a 900afcfb eed4e72a 59cb9ac2 f19d7cfb 6b4fdd49 f47fc5fd'
     )
-    x = bytes(reversed(bytes.fromhex('d5cb8454 d177733e ffffb2ec 712baeab')))
-    z = bytes([0])
+    x = reversed_hex('d5cb8454 d177733e ffffb2ec 712baeab')
+    z = b'\0'
     value = f4(u, v, x, z)
-    assert bytes(reversed(value)) == bytes.fromhex(
-        'f2c916f1 07a9bd1c f1eda1be a974872d'
-    )
+    assert value == reversed_hex('f2c916f1 07a9bd1c f1eda1be a974872d')
 
 
 # -----------------------------------------------------------------------------
 def test_f5():
-    w = bytes(
-        reversed(
-            bytes.fromhex(
-                'ec0234a3 57c8ad05 341010a6 0a397d9b'
-                + '99796b13 b4f866f1 868d34f3 73bfa698'
-            )
-        )
+    w = reversed_hex(
+        'ec0234a3 57c8ad05 341010a6 0a397d9b 99796b13 b4f866f1 868d34f3 73bfa698'
     )
-    n1 = bytes(reversed(bytes.fromhex('d5cb8454 d177733e ffffb2ec 712baeab')))
-    n2 = bytes(reversed(bytes.fromhex('a6e8e7cc 25a75f6e 216583f7 ff3dc4cf')))
-    a1 = bytes(reversed(bytes.fromhex('00561237 37bfce')))
-    a2 = bytes(reversed(bytes.fromhex('00a71370 2dcfc1')))
+    n1 = reversed_hex('d5cb8454 d177733e ffffb2ec 712baeab')
+    n2 = reversed_hex('a6e8e7cc 25a75f6e 216583f7 ff3dc4cf')
+    a1 = reversed_hex('00561237 37bfce')
+    a2 = reversed_hex('00a71370 2dcfc1')
     value = f5(w, n1, n2, a1, a2)
-    assert bytes(reversed(value[0])) == bytes.fromhex(
-        '2965f176 a1084a02 fd3f6a20 ce636e20'
-    )
-    assert bytes(reversed(value[1])) == bytes.fromhex(
-        '69867911 69d7cd23 980522b5 94750a38'
-    )
+    assert value[0] == reversed_hex('2965f176 a1084a02 fd3f6a20 ce636e20')
+    assert value[1] == reversed_hex('69867911 69d7cd23 980522b5 94750a38')
 
 
 # -----------------------------------------------------------------------------
 def test_f6():
-    n1 = bytes(reversed(bytes.fromhex('d5cb8454 d177733e ffffb2ec 712baeab')))
-    n2 = bytes(reversed(bytes.fromhex('a6e8e7cc 25a75f6e 216583f7 ff3dc4cf')))
-    mac_key = bytes(reversed(bytes.fromhex('2965f176 a1084a02 fd3f6a20 ce636e20')))
-    r = bytes(reversed(bytes.fromhex('12a3343b b453bb54 08da42d2 0c2d0fc8')))
-    io_cap = bytes(reversed(bytes.fromhex('010102')))
-    a1 = bytes(reversed(bytes.fromhex('00561237 37bfce')))
-    a2 = bytes(reversed(bytes.fromhex('00a71370 2dcfc1')))
+    n1 = reversed_hex('d5cb8454 d177733e ffffb2ec 712baeab')
+    n2 = reversed_hex('a6e8e7cc 25a75f6e 216583f7 ff3dc4cf')
+    mac_key = reversed_hex('2965f176 a1084a02 fd3f6a20 ce636e20')
+    r = reversed_hex('12a3343b b453bb54 08da42d2 0c2d0fc8')
+    io_cap = reversed_hex('010102')
+    a1 = reversed_hex('00561237 37bfce')
+    a2 = reversed_hex('00a71370 2dcfc1')
     value = f6(mac_key, n1, n2, r, io_cap, a1, a2)
-    assert bytes(reversed(value)) == bytes.fromhex(
-        'e3c47398 9cd0e8c5 d26c0b09 da958f61'
-    )
+    assert value == reversed_hex('e3c47398 9cd0e8c5 d26c0b09 da958f61')
 
 
 # -----------------------------------------------------------------------------
 def test_g2():
-    u = bytes(
-        reversed(
-            bytes.fromhex(
-                '20b003d2 f297be2c 5e2c83a7 e9f9a5b9'
-                + 'eff49111 acf4fddb cc030148 0e359de6'
-            )
-        )
+    u = reversed_hex(
+        '20b003d2 f297be2c 5e2c83a7 e9f9a5b9 eff49111 acf4fddb cc030148 0e359de6'
     )
-    v = bytes(
-        reversed(
-            bytes.fromhex(
-                '55188b3d 32f6bb9a 900afcfb eed4e72a'
-                + '59cb9ac2 f19d7cfb 6b4fdd49 f47fc5fd'
-            )
-        )
+    v = reversed_hex(
+        '55188b3d 32f6bb9a 900afcfb eed4e72a 59cb9ac2 f19d7cfb 6b4fdd49 f47fc5fd'
     )
-    x = bytes(reversed(bytes.fromhex('d5cb8454 d177733e ffffb2ec 712baeab')))
-    y = bytes(reversed(bytes.fromhex('a6e8e7cc 25a75f6e 216583f7 ff3dc4cf')))
+    x = reversed_hex('d5cb8454 d177733e ffffb2ec 712baeab')
+    y = reversed_hex('a6e8e7cc 25a75f6e 216583f7 ff3dc4cf')
     value = g2(u, v, x, y)
     assert value == 0x2F9ED5BA
 
 
 # -----------------------------------------------------------------------------
 def test_h6():
-    KEY = bytes.fromhex('ec0234a3 57c8ad05 341010a6 0a397d9b')
+    KEY = reversed_hex('ec0234a3 57c8ad05 341010a6 0a397d9b')
     KEY_ID = bytes.fromhex('6c656272')
-    assert h6(KEY, KEY_ID) == bytes.fromhex('2d9ae102 e76dc91c e8d3a9e2 80b16399')
+    assert h6(KEY, KEY_ID) == reversed_hex('2d9ae102 e76dc91c e8d3a9e2 80b16399')
 
 
 # -----------------------------------------------------------------------------
 def test_h7():
-    KEY = bytes.fromhex('ec0234a3 57c8ad05 341010a6 0a397d9b')
+    KEY = reversed_hex('ec0234a3 57c8ad05 341010a6 0a397d9b')
     SALT = bytes.fromhex('00000000 00000000 00000000 746D7031')
-    assert h7(SALT, KEY) == bytes.fromhex('fb173597 c6a3c0ec d2998c2a 75a57011')
+    assert h7(SALT, KEY) == reversed_hex('fb173597 c6a3c0ec d2998c2a 75a57011')
 
 
 # -----------------------------------------------------------------------------
 def test_ah():
-    irk = bytes(reversed(bytes.fromhex('ec0234a3 57c8ad05 341010a6 0a397d9b')))
-    prand = bytes(reversed(bytes.fromhex('708194')))
+    irk = reversed_hex('ec0234a3 57c8ad05 341010a6 0a397d9b')
+    prand = reversed_hex('708194')
     value = ah(irk, prand)
-    expected = bytes(reversed(bytes.fromhex('0dfbaa')))
+    expected = reversed_hex('0dfbaa')
     assert value == expected
 
 
@@ -243,7 +213,7 @@ def test_oob_data():
     oob_data = OobData(
         address=Address("F0:F1:F2:F3:F4:F5"),
         role=LeRole.BOTH_PERIPHERAL_PREFERRED,
-        shared_data=OobSharedData(c=bytes([1, 2]), r=bytes([3, 4])),
+        shared_data=OobSharedData(c=b'12', r=b'34'),
     )
     oob_data_ad = oob_data.to_ad()
     oob_data_bytes = bytes(oob_data_ad)
@@ -253,6 +223,32 @@ def test_oob_data():
     assert oob_data_parsed.role == oob_data.role
     assert oob_data_parsed.shared_data.c == oob_data.shared_data.c
     assert oob_data_parsed.shared_data.r == oob_data.shared_data.r
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    'ct2, expected',
+    [
+        (False, 'bc1ca4ef 633fc1bd 0d8230af ee388fb0'),
+        (True, '287ad379 dca40253 0a39f1f4 3047b835'),
+    ],
+)
+def test_ltk_to_link_key(ct2: bool, expected: str):
+    LTK = reversed_hex('368df9bc e3264b58 bd066c33 334fbf64')
+    assert smp.Session.derive_link_key(LTK, ct2) == reversed_hex(expected)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    'ct2, expected',
+    [
+        (False, 'a813fb72 f1a3dfa1 8a2c9a43 f10d0a30'),
+        (True, 'e85e09eb 5eccb3e2 69418a13 3211bc79'),
+    ],
+)
+def test_link_key_to_ltk(ct2: bool, expected: str):
+    LINK_KEY = reversed_hex('05040302 01000908 07060504 03020100')
+    assert smp.Session.derive_ltk(LINK_KEY, ct2) == reversed_hex(expected)
 
 
 # -----------------------------------------------------------------------------
