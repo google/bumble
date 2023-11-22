@@ -503,18 +503,18 @@ async def main():
         print(f'Received Data, PDU: {pdu.hex()}')
 
     def on_get_report_cb(report_id,report_type, buffer_size):
-        retValue = hid_device.GetReportStatus()
+        retValue = hid_device.GetSetStatus()
         print("GET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
             "buffer_size:" + str(buffer_size))
         if report_type == Message.ReportType.INPUT_REPORT:
             if report_id == 1:
                 retValue.data = keyboardData
-                retValue.status = hid_device.ReportStatus.SUCCESS
+                retValue.status = hid_device.GetSetReturn.SUCCESS
             elif report_id == 2:
                 retValue.data = mouseData
-                retValue.status = hid_device.ReportStatus.SUCCESS
+                retValue.status = hid_device.GetSetReturn.SUCCESS
             else:
-                retValue.status = hid_device.ReportStatus.REPORT_ID_NOT_FOUND
+                retValue.status = hid_device.GetSetReturn.REPORT_ID_NOT_FOUND
 
             if(buffer_size):
                 data_len = buffer_size -1
@@ -523,36 +523,36 @@ async def main():
             #This sample app has nothing to do with the report received, to enable PTS 
             #testing, we will return single byte random data.
             retValue.data = bytearray([0x11])
-            retValue.status = hid_device.ReportStatus.SUCCESS
+            retValue.status = hid_device.GetSetReturn.SUCCESS
             
         elif report_type == Message.ReportType.FEATURE_REPORT:
             #TBD - not requried for PTS testing
-            retValue.status = hid_device.ReportStatus.ERR_UNSUPPORTED_REQUEST
+            retValue.status = hid_device.GetSetReturn.ERR_UNSUPPORTED_REQUEST
             
         else:
-            retValue.status = hid_device.ReportStatus.FAILURE
+            retValue.status = hid_device.GetSetReturn.FAILURE
 
         return retValue
     
     def on_set_report_cb(report_id, report_type, data):
-        retValue = hid_device.GetReportStatus()
+        retValue = hid_device.GetSetStatus()
         print("SET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
             "data:" + str(data))
-        retValue.status = hid_device.ReportStatus.SUCCESS
+        retValue.status = hid_device.GetSetReturn.SUCCESS
         return retValue
         
 
     def on_get_protocol_cb():
-        retValue = hid_device.GetReportStatus()
+        retValue = hid_device.GetSetStatus()
         retValue.data=protocol_mode.to_bytes()
-        retValue.status=hid_device.ReportStatus.SUCCESS
+        retValue.status=hid_device.GetSetReturn.SUCCESS
         return retValue
 
     def on_set_protocol_cb(protocol):
-        retValue = hid_device.GetReportStatus()
+        retValue = hid_device.GetSetStatus()
         #We do not support SET_PROTOCOL
         print("SET_PROTOCOL report_id: " + str(protocol))
-        retValue.status=hid_device.ReportStatus.ERR_UNSUPPORTED_REQUEST
+        retValue.status=hid_device.GetSetReturn.ERR_UNSUPPORTED_REQUEST
         return retValue
 
     def on_virtual_cable_unplug_cb():
