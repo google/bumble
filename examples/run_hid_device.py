@@ -520,9 +520,9 @@ async def main():
                 
     def on_get_report_cb(report_id,report_type, buffer_size):
         retValue = hid_device.GetReportStatus()
-
+        print("GET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
+            "buffer_size:" + str(buffer_size))
         if report_type == Message.ReportType.INPUT_REPORT:
-            print("GET_REPORT - inputType")
             if report_id == 1:
                 retValue.data = keyboardData
                 retValue.status = hid_device.ReportStatus.SUCCESS
@@ -536,7 +536,6 @@ async def main():
                 data_len = buffer_size -1
                 retValue.data = retValue.data[:data_len]
         elif report_type == Message.ReportType.OUTPUT_REPORT:
-            print("GET_REPORT - outputType")
             #This sample app has nothing to do with the report received, to enable PTS 
             #testing, we will return single byte random data.
             retValue.data = bytearray([0x11])
@@ -544,13 +543,20 @@ async def main():
             
         elif report_type == Message.ReportType.FEATURE_REPORT:
             #TBD - not requried for PTS testing
-            print("GET_REPORT - FeatureReport")
             retValue.status = hid_device.ReportStatus.ERR_UNSUPPORTED_REQUEST
             
         else:
             retValue.status = hid_device.ReportStatus.FAILURE
 
         return retValue
+    
+    def on_set_report_cb(report_id, report_type, data):
+        retValue = hid_device.GetReportStatus()
+        print("SET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
+            "data:" + str(data))
+        retValue.status = hid_device.ReportStatus.SUCCESS
+        return retValue
+        
 
     def on_set_protocol_cb(param):
         if HID_BOOT_DEVICE:
@@ -577,11 +583,11 @@ async def main():
 
         # Register for  call backs
         hid_device.on('interrupt_data', on_hid_data_cb)
-        hid_device.on('set_report', on_set_report_cb)
         hid_device.on('get_protocol', on_get_protocol_cb)
         hid_device.on('set_protocol', on_set_protocol_cb)
         
         hid_device.register_get_report_cb(on_get_report_cb)
+        hid_device.register_set_report_cb(on_set_report_cb)
 
         # Register for virtual cable unplug call back
         hid_device.on('virtual_cable_unplug', on_virtual_cable_unplug_cb)

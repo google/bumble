@@ -308,16 +308,9 @@ class HID(EventEmitter):
         elif message_type == Message.MessageType.GET_REPORT:
             logger.debug('<<< HID GET REPORT')
             self.handle_get_report(pdu)
-            
         elif message_type == Message.MessageType.SET_REPORT:
             logger.debug('<<< HID SET REPORT')
-            report_type = pdu[0] & 3
-            report = pdu[2:]
-            report_id = pdu[1]
-            logger.debug(report_id)
-            logger.debug(report_type)
-            #TODO: to check for size mentioned in report descriptor
-            self.emit('set_report', report_id, report)
+            self.handle_set_report(pdu)
         elif message_type == Message.MessageType.GET_PROTOCOL:
             logger.debug('<<< HID GET PROTOCOL')
             self.emit('get_protocol')
@@ -433,11 +426,26 @@ class Device(HID):
                 self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
         else:
           logger.debug("GetReport callback not registered !!")
-         
           
     def register_get_report_cb(self,cb):
         self.get_report_cb=cb
         logger.debug("GetReport callback registered successfully")
+        
+    def handle_set_report(self, pdu: bytes):
+        if(self.set_report_cb != None):
+            report_type=pdu[0] & 0x03
+            report_id = pdu[1]
+            report_data = pdu[2:]
+            ret = self.set_report_cb(report_id, report_type, report_data)
+            if(ret.status == self.ReportStatus.SUCCESS):
+                self.send_handshake_message(Message.Handshake.SUCCESSFUL)
+            else: 
+                self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
+            
+    def register_set_report_cb(self, cb):
+        self.set_report_cb=cb
+        logger.debug("SetReport callback registered successfully")
+
 # -----------------------------------------------------------------------------
 class Host(HID):
     def __init__(self, device: Device) -> None:
