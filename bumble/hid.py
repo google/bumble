@@ -313,10 +313,10 @@ class HID(EventEmitter):
             self.handle_set_report(pdu)
         elif message_type == Message.MessageType.GET_PROTOCOL:
             logger.debug('<<< HID GET PROTOCOL')
-            self.emit('get_protocol')
+            self.handle_get_protocol(pdu)
         elif message_type == Message.MessageType.SET_PROTOCOL:
             logger.debug('<<< HID SET PROTOCOL')
-            self.emit('set_protocol', param)
+            self.handle_set_protocol(pdu)
         elif message_type == Message.MessageType.DATA:
             logger.debug('<<< HID CONTROL DATA')
             self.emit('control_data', pdu)
@@ -426,6 +426,7 @@ class Device(HID):
                 self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
         else:
           logger.debug("GetReport callback not registered !!")
+          self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
           
     def register_get_report_cb(self,cb):
         self.get_report_cb=cb
@@ -439,12 +440,47 @@ class Device(HID):
             ret = self.set_report_cb(report_id, report_type, report_data)
             if(ret.status == self.ReportStatus.SUCCESS):
                 self.send_handshake_message(Message.Handshake.SUCCESSFUL)
-            else: 
-                self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
+                return
+        else:
+            logger.debug("SetReport callback not registered !!")
+        
+        self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
             
     def register_set_report_cb(self, cb):
         self.set_report_cb=cb
         logger.debug("SetReport callback registered successfully")
+        
+    def handle_get_protocol(self, pdu: bytes):
+        ret = self.GetReportStatus()
+        if(self.get_protocol_cb != None):
+            ret=self.get_protocol_cb()
+            if(ret.status == self.ReportStatus.SUCCESS):
+                self.send_control_data(Message.ReportType.OTHER_REPORT, ret.data)
+                return
+        else:
+            logger.debug("GetProtocol callback not registered !!")
+
+        self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
+
+    def register_get_protocol_cb(self, cb):
+        self.get_protocol_cb=cb
+        logger.debug("GetProtocol callback registered successfully")
+    
+    def handle_set_protocol(self, pdu: bytes):
+        ret = self.GetReportStatus()
+        if(self.set_protocol_cb != None):
+            ret=self.set_protocol_cb(pdu[0] & 0x01)
+            if(ret.status == self.ReportStatus.SUCCESS):
+                return
+        else:
+            logger.debug("SetProtocol callback not registered !!")
+            
+        self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
+        
+    
+    def register_set_protocol_cb(self, cb):
+        self.set_protocol_cb=cb
+        logger.debug("SetProtocol callback registered successfully")
 
 # -----------------------------------------------------------------------------
 class Host(HID):

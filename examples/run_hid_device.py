@@ -502,22 +502,6 @@ async def main():
     def on_hid_data_cb(pdu):
         print(f'Received Data, PDU: {pdu.hex()}')
 
-    def on_set_report_cb(report_id: int, report: bytes):
-        if (report_id > 2) or (report_id == 0):
-            hid_device.send_handshake_message(Message.Handshake.ERR_INVALID_REPORT_ID)
-            print("Warning: Report ID Not Supported")
-        else:
-            hid_device.send_handshake_message(Message.Handshake.SUCCESSFUL)
-            print('Set Report, Report ID: ', report_id)
-            print('Report:', report)
-
-    def on_get_protocol_cb():
-            if HID_BOOT_DEVICE:
-                data = protocol_mode.to_bytes()
-                hid_device.send_control_data(Message.ReportType.OTHER_REPORT, data)
-            else:
-                hid_device.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
-                
     def on_get_report_cb(report_id,report_type, buffer_size):
         retValue = hid_device.GetReportStatus()
         print("GET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
@@ -558,13 +542,18 @@ async def main():
         return retValue
         
 
-    def on_set_protocol_cb(param):
-        if HID_BOOT_DEVICE:
-            global protocol_mode
-            protocol_mode = Message.ProtocolMode(param)
-            hid_device.send_handshake_message(Message.Handshake.SUCCESSFUL)
-        else:
-            hid_device.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
+    def on_get_protocol_cb():
+        retValue = hid_device.GetReportStatus()
+        retValue.data=protocol_mode.to_bytes()
+        retValue.status=hid_device.ReportStatus.SUCCESS
+        return retValue
+
+    def on_set_protocol_cb(protocol):
+        retValue = hid_device.GetReportStatus()
+        #We do not support SET_PROTOCOL
+        print("SET_PROTOCOL report_id: " + str(protocol))
+        retValue.status=hid_device.ReportStatus.ERR_UNSUPPORTED_REQUEST
+        return retValue
 
     def on_virtual_cable_unplug_cb():
         print(f'Received Virtual Cable Unplug')
@@ -583,11 +572,11 @@ async def main():
 
         # Register for  call backs
         hid_device.on('interrupt_data', on_hid_data_cb)
-        hid_device.on('get_protocol', on_get_protocol_cb)
-        hid_device.on('set_protocol', on_set_protocol_cb)
         
         hid_device.register_get_report_cb(on_get_report_cb)
         hid_device.register_set_report_cb(on_set_report_cb)
+        hid_device.register_get_protocol_cb(on_get_protocol_cb)
+        hid_device.register_set_protocol_cb(on_set_protocol_cb)
 
         # Register for virtual cable unplug call back
         hid_device.on('virtual_cable_unplug', on_virtual_cable_unplug_cb)
