@@ -28,16 +28,12 @@ from bumble.pairing import OobData, PairingDelegate, PairingConfig
 from bumble.smp import OobContext, OobLegacyContext
 from bumble.smp import error_name as smp_error_name
 from bumble.keys import JsonKeyStore
-<<<<<<< HEAD
 from bumble.core import (
     AdvertisingData,
     ProtocolError,
     BT_LE_TRANSPORT,
     BT_BR_EDR_TRANSPORT,
 )
-=======
-from bumble.core import ProtocolError, BT_LE_TRANSPORT, BT_BR_EDR_TRANSPORT
->>>>>>> e3de14f (first implementation (+1 squashed commit))
 from bumble.gatt import (
     GATT_DEVICE_NAME_CHARACTERISTIC,
     GATT_GENERIC_ACCESS_SERVICE,
@@ -398,14 +394,9 @@ async def pair(
             print(color(f'=== Connecting to {address_or_name}...', 'green'))
             connection = await device.connect(
                 address_or_name,
-<<<<<<< HEAD
                 transport=BT_LE_TRANSPORT if mode == 'le' else BT_BR_EDR_TRANSPORT,
             )
             pairing_failure = False
-=======
-                transport=(BT_LE_TRANSPORT if mode == 'le' else BT_BR_EDR_TRANSPORT),
-            )
->>>>>>> e3de14f (first implementation (+1 squashed commit))
 
             if not request:
                 try:
