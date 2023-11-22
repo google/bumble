@@ -53,10 +53,10 @@ def sdp_records():
 
 # -----------------------------------------------------------------------------
 # pylint: disable-next=too-many-nested-blocks
-async def find_a2dp_service(device, connection):
+async def find_a2dp_service(connection):
     # Connect to the SDP Server
-    sdp_client = SDP_Client(device)
-    await sdp_client.connect(connection)
+    sdp_client = SDP_Client(connection)
+    await sdp_client.connect()
 
     # Search for services with an Audio Sink service class
     search_result = await sdp_client.search_attributes(
@@ -177,7 +177,7 @@ async def main():
         print('*** Encryption on')
 
         # Look for an A2DP service
-        avdtp_version = await find_a2dp_service(device, connection)
+        avdtp_version = await find_a2dp_service(connection)
         if not avdtp_version:
             print(color('!!! no AVDTP service found'))
             return

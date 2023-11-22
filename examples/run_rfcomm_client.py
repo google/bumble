@@ -42,10 +42,10 @@ from bumble.sdp import (
 
 
 # -----------------------------------------------------------------------------
-async def list_rfcomm_channels(device, connection):
+async def list_rfcomm_channels(connection):
     # Connect to the SDP Server
-    sdp_client = SDP_Client(device)
-    await sdp_client.connect(connection)
+    sdp_client = SDP_Client(connection)
+    await sdp_client.connect()
 
     # Search for services with an L2CAP service attribute
     search_result = await sdp_client.search_attributes(
@@ -194,7 +194,7 @@ async def main():
 
         channel = sys.argv[4]
         if channel == 'discover':
-            await list_rfcomm_channels(device, connection)
+            await list_rfcomm_channels(connection)
             return
 
         # Request authentication
@@ -209,7 +209,7 @@ async def main():
 
         # Create a client and start it
         print('@@@ Starting RFCOMM client...')
-        rfcomm_client = Client(device, connection)
+        rfcomm_client = Client(connection)
         rfcomm_mux = await rfcomm_client.start()
         print('@@@ Started')
 

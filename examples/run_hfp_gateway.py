@@ -49,8 +49,8 @@ logger = logging.getLogger(__name__)
 # pylint: disable-next=too-many-nested-blocks
 async def list_rfcomm_channels(device, connection):
     # Connect to the SDP Server
-    sdp_client = SDP_Client(device)
-    await sdp_client.connect(connection)
+    sdp_client = SDP_Client(connection)
+    await sdp_client.connect()
 
     # Search for services that support the Handsfree Profile
     search_result = await sdp_client.search_attributes(
@@ -184,7 +184,7 @@ async def main():
 
         # Create a client and start it
         print('@@@ Starting to RFCOMM client...')
-        rfcomm_client = rfcomm.Client(device, connection)
+        rfcomm_client = rfcomm.Client(connection)
         rfcomm_mux = await rfcomm_client.start()
         print('@@@ Started')
 

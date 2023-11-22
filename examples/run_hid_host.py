@@ -22,12 +22,9 @@ import logging
 
 from bumble.colors import color
 
-import bumble.core
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.core import (
-    BT_L2CAP_PROTOCOL_ID,
-    BT_HIDP_PROTOCOL_ID,
     BT_HUMAN_INTERFACE_DEVICE_SERVICE,
     BT_BR_EDR_TRANSPORT,
 )
@@ -35,8 +32,6 @@ from bumble.hci import Address
 from bumble.hid import Host, Message
 from bumble.sdp import (
     Client as SDP_Client,
-    DataElement,
-    ServiceAttribute,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
@@ -75,11 +70,11 @@ SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID = 0x0210
 # -----------------------------------------------------------------------------
 
 
-async def get_hid_device_sdp_record(device, connection):
+async def get_hid_device_sdp_record(connection):
 
     # Connect to the SDP Server
-    sdp_client = SDP_Client(device)
-    await sdp_client.connect(connection)
+    sdp_client = SDP_Client(connection)
+    await sdp_client.connect()
     if sdp_client:
         print(color('Connected to SDP Server', 'blue'))
     else:
@@ -348,7 +343,7 @@ async def main():
         await connection.encrypt()
         print('*** Encryption on')
 
-        await get_hid_device_sdp_record(device, connection)
+        await get_hid_device_sdp_record(connection)
 
         # Create HID host and start it
         print('@@@ Starting HID Host...')

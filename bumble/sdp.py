@@ -760,13 +760,13 @@ class SDP_ServiceSearchAttributeResponse(SDP_PDU):
 class Client:
     channel: Optional[l2cap.ClassicChannel]
 
-    def __init__(self, device: Device) -> None:
-        self.device = device
+    def __init__(self, connection: Connection) -> None:
+        self.connection = connection
         self.pending_request = None
         self.channel = None
 
-    async def connect(self, connection: Connection) -> None:
-        self.channel = await connection.create_l2cap_channel(
+    async def connect(self) -> None:
+        self.channel = await self.connection.create_l2cap_channel(
             spec=l2cap.ClassicChannelSpec(SDP_PSM)
         )
 

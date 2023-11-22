@@ -889,8 +889,7 @@ class Client:
     multiplexer: Optional[Multiplexer]
     l2cap_channel: Optional[l2cap.ClassicChannel]
 
-    def __init__(self, device: Device, connection: Connection) -> None:
-        self.device = device
+    def __init__(self, connection: Connection) -> None:
         self.connection = connection
         self.l2cap_channel = None
         self.multiplexer = None
@@ -906,7 +905,7 @@ class Client:
             raise
 
         assert self.l2cap_channel is not None
-        # Create a mutliplexer to manage DLCs with the server
+        # Create a multiplexer to manage DLCs with the server
         self.multiplexer = Multiplexer(self.l2cap_channel, Multiplexer.Role.INITIATOR)
 
         # Connect the multiplexer

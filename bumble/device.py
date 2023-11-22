@@ -103,6 +103,7 @@ from .hci import (
     HCI_LE_Set_Advertising_Data_Command,
     HCI_LE_Set_Advertising_Enable_Command,
     HCI_LE_Set_Advertising_Parameters_Command,
+    HCI_LE_Set_Data_Length_Command,
     HCI_LE_Set_Default_PHY_Command,
     HCI_LE_Set_Extended_Scan_Enable_Command,
     HCI_LE_Set_Extended_Scan_Parameters_Command,
@@ -735,6 +736,9 @@ class Connection(CompositeEventEmitter):
 
         self.remove_listener('disconnection', abort.set_result)
         self.remove_listener('disconnection_failure', abort.set_exception)
+
+    async def set_data_length(self, tx_octets, tx_time) -> None:
+        return await self.device.set_data_length(self, tx_octets, tx_time)
 
     async def update_parameters(
         self,
@@ -2192,6 +2196,22 @@ class Device(CompositeEventEmitter):
                 'disconnection_failure', pending_disconnection.set_exception
             )
             self.disconnecting = False
+
+    async def set_data_length(self, connection, tx_octets, tx_time) -> None:
+        if tx_octets < 0x001B or tx_octets > 0x00FB:
+            raise ValueError('tx_octets must be between 0x001B and 0x00FB')
+
+        if tx_time < 0x0148 or tx_time > 0x4290:
+            raise ValueError('tx_time must be between 0x0148 and 0x4290')
+
+        return await self.send_command(
+            HCI_LE_Set_Data_Length_Command(
+                connection_handle=connection.handle,
+                tx_octets=tx_octets,
+                tx_time=tx_time,
+            ),  # type: ignore[call-arg]
+            check_result=True,
+        )
 
     async def update_connection_parameters(
         self,
