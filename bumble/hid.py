@@ -60,6 +60,7 @@ class Message:
         NOT_READY = 0x01
         ERR_INVALID_REPORT_ID = 0x02
         ERR_UNSUPPORTED_REQUEST = 0x03
+        ERR_INVALID_PARAMETER = 0x04
         ERR_UNKNOWN = 0x0E
         ERR_FATAL = 0x0F
 
@@ -101,12 +102,12 @@ class GetReportMessage(Message):
     def __bytes__(self) -> bytes:
         packet_bytes = bytearray()
         packet_bytes.append(self.report_id)
-        packet_bytes.extend(
-            [(self.buffer_size & 0xFF), ((self.buffer_size >> 8) & 0xFF)]
-        )
-        if self.report_type == Message.ReportType.OTHER_REPORT:
+        if self.buffer_size == 0:
             return self.header(self.report_type) + packet_bytes
         else:
+            packet_bytes.extend(
+                [(self.buffer_size & 0xFF), ((self.buffer_size >> 8) & 0xFF)]
+            )
             return self.header(0x08 | self.report_type) + packet_bytes
 
 
@@ -119,7 +120,17 @@ class SetReportMessage(Message):
     def __bytes__(self) -> bytes:
         return self.header(self.report_type) + self.data
 
+@dataclass
+class SendControlData(Message):
+    report_type: int
+    data: bytes
+    message_type = Message.MessageType.DATA
 
+    def __bytes__(self) -> bytes:
+        packet_bytes = bytearray()
+
+        packet_bytes.extend(self.data)
+        return self.header(self.report_type) + packet_bytes
 @dataclass
 class GetProtocolMessage(Message):
     message_type = Message.MessageType.GET_PROTOCOL
@@ -136,6 +147,15 @@ class SetProtocolMessage(Message):
     def __bytes__(self) -> bytes:
         return self.header(self.protocol_mode)
 
+@dataclass
+class GetProtocolReplyMessage(Message):
+    protocol_mode: int
+    message_type = Message.MessageType.DATA
+
+    def __bytes__(self) -> bytes:
+        packet_bytes = bytearray()
+        packet_bytes.append(self.protocol_mode)
+        return self.header(Message.ReportType.OTHER_REPORT) + packet_bytes
 
 @dataclass
 class Suspend(Message):
@@ -160,25 +180,41 @@ class VirtualCableUnplug(Message):
     def __bytes__(self) -> bytes:
         return self.header(Message.ControlCommand.VIRTUAL_CABLE_UNPLUG)
 
-
+#Device sends input report, host sends output report.
 @dataclass
 class SendData(Message):
     data: bytes
+    report_type: int
     message_type = Message.MessageType.DATA
 
     def __bytes__(self) -> bytes:
-        return self.header(Message.ReportType.OUTPUT_REPORT) + self.data
+        return self.header(self.report_type) + self.data
+
+@dataclass
+class SendHandshakeMessage(Message):
+    result_code: int
+    message_type = Message.MessageType.HANDSHAKE
+
+    def __bytes__(self) -> bytes:
+        return self.header(self.result_code)
 
 
 # -----------------------------------------------------------------------------
-class Host(EventEmitter):
+class HID(EventEmitter):
     l2cap_ctrl_channel: Optional[l2cap.ClassicChannel]
     l2cap_intr_channel: Optional[l2cap.ClassicChannel]
 
-    def __init__(self, device: Device, connection: Connection) -> None:
+    class Role(enum.IntEnum):
+        HOST = 0x00
+        DEVICE = 0x01
+
+
+    def __init__(self, device: Device, role: int) -> None:
         super().__init__()
         self.device = device
-        self.connection = connection
+        self.connection = None
+        self.remote_device_bd_address = None
+        self.role = role
 
         self.l2cap_ctrl_channel = None
         self.l2cap_intr_channel = None
@@ -186,6 +222,8 @@ class Host(EventEmitter):
         # Register ourselves with the L2CAP channel manager
         device.register_l2cap_server(HID_CONTROL_PSM, self.on_connection)
         device.register_l2cap_server(HID_INTERRUPT_PSM, self.on_connection)
+
+        device.on('connection', self.on_device_connection)
 
     async def connect_control_channel(self) -> None:
         # Create a new L2CAP connection - control channel
@@ -229,9 +267,18 @@ class Host(EventEmitter):
         self.l2cap_ctrl_channel = None
         await channel.disconnect()
 
+    def on_device_connection(self, connection: Connection) -> None:
+        self.connection = connection
+        self.remote_device_bd_address = connection.peer_address
+        connection.on('disconnection', self.on_disconnection)
+
     def on_connection(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         logger.debug(f'+++ New L2CAP connection: {l2cap_channel}')
         l2cap_channel.on('open', lambda: self.on_l2cap_channel_open(l2cap_channel))
+        l2cap_channel.on('close', lambda: self.on_l2cap_channel_close(l2cap_channel))
+
+    def on_disconnection(self, reason: int) -> None:
+        self.connection = None
 
     def on_l2cap_channel_open(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         if l2cap_channel.psm == HID_CONTROL_PSM:
@@ -242,37 +289,159 @@ class Host(EventEmitter):
             self.l2cap_intr_channel.sink = self.on_intr_pdu
         logger.debug(f'$$$ L2CAP channel open: {l2cap_channel}')
 
+    def on_l2cap_channel_close(self, l2cap_channel: l2cap.ClassicChannel) -> None:
+        if l2cap_channel.psm == HID_CONTROL_PSM:
+            self.l2cap_ctrl_channel = None
+        else:
+            self.l2cap_intr_channel = None
+        logger.debug(f'$$$ L2CAP channel close: {l2cap_channel}')
+
     def on_ctrl_pdu(self, pdu: bytes) -> None:
         logger.debug(f'<<< HID CONTROL PDU: {pdu.hex()}')
         # Here we will receive all kinds of packets, parse and then call respective callbacks
-        message_type = pdu[0] >> 4
         param = pdu[0] & 0x0F
+        message_type = pdu[0] >> 4
 
         if message_type == Message.MessageType.HANDSHAKE:
             logger.debug(f'<<< HID HANDSHAKE: {Message.Handshake(param).name}')
             self.emit('handshake', Message.Handshake(param))
+        elif message_type == Message.MessageType.GET_REPORT:
+            logger.debug('<<< HID GET REPORT')
+            self.handle_get_report(pdu)
+            
+        elif message_type == Message.MessageType.SET_REPORT:
+            logger.debug('<<< HID SET REPORT')
+            report_type = pdu[0] & 3
+            report = pdu[2:]
+            report_id = pdu[1]
+            logger.debug(report_id)
+            logger.debug(report_type)
+            #TODO: to check for size mentioned in report descriptor
+            self.emit('set_report', report_id, report)
+        elif message_type == Message.MessageType.GET_PROTOCOL:
+            logger.debug('<<< HID GET PROTOCOL')
+            self.emit('get_protocol')
+        elif message_type == Message.MessageType.SET_PROTOCOL:
+            logger.debug('<<< HID SET PROTOCOL')
+            self.emit('set_protocol', param)
         elif message_type == Message.MessageType.DATA:
             logger.debug('<<< HID CONTROL DATA')
-            self.emit('data', pdu)
+            self.emit('control_data', pdu)
         elif message_type == Message.MessageType.CONTROL:
             if param == Message.ControlCommand.SUSPEND:
                 logger.debug('<<< HID SUSPEND')
-                self.emit('suspend', pdu)
+                self.emit('suspend')
             elif param == Message.ControlCommand.EXIT_SUSPEND:
                 logger.debug('<<< HID EXIT SUSPEND')
-                self.emit('exit_suspend', pdu)
+                self.emit('exit_suspend')
             elif param == Message.ControlCommand.VIRTUAL_CABLE_UNPLUG:
                 logger.debug('<<< HID VIRTUAL CABLE UNPLUG')
                 self.emit('virtual_cable_unplug')
             else:
                 logger.debug('<<< HID CONTROL OPERATION UNSUPPORTED')
         else:
-            logger.debug('<<< HID CONTROL DATA')
-            self.emit('data', pdu)
+            logger.debug('<<< HID MESSAGE TYPE UNSUPPORTED')
+            self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
     def on_intr_pdu(self, pdu: bytes) -> None:
         logger.debug(f'<<< HID INTERRUPT PDU: {pdu.hex()}')
-        self.emit("data", pdu)
+        self.emit("interrupt_data", pdu)
+
+    def send_pdu_on_ctrl(self, msg: bytes) -> None:
+        self.l2cap_ctrl_channel.send_pdu(msg)  # type: ignore
+
+    def send_pdu_on_intr(self, msg: bytes) -> None:
+        self.l2cap_intr_channel.send_pdu(msg)  # type: ignore
+
+    def send_data(self, data: bytes) -> None:
+        if self.role == HID.Role.HOST:
+            report_type = Message.ReportType.OUTPUT_REPORT
+        else:
+            report_type = Message.ReportType.INPUT_REPORT
+        msg = SendData(data, report_type)
+        hid_message = bytes(msg)
+        if self.l2cap_intr_channel is not None:
+            logger.debug(f'>>> HID INTERRUPT SEND DATA, PDU: {hid_message.hex()}')
+            self.send_pdu_on_intr(hid_message)
+
+    def virtual_cable_unplug(self) -> None:
+        msg = VirtualCableUnplug()
+        hid_message = bytes(msg)
+        logger.debug(f'>>> HID CONTROL VIRTUAL CABLE UNPLUG, PDU: {hid_message.hex()}')
+        self.send_pdu_on_ctrl(hid_message)
+
+
+# -----------------------------------------------------------------------------
+
+
+
+class Device(HID):
+    class ReportStatus(enum.IntEnum):
+        FAILURE = 0x00
+        REPORT_ID_NOT_FOUND = 0x01
+        ERR_UNSUPPORTED_REQUEST = 0x02
+        ERR_UNKNOWN = 0x03
+        SUCCESS = 0xff
+
+        
+    class GetReportStatus():
+        def __init__(self) -> None:
+            self.status = 0
+            self.data=None
+    
+    def __init__(self, device: Device) -> None:
+        super().__init__(device, HID.Role.DEVICE)
+
+    def send_handshake_message(self, result_code: int) -> None:
+        msg = SendHandshakeMessage(result_code)
+        hid_message = bytes(msg)
+        logger.debug(f'>>> HID HANDSHAKE MESSAGE, PDU: {hid_message.hex()}')
+        self.send_pdu_on_ctrl(hid_message)
+
+    def send_control_data(self,report_type: int, data: bytes):
+        msg = SendControlData(report_type= report_type, data=data)
+        hid_message = bytes(msg)
+        logger.debug(f'>>> HID CONTROL DATA: {hid_message.hex()}')
+        self.send_pdu_on_ctrl(hid_message)
+        
+    def handle_get_report(self, pdu: bytes):
+        ret = self.GetReportStatus()
+        report_type=pdu[0] & 0x03
+        buffer_flag = (pdu[0] & 0x08) >> 3
+        report_id = pdu[1]
+        logger.debug("buffer_flag: " + str(buffer_flag))
+        if(buffer_flag == 1):
+            buffer_size = (pdu[3] << 8) | pdu[2]
+        else:
+            buffer_size = 0
+
+        if(self.get_report_cb != None):
+            ret = self.get_report_cb(report_id, report_type, buffer_size)
+            
+            if(ret.status == self.ReportStatus.FAILURE):
+                self.send_handshake_message(Message.Handshake.ERR_UNKNOWN)
+            elif(ret.status == self.ReportStatus.SUCCESS):
+                    data = bytearray()
+                    data.append(report_id)
+                    data.extend(ret.data)
+                    #TODO Check the data size and MTU size here and only then send out  
+                    #the message
+                    self.send_control_data(report_type=report_type, data = data)
+            elif(ret.status == self.ReportStatus.REPORT_ID_NOT_FOUND): 
+                self.send_handshake_message(Message.Handshake.ERR_INVALID_REPORT_ID)
+            elif(ret.status == self.ReportStatus.ERR_UNSUPPORTED_REQUEST): 
+                self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
+        else:
+          logger.debug("GetReport callback not registered !!")
+         
+          
+    def register_get_report_cb(self,cb):
+        self.get_report_cb=cb
+        logger.debug("GetReport callback registered successfully")
+# -----------------------------------------------------------------------------
+class Host(HID):
+    def __init__(self, device: Device) -> None:
+        super().__init__(device, HID.Role.HOST)
 
     def get_report(self, report_type: int, report_id: int, buffer_size: int) -> None:
         msg = GetReportMessage(
@@ -282,52 +451,32 @@ class Host(EventEmitter):
         logger.debug(f'>>> HID CONTROL GET REPORT, PDU: {hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)
 
-    def set_report(self, report_type: int, data: bytes):
+    def set_report(self, report_type: int, data: bytes) -> None:
         msg = SetReportMessage(report_type=report_type, data=data)
         hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL SET REPORT, PDU:{hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)
 
-    def get_protocol(self):
+    def get_protocol(self) -> None:
         msg = GetProtocolMessage()
         hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL GET PROTOCOL, PDU: {hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)
 
-    def set_protocol(self, protocol_mode: int):
+    def set_protocol(self, protocol_mode: int) -> None:
         msg = SetProtocolMessage(protocol_mode=protocol_mode)
         hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL SET PROTOCOL, PDU: {hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)
 
-    def send_pdu_on_ctrl(self, msg: bytes) -> None:
-        assert self.l2cap_ctrl_channel
-        self.l2cap_ctrl_channel.send_pdu(msg)
-
-    def send_pdu_on_intr(self, msg: bytes) -> None:
-        assert self.l2cap_intr_channel
-        self.l2cap_intr_channel.send_pdu(msg)
-
-    def send_data(self, data):
-        msg = SendData(data)
-        hid_message = bytes(msg)
-        logger.debug(f'>>> HID INTERRUPT SEND DATA, PDU: {hid_message.hex()}')
-        self.send_pdu_on_intr(hid_message)
-
-    def suspend(self):
+    def suspend(self) -> None:
         msg = Suspend()
         hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL SUSPEND, PDU:{hid_message.hex()}')
-        self.send_pdu_on_ctrl(msg)
+        self.send_pdu_on_ctrl(hid_message)
 
-    def exit_suspend(self):
+    def exit_suspend(self) -> None:
         msg = ExitSuspend()
         hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL EXIT SUSPEND, PDU:{hid_message.hex()}')
-        self.send_pdu_on_ctrl(msg)
-
-    def virtual_cable_unplug(self):
-        msg = VirtualCableUnplug()
-        hid_message = bytes(msg)
-        logger.debug(f'>>> HID CONTROL VIRTUAL CABLE UNPLUG, PDU: {hid_message.hex()}')
-        self.send_pdu_on_ctrl(msg)
+        self.send_pdu_on_ctrl(hid_message)

@@ -290,7 +290,10 @@ async def main():
         print('example: run_hid_host.py classic1.json usb:0 E1:CA:72:48:C4:E8/P')
         return
 
-    def on_hid_data_cb(pdu):
+    def on_hid_control_data_cb(pdu: bytes):
+        print(f'Received Control Data, PDU: {pdu.hex()}')
+
+    def on_hid_interrupt_data_cb(pdu: bytes):
         report_type = pdu[0] & 0x0F
         if len(pdu) == 1:
             print(color(f'Warning: No report received', 'yellow'))
@@ -310,15 +313,17 @@ async def main():
 
         if (report_length <= 1) or (report_id == 0):
             return
-
-        if report_type == Message.ReportType.INPUT_REPORT:
+        #Parse report over interrupt channel
+        if (report_type == Message.ReportType.INPUT_REPORT):
             ReportParser.parse_input_report(pdu[1:])  # type: ignore
 
     async def handle_virtual_cable_unplug():
         await hid_host.disconnect_interrupt_channel()
         await hid_host.disconnect_control_channel()
         await device.keystore.delete(target_address)  # type: ignore
-        await connection.disconnect()
+        connection = hid_host.connection
+        if connection is not None:
+            await connection.disconnect()
 
     def on_hid_virtual_cable_unplug_cb():
         asyncio.create_task(handle_virtual_cable_unplug())
@@ -330,6 +335,18 @@ async def main():
         # Create a device
         device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
         device.classic_enabled = True
+
+        # Create HID host and start it
+        print('@@@ Starting HID Host...')
+        hid_host = Host(device)
+
+        # Register for HID data call back
+        hid_host.on('interrupt_data', on_hid_interrupt_data_cb)
+        hid_host.on('control_data', on_hid_control_data_cb)
+
+        # Register for virtual cable unplug call back
+        hid_host.on('virtual_cable_unplug', on_hid_virtual_cable_unplug_cb)
+
         await device.power_on()
 
         # Connect to a peer
@@ -350,15 +367,6 @@ async def main():
 
         await get_hid_device_sdp_record(device, connection)
 
-        # Create HID host and start it
-        print('@@@ Starting HID Host...')
-        hid_host = Host(device, connection)
-
-        # Register for HID data call back
-        hid_host.on('data', on_hid_data_cb)
-
-        # Register for virtual cable unplug call back
-        hid_host.on('virtual_cable_unplug', on_hid_virtual_cable_unplug_cb)
 
         async def menu():
             reader = await get_stream_reader(sys.stdin)
@@ -399,24 +407,40 @@ async def main():
                     await hid_host.disconnect_interrupt_channel()
 
                 elif choice == '5':
-                    print(" 1. Report ID 0x02")
-                    print(" 2. Report ID 0x03")
-                    print(" 3. Report ID 0x05")
+                    print(" 1. Report ID 0x02 - Input, Mouse")
+                    print(" 2. Report ID 0x03 - Input, Keyboard")
+                    print(" 3. Report ID 0x05 - Input, Invalid ReportId")
+                    print(" 4. Report ID 0x02 - Output")
+                    print(" 5. Report ID 0x05 - Feature")
                     choice1 = await reader.readline()
                     choice1 = choice1.decode('utf-8').strip()
 
                     if choice1 == '1':
-                        hid_host.get_report(1, 2, 3)
+                        hid_host.get_report(1, 2, 0)
 
                     elif choice1 == '2':
-                        hid_host.get_report(2, 3, 2)
-
+                        hid_host.get_report(1, 1, 0)
+                        
                     elif choice1 == '3':
-                        hid_host.get_report(3, 5, 3)
+                        hid_host.get_report(1, 5, 0)
+                    
+                    elif choice1 == '4':
+                        hid_host.get_report(2, 1, 0)
 
+                    elif choice1 == '5':
+                        hid_host.get_report(3, 5, 0)
+                        
+                    elif choice1 == '6':
+                        hid_host.get_report(1, 2, 3)
+
+                    elif choice1 == '7':
+                        hid_host.get_report(2, 3, 2)
+                        
+                    elif choice1 == '8':
+                        hid_host.get_report(3, 5, 3)
                     else:
                         print('Incorrect option selected')
-
+                        
                 elif choice == '6':
                     print(" 1. Report type 1 and Report id 0x01")
                     print(" 2. Report type 2 and Report id 0x03")
@@ -489,6 +513,7 @@ async def main():
                     hid_host.virtual_cable_unplug()
                     try:
                         await device.keystore.delete(target_address)
+                        print("Unpair successful")
                     except KeyError:
                         print('Device not found or Device already unpaired.')
 
