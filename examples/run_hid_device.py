@@ -451,10 +451,10 @@ async def keyboard_device(hid_device, command):
                             if ord('a') <= code <= ord('z'):
                                 hid_code = 0x04 + code - ord('a')
                                 deviceData.setKeyBoardData(bytearray([0x01, 0x00, 0x00, hid_code, 0x00, 0x00, 0x00, 0x00, 0x00]))
-                                hid_device.send_data(deviceData.getKeyBoardData())
+                                hid_device.send_report_on_interrupt(deviceData.getKeyBoardData())
                     elif message_type == 'keyup':
                         deviceData.setKeyBoardData(bytearray([0x01, 0x00, 0x00, hid_code, 0x00, 0x00, 0x00, 0x00, 0x00]))
-                        hid_device.send_data(deviceData.getKeyBoardData())
+                        hid_device.send_report_on_interrupt(deviceData.getKeyBoardData())
                     elif message_type == "mousemove":
                         x = parsed['x']
                         if x > 127:
@@ -469,7 +469,7 @@ async def keyboard_device(hid_device, command):
                         x_cord = x.to_bytes(signed = True)
                         y_cord = y.to_bytes(signed = True)
                         deviceData.setMouseData(bytearray([0x02, 0x00]) + x_cord + y_cord)
-                        hid_device.send_data(deviceData.getMouseData())
+                        hid_device.send_report_on_interrupt(deviceData.getMouseData())
                 except websockets.exceptions.ConnectionClosedOK:
                     pass
 
@@ -554,7 +554,7 @@ async def main():
 
     def on_set_protocol_cb(protocol):
         retValue = hid_device.GetSetStatus()
-        #We do not support SET_PROTOCOL
+        #We do not support SET_PROTOCOL.
         print("SET_PROTOCOL report_id: " + str(protocol))
         retValue.status=hid_device.GetSetReturn.ERR_UNSUPPORTED_REQUEST
         return retValue
@@ -603,12 +603,12 @@ async def main():
                 print(" 2. Connect Interrupt Channel")
                 print(" 3. Disconnect Control Channel")
                 print(" 4. Disconnect Interrupt Channel")
-                print(" 5. Send Report")
+                print(" 5. Send Report on Interrupt Channel")
                 print(" 6. Virtual Cable Unplug")
                 print(" 7. Disconnect device")
                 print(" 8. Delete Bonding")
                 print(" 9. Re-connect to device")
-                print("10. Exit Application")
+                print("10. Exit ")
                 print("\nEnter your choice : \n")
 
                 choice = await reader.readline()
@@ -629,21 +629,28 @@ async def main():
                 elif choice == '5':
                     print(" 1. Report ID 0x01")
                     print(" 2. Report ID 0x02")
+                    print(" 3. Invalid Report ID")
 
                     choice1 = await reader.readline()
                     choice1 = choice1.decode('utf-8').strip()
 
                     if choice1 == '1':
                         data =  bytearray([0x01, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00])
-                        hid_device.send_data(data)
+                        hid_device.send_report_on_interrupt(data)
                         data =  bytearray([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-                        hid_device.send_data(data)
+                        hid_device.send_report_on_interrupt(data)
 
                     elif choice1 == '2':
                         data =  bytearray([0x02, 0x00, 0x00, 0xf6])
-                        hid_device.send_data(data)
+                        hid_device.send_report_on_interrupt(data)
                         data =  bytearray([0x02, 0x00, 0x00, 0x00])
-                        hid_device.send_data(data)
+                        hid_device.send_report_on_interrupt(data)
+
+                    elif choice1 == '3':
+                        data =  bytearray([0x00, 0x00, 0x00, 0x00])
+                        hid_device.send_report_on_interrupt(data)
+                        data =  bytearray([0x00, 0x00, 0x00, 0x00])
+                        hid_device.send_report_on_interrupt(data)
 
                     else:
                         print('Incorrect option selected')
@@ -668,7 +675,7 @@ async def main():
                         hid_host_bd_addr = str(hid_device.remote_device_bd_address)
                         await device.keystore.delete(hid_host_bd_addr)
                     except KeyError:
-                        print('Device not found or Device already unpaired.')
+                        print('Device NOT found or Device already unpaired.')
 
                 elif choice == '9':
                     hid_host_bd_addr = str(hid_device.remote_device_bd_address)
@@ -677,7 +684,7 @@ async def main():
                     await connection.encrypt()
 
                 elif choice == '10':
-                    sys.exit("Application exit successful")
+                    sys.exit("Exit successful")
 
                 else:
                     print("Invalid option selected.")
@@ -698,6 +705,7 @@ async def main():
                 await keyboard_device(hid_device, 'web')
 
         else:
+            #default option is using keyboard.html (web)
             await keyboard_device(hid_device, 'web')
 
         await hci_source.wait_for_termination()

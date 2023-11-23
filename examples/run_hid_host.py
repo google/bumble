@@ -377,14 +377,14 @@ async def main():
                 print(" 6. Set Report")
                 print(" 7. Set Protocol Mode")
                 print(" 8. Get Protocol Mode")
-                print(" 9. Send Report")
+                print(" 9. Send Report on Interrupt Channel")
                 print("10. Suspend")
                 print("11. Exit Suspend")
                 print("12. Virtual Cable Unplug")
                 print("13. Disconnect device")
                 print("14. Delete Bonding")
                 print("15. Re-connect to device")
-                print("16. Exit Application")
+                print("16. Exit")
                 print("\nEnter your choice : \n")
 
                 choice = await reader.readline()
@@ -403,28 +403,31 @@ async def main():
                     await hid_host.disconnect_interrupt_channel()
 
                 elif choice == '5':
-                    print(" 1. Report ID 0x02 - Input, Mouse")
-                    print(" 2. Report ID 0x03 - Input, Keyboard")
-                    print(" 3. Report ID 0x05 - Input, Invalid ReportId")
-                    print(" 4. Report ID 0x02 - Output")
-                    print(" 5. Report ID 0x05 - Feature")
+                    print(" 1. Input Report with ID 0x01")
+                    print(" 2. Input Report with ID 0x02")
+                    print(" 3. Input Report with ID 0x0F - Invalid ReportId")
+                    print(" 4. Output Report with ID 0x02")
+                    print(" 5. Feature Report with ID 0x05 - Unsupported Request")
+                    print(" 6. Input Report with ID 0x02, BufferSize 3")
+                    print(" 7. Output Report with ID 0x03, BufferSize 2")
+                    print(" 8. Feature Report with ID 0x05,  BufferSize 3")
                     choice1 = await reader.readline()
                     choice1 = choice1.decode('utf-8').strip()
 
                     if choice1 == '1':
-                        hid_host.get_report(1, 2, 0)
+                        hid_host.get_report(1, 1, 0)
 
                     elif choice1 == '2':
-                        hid_host.get_report(1, 1, 0)
+                        hid_host.get_report(1, 2, 0)
 
                     elif choice1 == '3':
                         hid_host.get_report(1, 5, 0)
 
                     elif choice1 == '4':
-                        hid_host.get_report(2, 1, 0)
+                        hid_host.get_report(2, 2, 0)
 
                     elif choice1 == '5':
-                        hid_host.get_report(3, 5, 0)
+                        hid_host.get_report(3, 15, 0)
 
                     elif choice1 == '6':
                         hid_host.get_report(1, 2, 3)
@@ -490,11 +493,11 @@ async def main():
                         data = bytearray(
                             [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
                         )
-                        hid_host.send_data(data)
+                        hid_host.send_report_on_interrupt(data)
 
                     elif choice1 == '2':
                         data = bytearray([0x03, 0x00, 0x0D, 0xFD, 0x00, 0x00])
-                        hid_host.send_data(data)
+                        hid_host.send_report_on_interrupt(data)
 
                     else:
                         print('Incorrect option selected')
@@ -540,7 +543,7 @@ async def main():
                     await connection.encrypt()
 
                 elif choice == '16':
-                    sys.exit("Application exit successful")
+                    sys.exit("Exit successful")
 
                 else:
                     print("Invalid option selected.")
