@@ -224,7 +224,7 @@ class HID(EventEmitter):
         device.register_l2cap_server(HID_INTERRUPT_PSM, self.on_connection)
 
         device.on('connection', self.on_device_connection)
-
+        
     async def connect_control_channel(self) -> None:
         # Create a new L2CAP connection - control channel
         try:
@@ -383,6 +383,10 @@ class Device(HID):
     
     def __init__(self, device: Device) -> None:
         super().__init__(device, HID.Role.DEVICE)
+        self.get_report_cb = None
+        self.set_report_cb = None
+        self.get_protocol_cb = None
+        self.set_protocol_cb = None
 
     def send_handshake_message(self, result_code: int) -> None:
         msg = SendHandshakeMessage(result_code)
@@ -416,9 +420,11 @@ class Device(HID):
                     data = bytearray()
                     data.append(report_id)
                     data.extend(ret.data)
-                    #TODO Check the data size and MTU size here and only then send out  
-                    #the message
-                    self.send_control_data(report_type=report_type, data = data)
+                    if(len(data)<self.l2cap_ctrl_channel.mtu):
+                        self.send_control_data(report_type=report_type, data = data)
+                    else:
+                        self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
+                        
             elif(ret.status == self.GetSetReturn.REPORT_ID_NOT_FOUND): 
                 self.send_handshake_message(Message.Handshake.ERR_INVALID_REPORT_ID)
             elif(ret.status == self.GetSetReturn.ERR_UNSUPPORTED_REQUEST): 
