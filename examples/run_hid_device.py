@@ -78,30 +78,31 @@ SDP_HID_BOOT_DEVICE_ATTRIBUTE_ID = 0x020E
 SDP_HID_SSR_HOST_MAX_LATENCY_ATTRIBUTE_ID = 0x020F
 SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID = 0x0210
 
+# Refer to HID profile specification v1.1.1, "5.3 Service Discovery Protocol (SDP)" for details
 # HID SDP attribute values
-LANGUAGE = 0x656e
-ENCODING = 0x6a
-PRIMARY_LANGUAGE_BASE_ID = 0x100
-VERSION_NUMBER = 0x0101
+LANGUAGE = 0x656e  # 0x656E uint16 “en” (English)
+ENCODING = 0x6a  # 0x006A uint16 UTF-8 encoding
+PRIMARY_LANGUAGE_BASE_ID = 0x100  # 0x0100 uint16 PrimaryLanguageBaseID
+VERSION_NUMBER = 0x0101  # 0x0101 uint16 version number (v1.1)
 SERVICE_NAME = b'Bumble HID'
 SERVICE_DESCRIPTION = b'Bumble'
 PROVIDER_NAME = b'Bumble'
-HID_PARSER_VERSION = 0x0111
-HID_DEVICE_SUBCLASS = 0xC0
-HID_COUNTRY_CODE = 0x21
-HID_VIRTUAL_CABLE = True
-HID_RECONNECT_INITIATE = True
-REPORT_DESCRIPTOR_TYPE = 0x22
-HID_LANGID_BASE_LANGUAGE = 0x0409
-HID_LANGID_BASE_BLUETOOTH_STRING_OFFSET = 0x100
-HID_BATTERY_POWER = True
-HID_REMOTE_WAKE = True
-HID_SUPERVISION_TIMEOUT = 0xC80
-HID_NORMALLY_CONNECTABLE = True
-HID_BOOT_DEVICE = True
-HID_SSR_HOST_MAX_LATENCY = 0x640
-HID_SSR_HOST_MIN_TIMEOUT = 0xC80
-HID_REPORT_MAP = bytes(
+HID_PARSER_VERSION = 0x0111  # uint16 0x0111
+HID_DEVICE_SUBCLASS = 0xC0  # Combo keyboard/pointing device
+HID_COUNTRY_CODE = 0x21  # 0x21 Uint8, USA
+HID_VIRTUAL_CABLE = True  #  0x01 Boolean
+HID_RECONNECT_INITIATE = True  #  0x01 Boolean
+REPORT_DESCRIPTOR_TYPE = 0x22  # 0x22 Type = Report Descriptor
+HID_LANGID_BASE_LANGUAGE = 0x0409  # 0x0409 Language = English (United States)
+HID_LANGID_BASE_BLUETOOTH_STRING_OFFSET = 0x100  # 0x0100 Bluetooth String Offset
+HID_BATTERY_POWER = True  #  0x01 Boolean
+HID_REMOTE_WAKE = True  #  0x01 Boolean
+HID_SUPERVISION_TIMEOUT = 0xC80  # uint16 0xC80
+HID_NORMALLY_CONNECTABLE = True  #  0x01 Boolean
+HID_BOOT_DEVICE = True  #  0x01 Boolean
+HID_SSR_HOST_MAX_LATENCY = 0x640  # uint16 0x640
+HID_SSR_HOST_MIN_TIMEOUT = 0xC80  # uint16 0xC80
+HID_REPORT_MAP = bytes(  # Text String, 50 Octet Report Descriptor
     # pylint: disable=line-too-long
     [
         0x05,
@@ -412,16 +413,16 @@ class DeviceData:
     def __init__(self) -> None:
         self.keyboardData=bytearray([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         self.mouseData=bytearray([0x00, 0x00, 0x00, 0x00])
-    
+
     def getKeyBoardData(self):
         return self.keyboardData
-    
+
     def getMouseData(self):
         return self.mouseData
-    
+
     def setKeyBoardData(self, data):
         self.keyboardData=data
-        
+
     def setMouseData(self, data):
         self.mouseData=data
 
@@ -468,26 +469,13 @@ async def keyboard_device(hid_device, command):
                         x_cord = x.to_bytes(signed = True)
                         y_cord = y.to_bytes(signed = True)
                         deviceData.setMouseData(bytearray([0x02, 0x00]) + x_cord + y_cord)
-                        hid_device.send_data(deviceData.getKeyBoardData())
+                        hid_device.send_data(deviceData.getMouseData())
                 except websockets.exceptions.ConnectionClosedOK:
                     pass
 
         # pylint: disable-next=no-member
         await websockets.serve(serve, 'localhost', 8989)
         await asyncio.get_event_loop().create_future()
-    else:
-        message = bytes('hello', 'ascii')
-        while True:
-            for letter in message:
-                await asyncio.sleep(3.0)
-
-                # Keypress for the letter
-                keycode = 0x04 + letter - 0x61
-                deviceData.setKeyBoardData(bytearray([0x01, 0x00, 0x00, keycode, 0x00, 0x00, 0x00, 0x00, 0x00]))
-                hid_device.send_data(deviceData.getKeyBoardData())
-                # Key release
-                deviceData.setKeyBoardData(bytearray([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]))
-                hid_device.send_data(deviceData.getKeyBoardData())
 
 
 
@@ -540,23 +528,23 @@ async def main():
             #testing, we will return single byte random data.
             retValue.data = bytearray([0x11])
             retValue.status = hid_device.GetSetReturn.SUCCESS
-            
+
         elif report_type == Message.ReportType.FEATURE_REPORT:
             #TBD - not requried for PTS testing
             retValue.status = hid_device.GetSetReturn.ERR_UNSUPPORTED_REQUEST
-            
+
         else:
             retValue.status = hid_device.GetSetReturn.FAILURE
 
         return retValue
-    
+
     def on_set_report_cb(report_id, report_type, data):
         retValue = hid_device.GetSetStatus()
         print("SET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
             "data:" + str(data))
         retValue.status = hid_device.GetSetReturn.SUCCESS
         return retValue
-        
+
 
     def on_get_protocol_cb():
         retValue = hid_device.GetSetStatus()
@@ -588,7 +576,7 @@ async def main():
 
         # Register for  call backs
         hid_device.on('interrupt_data', on_hid_data_cb)
-        
+
         hid_device.register_get_report_cb(on_get_report_cb)
         hid_device.register_set_report_cb(on_set_report_cb)
         hid_device.register_get_protocol_cb(on_get_protocol_cb)
@@ -620,6 +608,7 @@ async def main():
                 print(" 7. Disconnect device")
                 print(" 8. Delete Bonding")
                 print(" 9. Re-connect to device")
+                print("10. Exit Application")
                 print("\nEnter your choice : \n")
 
                 choice = await reader.readline()
@@ -687,6 +676,9 @@ async def main():
                     await connection.authenticate()
                     await connection.encrypt()
 
+                elif choice == '10':
+                    sys.exit("Application exit successful")
+
                 else:
                     print("Invalid option selected.")
 
@@ -698,7 +690,7 @@ async def main():
                 await menu()
 
             elif command == 'web':
-                # Run as a keyboard device
+                # Run as a keyboard and mouse device
                 await keyboard_device(hid_device, command)
 
             else:

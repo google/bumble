@@ -384,6 +384,7 @@ async def main():
                 print("13. Disconnect device")
                 print("14. Delete Bonding")
                 print("15. Re-connect to device")
+                print("16. Exit Application")
                 print("\nEnter your choice : \n")
 
                 choice = await reader.readline()
@@ -415,27 +416,27 @@ async def main():
 
                     elif choice1 == '2':
                         hid_host.get_report(1, 1, 0)
-                        
+
                     elif choice1 == '3':
                         hid_host.get_report(1, 5, 0)
-                    
+
                     elif choice1 == '4':
                         hid_host.get_report(2, 1, 0)
 
                     elif choice1 == '5':
                         hid_host.get_report(3, 5, 0)
-                        
+
                     elif choice1 == '6':
                         hid_host.get_report(1, 2, 3)
 
                     elif choice1 == '7':
                         hid_host.get_report(2, 3, 2)
-                        
+
                     elif choice1 == '8':
                         hid_host.get_report(3, 5, 3)
                     else:
                         print('Incorrect option selected')
-                        
+
                 elif choice == '6':
                     print(" 1. Report type 1 and Report id 0x01")
                     print(" 2. Report type 2 and Report id 0x03")
@@ -537,6 +538,9 @@ async def main():
                     )
                     await connection.authenticate()
                     await connection.encrypt()
+
+                elif choice == '16':
+                    sys.exit("Application exit successful")
 
                 else:
                     print("Invalid option selected.")
