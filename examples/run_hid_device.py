@@ -87,21 +87,21 @@ VERSION_NUMBER = 0x0101  # 0x0101 uint16 version number (v1.1)
 SERVICE_NAME = b'Bumble HID'
 SERVICE_DESCRIPTION = b'Bumble'
 PROVIDER_NAME = b'Bumble'
-HID_PARSER_VERSION = 0x0111  # uint16 0x0111
+HID_PARSER_VERSION = 0x0111  # uint16 0x0111 (v1.1.1)
 HID_DEVICE_SUBCLASS = 0xC0  # Combo keyboard/pointing device
 HID_COUNTRY_CODE = 0x21  # 0x21 Uint8, USA
-HID_VIRTUAL_CABLE = True  #  0x01 Boolean
-HID_RECONNECT_INITIATE = True  #  0x01 Boolean
+HID_VIRTUAL_CABLE = True  # Virtual cable enabled
+HID_RECONNECT_INITIATE = True  #  Reconnect initiate enabled
 REPORT_DESCRIPTOR_TYPE = 0x22  # 0x22 Type = Report Descriptor
 HID_LANGID_BASE_LANGUAGE = 0x0409  # 0x0409 Language = English (United States)
 HID_LANGID_BASE_BLUETOOTH_STRING_OFFSET = 0x100  # 0x0100 Bluetooth String Offset
-HID_BATTERY_POWER = True  #  0x01 Boolean
-HID_REMOTE_WAKE = True  #  0x01 Boolean
-HID_SUPERVISION_TIMEOUT = 0xC80  # uint16 0xC80
-HID_NORMALLY_CONNECTABLE = True  #  0x01 Boolean
-HID_BOOT_DEVICE = True  #  0x01 Boolean
-HID_SSR_HOST_MAX_LATENCY = 0x640  # uint16 0x640
-HID_SSR_HOST_MIN_TIMEOUT = 0xC80  # uint16 0xC80
+HID_BATTERY_POWER = True  #  Battery power enabled
+HID_REMOTE_WAKE = True  #  Remote wake enabled
+HID_SUPERVISION_TIMEOUT = 0xC80  # uint16 0xC80 (2s)
+HID_NORMALLY_CONNECTABLE = True  #  Normally connectable enabled
+HID_BOOT_DEVICE = True  #  Boot device support enabled
+HID_SSR_HOST_MAX_LATENCY = 0x640  # uint16 0x640 (1s)
+HID_SSR_HOST_MIN_TIMEOUT = 0xC80  # uint16 0xC80 (2s)
 HID_REPORT_MAP = bytes(  # Text String, 50 Octet Report Descriptor
     # pylint: disable=line-too-long
     [
