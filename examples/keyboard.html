@@ -40,9 +40,9 @@
                 }
             }
             function onMouseMove(event) {
-                //console.log(event.clientX, event.clientY)
-                mouseInfo.innerText = `MOUSE: x=${event.clientX}, y=${event.clientY}`
-                send({ type:'mousemove', x: event.clientX, y: event.clientY })
+                //console.log(event.movementX, event.movementY)
+                mouseInfo.innerText = `MOUSE: x=${event.movementX}, y=${event.movementY}`
+                send({ type:'mousemove', x: event.movementX, y: event.movementY })
             }
 
             function onKeyDown(event) {
