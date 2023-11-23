@@ -6,7 +6,7 @@
     | |_) ) |_| | | | | |_) ) || ____|
     |____/|____/|_|_|_|____/ \_)_____)
 
-Bluetooth Stack for Apps, Emulation, Test and Experimentation
+Bluetooth Stack for Apps, Emulation, Test and Experimentation Nikhil Kumar Singh
 =============================================================
 
 <img src="docs/mkdocs/src/images/logo_framed.png" alt="Logo" width="200" height="200"/>
