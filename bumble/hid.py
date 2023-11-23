@@ -224,7 +224,7 @@ class HID(EventEmitter):
         device.register_l2cap_server(HID_INTERRUPT_PSM, self.on_connection)
 
         device.on('connection', self.on_device_connection)
-        
+
     async def connect_control_channel(self) -> None:
         # Create a new L2CAP connection - control channel
         try:
@@ -450,7 +450,7 @@ class Device(HID):
             logger.debug("SetReport callback not registered !!")
 
         self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
-            
+
     def register_set_report_cb(self, cb):
         self.set_report_cb=cb
         logger.debug("SetReport callback registered successfully")

@@ -94,7 +94,7 @@ HID_VIRTUAL_CABLE = True  # Virtual cable enabled
 HID_RECONNECT_INITIATE = True  #  Reconnect initiate enabled
 REPORT_DESCRIPTOR_TYPE = 0x22  # 0x22 Type = Report Descriptor
 HID_LANGID_BASE_LANGUAGE = 0x0409  # 0x0409 Language = English (United States)
-HID_LANGID_BASE_BLUETOOTH_STRING_OFFSET = 0x100  # 0x0100 Bluetooth String Offset
+HID_LANGID_BASE_BLUETOOTH_STRING_OFFSET = 0x100  # 0x0100 Default
 HID_BATTERY_POWER = True  #  Battery power enabled
 HID_REMOTE_WAKE = True  #  Remote wake enabled
 HID_SUPERVISION_TIMEOUT = 0xC80  # uint16 0xC80 (2s)
@@ -436,7 +436,6 @@ async def keyboard_device(hid_device, command):
         # Start a Websocket server to receive events from a web page
         async def serve(websocket, _path):
             global deviceData
-            #global mouseData
             while True:
                 try:
                     message = await websocket.recv()
@@ -453,19 +452,17 @@ async def keyboard_device(hid_device, command):
                                 deviceData.setKeyBoardData(bytearray([0x01, 0x00, 0x00, hid_code, 0x00, 0x00, 0x00, 0x00, 0x00]))
                                 hid_device.send_report_on_interrupt(deviceData.getKeyBoardData())
                     elif message_type == 'keyup':
-                        deviceData.setKeyBoardData(bytearray([0x01, 0x00, 0x00, hid_code, 0x00, 0x00, 0x00, 0x00, 0x00]))
+                        deviceData.setKeyBoardData(bytearray([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]))
                         hid_device.send_report_on_interrupt(deviceData.getKeyBoardData())
                     elif message_type == "mousemove":
+                        # logical min and max values
+                        log_min = -127
+                        log_max = 127
                         x = parsed['x']
-                        if x > 127:
-                            x = 127
-                        elif x < -127:
-                            x = -127
                         y = parsed['y']
-                        if y > 127:
-                            y = 127
-                        elif y < -127:
-                            y = -127
+                        # limiting x and y values within logical max and min range
+                        x = max(log_min, min(log_max, x))
+                        y = max(log_min, min(log_max, y))
                         x_cord = x.to_bytes(signed = True)
                         y_cord = y.to_bytes(signed = True)
                         deviceData.setMouseData(bytearray([0x02, 0x00]) + x_cord + y_cord)
@@ -508,7 +505,7 @@ async def main():
 
     def on_get_report_cb(report_id,report_type, buffer_size):
         retValue = hid_device.GetSetStatus()
-        print("GET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
+        print("GET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+
             "buffer_size:" + str(buffer_size))
         if report_type == Message.ReportType.INPUT_REPORT:
             if report_id == 1:
@@ -524,7 +521,7 @@ async def main():
                 data_len = buffer_size -1
                 retValue.data = retValue.data[:data_len]
         elif report_type == Message.ReportType.OUTPUT_REPORT:
-            #This sample app has nothing to do with the report received, to enable PTS 
+            #This sample app has nothing to do with the report received, to enable PTS
             #testing, we will return single byte random data.
             retValue.data = bytearray([0x11])
             retValue.status = hid_device.GetSetReturn.SUCCESS
@@ -540,7 +537,7 @@ async def main():
 
     def on_set_report_cb(report_id, report_type, data):
         retValue = hid_device.GetSetStatus()
-        print("SET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
+        print("SET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+
             "data:" + str(data))
         retValue.status = hid_device.GetSetReturn.SUCCESS
         return retValue
