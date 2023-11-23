@@ -70,6 +70,7 @@ nav:
   - Extras:
     - extras/index.md
     - Android Remote HCI: extras/android_remote_hci.md
+    - Android BT Bench: extras/android_bt_bench.md
   - Hive:
     - hive/index.md
     - Speaker: hive/web/speaker/speaker.html
