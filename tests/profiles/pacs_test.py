@@ -20,11 +20,11 @@ from bumble.profiles import pacs
 
 # -----------------------------------------------------------------------------
 def test_codec_specific_capabilities() -> None:
-    SAMPLE_FREQUENCY = pacs.SupportedSampleFrequency.FREQ_16000
+    SAMPLE_FREQUENCY = pacs.SupportedSamplingFrequency.FREQ_16000
     FRAME_SURATION = pacs.SupportedFrameDuration.DURATION_10000_US_SUPPORTED
     AUDIO_CHANNEL_COUNTS = [1]
     cap = pacs.CodecSpecificCapabilities(
-        supported_sample_frequencies=SAMPLE_FREQUENCY,
+        supported_sampling_frequencies=SAMPLE_FREQUENCY,
         supported_frame_durations=FRAME_SURATION,
         supported_audio_channel_counts=AUDIO_CHANNEL_COUNTS,
         min_octets_per_sample=40,
@@ -36,11 +36,11 @@ def test_codec_specific_capabilities() -> None:
 
 # -----------------------------------------------------------------------------
 def test_pac_record() -> None:
-    SAMPLE_FREQUENCY = pacs.SupportedSampleFrequency.FREQ_16000
+    SAMPLE_FREQUENCY = pacs.SupportedSamplingFrequency.FREQ_16000
     FRAME_SURATION = pacs.SupportedFrameDuration.DURATION_10000_US_SUPPORTED
     AUDIO_CHANNEL_COUNTS = [1]
     cap = pacs.CodecSpecificCapabilities(
-        supported_sample_frequencies=SAMPLE_FREQUENCY,
+        supported_sampling_frequencies=SAMPLE_FREQUENCY,
         supported_frame_durations=FRAME_SURATION,
         supported_audio_channel_counts=AUDIO_CHANNEL_COUNTS,
         min_octets_per_sample=40,
@@ -48,10 +48,10 @@ def test_pac_record() -> None:
         supported_max_codec_frames_per_sdu=1,
     )
 
-    pac_record = pacs.PAC_Record(
+    pac_record = pacs.PacRecord(
         codec_id=b'12345', codec_specific_capabilities=cap, metadata=b''
     )
-    assert pacs.PAC_Record.from_bytes(bytes(pac_record)) == pac_record
+    assert pacs.PacRecord.from_bytes(bytes(pac_record)) == pac_record
 
 
 # -----------------------------------------------------------------------------

@@ -99,8 +99,8 @@ class ContextType(enum.IntFlag):
     EMERGENCY_ALARM  = 0x0800
 
 
-class SampleFrequency(enum.IntEnum):
-    '''Bluetooth Assigned Numbers, Section 6.12.5.1 - Sample Frequency'''
+class SamplingFrequency(enum.IntEnum):
+    '''Bluetooth Assigned Numbers, Section 6.12.5.1 - Sampling Frequency'''
 
     # fmt: off
     FREQ_8000    = 0x01 
@@ -119,77 +119,77 @@ class SampleFrequency(enum.IntEnum):
     # fmt: on
 
     @classmethod
-    def from_hz(cls, frequency: int) -> SampleFrequency:
+    def from_hz(cls, frequency: int) -> SamplingFrequency:
         return {
-            8000: SampleFrequency.FREQ_8000,
-            11025: SampleFrequency.FREQ_11025,
-            16000: SampleFrequency.FREQ_16000,
-            22050: SampleFrequency.FREQ_22050,
-            24000: SampleFrequency.FREQ_24000,
-            32000: SampleFrequency.FREQ_32000,
-            44100: SampleFrequency.FREQ_44100,
-            48000: SampleFrequency.FREQ_48000,
-            88200: SampleFrequency.FREQ_88200,
-            96000: SampleFrequency.FREQ_96000,
-            176400: SampleFrequency.FREQ_176400,
-            192000: SampleFrequency.FREQ_192000,
-            384000: SampleFrequency.FREQ_384000,
+            8000: SamplingFrequency.FREQ_8000,
+            11025: SamplingFrequency.FREQ_11025,
+            16000: SamplingFrequency.FREQ_16000,
+            22050: SamplingFrequency.FREQ_22050,
+            24000: SamplingFrequency.FREQ_24000,
+            32000: SamplingFrequency.FREQ_32000,
+            44100: SamplingFrequency.FREQ_44100,
+            48000: SamplingFrequency.FREQ_48000,
+            88200: SamplingFrequency.FREQ_88200,
+            96000: SamplingFrequency.FREQ_96000,
+            176400: SamplingFrequency.FREQ_176400,
+            192000: SamplingFrequency.FREQ_192000,
+            384000: SamplingFrequency.FREQ_384000,
         }[frequency]
 
     @property
     def hz(self) -> int:
         return {
-            SampleFrequency.FREQ_8000: 8000,
-            SampleFrequency.FREQ_11025: 11025,
-            SampleFrequency.FREQ_16000: 16000,
-            SampleFrequency.FREQ_22050: 22050,
-            SampleFrequency.FREQ_24000: 24000,
-            SampleFrequency.FREQ_32000: 32000,
-            SampleFrequency.FREQ_44100: 44100,
-            SampleFrequency.FREQ_48000: 48000,
-            SampleFrequency.FREQ_88200: 88200,
-            SampleFrequency.FREQ_96000: 96000,
-            SampleFrequency.FREQ_176400: 176400,
-            SampleFrequency.FREQ_192000: 192000,
-            SampleFrequency.FREQ_384000: 384000,
+            SamplingFrequency.FREQ_8000: 8000,
+            SamplingFrequency.FREQ_11025: 11025,
+            SamplingFrequency.FREQ_16000: 16000,
+            SamplingFrequency.FREQ_22050: 22050,
+            SamplingFrequency.FREQ_24000: 24000,
+            SamplingFrequency.FREQ_32000: 32000,
+            SamplingFrequency.FREQ_44100: 44100,
+            SamplingFrequency.FREQ_48000: 48000,
+            SamplingFrequency.FREQ_88200: 88200,
+            SamplingFrequency.FREQ_96000: 96000,
+            SamplingFrequency.FREQ_176400: 176400,
+            SamplingFrequency.FREQ_192000: 192000,
+            SamplingFrequency.FREQ_384000: 384000,
         }[self]
 
 
-class SupportedSampleFrequency(enum.IntFlag):
+class SupportedSamplingFrequency(enum.IntFlag):
     '''Bluetooth Assigned Numbers, Section 6.12.4.1 - Sample Frequency'''
 
     # fmt: off
-    FREQ_8000    = 1 << (SampleFrequency.FREQ_8000 - 1)
-    FREQ_11025   = 1 << (SampleFrequency.FREQ_11025 - 1)
-    FREQ_16000   = 1 << (SampleFrequency.FREQ_16000 - 1)
-    FREQ_22050   = 1 << (SampleFrequency.FREQ_22050 - 1)
-    FREQ_24000   = 1 << (SampleFrequency.FREQ_24000 - 1)
-    FREQ_32000   = 1 << (SampleFrequency.FREQ_32000 - 1)
-    FREQ_44100   = 1 << (SampleFrequency.FREQ_44100 - 1)
-    FREQ_48000   = 1 << (SampleFrequency.FREQ_48000 - 1)
-    FREQ_88200   = 1 << (SampleFrequency.FREQ_88200 - 1)
-    FREQ_96000   = 1 << (SampleFrequency.FREQ_96000 - 1)
-    FREQ_176400  = 1 << (SampleFrequency.FREQ_176400 - 1)
-    FREQ_192000  = 1 << (SampleFrequency.FREQ_192000 - 1)
-    FREQ_384000  = 1 << (SampleFrequency.FREQ_384000 - 1)
+    FREQ_8000    = 1 << (SamplingFrequency.FREQ_8000 - 1)
+    FREQ_11025   = 1 << (SamplingFrequency.FREQ_11025 - 1)
+    FREQ_16000   = 1 << (SamplingFrequency.FREQ_16000 - 1)
+    FREQ_22050   = 1 << (SamplingFrequency.FREQ_22050 - 1)
+    FREQ_24000   = 1 << (SamplingFrequency.FREQ_24000 - 1)
+    FREQ_32000   = 1 << (SamplingFrequency.FREQ_32000 - 1)
+    FREQ_44100   = 1 << (SamplingFrequency.FREQ_44100 - 1)
+    FREQ_48000   = 1 << (SamplingFrequency.FREQ_48000 - 1)
+    FREQ_88200   = 1 << (SamplingFrequency.FREQ_88200 - 1)
+    FREQ_96000   = 1 << (SamplingFrequency.FREQ_96000 - 1)
+    FREQ_176400  = 1 << (SamplingFrequency.FREQ_176400 - 1)
+    FREQ_192000  = 1 << (SamplingFrequency.FREQ_192000 - 1)
+    FREQ_384000  = 1 << (SamplingFrequency.FREQ_384000 - 1)
     # fmt: on
 
     @classmethod
-    def from_hz(cls, frequencies: Sequence[int]) -> SupportedSampleFrequency:
+    def from_hz(cls, frequencies: Sequence[int]) -> SupportedSamplingFrequency:
         MAPPING = {
-            8000: SupportedSampleFrequency.FREQ_8000,
-            11025: SupportedSampleFrequency.FREQ_11025,
-            16000: SupportedSampleFrequency.FREQ_16000,
-            22050: SupportedSampleFrequency.FREQ_22050,
-            24000: SupportedSampleFrequency.FREQ_24000,
-            32000: SupportedSampleFrequency.FREQ_32000,
-            44100: SupportedSampleFrequency.FREQ_44100,
-            48000: SupportedSampleFrequency.FREQ_48000,
-            88200: SupportedSampleFrequency.FREQ_88200,
-            96000: SupportedSampleFrequency.FREQ_96000,
-            176400: SupportedSampleFrequency.FREQ_176400,
-            192000: SupportedSampleFrequency.FREQ_192000,
-            384000: SupportedSampleFrequency.FREQ_384000,
+            8000: SupportedSamplingFrequency.FREQ_8000,
+            11025: SupportedSamplingFrequency.FREQ_11025,
+            16000: SupportedSamplingFrequency.FREQ_16000,
+            22050: SupportedSamplingFrequency.FREQ_22050,
+            24000: SupportedSamplingFrequency.FREQ_24000,
+            32000: SupportedSamplingFrequency.FREQ_32000,
+            44100: SupportedSamplingFrequency.FREQ_44100,
+            48000: SupportedSamplingFrequency.FREQ_48000,
+            88200: SupportedSamplingFrequency.FREQ_88200,
+            96000: SupportedSamplingFrequency.FREQ_96000,
+            176400: SupportedSamplingFrequency.FREQ_176400,
+            192000: SupportedSamplingFrequency.FREQ_192000,
+            384000: SupportedSamplingFrequency.FREQ_384000,
         }
 
         return functools.reduce(
@@ -250,13 +250,13 @@ class CodecSpecificCapabilities:
 
     class Type(enum.IntEnum):
         # fmt: off
-        SAMPLE_FREQUENCY     = 0x01
+        SAMPLING_FREQUENCY   = 0x01
         FRAME_DURATION       = 0x02
         AUDIO_CHANNEL_COUNT  = 0x03
         OCTETS_PER_SAMPLE    = 0x04
         CODEC_FRAMES_PER_SDU = 0x05
 
-    supported_sample_frequencies: SupportedSampleFrequency
+    supported_sampling_frequencies: SupportedSamplingFrequency
     supported_frame_durations: SupportedFrameDuration
     supported_audio_channel_counts: Sequence[int]
     min_octets_per_sample: int
@@ -272,8 +272,8 @@ class CodecSpecificCapabilities:
             value = int.from_bytes(data[pos : pos + length - 1], 'little')
             pos += length - 1
 
-            if type == CodecSpecificCapabilities.Type.SAMPLE_FREQUENCY:
-                supported_sample_frequencies = SupportedSampleFrequency(value)
+            if type == CodecSpecificCapabilities.Type.SAMPLING_FREQUENCY:
+                supported_sampling_frequencies = SupportedSamplingFrequency(value)
             elif type == CodecSpecificCapabilities.Type.FRAME_DURATION:
                 supported_frame_durations = SupportedFrameDuration(value)
             elif type == CodecSpecificCapabilities.Type.AUDIO_CHANNEL_COUNT:
@@ -286,7 +286,7 @@ class CodecSpecificCapabilities:
 
         # It is expected here that if some fields are missing, an error should be raised.
         return CodecSpecificCapabilities(
-            supported_sample_frequencies=supported_sample_frequencies,
+            supported_sampling_frequencies=supported_sampling_frequencies,
             supported_frame_durations=supported_frame_durations,
             supported_audio_channel_counts=supported_audio_channel_counts,
             min_octets_per_sample=min_octets_per_sample,
@@ -298,8 +298,8 @@ class CodecSpecificCapabilities:
         return struct.pack(
             '<BBHBBBBBBBBHHBBB',
             3,
-            CodecSpecificCapabilities.Type.SAMPLE_FREQUENCY,
-            self.supported_sample_frequencies,
+            CodecSpecificCapabilities.Type.SAMPLING_FREQUENCY,
+            self.supported_sampling_frequencies,
             2,
             CodecSpecificCapabilities.Type.FRAME_DURATION,
             self.supported_frame_durations,
@@ -317,19 +317,19 @@ class CodecSpecificCapabilities:
 
 
 @dataclasses.dataclass
-class PAC_Record:
+class PacRecord:
     codec_id: bytes
     codec_specific_capabilities: CodecSpecificCapabilities
     metadata: bytes
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> PAC_Record:
+    def from_bytes(cls, data: bytes) -> PacRecord:
         codec_id, size = struct.unpack_from('5sB', data)
         pos = 5 + 1
         codec_specific_capabilities, size = struct.unpack_from(f'{size}sB', data, pos)
         pos += len(codec_specific_capabilities) + 1
         (metadata,) = struct.unpack_from(f'{size}s', data, pos)
-        return PAC_Record(
+        return PacRecord(
             codec_id=codec_id,
             codec_specific_capabilities=CodecSpecificCapabilities.from_bytes(
                 codec_specific_capabilities
@@ -361,9 +361,9 @@ class Service(gatt.TemplateService):
         supported_sink_context: ContextType,
         available_source_context: ContextType,
         available_sink_context: ContextType,
-        sink_pacs: Optional[Sequence[PAC_Record]] = None,
+        sink_pacs: Optional[Sequence[PacRecord]] = None,
         sink_audio_location: Optional[AudioLocation] = None,
-        source_pacs: Optional[Sequence[PAC_Record]] = None,
+        source_pacs: Optional[Sequence[PacRecord]] = None,
         source_audio_location: Optional[AudioLocation] = None,
     ):
         characteristics = []
