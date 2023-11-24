@@ -120,6 +120,7 @@ class SetReportMessage(Message):
     def __bytes__(self) -> bytes:
         return self.header(self.report_type) + self.data
 
+
 @dataclass
 class SendControlData(Message):
     report_type: int
@@ -131,6 +132,8 @@ class SendControlData(Message):
 
         packet_bytes.extend(self.data)
         return self.header(self.report_type) + packet_bytes
+
+
 @dataclass
 class GetProtocolMessage(Message):
     message_type = Message.MessageType.GET_PROTOCOL
@@ -147,6 +150,7 @@ class SetProtocolMessage(Message):
     def __bytes__(self) -> bytes:
         return self.header(self.protocol_mode)
 
+
 @dataclass
 class GetProtocolReplyMessage(Message):
     protocol_mode: int
@@ -156,6 +160,7 @@ class GetProtocolReplyMessage(Message):
         packet_bytes = bytearray()
         packet_bytes.append(self.protocol_mode)
         return self.header(Message.ReportType.OTHER_REPORT) + packet_bytes
+
 
 @dataclass
 class Suspend(Message):
@@ -180,7 +185,8 @@ class VirtualCableUnplug(Message):
     def __bytes__(self) -> bytes:
         return self.header(Message.ControlCommand.VIRTUAL_CABLE_UNPLUG)
 
-#Device sends input report, host sends output report.
+
+# Device sends input report, host sends output report.
 @dataclass
 class SendData(Message):
     data: bytes
@@ -189,6 +195,7 @@ class SendData(Message):
 
     def __bytes__(self) -> bytes:
         return self.header(self.report_type) + self.data
+
 
 @dataclass
 class SendHandshakeMessage(Message):
@@ -207,7 +214,6 @@ class HID(EventEmitter):
     class Role(enum.IntEnum):
         HOST = 0x00
         DEVICE = 0x01
-
 
     def __init__(self, device: Device, role: int) -> None:
         super().__init__()
@@ -347,7 +353,7 @@ class HID(EventEmitter):
         assert self.l2cap_intr_channel
         self.l2cap_intr_channel.send_pdu(msg)
 
-    def send_report_on_interrupt(self, data: bytes) -> None:
+    def send_data(self, data: bytes) -> None:
         if self.role == HID.Role.HOST:
             report_type = Message.ReportType.OUTPUT_REPORT
         else:
@@ -368,20 +374,18 @@ class HID(EventEmitter):
 # -----------------------------------------------------------------------------
 
 
-
 class Device(HID):
     class GetSetReturn(enum.IntEnum):
         FAILURE = 0x00
         REPORT_ID_NOT_FOUND = 0x01
         ERR_UNSUPPORTED_REQUEST = 0x02
         ERR_UNKNOWN = 0x03
-        SUCCESS = 0xff
+        SUCCESS = 0xFF
 
-
-    class GetSetStatus():
+    class GetSetStatus:
         def __init__(self) -> None:
             self.status = 0
-            self.data=None
+            self.data = None
 
     def __init__(self, device: Device) -> None:
         super().__init__(device, HID.Role.DEVICE)
@@ -396,56 +400,56 @@ class Device(HID):
         logger.debug(f'>>> HID HANDSHAKE MESSAGE, PDU: {hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)
 
-    def send_control_data(self,report_type: int, data: bytes):
-        msg = SendControlData(report_type= report_type, data=data)
+    def send_control_data(self, report_type: int, data: bytes):
+        msg = SendControlData(report_type=report_type, data=data)
         hid_message = bytes(msg)
         logger.debug(f'>>> HID CONTROL DATA: {hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)
 
     def handle_get_report(self, pdu: bytes):
         ret = self.GetSetStatus()
-        report_type=pdu[0] & 0x03
+        report_type = pdu[0] & 0x03
         buffer_flag = (pdu[0] & 0x08) >> 3
         report_id = pdu[1]
         logger.debug("buffer_flag: " + str(buffer_flag))
-        if(buffer_flag == 1):
+        if buffer_flag == 1:
             buffer_size = (pdu[3] << 8) | pdu[2]
         else:
             buffer_size = 0
 
-        if(self.get_report_cb != None):
+        if self.get_report_cb != None:
             ret = self.get_report_cb(report_id, report_type, buffer_size)
 
-            if(ret.status == self.GetSetReturn.FAILURE):
+            if ret.status == self.GetSetReturn.FAILURE:
                 self.send_handshake_message(Message.Handshake.ERR_UNKNOWN)
-            elif(ret.status == self.GetSetReturn.SUCCESS):
-                    data = bytearray()
-                    data.append(report_id)
-                    data.extend(ret.data)
-                    if(len(data)<self.l2cap_ctrl_channel.mtu):
-                        self.send_control_data(report_type=report_type, data = data)
-                    else:
-                        self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
+            elif ret.status == self.GetSetReturn.SUCCESS:
+                data = bytearray()
+                data.append(report_id)
+                data.extend(ret.data)
+                if len(data) < self.l2cap_ctrl_channel.mtu:
+                    self.send_control_data(report_type=report_type, data=data)
+                else:
+                    self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
 
-            elif(ret.status == self.GetSetReturn.REPORT_ID_NOT_FOUND):
+            elif ret.status == self.GetSetReturn.REPORT_ID_NOT_FOUND:
                 self.send_handshake_message(Message.Handshake.ERR_INVALID_REPORT_ID)
-            elif(ret.status == self.GetSetReturn.ERR_UNSUPPORTED_REQUEST):
+            elif ret.status == self.GetSetReturn.ERR_UNSUPPORTED_REQUEST:
                 self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
         else:
-          logger.debug("GetReport callback not registered !!")
-          self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
+            logger.debug("GetReport callback not registered !!")
+            self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
-    def register_get_report_cb(self,cb):
-        self.get_report_cb=cb
+    def register_get_report_cb(self, cb):
+        self.get_report_cb = cb
         logger.debug("GetReport callback registered successfully")
 
     def handle_set_report(self, pdu: bytes):
-        if(self.set_report_cb != None):
-            report_type=pdu[0] & 0x03
+        if self.set_report_cb != None:
+            report_type = pdu[0] & 0x03
             report_id = pdu[1]
             report_data = pdu[2:]
             ret = self.set_report_cb(report_id, report_type, report_data)
-            if(ret.status == self.GetSetReturn.SUCCESS):
+            if ret.status == self.GetSetReturn.SUCCESS:
                 self.send_handshake_message(Message.Handshake.SUCCESSFUL)
                 return
         else:
@@ -454,14 +458,14 @@ class Device(HID):
         self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
     def register_set_report_cb(self, cb):
-        self.set_report_cb=cb
+        self.set_report_cb = cb
         logger.debug("SetReport callback registered successfully")
 
     def handle_get_protocol(self, pdu: bytes):
         ret = self.GetSetStatus()
-        if(self.get_protocol_cb != None):
-            ret=self.get_protocol_cb()
-            if(ret.status == self.GetSetReturn.SUCCESS):
+        if self.get_protocol_cb != None:
+            ret = self.get_protocol_cb()
+            if ret.status == self.GetSetReturn.SUCCESS:
                 self.send_control_data(Message.ReportType.OTHER_REPORT, ret.data)
                 return
         else:
@@ -470,24 +474,24 @@ class Device(HID):
         self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
     def register_get_protocol_cb(self, cb):
-        self.get_protocol_cb=cb
+        self.get_protocol_cb = cb
         logger.debug("GetProtocol callback registered successfully")
 
     def handle_set_protocol(self, pdu: bytes):
         ret = self.GetSetStatus()
-        if(self.set_protocol_cb != None):
-            ret=self.set_protocol_cb(pdu[0] & 0x01)
-            if(ret.status == self.GetSetReturn.SUCCESS):
+        if self.set_protocol_cb != None:
+            ret = self.set_protocol_cb(pdu[0] & 0x01)
+            if ret.status == self.GetSetReturn.SUCCESS:
                 return
         else:
             logger.debug("SetProtocol callback not registered !!")
 
         self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
-
     def register_set_protocol_cb(self, cb):
-        self.set_protocol_cb=cb
+        self.set_protocol_cb = cb
         logger.debug("SetProtocol callback registered successfully")
+
 
 # -----------------------------------------------------------------------------
 class Host(HID):

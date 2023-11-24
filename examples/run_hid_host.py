@@ -308,8 +308,8 @@ async def main():
 
         if (report_length <= 1) or (report_id == 0):
             return
-        #Parse report over interrupt channel
-        if (report_type == Message.ReportType.INPUT_REPORT):
+        # Parse report over interrupt channel
+        if report_type == Message.ReportType.INPUT_REPORT:
             ReportParser.parse_input_report(pdu[1:])  # type: ignore
 
     async def handle_virtual_cable_unplug():
@@ -361,7 +361,6 @@ async def main():
         print('*** Encryption on')
 
         await get_hid_device_sdp_record(connection)
-
 
         async def menu():
             reader = await get_stream_reader(sys.stdin)
@@ -493,11 +492,11 @@ async def main():
                         data = bytearray(
                             [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
                         )
-                        hid_host.send_report_on_interrupt(data)
+                        hid_host.send_data(data)
 
                     elif choice1 == '2':
                         data = bytearray([0x03, 0x00, 0x0D, 0xFD, 0x00, 0x00])
-                        hid_host.send_report_on_interrupt(data)
+                        hid_host.send_data(data)
 
                     else:
                         print('Incorrect option selected')
