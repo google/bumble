@@ -340,10 +340,12 @@ class HID(EventEmitter):
         self.emit("interrupt_data", pdu)
 
     def send_pdu_on_ctrl(self, msg: bytes) -> None:
-        self.l2cap_ctrl_channel.send_pdu(msg)  # type: ignore
+        assert self.l2cap_ctrl_channel
+        self.l2cap_ctrl_channel.send_pdu(msg)
 
     def send_pdu_on_intr(self, msg: bytes) -> None:
-        self.l2cap_intr_channel.send_pdu(msg)  # type: ignore
+        assert self.l2cap_intr_channel
+        self.l2cap_intr_channel.send_pdu(msg)
 
     def send_report_on_interrupt(self, data: bytes) -> None:
         if self.role == HID.Role.HOST:

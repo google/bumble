@@ -409,22 +409,11 @@ async def get_stream_reader(pipe) -> asyncio.StreamReader:
     await loop.connect_read_pipe(lambda: protocol, pipe)
     return reader
 
+
 class DeviceData:
     def __init__(self) -> None:
-        self.keyboardData=bytearray([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-        self.mouseData=bytearray([0x00, 0x00, 0x00, 0x00])
-
-    def getKeyBoardData(self):
-        return self.keyboardData
-
-    def getMouseData(self):
-        return self.mouseData
-
-    def setKeyBoardData(self, data):
-        self.keyboardData=data
-
-    def setMouseData(self, data):
-        self.mouseData=data
+        self.keyboardData = bytearray([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.mouseData = bytearray([0x00, 0x00, 0x00, 0x00])
 
 #Device's live data - Mouse and Keyboard will be stored in this
 deviceData=DeviceData()
@@ -449,11 +438,11 @@ async def keyboard_device(hid_device, command):
                             code = ord(key)
                             if ord('a') <= code <= ord('z'):
                                 hid_code = 0x04 + code - ord('a')
-                                deviceData.setKeyBoardData(bytearray([0x01, 0x00, 0x00, hid_code, 0x00, 0x00, 0x00, 0x00, 0x00]))
-                                hid_device.send_report_on_interrupt(deviceData.getKeyBoardData())
+                                deviceData.keyboardData = bytearray([0x01, 0x00, 0x00, hid_code, 0x00, 0x00, 0x00, 0x00, 0x00])
+                                hid_device.send_report_on_interrupt(deviceData.keyboardData)
                     elif message_type == 'keyup':
-                        deviceData.setKeyBoardData(bytearray([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]))
-                        hid_device.send_report_on_interrupt(deviceData.getKeyBoardData())
+                        deviceData.keyboardData = bytearray([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                        hid_device.send_report_on_interrupt(deviceData.keyboardData)
                     elif message_type == "mousemove":
                         # logical min and max values
                         log_min = -127
@@ -465,8 +454,8 @@ async def keyboard_device(hid_device, command):
                         y = max(log_min, min(log_max, y))
                         x_cord = x.to_bytes(signed = True)
                         y_cord = y.to_bytes(signed = True)
-                        deviceData.setMouseData(bytearray([0x02, 0x00]) + x_cord + y_cord)
-                        hid_device.send_report_on_interrupt(deviceData.getMouseData())
+                        deviceData.mouseData = bytearray([0x02, 0x00]) + x_cord + y_cord
+                        hid_device.send_report_on_interrupt(deviceData.mouseData)
                 except websockets.exceptions.ConnectionClosedOK:
                     pass
 
@@ -509,10 +498,10 @@ async def main():
             "buffer_size:" + str(buffer_size))
         if report_type == Message.ReportType.INPUT_REPORT:
             if report_id == 1:
-                retValue.data = deviceData.getKeyBoardData()
+                retValue.data = deviceData.keyboardData
                 retValue.status = hid_device.GetSetReturn.SUCCESS
             elif report_id == 2:
-                retValue.data = deviceData.getMouseData()
+                retValue.data = deviceData.mouseData
                 retValue.status = hid_device.GetSetReturn.SUCCESS
             else:
                 retValue.status = hid_device.GetSetReturn.REPORT_ID_NOT_FOUND
