@@ -3829,9 +3829,11 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
             'advertising_event_properties',
             {
                 'size': 2,
-                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties(
-                    x
-                ).name,
+                'mapper': lambda x: str(
+                    HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties(
+                        x
+                    )
+                ),
             },
         ),
         ('primary_advertising_interval_min', 3),
@@ -3840,9 +3842,9 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
             'primary_advertising_channel_map',
             {
                 'size': 1,
-                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap(
-                    x
-                ).name,
+                'mapper': lambda x: str(
+                    HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap(x)
+                ),
             },
         ),
         ('own_address_type', OwnAddressType.TYPE_SPEC),
@@ -3872,10 +3874,24 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
         ANONYMOUS_ADVERTISING = 1 << 5
         INCLUDE_TX_POWER = 1 << 6
 
+        def __str__(self) -> str:
+            return '|'.join(
+                flag.name
+                for flag in HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties
+                if self.value & flag.value and flag.name is not None
+            )
+
     class ChannelMap(enum.IntFlag):
         CHANNEL_37 = 1 << 0
         CHANNEL_38 = 1 << 1
         CHANNEL_39 = 1 << 2
+
+        def __str__(self) -> str:
+            return '|'.join(
+                flag.name
+                for flag in HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap
+                if self.value & flag.value and flag.name is not None
+            )
 
 
 # -----------------------------------------------------------------------------
