@@ -432,13 +432,29 @@ def wrap_async(function):
 
 def deprecated(msg: str):
     """
-    Throw deprecation warning before execution
+    Throw deprecation warning before execution.
     """
 
     def wrapper(function):
         @wraps(function)
         def inner(*args, **kwargs):
             warnings.warn(msg, DeprecationWarning)
+            return function(*args, **kwargs)
+
+        return inner
+
+    return wrapper
+
+
+def experimental(msg: str):
+    """
+    Throws a future warning before execution.
+    """
+
+    def wrapper(function):
+        @wraps(function)
+        def inner(*args, **kwargs):
+            warnings.warn(msg, FutureWarning)
             return function(*args, **kwargs)
 
         return inner
