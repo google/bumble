@@ -418,8 +418,11 @@ async def get_stream_reader(pipe) -> asyncio.StreamReader:
 
 class DeviceData:
     def __init__(self) -> None:
-        self.keyboardData = bytearray([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.keyboardData = bytearray(
+            [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+        )
         self.mouseData = bytearray([0x02, 0x00, 0x00, 0x00])
+
 
 # Device's live data - Mouse and Keyboard will be stored in this
 deviceData = DeviceData()
@@ -444,10 +447,24 @@ async def keyboard_device(hid_device, command):
                             code = ord(key)
                             if ord('a') <= code <= ord('z'):
                                 hid_code = 0x04 + code - ord('a')
-                                deviceData.keyboardData = bytearray([0x01, 0x00, 0x00, hid_code, 0x00, 0x00, 0x00, 0x00, 0x00])
+                                deviceData.keyboardData = bytearray(
+                                    [
+                                        0x01,
+                                        0x00,
+                                        0x00,
+                                        hid_code,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                    ]
+                                )
                                 hid_device.send_data(deviceData.keyboardData)
                     elif message_type == 'keyup':
-                        deviceData.keyboardData = bytearray([0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                        deviceData.keyboardData = bytearray(
+                            [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+                        )
                         hid_device.send_data(deviceData.keyboardData)
                     elif message_type == "mousemove":
                         # logical min and max values
@@ -458,8 +475,8 @@ async def keyboard_device(hid_device, command):
                         # limiting x and y values within logical max and min range
                         x = max(log_min, min(log_max, x))
                         y = max(log_min, min(log_max, y))
-                        x_cord = x.to_bytes(signed = True)
-                        y_cord = y.to_bytes(signed = True)
+                        x_cord = x.to_bytes(signed=True)
+                        y_cord = y.to_bytes(signed=True)
                         deviceData.mouseData = bytearray([0x02, 0x00]) + x_cord + y_cord
                         hid_device.send_data(deviceData.mouseData)
                 except websockets.exceptions.ConnectionClosedOK:
@@ -499,8 +516,14 @@ async def main():
 
     def on_get_report_cb(report_id, report_type, buffer_size):
         retValue = hid_device.GetSetStatus()
-        print("GET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
-            "buffer_size:" + str(buffer_size))
+        print(
+            "GET_REPORT report_id: "
+            + str(report_id)
+            + "report_type: "
+            + str(report_type)
+            + "buffer_size:"
+            + str(buffer_size)
+        )
         if report_type == Message.ReportType.INPUT_REPORT:
             if report_id == 1:
                 retValue.data = deviceData.keyboardData[1:]
@@ -515,8 +538,8 @@ async def main():
                 data_len = buffer_size - 1
                 retValue.data = retValue.data[:data_len]
         elif report_type == Message.ReportType.OUTPUT_REPORT:
-            #This sample app has nothing to do with the report received, to enable PTS 
-            #testing, we will return single byte random data.
+            # This sample app has nothing to do with the report received, to enable PTS
+            # testing, we will return single byte random data.
             retValue.data = bytearray([0x11])
             retValue.status = hid_device.GetSetReturn.SUCCESS
         elif report_type == Message.ReportType.FEATURE_REPORT:
@@ -531,15 +554,23 @@ async def main():
 
     def on_set_report_cb(report_id, report_type, report_size, data):
         retValue = hid_device.GetSetStatus()
-        print("SET_REPORT report_id: " + str(report_id) +"report_type: "+ str(report_type)+ 
-            "report_size " + str(report_size) + "data:" + str(data))
+        print(
+            "SET_REPORT report_id: "
+            + str(report_id)
+            + "report_type: "
+            + str(report_type)
+            + "report_size "
+            + str(report_size)
+            + "data:"
+            + str(data)
+        )
         if report_type == Message.ReportType.FEATURE_REPORT:
             retValue.status = hid_device.GetSetReturn.ERR_INVALID_PARAMETER
         elif report_type == Message.ReportType.INPUT_REPORT:
             if report_id == 1 and report_size != len(deviceData.keyboardData):
-               retValue.status = hid_device.GetSetReturn.ERR_INVALID_PARAMETER
+                retValue.status = hid_device.GetSetReturn.ERR_INVALID_PARAMETER
             elif report_id == 2 and report_size != len(deviceData.mouseData):
-               retValue.status = hid_device.GetSetReturn.ERR_INVALID_PARAMETER
+                retValue.status = hid_device.GetSetReturn.ERR_INVALID_PARAMETER
             elif report_id == 3:
                 retValue.status = hid_device.GetSetReturn.REPORT_ID_NOT_FOUND
             else:
