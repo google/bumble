@@ -187,8 +187,8 @@ SMP_KEYPRESS_AUTHREQ = 0b00010000
 SMP_CT2_AUTHREQ      = 0b00100000
 
 # Crypto salt
-SMP_CTKD_H7_LEBR_SALT = bytes.fromhex('00000000000000000000000000000000746D7031')
-SMP_CTKD_H7_BRLE_SALT = bytes.fromhex('00000000000000000000000000000000746D7032')
+SMP_CTKD_H7_LEBR_SALT = bytes.fromhex('000000000000000000000000746D7031')
+SMP_CTKD_H7_BRLE_SALT = bytes.fromhex('000000000000000000000000746D7032')
 
 # fmt: on
 # pylint: enable=line-too-long
@@ -579,7 +579,7 @@ class OobContext:
         self.r = crypto.r() if r is None else r
 
     def share(self) -> OobSharedData:
-        pkx = bytes(reversed(self.ecc_key.x))
+        pkx = self.ecc_key.x[::-1]
         return OobSharedData(c=crypto.f4(pkx, pkx, self.r, bytes(1)), r=self.r)
 
 
@@ -677,6 +677,13 @@ class Session:
         },
     }
 
+    ea: bytes
+    eb: bytes
+    ltk: bytes
+    preq: bytes
+    pres: bytes
+    tk: bytes
+
     def __init__(
         self,
         manager: Manager,
@@ -686,15 +693,10 @@ class Session:
     ) -> None:
         self.manager = manager
         self.connection = connection
-        self.preq: Optional[bytes] = None
-        self.pres: Optional[bytes] = None
-        self.ea = None
-        self.eb = None
         self.stk = None
-        self.ltk = None
         self.ltk_ediv = 0
         self.ltk_rand = bytes(8)
-        self.link_key = None
+        self.link_key: Optional[bytes] = None
         self.initiator_key_distribution: int = 0
         self.responder_key_distribution: int = 0
         self.peer_random_value: Optional[bytes] = None
@@ -787,9 +789,7 @@ class Session:
                     )
                 self.r = pairing_config.oob.our_context.r
                 self.ecc_key = pairing_config.oob.our_context.ecc_key
-                if pairing_config.oob.legacy_context is None:
-                    self.tk = None
-                else:
+                if pairing_config.oob.legacy_context is not None:
                     self.tk = pairing_config.oob.legacy_context.tk
             else:
                 if pairing_config.oob.legacy_context is None:
@@ -807,7 +807,7 @@ class Session:
 
     @property
     def pkx(self) -> Tuple[bytes, bytes]:
-        return (bytes(reversed(self.ecc_key.x)), self.peer_public_key_x)
+        return (self.ecc_key.x[::-1], self.peer_public_key_x)
 
     @property
     def pka(self) -> bytes:
@@ -1061,8 +1061,8 @@ class Session:
     def send_public_key_command(self) -> None:
         self.send_command(
             SMP_Pairing_Public_Key_Command(
-                public_key_x=bytes(reversed(self.ecc_key.x)),
-                public_key_y=bytes(reversed(self.ecc_key.y)),
+                public_key_x=self.ecc_key.x[::-1],
+                public_key_y=self.ecc_key.y[::-1],
             )
         )
 
@@ -1098,15 +1098,52 @@ class Session:
             )
         )
 
-    async def derive_ltk(self) -> None:
-        link_key = await self.manager.device.get_link_key(self.connection.peer_address)
-        assert link_key is not None
+    @classmethod
+    def derive_ltk(cls, link_key: bytes, ct2: bool) -> bytes:
+        '''Derives Long Term Key from Link Key.
+
+        Args:
+            link_key: BR/EDR Link Key bytes in little-endian.
+            ct2: whether ct2 is supported on both devices.
+        Returns:
+            LE Long Tern Key bytes in little-endian.
+        '''
         ilk = (
             crypto.h7(salt=SMP_CTKD_H7_BRLE_SALT, w=link_key)
-            if self.ct2
+            if ct2
             else crypto.h6(link_key, b'tmp2')
         )
-        self.ltk = crypto.h6(ilk, b'brle')
+        return crypto.h6(ilk, b'brle')
+
+    @classmethod
+    def derive_link_key(cls, ltk: bytes, ct2: bool) -> bytes:
+        '''Derives Link Key from Long Term Key.
+
+        Args:
+            ltk: LE Long Term Key bytes in little-endian.
+            ct2: whether ct2 is supported on both devices.
+        Returns:
+            BR/EDR Link Key bytes in little-endian.
+        '''
+        ilk = (
+            crypto.h7(salt=SMP_CTKD_H7_LEBR_SALT, w=ltk)
+            if ct2
+            else crypto.h6(ltk, b'tmp1')
+        )
+        return crypto.h6(ilk, b'lebr')
+
+    async def get_link_key_and_derive_ltk(self) -> None:
+        '''Retrieves BR/EDR Link Key from storage and derive it to LE LTK.'''
+        link_key = await self.manager.device.get_link_key(self.connection.peer_address)
+        if link_key is None:
+            logging.warning(
+                'Try to derive LTK but host does not have the LK. Send a SMP_PAIRING_FAILED but the procedure will not be paused!'
+            )
+            self.send_pairing_failed(
+                SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR
+            )
+        else:
+            self.ltk = self.derive_ltk(link_key, self.ct2)
 
     def distribute_keys(self) -> None:
         # Distribute the keys as required
@@ -1117,7 +1154,7 @@ class Session:
                 and self.initiator_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
                 self.ctkd_task = self.connection.abort_on(
-                    'disconnection', self.derive_ltk()
+                    'disconnection', self.get_link_key_and_derive_ltk()
                 )
             elif not self.sc:
                 # Distribute the LTK, EDIV and RAND
@@ -1147,12 +1184,7 @@ class Session:
 
             # CTKD, calculate BR/EDR link key
             if self.initiator_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
-                ilk = (
-                    crypto.h7(salt=SMP_CTKD_H7_LEBR_SALT, w=self.ltk)
-                    if self.ct2
-                    else crypto.h6(self.ltk, b'tmp1')
-                )
-                self.link_key = crypto.h6(ilk, b'lebr')
+                self.link_key = self.derive_link_key(self.ltk, self.ct2)
 
         else:
             # CTKD: Derive LTK from LinkKey
@@ -1161,7 +1193,7 @@ class Session:
                 and self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
                 self.ctkd_task = self.connection.abort_on(
-                    'disconnection', self.derive_ltk()
+                    'disconnection', self.get_link_key_and_derive_ltk()
                 )
             # Distribute the LTK, EDIV and RAND
             elif not self.sc:
@@ -1191,12 +1223,7 @@ class Session:
 
             # CTKD, calculate BR/EDR link key
             if self.responder_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
-                ilk = (
-                    crypto.h7(salt=SMP_CTKD_H7_LEBR_SALT, w=self.ltk)
-                    if self.ct2
-                    else crypto.h6(self.ltk, b'tmp1')
-                )
-                self.link_key = crypto.h6(ilk, b'lebr')
+                self.link_key = self.derive_link_key(self.ltk, self.ct2)
 
     def compute_peer_expected_distributions(self, key_distribution_flags: int) -> None:
         # Set our expectations for what to wait for in the key distribution phase
@@ -1754,14 +1781,10 @@ class Session:
         self.peer_public_key_y = command.public_key_y
 
         # Compute the DH key
-        self.dh_key = bytes(
-            reversed(
-                self.ecc_key.dh(
-                    bytes(reversed(command.public_key_x)),
-                    bytes(reversed(command.public_key_y)),
-                )
-            )
-        )
+        self.dh_key = self.ecc_key.dh(
+            command.public_key_x[::-1],
+            command.public_key_y[::-1],
+        )[::-1]
         logger.debug(f'DH key: {self.dh_key.hex()}')
 
         if self.pairing_method == PairingMethod.OOB:
@@ -1824,7 +1847,6 @@ class Session:
             else:
                 self.send_pairing_dhkey_check_command()
         else:
-            assert self.ltk
             self.start_encryption(self.ltk)
 
     def on_smp_pairing_failed_command(
@@ -1874,6 +1896,7 @@ class Manager(EventEmitter):
     sessions: Dict[int, Session]
     pairing_config_factory: Callable[[Connection], PairingConfig]
     session_proxy: Type[Session]
+    _ecc_key: Optional[crypto.EccKey]
 
     def __init__(
         self,

@@ -21,7 +21,7 @@ import logging
 import os
 import pytest
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from bumble.controller import Controller
 from bumble.core import BT_BR_EDR_TRANSPORT, BT_PERIPHERAL_ROLE, BT_CENTRAL_ROLE
@@ -38,7 +38,6 @@ from bumble.smp import (
     OobLegacyContext,
 )
 from bumble.core import ProtocolError
-from bumble.hci import HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE
 from bumble.keys import PairingKeys
 
 
@@ -519,16 +518,8 @@ async def test_self_smp_over_classic():
     # Mock connection
     # TODO: Implement Classic SSP and encryption in link relayer
     LINK_KEY = bytes.fromhex('287ad379dca402530a39f1f43047b835')
-    two_devices.devices[0].on_link_key(
-        two_devices.devices[1].public_address,
-        LINK_KEY,
-        HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
-    )
-    two_devices.devices[1].on_link_key(
-        two_devices.devices[0].public_address,
-        LINK_KEY,
-        HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
-    )
+    two_devices.devices[0].get_link_key = AsyncMock(return_value=LINK_KEY)
+    two_devices.devices[1].get_link_key = AsyncMock(return_value=LINK_KEY)
     two_devices.connections[0].encryption = 1
     two_devices.connections[1].encryption = 1
 

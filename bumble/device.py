@@ -32,6 +32,7 @@ from typing import (
     Optional,
     Tuple,
     Type,
+    Set,
     Union,
     cast,
     overload,
@@ -99,14 +100,20 @@ from .hci import (
     HCI_LE_Extended_Create_Connection_Command,
     HCI_LE_Rand_Command,
     HCI_LE_Read_PHY_Command,
+    HCI_LE_Remove_Advertising_Set_Command,
     HCI_LE_Set_Address_Resolution_Enable_Command,
     HCI_LE_Set_Advertising_Data_Command,
     HCI_LE_Set_Advertising_Enable_Command,
     HCI_LE_Set_Advertising_Parameters_Command,
+    HCI_LE_Set_Advertising_Set_Random_Address_Command,
     HCI_LE_Set_Data_Length_Command,
     HCI_LE_Set_Default_PHY_Command,
     HCI_LE_Set_Extended_Scan_Enable_Command,
     HCI_LE_Set_Extended_Scan_Parameters_Command,
+    HCI_LE_Set_Extended_Scan_Response_Data_Command,
+    HCI_LE_Set_Extended_Advertising_Data_Command,
+    HCI_LE_Set_Extended_Advertising_Enable_Command,
+    HCI_LE_Set_Extended_Advertising_Parameters_Command,
     HCI_LE_Set_PHY_Command,
     HCI_LE_Set_Random_Address_Command,
     HCI_LE_Set_Scan_Enable_Command,
@@ -155,6 +162,7 @@ from .utils import (
     setup_event_forwarding,
     composite_listener,
     deprecated,
+    experimental,
 )
 from .keys import (
     KeyStore,
@@ -189,6 +197,8 @@ DEVICE_MIN_SCAN_WINDOW                        = 25
 DEVICE_MAX_SCAN_WINDOW                        = 10240
 DEVICE_MIN_LE_RSSI                            = -127
 DEVICE_MAX_LE_RSSI                            = 20
+DEVICE_MIN_EXTENDED_ADVERTISING_SET_HANDLE    = 0x00
+DEVICE_MAX_EXTENDED_ADVERTISING_SET_HANDLE    = 0xEF
 
 DEVICE_DEFAULT_ADDRESS                        = '00:00:00:00:00:00'
 DEVICE_DEFAULT_ADVERTISING_INTERVAL           = 1000  # ms
@@ -960,6 +970,7 @@ class Device(CompositeEventEmitter):
     ]
     advertisement_accumulators: Dict[Address, AdvertisementDataAccumulator]
     config: DeviceConfiguration
+    extended_advertising_handles: Set[int]
 
     @composite_listener
     class Listener:
@@ -1058,6 +1069,7 @@ class Device(CompositeEventEmitter):
         self.classic_pending_accepts = {
             Address.ANY: []
         }  # Futures, by BD address OR [Futures] for Address.ANY
+        self.extended_advertising_handles = set()
 
         # Own address type cache
         self.advertising_own_address_type = None
@@ -1535,6 +1547,149 @@ class Device(CompositeEventEmitter):
             self.advertising_own_address_type = None
             self.advertising = False
             self.auto_restart_advertising = False
+
+    @experimental('Extended Advertising is still experimental - Might be changed soon.')
+    async def start_extended_advertising(
+        self,
+        advertising_properties: HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties = HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.CONNECTABLE_ADVERTISING,
+        target: Address = Address.ANY,
+        own_address_type: int = OwnAddressType.RANDOM,
+        scan_response: Optional[bytes] = None,
+        advertising_data: Optional[bytes] = None,
+    ) -> int:
+        """Starts an extended advertising set.
+
+        Args:
+          advertising_properties: Properties to pass in HCI_LE_Set_Extended_Advertising_Parameters_Command
+          target: Directed advertising target. Directed property should be set in advertising_properties arg.
+          own_address_type: own address type to use in the advertising.
+          scan_response: raw scan response. When a non-none value is set, HCI_LE_Set_Extended_Scan_Response_Data_Command will be sent.
+          advertising_data: raw advertising data. When a non-none value is set, HCI_LE_Set_Advertising_Set_Random_Address_Command will be sent.
+
+        Returns:
+          Handle of the new advertising set.
+        """
+
+        adv_handle = -1
+        # Find a free handle
+        for i in range(
+            DEVICE_MIN_EXTENDED_ADVERTISING_SET_HANDLE,
+            DEVICE_MAX_EXTENDED_ADVERTISING_SET_HANDLE + 1,
+        ):
+            if i not in self.extended_advertising_handles:
+                adv_handle = i
+                break
+
+        if adv_handle == -1:
+            raise InvalidStateError('No available advertising set.')
+
+        try:
+            # Set the advertising parameters
+            await self.send_command(
+                HCI_LE_Set_Extended_Advertising_Parameters_Command(
+                    advertising_handle=adv_handle,
+                    advertising_event_properties=advertising_properties,
+                    primary_advertising_interval_min=self.advertising_interval_min,
+                    primary_advertising_interval_max=self.advertising_interval_max,
+                    primary_advertising_channel_map=(
+                        HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap.CHANNEL_37
+                        | HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap.CHANNEL_38
+                        | HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap.CHANNEL_39
+                    ),
+                    own_address_type=own_address_type,
+                    peer_address_type=target.address_type,
+                    peer_address=target,
+                    advertising_tx_power=7,
+                    advertising_filter_policy=0,
+                    primary_advertising_phy=1,  # LE 1M
+                    secondary_advertising_max_skip=0,
+                    secondary_advertising_phy=1,  # LE 1M
+                    advertising_sid=0,
+                    scan_request_notification_enable=0,
+                ),  # type: ignore[call-arg]
+                check_result=True,
+            )
+
+            # Set the advertising data if present
+            if advertising_data is not None:
+                await self.send_command(
+                    HCI_LE_Set_Extended_Advertising_Data_Command(
+                        advertising_handle=adv_handle,
+                        operation=HCI_LE_Set_Extended_Advertising_Data_Command.Operation.COMPLETE_DATA,
+                        fragment_preference=0x01,  # Should not fragment
+                        advertising_data=advertising_data,
+                    ),  # type: ignore[call-arg]
+                    check_result=True,
+                )
+
+            # Set the scan response if present
+            if scan_response is not None:
+                await self.send_command(
+                    HCI_LE_Set_Extended_Scan_Response_Data_Command(
+                        advertising_handle=adv_handle,
+                        operation=HCI_LE_Set_Extended_Advertising_Data_Command.Operation.COMPLETE_DATA,
+                        fragment_preference=0x01,  # Should not fragment
+                        scan_response_data=scan_response,
+                    ),  # type: ignore[call-arg]
+                    check_result=True,
+                )
+
+            if own_address_type in (
+                OwnAddressType.RANDOM,
+                OwnAddressType.RESOLVABLE_OR_RANDOM,
+            ):
+                await self.send_command(
+                    HCI_LE_Set_Advertising_Set_Random_Address_Command(
+                        advertising_handle=adv_handle,
+                        random_address=self.random_address,
+                    ),  # type: ignore[call-arg]
+                    check_result=True,
+                )
+
+            # Enable advertising
+            await self.send_command(
+                HCI_LE_Set_Extended_Advertising_Enable_Command(
+                    enable=1,
+                    advertising_handles=[adv_handle],
+                    durations=[0],  # Forever
+                    max_extended_advertising_events=[0],  # Infinite
+                ),  # type: ignore[call-arg]
+                check_result=True,
+            )
+        except HCI_Error as error:
+            # When any step fails, cleanup the advertising handle.
+            await self.send_command(
+                HCI_LE_Remove_Advertising_Set_Command(advertising_handle=adv_handle),  # type: ignore[call-arg]
+                check_result=False,
+            )
+            raise error
+
+        self.extended_advertising_handles.add(adv_handle)
+        return adv_handle
+
+    @experimental('Extended Advertising is still experimental - Might be changed soon.')
+    async def stop_extended_advertising(self, adv_handle: int) -> None:
+        """Stops an extended advertising set.
+
+        Args:
+          adv_handle: Handle of the advertising set to stop.
+        """
+        # Disable advertising
+        await self.send_command(
+            HCI_LE_Set_Extended_Advertising_Enable_Command(
+                enable=0,
+                advertising_handles=[adv_handle],
+                durations=[0],
+                max_extended_advertising_events=[0],
+            ),  # type: ignore[call-arg]
+            check_result=True,
+        )
+        # Remove advertising set
+        await self.send_command(
+            HCI_LE_Remove_Advertising_Set_Command(advertising_handle=adv_handle),  # type: ignore[call-arg]
+            check_result=True,
+        )
+        self.extended_advertising_handles.remove(adv_handle)
 
     @property
     def is_advertising(self):
