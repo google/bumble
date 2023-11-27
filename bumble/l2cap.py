@@ -391,6 +391,9 @@ class L2CAP_Connection_Request(L2CAP_Control_Frame):
     See Bluetooth spec @ Vol 3, Part A - 4.2 CONNECTION REQUEST
     '''
 
+    psm: int
+    source_cid: int
+
     @staticmethod
     def parse_psm(data: bytes, offset: int = 0) -> Tuple[int, int]:
         psm_length = 2
@@ -431,6 +434,11 @@ class L2CAP_Connection_Response(L2CAP_Control_Frame):
     '''
     See Bluetooth spec @ Vol 3, Part A - 4.3 CONNECTION RESPONSE
     '''
+
+    source_cid: int
+    destination_cid: int
+    status: int
+    result: int
 
     CONNECTION_SUCCESSFUL = 0x0000
     CONNECTION_PENDING = 0x0001
