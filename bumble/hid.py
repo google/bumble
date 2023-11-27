@@ -380,6 +380,7 @@ class Device(HID):
         REPORT_ID_NOT_FOUND = 0x01
         ERR_UNSUPPORTED_REQUEST = 0x02
         ERR_UNKNOWN = 0x03
+        ERR_INVALID_PARAMETER = 0x04
         SUCCESS = 0xFF
 
     class GetSetStatus:
@@ -433,6 +434,8 @@ class Device(HID):
 
             elif ret.status == self.GetSetReturn.REPORT_ID_NOT_FOUND:
                 self.send_handshake_message(Message.Handshake.ERR_INVALID_REPORT_ID)
+            elif ret.status == self.GetSetReturn.ERR_INVALID_PARAMETER:
+                self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
             elif ret.status == self.GetSetReturn.ERR_UNSUPPORTED_REQUEST:
                 self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
         else:
@@ -448,14 +451,19 @@ class Device(HID):
             report_type = pdu[0] & 0x03
             report_id = pdu[1]
             report_data = pdu[2:]
-            ret = self.set_report_cb(report_id, report_type, report_data)
+            report_size = len(pdu[1:])
+            ret = self.set_report_cb(report_id, report_type, report_size, report_data)
             if ret.status == self.GetSetReturn.SUCCESS:
                 self.send_handshake_message(Message.Handshake.SUCCESSFUL)
-                return
+            elif ret.status == self.GetSetReturn.ERR_INVALID_PARAMETER:
+                self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
+            elif ret.status == self.GetSetReturn.REPORT_ID_NOT_FOUND:
+                self.send_handshake_message(Message.Handshake.ERR_INVALID_REPORT_ID)
+            else:
+                self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
         else:
             logger.debug("SetReport callback not registered !!")
-
-        self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
+            self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
     def register_set_report_cb(self, cb):
         self.set_report_cb = cb
