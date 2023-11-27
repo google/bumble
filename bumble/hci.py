@@ -4451,7 +4451,10 @@ class HCI_LE_Accept_CIS_Request_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
-    fields=[('connection_handle', 2)],
+    fields=[
+        ('connection_handle', 2),
+        ('reason', {'size': 1, 'mapper': HCI_Constant.error_name}),
+    ],
 )
 class HCI_LE_Reject_CIS_Request_Command(HCI_Command):
     '''
@@ -4459,6 +4462,7 @@ class HCI_LE_Reject_CIS_Request_Command(HCI_Command):
     '''
 
     connection_handle: int
+    reason: int
 
 
 # -----------------------------------------------------------------------------
