@@ -150,7 +150,7 @@ class PacketParser:
                         try:
                             self.sink.on_packet(bytes(self.packet))
                         except Exception as error:
-                            logger.warning(
+                            logger.exception(
                                 color(f'!!! Exception in on_packet: {error}', 'red')
                             )
                     self.reset()
