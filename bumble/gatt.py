@@ -93,30 +93,35 @@ GATT_RECONNECTION_CONFIGURATION_SERVICE     = UUID.from_16_bits(0x1829, 'Reconne
 GATT_INSULIN_DELIVERY_SERVICE               = UUID.from_16_bits(0x183A, 'Insulin Delivery')
 GATT_BINARY_SENSOR_SERVICE                  = UUID.from_16_bits(0x183B, 'Binary Sensor')
 GATT_EMERGENCY_CONFIGURATION_SERVICE        = UUID.from_16_bits(0x183C, 'Emergency Configuration')
+GATT_AUTHORIZATION_CONTROL_SERVICE          = UUID.from_16_bits(0x183D, 'Authorization Control')
 GATT_PHYSICAL_ACTIVITY_MONITOR_SERVICE      = UUID.from_16_bits(0x183E, 'Physical Activity Monitor')
+GATT_ELAPSED_TIME_SERVICE                   = UUID.from_16_bits(0x183F, 'Elapsed Time')
+GATT_GENERIC_HEALTH_SENSOR_SERVICE          = UUID.from_16_bits(0x1840, 'Generic Health Sensor')
 GATT_AUDIO_INPUT_CONTROL_SERVICE            = UUID.from_16_bits(0x1843, 'Audio Input Control')
 GATT_VOLUME_CONTROL_SERVICE                 = UUID.from_16_bits(0x1844, 'Volume Control')
 GATT_VOLUME_OFFSET_CONTROL_SERVICE          = UUID.from_16_bits(0x1845, 'Volume Offset Control')
-GATT_COORDINATED_SET_IDENTIFICATION_SERVICE = UUID.from_16_bits(0x1846, 'Coordinated Set Identification Service')
+GATT_COORDINATED_SET_IDENTIFICATION_SERVICE = UUID.from_16_bits(0x1846, 'Coordinated Set Identification')
 GATT_DEVICE_TIME_SERVICE                    = UUID.from_16_bits(0x1847, 'Device Time')
-# LE Audio Services
-GATT_MEDIA_CONTROL_SERVICE                  = UUID.from_16_bits(0x1848, 'Media Control Service')
-GATT_GENERIC_MEDIA_CONTROL_SERVICE          = UUID.from_16_bits(0x1849, 'Generic Media Control Service')
-GATT_CONSTANT_TONE_EXTENSION_SERVICE        = UUID.from_16_bits(0x184A, 'Constant Tone Extension Service')
-GATT_TELEPHONE_BEARER_SERVICE               = UUID.from_16_bits(0x184B, 'Telephone Bearer Service')
-GATT_GENERIC_TELEPHONE_BEARER_SERVICE       = UUID.from_16_bits(0x184C, 'Generic Telephone Bearer Service')
-GATT_MICROPHONE_CONTROL_SERVICE             = UUID.from_16_bits(0x184D, 'Microphone Control Service')
-GATT_AUDIO_STREAM_CONTROL_SERVICE           = UUID.from_16_bits(0x184E, 'Audio Stream Control Service')
-GATT_BROADCAST_AUDIO_SCAN_SERVICE           = UUID.from_16_bits(0x184F, 'Broadcast Audio Scan Service')
-GATT_PUBLISHED_AUDIO_CAPABILITIES_SERVICE   = UUID.from_16_bits(0x1850, 'Published Audio Capabilities Service')
-GATT_BASIC_AUDIO_ANNOUNCEMENT_SERVICE       = UUID.from_16_bits(0x1851, 'Basic Audio Announcement Service')
-GATT_BROADCAST_AUDIO_ANNOUNCEMENT_SERVICE   = UUID.from_16_bits(0x1852, 'Broadcast Audio Announcement Service')
-GATT_COMMON_AUDIO_SERVICE                   = UUID.from_16_bits(0x1853, 'Common Audio Service')
-GATT_HEARING_ACCESS_SERVICE                 = UUID.from_16_bits(0x1854, 'Hearing Access Service')
-GATT_TELEPHONY_AND_MEDIA_AUDIO_SERVICE      = UUID.from_16_bits(0x1855, 'Telephony and Media Audio Service')
-GATT_PUBLIC_BROADCAST_ANNOUNCEMENT_SERVICE  = UUID.from_16_bits(0x1856, 'Public Broadcast Announcement Service')
+GATT_MEDIA_CONTROL_SERVICE                  = UUID.from_16_bits(0x1848, 'Media Control')
+GATT_GENERIC_MEDIA_CONTROL_SERVICE          = UUID.from_16_bits(0x1849, 'Generic Media Control')
+GATT_CONSTANT_TONE_EXTENSION_SERVICE        = UUID.from_16_bits(0x184A, 'Constant Tone Extension')
+GATT_TELEPHONE_BEARER_SERVICE               = UUID.from_16_bits(0x184B, 'Telephone Bearer')
+GATT_GENERIC_TELEPHONE_BEARER_SERVICE       = UUID.from_16_bits(0x184C, 'Generic Telephone Bearer')
+GATT_MICROPHONE_CONTROL_SERVICE             = UUID.from_16_bits(0x184D, 'Microphone Control')
+GATT_AUDIO_STREAM_CONTROL_SERVICE           = UUID.from_16_bits(0x184E, 'Audio Stream Control')
+GATT_BROADCAST_AUDIO_SCAN_SERVICE           = UUID.from_16_bits(0x184F, 'Broadcast Audio Scan')
+GATT_PUBLISHED_AUDIO_CAPABILITIES_SERVICE   = UUID.from_16_bits(0x1850, 'Published Audio Capabilities')
+GATT_BASIC_AUDIO_ANNOUNCEMENT_SERVICE       = UUID.from_16_bits(0x1851, 'Basic Audio Announcement')
+GATT_BROADCAST_AUDIO_ANNOUNCEMENT_SERVICE   = UUID.from_16_bits(0x1852, 'Broadcast Audio Announcement')
+GATT_COMMON_AUDIO_SERVICE                   = UUID.from_16_bits(0x1853, 'Common Audio')
+GATT_HEARING_ACCESS_SERVICE                 = UUID.from_16_bits(0x1854, 'Hearing Access')
+GATT_TELEPHONY_AND_MEDIA_AUDIO_SERVICE      = UUID.from_16_bits(0x1855, 'Telephony and Media Audio')
+GATT_PUBLIC_BROADCAST_ANNOUNCEMENT_SERVICE  = UUID.from_16_bits(0x1856, 'Public Broadcast Announcement')
+GATT_ELECTRONIC_SHELF_LABEL_SERVICE         = UUID.from_16_bits(0X1857, 'Electronic Shelf Label')
+GATT_GAMING_AUDIO_SERVICE                   = UUID.from_16_bits(0x1858, 'Gaming Audio')
+GATT_MESH_PROXY_SOLICITATION_SERVICE        = UUID.from_16_bits(0x1859, 'Mesh Audio Solicitation')
 
-# Types
+# Attribute Types
 GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE   = UUID.from_16_bits(0x2800, 'Primary Service')
 GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE = UUID.from_16_bits(0x2801, 'Secondary Service')
 GATT_INCLUDE_ATTRIBUTE_TYPE           = UUID.from_16_bits(0x2802, 'Include')
@@ -139,6 +144,8 @@ GATT_ENVIRONMENTAL_SENSING_MEASUREMENT_DESCRIPTOR    = UUID.from_16_bits(0x290C,
 GATT_ENVIRONMENTAL_SENSING_TRIGGER_DESCRIPTOR        = UUID.from_16_bits(0x290D, 'Environmental Sensing Trigger Setting')
 GATT_TIME_TRIGGER_DESCRIPTOR                         = UUID.from_16_bits(0x290E, 'Time Trigger Setting')
 GATT_COMPLETE_BR_EDR_TRANSPORT_BLOCK_DATA_DESCRIPTOR = UUID.from_16_bits(0x290F, 'Complete BR-EDR Transport Block Data')
+GATT_OBSERVATION_SCHEDULE_DESCRIPTOR                 = UUID.from_16_bits(0x290F, 'Observation Schedule')
+GATT_VALID_RANGE_AND_ACCURACY_DESCRIPTOR             = UUID.from_16_bits(0x290F, 'Valid Range And Accuracy')
 
 # Device Information Service
 GATT_SYSTEM_ID_CHARACTERISTIC                          = UUID.from_16_bits(0x2A23, 'System ID')
@@ -165,6 +172,9 @@ GATT_HEART_RATE_CONTROL_POINT_CHARACTERISTIC = UUID.from_16_bits(0x2A39, 'Heart 
 
 # Battery Service
 GATT_BATTERY_LEVEL_CHARACTERISTIC = UUID.from_16_bits(0x2A19, 'Battery Level')
+
+# Telephony And Media Audio Service (TMAS)
+GATT_TMAP_ROLE_CHARACTERISTIC = UUID.from_16_bits(0x2B51, 'TMAP Role')
 
 # Audio Input Control Service (AICS)
 GATT_AUDIO_INPUT_STATE_CHARACTERISTIC         = UUID.from_16_bits(0x2B77, 'Audio Input State')
@@ -274,6 +284,9 @@ GATT_BOOT_KEYBOARD_INPUT_REPORT_CHARACTERISTIC                 = UUID.from_16_bi
 GATT_CURRENT_TIME_CHARACTERISTIC                               = UUID.from_16_bits(0x2A2B, 'Current Time')
 GATT_BOOT_KEYBOARD_OUTPUT_REPORT_CHARACTERISTIC                = UUID.from_16_bits(0x2A32, 'Boot Keyboard Output Report')
 GATT_CENTRAL_ADDRESS_RESOLUTION__CHARACTERISTIC                = UUID.from_16_bits(0x2AA6, 'Central Address Resolution')
+GATT_CLIENT_SUPPORTED_FEATURES_CHARACTERISTIC                  = UUID.from_16_bits(0x2B29, 'Client Supported Features')
+GATT_DATABASE_HASH_CHARACTERISTIC                              = UUID.from_16_bits(0x2B2A, 'Database Hash')
+GATT_SERVER_SUPPORTED_FEATURES_CHARACTERISTIC                  = UUID.from_16_bits(0x2B3A, 'Server Supported Features')
 
 # fmt: on
 # pylint: enable=line-too-long
