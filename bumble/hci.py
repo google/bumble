@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import collections
+import dataclasses
 import enum
 import functools
 import logging
@@ -1382,6 +1383,45 @@ HCI_LE_SUPPORTED_FEATURES_NAMES = {
 STATUS_SPEC = {'size': 1, 'mapper': lambda x: HCI_Constant.status_name(x)}
 
 
+class CodecID(enum.IntEnum):
+    # fmt: off
+    U_LOG           = 0x00
+    A_LOG           = 0x01
+    CVSD            = 0x02
+    TRANSPARENT     = 0x03
+    LINEAR_PCM      = 0x04
+    MSBC            = 0x05
+    LC3             = 0x06
+    G729A           = 0x07
+    VENDOR_SPECIFIC = 0xFF
+
+
+@dataclasses.dataclass(frozen=True)
+class CodingFormat:
+    codec_id: CodecID
+    company_id: int = 0
+    vendor_specific_codec_id: int = 0
+
+    @classmethod
+    def parse_from_bytes(cls, data: bytes, offset: int):
+        (codec_id, company_id, vendor_specific_codec_id) = struct.unpack_from(
+            '<BHH', data, offset
+        )
+        return offset + 5, cls(
+            codec_id=CodecID(codec_id),
+            company_id=company_id,
+            vendor_specific_codec_id=vendor_specific_codec_id,
+        )
+
+    def to_bytes(self) -> bytes:
+        return struct.pack(
+            '<BHH', self.codec_id, self.company_id, self.vendor_specific_codec_id
+        )
+
+    def __bytes__(self) -> bytes:
+        return self.to_bytes()
+
+
 # -----------------------------------------------------------------------------
 class HCI_Constant:
     @staticmethod
@@ -1887,6 +1927,7 @@ class Address:
 Address.NIL = Address(b"\xff\xff\xff\xff\xff\xff", Address.PUBLIC_DEVICE_ADDRESS)
 Address.ANY = Address(b"\x00\x00\x00\x00\x00\x00", Address.PUBLIC_DEVICE_ADDRESS)
 Address.ANY_RANDOM = Address(b"\x00\x00\x00\x00\x00\x00", Address.RANDOM_DEVICE_ADDRESS)
+
 
 # -----------------------------------------------------------------------------
 class OwnAddressType:
@@ -2445,14 +2486,14 @@ class HCI_IO_Capability_Request_Negative_Reply_Command(HCI_Command):
         ('connection_handle', 2),
         ('transmit_bandwidth', 4),
         ('receive_bandwidth', 4),
-        ('transmit_coding_format', 5),
-        ('receive_coding_format', 5),
+        ('transmit_coding_format', CodingFormat.parse_from_bytes),
+        ('receive_coding_format', CodingFormat.parse_from_bytes),
         ('transmit_codec_frame_size', 2),
         ('receive_codec_frame_size', 2),
         ('input_bandwidth', 4),
         ('output_bandwidth', 4),
-        ('input_coding_format', 5),
-        ('output_coding_format', 5),
+        ('input_coding_format', CodingFormat.parse_from_bytes),
+        ('output_coding_format', CodingFormat.parse_from_bytes),
         ('input_coded_data_size', 2),
         ('output_coded_data_size', 2),
         ('input_pcm_data_format', 1),
@@ -2472,22 +2513,6 @@ class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.45 Enhanced Setup Synchronous Connection Command
     '''
-
-    class CodingFormat(enum.IntEnum):
-        U_LOG = 0x00
-        A_LOG = 0x01
-        CVSD = 0x02
-        TRANSPARENT = 0x03
-        PCM = 0x04
-        MSBC = 0x05
-        LC3 = 0x06
-        G729A = 0x07
-
-        def to_bytes(self):
-            return self.value.to_bytes(5, 'little')
-
-        def __bytes__(self):
-            return self.to_bytes()
 
     class PcmDataFormat(enum.IntEnum):
         NA = 0x00
@@ -2525,14 +2550,14 @@ class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_Command):
         ('bd_addr', Address.parse_address),
         ('transmit_bandwidth', 4),
         ('receive_bandwidth', 4),
-        ('transmit_coding_format', 5),
-        ('receive_coding_format', 5),
+        ('transmit_coding_format', CodingFormat.parse_from_bytes),
+        ('receive_coding_format', CodingFormat.parse_from_bytes),
         ('transmit_codec_frame_size', 2),
         ('receive_codec_frame_size', 2),
         ('input_bandwidth', 4),
         ('output_bandwidth', 4),
-        ('input_coding_format', 5),
-        ('output_coding_format', 5),
+        ('input_coding_format', CodingFormat.parse_from_bytes),
+        ('output_coding_format', CodingFormat.parse_from_bytes),
         ('input_coded_data_size', 2),
         ('output_coded_data_size', 2),
         ('input_pcm_data_format', 1),
@@ -4471,7 +4496,7 @@ class HCI_LE_Reject_CIS_Request_Command(HCI_Command):
         ('connection_handle', 2),
         ('data_path_direction', 1),
         ('data_path_id', 1),
-        ('codec_id', 5),
+        ('codec_id', CodingFormat.parse_from_bytes),
         ('controller_delay', 3),
         ('codec_configuration', '*'),
     ],
@@ -4488,7 +4513,7 @@ class HCI_LE_Setup_ISO_Data_Path_Command(HCI_Command):
     connection_handle: int
     data_path_direction: int
     data_path_id: int
-    codec_id: int
+    codec_id: CodingFormat
     controller_delay: int
     codec_configuration: int
 

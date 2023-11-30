@@ -22,7 +22,7 @@ import dataclasses
 import enum
 import traceback
 import warnings
-from typing import Dict, List, Union, Set, TYPE_CHECKING
+from typing import Dict, List, Union, Set, Any, TYPE_CHECKING
 
 from . import at
 from . import rfcomm
@@ -35,7 +35,11 @@ from bumble.core import (
     BT_L2CAP_PROTOCOL_ID,
     BT_RFCOMM_PROTOCOL_ID,
 )
-from bumble.hci import HCI_Enhanced_Setup_Synchronous_Connection_Command
+from bumble.hci import (
+    HCI_Enhanced_Setup_Synchronous_Connection_Command,
+    CodingFormat,
+    CodecID,
+)
 from bumble.sdp import (
     DataElement,
     ServiceAttribute,
@@ -65,6 +69,7 @@ class HfpProtocolError(ProtocolError):
 # -----------------------------------------------------------------------------
 # Protocol Support
 # -----------------------------------------------------------------------------
+
 
 # -----------------------------------------------------------------------------
 class HfpProtocol:
@@ -842,19 +847,15 @@ class DefaultCodecParameters(enum.IntEnum):
 @dataclasses.dataclass
 class EscoParameters:
     # Codec specific
-    transmit_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat
-    receive_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat
+    transmit_coding_format: CodingFormat
+    receive_coding_format: CodingFormat
     packet_type: HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType
     retransmission_effort: HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort
     max_latency: int
 
     # Common
-    input_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat = (
-        HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.PCM
-    )
-    output_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat = (
-        HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.PCM
-    )
+    input_coding_format: CodingFormat = CodingFormat(CodecID.LINEAR_PCM)
+    output_coding_format: CodingFormat = CodingFormat(CodecID.LINEAR_PCM)
     input_coded_data_size: int = 16
     output_coded_data_size: int = 16
     input_pcm_data_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.PcmDataFormat = (
@@ -880,26 +881,31 @@ class EscoParameters:
     transmit_codec_frame_size: int = 60
     receive_codec_frame_size: int = 60
 
+    def asdict(self) -> Dict[str, Any]:
+        # dataclasses.asdict() will recursively deep-copy the entire object,
+        # which is expensive and breaks CodingFormat object, so let it simply copy here.
+        return self.__dict__
+
 
 _ESCO_PARAMETERS_CVSD_D0 = EscoParameters(
-    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
-    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    transmit_coding_format=CodingFormat(CodecID.CVSD),
+    receive_coding_format=CodingFormat(CodecID.CVSD),
     max_latency=0xFFFF,
     packet_type=HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.HV1,
     retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.NO_RETRANSMISSION,
 )
 
 _ESCO_PARAMETERS_CVSD_D1 = EscoParameters(
-    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
-    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    transmit_coding_format=CodingFormat(CodecID.CVSD),
+    receive_coding_format=CodingFormat(CodecID.CVSD),
     max_latency=0xFFFF,
     packet_type=HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.HV3,
     retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.NO_RETRANSMISSION,
 )
 
 _ESCO_PARAMETERS_CVSD_S1 = EscoParameters(
-    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
-    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    transmit_coding_format=CodingFormat(CodecID.CVSD),
+    receive_coding_format=CodingFormat(CodecID.CVSD),
     max_latency=0x0007,
     packet_type=(
         HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
@@ -912,8 +918,8 @@ _ESCO_PARAMETERS_CVSD_S1 = EscoParameters(
 )
 
 _ESCO_PARAMETERS_CVSD_S2 = EscoParameters(
-    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
-    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    transmit_coding_format=CodingFormat(CodecID.CVSD),
+    receive_coding_format=CodingFormat(CodecID.CVSD),
     max_latency=0x0007,
     packet_type=(
         HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
@@ -925,8 +931,8 @@ _ESCO_PARAMETERS_CVSD_S2 = EscoParameters(
 )
 
 _ESCO_PARAMETERS_CVSD_S3 = EscoParameters(
-    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
-    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    transmit_coding_format=CodingFormat(CodecID.CVSD),
+    receive_coding_format=CodingFormat(CodecID.CVSD),
     max_latency=0x000A,
     packet_type=(
         HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
@@ -938,8 +944,8 @@ _ESCO_PARAMETERS_CVSD_S3 = EscoParameters(
 )
 
 _ESCO_PARAMETERS_CVSD_S4 = EscoParameters(
-    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
-    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.CVSD,
+    transmit_coding_format=CodingFormat(CodecID.CVSD),
+    receive_coding_format=CodingFormat(CodecID.CVSD),
     max_latency=0x000C,
     packet_type=(
         HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
@@ -951,8 +957,8 @@ _ESCO_PARAMETERS_CVSD_S4 = EscoParameters(
 )
 
 _ESCO_PARAMETERS_MSBC_T1 = EscoParameters(
-    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.MSBC,
-    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.MSBC,
+    transmit_coding_format=CodingFormat(CodecID.MSBC),
+    receive_coding_format=CodingFormat(CodecID.MSBC),
     max_latency=0x0008,
     packet_type=(
         HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
@@ -966,8 +972,8 @@ _ESCO_PARAMETERS_MSBC_T1 = EscoParameters(
 )
 
 _ESCO_PARAMETERS_MSBC_T2 = EscoParameters(
-    transmit_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.MSBC,
-    receive_coding_format=HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.MSBC,
+    transmit_coding_format=CodingFormat(CodecID.MSBC),
+    receive_coding_format=CodingFormat(CodecID.MSBC),
     max_latency=0x000D,
     packet_type=(
         HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3

@@ -72,7 +72,7 @@ async def main() -> None:
     await devices[0].send_command(
         HCI_Enhanced_Setup_Synchronous_Connection_Command(
             connection_handle=connections[0].handle,
-            **dataclasses.asdict(ESCO_PARAMETERS[DefaultCodecParameters.ESCO_CVSD_S3])
+            **ESCO_PARAMETERS[DefaultCodecParameters.ESCO_CVSD_S3].asdict(),
             # type: ignore[call-args]
         )
     )
