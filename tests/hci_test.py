@@ -453,6 +453,7 @@ def test_HCI_LE_Setup_ISO_Data_Path_Command():
     assert command.data_path_id == 0x01
     assert command.codec_id == CodingFormat(CodecID.TRANSPARENT)
     assert command.controller_delay == 0
+    assert command.codec_configuration == b''
 
     basic_check(command)
 
