@@ -207,11 +207,11 @@ class CharacteristicProxy(AttributeProxy):
 
         return await self.client.subscribe(self, subscriber, prefer_notify)
 
-    async def unsubscribe(self, subscriber=None):
+    async def unsubscribe(self, subscriber=None, force=False):
         if subscriber in self.subscribers:
             subscriber = self.subscribers.pop(subscriber)
 
-        return await self.client.unsubscribe(self, subscriber)
+        return await self.client.unsubscribe(self, subscriber, force)
 
     def __str__(self) -> str:
         return (
@@ -262,10 +262,8 @@ class Client:
         self.request_semaphore = asyncio.Semaphore(1)
         self.pending_request = None
         self.pending_response = None
-        self.notification_subscribers = (
-            {}
-        )  # Notification subscribers, by attribute handle
-        self.indication_subscribers = {}  # Indication subscribers, by attribute handle
+        self.notification_subscribers = {}  # Subscriber set, by attribute handle
+        self.indication_subscribers = {}  # Subscriber set, by attribute handle
         self.services = []
         self.cached_values = {}
 
@@ -836,6 +834,7 @@ class Client:
         subscriber_set = subscribers.setdefault(characteristic.handle, set())
         if subscriber is not None:
             subscriber_set.add(subscriber)
+
         # Add the characteristic as a subscriber, which will result in the
         # characteristic emitting an 'update' event when a notification or indication
         # is received
@@ -847,7 +846,14 @@ class Client:
         self,
         characteristic: CharacteristicProxy,
         subscriber: Optional[Callable[[bytes], Any]] = None,
+        force: bool = False,
     ) -> None:
+        '''
+        Unsubscribe from a characteristic.
+
+        If `force` is True, this will write zeros to the CCCD when there are no
+        subscribers left, even if there were already no registered subscribers.
+        '''
         # If we haven't already discovered the descriptors for this characteristic,
         # do it now
         if not characteristic.descriptors_discovered:
@@ -861,25 +867,39 @@ class Client:
             logger.warning('unsubscribing from characteristic with no CCCD descriptor')
             return
 
+        # Check if the characteristic has subscribers
+        if not (
+            characteristic.handle in self.notification_subscribers
+            or characteristic.handle in self.indication_subscribers
+        ):
+            if not force:
+                return
+
+        # Remove the subscriber(s)
         if subscriber is not None:
             # Remove matching subscriber from subscriber sets
             for subscriber_set in (
                 self.notification_subscribers,
                 self.indication_subscribers,
             ):
-                subscribers = subscriber_set.get(characteristic.handle, set())
-                if subscriber in subscribers:
+                if (
+                    subscribers := subscriber_set.get(characteristic.handle)
+                ) and subscriber in subscribers:
                     subscribers.remove(subscriber)
 
                     # Cleanup if we removed the last one
                     if not subscribers:
                         del subscriber_set[characteristic.handle]
         else:
-            # Remove all subscribers for this attribute from the sets!
+            # Remove all subscribers for this attribute from the sets
             self.notification_subscribers.pop(characteristic.handle, None)
             self.indication_subscribers.pop(characteristic.handle, None)
 
-        if not self.notification_subscribers and not self.indication_subscribers:
+        # Update the CCCD
+        if not (
+            characteristic.handle in self.notification_subscribers
+            or characteristic.handle in self.indication_subscribers
+        ):
             # No more subscribers left
             await self.write_value(cccd, b'\x00\x00', with_response=True)
 
