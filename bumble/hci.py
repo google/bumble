@@ -1517,6 +1517,12 @@ class HCI_Object:
             # The rest of the bytes
             field_value = data[offset:]
             return (field_value, len(field_value))
+        if field_type == 'v':
+            # Variable-length bytes field, with 1-byte length at the beginning
+            field_length = data[offset]
+            offset += 1
+            field_value = data[offset : offset + field_length]
+            return (field_value, field_length + 1)
         if field_type == 1:
             # 8-bit unsigned
             return (data[offset], 1)
@@ -1621,6 +1627,11 @@ class HCI_Object:
                     raise ValueError('value too large for *-typed field')
             else:
                 field_bytes = bytes(field_value)
+        elif field_type == 'v':
+            # Variable-length bytes field, with 1-byte length at the beginning
+            field_bytes = bytes(field_bytes)
+            field_length = len(field_bytes)
+            field_bytes = bytes([field_length]) + field_bytes
         elif isinstance(field_value, (bytes, bytearray)) or hasattr(
             field_value, 'to_bytes'
         ):
@@ -4498,7 +4509,7 @@ class HCI_LE_Reject_CIS_Request_Command(HCI_Command):
         ('data_path_id', 1),
         ('codec_id', CodingFormat.parse_from_bytes),
         ('controller_delay', 3),
-        ('codec_configuration', '*'),
+        ('codec_configuration', 'v'),
     ],
     return_parameters_fields=[
         ('status', STATUS_SPEC),
@@ -4515,7 +4526,7 @@ class HCI_LE_Setup_ISO_Data_Path_Command(HCI_Command):
     data_path_id: int
     codec_id: CodingFormat
     controller_delay: int
-    codec_configuration: int
+    codec_configuration: bytes
 
 
 # -----------------------------------------------------------------------------
