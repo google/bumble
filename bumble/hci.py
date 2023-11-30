@@ -5296,6 +5296,10 @@ class HCI_Disconnection_Complete_Event(HCI_Event):
     See Bluetooth spec @ 7.7.5 Disconnection Complete Event
     '''
 
+    status: int
+    connection_handle: int
+    reason: int
+
 
 # -----------------------------------------------------------------------------
 @HCI_Event.event([('status', STATUS_SPEC), ('connection_handle', 2)])

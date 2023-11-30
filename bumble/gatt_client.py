@@ -38,6 +38,7 @@ from typing import (
     Any,
     Iterable,
     Type,
+    Set,
     TYPE_CHECKING,
 )
 
@@ -128,7 +129,7 @@ class ServiceProxy(AttributeProxy):
     included_services: List[ServiceProxy]
 
     @staticmethod
-    def from_client(service_class, client, service_uuid):
+    def from_client(service_class, client: Client, service_uuid: UUID):
         # The service and its characteristics are considered to have already been
         # discovered
         services = client.get_services_by_uuid(service_uuid)
@@ -246,8 +247,12 @@ class ProfileServiceProxy:
 class Client:
     services: List[ServiceProxy]
     cached_values: Dict[int, Tuple[datetime, bytes]]
-    notification_subscribers: Dict[int, Callable[[bytes], Any]]
-    indication_subscribers: Dict[int, Callable[[bytes], Any]]
+    notification_subscribers: Dict[
+        int, Set[Union[CharacteristicProxy, Callable[[bytes], Any]]]
+    ]
+    indication_subscribers: Dict[
+        int, Set[Union[CharacteristicProxy, Callable[[bytes], Any]]]
+    ]
     pending_response: Optional[asyncio.futures.Future[ATT_PDU]]
     pending_request: Optional[ATT_PDU]
 
@@ -682,8 +687,8 @@ class Client:
     async def discover_descriptors(
         self,
         characteristic: Optional[CharacteristicProxy] = None,
-        start_handle=None,
-        end_handle=None,
+        start_handle: Optional[int] = None,
+        end_handle: Optional[int] = None,
     ) -> List[DescriptorProxy]:
         '''
         See Vol 3, Part G - 4.7.1 Discover All Characteristic Descriptors
@@ -789,7 +794,12 @@ class Client:
 
         return attributes
 
-    async def subscribe(self, characteristic, subscriber=None, prefer_notify=True):
+    async def subscribe(
+        self,
+        characteristic: CharacteristicProxy,
+        subscriber: Optional[Callable[[bytes], Any]] = None,
+        prefer_notify: bool = True,
+    ) -> None:
         # If we haven't already discovered the descriptors for this characteristic,
         # do it now
         if not characteristic.descriptors_discovered:
@@ -833,7 +843,11 @@ class Client:
 
         await self.write_value(cccd, struct.pack('<H', bits), with_response=True)
 
-    async def unsubscribe(self, characteristic, subscriber=None):
+    async def unsubscribe(
+        self,
+        characteristic: CharacteristicProxy,
+        subscriber: Optional[Callable[[bytes], Any]] = None,
+    ) -> None:
         # If we haven't already discovered the descriptors for this characteristic,
         # do it now
         if not characteristic.descriptors_discovered:
@@ -853,7 +867,7 @@ class Client:
                 self.notification_subscribers,
                 self.indication_subscribers,
             ):
-                subscribers = subscriber_set.get(characteristic.handle, [])
+                subscribers = subscriber_set.get(characteristic.handle, set())
                 if subscriber in subscribers:
                     subscribers.remove(subscriber)
 
@@ -871,7 +885,7 @@ class Client:
 
     async def read_value(
         self, attribute: Union[int, AttributeProxy], no_long_read: bool = False
-    ) -> Any:
+    ) -> bytes:
         '''
         See Vol 3, Part G - 4.8.1 Read Characteristic Value
 
@@ -1067,7 +1081,7 @@ class Client:
     def on_att_handle_value_notification(self, notification):
         # Call all subscribers
         subscribers = self.notification_subscribers.get(
-            notification.attribute_handle, []
+            notification.attribute_handle, set()
         )
         if not subscribers:
             logger.warning('!!! received notification with no subscriber')
@@ -1081,7 +1095,9 @@ class Client:
 
     def on_att_handle_value_indication(self, indication):
         # Call all subscribers
-        subscribers = self.indication_subscribers.get(indication.attribute_handle, [])
+        subscribers = self.indication_subscribers.get(
+            indication.attribute_handle, set()
+        )
         if not subscribers:
             logger.warning('!!! received indication with no subscriber')
 

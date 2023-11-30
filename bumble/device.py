@@ -23,6 +23,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, AsyncExitStack
 from dataclasses import dataclass
+from collections.abc import Iterable
 from typing import (
     Any,
     Callable,
@@ -32,6 +33,7 @@ from typing import (
     Optional,
     Tuple,
     Type,
+    TypeVar,
     Set,
     Union,
     cast,
@@ -440,8 +442,11 @@ class LePhyOptions:
 
 
 # -----------------------------------------------------------------------------
+_PROXY_CLASS = TypeVar('_PROXY_CLASS', bound=gatt_client.ProfileServiceProxy)
+
+
 class Peer:
-    def __init__(self, connection):
+    def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
         # Create a GATT client for the connection
@@ -449,77 +454,113 @@ class Peer:
         connection.gatt_client = self.gatt_client
 
     @property
-    def services(self):
+    def services(self) -> List[gatt_client.ServiceProxy]:
         return self.gatt_client.services
 
-    async def request_mtu(self, mtu):
+    async def request_mtu(self, mtu: int) -> int:
         mtu = await self.gatt_client.request_mtu(mtu)
         self.connection.emit('connection_att_mtu_update')
         return mtu
 
-    async def discover_service(self, uuid):
+    async def discover_service(
+        self, uuid: Union[core.UUID, str]
+    ) -> List[gatt_client.ServiceProxy]:
         return await self.gatt_client.discover_service(uuid)
 
-    async def discover_services(self, uuids=()):
+    async def discover_services(
+        self, uuids: Iterable[core.UUID] = ()
+    ) -> List[gatt_client.ServiceProxy]:
         return await self.gatt_client.discover_services(uuids)
 
-    async def discover_included_services(self, service):
+    async def discover_included_services(
+        self, service: gatt_client.ServiceProxy
+    ) -> List[gatt_client.ServiceProxy]:
         return await self.gatt_client.discover_included_services(service)
 
-    async def discover_characteristics(self, uuids=(), service=None):
+    async def discover_characteristics(
+        self,
+        uuids: Iterable[Union[core.UUID, str]] = (),
+        service: Optional[gatt_client.ServiceProxy] = None,
+    ) -> List[gatt_client.CharacteristicProxy]:
         return await self.gatt_client.discover_characteristics(
             uuids=uuids, service=service
         )
 
     async def discover_descriptors(
-        self, characteristic=None, start_handle=None, end_handle=None
+        self,
+        characteristic: Optional[gatt_client.CharacteristicProxy] = None,
+        start_handle: Optional[int] = None,
+        end_handle: Optional[int] = None,
     ):
         return await self.gatt_client.discover_descriptors(
             characteristic, start_handle, end_handle
         )
 
-    async def discover_attributes(self):
+    async def discover_attributes(self) -> List[gatt_client.AttributeProxy]:
         return await self.gatt_client.discover_attributes()
 
-    async def subscribe(self, characteristic, subscriber=None, prefer_notify=True):
+    async def subscribe(
+        self,
+        characteristic: gatt_client.CharacteristicProxy,
+        subscriber: Optional[Callable[[bytes], Any]] = None,
+        prefer_notify: bool = True,
+    ) -> None:
         return await self.gatt_client.subscribe(
             characteristic, subscriber, prefer_notify
         )
 
-    async def unsubscribe(self, characteristic, subscriber=None):
+    async def unsubscribe(
+        self,
+        characteristic: gatt_client.CharacteristicProxy,
+        subscriber: Optional[Callable[[bytes], Any]] = None,
+    ) -> None:
         return await self.gatt_client.unsubscribe(characteristic, subscriber)
 
-    async def read_value(self, attribute):
+    async def read_value(
+        self, attribute: Union[int, gatt_client.AttributeProxy]
+    ) -> bytes:
         return await self.gatt_client.read_value(attribute)
 
-    async def write_value(self, attribute, value, with_response=False):
+    async def write_value(
+        self,
+        attribute: Union[int, gatt_client.AttributeProxy],
+        value: bytes,
+        with_response: bool = False,
+    ) -> None:
         return await self.gatt_client.write_value(attribute, value, with_response)
 
-    async def read_characteristics_by_uuid(self, uuid, service=None):
+    async def read_characteristics_by_uuid(
+        self, uuid: core.UUID, service: Optional[gatt_client.ServiceProxy] = None
+    ) -> List[bytes]:
         return await self.gatt_client.read_characteristics_by_uuid(uuid, service)
 
-    def get_services_by_uuid(self, uuid):
+    def get_services_by_uuid(self, uuid: core.UUID) -> List[gatt_client.ServiceProxy]:
         return self.gatt_client.get_services_by_uuid(uuid)
 
-    def get_characteristics_by_uuid(self, uuid, service=None):
+    def get_characteristics_by_uuid(
+        self, uuid: core.UUID, service: Optional[gatt_client.ServiceProxy] = None
+    ) -> List[gatt_client.CharacteristicProxy]:
         return self.gatt_client.get_characteristics_by_uuid(uuid, service)
 
-    def create_service_proxy(self, proxy_class):
-        return proxy_class.from_client(self.gatt_client)
+    def create_service_proxy(self, proxy_class: Type[_PROXY_CLASS]) -> _PROXY_CLASS:
+        return cast(_PROXY_CLASS, proxy_class.from_client(self.gatt_client))
 
-    async def discover_service_and_create_proxy(self, proxy_class):
+    async def discover_service_and_create_proxy(
+        self, proxy_class: Type[_PROXY_CLASS]
+    ) -> Optional[_PROXY_CLASS]:
         # Discover the first matching service and its characteristics
         services = await self.discover_service(proxy_class.SERVICE_CLASS.UUID)
         if services:
             service = services[0]
             await service.discover_characteristics()
             return self.create_service_proxy(proxy_class)
+        return None
 
-    async def sustain(self, timeout=None):
+    async def sustain(self, timeout: Optional[float] = None) -> None:
         await self.connection.sustain(timeout)
 
     # [Classic only]
-    async def request_name(self):
+    async def request_name(self) -> str:
         return await self.connection.request_remote_name()
 
     async def __aenter__(self):
@@ -532,7 +573,7 @@ class Peer:
     async def __aexit__(self, exc_type, exc_value, traceback):
         pass
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.connection.peer_address} as {self.connection.role_name}'
 
 
@@ -732,7 +773,7 @@ class Connection(CompositeEventEmitter):
     async def switch_role(self, role: int) -> None:
         return await self.device.switch_role(self, role)
 
-    async def sustain(self, timeout=None):
+    async def sustain(self, timeout: Optional[float] = None) -> None:
         """Idles the current task waiting for a disconnect or timeout"""
 
         abort = asyncio.get_running_loop().create_future()
