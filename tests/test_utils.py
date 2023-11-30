@@ -71,3 +71,6 @@ class TwoDevices:
         # Check the post conditions
         assert self.connections[0] is not None
         assert self.connections[1] is not None
+
+    def __getitem__(self, index: int) -> Device:
+        return self.devices[index]
