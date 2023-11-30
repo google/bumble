@@ -35,6 +35,7 @@ from bumble.profiles.bap import (
     SupportedFrameDuration,
     PacRecord,
     PublishedAudioCapabilitiesService,
+    AudioStreamControlService,
 )
 
 from bumble.transport import open_transport_or_link
@@ -103,12 +104,18 @@ async def main() -> None:
             )
         )
 
+        device.add_service(AudioStreamControlService(device, sink_ase_id=[1, 2]))
+
         advertising_data = bytes(
             AdvertisingData(
                 [
                     (
                         AdvertisingData.COMPLETE_LOCAL_NAME,
                         bytes('Bumble LE Audio', 'utf-8'),
+                    ),
+                    (
+                        AdvertisingData.FLAGS,
+                        bytes([AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG]),
                     ),
                     (
                         AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,

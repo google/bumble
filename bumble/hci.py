@@ -728,6 +728,19 @@ HCI_LE_PHY_TYPE_TO_BIT = {
     HCI_LE_CODED_PHY: HCI_LE_CODED_PHY_BIT
 }
 
+
+class Phy(enum.IntEnum):
+    LE_1M    = 0x01
+    LE_2M    = 0x02
+    LE_CODED = 0x03
+
+
+class PhyBit(enum.IntFlag):
+    LE_1M    = 0b00000001
+    LE_2M    = 0b00000010
+    LE_CODED = 0b00000100
+
+
 # Connection Parameters
 HCI_CONNECTION_INTERVAL_MS_PER_UNIT = 1.25
 HCI_CONNECTION_LATENCY_MS_PER_UNIT  = 1.25
