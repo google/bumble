@@ -850,10 +850,10 @@ class EscoParameters:
 
     # Common
     input_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat = (
-        HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.TRANSPARENT
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.PCM
     )
     output_coding_format: HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat = (
-        HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.TRANSPARENT
+        HCI_Enhanced_Setup_Synchronous_Connection_Command.CodingFormat.PCM
     )
     input_coded_data_size: int = 16
     output_coded_data_size: int = 16
@@ -960,6 +960,8 @@ _ESCO_PARAMETERS_MSBC_T1 = EscoParameters(
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5
     ),
+    input_bandwidth=32000,
+    output_bandwidth=32000,
     retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.OPTIMIZE_FOR_QUALITY,
 )
 
@@ -974,10 +976,12 @@ _ESCO_PARAMETERS_MSBC_T2 = EscoParameters(
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5
     ),
+    input_bandwidth=32000,
+    output_bandwidth=32000,
     retransmission_effort=HCI_Enhanced_Setup_Synchronous_Connection_Command.RetransmissionEffort.OPTIMIZE_FOR_QUALITY,
 )
 
-ESCO_PERAMETERS = {
+ESCO_PARAMETERS = {
     DefaultCodecParameters.SCO_CVSD_D0: _ESCO_PARAMETERS_CVSD_D0,
     DefaultCodecParameters.SCO_CVSD_D1: _ESCO_PARAMETERS_CVSD_D1,
     DefaultCodecParameters.ESCO_CVSD_S1: _ESCO_PARAMETERS_CVSD_S1,

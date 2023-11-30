@@ -1,4 +1,4 @@
-# Copyright 2021-2023 Google LLC
+# Copyright 2021-2022 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,17 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import dataclasses
 import logging
 import sys
 import os
-from bumble.device import (
-    Device,
-    Connection,
-)
-from bumble.hci import (
-    OwnAddressType,
-    HCI_LE_Set_Extended_Advertising_Parameters_Command,
-)
+from bumble.core import BT_BR_EDR_TRANSPORT
+from bumble.device import Device, ScoLink
+from bumble.hci import HCI_Enhanced_Setup_Synchronous_Connection_Command
+from bumble.hfp import DefaultCodecParameters, ESCO_PARAMETERS
 
 from bumble.transport import open_transport_or_link
 
@@ -35,11 +32,11 @@ from bumble.transport import open_transport_or_link
 async def main() -> None:
     if len(sys.argv) < 3:
         print(
-            'Usage: run_cig_setup.py <config-file>'
+            'Usage: run_esco_connection.py <config-file>'
             '<transport-spec-for-device-1> <transport-spec-for-device-2>'
         )
         print(
-            'example: run_cig_setup.py device1.json'
+            'example: run_esco_connection.py classic1.json'
             'tcp-client:127.0.0.1:6402 tcp-client:127.0.0.1:6402'
         )
         return
@@ -57,45 +54,28 @@ async def main() -> None:
         for hci_transport in hci_transports
     ]
 
-    devices[0].cis_enabled = True
-    devices[1].cis_enabled = True
+    devices[0].classic_enabled = True
+    devices[1].classic_enabled = True
 
     await asyncio.gather(*[device.power_on() for device in devices])
-    await devices[0].start_extended_advertising(
-        advertising_properties=(
-            HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.CONNECTABLE_ADVERTISING
-        ),
-        own_address_type=OwnAddressType.PUBLIC,
+
+    connections = await asyncio.gather(
+        devices[0].accept(devices[1].public_address),
+        devices[1].connect(devices[0].public_address, transport=BT_BR_EDR_TRANSPORT),
     )
 
-    connection = await devices[1].connect(
-        devices[0].public_address, own_address_type=OwnAddressType.PUBLIC
+    def on_sco(sco_link: ScoLink):
+        connections[0].abort_on('disconnection', sco_link.disconnect())
+
+    devices[0].once('sco_connection', on_sco)
+
+    await devices[0].send_command(
+        HCI_Enhanced_Setup_Synchronous_Connection_Command(
+            connection_handle=connections[0].handle,
+            **dataclasses.asdict(ESCO_PARAMETERS[DefaultCodecParameters.ESCO_CVSD_S3])
+            # type: ignore[call-args]
+        )
     )
-
-    cid_ids = [2, 3]
-    cis_handles = await devices[1].setup_cig(
-        cig_id=1,
-        cis_id=cid_ids,
-        sdu_interval=(10000, 0),
-        framing=0,
-        max_sdu=(120, 0),
-        retransmission_number=13,
-        max_transport_latency=(100, 0),
-    )
-
-    def on_cis_request(
-        connection: Connection, cis_handle: int, _cig_id: int, _cis_id: int
-    ):
-        connection.abort_on('disconnection', devices[0].accept_cis_request(cis_handle))
-
-    devices[0].on('cis_request', on_cis_request)
-
-    cis_links = await devices[1].create_cis(
-        [(cis, connection.handle) for cis in cis_handles]
-    )
-
-    for cis_link in cis_links:
-        await cis_link.disconnect()
 
     await asyncio.gather(
         *[hci_transport.source.terminated for hci_transport in hci_transports]

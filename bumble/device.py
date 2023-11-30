@@ -3570,6 +3570,7 @@ class Device(CompositeEventEmitter):
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
+    @experimental('Only for testing.')
     def on_sco_connection(
         self, acl_connection: Connection, sco_handle: int, link_type: int
     ) -> None:
@@ -3578,23 +3579,27 @@ class Device(CompositeEventEmitter):
             f'sco_handle=[0x{sco_handle:04X}], '
             f'link_type=[0x{link_type:02X}] ***'
         )
-        self.sco_links[sco_handle] = ScoLink(
+        sco_link = self.sco_links[sco_handle] = ScoLink(
             device=self,
             acl_connection=acl_connection,
             handle=sco_handle,
             link_type=link_type,
         )
+        self.emit('sco_connection', sco_link)
 
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
+    @experimental('Only for testing.')
     def on_sco_connection_failure(
         self, acl_connection: Connection, status: int
     ) -> None:
         logger.debug(f'*** SCO connection failure: {acl_connection.peer_address}***')
+        self.emit('sco_connection_failure')
 
     # [Classic only]
     @host_event_handler
+    @experimental('Only for testing')
     def on_sco_packet(self, sco_handle: int, packet: HCI_SynchronousDataPacket) -> None:
         if sco_link := self.sco_links.get(sco_handle, None):
             sco_link.emit('pdu', packet)
@@ -3602,6 +3607,7 @@ class Device(CompositeEventEmitter):
     # [LE only]
     @host_event_handler
     @with_connection_from_handle
+    @experimental('Only for testing')
     def on_cis_request(
         self,
         acl_connection: Connection,
@@ -3628,6 +3634,7 @@ class Device(CompositeEventEmitter):
 
     # [LE only]
     @host_event_handler
+    @experimental('Only for testing')
     def on_cis_establishment(self, cis_handle: int) -> None:
         cis_link = self.cis_links[cis_handle]
         cis_link.state = CisLink.State.ESTABLISHED
@@ -3647,6 +3654,7 @@ class Device(CompositeEventEmitter):
 
     # [LE only]
     @host_event_handler
+    @experimental('Only for testing')
     def on_cis_establishment_failure(self, cis_handle: int, status: int) -> None:
         logger.debug(f'*** CIS Establishment Failure: cis=[0x{cis_handle:04X}] ***')
         if cis_link := self.cis_links.pop(cis_handle, None):
@@ -3655,6 +3663,7 @@ class Device(CompositeEventEmitter):
 
     # [LE only]
     @host_event_handler
+    @experimental('Only for testing')
     def on_iso_packet(self, handle: int, packet: HCI_IsoDataPacket) -> None:
         if cis_link := self.cis_links.get(handle, None):
             cis_link.emit('pdu', packet)
