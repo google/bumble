@@ -21,7 +21,7 @@ import functools
 import json
 import asyncio
 import logging
-from contextlib import asynccontextmanager, AsyncExitStack
+from contextlib import asynccontextmanager, AsyncExitStack, closing
 from dataclasses import dataclass
 from collections.abc import Iterable
 from typing import (
@@ -49,6 +49,7 @@ from .hci import (
     HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
     HCI_CENTRAL_ROLE,
     HCI_COMMAND_STATUS_PENDING,
+    HCI_CONNECTED_ISOCHRONOUS_STREAM_LE_SUPPORTED_FEATURE,
     HCI_CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR,
     HCI_DISPLAY_YES_NO_IO_CAPABILITY,
     HCI_DISPLAY_ONLY_IO_CAPABILITY,
@@ -85,29 +86,35 @@ from .hci import (
     HCI_Constant,
     HCI_Create_Connection_Cancel_Command,
     HCI_Create_Connection_Command,
+    HCI_Create_Connection_Command,
     HCI_Disconnect_Command,
     HCI_Encryption_Change_Event,
     HCI_Error,
     HCI_IO_Capability_Request_Reply_Command,
     HCI_Inquiry_Cancel_Command,
     HCI_Inquiry_Command,
+    HCI_IsoDataPacket,
+    HCI_LE_Accept_CIS_Request_Command,
     HCI_LE_Add_Device_To_Resolving_List_Command,
     HCI_LE_Advertising_Report_Event,
     HCI_LE_Clear_Resolving_List_Command,
     HCI_LE_Connection_Update_Command,
     HCI_LE_Create_Connection_Cancel_Command,
     HCI_LE_Create_Connection_Command,
+    HCI_LE_Create_CIS_Command,
     HCI_LE_Enable_Encryption_Command,
     HCI_LE_Extended_Advertising_Report_Event,
     HCI_LE_Extended_Create_Connection_Command,
     HCI_LE_Rand_Command,
     HCI_LE_Read_PHY_Command,
+    HCI_LE_Reject_CIS_Request_Command,
     HCI_LE_Remove_Advertising_Set_Command,
     HCI_LE_Set_Address_Resolution_Enable_Command,
     HCI_LE_Set_Advertising_Data_Command,
     HCI_LE_Set_Advertising_Enable_Command,
     HCI_LE_Set_Advertising_Parameters_Command,
     HCI_LE_Set_Advertising_Set_Random_Address_Command,
+    HCI_LE_Set_CIG_Parameters_Command,
     HCI_LE_Set_Data_Length_Command,
     HCI_LE_Set_Default_PHY_Command,
     HCI_LE_Set_Extended_Scan_Enable_Command,
@@ -116,6 +123,7 @@ from .hci import (
     HCI_LE_Set_Extended_Advertising_Data_Command,
     HCI_LE_Set_Extended_Advertising_Enable_Command,
     HCI_LE_Set_Extended_Advertising_Parameters_Command,
+    HCI_LE_Set_Host_Feature_Command,
     HCI_LE_Set_PHY_Command,
     HCI_LE_Set_Random_Address_Command,
     HCI_LE_Set_Scan_Enable_Command,
@@ -130,6 +138,7 @@ from .hci import (
     HCI_Switch_Role_Command,
     HCI_Set_Connection_Encryption_Command,
     HCI_StatusError,
+    HCI_SynchronousDataPacket,
     HCI_User_Confirmation_Request_Negative_Reply_Command,
     HCI_User_Confirmation_Request_Reply_Command,
     HCI_User_Passkey_Request_Negative_Reply_Command,
@@ -161,6 +170,7 @@ from .core import (
 from .utils import (
     AsyncRunner,
     CompositeEventEmitter,
+    EventWatcher,
     setup_event_forwarding,
     composite_listener,
     deprecated,
@@ -593,6 +603,46 @@ ConnectionParametersPreferences.default = ConnectionParametersPreferences()
 
 
 # -----------------------------------------------------------------------------
+@dataclass
+class ScoLink(CompositeEventEmitter):
+    device: Device
+    acl_connection: Connection
+    handle: int
+    link_type: int
+
+    def __post_init__(self):
+        super().__init__()
+
+    async def disconnect(
+        self, reason: int = HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
+    ) -> None:
+        await self.device.disconnect(self, reason)
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class CisLink(CompositeEventEmitter):
+    class State(IntEnum):
+        PENDING = 0
+        ESTABLISHED = 1
+
+    device: Device
+    acl_connection: Connection  # Based ACL connection
+    handle: int  # CIS handle assigned by Controller (in LE_Set_CIG_Parameters Complete or LE_CIS_Request events)
+    cis_id: int  # CIS ID assigned by Central device
+    cig_id: int  # CIG ID assigned by Central device
+    state: State = State.PENDING
+
+    def __post_init__(self):
+        super().__init__()
+
+    async def disconnect(
+        self, reason: int = HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
+    ) -> None:
+        await self.device.disconnect(self, reason)
+
+
+# -----------------------------------------------------------------------------
 class Connection(CompositeEventEmitter):
     device: Device
     handle: int
@@ -870,6 +920,7 @@ class DeviceConfiguration:
         self.keystore = None
         self.gatt_services: List[Dict[str, Any]] = []
         self.address_resolution_offload = False
+        self.cis_enabled = False
 
     def load_from_dict(self, config: Dict[str, Any]) -> None:
         # Load simple properties
@@ -905,6 +956,7 @@ class DeviceConfiguration:
         self.address_resolution_offload = config.get(
             'address_resolution_offload', self.address_resolution_offload
         )
+        self.cis_enabled = config.get('cis_enabled', self.cis_enabled)
 
         # Load or synthesize an IRK
         irk = config.get('irk')
@@ -1012,6 +1064,9 @@ class Device(CompositeEventEmitter):
     advertisement_accumulators: Dict[Address, AdvertisementDataAccumulator]
     config: DeviceConfiguration
     extended_advertising_handles: Set[int]
+    sco_links: Dict[int, ScoLink]
+    cis_links: Dict[int, CisLink]
+    _pending_cis: Dict[int, Tuple[int, int]]
 
     @composite_listener
     class Listener:
@@ -1104,6 +1159,9 @@ class Device(CompositeEventEmitter):
         self.disconnecting = False
         self.connections = {}  # Connections, by connection handle
         self.pending_connections = {}  # Connections, by BD address (BR/EDR only)
+        self.sco_links = {}  # ScoLinks, by connection handle (BR/EDR only)
+        self.cis_links = {}  # CisLinks, by connection handle (LE only)
+        self._pending_cis = {}  # (CIS_ID, CIG_ID), by CIS_handle
         self.classic_enabled = False
         self.inquiry_response = None
         self.address_resolver = None
@@ -1133,6 +1191,7 @@ class Device(CompositeEventEmitter):
         self.le_enabled = config.le_enabled
         self.classic_enabled = config.classic_enabled
         self.le_simultaneous_enabled = config.le_simultaneous_enabled
+        self.cis_enabled = config.cis_enabled
         self.classic_sc_enabled = config.classic_sc_enabled
         self.classic_ssp_enabled = config.classic_ssp_enabled
         self.classic_smp_enabled = config.classic_smp_enabled
@@ -1441,6 +1500,16 @@ class Device(CompositeEventEmitter):
                     HCI_LE_Set_Address_Resolution_Enable_Command(
                         address_resolution_enable=1
                     )  # type: ignore[call-arg]
+                )
+
+            if self.cis_enabled:
+                await self.send_command(
+                    HCI_LE_Set_Host_Feature_Command(  # type: ignore[call-arg]
+                        bit_number=(
+                            HCI_CONNECTED_ISOCHRONOUS_STREAM_LE_SUPPORTED_FEATURE
+                        ),
+                        bit_value=1,
+                    )
                 )
 
         if self.classic_enabled:
@@ -2366,7 +2435,9 @@ class Device(CompositeEventEmitter):
                 check_result=True,
             )
 
-    async def disconnect(self, connection, reason):
+    async def disconnect(
+        self, connection: Union[Connection, ScoLink, CisLink], reason: int
+    ) -> None:
         # Create a future so that we can wait for the disconnection's result
         pending_disconnection = asyncio.get_running_loop().create_future()
         connection.on('disconnection', pending_disconnection.set_result)
@@ -2374,7 +2445,7 @@ class Device(CompositeEventEmitter):
 
         # Request a disconnection
         result = await self.send_command(
-            HCI_Disconnect_Command(connection_handle=connection.handle, reason=reason)
+            HCI_Disconnect_Command(connection_handle=connection.handle, reason=reason)  # type: ignore[call-arg]
         )
 
         try:
@@ -2837,6 +2908,154 @@ class Device(CompositeEventEmitter):
             self.remove_listener('remote_name', handler)
             self.remove_listener('remote_name_failure', failure_handler)
 
+    # [LE only]
+    @experimental('Only for testing.')
+    async def setup_cig(
+        self,
+        cig_id: int,
+        cis_id: List[int],
+        sdu_interval: Tuple[int, int],
+        framing: int,
+        max_sdu: Tuple[int, int],
+        retransmission_number: int,
+        max_transport_latency: Tuple[int, int],
+    ) -> List[int]:
+        """Sends HCI_LE_Set_CIG_Parameters_Command.
+
+        Args:
+            cig_id: CIG_ID.
+            cis_id: CID ID list.
+            sdu_interval: SDU intervals of (Central->Peripheral, Peripheral->Cental).
+            framing: Un-framing(0) or Framing(1).
+            max_sdu: Max SDU counts of (Central->Peripheral, Peripheral->Cental).
+            retransmission_number: retransmission_number.
+            max_transport_latency: Max transport latencies of
+                                   (Central->Peripheral, Peripheral->Cental).
+
+        Returns:
+            List of created CIS handles corresponding to the same order of [cid_id].
+        """
+        num_cis = len(cis_id)
+
+        response = await self.send_command(
+            HCI_LE_Set_CIG_Parameters_Command(  # type: ignore[call-arg]
+                cig_id=cig_id,
+                sdu_interval_c_to_p=sdu_interval[0],
+                sdu_interval_p_to_c=sdu_interval[1],
+                worst_case_sca=0x00,  # 251-500 ppm
+                packing=0x00,  # Sequential
+                framing=framing,
+                max_transport_latency_c_to_p=max_transport_latency[0],
+                max_transport_latency_p_to_c=max_transport_latency[1],
+                cis_id=cis_id,
+                max_sdu_c_to_p=[max_sdu[0]] * num_cis,
+                max_sdu_p_to_c=[max_sdu[1]] * num_cis,
+                phy_c_to_p=[HCI_LE_2M_PHY] * num_cis,
+                phy_p_to_c=[HCI_LE_2M_PHY] * num_cis,
+                rtn_c_to_p=[retransmission_number] * num_cis,
+                rtn_p_to_c=[retransmission_number] * num_cis,
+            ),
+            check_result=True,
+        )
+
+        # Ideally, we should manage CIG lifecycle, but they are not useful for Unicast
+        # Server, so here it only provides a basic functionality for testing.
+        cis_handles = response.return_parameters.connection_handle[:]
+        for id, cis_handle in zip(cis_id, cis_handles):
+            self._pending_cis[cis_handle] = (id, cig_id)
+
+        return cis_handles
+
+    # [LE only]
+    @experimental('Only for testing.')
+    async def create_cis(self, cis_acl_pairs: List[Tuple[int, int]]) -> List[CisLink]:
+        for cis_handle, acl_handle in cis_acl_pairs:
+            acl_connection = self.lookup_connection(acl_handle)
+            assert acl_connection
+            cis_id, cig_id = self._pending_cis.pop(cis_handle)
+            self.cis_links[cis_handle] = CisLink(
+                device=self,
+                acl_connection=acl_connection,
+                handle=cis_handle,
+                cis_id=cis_id,
+                cig_id=cig_id,
+            )
+
+        result = await self.send_command(
+            HCI_LE_Create_CIS_Command(  # type: ignore[call-arg]
+                cis_connection_handle=[p[0] for p in cis_acl_pairs],
+                acl_connection_handle=[p[1] for p in cis_acl_pairs],
+            ),
+        )
+        if result.status != HCI_COMMAND_STATUS_PENDING:
+            logger.warning(
+                'HCI_LE_Create_CIS_Command failed: '
+                f'{HCI_Constant.error_name(result.status)}'
+            )
+            raise HCI_StatusError(result)
+
+        pending_cis_establishments: Dict[int, asyncio.Future[CisLink]] = {}
+        for cis_handle, _ in cis_acl_pairs:
+            pending_cis_establishments[
+                cis_handle
+            ] = asyncio.get_running_loop().create_future()
+
+        with closing(EventWatcher()) as watcher:
+
+            @watcher.on(self, 'cis_establishment')
+            def on_cis_establishment(cis_link: CisLink) -> None:
+                if pending_future := pending_cis_establishments.get(
+                    cis_link.handle, None
+                ):
+                    pending_future.set_result(cis_link)
+
+            return await asyncio.gather(*pending_cis_establishments.values())
+
+    # [LE only]
+    @experimental('Only for testing.')
+    async def accept_cis_request(self, handle: int) -> CisLink:
+        result = await self.send_command(
+            HCI_LE_Accept_CIS_Request_Command(  # type: ignore[call-arg]
+                connection_handle=handle
+            ),
+        )
+        if result.status != HCI_COMMAND_STATUS_PENDING:
+            logger.warning(
+                'HCI_LE_Accept_CIS_Request_Command failed: '
+                f'{HCI_Constant.error_name(result.status)}'
+            )
+            raise HCI_StatusError(result)
+
+        pending_cis_establishment = asyncio.get_running_loop().create_future()
+
+        with closing(EventWatcher()) as watcher:
+
+            @watcher.on(self, 'cis_establishment')
+            def on_cis_establishment(cis_link: CisLink) -> None:
+                if cis_link.handle == handle:
+                    pending_cis_establishment.set_result(cis_link)
+
+            return await pending_cis_establishment
+
+    # [LE only]
+    @experimental('Only for testing.')
+    async def reject_cis_request(
+        self,
+        handle: int,
+        reason: int = HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
+    ) -> None:
+        result = await self.send_command(
+            HCI_LE_Reject_CIS_Request_Command(  # type: ignore[call-arg]
+                connection_handle=handle, reason=reason
+            ),
+        )
+        if result.status != HCI_COMMAND_STATUS_PENDING:
+            logger.warning(
+                'HCI_LE_Reject_CIS_Request_Command failed: '
+                f'{HCI_Constant.error_name(result.status)}'
+            )
+            raise HCI_StatusError(result)
+
     @host_event_handler
     def on_flush(self):
         self.emit('flush')
@@ -3041,30 +3260,35 @@ class Device(CompositeEventEmitter):
             )
 
     @host_event_handler
-    @with_connection_from_handle
-    def on_disconnection(self, connection, reason):
-        logger.debug(
-            f'*** Disconnection: [0x{connection.handle:04X}] '
-            f'{connection.peer_address} as {connection.role_name}, reason={reason}'
-        )
-        connection.emit('disconnection', reason)
+    def on_disconnection(self, connection_handle: int, reason: int) -> None:
+        if connection := self.connections.pop(connection_handle, None):
+            logger.debug(
+                f'*** Disconnection: [0x{connection.handle:04X}] '
+                f'{connection.peer_address} as {connection.role_name}, reason={reason}'
+            )
+            connection.emit('disconnection', reason)
 
-        # Remove the connection from the map
-        del self.connections[connection.handle]
+            # Cleanup subsystems that maintain per-connection state
+            self.gatt_server.on_disconnection(connection)
 
-        # Cleanup subsystems that maintain per-connection state
-        self.gatt_server.on_disconnection(connection)
-
-        # Restart advertising if auto-restart is enabled
-        if self.auto_restart_advertising:
-            logger.debug('restarting advertising')
-            self.abort_on(
-                'flush',
-                self.start_advertising(
-                    advertising_type=self.advertising_type,
-                    own_address_type=self.advertising_own_address_type,
-                    auto_restart=True,
-                ),
+            # Restart advertising if auto-restart is enabled
+            if self.auto_restart_advertising:
+                logger.debug('restarting advertising')
+                self.abort_on(
+                    'flush',
+                    self.start_advertising(
+                        advertising_type=self.advertising_type,  # type: ignore[arg-type]
+                        own_address_type=self.advertising_own_address_type,  # type: ignore[arg-type]
+                        auto_restart=True,
+                    ),
+                )
+        elif sco_link := self.sco_links.pop(connection_handle, None):
+            sco_link.emit('disconnection', reason)
+        elif cis_link := self.cis_links.pop(connection_handle, None):
+            cis_link.emit('disconnection', reason)
+        else:
+            logger.error(
+                f'*** Unknown disconnection handle=0x{connection_handle}, reason={reason} ***'
             )
 
     @host_event_handler
@@ -3342,6 +3566,107 @@ class Device(CompositeEventEmitter):
         if connection:
             connection.emit('remote_name_failure', error)
         self.emit('remote_name_failure', address, error)
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    @experimental('Only for testing.')
+    def on_sco_connection(
+        self, acl_connection: Connection, sco_handle: int, link_type: int
+    ) -> None:
+        logger.debug(
+            f'*** SCO connected: {acl_connection.peer_address}, '
+            f'sco_handle=[0x{sco_handle:04X}], '
+            f'link_type=[0x{link_type:02X}] ***'
+        )
+        sco_link = self.sco_links[sco_handle] = ScoLink(
+            device=self,
+            acl_connection=acl_connection,
+            handle=sco_handle,
+            link_type=link_type,
+        )
+        self.emit('sco_connection', sco_link)
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_address
+    @experimental('Only for testing.')
+    def on_sco_connection_failure(
+        self, acl_connection: Connection, status: int
+    ) -> None:
+        logger.debug(f'*** SCO connection failure: {acl_connection.peer_address}***')
+        self.emit('sco_connection_failure')
+
+    # [Classic only]
+    @host_event_handler
+    @experimental('Only for testing')
+    def on_sco_packet(self, sco_handle: int, packet: HCI_SynchronousDataPacket) -> None:
+        if sco_link := self.sco_links.get(sco_handle, None):
+            sco_link.emit('pdu', packet)
+
+    # [LE only]
+    @host_event_handler
+    @with_connection_from_handle
+    @experimental('Only for testing')
+    def on_cis_request(
+        self,
+        acl_connection: Connection,
+        cis_handle: int,
+        cig_id: int,
+        cis_id: int,
+    ) -> None:
+        logger.debug(
+            f'*** CIS Request '
+            f'acl_handle=[0x{acl_connection.handle:04X}]{acl_connection.peer_address}, '
+            f'cis_handle=[0x{cis_handle:04X}], '
+            f'cig_id=[0x{cig_id:02X}], '
+            f'cis_id=[0x{cis_id:02X}] ***'
+        )
+        # LE_CIS_Established event doesn't provide info, so we must store them here.
+        self.cis_links[cis_handle] = CisLink(
+            device=self,
+            acl_connection=acl_connection,
+            handle=cis_handle,
+            cig_id=cig_id,
+            cis_id=cis_id,
+        )
+        self.emit('cis_request', acl_connection, cis_handle, cig_id, cis_id)
+
+    # [LE only]
+    @host_event_handler
+    @experimental('Only for testing')
+    def on_cis_establishment(self, cis_handle: int) -> None:
+        cis_link = self.cis_links[cis_handle]
+        cis_link.state = CisLink.State.ESTABLISHED
+
+        assert cis_link.acl_connection
+
+        logger.debug(
+            f'*** CIS Establishment '
+            f'{cis_link.acl_connection.peer_address}, '
+            f'cis_handle=[0x{cis_handle:04X}], '
+            f'cig_id=[0x{cis_link.cig_id:02X}], '
+            f'cis_id=[0x{cis_link.cis_id:02X}] ***'
+        )
+
+        cis_link.emit('establishment')
+        self.emit('cis_establishment', cis_link)
+
+    # [LE only]
+    @host_event_handler
+    @experimental('Only for testing')
+    def on_cis_establishment_failure(self, cis_handle: int, status: int) -> None:
+        logger.debug(f'*** CIS Establishment Failure: cis=[0x{cis_handle:04X}] ***')
+        if cis_link := self.cis_links.pop(cis_handle, None):
+            cis_link.emit('establishment_failure')
+        self.emit('cis_establishment_failure', cis_handle, status)
+
+    # [LE only]
+    @host_event_handler
+    @experimental('Only for testing')
+    def on_iso_packet(self, handle: int, packet: HCI_IsoDataPacket) -> None:
+        if cis_link := self.cis_links.get(handle, None):
+            cis_link.emit('pdu', packet)
 
     @host_event_handler
     @with_connection_from_handle
