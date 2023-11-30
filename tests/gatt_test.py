@@ -20,6 +20,7 @@ import logging
 import os
 import struct
 import pytest
+from unittest.mock import Mock, ANY
 
 from bumble.controller import Controller
 from bumble.gatt_client import CharacteristicProxy
@@ -765,6 +766,83 @@ async def test_subscribe_notify():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_unsubscribe():
+    [client, server] = LinkedDevices().devices[:2]
+
+    characteristic1 = Characteristic(
+        'FDB159DB-036C-49E3-B3DB-6325AC750806',
+        Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
+        Characteristic.READABLE,
+        bytes([1, 2, 3]),
+    )
+    characteristic2 = Characteristic(
+        '3234C4F4-3F34-4616-8935-45A50EE05DEB',
+        Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
+        Characteristic.READABLE,
+        bytes([1, 2, 3]),
+    )
+
+    service1 = Service(
+        '3A657F47-D34F-46B3-B1EC-698E29B6B829',
+        [characteristic1, characteristic2],
+    )
+    server.add_services([service1])
+
+    mock1 = Mock()
+    characteristic1.on('subscription', mock1)
+    mock2 = Mock()
+    characteristic2.on('subscription', mock2)
+
+    await client.power_on()
+    await server.power_on()
+    connection = await client.connect(server.random_address)
+    peer = Peer(connection)
+
+    await peer.discover_services()
+    await peer.discover_characteristics()
+    c = peer.get_characteristics_by_uuid(characteristic1.uuid)
+    assert len(c) == 1
+    c1 = c[0]
+    c = peer.get_characteristics_by_uuid(characteristic2.uuid)
+    assert len(c) == 1
+    c2 = c[0]
+
+    await c1.subscribe()
+    await async_barrier()
+    mock1.assert_called_once_with(ANY, True, False)
+
+    await c2.subscribe()
+    await async_barrier()
+    mock2.assert_called_once_with(ANY, True, False)
+
+    mock1.reset_mock()
+    await c1.unsubscribe()
+    await async_barrier()
+    mock1.assert_called_once_with(ANY, False, False)
+
+    mock2.reset_mock()
+    await c2.unsubscribe()
+    await async_barrier()
+    mock2.assert_called_once_with(ANY, False, False)
+
+    mock1.reset_mock()
+    await c1.unsubscribe()
+    await async_barrier()
+    mock1.assert_not_called()
+
+    mock2.reset_mock()
+    await c2.unsubscribe()
+    await async_barrier()
+    mock2.assert_not_called()
+
+    mock1.reset_mock()
+    await c1.unsubscribe(force=True)
+    await async_barrier()
+    mock1.assert_called_once_with(ANY, False, False)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_mtu_exchange():
     [d1, d2, d3] = LinkedDevices().devices[:3]
 
@@ -886,6 +964,7 @@ async def async_main():
     await test_read_write()
     await test_read_write2()
     await test_subscribe_notify()
+    await test_unsubscribe()
     await test_characteristic_encoding()
     await test_mtu_exchange()
 
