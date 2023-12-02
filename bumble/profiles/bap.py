@@ -443,9 +443,9 @@ class AseReasonCode(enum.IntEnum):
     INVALID_ASE_CIS_MAPPING         = 0x0A
 
 
-class AudioRole(enum.Enum):
-    SINK = enum.auto()
-    SOURCE = enum.auto()
+class AudioRole(enum.IntEnum):
+    SINK = hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.CONTROLLER_TO_HOST
+    SOURCE = hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.HOST_TO_CONTROLLER
 
 
 # -----------------------------------------------------------------------------
@@ -834,9 +834,21 @@ class AseStateMachine(gatt.Characteristic):
     def on_cis_establishment(self, cis_link: device.CisLink) -> None:
         if cis_link.cis_id == self.cis_id and self.state == self.State.ENABLING:
             self.state = self.State.STREAMING
-            cis_link.acl_connection.abort_on(
-                'flush', self.service.device.notify_subscribers(self, self.value)
-            )
+
+            async def post_cis_established():
+                await self.service.device.send_command(
+                    hci.HCI_LE_Setup_ISO_Data_Path_Command(
+                        connection_handle=cis_link.handle,
+                        data_path_direction=self.role,
+                        data_path_id=0x00,  # Fixed HCI
+                        codec_id=hci.CodingFormat(hci.CodecID.TRANSPARENT),
+                        controller_delay=0,
+                        codec_configuration=b'',
+                    )
+                )
+                await self.service.device.notify_subscribers(self, self.value)
+
+            cis_link.acl_connection.abort_on('flush', post_cis_established())
 
     def on_config_codec(
         self,

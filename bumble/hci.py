@@ -4554,6 +4554,10 @@ class HCI_LE_Setup_ISO_Data_Path_Command(HCI_Command):
     See Bluetooth spec @ 7.8.109 LE Setup ISO Data Path command
     '''
 
+    class Direction(enum.IntEnum):
+        HOST_TO_CONTROLLER = 0x00
+        CONTROLLER_TO_HOST = 0x01
+
     connection_handle: int
     data_path_direction: int
     data_path_id: int
