@@ -1629,7 +1629,7 @@ class HCI_Object:
                 field_bytes = bytes(field_value)
         elif field_type == 'v':
             # Variable-length bytes field, with 1-byte length at the beginning
-            field_bytes = bytes(field_bytes)
+            field_bytes = bytes(field_value)
             field_length = len(field_bytes)
             field_bytes = bytes([field_length]) + field_bytes
         elif isinstance(field_value, (bytes, bytearray)) or hasattr(
