@@ -1,0 +1,134 @@
+# Copyright 2021-2023 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# -----------------------------------------------------------------------------
+# Imports
+# -----------------------------------------------------------------------------
+import asyncio
+import logging
+import sys
+import os
+from bumble.core import AdvertisingData
+from bumble.device import Device
+from bumble.hci import (
+    CodecID,
+    CodingFormat,
+    OwnAddressType,
+    HCI_LE_Set_Extended_Advertising_Parameters_Command,
+)
+from bumble.profiles.bap import (
+    CodecSpecificCapabilities,
+    ContextType,
+    AudioLocation,
+    SupportedSamplingFrequency,
+    SupportedFrameDuration,
+    PacRecord,
+    PublishedAudioCapabilitiesService,
+)
+
+from bumble.transport import open_transport_or_link
+
+
+# -----------------------------------------------------------------------------
+async def main() -> None:
+    if len(sys.argv) < 3:
+        print('Usage: run_cig_setup.py <config-file>' '<transport-spec-for-device>')
+        return
+
+    print('<<< connecting to HCI...')
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+        print('<<< connected')
+
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
+        device.cis_enabled = True
+
+        await device.power_on()
+
+        device.add_service(
+            PublishedAudioCapabilitiesService(
+                supported_source_context=ContextType.PROHIBITED,
+                available_source_context=ContextType.PROHIBITED,
+                supported_sink_context=ContextType.MEDIA,
+                available_sink_context=ContextType.MEDIA,
+                sink_audio_locations=(
+                    AudioLocation.FRONT_LEFT | AudioLocation.FRONT_RIGHT
+                ),
+                sink_pac=[
+                    # Codec Capability Setting 16_2
+                    PacRecord(
+                        coding_format=CodingFormat(CodecID.LC3),
+                        codec_specific_capabilities=CodecSpecificCapabilities(
+                            supported_sampling_frequencies=(
+                                SupportedSamplingFrequency.FREQ_16000
+                            ),
+                            supported_frame_durations=(
+                                SupportedFrameDuration.DURATION_10000_US_SUPPORTED
+                            ),
+                            supported_audio_channel_counts=[1],
+                            min_octets_per_codec_frame=40,
+                            max_octets_per_codec_frame=40,
+                            supported_max_codec_frames_per_sdu=1,
+                        ),
+                    ),
+                    # Codec Capability Setting 24_2
+                    PacRecord(
+                        coding_format=CodingFormat(CodecID.LC3),
+                        codec_specific_capabilities=CodecSpecificCapabilities(
+                            supported_sampling_frequencies=(
+                                SupportedSamplingFrequency.FREQ_24000
+                            ),
+                            supported_frame_durations=(
+                                SupportedFrameDuration.DURATION_10000_US_SUPPORTED
+                            ),
+                            supported_audio_channel_counts=[1],
+                            min_octets_per_codec_frame=60,
+                            max_octets_per_codec_frame=60,
+                            supported_max_codec_frames_per_sdu=1,
+                        ),
+                    ),
+                ],
+            )
+        )
+
+        advertising_data = bytes(
+            AdvertisingData(
+                [
+                    (
+                        AdvertisingData.COMPLETE_LOCAL_NAME,
+                        bytes('Bumble LE Audio', 'utf-8'),
+                    ),
+                    (
+                        AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+                        bytes(PublishedAudioCapabilitiesService.UUID),
+                    ),
+                ]
+            )
+        )
+
+        await device.start_extended_advertising(
+            advertising_properties=(
+                HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.CONNECTABLE_ADVERTISING
+            ),
+            own_address_type=OwnAddressType.RANDOM,
+            advertising_data=advertising_data,
+        )
+
+        await hci_transport.source.terminated
+
+
+# -----------------------------------------------------------------------------
+logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+asyncio.run(main())
