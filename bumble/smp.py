@@ -1090,7 +1090,7 @@ class Session:
         # We can now encrypt the connection with the short term key, so that we can
         # distribute the long term and/or other keys over an encrypted connection
         self.manager.device.host.send_command_sync(
-            HCI_LE_Enable_Encryption_Command(  # type: ignore[call-arg]
+            HCI_LE_Enable_Encryption_Command(
                 connection_handle=self.connection.handle,
                 random_number=bytes(8),
                 encrypted_diversifier=0,

@@ -2018,6 +2018,7 @@ class HCI_Command(HCI_Packet):
     hci_packet_type = HCI_COMMAND_PACKET
     command_names: Dict[int, str] = {}
     command_classes: Dict[int, Type[HCI_Command]] = {}
+    op_code: int
 
     @staticmethod
     def command(fields=(), return_parameters_fields=()):
@@ -2103,7 +2104,11 @@ class HCI_Command(HCI_Packet):
         return_parameters.fields = cls.return_parameters_fields
         return return_parameters
 
-    def __init__(self, op_code, parameters=None, **kwargs):
+    def __init__(self, op_code=-1, parameters=None, **kwargs):
+        # Since the legacy implementation relies on an __init__ injector, typing always
+        # complains that positional argument op_code is not passed, so here sets a
+        # default value to allow building derived HCI_Command without op_code.
+        assert op_code != -1
         super().__init__(HCI_Command.command_name(op_code))
         if (fields := getattr(self, 'fields', None)) and kwargs:
             HCI_Object.init_from_fields(self, fields, kwargs)

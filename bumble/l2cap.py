@@ -1926,7 +1926,7 @@ class ChannelManager:
                     supervision_timeout=request.timeout,
                     min_ce_length=0,
                     max_ce_length=0,
-                )  # type: ignore[call-arg]
+                )
             )
         else:
             self.send_control_frame(
