@@ -12,7 +12,7 @@
         <link rel="prev" href="index.html">
       
       
-        <link rel="next" href="../hive/index.html">
+        <link rel="next" href="android_bt_bench.html">
       
       
       <link rel="icon" href="../images/favicon.ico">
@@ -1753,6 +1753,8 @@
       
         
       
+        
+      
     
     
     
@@ -1868,6 +1870,13 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#root-shell" class="md-nav__link">
+    Root Shell
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#disabling-selinux" class="md-nav__link">
     Disabling SELinux
   </a>
@@ -1887,11 +1896,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#starting-the-app" class="md-nav__link">
-    Starting the app
+  <a href="#running-as-a-command-line-app" class="md-nav__link">
+    Running as a command line app
   </a>
   
-    <nav class="md-nav" aria-label="Starting the app">
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-as-a-normal-app" class="md-nav__link">
+    Running as a normal app
+  </a>
+  
+    <nav class="md-nav" aria-label="Running as a normal app">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1936,6 +1952,26 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="android_bt_bench.html" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Android BT Bench
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -2123,6 +2159,13 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#root-shell" class="md-nav__link">
+    Root Shell
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#disabling-selinux" class="md-nav__link">
     Disabling SELinux
   </a>
@@ -2142,11 +2185,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#starting-the-app" class="md-nav__link">
-    Starting the app
+  <a href="#running-as-a-command-line-app" class="md-nav__link">
+    Running as a command line app
   </a>
   
-    <nav class="md-nav" aria-label="Starting the app">
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-as-a-normal-app" class="md-nav__link">
+    Running as a normal app
+  </a>
+  
+    <nav class="md-nav" aria-label="Running as a normal app">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2203,15 +2253,15 @@
 
 
 <h1 id="android-remote-hci-app">ANDROID REMOTE HCI APP<a class="headerlink" href="#android-remote-hci-app" title="Permanent link">&para;</a></h1>
-<p>This application allows using an android phone's built-in Bluetooth controller with 
+<p>This application allows using an android phone's built-in Bluetooth controller with
 a Bumble host stack running outside the phone (typically a development laptop or desktop).
 The app runs an HCI proxy between a TCP socket on the "outside" and the Bluetooth HCI HAL
-on the "inside". (See <a href="https://source.android.com/docs/core/connect/bluetooth">this page</a> for a high level 
+on the "inside". (See <a href="https://source.android.com/docs/core/connect/bluetooth">this page</a> for a high level
 description of the Android Bluetooth HCI HAL).
-The HCI packets received on the TCP socket are forwarded to the phone's controller, and the 
+The HCI packets received on the TCP socket are forwarded to the phone's controller, and the
 packets coming from the controller are forwarded to the TCP socket.</p>
 <h2 id="building">Building<a class="headerlink" href="#building" title="Permanent link">&para;</a></h2>
-<p>You can build the app by running <code>./gradlew build</code> (use <code>gradlew.bat</code> on Windows) from the <code>RemoteHCI</code> top level directory.
+<p>You can build the app by running <code>./gradlew build</code> (use <code>gradlew.bat</code> on Windows) from the <code>extras/android/RemoteHCI</code> top level directory.
 You can also build with Android Studio: open the <code>RemoteHCI</code> project. You can build and/or debug from there.</p>
 <p>If the build succeeds, you can find the app APKs (debug and release) at:</p>
 <ul>
@@ -2219,9 +2269,24 @@ You can also build with Android Studio: open the <code>RemoteHCI</code> project.
 <li>[Debug] <code>app/build/outputs/apk/debug/app-debug.apk</code></li>
 </ul>
 <h2 id="running">Running<a class="headerlink" href="#running" title="Permanent link">&para;</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In the following examples, it is assumed that shell commands are executed while in the
+app's root directory, <code>extras/android/RemoteHCI</code>. If you are in a different directory,
+adjust the relative paths accordingly.</p>
+</div>
 <h3 id="preconditions">Preconditions<a class="headerlink" href="#preconditions" title="Permanent link">&para;</a></h3>
-<p>When the proxy starts (tapping the "Start" button in the app's main activity), it will try to 
-bind to the Bluetooth HAL. This requires disabling SELinux temporarily, and being the only HAL client.</p>
+<p>When the proxy starts (tapping the "Start" button in the app's main activity, or running the proxy
+from an <code>adb shell</code> command line), it will try to bind to the Bluetooth HAL.
+This requires that there is no other HAL client, and requires certain privileges.
+For running as a regular app, this requires disabling SELinux temporarily.
+For running as a command-line executable, this just requires a root shell.</p>
+<h4 id="root-shell">Root Shell<a class="headerlink" href="#root-shell" title="Permanent link">&para;</a></h4>
+<div class="admonition tip">
+<p class="admonition-title">Restart <code>adb</code> as root</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>adb<span class="w"> </span>root
+</code></pre></div>
+</div>
 <h4 id="disabling-selinux">Disabling SELinux<a class="headerlink" href="#disabling-selinux" title="Permanent link">&para;</a></h4>
 <p>Binding to the Bluetooth HCI HAL requires certain SELinux permissions that can't simply be changed
 on a device without rebuilding its system image. To bypass these restrictions, you will need
@@ -2243,8 +2308,8 @@ development phone).</p>
 <p>This state will also reset to the normal SELinux enforcement when you reboot.</p>
 </div>
 <h4 id="stopping-the-bluetooth-process">Stopping the bluetooth process<a class="headerlink" href="#stopping-the-bluetooth-process" title="Permanent link">&para;</a></h4>
-<p>Since the Bluetooth HAL service can only accept one client, and that in normal conditions 
-that client is the Android's bluetooth stack, it is required to first shut down the 
+<p>Since the Bluetooth HAL service can only accept one client, and that in normal conditions
+that client is the Android's bluetooth stack, it is required to first shut down the
 Android bluetooth stack process.</p>
 <div class="admonition tip">
 <p class="admonition-title">Checking if the Bluetooth process is running</p>
@@ -2263,7 +2328,30 @@ Airplane Mode, then rebooting. The bluetooth process should, in theory, not rest
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>adb<span class="w"> </span>shell<span class="w"> </span>cmd<span class="w"> </span>bluetooth_manager<span class="w"> </span>disable
 </code></pre></div>
 </div>
-<h3 id="starting-the-app">Starting the app<a class="headerlink" href="#starting-the-app" title="Permanent link">&para;</a></h3>
+<h3 id="running-as-a-command-line-app">Running as a command line app<a class="headerlink" href="#running-as-a-command-line-app" title="Permanent link">&para;</a></h3>
+<p>You push the built APK to a temporary location on the phone's filesystem, then launch the command
+line executable with an <code>adb shell</code> command.</p>
+<div class="admonition tip">
+<p class="admonition-title">Pushing the executable</p>
+<p><div class="highlight"><pre><span></span><code>$<span class="w"> </span>adb<span class="w"> </span>push<span class="w"> </span>app/build/outputs/apk/release/app-release-unsigned.apk<span class="w"> </span>/data/local/tmp/remotehci.apk
+</code></pre></div>
+Do this every time you rebuild. Alternatively, you can push the <code>debug</code> APK instead:
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>adb<span class="w"> </span>push<span class="w"> </span>app/build/outputs/apk/debug/app-debug.apk<span class="w"> </span>/data/local/tmp/remotehci.apk
+</code></pre></div></p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Start the proxy from the command line</p>
+<p><div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span><span class="s2">&quot;CLASSPATH=/data/local/tmp/remotehci.apk app_process /system/bin com.github.google.bumble.remotehci.CommandLineInterface&quot;</span>
+</code></pre></div>
+This will run the proxy, listening on the default TCP port.
+If you want a different port, pass it as a command line parameter</p>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Start the proxy from the command line with a specific TCP port</p>
+<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span><span class="s2">&quot;CLASSPATH=/data/local/tmp/remotehci.apk app_process /system/bin com.github.google.bumble.remotehci.CommandLineInterface 12345&quot;</span>
+</code></pre></div>
+</div>
+<h3 id="running-as-a-normal-app">Running as a normal app<a class="headerlink" href="#running-as-a-normal-app" title="Permanent link">&para;</a></h3>
 <p>You can start the app from the Android launcher, from Android Studio, or with <code>adb</code></p>
 <h4 id="launching-from-the-launcher">Launching from the launcher<a class="headerlink" href="#launching-from-the-launcher" title="Permanent link">&para;</a></h4>
 <p>Just tap the app icon on the launcher, check the TCP port that is configured, and tap
@@ -2284,10 +2372,10 @@ automatically start the proxy, and/or set the port number.</p>
 </div>
 <h4 id="selecting-a-tcp-port">Selecting a TCP port<a class="headerlink" href="#selecting-a-tcp-port" title="Permanent link">&para;</a></h4>
 <p>The RemoteHCI app's main activity has a "TCP Port" setting where you can change the port on
-which the proxy is accepting connections. If the default value isn't suitable, you can 
+which the proxy is accepting connections. If the default value isn't suitable, you can
 change it there (you can also use the special value 0 to let the OS assign a port number for you).</p>
 <h3 id="connecting-to-the-proxy">Connecting to the proxy<a class="headerlink" href="#connecting-to-the-proxy" title="Permanent link">&para;</a></h3>
-<p>To connect the Bumble stack to the proxy, you need to be able to reach the phone's network 
+<p>To connect the Bumble stack to the proxy, you need to be able to reach the phone's network
 stack. This can be done over the phone's WiFi connection, or, alternatively, using an <code>adb</code>
 TCP forward (which should be faster than over WiFi).</p>
 <div class="admonition tip">
@@ -2295,7 +2383,7 @@ TCP forward (which should be faster than over WiFi).</p>
 <p>To connect to the proxy via an <code>adb</code> TCP forward, use:
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>adb<span class="w"> </span>forward<span class="w"> </span>tcp:&lt;outside-port&gt;<span class="w"> </span>tcp:&lt;inside-port&gt;
 </code></pre></div>
-Where <code>&lt;outside-port&gt;</code> is the port number for a listening socket on your laptop or 
+Where <code>&lt;outside-port&gt;</code> is the port number for a listening socket on your laptop or
 desktop machine, and <inside-port> is the TCP port selected in the app's user interface.
 Those two ports may be the same, of course.
 For example, with the default TCP port 9993:
@@ -2303,7 +2391,7 @@ For example, with the default TCP port 9993:
 </code></pre></div></p>
 </div>
 <p>Once you've ensured that you can reach the proxy's TCP port on the phone, either directly or
-via an <code>adb</code> forward, you can then use it as a Bumble transport, using the transport name: 
+via an <code>adb</code> forward, you can then use it as a Bumble transport, using the transport name:
 <code>tcp-client:&lt;host&gt;:&lt;port&gt;</code> syntax.</p>
 <div class="admonition example">
 <p class="admonition-title">Connecting a Bumble client</p>
@@ -2350,13 +2438,13 @@ Assuming you have set up an <code>adb</code> forward on port 9993:
           </a>
         
         
-          <a href="../hive/index.html" title="HIVE" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
+          <a href="android_bt_bench.html" title="Android BT Bench" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
               <span class="md-flex__ellipsis">
                 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                HIVE
+                Android BT Bench
               </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink">

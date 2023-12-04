@@ -172,9 +172,7 @@ class Speaker:
         connection.on('disconnection', self.on_bluetooth_disconnection)
         peer_name = '' if connection.peer_name is None else connection.peer_name
         peer_address = connection.peer_address.to_string(False)
-        self.emit(
-            'connection', {'peer_name': peer_name, 'peer_address': peer_address}
-        )
+        self.emit('connection', {'peer_name': peer_name, 'peer_address': peer_address})
 
     def on_bluetooth_disconnection(self, reason):
         print(f'Disconnection ({reason})')
