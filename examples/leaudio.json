@@ -1,0 +1,5 @@
+{
+    "name": "Bumble-LEA",
+    "keystore": "JsonKeyStore",
+    "advertising_interval": 100
+}

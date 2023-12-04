@@ -32,8 +32,8 @@ from .hci import (
     Address,
     HCI_ACL_DATA_PACKET,
     HCI_COMMAND_PACKET,
-    HCI_COMMAND_COMPLETE_EVENT,
     HCI_EVENT_PACKET,
+    HCI_ISO_DATA_PACKET,
     HCI_LE_READ_BUFFER_SIZE_COMMAND,
     HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND,
     HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
@@ -52,6 +52,7 @@ from .hci import (
     HCI_Constant,
     HCI_Error,
     HCI_Event,
+    HCI_IsoDataPacket,
     HCI_LE_Long_Term_Key_Request_Negative_Reply_Command,
     HCI_LE_Long_Term_Key_Request_Reply_Command,
     HCI_LE_Read_Buffer_Size_Command,
@@ -75,7 +76,6 @@ from .core import (
     BT_LE_TRANSPORT,
     ConnectionPHY,
     ConnectionParameters,
-    InvalidStateError,
 )
 from .utils import AbortableEventEmitter
 from .transport.common import TransportLostError
@@ -243,7 +243,7 @@ class Host(AbortableEventEmitter):
             # understand
             le_event_mask = bytes.fromhex('1F00000000000000')
         else:
-            le_event_mask = bytes.fromhex('FFFFF00000000000')
+            le_event_mask = bytes.fromhex('FFFFFFFF00000000')
 
         await self.send_command(
             HCI_LE_Set_Event_Mask_Command(le_event_mask=le_event_mask)
@@ -495,6 +495,8 @@ class Host(AbortableEventEmitter):
             self.on_hci_acl_data_packet(cast(HCI_AclDataPacket, packet))
         elif packet.hci_packet_type == HCI_SYNCHRONOUS_DATA_PACKET:
             self.on_hci_sco_data_packet(cast(HCI_SynchronousDataPacket, packet))
+        elif packet.hci_packet_type == HCI_ISO_DATA_PACKET:
+            self.on_hci_iso_data_packet(cast(HCI_IsoDataPacket, packet))
         else:
             logger.warning(f'!!! unknown packet type {packet.hci_packet_type}')
 
@@ -514,6 +516,10 @@ class Host(AbortableEventEmitter):
     def on_hci_sco_data_packet(self, packet: HCI_SynchronousDataPacket) -> None:
         # Experimental
         self.emit('sco_packet', packet.connection_handle, packet)
+
+    def on_hci_iso_data_packet(self, packet: HCI_IsoDataPacket) -> None:
+        # Experimental
+        self.emit('iso_packet', packet.connection_handle, packet)
 
     def on_l2cap_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
@@ -714,6 +720,24 @@ class Host(AbortableEventEmitter):
 
     def on_hci_le_extended_advertising_report_event(self, event):
         self.on_hci_le_advertising_report_event(event)
+
+    def on_hci_le_cis_request_event(self, event):
+        self.emit(
+            'cis_request',
+            event.acl_connection_handle,
+            event.cis_connection_handle,
+            event.cig_id,
+            event.cis_id,
+        )
+
+    def on_hci_le_cis_established_event(self, event):
+        # The remaining parameters are unused for now.
+        if event.status == HCI_SUCCESS:
+            self.emit('cis_establishment', event.connection_handle)
+        else:
+            self.emit(
+                'cis_establishment_failure', event.connection_handle, event.status
+            )
 
     def on_hci_le_remote_connection_parameter_request_event(self, event):
         if event.connection_handle not in self.connections:

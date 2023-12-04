@@ -24,6 +24,8 @@ from bumble.hci import (
     HCI_RESET_COMMAND,
     HCI_SUCCESS,
     Address,
+    CodingFormat,
+    CodecID,
     HCI_Command,
     HCI_Command_Complete_Event,
     HCI_Command_Status_Event,
@@ -51,6 +53,7 @@ from bumble.hci import (
     HCI_LE_Set_Random_Address_Command,
     HCI_LE_Set_Scan_Enable_Command,
     HCI_LE_Set_Scan_Parameters_Command,
+    HCI_LE_Setup_ISO_Data_Path_Command,
     HCI_Number_Of_Completed_Packets_Event,
     HCI_Packet,
     HCI_PIN_Code_Request_Reply_Command,
@@ -438,6 +441,28 @@ def test_HCI_LE_Set_Extended_Advertising_Enable_Command():
         advertising_handles=[1, 2, 3],
         durations=[5, 6, 7],
         max_extended_advertising_events=[8, 9, 10],
+    )
+    basic_check(command)
+
+
+# -----------------------------------------------------------------------------
+def test_HCI_LE_Setup_ISO_Data_Path_Command():
+    command = HCI_Packet.from_bytes(bytes.fromhex('016e200d60000001030000000000000000'))
+
+    assert command.connection_handle == 0x0060
+    assert command.data_path_direction == 0x00
+    assert command.data_path_id == 0x01
+    assert command.codec_id == CodingFormat(CodecID.TRANSPARENT)
+    assert command.controller_delay == 0
+    assert command.codec_configuration == b''
+
+    command = HCI_LE_Setup_ISO_Data_Path_Command(
+        connection_handle=0x0060,
+        data_path_direction=0x00,
+        data_path_id=0x01,
+        codec_id=CodingFormat(CodecID.TRANSPARENT),
+        controller_delay=0x00,
+        codec_configuration=b'',
     )
     basic_check(command)
 
