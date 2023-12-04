@@ -4,19 +4,24 @@ import java.io.IOException
 
 class CommandLineInterface {
     companion object {
+        fun printUsage() {
+            System.out.println("usage: <launch-command> [-h|--help] [<tcp-port>]")
+        }
+
         @JvmStatic fun main(args: Array<String>) {
             System.out.println("Starting proxy")
 
             var tcpPort = DEFAULT_TCP_PORT
             if (args.isNotEmpty()) {
                 if (args[0] == "-h" || args[0] == "--help") {
-                    System.out.println("usage: <launch-command> [-h|--help] [<tcp-port>]")
+                    printUsage()
                     return
                 }
                 try {
                     tcpPort = args[0].toInt()
                 } catch (error: NumberFormatException) {
                     System.out.println("ERROR: invalid TCP port argument")
+                    printUsage()
                     return
                 }
             }
