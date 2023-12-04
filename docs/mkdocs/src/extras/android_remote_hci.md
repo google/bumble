@@ -1,19 +1,19 @@
 ANDROID REMOTE HCI APP
 ======================
 
-This application allows using an android phone's built-in Bluetooth controller with 
+This application allows using an android phone's built-in Bluetooth controller with
 a Bumble host stack running outside the phone (typically a development laptop or desktop).
 The app runs an HCI proxy between a TCP socket on the "outside" and the Bluetooth HCI HAL
-on the "inside". (See [this page](https://source.android.com/docs/core/connect/bluetooth) for a high level 
+on the "inside". (See [this page](https://source.android.com/docs/core/connect/bluetooth) for a high level
 description of the Android Bluetooth HCI HAL).
-The HCI packets received on the TCP socket are forwarded to the phone's controller, and the 
+The HCI packets received on the TCP socket are forwarded to the phone's controller, and the
 packets coming from the controller are forwarded to the TCP socket.
 
 
 Building
 --------
 
-You can build the app by running `./gradlew build` (use `gradlew.bat` on Windows) from the `RemoteHCI` top level directory.
+You can build the app by running `./gradlew build` (use `gradlew.bat` on Windows) from the `extras/android/RemoteHCI` top level directory.
 You can also build with Android Studio: open the `RemoteHCI` project. You can build and/or debug from there.
 
 If the build succeeds, you can find the app APKs (debug and release) at:
@@ -25,9 +25,23 @@ If the build succeeds, you can find the app APKs (debug and release) at:
 Running
 -------
 
+!!! note
+    In the following examples, it is assumed that shell commands are executed while in the
+    app's root directory, `extras/android/RemoteHCI`. If you are in a different directory,
+    adjust the relative paths accordingly.
+
 ### Preconditions
-When the proxy starts (tapping the "Start" button in the app's main activity), it will try to 
-bind to the Bluetooth HAL. This requires disabling SELinux temporarily, and being the only HAL client.
+When the proxy starts (tapping the "Start" button in the app's main activity, or running the proxy
+from an `adb shell` command line), it will try to bind to the Bluetooth HAL.
+This requires that there is no other HAL client, and requires certain privileges.
+For running as a regular app, this requires disabling SELinux temporarily.
+For running as a command-line executable, this just requires a root shell.
+
+#### Root Shell
+!!! tip "Restart `adb` as root"
+    ```bash
+    $ adb root
+    ```
 
 #### Disabling SELinux
 Binding to the Bluetooth HCI HAL requires certain SELinux permissions that can't simply be changed
@@ -56,8 +70,8 @@ development phone).
     This state will also reset to the normal SELinux enforcement when you reboot.
 
 #### Stopping the bluetooth process
-Since the Bluetooth HAL service can only accept one client, and that in normal conditions 
-that client is the Android's bluetooth stack, it is required to first shut down the 
+Since the Bluetooth HAL service can only accept one client, and that in normal conditions
+that client is the Android's bluetooth stack, it is required to first shut down the
 Android bluetooth stack process.
 
 !!! tip "Checking if the Bluetooth process is running"
@@ -79,7 +93,33 @@ Airplane Mode, then rebooting. The bluetooth process should, in theory, not rest
     $ adb shell cmd bluetooth_manager disable
     ```
 
-### Starting the app
+### Running as a command line app
+
+You push the built APK to a temporary location on the phone's filesystem, then launch the command
+line executable with an `adb shell` command.
+
+!!! tip "Pushing the executable"
+    ```bash
+    $ adb push app/build/outputs/apk/release/app-release-unsigned.apk /data/local/tmp/remotehci.apk
+    ```
+    Do this every time you rebuild. Alternatively, you can push the `debug` APK instead:
+    ```bash
+    $ adb push app/build/outputs/apk/debug/app-debug.apk /data/local/tmp/remotehci.apk
+    ```
+
+!!! tip "Start the proxy from the command line"
+    ```bash
+    adb shell "CLASSPATH=/data/local/tmp/remotehci.apk app_process /system/bin com.github.google.bumble.remotehci.CommandLineInterface"
+    ```
+    This will run the proxy, listening on the default TCP port.
+    If you want a different port, pass it as a command line parameter
+
+!!! tip "Start the proxy from the command line with a specific TCP port"
+    ```bash
+    adb shell "CLASSPATH=/data/local/tmp/remotehci.apk app_process /system/bin com.github.google.bumble.remotehci.CommandLineInterface 12345"
+    ```
+
+### Running as a normal app
 You can start the app from the Android launcher, from Android Studio, or with `adb`
 
 #### Launching from the launcher
@@ -103,11 +143,11 @@ automatically start the proxy, and/or set the port number.
 
 #### Selecting a TCP port
 The RemoteHCI app's main activity has a "TCP Port" setting where you can change the port on
-which the proxy is accepting connections. If the default value isn't suitable, you can 
+which the proxy is accepting connections. If the default value isn't suitable, you can
 change it there (you can also use the special value 0 to let the OS assign a port number for you).
 
 ### Connecting to the proxy
-To connect the Bumble stack to the proxy, you need to be able to reach the phone's network 
+To connect the Bumble stack to the proxy, you need to be able to reach the phone's network
 stack. This can be done over the phone's WiFi connection, or, alternatively, using an `adb`
 TCP forward (which should be faster than over WiFi).
 
@@ -116,7 +156,7 @@ TCP forward (which should be faster than over WiFi).
     ```bash
     $ adb forward tcp:<outside-port> tcp:<inside-port>
     ```
-    Where ``<outside-port>`` is the port number for a listening socket on your laptop or 
+    Where ``<outside-port>`` is the port number for a listening socket on your laptop or
     desktop machine, and <inside-port> is the TCP port selected in the app's user interface.
     Those two ports may be the same, of course.
     For example, with the default TCP port 9993:
@@ -125,7 +165,7 @@ TCP forward (which should be faster than over WiFi).
     ```
 
 Once you've ensured that you can reach the proxy's TCP port on the phone, either directly or
-via an `adb` forward, you can then use it as a Bumble transport, using the transport name: 
+via an `adb` forward, you can then use it as a Bumble transport, using the transport name:
 ``tcp-client:<host>:<port>`` syntax.
 
 !!! example "Connecting a Bumble client"
