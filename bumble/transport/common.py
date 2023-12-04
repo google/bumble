@@ -42,6 +42,7 @@ HCI_PACKET_INFO: Dict[int, Tuple[int, int, str]] = {
     hci.HCI_ACL_DATA_PACKET: (2, 2, 'H'),
     hci.HCI_SYNCHRONOUS_DATA_PACKET: (1, 2, 'B'),
     hci.HCI_EVENT_PACKET: (1, 1, 'B'),
+    hci.HCI_ISO_DATA_PACKET: (2, 2, 'H'),
 }
 
 

@@ -2008,6 +2008,9 @@ class HCI_Packet:
         if packet_type == HCI_EVENT_PACKET:
             return HCI_Event.from_bytes(packet)
 
+        if packet_type == HCI_ISO_DATA_PACKET:
+            return HCI_IsoDataPacket.from_bytes(packet)
+
         return HCI_CustomPacket(packet)
 
     def __init__(self, name):
@@ -6120,7 +6123,7 @@ class HCI_IsoDataPacket(HCI_Packet):
         if ts_flag:
             if not should_include_sdu_info:
                 logger.warn(f'Timestamp included when pb_flag={bin(pb_flag)}')
-            time_stamp, _ = struct.unpack_from('<I', packet, pos)
+            time_stamp, *_ = struct.unpack_from('<I', packet, pos)
             pos += 4
 
         if should_include_sdu_info:
@@ -6187,7 +6190,7 @@ class HCI_IsoDataPacket(HCI_Packet):
                 self.packet_sequence_number,
                 self.iso_sdu_length | self.packet_status_flag << 14,
             ]
-        return struct.pack(fmt, args) + self.iso_sdu_fragment
+        return struct.pack(fmt, *args) + self.iso_sdu_fragment
 
     def __str__(self) -> str:
         return (
