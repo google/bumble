@@ -8,7 +8,11 @@ class CommandLineInterface {
             System.out.println("Starting proxy")
 
             var tcpPort = DEFAULT_TCP_PORT
-            if (args.size >= 1) {
+            if (args.isNotEmpty()) {
+                if (args[0] == "-h" || args[0] == "--help") {
+                    System.out.println("usage: <launch-command> [-h|--help] [<tcp-port>]")
+                    return
+                }
                 try {
                     tcpPort = args[0].toInt()
                 } catch (error: NumberFormatException) {
