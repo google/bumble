@@ -22,7 +22,7 @@ import enum
 import struct
 
 from pyee import EventEmitter
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Callable, TYPE_CHECKING
 
 from bumble import l2cap, device
 from bumble.colors import color
@@ -193,8 +193,9 @@ class SendHandshakeMessage(Message):
 
 # -----------------------------------------------------------------------------
 class HID(EventEmitter):
-    l2cap_ctrl_channel: Optional[l2cap.ClassicChannel]
-    l2cap_intr_channel: Optional[l2cap.ClassicChannel]
+    l2cap_ctrl_channel: Optional[l2cap.ClassicChannel] = None
+    l2cap_intr_channel: Optional[l2cap.ClassicChannel] = None
+    connection: Optional[device.Connection] = None
 
     class Role(enum.IntEnum):
         HOST = 0x00
@@ -203,18 +204,28 @@ class HID(EventEmitter):
     def __init__(self, device: device.Device, role: Role) -> None:
         super().__init__()
         self.device = device
-        self.connection = None
-        self.remote_device_bd_address = None
         self.role = role
 
-        self.l2cap_ctrl_channel = None
-        self.l2cap_intr_channel = None
-
         # Register ourselves with the L2CAP channel manager
-        device.register_l2cap_server(HID_CONTROL_PSM, self.on_connection)
-        device.register_l2cap_server(HID_INTERRUPT_PSM, self.on_connection)
+        device.register_l2cap_server(HID_CONTROL_PSM, self.on_l2cap_connection)
+        device.register_l2cap_server(HID_INTERRUPT_PSM, self.on_l2cap_connection)
 
         device.on('connection', self.on_device_connection)
+
+    def handle_get_report(self, pdu: bytes):
+        return
+
+    def handle_set_report(self, pdu: bytes):
+        return
+
+    def handle_get_protocol(self, pdu: bytes):
+        return
+
+    def handle_set_protocol(self, pdu: bytes):
+        return
+
+    def send_handshake_message(self, result_code: int):
+        return
 
     async def connect_control_channel(self) -> None:
         # Create a new L2CAP connection - control channel
@@ -259,19 +270,16 @@ class HID(EventEmitter):
         await channel.disconnect()
 
     def on_device_connection(self, connection: device.Connection) -> None:
-        self.connection = connection  #  type: ignore[assignment]
-        self.remote_device_bd_address = (
-            connection.peer_address  #  type: ignore[assignment]
-        )
-        connection.on('disconnection', self.on_disconnection)
+        self.connection = connection
+        connection.on('disconnection', self.on_device_disconnection)
 
-    def on_connection(self, l2cap_channel: l2cap.ClassicChannel) -> None:
+    def on_device_disconnection(self, reason: int) -> None:
+        self.connection = None
+
+    def on_l2cap_connection(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         logger.debug(f'+++ New L2CAP connection: {l2cap_channel}')
         l2cap_channel.on('open', lambda: self.on_l2cap_channel_open(l2cap_channel))
         l2cap_channel.on('close', lambda: self.on_l2cap_channel_close(l2cap_channel))
-
-    def on_disconnection(self, reason: int) -> None:
-        self.connection = None
 
     def on_l2cap_channel_open(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         if l2cap_channel.psm == HID_CONTROL_PSM:
@@ -299,16 +307,16 @@ class HID(EventEmitter):
             self.emit('handshake', Message.Handshake(param))
         elif message_type == Message.MessageType.GET_REPORT:
             logger.debug('<<< HID GET REPORT')
-            self.handle_get_report(pdu)  #  type: ignore[attr-defined]
+            self.handle_get_report(pdu)
         elif message_type == Message.MessageType.SET_REPORT:
             logger.debug('<<< HID SET REPORT')
-            self.handle_set_report(pdu)  #  type: ignore[attr-defined]
+            self.handle_set_report(pdu)
         elif message_type == Message.MessageType.GET_PROTOCOL:
             logger.debug('<<< HID GET PROTOCOL')
-            self.handle_get_protocol(pdu)  #  type: ignore[attr-defined]
+            self.handle_get_protocol(pdu)
         elif message_type == Message.MessageType.SET_PROTOCOL:
             logger.debug('<<< HID SET PROTOCOL')
-            self.handle_set_protocol(pdu)  #  type: ignore[attr-defined]
+            self.handle_set_protocol(pdu)
         elif message_type == Message.MessageType.DATA:
             logger.debug('<<< HID CONTROL DATA')
             self.emit('control_data', pdu)
@@ -326,9 +334,7 @@ class HID(EventEmitter):
                 logger.debug('<<< HID CONTROL OPERATION UNSUPPORTED')
         else:
             logger.debug('<<< HID MESSAGE TYPE UNSUPPORTED')
-            self.send_handshake_message(  #  type: ignore[attr-defined]
-                Message.Handshake.ERR_UNSUPPORTED_REQUEST
-            )
+            self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
     def on_intr_pdu(self, pdu: bytes) -> None:
         logger.debug(f'<<< HID INTERRUPT PDU: {pdu.hex()}')
@@ -379,10 +385,10 @@ class Device(HID):
 
     def __init__(self, device: device.Device) -> None:
         super().__init__(device, HID.Role.DEVICE)
-        self.get_report_cb = None
-        self.set_report_cb = None
-        self.get_protocol_cb = None
-        self.set_protocol_cb = None
+        get_report_cb: Optional[Callable[[int, int, int], None]] = None
+        set_report_cb: Optional[Callable[[int, int, int, bytes], None]] = None
+        get_protocol_cb: Optional[Callable[[], None]] = None
+        set_protocol_cb: Optional[Callable[[int, bytes], None]] = None
 
     def send_handshake_message(self, result_code: int) -> None:
         msg = SendHandshakeMessage(result_code)
@@ -418,7 +424,7 @@ class Device(HID):
             data = bytearray()
             data.append(report_id)
             data.extend(ret.data)
-            if len(data) < self.l2cap_ctrl_channel.mtu:
+            if len(data) < self.l2cap_ctrl_channel.mtu:  # type: ignore[union-attr]
                 self.send_control_data(report_type=report_type, data=data)
             else:
                 self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
@@ -441,10 +447,8 @@ class Device(HID):
         report_type = pdu[0] & 0x03
         report_id = pdu[1]
         report_data = pdu[2:]
-        report_size = len(pdu[1:])
-        ret = self.set_report_cb(
-            report_id, report_type, report_size, report_data
-        )  #  type: ignore
+        report_size = len(report_data) + 1
+        ret = self.set_report_cb(report_id, report_type, report_size, report_data)
         if ret.status == self.GetSetReturn.SUCCESS:
             self.send_handshake_message(Message.Handshake.SUCCESSFUL)
         elif ret.status == self.GetSetReturn.ERR_INVALID_PARAMETER:

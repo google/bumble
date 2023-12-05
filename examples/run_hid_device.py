@@ -428,63 +428,62 @@ class DeviceData:
 deviceData = DeviceData()
 
 # -----------------------------------------------------------------------------
-async def keyboard_device(hid_device, command):
+async def keyboard_device(hid_device):
 
-    if command == 'web':
-        # Start a Websocket server to receive events from a web page
-        async def serve(websocket, _path):
-            global deviceData
-            while True:
-                try:
-                    message = await websocket.recv()
-                    print('Received: ', str(message))
-                    parsed = json.loads(message)
-                    message_type = parsed['type']
-                    if message_type == 'keydown':
-                        # Only deal with keys a to z for now
-                        key = parsed['key']
-                        if len(key) == 1:
-                            code = ord(key)
-                            if ord('a') <= code <= ord('z'):
-                                hid_code = 0x04 + code - ord('a')
-                                deviceData.keyboardData = bytearray(
-                                    [
-                                        0x01,
-                                        0x00,
-                                        0x00,
-                                        hid_code,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                        0x00,
-                                    ]
-                                )
-                                hid_device.send_data(deviceData.keyboardData)
-                    elif message_type == 'keyup':
-                        deviceData.keyboardData = bytearray(
-                            [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-                        )
-                        hid_device.send_data(deviceData.keyboardData)
-                    elif message_type == "mousemove":
-                        # logical min and max values
-                        log_min = -127
-                        log_max = 127
-                        x = parsed['x']
-                        y = parsed['y']
-                        # limiting x and y values within logical max and min range
-                        x = max(log_min, min(log_max, x))
-                        y = max(log_min, min(log_max, y))
-                        x_cord = x.to_bytes(signed=True)
-                        y_cord = y.to_bytes(signed=True)
-                        deviceData.mouseData = bytearray([0x02, 0x00]) + x_cord + y_cord
-                        hid_device.send_data(deviceData.mouseData)
-                except websockets.exceptions.ConnectionClosedOK:
-                    pass
+    # Start a Websocket server to receive events from a web page
+    async def serve(websocket, _path):
+        global deviceData
+        while True:
+            try:
+                message = await websocket.recv()
+                print('Received: ', str(message))
+                parsed = json.loads(message)
+                message_type = parsed['type']
+                if message_type == 'keydown':
+                    # Only deal with keys a to z for now
+                    key = parsed['key']
+                    if len(key) == 1:
+                        code = ord(key)
+                        if ord('a') <= code <= ord('z'):
+                            hid_code = 0x04 + code - ord('a')
+                            deviceData.keyboardData = bytearray(
+                                [
+                                    0x01,
+                                    0x00,
+                                    0x00,
+                                    hid_code,
+                                    0x00,
+                                    0x00,
+                                    0x00,
+                                    0x00,
+                                    0x00,
+                                ]
+                            )
+                            hid_device.send_data(deviceData.keyboardData)
+                elif message_type == 'keyup':
+                    deviceData.keyboardData = bytearray(
+                        [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+                    )
+                    hid_device.send_data(deviceData.keyboardData)
+                elif message_type == "mousemove":
+                    # logical min and max values
+                    log_min = -127
+                    log_max = 127
+                    x = parsed['x']
+                    y = parsed['y']
+                    # limiting x and y values within logical max and min range
+                    x = max(log_min, min(log_max, x))
+                    y = max(log_min, min(log_max, y))
+                    x_cord = x.to_bytes(signed=True)
+                    y_cord = y.to_bytes(signed=True)
+                    deviceData.mouseData = bytearray([0x02, 0x00]) + x_cord + y_cord
+                    hid_device.send_data(deviceData.mouseData)
+            except websockets.exceptions.ConnectionClosedOK:
+                pass
 
-        # pylint: disable-next=no-member
-        await websockets.serve(serve, 'localhost', 8989)
-        await asyncio.get_event_loop().create_future()
+    # pylint: disable-next=no-member
+    await websockets.serve(serve, 'localhost', 8989)
+    await asyncio.get_event_loop().create_future()
 
 
 # -----------------------------------------------------------------------------
@@ -511,10 +510,10 @@ async def main():
         if connection is not None:
             await connection.disconnect()
 
-    def on_hid_data_cb(pdu):
+    def on_hid_data_cb(pdu: bytes):
         print(f'Received Data, PDU: {pdu.hex()}')
 
-    def on_get_report_cb(report_id, report_type, buffer_size):
+    def on_get_report_cb(report_id: int, report_type: int, buffer_size: int):
         retValue = hid_device.GetSetStatus()
         print(
             "GET_REPORT report_id: "
@@ -552,7 +551,9 @@ async def main():
 
         return retValue
 
-    def on_set_report_cb(report_id, report_type, report_size, data):
+    def on_set_report_cb(
+        report_id: int, report_type: int, report_size: int, data: bytes
+    ):
         retValue = hid_device.GetSetStatus()
         print(
             "SET_REPORT report_id: "
@@ -586,7 +587,7 @@ async def main():
         retValue.status = hid_device.GetSetReturn.SUCCESS
         return retValue
 
-    def on_set_protocol_cb(protocol):
+    def on_set_protocol_cb(protocol: int):
         retValue = hid_device.GetSetStatus()
         # We do not support SET_PROTOCOL.
         print("SET_PROTOCOL report_id: " + str(protocol))
@@ -731,24 +732,14 @@ async def main():
                 else:
                     print("Invalid option selected.")
 
-        if len(sys.argv) > 3:
+        if (len(sys.argv) > 3) and (command == 'test-mode'):
+            # Test mode for PTS/Unit testing
             command = sys.argv[3]
-
-            if command == 'test-mode':
-                # Enabling menu for testing
-                await menu()
-
-            elif command == 'web':
-                # Run as a keyboard and mouse device
-                await keyboard_device(hid_device, command)
-
-            else:
-                print("Command incorrect. Switching to default: web")
-                await keyboard_device(hid_device, 'web')
-
+            await menu()
         else:
             # default option is using keyboard.html (web)
-            await keyboard_device(hid_device, 'web')
+            print("Command incorrect. Switching to default")
+            await keyboard_device(hid_device)
 
         await hci_source.wait_for_termination()
 
