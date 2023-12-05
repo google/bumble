@@ -25,7 +25,7 @@ import pathlib
 import platform
 from typing import Dict, Iterable, Optional, Type, TYPE_CHECKING
 
-from . import rtk
+from . import rtk, intel
 from .common import Driver
 
 if TYPE_CHECKING:
@@ -45,7 +45,7 @@ async def get_driver_for_host(host: Host) -> Optional[Driver]:
     found.
     If a "driver" HCI metadata entry is present, only that driver class will be probed.
     """
-    driver_classes: Dict[str, Type[Driver]] = {"rtk": rtk.Driver}
+    driver_classes: Dict[str, Type[Driver]] = {"rtk": rtk.Driver, "intel": intel.Driver}
     probe_list: Iterable[str]
     if driver_name := host.hci_metadata.get("driver"):
         # Only probe a single driver
@@ -62,6 +62,10 @@ async def get_driver_for_host(host: Host) -> Optional[Driver]:
                 return driver
         else:
             logger.debug(f"Skipping unknown driver class: {driver_name}")
+
+    if driver := await intel.Driver.for_host(host):
+        logger.debug("Instantiated Intel driver")
+        return driver
 
     return None
 
