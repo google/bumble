@@ -32,6 +32,7 @@ from bumble.hci import (
     HCI_CustomPacket,
     HCI_Disconnect_Command,
     HCI_Event,
+    HCI_IsoDataPacket,
     HCI_LE_Add_Device_To_Filter_Accept_List_Command,
     HCI_LE_Advertising_Report_Event,
     HCI_LE_Channel_Selection_Algorithm_Event,
@@ -487,6 +488,29 @@ def test_custom():
 
 
 # -----------------------------------------------------------------------------
+def test_iso_data_packet():
+    data = bytes.fromhex(
+        '05616044002ac9f0a193003c00e83b477b00eba8d41dc018bf1a980f0290afe1e7c37652096697'
+        '52b6a535a8df61e22931ef5a36281bc77ed6a3206d984bcdabee6be831c699cb50e2'
+    )
+    packet = HCI_IsoDataPacket.from_bytes(data)
+    assert packet.connection_handle == 0x0061
+    assert packet.packet_status_flag == 0
+    assert packet.pb_flag == 0x02
+    assert packet.ts_flag == 0x01
+    assert packet.data_total_length == 68
+    assert packet.time_stamp == 2716911914
+    assert packet.packet_sequence_number == 147
+    assert packet.iso_sdu_length == 60
+    assert packet.iso_sdu_fragment == bytes.fromhex(
+        'e83b477b00eba8d41dc018bf1a980f0290afe1e7c3765209669752b6a535a8df61e22931ef5a3'
+        '6281bc77ed6a3206d984bcdabee6be831c699cb50e2'
+    )
+
+    assert packet.to_bytes() == data
+
+
+# -----------------------------------------------------------------------------
 def run_test_events():
     test_HCI_Event()
     test_HCI_LE_Connection_Complete_Event()
@@ -524,6 +548,7 @@ def run_test_commands():
     test_HCI_LE_Set_Default_PHY_Command()
     test_HCI_LE_Set_Extended_Scan_Parameters_Command()
     test_HCI_LE_Set_Extended_Advertising_Enable_Command()
+    test_HCI_LE_Setup_ISO_Data_Path_Command()
 
 
 # -----------------------------------------------------------------------------
@@ -532,3 +557,4 @@ if __name__ == '__main__':
     run_test_commands()
     test_address()
     test_custom()
+    test_iso_data_packet()
