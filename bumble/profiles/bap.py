@@ -765,6 +765,8 @@ class AseStateMachine(gatt.Characteristic):
         DISABLING        = 0x05
         RELEASING        = 0x06
 
+    cis_link: Optional[device.CisLink] = None
+
     # Additional parameters in CODEC_CONFIGURED State
     preferred_framing = 0  # Unframed PDU supported
     preferred_phy = 0
@@ -834,6 +836,7 @@ class AseStateMachine(gatt.Characteristic):
     def on_cis_establishment(self, cis_link: device.CisLink) -> None:
         if cis_link.cis_id == self.cis_id and self.state == self.State.ENABLING:
             self.state = self.State.STREAMING
+            self.cis_link = cis_link
 
             async def post_cis_established():
                 await self.service.device.send_command(
@@ -979,6 +982,18 @@ class AseStateMachine(gatt.Characteristic):
                 AseReasonCode.NONE,
             )
         self.state = self.State.RELEASING
+
+        async def remove_cis_async():
+            await self.service.device.send_command(
+                hci.HCI_LE_Remove_ISO_Data_Path_Command(
+                    connection_handle=self.cis_link.handle,
+                    data_path_direction=self.role,
+                )
+            )
+            self.state = self.State.CODEC_CONFIGURED
+            await self.service.device.notify_subscribers(self, self.value)
+
+        self.service.device.abort_on('flush', remove_cis_async())
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
 
     @property
