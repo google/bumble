@@ -34,6 +34,11 @@ from bumble import gatt_client
 
 
 # -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logger = logging.getLogger(__name__)
+
+# -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
 
@@ -976,7 +981,7 @@ class AseStateMachine(gatt.Characteristic):
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
 
     def on_release(self) -> Tuple[AseResponseCode, AseReasonCode]:
-        if self.state != AseStateMachine.State.IDLE:
+        if self.state == AseStateMachine.State.IDLE:
             return (
                 AseResponseCode.INVALID_ASE_STATE_MACHINE_TRANSITION,
                 AseReasonCode.NONE,
@@ -990,7 +995,7 @@ class AseStateMachine(gatt.Characteristic):
                     data_path_direction=self.role,
                 )
             )
-            self.state = self.State.CODEC_CONFIGURED
+            self.state = self.State.IDLE
             await self.service.device.notify_subscribers(self, self.value)
 
         self.service.device.abort_on('flush', remove_cis_async())
@@ -1101,7 +1106,7 @@ class AudioStreamControlService(gatt.TemplateService):
     def on_write_ase_control_point(self, connection, data):
         operation = ASE_Operation.from_bytes(data)
         responses = []
-        logging.debug(f'*** ASCS Write {operation} ***')
+        logger.debug(f'*** ASCS Write {operation} ***')
 
         if operation.op_code == ASE_Operation.Opcode.CONFIG_CODEC:
             for ase_id, *args in zip(
