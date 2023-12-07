@@ -440,11 +440,15 @@ class AdvertisingType(IntEnum):
 # -----------------------------------------------------------------------------
 @dataclass
 class LegacyAdvertiser:
+    device: Device
     advertising_type: AdvertisingType
     own_address_type: OwnAddressType
     auto_restart: bool
     advertising_data: Optional[bytes]
     scan_response_data: Optional[bytes]
+
+    async def stop(self) -> None:
+        await self.device.stop_legacy_advertising()
 
 
 # -----------------------------------------------------------------------------
@@ -1707,6 +1711,7 @@ class Device(CompositeEventEmitter):
         )
 
         self.legacy_advertiser = LegacyAdvertiser(
+            device=self,
             advertising_type=advertising_type,
             own_address_type=own_address_type,
             auto_restart=auto_restart,
@@ -1763,7 +1768,7 @@ class Device(CompositeEventEmitter):
             DEVICE_MIN_EXTENDED_ADVERTISING_SET_HANDLE,
             DEVICE_MAX_EXTENDED_ADVERTISING_SET_HANDLE + 1,
         ):
-            if i not in self.extended_advertisers.keys():
+            if i not in self.extended_advertisers:
                 adv_handle = i
                 break
 
@@ -3236,7 +3241,8 @@ class Device(CompositeEventEmitter):
                 own_address_type = self.legacy_advertiser.own_address_type
                 # Store advertiser for restarting - it's only required for legacy, since
                 # extended advertisement produces HCI_Advertising_Set_Terminated.
-                advertiser = self.legacy_advertiser
+                if self.legacy_advertiser.auto_restart:
+                    advertiser = self.legacy_advertiser
             else:
                 # For extended advertisement, determining own address type later.
                 own_address_type = OwnAddressType.RANDOM
@@ -3366,6 +3372,8 @@ class Device(CompositeEventEmitter):
                         self.start_legacy_advertising(
                             advertising_type=advertiser.advertising_type,
                             own_address_type=advertiser.own_address_type,
+                            advertising_data=advertiser.advertising_data,
+                            scan_response_data=advertiser.scan_response_data,
                             auto_restart=True,
                         ),
                     )
@@ -3715,7 +3723,8 @@ class Device(CompositeEventEmitter):
             connection = self.lookup_connection(connection_handle)
         if advertiser := self.extended_advertisers.pop(advertising_handle, None):
             if connection:
-                connection.advertiser_after_disconnection = advertiser
+                if advertiser.auto_restart:
+                    connection.advertiser_after_disconnection = advertiser
                 if advertiser.own_address_type in (
                     OwnAddressType.PUBLIC,
                     OwnAddressType.RESOLVABLE_OR_PUBLIC,
