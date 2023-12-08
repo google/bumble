@@ -721,6 +721,14 @@ class Host(AbortableEventEmitter):
     def on_hci_le_extended_advertising_report_event(self, event):
         self.on_hci_le_advertising_report_event(event)
 
+    def on_hci_le_advertising_set_terminated_event(self, event):
+        self.emit(
+            'advertising_set_termination',
+            event.status,
+            event.advertising_handle,
+            event.connection_handle,
+        )
+
     def on_hci_le_cis_request_event(self, event):
         self.emit(
             'cis_request',
