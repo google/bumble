@@ -1075,11 +1075,14 @@ class AudioStreamControlService(gatt.TemplateService):
     ) -> None:
         self.device = device
         self.ase_state_machines = {
-            id: AseStateMachine(role=AudioRole.SINK, ase_id=id, service=self)
-            for id in sink_ase_id
-        } | {
-            id: AseStateMachine(role=AudioRole.SOURCE, ase_id=id, service=self)
-            for id in source_ase_id
+            **{
+                id: AseStateMachine(role=AudioRole.SINK, ase_id=id, service=self)
+                for id in sink_ase_id
+            },
+            **{
+                id: AseStateMachine(role=AudioRole.SOURCE, ase_id=id, service=self)
+                for id in source_ase_id
+            },
         }  # ASE state machines, by ASE ID
 
         for ase in self.ase_state_machines.values():
