@@ -32,6 +32,10 @@ class AppViewModel : ViewModel() {
     private var preferences: SharedPreferences? = null
     var peerBluetoothAddress by mutableStateOf(DEFAULT_PEER_BLUETOOTH_ADDRESS)
     var l2capPsm by mutableStateOf(0)
+    var use2mPhy by mutableStateOf(true)
+    var mtu by mutableStateOf(0)
+    var rxPhy by mutableStateOf(0)
+    var txPhy by mutableStateOf(0)
     var senderPacketCountSlider by mutableFloatStateOf(0.0F)
     var senderPacketSizeSlider by mutableFloatStateOf(0.0F)
     var senderPacketCount by mutableIntStateOf(DEFAULT_SENDER_PACKET_COUNT)
@@ -116,7 +120,7 @@ class AppViewModel : ViewModel() {
     }
 
     fun updateSenderPacketSizeSlider() {
-        if (senderPacketSize <= 1) {
+        if (senderPacketSize <= 16) {
             senderPacketSizeSlider = 0.0F
         } else if (senderPacketSize <= 256) {
             senderPacketSizeSlider = 0.02F
@@ -138,7 +142,7 @@ class AppViewModel : ViewModel() {
 
     fun updateSenderPacketSize() {
         if (senderPacketSizeSlider < 0.1F) {
-            senderPacketSize = 1
+            senderPacketSize = 16
         } else if (senderPacketSizeSlider < 0.3F) {
             senderPacketSize = 256
         } else if (senderPacketSizeSlider < 0.5F) {

@@ -30,7 +30,7 @@ private val Log = Logger.getLogger("btbench.l2cap-server")
 class L2capServer(private val viewModel: AppViewModel, private val bluetoothAdapter: BluetoothAdapter) {
     @SuppressLint("MissingPermission")
     fun run() {
-        // Advertise to that the peer can find us and connect.
+        // Advertise so that the peer can find us and connect.
         val callback = object: AdvertiseCallback() {
             override fun onStartFailure(errorCode: Int) {
                 Log.warning("failed to start advertising: $errorCode")
@@ -50,13 +50,12 @@ class L2capServer(private val viewModel: AppViewModel, private val bluetoothAdap
         val advertiseData = AdvertiseData.Builder().build()
         val scanData = AdvertiseData.Builder().setIncludeDeviceName(true).build()
         val advertiser = bluetoothAdapter.bluetoothLeAdvertiser
-        advertiser.startAdvertising(advertiseSettings, advertiseData, scanData, callback)
 
         val serverSocket = bluetoothAdapter.listenUsingInsecureL2capChannel()
         viewModel.l2capPsm = serverSocket.psm
         Log.info("psm = $serverSocket.psm")
 
         val server = SocketServer(viewModel, serverSocket)
-        server.run({ advertiser.stopAdvertising(callback) })
+        server.run({ advertiser.stopAdvertising(callback) }, { advertiser.startAdvertising(advertiseSettings, advertiseData, scanData, callback) })
     }
 }

@@ -22,6 +22,8 @@ import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.socket-client")
 
+private const val DEFAULT_STARTUP_DELAY = 1000
+
 class SocketClient(private val viewModel: AppViewModel, private val socket: BluetoothSocket) {
     @SuppressLint("MissingPermission")
     fun run() {
@@ -55,6 +57,10 @@ class SocketClient(private val viewModel: AppViewModel, private val socket: Blue
             thread {
                 socketDataSource.receive()
             }
+
+            Log.info("Startup delay: $DEFAULT_STARTUP_DELAY")
+            Thread.sleep(DEFAULT_STARTUP_DELAY.toLong());
+            Log.info("Starting to send")
 
             sender.run()
             cleanup()

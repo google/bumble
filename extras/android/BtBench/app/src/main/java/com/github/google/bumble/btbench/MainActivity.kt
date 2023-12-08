@@ -26,23 +26,33 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -171,7 +181,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun runL2capClient() {
-        val l2capClient = bluetoothAdapter?.let { L2capClient(appViewModel, it) }
+        val l2capClient = bluetoothAdapter?.let { L2capClient(appViewModel, it, baseContext) }
         l2capClient?.run()
     }
 
@@ -199,9 +209,12 @@ fun MainView(
     runL2capServer: () -> Unit
 ) {
     BTBenchTheme {
-        // A surface container using the 'background' color from the theme
+        val scrollState = rememberScrollState()
         Surface(
-            modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState),
+            color = MaterialTheme.colorScheme.background
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
@@ -212,28 +225,33 @@ fun MainView(
                 )
                 Divider()
                 val keyboardController = LocalSoftwareKeyboardController.current
-                TextField(label = {
-                    Text(text = "Peer Bluetooth Address")
-                },
+                val focusRequester = remember { FocusRequester() }
+                val focusManager = LocalFocusManager.current
+                TextField(
+                    label = {
+                        Text(text = "Peer Bluetooth Address")
+                    },
                     value = appViewModel.peerBluetoothAddress,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                     keyboardOptions = KeyboardOptions.Default.copy(
                         keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done
                     ),
                     onValueChange = {
                         appViewModel.updatePeerBluetoothAddress(it)
                     },
-                    keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() })
+                    keyboardActions = KeyboardActions(onDone = {
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
+                    })
                 )
                 Divider()
                 TextField(label = {
                     Text(text = "L2CAP PSM")
                 },
                     value = appViewModel.l2capPsm.toString(),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                     keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Done
+                        keyboardType = KeyboardType.Number, imeAction = ImeAction.Done
                     ),
                     onValueChange = {
                         if (it.isNotEmpty()) {
@@ -243,7 +261,11 @@ fun MainView(
                             }
                         }
                     },
-                    keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }))
+                    keyboardActions = KeyboardActions(onDone = {
+                        keyboardController?.hide()
+                        focusManager.clearFocus()
+                    })
+                )
                 Divider()
                 Slider(
                     value = appViewModel.senderPacketCountSlider, onValueChange = {
@@ -264,7 +286,19 @@ fun MainView(
                 ActionButton(
                     text = "Become Discoverable", onClick = becomeDiscoverable, true
                 )
-                Row() {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "2M PHY")
+                    Spacer(modifier = Modifier.padding(start = 8.dp))
+                    Switch(
+                        checked = appViewModel.use2mPhy,
+                        onCheckedChange = { appViewModel.use2mPhy = it }
+                    )
+
+                }
+                Row {
                     ActionButton(
                         text = "RFCOMM Client", onClick = runRfcommClient, !appViewModel.running
                     )
@@ -272,7 +306,7 @@ fun MainView(
                         text = "RFCOMM Server", onClick = runRfcommServer, !appViewModel.running
                     )
                 }
-                Row() {
+                Row {
                     ActionButton(
                         text = "L2CAP Client", onClick = runL2capClient, !appViewModel.running
                     )
@@ -281,6 +315,12 @@ fun MainView(
                     )
                 }
                 Divider()
+                Text(
+                    text = if (appViewModel.mtu != 0) "MTU: ${appViewModel.mtu}" else ""
+                )
+                Text(
+                    text = if (appViewModel.rxPhy != 0 || appViewModel.txPhy != 0) "PHY: tx=${appViewModel.txPhy}, rx=${appViewModel.rxPhy}" else ""
+                )
                 Text(
                     text = "Packets Sent: ${appViewModel.packetsSent}"
                 )
