@@ -1209,3 +1209,24 @@ class PublishedAudioCapabilitiesServiceProxy(gatt_client.ProfileServiceProxy):
             gatt.GATT_SOURCE_AUDIO_LOCATION_CHARACTERISTIC
         ):
             self.source_audio_locations = characteristics[0]
+
+
+class AudioStreamControlServiceProxy(gatt_client.ProfileServiceProxy):
+    SERVICE_CLASS = AudioStreamControlService
+
+    sink_ase: List[gatt_client.CharacteristicProxy]
+    source_ase: List[gatt_client.CharacteristicProxy]
+    ase_control_point: gatt_client.CharacteristicProxy
+
+    def __init__(self, service_proxy: gatt_client.ServiceProxy):
+        self.service_proxy = service_proxy
+
+        self.sink_ase = service_proxy.get_characteristics_by_uuid(
+            gatt.GATT_SINK_ASE_CHARACTERISTIC
+        )
+        self.source_ase = service_proxy.get_characteristics_by_uuid(
+            gatt.GATT_SOURCE_ASE_CHARACTERISTIC
+        )
+        self.ase_control_point = service_proxy.get_characteristics_by_uuid(
+            gatt.GATT_ASE_CONTROL_POINT_CHARACTERISTIC
+        )[0]
