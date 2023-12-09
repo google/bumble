@@ -45,7 +45,7 @@ class SocketServer(private val viewModel: AppViewModel, private val serverSocket
                     cleanup()
                     return@thread
                 }
-                Log.info("got connection")
+                Log.info("got connection from ${socket.remoteDevice.address}")
                 onConnected()
 
                 viewModel.aborter = {

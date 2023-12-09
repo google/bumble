@@ -21,6 +21,7 @@ import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.os.Build
 import java.util.logging.Logger
 
 private val Log = Logger.getLogger("btbench.l2cap-client")
@@ -33,7 +34,20 @@ class L2capClient(
     @SuppressLint("MissingPermission")
     fun run() {
         viewModel.running = true
-        val remoteDevice = bluetoothAdapter.getRemoteDevice(viewModel.peerBluetoothAddress)
+        val addressIsPublic = viewModel.peerBluetoothAddress.endsWith("/P")
+        val address = viewModel.peerBluetoothAddress.take(17)
+        val remoteDevice = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            bluetoothAdapter.getRemoteLeDevice(
+                address,
+                if (addressIsPublic) {
+                    BluetoothDevice.ADDRESS_TYPE_PUBLIC
+                } else {
+                    BluetoothDevice.ADDRESS_TYPE_RANDOM
+                }
+            )
+        } else {
+            bluetoothAdapter.getRemoteDevice(address)
+        }
 
         val gatt = remoteDevice.connectGatt(
             context,

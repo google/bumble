@@ -22,7 +22,7 @@ import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.socket-client")
 
-private const val DEFAULT_STARTUP_DELAY = 1000
+private const val DEFAULT_STARTUP_DELAY = 3000
 
 class SocketClient(private val viewModel: AppViewModel, private val socket: BluetoothSocket) {
     @SuppressLint("MissingPermission")

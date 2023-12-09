@@ -68,11 +68,12 @@ class AppViewModel : ViewModel() {
     }
 
     fun updatePeerBluetoothAddress(peerBluetoothAddress: String) {
-        this.peerBluetoothAddress = peerBluetoothAddress
+        val address = peerBluetoothAddress.uppercase()
+        this.peerBluetoothAddress = address
 
         // Save the address to the preferences
         with(preferences!!.edit()) {
-            putString(PEER_BLUETOOTH_ADDRESS_PREF_KEY, peerBluetoothAddress)
+            putString(PEER_BLUETOOTH_ADDRESS_PREF_KEY, address)
             apply()
         }
     }
