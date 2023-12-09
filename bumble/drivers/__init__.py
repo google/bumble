@@ -60,12 +60,23 @@ class Driver(abc.ABC):
 # Functions
 # -----------------------------------------------------------------------------
 async def get_driver_for_host(host):
-    """Probe all known diver classes until one returns a valid instance for a host,
-    or none is found.
+    """Probe diver classes until one returns a valid instance for a host, or none is
+    found.
+    If a "driver" HCI metadata entry is present, only that driver class will be probed.
     """
-    if driver := await rtk.Driver.for_host(host):
-        logger.debug("Instantiated RTK driver")
-        return driver
+    driver_classes = {"rtk": rtk.Driver}
+    if driver_name := host.hci_metadata.get("driver"):
+        # Only probe a single driver
+        probe_list = [driver_name]
+    else:
+        # Probe all drivers
+        probe_list = driver_classes.keys()
+
+    for driver_name in probe_list:
+        logger.debug(f"Probing {driver_name} driver class")
+        if driver := await rtk.Driver.for_host(host):
+            logger.debug(f"Instantiated {driver_name} driver")
+            return driver
 
     return None
 

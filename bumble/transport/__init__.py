@@ -18,6 +18,7 @@
 from contextlib import asynccontextmanager
 import logging
 import os
+from typing import Optional
 
 from .common import Transport, AsyncPipeSink, SnoopingTransport
 from ..snoop import create_snooper
@@ -52,8 +53,16 @@ def _wrap_transport(transport: Transport) -> Transport:
 async def open_transport(name: str) -> Transport:
     """
     Open a transport by name.
-    The name must be <type>:<parameters>
-    Where <parameters> depend on the type (and may be empty for some types).
+    The name must be <type>:<metadata><parameters>
+    Where <parameters> depend on the type (and may be empty for some types), and
+    <metadata> is either omitted, or a ,-separated list of <key>=<value> pairs,
+    enclosed in [].
+    If there are not metadata or parameter, the : after the <type> may be omitted.
+    Examples:
+      * usb:0
+      * usb:[driver=rtk]0
+      * android-netsim
+
     The supported types are:
       * serial
       * udp
@@ -71,15 +80,34 @@ async def open_transport(name: str) -> Transport:
       * android-netsim
     """
 
-    return _wrap_transport(await _open_transport(name))
+    scheme, *tail = name.split(':', 1)
+    spec = tail[0] if tail else None
+    if spec:
+        # Metadata may precede the spec
+        if spec.startswith('['):
+            metadata_str, *tail = spec[1:].split(']')
+            spec = tail[0] if tail else None
+            metadata = dict([entry.split('=') for entry in metadata_str.split(',')])
+        else:
+            metadata = None
+
+    transport = await _open_transport(scheme, spec)
+    if metadata:
+        transport.source.metadata = {  # type: ignore[attr-defined]
+            **metadata,
+            **getattr(transport.source, 'metadata', {}),
+        }
+        # pylint: disable=line-too-long
+        logger.debug(f'HCI metadata: {transport.source.metadata}')  # type: ignore[attr-defined]
+
+    return _wrap_transport(transport)
 
 
 # -----------------------------------------------------------------------------
-async def _open_transport(name: str) -> Transport:
+async def _open_transport(scheme: str, spec: Optional[str]) -> Transport:
     # pylint: disable=import-outside-toplevel
     # pylint: disable=too-many-return-statements
 
-    scheme, *spec = name.split(':', 1)
     if scheme == 'serial' and spec:
         from .serial import open_serial_transport
 
