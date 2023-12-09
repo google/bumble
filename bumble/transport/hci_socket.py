@@ -59,10 +59,7 @@ async def open_hci_socket_transport(spec: Optional[str]) -> Transport:
         ) from error
 
     # Compute the adapter index
-    if spec is None:
-        adapter_index = 0
-    else:
-        adapter_index = int(spec)
+    adapter_index = int(spec) if spec else 0
 
     # Bind the socket
     # NOTE: since Python doesn't support binding with the required address format (yet),
