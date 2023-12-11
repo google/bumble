@@ -285,8 +285,9 @@ class HostService(HostServicer):
             raise NotImplementedError(
                 "TODO: add support for extended advertising in Bumble"
             )
-        if request.interval:
-            raise NotImplementedError("TODO: add support for `request.interval`")
+        if advertising_interval := request.interval:
+            self.device.config.advertising_interval_min = advertising_interval
+            self.device.config.advertising_interval_max = advertising_interval
         if request.interval_range:
             raise NotImplementedError("TODO: add support for `request.interval_range`")
         if request.primary_phy:
