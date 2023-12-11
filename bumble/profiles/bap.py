@@ -807,7 +807,7 @@ class AseStateMachine(gatt.Characteristic):
     ) -> None:
         self.service = service
         self.ase_id = ase_id
-        self.state = AseStateMachine.State.IDLE
+        self._state = AseStateMachine.State.IDLE
         self.role = role
 
         uuid = (
@@ -1002,6 +1002,15 @@ class AseStateMachine(gatt.Characteristic):
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
 
     @property
+    def state(self) -> State:
+        return self._state
+
+    @state.setter
+    def state(self, new_state: State) -> None:
+        logger.debug(f'{self} state change -> {colors.color(new_state.name, "cyan")}')
+        self._state = new_state
+
+    @property
     def value(self):
         '''Returns ASE_ID, ASE_STATE, and ASE Additional Parameters.'''
 
@@ -1060,6 +1069,12 @@ class AseStateMachine(gatt.Characteristic):
     def on_read(self, _: device.Connection) -> bytes:
         return self.value
 
+    def __str__(self) -> str:
+        return (
+            f'AseStateMachine(id={self.ase_id}, role={self.role.name} '
+            f'state={self._state.name})'
+        )
+
 
 class AudioStreamControlService(gatt.TemplateService):
     UUID = gatt.GATT_AUDIO_STREAM_CONTROL_SERVICE
@@ -1084,9 +1099,6 @@ class AudioStreamControlService(gatt.TemplateService):
                 for id in source_ase_id
             },
         }  # ASE state machines, by ASE ID
-
-        for ase in self.ase_state_machines.values():
-            print(ase.ase_id)
 
         self.ase_control_point = gatt.Characteristic(
             uuid=gatt.GATT_ASE_CONTROL_POINT_CHARACTERISTIC,
