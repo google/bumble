@@ -30,6 +30,6 @@ class RfcommServer(private val viewModel: AppViewModel, val bluetoothAdapter: Bl
         )
 
         val server = SocketServer(viewModel, serverSocket)
-        server.run({})
+        server.run({}, {})
     }
 }
