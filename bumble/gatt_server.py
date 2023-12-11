@@ -961,7 +961,7 @@ class Server(EventEmitter):
         try:
             attribute.write_value(connection, request.attribute_value)
         except Exception as error:
-            logger.warning(f'!!! ignoring exception: {error}')
+            logger.exception(f'!!! ignoring exception: {error}')
 
     def on_att_handle_value_confirmation(self, connection, _confirmation):
         '''

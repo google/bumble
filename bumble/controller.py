@@ -1263,3 +1263,15 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.74 LE Read Transmit Power Command
         '''
         return struct.pack('<BBB', HCI_SUCCESS, 0, 0)
+
+    def on_hci_le_setup_iso_data_path_command(self, command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.109 LE Setup ISO Data Path Command
+        '''
+        return struct.pack('<BH', HCI_SUCCESS, command.connection_handle)
+
+    def on_hci_le_remove_iso_data_path_command(self, command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.110 LE Remove ISO Data Path Command
+        '''
+        return struct.pack('<BH', HCI_SUCCESS, command.connection_handle)

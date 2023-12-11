@@ -19,12 +19,14 @@ import asyncio
 import logging
 import sys
 import os
+import struct
 from bumble.core import AdvertisingData
-from bumble.device import Device
+from bumble.device import Device, CisLink
 from bumble.hci import (
     CodecID,
     CodingFormat,
     OwnAddressType,
+    HCI_IsoDataPacket,
     HCI_LE_Set_Extended_Advertising_Parameters_Command,
 )
 from bumble.profiles.bap import (
@@ -35,6 +37,7 @@ from bumble.profiles.bap import (
     SupportedFrameDuration,
     PacRecord,
     PublishedAudioCapabilitiesService,
+    AudioStreamControlService,
 )
 
 from bumble.transport import open_transport_or_link
@@ -103,6 +106,8 @@ async def main() -> None:
             )
         )
 
+        device.add_service(AudioStreamControlService(device, sink_ase_id=[1, 2]))
+
         advertising_data = bytes(
             AdvertisingData(
                 [
@@ -111,12 +116,57 @@ async def main() -> None:
                         bytes('Bumble LE Audio', 'utf-8'),
                     ),
                     (
+                        AdvertisingData.FLAGS,
+                        bytes(
+                            [
+                                AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
+                                | AdvertisingData.BR_EDR_HOST_FLAG
+                                | AdvertisingData.BR_EDR_CONTROLLER_FLAG
+                            ]
+                        ),
+                    ),
+                    (
                         AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
                         bytes(PublishedAudioCapabilitiesService.UUID),
                     ),
                 ]
             )
         )
+        subprocess = await asyncio.create_subprocess_shell(
+            f'dlc3 | ffplay pipe:0',
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        stdin = subprocess.stdin
+        assert stdin
+
+        # Write a fake LC3 header to dlc3.
+        stdin.write(
+            bytes([0x1C, 0xCC])  # Header.
+            + struct.pack(
+                '<HHHHHHI',
+                18,  # Header length.
+                24000 // 100,  # Sampling Rate(/100Hz).
+                0,  # Bitrate(unused).
+                1,  # Channels.
+                10000 // 10,  # Frame duration(/10us).
+                0,  # RFU.
+                0x0FFFFFFF,  # Frame counts.
+            )
+        )
+
+        def on_pdu(pdu: HCI_IsoDataPacket):
+            # LC3 format: |frame_length(2)| + |frame(length)|.
+            if pdu.iso_sdu_length:
+                stdin.write(struct.pack('<H', pdu.iso_sdu_length))
+            stdin.write(pdu.iso_sdu_fragment)
+
+        def on_cis(cis_link: CisLink):
+            cis_link.on('pdu', on_pdu)
+
+        device.once('cis_establishment', on_cis)
 
         await device.start_extended_advertising(
             advertising_properties=(
