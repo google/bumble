@@ -69,7 +69,7 @@ async def open_android_emulator_transport(spec: Optional[str]) -> Transport:
     mode = 'host'
     server_host = 'localhost'
     server_port = '8554'
-    if spec is not None:
+    if spec:
         params = spec.split(',')
         for param in params:
             if param.startswith('mode='):

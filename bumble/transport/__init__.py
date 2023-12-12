@@ -18,6 +18,7 @@
 from contextlib import asynccontextmanager
 import logging
 import os
+from typing import Optional
 
 from .common import Transport, AsyncPipeSink, SnoopingTransport
 from ..snoop import create_snooper
@@ -52,8 +53,16 @@ def _wrap_transport(transport: Transport) -> Transport:
 async def open_transport(name: str) -> Transport:
     """
     Open a transport by name.
-    The name must be <type>:<parameters>
-    Where <parameters> depend on the type (and may be empty for some types).
+    The name must be <type>:<metadata><parameters>
+    Where <parameters> depend on the type (and may be empty for some types), and
+    <metadata> is either omitted, or a ,-separated list of <key>=<value> pairs,
+    enclosed in [].
+    If there are not metadata or parameter, the : after the <type> may be omitted.
+    Examples:
+      * usb:0
+      * usb:[driver=rtk]0
+      * android-netsim
+
     The supported types are:
       * serial
       * udp
@@ -71,87 +80,106 @@ async def open_transport(name: str) -> Transport:
       * android-netsim
     """
 
-    return _wrap_transport(await _open_transport(name))
+    scheme, *tail = name.split(':', 1)
+    spec = tail[0] if tail else None
+    if spec:
+        # Metadata may precede the spec
+        if spec.startswith('['):
+            metadata_str, *tail = spec[1:].split(']')
+            spec = tail[0] if tail else None
+            metadata = dict([entry.split('=') for entry in metadata_str.split(',')])
+        else:
+            metadata = None
+
+    transport = await _open_transport(scheme, spec)
+    if metadata:
+        transport.source.metadata = {  # type: ignore[attr-defined]
+            **metadata,
+            **getattr(transport.source, 'metadata', {}),
+        }
+        # pylint: disable=line-too-long
+        logger.debug(f'HCI metadata: {transport.source.metadata}')  # type: ignore[attr-defined]
+
+    return _wrap_transport(transport)
 
 
 # -----------------------------------------------------------------------------
-async def _open_transport(name: str) -> Transport:
+async def _open_transport(scheme: str, spec: Optional[str]) -> Transport:
     # pylint: disable=import-outside-toplevel
     # pylint: disable=too-many-return-statements
 
-    scheme, *spec = name.split(':', 1)
     if scheme == 'serial' and spec:
         from .serial import open_serial_transport
 
-        return await open_serial_transport(spec[0])
+        return await open_serial_transport(spec)
 
     if scheme == 'udp' and spec:
         from .udp import open_udp_transport
 
-        return await open_udp_transport(spec[0])
+        return await open_udp_transport(spec)
 
     if scheme == 'tcp-client' and spec:
         from .tcp_client import open_tcp_client_transport
 
-        return await open_tcp_client_transport(spec[0])
+        return await open_tcp_client_transport(spec)
 
     if scheme == 'tcp-server' and spec:
         from .tcp_server import open_tcp_server_transport
 
-        return await open_tcp_server_transport(spec[0])
+        return await open_tcp_server_transport(spec)
 
     if scheme == 'ws-client' and spec:
         from .ws_client import open_ws_client_transport
 
-        return await open_ws_client_transport(spec[0])
+        return await open_ws_client_transport(spec)
 
     if scheme == 'ws-server' and spec:
         from .ws_server import open_ws_server_transport
 
-        return await open_ws_server_transport(spec[0])
+        return await open_ws_server_transport(spec)
 
     if scheme == 'pty':
         from .pty import open_pty_transport
 
-        return await open_pty_transport(spec[0] if spec else None)
+        return await open_pty_transport(spec)
 
     if scheme == 'file':
         from .file import open_file_transport
 
         assert spec is not None
-        return await open_file_transport(spec[0])
+        return await open_file_transport(spec)
 
     if scheme == 'vhci':
         from .vhci import open_vhci_transport
 
-        return await open_vhci_transport(spec[0] if spec else None)
+        return await open_vhci_transport(spec)
 
     if scheme == 'hci-socket':
         from .hci_socket import open_hci_socket_transport
 
-        return await open_hci_socket_transport(spec[0] if spec else None)
+        return await open_hci_socket_transport(spec)
 
     if scheme == 'usb':
         from .usb import open_usb_transport
 
-        assert spec is not None
-        return await open_usb_transport(spec[0])
+        assert spec
+        return await open_usb_transport(spec)
 
     if scheme == 'pyusb':
         from .pyusb import open_pyusb_transport
 
-        assert spec is not None
-        return await open_pyusb_transport(spec[0])
+        assert spec
+        return await open_pyusb_transport(spec)
 
     if scheme == 'android-emulator':
         from .android_emulator import open_android_emulator_transport
 
-        return await open_android_emulator_transport(spec[0] if spec else None)
+        return await open_android_emulator_transport(spec)
 
     if scheme == 'android-netsim':
         from .android_netsim import open_android_netsim_transport
 
-        return await open_android_netsim_transport(spec[0] if spec else None)
+        return await open_android_netsim_transport(spec)
 
     raise ValueError('unknown transport scheme')
 

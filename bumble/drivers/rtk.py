@@ -41,7 +41,7 @@ from bumble.hci import (
     HCI_Reset_Command,
     HCI_Read_Local_Version_Information_Command,
 )
-
+from bumble.drivers import common
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -285,7 +285,7 @@ class Firmware:
             )
 
 
-class Driver:
+class Driver(common.Driver):
     @dataclass
     class DriverInfo:
         rom: int
@@ -470,8 +470,12 @@ class Driver:
             logger.debug("USB metadata not found")
             return False
 
-        vendor_id = host.hci_metadata.get("vendor_id", None)
-        product_id = host.hci_metadata.get("product_id", None)
+        if host.hci_metadata.get('driver') == 'rtk':
+            # Forced driver
+            return True
+
+        vendor_id = host.hci_metadata.get("vendor_id")
+        product_id = host.hci_metadata.get("product_id")
         if vendor_id is None or product_id is None:
             logger.debug("USB metadata not sufficient")
             return False
@@ -486,6 +490,9 @@ class Driver:
 
     @classmethod
     async def driver_info_for_host(cls, host):
+        await host.send_command(HCI_Reset_Command(), check_result=True)
+        host.ready = True  # Needed to let the host know the controller is ready.
+
         response = await host.send_command(
             HCI_Read_Local_Version_Information_Command(), check_result=True
         )

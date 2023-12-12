@@ -1,13 +1,16 @@
 REALTEK DRIVER
 ==============
 
-This driver supports loading firmware images and optional config data to 
+This driver supports loading firmware images and optional config data to
 USB dongles with a Realtek chipset.
 A number of USB dongles are supported, but likely not all.
-When using a USB dongle, the USB product ID and manufacturer ID are used
+When using a USB dongle, the USB product ID and vendor ID are used
 to find whether a matching set of firmware image and config data
 is needed for that specific model. If a match exists, the driver will try
 load the firmware image and, if needed, config data.
+Alternatively, the metadata property ``driver=rtk`` may be specified in a transport
+name to force that driver to be used (ex: ``usb:[driver=rtk]0`` instead of just
+``usb:0`` for the first USB device).
 The driver will look for those files by name, in order, in:
 
   * The directory specified by the environment variable `BUMBLE_RTK_FIRMWARE_DIR`

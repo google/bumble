@@ -21,7 +21,7 @@ import struct
 import asyncio
 import logging
 import io
-from typing import ContextManager, Tuple, Optional, Protocol, Dict
+from typing import Any, ContextManager, Tuple, Optional, Protocol, Dict
 
 from bumble import hci
 from bumble.colors import color
