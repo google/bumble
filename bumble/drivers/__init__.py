@@ -19,12 +19,17 @@ like loading firmware after a cold start.
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-import abc
+from __future__ import annotations
 import logging
 import pathlib
 import platform
-from . import rtk
+from typing import Dict, Iterable, Optional, Type, TYPE_CHECKING
 
+from . import rtk
+from .common import Driver
+
+if TYPE_CHECKING:
+    from bumble.host import Host
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -33,38 +38,15 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-# Classes
-# -----------------------------------------------------------------------------
-class Driver(abc.ABC):
-    """Base class for drivers."""
-
-    @staticmethod
-    async def for_host(_host):
-        """Return a driver instance for a host.
-
-        Args:
-            host: Host object for which a driver should be created.
-
-        Returns:
-            A Driver instance if a driver should be instantiated for this host, or
-            None if no driver instance of this class is needed.
-        """
-        return None
-
-    @abc.abstractmethod
-    async def init_controller(self):
-        """Initialize the controller."""
-
-
-# -----------------------------------------------------------------------------
 # Functions
 # -----------------------------------------------------------------------------
-async def get_driver_for_host(host):
+async def get_driver_for_host(host: Host) -> Optional[Driver]:
     """Probe diver classes until one returns a valid instance for a host, or none is
     found.
     If a "driver" HCI metadata entry is present, only that driver class will be probed.
     """
-    driver_classes = {"rtk": rtk.Driver}
+    driver_classes: Dict[str, Type[Driver]] = {"rtk": rtk.Driver}
+    probe_list: Iterable[str]
     if driver_name := host.hci_metadata.get("driver"):
         # Only probe a single driver
         probe_list = [driver_name]
@@ -73,10 +55,13 @@ async def get_driver_for_host(host):
         probe_list = driver_classes.keys()
 
     for driver_name in probe_list:
-        logger.debug(f"Probing {driver_name} driver class")
-        if driver := await rtk.Driver.for_host(host):
-            logger.debug(f"Instantiated {driver_name} driver")
-            return driver
+        if driver_class := driver_classes.get(driver_name):
+            logger.debug(f"Probing driver class: {driver_name}")
+            if driver := await driver_class.for_host(host):
+                logger.debug(f"Instantiated {driver_name} driver")
+                return driver
+        else:
+            logger.debug(f"Skipping unknown driver class: {driver_name}")
 
     return None
 

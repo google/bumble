@@ -41,7 +41,7 @@ from bumble.hci import (
     HCI_Reset_Command,
     HCI_Read_Local_Version_Information_Command,
 )
-
+from bumble.drivers import common
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -285,7 +285,7 @@ class Firmware:
             )
 
 
-class Driver:
+class Driver(common.Driver):
     @dataclass
     class DriverInfo:
         rom: int
