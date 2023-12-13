@@ -139,6 +139,7 @@ class Host(AbortableEventEmitter):
         super().__init__()
 
         self.hci_metadata = {}
+        self.controller_init_required = False
         self.ready = False  # True when we can accept incoming packets
         self.connections = {}  # Connections, by connection handle
         self.pending_command = None
@@ -204,9 +205,11 @@ class Host(AbortableEventEmitter):
         # an object property.
         reset_needed = True
         if driver_factory is not None:
+            self.controller_init_required = True
             if driver := await driver_factory(self):
                 await driver.init_controller()
                 reset_needed = False
+                self.controller_init_required = False
 
         # Send a reset command unless a driver has already done so.
         if reset_needed:
@@ -469,9 +472,13 @@ class Host(AbortableEventEmitter):
     # Packet Sink protocol (packets coming from the controller via HCI)
     def on_packet(self, packet: bytes) -> None:
         hci_packet = HCI_Packet.from_bytes(packet)
-        if self.ready or (
-            isinstance(hci_packet, HCI_Command_Complete_Event)
-            and hci_packet.command_opcode == HCI_RESET_COMMAND
+        if (
+            self.controller_init_required
+            or self.ready
+            or (
+                isinstance(hci_packet, HCI_Command_Complete_Event)
+                and hci_packet.command_opcode == HCI_RESET_COMMAND
+            )
         ):
             self.on_hci_packet(hci_packet)
         else:
