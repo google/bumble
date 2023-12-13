@@ -21,7 +21,7 @@ import collections
 import logging
 import struct
 
-from typing import Optional, TYPE_CHECKING, Dict, Callable, Awaitable, cast
+from typing import Any, Awaitable, Callable, Dict, Optional, Union, cast, TYPE_CHECKING
 
 from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
@@ -124,7 +124,8 @@ class Connection:
 class Host(AbortableEventEmitter):
     connections: Dict[int, Connection]
     acl_packet_queue: collections.deque[HCI_AclDataPacket]
-    hci_sink: TransportSink
+    hci_sink: Optional[TransportSink] = None
+    hci_metadata: Dict[str, Any]
     long_term_key_provider: Optional[
         Callable[[int, bytes, int], Awaitable[Optional[bytes]]]
     ]
@@ -137,9 +138,8 @@ class Host(AbortableEventEmitter):
     ) -> None:
         super().__init__()
 
-        self.hci_metadata = None
+        self.hci_metadata = {}
         self.ready = False  # True when we can accept incoming packets
-        self.reset_done = False
         self.connections = {}  # Connections, by connection handle
         self.pending_command = None
         self.pending_response = None
@@ -162,10 +162,7 @@ class Host(AbortableEventEmitter):
 
         # Connect to the source and sink if specified
         if controller_source:
-            controller_source.set_packet_sink(self)
-            self.hci_metadata = getattr(
-                controller_source, 'metadata', self.hci_metadata
-            )
+            self.set_packet_source(controller_source)
         if controller_sink:
             self.set_packet_sink(controller_sink)
 
@@ -200,17 +197,21 @@ class Host(AbortableEventEmitter):
             self.ready = False
             await self.flush()
 
-        await self.send_command(HCI_Reset_Command(), check_result=True)
-        self.ready = True
-
         # Instantiate and init a driver for the host if needed.
         # NOTE: we don't keep a reference to the driver here, because we don't
         # currently have a need for the driver later on. But if the driver interface
         # evolves, it may be required, then, to store a reference to the driver in
         # an object property.
+        reset_needed = True
         if driver_factory is not None:
             if driver := await driver_factory(self):
                 await driver.init_controller()
+                reset_needed = False
+
+        # Send a reset command unless a driver has already done so.
+        if reset_needed:
+            await self.send_command(HCI_Reset_Command(), check_result=True)
+            self.ready = True
 
         response = await self.send_command(
             HCI_Read_Local_Supported_Commands_Command(), check_result=True
@@ -313,25 +314,28 @@ class Host(AbortableEventEmitter):
                     )
                 )
 
-        self.reset_done = True
-
     @property
-    def controller(self) -> TransportSink:
+    def controller(self) -> Optional[TransportSink]:
         return self.hci_sink
 
     @controller.setter
-    def controller(self, controller):
+    def controller(self, controller) -> None:
         self.set_packet_sink(controller)
         if controller:
             controller.set_packet_sink(self)
 
-    def set_packet_sink(self, sink: TransportSink) -> None:
+    def set_packet_sink(self, sink: Optional[TransportSink]) -> None:
         self.hci_sink = sink
+
+    def set_packet_source(self, source: TransportSource) -> None:
+        source.set_packet_sink(self)
+        self.hci_metadata = getattr(source, 'metadata', self.hci_metadata)
 
     def send_hci_packet(self, packet: HCI_Packet) -> None:
         if self.snooper:
             self.snooper.snoop(bytes(packet), Snooper.Direction.HOST_TO_CONTROLLER)
-        self.hci_sink.on_packet(bytes(packet))
+        if self.hci_sink:
+            self.hci_sink.on_packet(bytes(packet))
 
     async def send_command(self, command, check_result=False):
         logger.debug(f'{color("### HOST -> CONTROLLER", "blue")}: {command}')
@@ -720,6 +724,14 @@ class Host(AbortableEventEmitter):
 
     def on_hci_le_extended_advertising_report_event(self, event):
         self.on_hci_le_advertising_report_event(event)
+
+    def on_hci_le_advertising_set_terminated_event(self, event):
+        self.emit(
+            'advertising_set_termination',
+            event.status,
+            event.advertising_handle,
+            event.connection_handle,
+        )
 
     def on_hci_le_cis_request_event(self, event):
         self.emit(

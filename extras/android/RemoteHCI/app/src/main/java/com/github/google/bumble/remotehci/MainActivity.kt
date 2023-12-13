@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -71,7 +73,7 @@ class AppViewModel : ViewModel(), HciProxy.Listener {
         this.tcpPort = tcpPort
 
         // Save the port to the preferences
-        with (preferences!!.edit()) {
+        with(preferences!!.edit()) {
             putString(TCP_PORT_PREF_KEY, tcpPort.toString())
             apply()
         }
@@ -138,7 +140,8 @@ class MainActivity : ComponentActivity() {
                 log.warning("Exception while running HCI Server: $error")
             } catch (error: HalException) {
                 log.warning("HAL exception: ${error.message}")
-                appViewModel.message = "Cannot bind to HAL (${error.message}). You may need to use the command 'setenforce 0' in a root adb shell."
+                appViewModel.message =
+                    "Cannot bind to HAL (${error.message}). You may need to use the command 'setenforce 0' in a root adb shell."
             }
             log.info("HCI Proxy thread ended")
             appViewModel.canStart = true
@@ -157,9 +160,12 @@ fun ActionButton(text: String, onClick: () -> Unit, enabled: Boolean) {
 @Composable
 fun MainView(appViewModel: AppViewModel, startProxy: () -> Unit) {
     RemoteHCITheme {
-        // A surface container using the 'background' color from the theme
+        val scrollState = rememberScrollState()
         Surface(
-            modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState),
+            color = MaterialTheme.colorScheme.background
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
@@ -174,13 +180,15 @@ fun MainView(appViewModel: AppViewModel, startProxy: () -> Unit) {
                 )
                 Divider()
                 val keyboardController = LocalSoftwareKeyboardController.current
-                TextField(
-                    label = {
-                        Text(text = "TCP Port")
-                    },
+                TextField(label = {
+                    Text(text = "TCP Port")
+                },
                     value = appViewModel.tcpPort.toString(),
                     modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions.Default.copy(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done
+                    ),
                     onValueChange = {
                         if (it.isNotEmpty()) {
                             val tcpPort = it.toIntOrNull()
@@ -189,10 +197,7 @@ fun MainView(appViewModel: AppViewModel, startProxy: () -> Unit) {
                             }
                         }
                     },
-                    keyboardActions = KeyboardActions(
-                        onDone = {keyboardController?.hide()}
-                    )
-                )
+                    keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }))
                 Divider()
                 val connectState = if (appViewModel.hostConnected) "CONNECTED" else "DISCONNECTED"
                 Text(

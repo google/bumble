@@ -728,6 +728,19 @@ HCI_LE_PHY_TYPE_TO_BIT = {
     HCI_LE_CODED_PHY: HCI_LE_CODED_PHY_BIT
 }
 
+
+class Phy(enum.IntEnum):
+    LE_1M    = 0x01
+    LE_2M    = 0x02
+    LE_CODED = 0x03
+
+
+class PhyBit(enum.IntFlag):
+    LE_1M    = 0b00000001
+    LE_2M    = 0b00000010
+    LE_CODED = 0b00000100
+
+
 # Connection Parameters
 HCI_CONNECTION_INTERVAL_MS_PER_UNIT = 1.25
 HCI_CONNECTION_LATENCY_MS_PER_UNIT  = 1.25
@@ -1963,25 +1976,15 @@ Address.ANY_RANDOM = Address(b"\x00\x00\x00\x00\x00\x00", Address.RANDOM_DEVICE_
 
 
 # -----------------------------------------------------------------------------
-class OwnAddressType:
+class OwnAddressType(enum.IntEnum):
     PUBLIC = 0
     RANDOM = 1
     RESOLVABLE_OR_PUBLIC = 2
     RESOLVABLE_OR_RANDOM = 3
 
-    TYPE_NAMES = {
-        PUBLIC: 'PUBLIC',
-        RANDOM: 'RANDOM',
-        RESOLVABLE_OR_PUBLIC: 'RESOLVABLE_OR_PUBLIC',
-        RESOLVABLE_OR_RANDOM: 'RESOLVABLE_OR_RANDOM',
-    }
-
-    @staticmethod
-    def type_name(type_id):
-        return name_or_number(OwnAddressType.TYPE_NAMES, type_id)
-
-    # pylint: disable-next=unnecessary-lambda
-    TYPE_SPEC = {'size': 1, 'mapper': lambda x: OwnAddressType.type_name(x)}
+    @classmethod
+    def type_spec(cls):
+        return {'size': 1, 'mapper': lambda x: OwnAddressType(x).name}
 
 
 # -----------------------------------------------------------------------------
@@ -3374,7 +3377,7 @@ class HCI_LE_Set_Random_Address_Command(HCI_Command):
                 ),
             },
         ),
-        ('own_address_type', OwnAddressType.TYPE_SPEC),
+        ('own_address_type', OwnAddressType.type_spec()),
         ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
         ('peer_address', Address.parse_address_preceded_by_type),
         ('advertising_channel_map', 1),
@@ -3467,7 +3470,7 @@ class HCI_LE_Set_Advertising_Enable_Command(HCI_Command):
         ('le_scan_type', 1),
         ('le_scan_interval', 2),
         ('le_scan_window', 2),
-        ('own_address_type', OwnAddressType.TYPE_SPEC),
+        ('own_address_type', OwnAddressType.type_spec()),
         ('scanning_filter_policy', 1),
     ]
 )
@@ -3506,7 +3509,7 @@ class HCI_LE_Set_Scan_Enable_Command(HCI_Command):
         ('initiator_filter_policy', 1),
         ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
         ('peer_address', Address.parse_address_preceded_by_type),
-        ('own_address_type', OwnAddressType.TYPE_SPEC),
+        ('own_address_type', OwnAddressType.type_spec()),
         ('connection_interval_min', 2),
         ('connection_interval_max', 2),
         ('max_latency', 2),
@@ -3913,7 +3916,7 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
                 ),
             },
         ),
-        ('own_address_type', OwnAddressType.TYPE_SPEC),
+        ('own_address_type', OwnAddressType.type_spec()),
         ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
         ('peer_address', Address.parse_address_preceded_by_type),
         ('advertising_filter_policy', 1),
@@ -4309,7 +4312,7 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
             ('initiator_filter_policy:', self.initiator_filter_policy),
             (
                 'own_address_type:       ',
-                OwnAddressType.type_name(self.own_address_type),
+                OwnAddressType(self.own_address_type).name,
             ),
             (
                 'peer_address_type:      ',
@@ -4550,6 +4553,10 @@ class HCI_LE_Setup_ISO_Data_Path_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.109 LE Setup ISO Data Path command
     '''
+
+    class Direction(enum.IntEnum):
+        HOST_TO_CONTROLLER = 0x00
+        CONTROLLER_TO_HOST = 0x01
 
     connection_handle: int
     data_path_direction: int
@@ -5188,6 +5195,21 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
 HCI_LE_Meta_Event.subevent_classes[
     HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT
 ] = HCI_LE_Extended_Advertising_Report_Event
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', 1),
+        ('advertising_handle', 1),
+        ('connection_handle', 2),
+        ('number_completed_extended_advertising_events', 1),
+    ]
+)
+class HCI_LE_Advertising_Set_Terminated_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.18 LE Advertising Set Terminated Event
+    '''
 
 
 # -----------------------------------------------------------------------------

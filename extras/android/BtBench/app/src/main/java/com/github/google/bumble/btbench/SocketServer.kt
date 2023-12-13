@@ -22,14 +22,13 @@ import kotlin.concurrent.thread
 private val Log = Logger.getLogger("btbench.socket-server")
 
 class SocketServer(private val viewModel: AppViewModel, private val serverSocket: BluetoothServerSocket) {
-    fun run(onTerminate: () -> Unit) {
+    fun run(onConnected: () -> Unit, onDisconnected: () -> Unit) {
         var aborted = false
         viewModel.running = true
 
         fun cleanup() {
             serverSocket.close()
             viewModel.running = false
-            onTerminate()
         }
 
         thread(name = "SocketServer") {
@@ -38,6 +37,7 @@ class SocketServer(private val viewModel: AppViewModel, private val serverSocket
                     serverSocket.close()
                 }
                 Log.info("waiting for connection...")
+                onDisconnected()
                 val socket = try {
                     serverSocket.accept()
                 } catch (error: IOException) {
@@ -45,7 +45,8 @@ class SocketServer(private val viewModel: AppViewModel, private val serverSocket
                     cleanup()
                     return@thread
                 }
-                Log.info("got connection")
+                Log.info("got connection from ${socket.remoteDevice.address}")
+                onConnected()
 
                 viewModel.aborter = {
                     aborted = true

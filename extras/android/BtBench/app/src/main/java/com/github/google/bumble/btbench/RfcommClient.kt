@@ -25,7 +25,8 @@ private val Log = Logger.getLogger("btbench.rfcomm-client")
 class RfcommClient(private val viewModel: AppViewModel, val bluetoothAdapter: BluetoothAdapter) {
     @SuppressLint("MissingPermission")
     fun run() {
-        val remoteDevice = bluetoothAdapter.getRemoteDevice(viewModel.peerBluetoothAddress)
+        val address = viewModel.peerBluetoothAddress.take(17)
+        val remoteDevice = bluetoothAdapter.getRemoteDevice(address)
         val socket = remoteDevice.createInsecureRfcommSocketToServiceRecord(
             DEFAULT_RFCOMM_UUID
         )
