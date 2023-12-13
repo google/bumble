@@ -16,20 +16,28 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import datetime
+import functools
 import logging
 import sys
 import os
+import io
 import struct
 import secrets
+
+from typing import Dict
+
 from bumble.core import AdvertisingData
-from bumble.device import Device, CisLink
+from bumble.device import Device
 from bumble.hci import (
     CodecID,
     CodingFormat,
     HCI_IsoDataPacket,
 )
 from bumble.profiles.bap import (
+    AseStateMachine,
     UnicastServerAdvertisingData,
+    CodecSpecificConfiguration,
     CodecSpecificCapabilities,
     ContextType,
     AudioLocation,
@@ -43,6 +51,32 @@ from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
 
 from bumble.transport import open_transport_or_link
+
+
+def _sink_pac_record() -> PacRecord:
+    return PacRecord(
+        coding_format=CodingFormat(CodecID.LC3),
+        codec_specific_capabilities=CodecSpecificCapabilities(
+            supported_sampling_frequencies=(
+                SupportedSamplingFrequency.FREQ_8000
+                | SupportedSamplingFrequency.FREQ_16000
+                | SupportedSamplingFrequency.FREQ_24000
+                | SupportedSamplingFrequency.FREQ_32000
+                | SupportedSamplingFrequency.FREQ_48000
+            ),
+            supported_frame_durations=(
+                SupportedFrameDuration.DURATION_7500_US_SUPPORTED
+                | SupportedFrameDuration.DURATION_10000_US_SUPPORTED
+            ),
+            supported_audio_channel_count=[1, 2],
+            min_octets_per_codec_frame=26,
+            max_octets_per_codec_frame=240,
+            supported_max_codec_frames_per_sdu=2,
+        ),
+    )
+
+
+file_outputs: Dict[AseStateMachine, io.BufferedWriter] = {}
 
 
 # -----------------------------------------------------------------------------
@@ -71,49 +105,17 @@ async def main() -> None:
             PublishedAudioCapabilitiesService(
                 supported_source_context=ContextType.PROHIBITED,
                 available_source_context=ContextType.PROHIBITED,
-                supported_sink_context=ContextType.MEDIA,
-                available_sink_context=ContextType.MEDIA,
+                supported_sink_context=ContextType(0xFF),  # All context types
+                available_sink_context=ContextType(0xFF),  # All context types
                 sink_audio_locations=(
                     AudioLocation.FRONT_LEFT | AudioLocation.FRONT_RIGHT
                 ),
-                sink_pac=[
-                    # Codec Capability Setting 16_2
-                    PacRecord(
-                        coding_format=CodingFormat(CodecID.LC3),
-                        codec_specific_capabilities=CodecSpecificCapabilities(
-                            supported_sampling_frequencies=(
-                                SupportedSamplingFrequency.FREQ_16000
-                            ),
-                            supported_frame_durations=(
-                                SupportedFrameDuration.DURATION_10000_US_SUPPORTED
-                            ),
-                            supported_audio_channel_counts=[1],
-                            min_octets_per_codec_frame=40,
-                            max_octets_per_codec_frame=40,
-                            supported_max_codec_frames_per_sdu=1,
-                        ),
-                    ),
-                    # Codec Capability Setting 24_2
-                    PacRecord(
-                        coding_format=CodingFormat(CodecID.LC3),
-                        codec_specific_capabilities=CodecSpecificCapabilities(
-                            supported_sampling_frequencies=(
-                                SupportedSamplingFrequency.FREQ_48000
-                            ),
-                            supported_frame_durations=(
-                                SupportedFrameDuration.DURATION_10000_US_SUPPORTED
-                            ),
-                            supported_audio_channel_counts=[1],
-                            min_octets_per_codec_frame=120,
-                            max_octets_per_codec_frame=120,
-                            supported_max_codec_frames_per_sdu=1,
-                        ),
-                    ),
-                ],
+                sink_pac=[_sink_pac_record()],
             )
         )
 
-        device.add_service(AudioStreamControlService(device, sink_ase_id=[1, 2]))
+        ascs = AudioStreamControlService(device, sink_ase_id=[1], source_ase_id=[2])
+        device.add_service(ascs)
 
         advertising_data = (
             bytes(
@@ -143,44 +145,57 @@ async def main() -> None:
             + csis.get_advertising_data()
             + bytes(UnicastServerAdvertisingData())
         )
-        subprocess = await asyncio.create_subprocess_shell(
-            f'dlc3 | ffplay pipe:0',
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
 
-        stdin = subprocess.stdin
-        assert stdin
-
-        # Write a fake LC3 header to dlc3.
-        stdin.write(
-            bytes([0x1C, 0xCC])  # Header.
-            + struct.pack(
-                '<HHHHHHI',
-                18,  # Header length.
-                48000 // 100,  # Sampling Rate(/100Hz).
-                0,  # Bitrate(unused).
-                1,  # Channels.
-                10000 // 10,  # Frame duration(/10us).
-                0,  # RFU.
-                0x0FFFFFFF,  # Frame counts.
-            )
-        )
-
-        def on_pdu(pdu: HCI_IsoDataPacket):
+        def on_pdu(ase: AseStateMachine, pdu: HCI_IsoDataPacket):
             # LC3 format: |frame_length(2)| + |frame(length)|.
+            sdu = b''
             if pdu.iso_sdu_length:
-                stdin.write(struct.pack('<H', pdu.iso_sdu_length))
-            stdin.write(pdu.iso_sdu_fragment)
+                sdu = struct.pack('<H', pdu.iso_sdu_length)
+            sdu += pdu.iso_sdu_fragment
+            file_outputs[ase].write(sdu)
 
-        def on_cis(cis_link: CisLink):
-            cis_link.on('pdu', on_pdu)
+        def on_ase_state_change(
+            state: AseStateMachine.State,
+            ase: AseStateMachine,
+        ) -> None:
+            if state != AseStateMachine.State.STREAMING:
+                if file_output := file_outputs.pop(ase):
+                    file_output.close()
+            else:
+                file_output = open(f'{datetime.datetime.now().isoformat()}.lc3', 'wb')
+                codec_configuration = ase.codec_specific_configuration
+                assert isinstance(codec_configuration, CodecSpecificConfiguration)
+                # Write a LC3 header.
+                file_output.write(
+                    bytes([0x1C, 0xCC])  # Header.
+                    + struct.pack(
+                        '<HHHHHHI',
+                        18,  # Header length.
+                        codec_configuration.sampling_frequency.hz
+                        // 100,  # Sampling Rate(/100Hz).
+                        0,  # Bitrate(unused).
+                        bin(codec_configuration.audio_channel_allocation).count(
+                            '1'
+                        ),  # Channels.
+                        codec_configuration.frame_duration.us
+                        // 10,  # Frame duration(/10us).
+                        0,  # RFU.
+                        0x0FFFFFFF,  # Frame counts.
+                    )
+                )
+                file_outputs[ase] = file_output
+                assert ase.cis_link
+                ase.cis_link.sink = functools.partial(on_pdu, ase)
 
-        device.once('cis_establishment', on_cis)
+        for ase in ascs.ase_state_machines.values():
+            ase.on(
+                'state_change',
+                functools.partial(on_ase_state_change, ase=ase),
+            )
 
         await device.create_advertising_set(
             advertising_data=advertising_data,
+            auto_restart=True,
         )
 
         await hci_transport.source.terminated

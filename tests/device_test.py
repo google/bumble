@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import functools
 import logging
 import os
 from types import LambdaType
@@ -35,12 +36,14 @@ from bumble.hci import (
     HCI_COMMAND_STATUS_PENDING,
     HCI_CREATE_CONNECTION_COMMAND,
     HCI_SUCCESS,
+    HCI_CONNECTION_FAILED_TO_BE_ESTABLISHED_ERROR,
     Address,
     OwnAddressType,
     HCI_Command_Complete_Event,
     HCI_Command_Status_Event,
     HCI_Connection_Complete_Event,
     HCI_Connection_Request_Event,
+    HCI_Error,
     HCI_Packet,
 )
 from bumble.gatt import (
@@ -52,6 +55,10 @@ from bumble.gatt import (
 
 from .test_utils import TwoDevices, async_barrier
 
+# -----------------------------------------------------------------------------
+# Constants
+# -----------------------------------------------------------------------------
+_TIMEOUT = 0.1
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -387,6 +394,29 @@ async def test_get_remote_le_features():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_get_remote_le_features_failed():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    def on_hci_le_read_remote_features_complete_event(event):
+        devices[0].host.emit(
+            'le_remote_features_failure',
+            event.connection_handle,
+            HCI_CONNECTION_FAILED_TO_BE_ESTABLISHED_ERROR,
+        )
+
+    devices[0].host.on_hci_le_read_remote_features_complete_event = (
+        on_hci_le_read_remote_features_complete_event
+    )
+
+    with pytest.raises(HCI_Error):
+        await asyncio.wait_for(
+            devices.connections[0].get_remote_le_features(), _TIMEOUT
+        )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_cis():
     devices = TwoDevices()
     await devices.setup_connection()
@@ -431,6 +461,65 @@ async def test_cis():
 
     await cis_links[0].disconnect()
     await cis_links[1].disconnect()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_cis_setup_failure():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    cis_requests = asyncio.Queue()
+
+    def on_cis_request(
+        acl_connection: Connection,
+        cis_handle: int,
+        cig_id: int,
+        cis_id: int,
+    ):
+        del acl_connection, cig_id, cis_id
+        cis_requests.put_nowait(cis_handle)
+
+    devices[1].on('cis_request', on_cis_request)
+
+    cis_handles = await devices[0].setup_cig(
+        cig_id=1,
+        cis_id=[2],
+        sdu_interval=(0, 0),
+        framing=0,
+        max_sdu=(0, 0),
+        retransmission_number=0,
+        max_transport_latency=(0, 0),
+    )
+    assert len(cis_handles) == 1
+
+    cis_create_task = asyncio.create_task(
+        devices[0].create_cis(
+            [
+                (cis_handles[0], devices.connections[0].handle),
+            ]
+        )
+    )
+
+    def on_hci_le_cis_established_event(host, event):
+        host.emit(
+            'cis_establishment_failure',
+            event.connection_handle,
+            HCI_CONNECTION_FAILED_TO_BE_ESTABLISHED_ERROR,
+        )
+
+    for device in devices:
+        device.host.on_hci_le_cis_established_event = functools.partial(
+            on_hci_le_cis_established_event, device.host
+        )
+
+    cis_request = await asyncio.wait_for(cis_requests.get(), _TIMEOUT)
+
+    with pytest.raises(HCI_Error):
+        await asyncio.wait_for(devices[1].accept_cis_request(cis_request), _TIMEOUT)
+
+    with pytest.raises(HCI_Error):
+        await asyncio.wait_for(cis_create_task, _TIMEOUT)
 
 
 # -----------------------------------------------------------------------------
