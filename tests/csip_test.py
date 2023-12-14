@@ -32,6 +32,41 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
+def test_s1():
+    assert (
+        csip.s1(b'SIRKenc'[::-1])
+        == bytes.fromhex('6901983f 18149e82 3c7d133a 7d774572')[::-1]
+    )
+
+
+# -----------------------------------------------------------------------------
+def test_k1():
+    K = bytes.fromhex('676e1b9b d448696f 061ec622 3ce5ced9')[::-1]
+    SALT = csip.s1(b'SIRKenc'[::-1])
+    P = b'csis'[::-1]
+    assert (
+        csip.k1(K, SALT, P)
+        == bytes.fromhex('5277453c c094d982 b0e8ee53 2f2d1f8b')[::-1]
+    )
+
+
+# -----------------------------------------------------------------------------
+def test_sih():
+    SIRK = bytes.fromhex('457d7d09 21a1fd22 cecd8c86 dd72cccd')[::-1]
+    PRAND = bytes.fromhex('69f563')[::-1]
+    assert csip.sih(SIRK, PRAND) == bytes.fromhex('1948da')[::-1]
+
+
+# -----------------------------------------------------------------------------
+def test_sef():
+    SIRK = bytes.fromhex('457d7d09 21a1fd22 cecd8c86 dd72cccd')[::-1]
+    K = bytes.fromhex('676e1b9b d448696f 061ec622 3ce5ced9')[::-1]
+    assert (
+        csip.sef(K, SIRK) == bytes.fromhex('170a3835 e13524a0 7e2562d5 f25fd346')[::-1]
+    )
+
+
+# -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_csis():
     SIRK = bytes.fromhex('2f62c8ae41867d1bb619e788a2605faa')
@@ -40,6 +75,7 @@ async def test_csis():
     devices[0].add_service(
         csip.CoordinatedSetIdentificationService(
             set_identity_resolving_key=SIRK,
+            set_identity_resolving_key_type=csip.SirkType.PLAINTEXT,
             coordinated_set_size=2,
             set_member_lock=csip.MemberLock.UNLOCKED,
             set_member_rank=0,
@@ -65,6 +101,7 @@ async def test_csis():
 
 # -----------------------------------------------------------------------------
 async def run():
+    test_sih()
     await test_csis()
 
 

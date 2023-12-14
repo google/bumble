@@ -101,6 +101,16 @@ class EccKey:
 
 
 # -----------------------------------------------------------------------------
+def generate_prand() -> bytes:
+    '''Generates random 3 bytes, with the 2 most significant bits of 0b01.
+
+    See Bluetooth spec, Vol 6, Part E - Table 1.2.
+    '''
+    prand_bytes = secrets.token_bytes(6)
+    return prand_bytes[:2] + bytes([(prand_bytes[2] & 0b01111111) | 0b01000000])
+
+
+# -----------------------------------------------------------------------------
 def xor(x: bytes, y: bytes) -> bytes:
     assert len(x) == len(y)
     return bytes(map(operator.xor, x, y))

@@ -368,9 +368,12 @@ class TemplateService(Service):
     UUID: UUID
 
     def __init__(
-        self, characteristics: List[Characteristic], primary: bool = True
+        self,
+        characteristics: List[Characteristic],
+        primary: bool = True,
+        included_services: List[Service] = [],
     ) -> None:
-        super().__init__(self.UUID, characteristics, primary)
+        super().__init__(self.UUID, characteristics, primary, included_services)
 
 
 # -----------------------------------------------------------------------------

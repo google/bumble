@@ -20,6 +20,7 @@ import logging
 import sys
 import os
 import struct
+import secrets
 from bumble.core import AdvertisingData
 from bumble.device import Device, CisLink
 from bumble.hci import (
@@ -39,6 +40,8 @@ from bumble.profiles.bap import (
     PublishedAudioCapabilitiesService,
     AudioStreamControlService,
 )
+from bumble.profiles.cap import CommonAudioServiceService
+from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
 
 from bumble.transport import open_transport_or_link
 
@@ -60,6 +63,11 @@ async def main() -> None:
 
         await device.power_on()
 
+        csis = CoordinatedSetIdentificationService(
+            set_identity_resolving_key=secrets.token_bytes(16),
+            set_identity_resolving_key_type=SirkType.PLAINTEXT,
+        )
+        device.add_service(CommonAudioServiceService(csis))
         device.add_service(
             PublishedAudioCapabilitiesService(
                 supported_source_context=ContextType.PROHIBITED,
@@ -108,29 +116,32 @@ async def main() -> None:
 
         device.add_service(AudioStreamControlService(device, sink_ase_id=[1, 2]))
 
-        advertising_data = bytes(
-            AdvertisingData(
-                [
-                    (
-                        AdvertisingData.COMPLETE_LOCAL_NAME,
-                        bytes('Bumble LE Audio', 'utf-8'),
-                    ),
-                    (
-                        AdvertisingData.FLAGS,
-                        bytes(
-                            [
-                                AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
-                                | AdvertisingData.BR_EDR_HOST_FLAG
-                                | AdvertisingData.BR_EDR_CONTROLLER_FLAG
-                            ]
+        advertising_data = (
+            bytes(
+                AdvertisingData(
+                    [
+                        (
+                            AdvertisingData.COMPLETE_LOCAL_NAME,
+                            bytes('Bumble LE Audio', 'utf-8'),
                         ),
-                    ),
-                    (
-                        AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                        bytes(PublishedAudioCapabilitiesService.UUID),
-                    ),
-                ]
+                        (
+                            AdvertisingData.FLAGS,
+                            bytes(
+                                [
+                                    AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
+                                    | AdvertisingData.BR_EDR_HOST_FLAG
+                                    | AdvertisingData.BR_EDR_CONTROLLER_FLAG
+                                ]
+                            ),
+                        ),
+                        (
+                            AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+                            bytes(PublishedAudioCapabilitiesService.UUID),
+                        ),
+                    ]
+                )
             )
+            + csis.get_advertising_data()
         )
         subprocess = await asyncio.create_subprocess_shell(
             f'dlc3 | ffplay pipe:0',
