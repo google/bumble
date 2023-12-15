@@ -24,10 +24,10 @@ from typing import Tuple
 
 from .test_utils import TwoDevices
 from bumble import core
-from bumble import device
 from bumble import hfp
 from bumble import rfcomm
 from bumble import hci
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -109,7 +109,7 @@ async def test_sco_setup():
         devices[1].accept(devices[0].public_address),
     )
 
-    def on_sco_request(_connection: device.Connection, _link_type: int):
+    def on_sco_request(_connection, _link_type: int):
         connections[1].abort_on(
             'disconnection',
             devices[1].send_command(
@@ -124,17 +124,13 @@ async def test_sco_setup():
 
     devices[1].on('sco_request', on_sco_request)
 
-    sco_connections = [
+    sco_connection_futures = [
         asyncio.get_running_loop().create_future(),
         asyncio.get_running_loop().create_future(),
     ]
 
-    devices[0].on(
-        'sco_connection', lambda sco_link: sco_connections[0].set_result(sco_link)
-    )
-    devices[1].on(
-        'sco_connection', lambda sco_link: sco_connections[1].set_result(sco_link)
-    )
+    for device, future in zip(devices, sco_connection_futures):
+        device.on('sco_connection', future.set_result)
 
     await devices[0].send_command(
         hci.HCI_Enhanced_Setup_Synchronous_Connection_Command(
@@ -142,8 +138,17 @@ async def test_sco_setup():
             **hfp.ESCO_PARAMETERS[hfp.DefaultCodecParameters.ESCO_CVSD_S1].asdict(),
         )
     )
+    sco_connections = await asyncio.gather(*sco_connection_futures)
 
-    await asyncio.gather(*sco_connections)
+    sco_disconnection_futures = [
+        asyncio.get_running_loop().create_future(),
+        asyncio.get_running_loop().create_future(),
+    ]
+    for future, sco_connection in zip(sco_disconnection_futures, sco_connections):
+        sco_connection.on('disconnection', future.set_result)
+
+    await sco_connections[0].disconnect()
+    await asyncio.gather(*sco_disconnection_futures)
 
 
 # -----------------------------------------------------------------------------

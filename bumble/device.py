@@ -3078,33 +3078,29 @@ class Device(CompositeEventEmitter):
                 cig_id=cig_id,
             )
 
-        result = await self.send_command(
-            HCI_LE_Create_CIS_Command(
-                cis_connection_handle=[p[0] for p in cis_acl_pairs],
-                acl_connection_handle=[p[1] for p in cis_acl_pairs],
-            ),
-        )
-        if result.status != HCI_COMMAND_STATUS_PENDING:
-            logger.warning(
-                'HCI_LE_Create_CIS_Command failed: '
-                f'{HCI_Constant.error_name(result.status)}'
-            )
-            raise HCI_StatusError(result)
-
-        pending_cis_establishments: Dict[int, asyncio.Future[CisLink]] = {}
-        for cis_handle, _ in cis_acl_pairs:
-            pending_cis_establishments[
-                cis_handle
-            ] = asyncio.get_running_loop().create_future()
-
         with closing(EventWatcher()) as watcher:
+            pending_cis_establishments = {
+                cis_handle: asyncio.get_running_loop().create_future()
+                for cis_handle, _ in cis_acl_pairs
+            }
 
             @watcher.on(self, 'cis_establishment')
             def on_cis_establishment(cis_link: CisLink) -> None:
-                if pending_future := pending_cis_establishments.get(
-                    cis_link.handle, None
-                ):
+                if pending_future := pending_cis_establishments.get(cis_link.handle):
                     pending_future.set_result(cis_link)
+
+            result = await self.send_command(
+                HCI_LE_Create_CIS_Command(
+                    cis_connection_handle=[p[0] for p in cis_acl_pairs],
+                    acl_connection_handle=[p[1] for p in cis_acl_pairs],
+                ),
+            )
+            if result.status != HCI_COMMAND_STATUS_PENDING:
+                logger.warning(
+                    'HCI_LE_Create_CIS_Command failed: '
+                    f'{HCI_Constant.error_name(result.status)}'
+                )
+                raise HCI_StatusError(result)
 
             return await asyncio.gather(*pending_cis_establishments.values())
 
@@ -3753,7 +3749,7 @@ class Device(CompositeEventEmitter):
     @host_event_handler
     @experimental('Only for testing')
     def on_sco_packet(self, sco_handle: int, packet: HCI_SynchronousDataPacket) -> None:
-        if sco_link := self.sco_links.get(sco_handle, None):
+        if sco_link := self.sco_links.get(sco_handle):
             sco_link.emit('pdu', packet)
 
     # [LE only]
@@ -3833,7 +3829,7 @@ class Device(CompositeEventEmitter):
     @experimental('Only for testing')
     def on_cis_establishment_failure(self, cis_handle: int, status: int) -> None:
         logger.debug(f'*** CIS Establishment Failure: cis=[0x{cis_handle:04X}] ***')
-        if cis_link := self.cis_links.pop(cis_handle, None):
+        if cis_link := self.cis_links.pop(cis_handle):
             cis_link.emit('establishment_failure')
         self.emit('cis_establishment_failure', cis_handle, status)
 
@@ -3841,7 +3837,7 @@ class Device(CompositeEventEmitter):
     @host_event_handler
     @experimental('Only for testing')
     def on_iso_packet(self, handle: int, packet: HCI_IsoDataPacket) -> None:
-        if cis_link := self.cis_links.get(handle, None):
+        if cis_link := self.cis_links.get(handle):
             cis_link.emit('pdu', packet)
 
     @host_event_handler

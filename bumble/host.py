@@ -18,6 +18,7 @@
 from __future__ import annotations
 import asyncio
 import collections
+import dataclasses
 import logging
 import struct
 
@@ -162,8 +163,24 @@ class Connection:
 
 
 # -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class ScoLink:
+    peer_address: Address
+    handle: int
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class CisLink:
+    peer_address: Address
+    handle: int
+
+
+# -----------------------------------------------------------------------------
 class Host(AbortableEventEmitter):
     connections: Dict[int, Connection]
+    cis_links: Dict[int, CisLink]
+    sco_links: Dict[int, ScoLink]
     acl_packet_queue: Optional[AclPacketQueue] = None
     le_acl_packet_queue: Optional[AclPacketQueue] = None
     hci_sink: Optional[TransportSink] = None
@@ -183,6 +200,8 @@ class Host(AbortableEventEmitter):
         self.hci_metadata = {}
         self.ready = False  # True when we can accept incoming packets
         self.connections = {}  # Connections, by connection handle
+        self.cis_links = {}  # CIS links, by connection handle
+        self.sco_links = {}  # SCO links, by connection handle
         self.pending_command = None
         self.pending_response = None
         self.local_version = None
@@ -696,25 +715,36 @@ class Host(AbortableEventEmitter):
 
     def on_hci_disconnection_complete_event(self, event):
         # Find the connection
-        if (connection := self.connections.get(event.connection_handle)) is None:
+        handle = event.connection_handle
+        if (
+            connection := (
+                self.connections.get(handle)
+                or self.cis_links.get(handle)
+                or self.sco_links.get(handle)
+            )
+        ) is None:
             logger.warning('!!! DISCONNECTION COMPLETE: unknown handle')
             return
 
         if event.status == HCI_SUCCESS:
             logger.debug(
-                f'### DISCONNECTION: [0x{event.connection_handle:04X}] '
+                f'### DISCONNECTION: [0x{handle:04X}] '
                 f'{connection.peer_address} '
                 f'reason={event.reason}'
             )
-            del self.connections[event.connection_handle]
 
             # Notify the listeners
-            self.emit('disconnection', event.connection_handle, event.reason)
+            self.emit('disconnection', handle, event.reason)
+            (
+                self.connections.pop(handle, 0)
+                or self.cis_links.pop(handle, 0)
+                or self.sco_links.pop(handle, 0)
+            )
         else:
             logger.debug(f'### DISCONNECTION FAILED: {event.status}')
 
             # Notify the listeners
-            self.emit('disconnection_failure', event.connection_handle, event.status)
+            self.emit('disconnection_failure', handle, event.status)
 
     def on_hci_le_connection_update_complete_event(self, event):
         if (connection := self.connections.get(event.connection_handle)) is None:
@@ -775,6 +805,10 @@ class Host(AbortableEventEmitter):
     def on_hci_le_cis_established_event(self, event):
         # The remaining parameters are unused for now.
         if event.status == HCI_SUCCESS:
+            self.cis_links[event.connection_handle] = CisLink(
+                handle=event.connection_handle,
+                peer_address=Address.ANY,
+            )
             self.emit('cis_establishment', event.connection_handle)
         else:
             self.emit(
@@ -839,6 +873,11 @@ class Host(AbortableEventEmitter):
             logger.debug(
                 f'### SCO CONNECTION: [0x{event.connection_handle:04X}] '
                 f'{event.bd_addr}'
+            )
+
+            self.sco_links[event.connection_handle] = ScoLink(
+                peer_address=event.bd_addr,
+                handle=event.connection_handle,
             )
 
             # Notify the client
