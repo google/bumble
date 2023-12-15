@@ -496,8 +496,8 @@ async def main():
             '  web (run a keyboard with keypress input from a web page, '
             'see keyboard.html'
         )
-        print('example: python run_hid_device.py classic3.json usb:0 web')
-        print('example: python run_hid_device.py classic3.json usb:0 test-mode')
+        print('example: python run_hid_device.py hid_keyboard.json usb:0 web')
+        print('example: python run_hid_device.py hid_keyboard.json usb:0 test-mode')
 
         return
 
@@ -732,13 +732,12 @@ async def main():
                 else:
                     print("Invalid option selected.")
 
-        if (len(sys.argv) > 3) and (command == 'test-mode'):
+        if (len(sys.argv) > 3) and (sys.argv[3] == 'test-mode'):
             # Test mode for PTS/Unit testing
-            command = sys.argv[3]
             await menu()
         else:
             # default option is using keyboard.html (web)
-            print("Command incorrect. Switching to default")
+            print("Executing in Web mode")
             await keyboard_device(hid_device)
 
         await hci_source.wait_for_termination()

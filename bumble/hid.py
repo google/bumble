@@ -27,6 +27,7 @@ from typing import Optional, Callable, TYPE_CHECKING
 from bumble import l2cap, device
 from bumble.colors import color
 from bumble.core import InvalidStateError, ProtocolError
+from .hci import Address
 
 
 # -----------------------------------------------------------------------------
@@ -203,6 +204,7 @@ class HID(EventEmitter):
 
     def __init__(self, device: device.Device, role: Role) -> None:
         super().__init__()
+        self.remote_device_bd_address: Optional[Address] = None
         self.device = device
         self.role = role
 
@@ -213,19 +215,19 @@ class HID(EventEmitter):
         device.on('connection', self.on_device_connection)
 
     def handle_get_report(self, pdu: bytes):
-        return
+        pass
 
     def handle_set_report(self, pdu: bytes):
-        return
+        pass
 
     def handle_get_protocol(self, pdu: bytes):
-        return
+        pass
 
     def handle_set_protocol(self, pdu: bytes):
-        return
+        pass
 
     def send_handshake_message(self, result_code: int):
-        return
+        pass
 
     async def connect_control_channel(self) -> None:
         # Create a new L2CAP connection - control channel
@@ -271,6 +273,7 @@ class HID(EventEmitter):
 
     def on_device_connection(self, connection: device.Connection) -> None:
         self.connection = connection
+        self.remote_device_bd_address = connection.peer_address
         connection.on('disconnection', self.on_device_disconnection)
 
     def on_device_disconnection(self, reason: int) -> None:
@@ -388,7 +391,7 @@ class Device(HID):
         get_report_cb: Optional[Callable[[int, int, int], None]] = None
         set_report_cb: Optional[Callable[[int, int, int, bytes], None]] = None
         get_protocol_cb: Optional[Callable[[], None]] = None
-        set_protocol_cb: Optional[Callable[[int, bytes], None]] = None
+        set_protocol_cb: Optional[Callable[[int], None]] = None
 
     def send_handshake_message(self, result_code: int) -> None:
         msg = SendHandshakeMessage(result_code)
@@ -417,7 +420,7 @@ class Device(HID):
             buffer_size = 0
 
         ret = self.get_report_cb(report_id, report_type, buffer_size)
-
+        assert ret is not None
         if ret.status == self.GetSetReturn.FAILURE:
             self.send_handshake_message(Message.Handshake.ERR_UNKNOWN)
         elif ret.status == self.GetSetReturn.SUCCESS:
@@ -435,7 +438,7 @@ class Device(HID):
         elif ret.status == self.GetSetReturn.ERR_UNSUPPORTED_REQUEST:
             self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
-    def register_get_report_cb(self, cb):
+    def register_get_report_cb(self, cb: Callable[[int, int, int], None]) -> None:
         self.get_report_cb = cb
         logger.debug("GetReport callback registered successfully")
 
@@ -449,6 +452,7 @@ class Device(HID):
         report_data = pdu[2:]
         report_size = len(report_data) + 1
         ret = self.set_report_cb(report_id, report_type, report_size, report_data)
+        assert ret is not None
         if ret.status == self.GetSetReturn.SUCCESS:
             self.send_handshake_message(Message.Handshake.SUCCESSFUL)
         elif ret.status == self.GetSetReturn.ERR_INVALID_PARAMETER:
@@ -458,7 +462,9 @@ class Device(HID):
         else:
             self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
-    def register_set_report_cb(self, cb):
+    def register_set_report_cb(
+        self, cb: Callable[[int, int, int, bytes], None]
+    ) -> None:
         self.set_report_cb = cb
         logger.debug("SetReport callback registered successfully")
 
@@ -468,12 +474,13 @@ class Device(HID):
             self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
             return
         ret = self.get_protocol_cb()
+        assert ret is not None
         if ret.status == self.GetSetReturn.SUCCESS:
             self.send_control_data(Message.ReportType.OTHER_REPORT, ret.data)
         else:
             self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
-    def register_get_protocol_cb(self, cb):
+    def register_get_protocol_cb(self, cb: Callable[[], None]) -> None:
         self.get_protocol_cb = cb
         logger.debug("GetProtocol callback registered successfully")
 
@@ -483,12 +490,13 @@ class Device(HID):
             self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
             return
         ret = self.set_protocol_cb(pdu[0] & 0x01)
+        assert ret is not None
         if ret.status == self.GetSetReturn.SUCCESS:
             self.send_handshake_message(Message.Handshake.SUCCESSFUL)
         else:
             self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
 
-    def register_set_protocol_cb(self, cb):
+    def register_set_protocol_cb(self, cb: Callable[[int], None]) -> None:
         self.set_protocol_cb = cb
         logger.debug("SetProtocol callback registered successfully")
 
