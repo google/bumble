@@ -22,13 +22,12 @@ import os
 import struct
 import secrets
 from bumble.core import AdvertisingData
-from bumble.device import Device, CisLink
+from bumble.device import Device, CisLink, AdvertisingParameters
 from bumble.hci import (
     CodecID,
     CodingFormat,
     OwnAddressType,
     HCI_IsoDataPacket,
-    HCI_LE_Set_Extended_Advertising_Parameters_Command,
 )
 from bumble.profiles.bap import (
     CodecSpecificCapabilities,
@@ -179,13 +178,10 @@ async def main() -> None:
 
         device.once('cis_establishment', on_cis)
 
-        await device.start_extended_advertising(
-            advertising_properties=(
-                HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.CONNECTABLE_ADVERTISING
-            ),
-            own_address_type=OwnAddressType.RANDOM,
+        advertising_set = await device.create_advertising_set(
             advertising_data=advertising_data,
         )
+        await advertising_set.start()
 
         await hci_transport.source.terminated
 

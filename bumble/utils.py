@@ -226,13 +226,13 @@ class CompositeEventEmitter(AbortableEventEmitter):
         if self._listener:
             # Call the deregistration methods for each base class that has them
             for cls in self._listener.__class__.mro():
-                if hasattr(cls, '_bumble_register_composite'):
-                    cls._bumble_deregister_composite(listener, self)
+                if '_bumble_register_composite' in cls.__dict__:
+                    cls._bumble_deregister_composite(self._listener, self)
         self._listener = listener
         if listener:
             # Call the registration methods for each base class that has them
             for cls in listener.__class__.mro():
-                if hasattr(cls, '_bumble_deregister_composite'):
+                if '_bumble_deregister_composite' in cls.__dict__:
                     cls._bumble_register_composite(listener, self)
 
 

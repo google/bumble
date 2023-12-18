@@ -19,8 +19,13 @@ import asyncio
 import logging
 import sys
 import os
-from bumble.device import AdvertisingType, Device
-from bumble.hci import Address, HCI_LE_Set_Extended_Advertising_Parameters_Command
+from bumble.device import (
+    AdvertisingParameters,
+    AdvertisingEventProperties,
+    AdvertisingType,
+    Device,
+)
+from bumble.hci import Address
 
 from bumble.transport import open_transport_or_link
 
@@ -35,20 +40,16 @@ async def main() -> None:
         return
 
     if len(sys.argv) >= 4:
-        advertising_properties = (
-            HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties(
-                int(sys.argv[3])
-            )
+        advertising_properties = AdvertisingEventProperties.from_advertising_type(
+            AdvertisingType(int(sys.argv[3]))
         )
     else:
-        advertising_properties = (
-            HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.CONNECTABLE_ADVERTISING
-        )
+        advertising_properties = AdvertisingEventProperties()
 
     if len(sys.argv) >= 5:
-        target = Address(sys.argv[4])
+        peer_address = Address(sys.argv[4])
     else:
-        target = Address.ANY
+        peer_address = Address.ANY
 
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(sys.argv[2]) as hci_transport:
@@ -58,9 +59,14 @@ async def main() -> None:
             sys.argv[1], hci_transport.source, hci_transport.sink
         )
         await device.power_on()
-        await device.start_extended_advertising(
-            advertising_properties=advertising_properties, target=target
-        )
+        await (
+            await device.create_advertising_set(
+                advertising_parameters=AdvertisingParameters(
+                    advertising_event_properties=advertising_properties,
+                    peer_address=peer_address,
+                )
+            )
+        ).start()
         await hci_transport.source.terminated
 
 

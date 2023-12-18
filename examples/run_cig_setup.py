@@ -22,10 +22,11 @@ import os
 from bumble.device import (
     Device,
     Connection,
+    AdvertisingParameters,
+    AdvertisingEventProperties,
 )
 from bumble.hci import (
     OwnAddressType,
-    HCI_LE_Set_Extended_Advertising_Parameters_Command,
 )
 
 from bumble.transport import open_transport_or_link
@@ -61,12 +62,8 @@ async def main() -> None:
     devices[1].cis_enabled = True
 
     await asyncio.gather(*[device.power_on() for device in devices])
-    await devices[0].start_extended_advertising(
-        advertising_properties=(
-            HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.CONNECTABLE_ADVERTISING
-        ),
-        own_address_type=OwnAddressType.PUBLIC,
-    )
+    advertising_set = await devices[0].create_advertising_set()
+    await advertising_set.start()
 
     connection = await devices[1].connect(
         devices[0].public_address, own_address_type=OwnAddressType.PUBLIC

@@ -39,6 +39,8 @@ from .hci import (
     HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND,
     HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
     HCI_LE_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
+    HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND,
+    HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND,
     HCI_READ_BUFFER_SIZE_COMMAND,
     HCI_READ_LOCAL_VERSION_INFORMATION_COMMAND,
     HCI_RESET_COMMAND,
@@ -46,6 +48,88 @@ from .hci import (
     HCI_SUPPORTED_COMMANDS_FLAGS,
     HCI_SYNCHRONOUS_DATA_PACKET,
     HCI_VERSION_BLUETOOTH_CORE_4_0,
+    HCI_INQUIRY_COMPLETE_EVENT,
+    HCI_INQUIRY_RESULT_EVENT,
+    HCI_CONNECTION_COMPLETE_EVENT,
+    HCI_CONNECTION_REQUEST_EVENT,
+    HCI_DISCONNECTION_COMPLETE_EVENT,
+    HCI_AUTHENTICATION_COMPLETE_EVENT,
+    HCI_REMOTE_NAME_REQUEST_COMPLETE_EVENT,
+    HCI_ENCRYPTION_CHANGE_EVENT,
+    HCI_CHANGE_CONNECTION_LINK_KEY_COMPLETE_EVENT,
+    HCI_LINK_KEY_TYPE_CHANGED_EVENT,
+    HCI_READ_REMOTE_SUPPORTED_FEATURES_COMPLETE_EVENT,
+    HCI_READ_REMOTE_VERSION_INFORMATION_COMPLETE_EVENT,
+    HCI_QOS_SETUP_COMPLETE_EVENT,
+    HCI_HARDWARE_ERROR_EVENT,
+    HCI_FLUSH_OCCURRED_EVENT,
+    HCI_ROLE_CHANGE_EVENT,
+    HCI_MODE_CHANGE_EVENT,
+    HCI_RETURN_LINK_KEYS_EVENT,
+    HCI_PIN_CODE_REQUEST_EVENT,
+    HCI_LINK_KEY_REQUEST_EVENT,
+    HCI_LINK_KEY_NOTIFICATION_EVENT,
+    HCI_LOOPBACK_COMMAND_EVENT,
+    HCI_DATA_BUFFER_OVERFLOW_EVENT,
+    HCI_MAX_SLOTS_CHANGE_EVENT,
+    HCI_READ_CLOCK_OFFSET_COMPLETE_EVENT,
+    HCI_CONNECTION_PACKET_TYPE_CHANGED_EVENT,
+    HCI_QOS_VIOLATION_EVENT,
+    HCI_PAGE_SCAN_REPETITION_MODE_CHANGE_EVENT,
+    HCI_FLOW_SPECIFICATION_COMPLETE_EVENT,
+    HCI_INQUIRY_RESULT_WITH_RSSI_EVENT,
+    HCI_READ_REMOTE_EXTENDED_FEATURES_COMPLETE_EVENT,
+    HCI_SYNCHRONOUS_CONNECTION_COMPLETE_EVENT,
+    HCI_SYNCHRONOUS_CONNECTION_CHANGED_EVENT,
+    HCI_SNIFF_SUBRATING_EVENT,
+    HCI_EXTENDED_INQUIRY_RESULT_EVENT,
+    HCI_ENCRYPTION_KEY_REFRESH_COMPLETE_EVENT,
+    HCI_IO_CAPABILITY_REQUEST_EVENT,
+    HCI_IO_CAPABILITY_RESPONSE_EVENT,
+    HCI_USER_CONFIRMATION_REQUEST_EVENT,
+    HCI_USER_PASSKEY_REQUEST_EVENT,
+    HCI_REMOTE_OOB_DATA_REQUEST_EVENT,
+    HCI_SIMPLE_PAIRING_COMPLETE_EVENT,
+    HCI_LINK_SUPERVISION_TIMEOUT_CHANGED_EVENT,
+    HCI_ENHANCED_FLUSH_COMPLETE_EVENT,
+    HCI_USER_PASSKEY_NOTIFICATION_EVENT,
+    HCI_KEYPRESS_NOTIFICATION_EVENT,
+    HCI_REMOTE_HOST_SUPPORTED_FEATURES_NOTIFICATION_EVENT,
+    HCI_LE_META_EVENT,
+    HCI_LE_CONNECTION_COMPLETE_EVENT,
+    HCI_LE_ADVERTISING_REPORT_EVENT,
+    HCI_LE_CONNECTION_UPDATE_COMPLETE_EVENT,
+    HCI_LE_READ_REMOTE_FEATURES_COMPLETE_EVENT,
+    HCI_LE_LONG_TERM_KEY_REQUEST_EVENT,
+    HCI_LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT,
+    HCI_LE_DATA_LENGTH_CHANGE_EVENT,
+    HCI_LE_READ_LOCAL_P_256_PUBLIC_KEY_COMPLETE_EVENT,
+    HCI_LE_GENERATE_DHKEY_COMPLETE_EVENT,
+    HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT,
+    HCI_LE_DIRECTED_ADVERTISING_REPORT_EVENT,
+    HCI_LE_PHY_UPDATE_COMPLETE_EVENT,
+    HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT,
+    HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_EVENT,
+    HCI_LE_PERIODIC_ADVERTISING_REPORT_EVENT,
+    HCI_LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT,
+    HCI_LE_SCAN_TIMEOUT_EVENT,
+    HCI_LE_ADVERTISING_SET_TERMINATED_EVENT,
+    HCI_LE_SCAN_REQUEST_RECEIVED_EVENT,
+    HCI_LE_CONNECTIONLESS_IQ_REPORT_EVENT,
+    HCI_LE_CONNECTION_IQ_REPORT_EVENT,
+    HCI_LE_CTE_REQUEST_FAILED_EVENT,
+    HCI_LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_EVENT,
+    HCI_LE_CIS_ESTABLISHED_EVENT,
+    HCI_LE_CIS_REQUEST_EVENT,
+    HCI_LE_CREATE_BIG_COMPLETE_EVENT,
+    HCI_LE_TERMINATE_BIG_COMPLETE_EVENT,
+    HCI_LE_BIG_SYNC_ESTABLISHED_EVENT,
+    HCI_LE_BIG_SYNC_LOST_EVENT,
+    HCI_LE_REQUEST_PEER_SCA_COMPLETE_EVENT,
+    HCI_LE_PATH_LOSS_THRESHOLD_EVENT,
+    HCI_LE_TRANSMIT_POWER_REPORTING_EVENT,
+    HCI_LE_BIGINFO_ADVERTISING_REPORT_EVENT,
+    HCI_LE_SUBRATE_CHANGE_EVENT,
     HCI_AclDataPacket,
     HCI_AclDataPacketAssembler,
     HCI_Command,
@@ -56,12 +140,14 @@ from .hci import (
     HCI_IsoDataPacket,
     HCI_LE_Long_Term_Key_Request_Negative_Reply_Command,
     HCI_LE_Long_Term_Key_Request_Reply_Command,
+    HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command,
     HCI_LE_Read_Buffer_Size_Command,
     HCI_LE_Read_Local_Supported_Features_Command,
     HCI_LE_Read_Suggested_Default_Data_Length_Command,
     HCI_LE_Remote_Connection_Parameter_Request_Reply_Command,
     HCI_LE_Set_Event_Mask_Command,
     HCI_LE_Write_Suggested_Default_Data_Length_Command,
+    HCI_LE_Read_Maximum_Advertising_Data_Length_Command,
     HCI_Link_Key_Request_Negative_Reply_Command,
     HCI_Link_Key_Request_Reply_Command,
     HCI_Packet,
@@ -204,6 +290,8 @@ class Host(AbortableEventEmitter):
         self.sco_links = {}  # SCO links, by connection handle
         self.pending_command = None
         self.pending_response = None
+        self.number_of_supported_advertising_sets = 0
+        self.maximum_advertising_data_length = 31
         self.local_version = None
         self.local_supported_commands = bytes(64)
         self.local_le_features = 0
@@ -288,7 +376,60 @@ class Host(AbortableEventEmitter):
             self.local_version = response.return_parameters
 
         await self.send_command(
-            HCI_Set_Event_Mask_Command(event_mask=bytes.fromhex('FFFFFFFFFFFFFF3F'))
+            HCI_Set_Event_Mask_Command(
+                event_mask=HCI_Set_Event_Mask_Command.mask(
+                    [
+                        HCI_INQUIRY_COMPLETE_EVENT,
+                        HCI_INQUIRY_RESULT_EVENT,
+                        HCI_CONNECTION_COMPLETE_EVENT,
+                        HCI_CONNECTION_REQUEST_EVENT,
+                        HCI_DISCONNECTION_COMPLETE_EVENT,
+                        HCI_AUTHENTICATION_COMPLETE_EVENT,
+                        HCI_REMOTE_NAME_REQUEST_COMPLETE_EVENT,
+                        HCI_ENCRYPTION_CHANGE_EVENT,
+                        HCI_CHANGE_CONNECTION_LINK_KEY_COMPLETE_EVENT,
+                        HCI_LINK_KEY_TYPE_CHANGED_EVENT,
+                        HCI_READ_REMOTE_SUPPORTED_FEATURES_COMPLETE_EVENT,
+                        HCI_READ_REMOTE_VERSION_INFORMATION_COMPLETE_EVENT,
+                        HCI_QOS_SETUP_COMPLETE_EVENT,
+                        HCI_HARDWARE_ERROR_EVENT,
+                        HCI_FLUSH_OCCURRED_EVENT,
+                        HCI_ROLE_CHANGE_EVENT,
+                        HCI_MODE_CHANGE_EVENT,
+                        HCI_RETURN_LINK_KEYS_EVENT,
+                        HCI_PIN_CODE_REQUEST_EVENT,
+                        HCI_LINK_KEY_REQUEST_EVENT,
+                        HCI_LINK_KEY_NOTIFICATION_EVENT,
+                        HCI_LOOPBACK_COMMAND_EVENT,
+                        HCI_DATA_BUFFER_OVERFLOW_EVENT,
+                        HCI_MAX_SLOTS_CHANGE_EVENT,
+                        HCI_READ_CLOCK_OFFSET_COMPLETE_EVENT,
+                        HCI_CONNECTION_PACKET_TYPE_CHANGED_EVENT,
+                        HCI_QOS_VIOLATION_EVENT,
+                        HCI_PAGE_SCAN_REPETITION_MODE_CHANGE_EVENT,
+                        HCI_FLOW_SPECIFICATION_COMPLETE_EVENT,
+                        HCI_INQUIRY_RESULT_WITH_RSSI_EVENT,
+                        HCI_READ_REMOTE_EXTENDED_FEATURES_COMPLETE_EVENT,
+                        HCI_SYNCHRONOUS_CONNECTION_COMPLETE_EVENT,
+                        HCI_SYNCHRONOUS_CONNECTION_CHANGED_EVENT,
+                        HCI_SNIFF_SUBRATING_EVENT,
+                        HCI_EXTENDED_INQUIRY_RESULT_EVENT,
+                        HCI_ENCRYPTION_KEY_REFRESH_COMPLETE_EVENT,
+                        HCI_IO_CAPABILITY_REQUEST_EVENT,
+                        HCI_IO_CAPABILITY_RESPONSE_EVENT,
+                        HCI_USER_CONFIRMATION_REQUEST_EVENT,
+                        HCI_USER_PASSKEY_REQUEST_EVENT,
+                        HCI_REMOTE_OOB_DATA_REQUEST_EVENT,
+                        HCI_SIMPLE_PAIRING_COMPLETE_EVENT,
+                        HCI_LINK_SUPERVISION_TIMEOUT_CHANGED_EVENT,
+                        HCI_ENHANCED_FLUSH_COMPLETE_EVENT,
+                        HCI_USER_PASSKEY_NOTIFICATION_EVENT,
+                        HCI_KEYPRESS_NOTIFICATION_EVENT,
+                        HCI_REMOTE_HOST_SUPPORTED_FEATURES_NOTIFICATION_EVENT,
+                        HCI_LE_META_EVENT,
+                    ]
+                )
+            )
         )
 
         if (
@@ -299,7 +440,44 @@ class Host(AbortableEventEmitter):
             # understand
             le_event_mask = bytes.fromhex('1F00000000000000')
         else:
-            le_event_mask = bytes.fromhex('FFFFFFFF00000000')
+            le_event_mask = HCI_LE_Set_Event_Mask_Command.mask(
+                [
+                    HCI_LE_CONNECTION_COMPLETE_EVENT,
+                    HCI_LE_ADVERTISING_REPORT_EVENT,
+                    HCI_LE_CONNECTION_UPDATE_COMPLETE_EVENT,
+                    HCI_LE_READ_REMOTE_FEATURES_COMPLETE_EVENT,
+                    HCI_LE_LONG_TERM_KEY_REQUEST_EVENT,
+                    HCI_LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT,
+                    HCI_LE_DATA_LENGTH_CHANGE_EVENT,
+                    HCI_LE_READ_LOCAL_P_256_PUBLIC_KEY_COMPLETE_EVENT,
+                    HCI_LE_GENERATE_DHKEY_COMPLETE_EVENT,
+                    HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT,
+                    HCI_LE_DIRECTED_ADVERTISING_REPORT_EVENT,
+                    HCI_LE_PHY_UPDATE_COMPLETE_EVENT,
+                    HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT,
+                    HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_EVENT,
+                    HCI_LE_PERIODIC_ADVERTISING_REPORT_EVENT,
+                    HCI_LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT,
+                    HCI_LE_SCAN_TIMEOUT_EVENT,
+                    HCI_LE_ADVERTISING_SET_TERMINATED_EVENT,
+                    HCI_LE_SCAN_REQUEST_RECEIVED_EVENT,
+                    HCI_LE_CONNECTIONLESS_IQ_REPORT_EVENT,
+                    HCI_LE_CONNECTION_IQ_REPORT_EVENT,
+                    HCI_LE_CTE_REQUEST_FAILED_EVENT,
+                    HCI_LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_EVENT,
+                    HCI_LE_CIS_ESTABLISHED_EVENT,
+                    HCI_LE_CIS_REQUEST_EVENT,
+                    HCI_LE_CREATE_BIG_COMPLETE_EVENT,
+                    HCI_LE_TERMINATE_BIG_COMPLETE_EVENT,
+                    HCI_LE_BIG_SYNC_ESTABLISHED_EVENT,
+                    HCI_LE_BIG_SYNC_LOST_EVENT,
+                    HCI_LE_REQUEST_PEER_SCA_COMPLETE_EVENT,
+                    HCI_LE_PATH_LOSS_THRESHOLD_EVENT,
+                    HCI_LE_TRANSMIT_POWER_REPORTING_EVENT,
+                    HCI_LE_BIGINFO_ADVERTISING_REPORT_EVENT,
+                    HCI_LE_SUBRATE_CHANGE_EVENT,
+                ]
+            )
 
         await self.send_command(
             HCI_LE_Set_Event_Mask_Command(le_event_mask=le_event_mask)
@@ -376,6 +554,25 @@ class Host(AbortableEventEmitter):
                         suggested_max_tx_time=self.suggested_max_tx_time,
                     )
                 )
+
+        if self.supports_command(
+            HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND
+        ):
+            response = await self.send_command(
+                HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command(),
+                check_result=True,
+            )
+            self.number_of_supported_advertising_sets = (
+                response.return_parameters.num_supported_advertising_sets
+            )
+
+        if self.supports_command(HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND):
+            response = await self.send_command(
+                HCI_LE_Read_Maximum_Advertising_Data_Length_Command(), check_result=True
+            )
+            self.maximum_advertising_data_length = (
+                response.return_parameters.max_advertising_data_length
+            )
 
     @property
     def controller(self) -> Optional[TransportSink]:
@@ -791,6 +988,7 @@ class Host(AbortableEventEmitter):
             event.status,
             event.advertising_handle,
             event.connection_handle,
+            event.num_completed_extended_advertising_events,
         )
 
     def on_hci_le_cis_request_event(self, event):
