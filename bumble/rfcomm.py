@@ -118,8 +118,8 @@ CRC_TABLE = bytes([
     0XBA, 0X2B, 0X59, 0XC8, 0XBD, 0X2C, 0X5E, 0XCF
 ])
 
-RFCOMM_DEFAULT_INITIAL_RX_CREDITS = 7
-RFCOMM_DEFAULT_PREFERRED_MTU      = 1280
+RFCOMM_DEFAULT_WINDOW_SIZE    = 16
+RFCOMM_DEFAULT_MAX_FRAME_SIZE = 2000
 
 RFCOMM_DYNAMIC_CHANNEL_NUMBER_START = 1
 RFCOMM_DYNAMIC_CHANNEL_NUMBER_END   = 30
@@ -438,14 +438,16 @@ class DLC(EventEmitter):
         multiplexer: Multiplexer,
         dlci: int,
         max_frame_size: int,
-        initial_tx_credits: int,
+        window_size: int,
     ) -> None:
         super().__init__()
         self.multiplexer = multiplexer
         self.dlci = dlci
-        self.rx_credits = RFCOMM_DEFAULT_INITIAL_RX_CREDITS
-        self.rx_threshold = self.rx_credits // 2
-        self.tx_credits = initial_tx_credits
+        self.max_frame_size = max_frame_size
+        self.window_size = window_size
+        self.rx_credits = window_size
+        self.rx_threshold = window_size // 2
+        self.tx_credits = window_size
         self.tx_buffer = b''
         self.state = DLC.State.INIT
         self.role = multiplexer.role
@@ -537,11 +539,11 @@ class DLC(EventEmitter):
         if len(data) and self.sink:
             self.sink(data)  # pylint: disable=not-callable
 
-        # Update the credits
-        if self.rx_credits > 0:
-            self.rx_credits -= 1
-        else:
-            logger.warning(color('!!! received frame with no rx credits', 'red'))
+            # Update the credits
+            if self.rx_credits > 0:
+                self.rx_credits -= 1
+            else:
+                logger.warning(color('!!! received frame with no rx credits', 'red'))
 
         # Check if there's anything to send (including credits)
         self.process_tx()
@@ -580,9 +582,9 @@ class DLC(EventEmitter):
             cl=0xE0,
             priority=7,
             ack_timer=0,
-            max_frame_size=RFCOMM_DEFAULT_PREFERRED_MTU,
+            max_frame_size=self.max_frame_size,
             max_retransmissions=0,
-            window_size=RFCOMM_DEFAULT_INITIAL_RX_CREDITS,
+            window_size=self.window_size,
         )
         mcc = RFCOMM_Frame.make_mcc(mcc_type=RFCOMM_MCC_PN_TYPE, c_r=0, data=bytes(pn))
         logger.debug(f'>>> PN Response: {pn}')
@@ -591,7 +593,7 @@ class DLC(EventEmitter):
 
     def rx_credits_needed(self) -> int:
         if self.rx_credits <= self.rx_threshold:
-            return RFCOMM_DEFAULT_INITIAL_RX_CREDITS - self.rx_credits
+            return self.window_size - self.rx_credits
 
         return 0
 
@@ -843,7 +845,12 @@ class Multiplexer(EventEmitter):
         )
         await self.disconnection_result
 
-    async def open_dlc(self, channel: int) -> DLC:
+    async def open_dlc(
+        self,
+        channel: int,
+        max_frame_size: int = RFCOMM_DEFAULT_MAX_FRAME_SIZE,
+        window_size: int = RFCOMM_DEFAULT_WINDOW_SIZE,
+    ) -> DLC:
         if self.state != Multiplexer.State.CONNECTED:
             if self.state == Multiplexer.State.OPENING:
                 raise InvalidStateError('open already in progress')
@@ -855,9 +862,9 @@ class Multiplexer(EventEmitter):
             cl=0xF0,
             priority=7,
             ack_timer=0,
-            max_frame_size=RFCOMM_DEFAULT_PREFERRED_MTU,
+            max_frame_size=max_frame_size,
             max_retransmissions=0,
-            window_size=RFCOMM_DEFAULT_INITIAL_RX_CREDITS,
+            window_size=window_size,
         )
         mcc = RFCOMM_Frame.make_mcc(mcc_type=RFCOMM_MCC_PN_TYPE, c_r=1, data=bytes(pn))
         logger.debug(f'>>> Sending MCC: {pn}')
