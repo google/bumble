@@ -327,10 +327,7 @@ class Host(AbortableEventEmitter):
                 f'hc_total_num_le_acl_data_packets={hc_total_num_le_acl_data_packets}'
             )
 
-        if (
-            hc_le_acl_data_packet_length == 0
-            or hc_total_num_le_acl_data_packets == 0
-        ):
+        if hc_le_acl_data_packet_length == 0 or hc_total_num_le_acl_data_packets == 0:
             # LE and Classic share the same queue
             self.le_acl_packet_queue = self.acl_packet_queue
         else:

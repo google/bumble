@@ -1110,9 +1110,11 @@ class Peripheral(Device.Listener, Connection.Listener):
 
         # Stop being discoverable and connectable
         if self.classic:
+
             async def stop_being_discoverable_connectable():
                 await self.device.set_discoverable(False)
                 await self.device.set_connectable(False)
+
             AsyncRunner.spawn(stop_being_discoverable_connectable())
 
         # Request a new data length if needed
