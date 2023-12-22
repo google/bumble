@@ -21,9 +21,11 @@ import dataclasses
 import enum
 import functools
 import logging
+import secrets
 import struct
 from typing import Any, Dict, Callable, Optional, Type, Union, List
 
+from bumble import crypto
 from .colors import color
 from .core import (
     BT_BR_EDR_TRANSPORT,
@@ -1880,6 +1882,43 @@ class Address:
     def parse_address_preceded_by_type(data, offset):
         address_type = data[offset - 1]
         return Address.parse_address_with_type(data, offset, address_type)
+
+    @classmethod
+    def generate_static_address(cls) -> Address:
+        '''Generates Random Static Address, with the 2 most significant bits of 0b11.
+
+        See Bluetooth spec, Vol 6, Part B - Table 1.2.
+        '''
+        address_bytes = secrets.token_bytes(6)
+        address_bytes = address_bytes[:5] + bytes([address_bytes[5] | 0b11000000])
+        return Address(
+            address=address_bytes, address_type=Address.RANDOM_DEVICE_ADDRESS
+        )
+
+    @classmethod
+    def generate_private_address(cls, irk: bytes = b'') -> Address:
+        '''Generates Random Private MAC Address.
+
+        If IRK is present, a Resolvable Private Address, with the 2 most significant
+        bits of 0b01 will be generated. Otherwise, a Non-resolvable Private Address,
+        with the 2 most significant bits of 0b00 will be generated.
+
+        See Bluetooth spec, Vol 6, Part B - Table 1.2.
+
+        Args:
+            irk: Local Identity Resolving Key(IRK), in little-endian. If not set, a
+            non-resolvable address will be generated.
+        '''
+        if irk:
+            prand = crypto.generate_prand()
+            address_bytes = crypto.ah(irk, prand) + prand
+        else:
+            address_bytes = secrets.token_bytes(6)
+            address_bytes = address_bytes[:5] + bytes([address_bytes[5] & 0b00111111])
+
+        return Address(
+            address=address_bytes, address_type=Address.RANDOM_DEVICE_ADDRESS
+        )
 
     def __init__(
         self, address: Union[bytes, str], address_type: int = RANDOM_DEVICE_ADDRESS
