@@ -21,6 +21,9 @@ import enum
 import struct
 from typing import Optional
 
+from bumble import core
+from bumble import crypto
+from bumble import device
 from bumble import gatt
 from bumble import gatt_client
 
@@ -43,9 +46,43 @@ class MemberLock(enum.IntEnum):
 
 
 # -----------------------------------------------------------------------------
-# Utils
+# Crypto Toolbox
 # -----------------------------------------------------------------------------
-# TODO: Implement RSI Generator
+def s1(m: bytes) -> bytes:
+    '''
+    Coordinated Set Identification Service - 4.3 s1 SALT generation function.
+    '''
+    return crypto.aes_cmac(m[::-1], bytes(16))[::-1]
+
+
+def k1(n: bytes, salt: bytes, p: bytes) -> bytes:
+    '''
+    Coordinated Set Identification Service - 4.4 k1 derivation function.
+    '''
+    t = crypto.aes_cmac(n[::-1], salt[::-1])
+    return crypto.aes_cmac(p[::-1], t)[::-1]
+
+
+def sef(k: bytes, r: bytes) -> bytes:
+    '''
+    Coordinated Set Identification Service - 4.5 SIRK encryption function sef.
+    '''
+    return crypto.xor(k1(k, s1(b'SIRKenc'[::-1]), b'csis'[::-1]), r)
+
+
+def sih(k: bytes, r: bytes) -> bytes:
+    '''
+    Coordinated Set Identification Service - 4.7 Resolvable Set Identifier hash function sih.
+    '''
+    return crypto.e(k, r + bytes(13))[:3]
+
+
+def generate_rsi(sirk: bytes) -> bytes:
+    '''
+    Coordinated Set Identification Service - 4.8 Resolvable Set Identifier generation operation.
+    '''
+    prand = crypto.generate_prand()
+    return sih(sirk, prand) + prand
 
 
 # -----------------------------------------------------------------------------
@@ -54,6 +91,7 @@ class MemberLock(enum.IntEnum):
 class CoordinatedSetIdentificationService(gatt.TemplateService):
     UUID = gatt.GATT_COORDINATED_SET_IDENTIFICATION_SERVICE
 
+    set_identity_resolving_key: bytes
     set_identity_resolving_key_characteristic: gatt.Characteristic
     coordinated_set_size_characteristic: Optional[gatt.Characteristic] = None
     set_member_lock_characteristic: Optional[gatt.Characteristic] = None
@@ -62,19 +100,21 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
     def __init__(
         self,
         set_identity_resolving_key: bytes,
+        set_identity_resolving_key_type: SirkType,
         coordinated_set_size: Optional[int] = None,
         set_member_lock: Optional[MemberLock] = None,
         set_member_rank: Optional[int] = None,
     ) -> None:
         characteristics = []
 
+        self.set_identity_resolving_key = set_identity_resolving_key
+        self.set_identity_resolving_key_type = set_identity_resolving_key_type
         self.set_identity_resolving_key_characteristic = gatt.Characteristic(
             uuid=gatt.GATT_SET_IDENTITY_RESOLVING_KEY_CHARACTERISTIC,
             properties=gatt.Characteristic.Properties.READ
             | gatt.Characteristic.Properties.NOTIFY,
             permissions=gatt.Characteristic.Permissions.READABLE,
-            # TODO: Implement encrypted SIRK reader.
-            value=struct.pack('B', SirkType.PLAINTEXT) + set_identity_resolving_key,
+            value=gatt.CharacteristicValue(read=self.on_sirk_read),
         )
         characteristics.append(self.set_identity_resolving_key_characteristic)
 
@@ -111,6 +151,24 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
             characteristics.append(self.set_member_rank_characteristic)
 
         super().__init__(characteristics)
+
+    def on_sirk_read(self, _connection: device.Connection) -> bytes:
+        if self.set_identity_resolving_key_type == SirkType.PLAINTEXT:
+            return bytes([SirkType.PLAINTEXT]) + self.set_identity_resolving_key
+        else:
+            raise NotImplementedError('TODO: Pending async Characteristic read.')
+
+    def get_advertising_data(self) -> bytes:
+        return bytes(
+            core.AdvertisingData(
+                [
+                    (
+                        core.AdvertisingData.RESOLVABLE_SET_IDENTIFIER,
+                        generate_rsi(self.set_identity_resolving_key),
+                    ),
+                ]
+            )
+        )
 
 
 # -----------------------------------------------------------------------------
