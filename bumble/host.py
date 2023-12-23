@@ -110,7 +110,7 @@ class AclPacketQueue:
         self.packets.appendleft(packet)
         self.check_queue()
 
-        if len(self.packets):
+        if self.packets:
             logger.debug(
                 f'{self.in_flight} ACL packets in flight, '
                 f'{len(self.packets)} in queue'
