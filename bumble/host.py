@@ -591,7 +591,9 @@ class Host(AbortableEventEmitter):
         return self.on_command_processed(event)
 
     def on_hci_number_of_completed_packets_event(self, event):
-        for i, connection_handle in enumerate(event.connection_handles):
+        for connection_handle, num_completed_packets in zip(
+            event.connection_handles, event.num_completed_packets
+        ):
             if not (connection := self.connections.get(connection_handle)):
                 logger.warning(
                     'received packet completion event for unknown handle '
@@ -599,9 +601,7 @@ class Host(AbortableEventEmitter):
                 )
                 continue
 
-            connection.acl_packet_queue.on_packets_completed(
-                event.num_completed_packets[i]
-            )
+            connection.acl_packet_queue.on_packets_completed(num_completed_packets)
 
     # Classic only
     def on_hci_connection_request_event(self, event):
