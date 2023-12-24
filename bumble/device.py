@@ -21,6 +21,7 @@ import functools
 import json
 import asyncio
 import logging
+import secrets
 from contextlib import asynccontextmanager, AsyncExitStack, closing
 from dataclasses import dataclass
 from collections.abc import Iterable
@@ -995,12 +996,15 @@ class DeviceConfiguration:
         irk = config.get('irk')
         if irk:
             self.irk = bytes.fromhex(irk)
-        else:
+        elif self.address != Address(DEVICE_DEFAULT_ADDRESS):
             # Construct an IRK from the address bytes
             # NOTE: this is not secure, but will always give the same IRK for the same
             # address
             address_bytes = bytes(self.address)
             self.irk = (address_bytes * 3)[:16]
+        else:
+            # Fallback - when both IRK and address are not set, randomly generate an IRK.
+            self.irk = secrets.token_bytes(16)
 
         # Load advertising data
         advertising_data = config.get('advertising_data')
@@ -1582,6 +1586,16 @@ class Device(CompositeEventEmitter):
         if self.address_resolution_offload:
             await self.send_command(HCI_LE_Clear_Resolving_List_Command())
 
+            # Add an empty entry for non-directed address generation.
+            await self.send_command(
+                HCI_LE_Add_Device_To_Resolving_List_Command(
+                    peer_identity_address_type=Address.ANY.address_type,
+                    peer_identity_address=Address.ANY,
+                    peer_irk=bytes(16),
+                    local_irk=self.irk,
+                )
+            )
+
             for irk, address in resolving_keys:
                 await self.send_command(
                     HCI_LE_Add_Device_To_Resolving_List_Command(
@@ -1682,8 +1696,8 @@ class Device(CompositeEventEmitter):
             peer_address = target
             peer_address_type = target.address_type
         else:
-            peer_address = Address('00:00:00:00:00:00')
-            peer_address_type = Address.PUBLIC_DEVICE_ADDRESS
+            peer_address = Address.ANY
+            peer_address_type = Address.ANY.address_type
 
         # Set the advertising parameters
         await self.send_command(
