@@ -59,14 +59,12 @@ async def main() -> None:
             sys.argv[1], hci_transport.source, hci_transport.sink
         )
         await device.power_on()
-        await (
-            await device.create_advertising_set(
-                advertising_parameters=AdvertisingParameters(
-                    advertising_event_properties=advertising_properties,
-                    peer_address=peer_address,
-                )
+        await device.create_advertising_set(
+            advertising_parameters=AdvertisingParameters(
+                advertising_event_properties=advertising_properties,
+                peer_address=peer_address,
             )
-        ).start()
+        )
         await hci_transport.source.terminated
 
 

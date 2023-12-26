@@ -59,7 +59,6 @@ async def main() -> None:
                 advertising_data=bytes(advertising_data1),
             )
             print("Selected TX power 1:", set1.selected_tx_power)
-            await set1.start()
 
             advertising_data2 = AdvertisingData(
                 [(AdvertisingData.COMPLETE_LOCAL_NAME, "Bumble 2".encode("utf-8"))]
@@ -70,6 +69,7 @@ async def main() -> None:
                 random_address=Address("F0:F0:F0:F0:F0:F1"),
                 advertising_parameters=AdvertisingParameters(),
                 advertising_data=bytes(advertising_data2),
+                auto_start=False,
                 auto_restart=True,
             )
             print("Selected TX power 2:", set2.selected_tx_power)
@@ -90,7 +90,6 @@ async def main() -> None:
                 scan_response_data=bytes(scan_response_data3),
             )
             print("Selected TX power 3:", set2.selected_tx_power)
-            await set3.start()
 
         await hci_transport.source.terminated
 

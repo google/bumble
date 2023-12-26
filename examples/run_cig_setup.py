@@ -63,7 +63,6 @@ async def main() -> None:
 
     await asyncio.gather(*[device.power_on() for device in devices])
     advertising_set = await devices[0].create_advertising_set()
-    await advertising_set.start()
 
     connection = await devices[1].connect(
         devices[0].public_address, own_address_type=OwnAddressType.PUBLIC

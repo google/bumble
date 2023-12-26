@@ -181,7 +181,6 @@ async def main() -> None:
         advertising_set = await device.create_advertising_set(
             advertising_data=advertising_data,
         )
-        await advertising_set.start()
 
         await hci_transport.source.terminated
 

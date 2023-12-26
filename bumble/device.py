@@ -664,6 +664,7 @@ class AdvertisingSet(EventEmitter):
         self.advertising_data = advertising_data
 
     async def set_scan_response_data(self, scan_response_data: bytes) -> None:
+        # pylint: disable=line-too-long
         if (
             scan_response_data
             and not self.advertising_parameters.advertising_event_properties.is_scannable
@@ -674,7 +675,6 @@ class AdvertisingSet(EventEmitter):
             )
             return
 
-        # pylint: disable=line-too-long
         await self.device.send_command(
             HCI_LE_Set_Extended_Scan_Response_Data_Command(
                 advertising_handle=self.advertising_handle,
@@ -2016,6 +2016,7 @@ class Device(CompositeEventEmitter):
         if self.supports_le_extended_advertising:
             # Use extended advertising commands with legacy PDUs.
             self.legacy_advertising_set = await self.create_advertising_set(
+                auto_start=True,
                 auto_restart=auto_restart,
                 random_address=self.random_address,
                 advertising_parameters=AdvertisingParameters(
@@ -2036,8 +2037,6 @@ class Device(CompositeEventEmitter):
                     self.scan_response_data if advertising_type.is_scannable else b''
                 ),
             )
-
-            await self.legacy_advertising_set.start()
         else:
             # Use legacy commands.
             self.legacy_advertiser = LegacyAdvertiser(
@@ -2068,8 +2067,37 @@ class Device(CompositeEventEmitter):
         scan_response_data: bytes = b'',
         periodic_advertising_parameters: Optional[PeriodicAdvertisingParameters] = None,
         periodic_advertising_data: bytes = b'',
+        auto_start: bool = True,
         auto_restart: bool = False,
     ) -> AdvertisingSet:
+        """
+        Create an advertising set.
+
+        This method allows the creation of advertising sets for controllers that
+        support extended advertising.
+
+        Args:
+          advertising_parameters:
+            The parameters to use for this set. If None, default parameters are used.
+          random_address:
+            The random address to use (only relevant when the parameters specify that
+            own_address_type is random).
+          advertising_data:
+            Initial value for the set's advertising data.
+          scan_response_data:
+            Initial value for the set's scan response data.
+          periodic_advertising_parameters:
+            The parameters to use for periodic advertising (if needed).
+          periodic_advertising_data:
+            Initial value for the set's periodic advertising data.
+          auto_start:
+            True if the set should be automatically started upon creation.
+          auto_restart:
+            True if the set should be automatically restated after a disconnection.
+
+        Returns:
+          An AdvertisingSet instance.
+        """
         # Allocate a new handle
         try:
             advertising_handle = next(
@@ -2144,6 +2172,15 @@ class Device(CompositeEventEmitter):
 
         # Remember the set.
         self.extended_advertising_sets[advertising_handle] = advertising_set
+
+        # Try to start the set if requested.
+        if auto_start:
+            try:
+                await advertising_set.start()
+            except Exception as error:
+                logger.exception(f'failed to start advertising set: {error}')
+                await advertising_set.remove()
+                raise
 
         return advertising_set
 

@@ -327,7 +327,6 @@ async def test_extended_advertising():
 
     # Start advertising
     advertising_set = await device.create_advertising_set()
-    await advertising_set.start()
     assert device.extended_advertising_sets
     assert advertising_set.enabled
 
@@ -348,7 +347,6 @@ async def test_extended_advertising_connection(own_address_type):
     advertising_set = await device.create_advertising_set(
         advertising_parameters=AdvertisingParameters(own_address_type=own_address_type)
     )
-    await advertising_set.start()
     device.on_connection(
         0x0001,
         BT_LE_TRANSPORT,
