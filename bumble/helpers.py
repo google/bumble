@@ -37,6 +37,7 @@ from bumble.l2cap import (
     L2CAP_Connection_Response,
 )
 from bumble.hci import (
+    Address,
     HCI_EVENT_PACKET,
     HCI_ACL_DATA_PACKET,
     HCI_DISCONNECTION_COMPLETE_EVENT,
@@ -48,6 +49,7 @@ from bumble.hci import (
 )
 from bumble.rfcomm import RFCOMM_Frame, RFCOMM_PSM
 from bumble.sdp import SDP_PDU, SDP_PSM
+from bumble import crypto
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -232,3 +234,15 @@ class PacketTracer:
         )
         self.host_to_controller_analyzer.peer = self.controller_to_host_analyzer
         self.controller_to_host_analyzer.peer = self.host_to_controller_analyzer
+
+
+def generate_irk() -> bytes:
+    return crypto.r()
+
+
+def verify_rpa_with_irk(rpa: Address, irk: bytes) -> bool:
+    rpa_bytes = bytes(rpa)
+    prand_given = rpa_bytes[3:]
+    hash_given = rpa_bytes[:3]
+    hash_local = crypto.ah(irk, prand_given)
+    return hash_local[:3] == hash_given
