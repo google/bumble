@@ -134,12 +134,14 @@ class Controller:
             '0000000060000000'
         )  # BR/EDR Not Supported, LE Supported (Controller)
         self.manufacturer_name = 0xFFFF
+        self.hc_data_packet_length = 27
+        self.hc_total_num_data_packets = 64
         self.hc_le_data_packet_length = 27
         self.hc_total_num_le_data_packets = 64
         self.event_mask = 0
         self.event_mask_page_2 = 0
         self.supported_commands = bytes.fromhex(
-            '2000800000c000000000e40000002822000000000000040000f7ffff7f000000'
+            '2000800000c000000000e4000000a822000000000000040000f7ffff7f000000'
             '30f0f9ff01008004000000000000000000000000000000000000000000000000'
         )
         self.le_event_mask = 0
@@ -913,6 +915,19 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.4.3 Read Local Supported Features Command
         '''
         return bytes([HCI_SUCCESS]) + self.lmp_features
+
+    def on_hci_read_buffer_size_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.4.5 Read Buffer Size Command
+        '''
+        return struct.pack(
+            '<BHBHH',
+            HCI_SUCCESS,
+            self.hc_data_packet_length,
+            0,
+            self.hc_total_num_data_packets,
+            0,
+        )
 
     def on_hci_read_bd_addr_command(self, _command):
         '''

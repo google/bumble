@@ -29,7 +29,7 @@ from bumble.core import (
     ConnectionParameters,
 )
 from bumble.device import Connection, Device
-from bumble.host import Host
+from bumble.host import AclPacketQueue, Host
 from bumble.hci import (
     HCI_ACCEPT_CONNECTION_REQUEST_COMMAND,
     HCI_COMMAND_STATUS_PENDING,
@@ -72,6 +72,13 @@ async def test_device_connect_parallel():
     d0 = Device(host=Host(None, None))
     d1 = Device(host=Host(None, None))
     d2 = Device(host=Host(None, None))
+
+    def _send(packet):
+        pass
+
+    d0.host.acl_packet_queue = AclPacketQueue(0, 0, _send)
+    d1.host.acl_packet_queue = AclPacketQueue(0, 0, _send)
+    d2.host.acl_packet_queue = AclPacketQueue(0, 0, _send)
 
     # enable classic
     d0.classic_enabled = True
