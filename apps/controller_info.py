@@ -24,6 +24,10 @@ from bumble.company_ids import COMPANY_IDENTIFIERS
 from bumble.colors import color
 from bumble.core import name_or_number
 from bumble.hci import (
+    HCI_READ_LOCAL_EXTENDED_FEATURES_COMMAND,
+    HCI_READ_LOCAL_SUPPORTED_FEATURES_COMMAND,
+    HCI_Read_Local_Extended_Features_Command,
+    HCI_Read_Local_Supported_Features_Command,
     map_null_terminated_utf8_string,
     HCI_SUCCESS,
     HCI_LE_SUPPORTED_FEATURES_NAMES,
@@ -56,6 +60,36 @@ def command_succeeded(response):
     if isinstance(response, HCI_Command_Complete_Event):
         return response.return_parameters.status == HCI_SUCCESS
     return False
+
+
+# -----------------------------------------------------------------------------
+async def get_common_info(host):
+    if host.supports_command(HCI_READ_LOCAL_SUPPORTED_FEATURES_COMMAND):
+        response = await host.send_command(HCI_Read_Local_Supported_Features_Command())
+        if response.return_parameters.status == HCI_SUCCESS:
+            print()
+            print(color('LMP Features:', 'yellow'))
+            # TODO: support printing discrete enum values
+            print('  ', response.return_parameters.lmp_features.hex())
+
+    if host.supports_command(HCI_READ_LOCAL_EXTENDED_FEATURES_COMMAND):
+        response = await host.send_command(
+            HCI_Read_Local_Extended_Features_Command(page_number=0)
+        )
+        if response.return_parameters.status == HCI_SUCCESS:
+            if response.return_parameters.max_page_number > 0:
+                print()
+                print(color('Extended LMP Features:', 'yellow'))
+
+            for page in range(1, response.return_parameters.max_page_number + 1):
+                response = await host.send_command(
+                    HCI_Read_Local_Extended_Features_Command(page_number=page)
+                )
+
+                if response.return_parameters.status == HCI_SUCCESS:
+                    # TODO: support printing discrete enum values
+                    print(f'  Page {page}:')
+                    print('  ', response.return_parameters.extended_lmp_features.hex())
 
 
 # -----------------------------------------------------------------------------
@@ -161,6 +195,9 @@ async def async_main(transport):
             name_or_number(LMP_VERSION_NAMES, host.local_version.lmp_version),
         )
         print(color('  LMP Subversion:', 'green'), host.local_version.lmp_subversion)
+
+        # Get the common info
+        await get_common_info(host)
 
         # Get the Classic info
         await get_classic_info(host)

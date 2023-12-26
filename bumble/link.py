@@ -95,11 +95,21 @@ class LocalLink:
     def on_address_changed(self, controller):
         pass
 
-    def send_advertising_data(self, sender_address, data):
+    def send_advertising_data(self, sender_address, data, scan_response):
         # Send the advertising data to all controllers, except the sender
         for controller in self.controllers:
             if controller.random_address != sender_address:
-                controller.on_link_advertising_data(sender_address, data)
+                controller.on_link_advertising_data(sender_address, data, scan_response)
+
+    def send_extended_advertising_data(
+        self, sender_address, event_type, data, scan_response
+    ):
+        # Send the advertising data to all controllers, except the sender
+        for controller in self.controllers:
+            if controller.random_address != sender_address:
+                controller.on_link_extended_advertising_data(
+                    sender_address, event_type, data, scan_response
+                )
 
     def send_acl_data(self, sender_controller, destination_address, transport, data):
         # Send the data to the first controller with a matching address
@@ -151,30 +161,34 @@ class LocalLink:
         asyncio.get_running_loop().call_soon(self.on_connection_complete)
 
     def on_disconnection_complete(
-        self, central_address, peripheral_address, disconnect_command
+        self, initiator_address, peer_address, disconnect_command
     ):
         # Find the controller that initiated the disconnection
-        if not (central_controller := self.find_controller(central_address)):
+        if not (initiator_controller := self.find_controller(initiator_address)):
             logger.warning('!!! Initiating controller not found')
             return
 
         # Disconnect from the first controller with a matching address
-        if peripheral_controller := self.find_controller(peripheral_address):
-            peripheral_controller.on_link_central_disconnected(
-                central_address, disconnect_command.reason
+        if peer_controller := self.find_controller(peer_address):
+            peer_controller.on_link_peer_disconnected(
+                initiator_address, disconnect_command.reason
             )
 
-        central_controller.on_link_peripheral_disconnection_complete(
+        initiator_controller.on_link_initiated_disconnection_complete(
             disconnect_command, HCI_SUCCESS
         )
 
-    def disconnect(self, central_address, peripheral_address, disconnect_command):
+    def disconnect(self, initiator_address, peer_address, disconnect_command):
         logger.debug(
-            f'$$$ DISCONNECTION {central_address} -> '
-            f'{peripheral_address}: reason = {disconnect_command.reason}'
+            f'$$$ DISCONNECTION {initiator_address} -> '
+            f'{peer_address}: reason = {disconnect_command.reason}'
         )
-        args = [central_address, peripheral_address, disconnect_command]
-        asyncio.get_running_loop().call_soon(self.on_disconnection_complete, *args)
+        asyncio.get_running_loop().call_soon(
+            self.on_disconnection_complete,
+            initiator_address,
+            peer_address,
+            disconnect_command,
+        )
 
     # pylint: disable=too-many-arguments
     def on_connection_encrypted(
@@ -360,11 +374,11 @@ class RemoteLink:
 
     async def on_left_received(self, address):
         if address in self.central_connections:
-            self.controller.on_link_peripheral_disconnected(Address(address))
+            self.controller.on_link_connection_lost(Address(address))
             self.central_connections.remove(address)
 
         if address in self.peripheral_connections:
-            self.controller.on_link_central_disconnected(
+            self.controller.on_link_peer_disconnected(
                 address, HCI_CONNECTION_TIMEOUT_ERROR
             )
             self.peripheral_connections.remove(address)
@@ -384,7 +398,7 @@ class RemoteLink:
     async def on_advertisement_message_received(self, sender, advertisement):
         try:
             self.controller.on_link_advertising_data(
-                Address(sender), bytes.fromhex(advertisement)
+                Address(sender), bytes.fromhex(advertisement), b''
             )
         except Exception:
             logger.exception('exception')
@@ -424,7 +438,7 @@ class RemoteLink:
         # Notify the controller
         params = parse_parameters(message)
         reason = int(params.get('reason', str(HCI_CONNECTION_TIMEOUT_ERROR)))
-        self.controller.on_link_central_disconnected(Address(sender), reason)
+        self.controller.on_link_peer_disconnected(Address(sender), reason)
 
         # Forget the connection
         if sender in self.peripheral_connections:
@@ -471,7 +485,7 @@ class RemoteLink:
     async def send_advertising_data_to_relay(self, data):
         await self.send_targeted_message('*', f'advertisement:{data.hex()}')
 
-    def send_advertising_data(self, _, data):
+    def send_advertising_data(self, _, data, scan_response):
         self.execute(partial(self.send_advertising_data_to_relay, data))
 
     async def send_acl_data_to_relay(self, peer_address, data):

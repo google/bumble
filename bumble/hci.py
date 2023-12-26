@@ -3266,7 +3266,9 @@ class HCI_Read_Local_Supported_Commands_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command()
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('lmp_features', 8)]
+)
 class HCI_Read_Local_Supported_Features_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.4.3 Read Local Supported Features Command
@@ -3279,7 +3281,7 @@ class HCI_Read_Local_Supported_Features_Command(HCI_Command):
     return_parameters_fields=[
         ('status', STATUS_SPEC),
         ('page_number', 1),
-        ('maximum_page_number', 1),
+        ('max_page_number', 1),
         ('extended_lmp_features', 8),
     ],
 )
@@ -3448,7 +3450,9 @@ class HCI_LE_Set_Advertising_Parameters_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command()
+@HCI_Command.command(
+    return_parameters_fields=[('status', STATUS_SPEC), ('tx_power_level', 1)]
+)
 class HCI_LE_Read_Advertising_Physical_Channel_Tx_Power_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.6 LE Read Advertising Physical Channel Tx Power Command
@@ -5829,7 +5833,7 @@ class HCI_Inquiry_Result_With_RSSI_Event(HCI_Event):
         ('status', STATUS_SPEC),
         ('connection_handle', 2),
         ('page_number', 1),
-        ('maximum_page_number', 1),
+        ('max_page_number', 1),
         ('extended_lmp_features', 8),
     ]
 )
