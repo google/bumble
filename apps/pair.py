@@ -52,11 +52,13 @@ from bumble.att import (
 class Waiter:
     instance = None
 
-    def __init__(self):
+    def __init__(self, linger=False):
         self.done = asyncio.get_running_loop().create_future()
+        self.linger = linger
 
     def terminate(self):
-        self.done.set_result(None)
+        if not self.linger:
+            self.done.set_result(None)
 
     async def wait_until_terminated(self):
         return await self.done
@@ -302,7 +304,7 @@ async def pair(
     hci_transport,
     address_or_name,
 ):
-    Waiter.instance = Waiter()
+    Waiter.instance = Waiter(linger=linger)
 
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(hci_transport) as (hci_source, hci_sink):
@@ -396,7 +398,6 @@ async def pair(
                 address_or_name,
                 transport=BT_LE_TRANSPORT if mode == 'le' else BT_BR_EDR_TRANSPORT,
             )
-            pairing_failure = False
 
             if not request:
                 try:
@@ -405,11 +406,8 @@ async def pair(
                     else:
                         await connection.authenticate()
                 except ProtocolError as error:
-                    pairing_failure = True
                     print(color(f'Pairing failed: {error}', 'red'))
 
-            if not linger or pairing_failure:
-                return
         else:
             if mode == 'le':
                 # Advertise so that peers can find us and connect
@@ -459,7 +457,7 @@ class LogHandler(logging.Handler):
     help='Enable CTKD',
     show_default=True,
 )
-@click.option('--linger', default=True, is_flag=True, help='Linger after pairing')
+@click.option('--linger', default=False, is_flag=True, help='Linger after pairing')
 @click.option(
     '--io',
     type=click.Choice(
