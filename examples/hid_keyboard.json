@@ -1,0 +1,5 @@
+{
+    "name": "Bumble HID Keyboard",
+    "class_of_device": 9664,
+    "keystore": "JsonKeyStore"
+}
