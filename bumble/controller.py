@@ -155,7 +155,7 @@ from bumble.hci import (
     HCI_Number_Of_Completed_Packets_Event,
     HCI_Packet,
     HCI_Role_Change_Event,
-    HCI_Command
+    HCI_Command,
 )
 from typing import Dict, List, Optional, Sequence, Tuple, Union, TYPE_CHECKING
 
@@ -239,6 +239,7 @@ class Options:
 # -----------------------------------------------------------------------------
 class Advertiser:
     enabled: bool = False
+
     def send_advertising_data(self, controller: Controller):
         pass
 
@@ -255,7 +256,9 @@ class LegacyAdvertiser(Advertiser):
         if self.parameters is None or not self.enabled:
             return
 
-        controller.link.send_advertising_data(self.address, self.data, self.scan_response_data)
+        controller.link.send_advertising_data(
+            self.address, self.data, self.scan_response_data
+        )
 
         next_advertising_time = (
             time.time() + self.parameters.advertising_interval_min / 625.0
@@ -341,119 +344,6 @@ class ExtendedAdvertiser(Advertiser):
             time.time() + self.parameters.primary_advertising_interval_min / 625.0
         )
         controller.schedule_advertiser(self, next_advertising_time)
-
-
-# -----------------------------------------------------------------------------
-@dataclass
-class Options:
-    extended_advertising: bool = False
-
-
-# -----------------------------------------------------------------------------
-class LegacyAdvertiser:
-    def __init__(self, parameters, address):
-        self.address = address
-        self.parameters = parameters
-        self.data = b''
-        self.scan_response_data = b''
-        self.enabled = False
-        self.next_advertising_time = 0  # When to advertise next
-
-    def schedule(self):
-        if self.parameters is None:
-            return
-        self.next_advertising_time = (
-            time.time() + self.parameters.advertising_interval_min / 625.0
-        )
-
-    def send_advertising_data(self, link):
-        if self.parameters is None or not self.enabled:
-            return
-
-        link.send_advertising_data(self.address, self.data, self.scan_response_data)
-        self.schedule()
-
-
-# -----------------------------------------------------------------------------
-class ExtendedAdvertiser:
-    def __init__(self, parameters, address):
-        self.parameters = parameters
-        self.address = address
-        self.data = b''
-        self.scan_response_data = b''
-        self.enabled = False
-        self.max_extended_advertising_events = 0
-        self.extended_advertising_events = 0
-        self.duration = 0
-        self.first_advertising_time = 0
-        self.next_advertising_time = 0  # When to advertise next
-
-    @property
-    def tx_power(self):
-        return (
-            0
-            if self.parameters.advertising_tx_power == 0x7F
-            else self.parameters.advertising_tx_power
-        )
-
-    @property
-    def is_connectable(self):
-        return self.parameters.advertising_event_properties & (1 << 0) != 0
-
-    @property
-    def is_scannable(self):
-        return self.parameters.advertising_event_properties & (1 << 1) != 0
-
-    @property
-    def is_directed(self):
-        return self.parameters.advertising_event_properties & (1 << 2) != 0
-
-    @property
-    def is_high_duty_cycle_directed(self):
-        return self.parameters.advertising_event_properties & (1 << 3) != 0
-
-    @property
-    def is_legacy(self):
-        return self.parameters.advertising_event_properties & (1 << 4) != 0
-
-    @property
-    def is_anonymous(self):
-        return self.parameters.advertising_event_properties & (1 << 5) != 0
-
-    def schedule(self):
-        self.next_advertising_time = (
-            time.time() + self.parameters.primary_advertising_interval_min / 625.0
-        )
-
-    def send_advertising_data(self, link):
-        if not self.enabled:
-            return
-
-        if (
-            self.max_extended_advertising_events > 0
-            and self.extended_advertising_events >= self.max_extended_advertising_events
-        ):
-            self.next_advertising_time = 0
-            return
-
-        now = time.time()
-        if self.extended_advertising_events == 0:
-            self.first_advertising_time = now
-
-        if self.duration:
-            elapsed = now - self.first_advertising_time
-            if elapsed > self.duration / 100.0:
-                self.next_advertising_time = 0
-                return
-
-        self.extended_advertising_events += 1
-        link.send_extended_advertising_data(
-            self.address,
-            self.parameters.advertising_event_properties,
-            self.data,
-            self.scan_response_data,
-        )
-        self.schedule()
 
 
 # -----------------------------------------------------------------------------
@@ -1138,7 +1028,6 @@ class Controller:
             self.advertising_timer_handle = asyncio.get_running_loop().call_soon(
                 self.on_advertising_timer_fired
             )
-
 
     ############################################################
     # HCI handlers
