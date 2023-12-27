@@ -777,7 +777,7 @@ class ConsoleApp:
                 if not service:
                     continue
                 values = [
-                    attribute.read_value(connection)
+                    await attribute.read_value(connection)
                     for connection in self.device.connections.values()
                 ]
                 if not values:
@@ -796,11 +796,11 @@ class ConsoleApp:
                 if not characteristic:
                     continue
                 values = [
-                    attribute.read_value(connection)
+                    await attribute.read_value(connection)
                     for connection in self.device.connections.values()
                 ]
                 if not values:
-                    values = [attribute.read_value(None)]
+                    values = [await attribute.read_value(None)]
 
                 # TODO: future optimization: convert CCCD value to human readable string
 
@@ -944,7 +944,7 @@ class ConsoleApp:
 
         # send data to any subscribers
         if isinstance(attribute, Characteristic):
-            attribute.write_value(None, value)
+            await attribute.write_value(None, value)
             if attribute.has_properties(Characteristic.NOTIFY):
                 await self.device.gatt_server.notify_subscribers(attribute)
             if attribute.has_properties(Characteristic.INDICATE):

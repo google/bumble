@@ -18,7 +18,7 @@
 # -----------------------------------------------------------------------------
 import struct
 import logging
-from typing import List
+from typing import List, Optional
 
 from bumble import l2cap
 from ..core import AdvertisingData
@@ -67,7 +67,7 @@ class AshaService(TemplateService):
             self.emit('volume', connection, value[0])
 
         # Handler for audio control commands
-        def on_audio_control_point_write(connection: Connection, value):
+        def on_audio_control_point_write(connection: Optional[Connection], value):
             logger.info(f'--- AUDIO CONTROL POINT Write:{value.hex()}')
             opcode = value[0]
             if opcode == AshaService.OPCODE_START:

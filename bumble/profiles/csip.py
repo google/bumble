@@ -152,7 +152,7 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
 
         super().__init__(characteristics)
 
-    def on_sirk_read(self, _connection: device.Connection) -> bytes:
+    def on_sirk_read(self, _connection: Optional[device.Connection]) -> bytes:
         if self.set_identity_resolving_key_type == SirkType.PLAINTEXT:
             return bytes([SirkType.PLAINTEXT]) + self.set_identity_resolving_key
         else:

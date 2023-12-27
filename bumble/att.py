@@ -25,9 +25,21 @@
 from __future__ import annotations
 import enum
 import functools
+import inspect
 import struct
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Type,
+    Union,
+    TYPE_CHECKING,
+)
+
 from pyee import EventEmitter
-from typing import Dict, Type, List, Protocol, Union, Optional, Any, TYPE_CHECKING
 
 from bumble.core import UUID, name_or_number, ProtocolError
 from bumble.hci import HCI_Object, key_with_value
@@ -722,12 +734,38 @@ class ATT_Handle_Value_Confirmation(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-class ConnectionValue(Protocol):
-    def read(self, connection) -> bytes:
-        ...
+class AttributeValue:
+    '''
+    Attribute value where reading and/or writing is delegated to functions
+    passed as arguments to the constructor.
+    '''
 
-    def write(self, connection, value: bytes) -> None:
-        ...
+    def __init__(
+        self,
+        read: Union[
+            Callable[[Optional[Connection]], bytes],
+            Callable[[Optional[Connection]], Awaitable[bytes]],
+            None,
+        ] = None,
+        write: Union[
+            Callable[[Optional[Connection], bytes], None],
+            Callable[[Optional[Connection], bytes], Awaitable[None]],
+            None,
+        ] = None,
+    ):
+        self._read = read
+        self._write = write
+
+    def read(self, connection: Optional[Connection]) -> Union[bytes, Awaitable[bytes]]:
+        return self._read(connection) if self._read else b''
+
+    def write(
+        self, connection: Optional[Connection], value: bytes
+    ) -> Union[Awaitable[None], None]:
+        if self._write:
+            return self._write(connection, value)
+
+        return None
 
 
 # -----------------------------------------------------------------------------
@@ -770,13 +808,13 @@ class Attribute(EventEmitter):
     READ_REQUIRES_AUTHORIZATION = Permissions.READ_REQUIRES_AUTHORIZATION
     WRITE_REQUIRES_AUTHORIZATION = Permissions.WRITE_REQUIRES_AUTHORIZATION
 
-    value: Union[str, bytes, ConnectionValue]
+    value: Union[bytes, AttributeValue]
 
     def __init__(
         self,
         attribute_type: Union[str, bytes, UUID],
         permissions: Union[str, Attribute.Permissions],
-        value: Union[str, bytes, ConnectionValue] = b'',
+        value: Union[str, bytes, AttributeValue] = b'',
     ) -> None:
         EventEmitter.__init__(self)
         self.handle = 0
@@ -806,7 +844,7 @@ class Attribute(EventEmitter):
     def decode_value(self, value_bytes: bytes) -> Any:
         return value_bytes
 
-    def read_value(self, connection: Optional[Connection]) -> bytes:
+    async def read_value(self, connection: Optional[Connection]) -> bytes:
         if (
             (self.permissions & self.READ_REQUIRES_ENCRYPTION)
             and connection is not None
@@ -832,6 +870,8 @@ class Attribute(EventEmitter):
         if hasattr(self.value, 'read'):
             try:
                 value = self.value.read(connection)
+                if inspect.isawaitable(value):
+                    value = await value
             except ATT_Error as error:
                 raise ATT_Error(
                     error_code=error.error_code, att_handle=self.handle
@@ -841,7 +881,7 @@ class Attribute(EventEmitter):
 
         return self.encode_value(value)
 
-    def write_value(self, connection: Connection, value_bytes: bytes) -> None:
+    async def write_value(self, connection: Connection, value_bytes: bytes) -> None:
         if (
             self.permissions & self.WRITE_REQUIRES_ENCRYPTION
         ) and not connection.encryption:
@@ -864,7 +904,9 @@ class Attribute(EventEmitter):
 
         if hasattr(self.value, 'write'):
             try:
-                self.value.write(connection, value)  # pylint: disable=not-callable
+                result = self.value.write(connection, value)
+                if inspect.isawaitable(result):
+                    await result
             except ATT_Error as error:
                 raise ATT_Error(
                     error_code=error.error_code, att_handle=self.handle

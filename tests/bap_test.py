@@ -48,7 +48,8 @@ from bumble.profiles.bap import (
     PublishedAudioCapabilitiesService,
     PublishedAudioCapabilitiesServiceProxy,
 )
-from .test_utils import TwoDevices
+from tests.test_utils import TwoDevices
+
 
 # -----------------------------------------------------------------------------
 # Logging
