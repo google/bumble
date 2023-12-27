@@ -151,7 +151,7 @@ async def get_acl_flow_control_info(host: Host) -> None:
         print(
             color('ACL Flow Control:', 'yellow'),
             f'{response.return_parameters.hc_total_num_acl_data_packets} '
-            f'packets of size {response.return_parameters.hc_acl_data_packet_length}'
+            f'packets of size {response.return_parameters.hc_acl_data_packet_length}',
         )
 
     if host.supports_command(HCI_LE_READ_BUFFER_SIZE_COMMAND):
@@ -161,7 +161,7 @@ async def get_acl_flow_control_info(host: Host) -> None:
         print(
             color('LE ACL Flow Control:', 'yellow'),
             f'{response.return_parameters.hc_total_num_le_acl_data_packets} '
-            f'packets of size {response.return_parameters.hc_le_acl_data_packet_length}'
+            f'packets of size {response.return_parameters.hc_le_acl_data_packet_length}',
         )
 
 
