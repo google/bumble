@@ -96,7 +96,7 @@ DEFAULT_RFCOMM_CHANNEL = 8
 # -----------------------------------------------------------------------------
 def parse_packet(packet):
     if len(packet) < 1:
-        print(
+        logging.info(
             color(f'!!! Packet too short (got {len(packet)} bytes, need >= 1)', 'red')
         )
         raise ValueError('packet too short')
@@ -104,7 +104,7 @@ def parse_packet(packet):
     try:
         packet_type = PacketType(packet[0])
     except ValueError:
-        print(color(f'!!! Invalid packet type 0x{packet[0]:02X}', 'red'))
+        logging.info(color(f'!!! Invalid packet type 0x{packet[0]:02X}', 'red'))
         raise
 
     return (packet_type, packet[1:])
@@ -112,7 +112,7 @@ def parse_packet(packet):
 
 def parse_packet_sequence(packet_data):
     if len(packet_data) < 5:
-        print(
+        logging.info(
             color(
                 f'!!!Packet too short (got {len(packet_data)} bytes, need >= 5)',
                 'red',
@@ -156,7 +156,7 @@ def print_connection(connection):
 
     mtu = connection.att_mtu
 
-    print(
+    logging.info(
         f'{color("@@@ Connection:", "yellow")} '
         f'{connection_parameters} '
         f'{data_length} '
@@ -267,15 +267,15 @@ class Sender:
         pass
 
     async def run(self):
-        print(color('--- Waiting for I/O to be ready...', 'blue'))
+        logging.info(color('--- Waiting for I/O to be ready...', 'blue'))
         await self.packet_io.ready.wait()
-        print(color('--- Go!', 'blue'))
+        logging.info(color('--- Go!', 'blue'))
 
         if self.tx_start_delay:
-            print(color(f'*** Startup delay: {self.tx_start_delay}', 'blue'))
+            logging.info(color(f'*** Startup delay: {self.tx_start_delay}', 'blue'))
             await asyncio.sleep(self.tx_start_delay)
 
-        print(color('=== Sending RESET', 'magenta'))
+        logging.info(color('=== Sending RESET', 'magenta'))
         await self.packet_io.send_packet(bytes([PacketType.RESET]))
         self.start_time = time.time()
         for tx_i in range(self.tx_packet_count):
@@ -286,12 +286,12 @@ class Sender:
                 packet_flags,
                 tx_i,
             ) + bytes(self.tx_packet_size - 6)
-            print(color(f'Sending packet {tx_i}: {len(packet)} bytes', 'yellow'))
+            logging.info(color(f'Sending packet {tx_i}: {len(packet)} bytes', 'yellow'))
             self.bytes_sent += len(packet)
             await self.packet_io.send_packet(packet)
 
         await self.done.wait()
-        print(color('=== Done!', 'magenta'))
+        logging.info(color('=== Done!', 'magenta'))
 
     def on_packet_received(self, packet):
         try:
@@ -302,7 +302,7 @@ class Sender:
         if packet_type == PacketType.ACK:
             elapsed = time.time() - self.start_time
             average_tx_speed = self.bytes_sent / elapsed
-            print(
+            logging.info(
                 color(
                     f'@@@ Received ACK. Speed: average={average_tx_speed:.4f}'
                     f' ({self.bytes_sent} bytes in {elapsed:.2f} seconds)',
@@ -316,6 +316,10 @@ class Sender:
 # Receiver
 # -----------------------------------------------------------------------------
 class Receiver:
+    expected_packet_index: int
+    start_timestamp: float
+    last_timestamp: float
+
     def __init__(self, packet_io):
         self.reset()
         self.packet_io = packet_io
@@ -337,7 +341,7 @@ class Receiver:
         now = time.time()
 
         if packet_type == PacketType.RESET:
-            print(color('=== Received RESET', 'magenta'))
+            logging.info(color('=== Received RESET', 'magenta'))
             self.reset()
             self.start_timestamp = now
             return
@@ -346,13 +350,13 @@ class Receiver:
             packet_flags, packet_index = parse_packet_sequence(packet_data)
         except ValueError:
             return
-        print(
+        logging.info(
             f'<<< Received packet {packet_index}: '
             f'flags=0x{packet_flags:02X}, {len(packet)} bytes'
         )
 
         if packet_index != self.expected_packet_index:
-            print(
+            logging.info(
                 color(
                     f'!!! Unexpected packet, expected {self.expected_packet_index} '
                     f'but received {packet_index}'
@@ -364,7 +368,7 @@ class Receiver:
         self.bytes_received += len(packet)
         instant_rx_speed = len(packet) / elapsed_since_last
         average_rx_speed = self.bytes_received / elapsed_since_start
-        print(
+        logging.info(
             color(
                 f'Speed: instant={instant_rx_speed:.4f}, average={average_rx_speed:.4f}',
                 'yellow',
@@ -380,12 +384,12 @@ class Receiver:
                     struct.pack('>bbI', PacketType.ACK, packet_flags, packet_index)
                 )
             )
-            print(color('@@@ Received last packet', 'green'))
+            logging.info(color('@@@ Received last packet', 'green'))
             self.done.set()
 
     async def run(self):
         await self.done.wait()
-        print(color('=== Done!', 'magenta'))
+        logging.info(color('=== Done!', 'magenta'))
 
 
 # -----------------------------------------------------------------------------
@@ -407,23 +411,23 @@ class Ping:
         pass
 
     async def run(self):
-        print(color('--- Waiting for I/O to be ready...', 'blue'))
+        logging.info(color('--- Waiting for I/O to be ready...', 'blue'))
         await self.packet_io.ready.wait()
-        print(color('--- Go!', 'blue'))
+        logging.info(color('--- Go!', 'blue'))
 
         if self.tx_start_delay:
-            print(color(f'*** Startup delay: {self.tx_start_delay}', 'blue'))
+            logging.info(color(f'*** Startup delay: {self.tx_start_delay}', 'blue'))
             await asyncio.sleep(self.tx_start_delay)
 
-        print(color('=== Sending RESET', 'magenta'))
+        logging.info(color('=== Sending RESET', 'magenta'))
         await self.packet_io.send_packet(bytes([PacketType.RESET]))
 
         await self.send_next_ping()
 
         await self.done.wait()
         average_latency = sum(self.latencies) / len(self.latencies)
-        print(color(f'@@@ Average latency: {average_latency:.2f}'))
-        print(color('=== Done!', 'magenta'))
+        logging.info(color(f'@@@ Average latency: {average_latency:.2f}'))
+        logging.info(color('=== Done!', 'magenta'))
 
     async def send_next_ping(self):
         packet = struct.pack(
@@ -434,7 +438,7 @@ class Ping:
             else 0,
             self.current_packet_index,
         ) + bytes(self.tx_packet_size - 6)
-        print(color(f'Sending packet {self.current_packet_index}', 'yellow'))
+        logging.info(color(f'Sending packet {self.current_packet_index}', 'yellow'))
         self.ping_sent_time = time.time()
         await self.packet_io.send_packet(packet)
 
@@ -454,7 +458,7 @@ class Ping:
         if packet_type == PacketType.ACK:
             latency = elapsed * 1000
             self.latencies.append(latency)
-            print(
+            logging.info(
                 color(
                     f'<<< Received ACK [{packet_index}], latency={latency:.2f}ms',
                     'green',
@@ -464,7 +468,7 @@ class Ping:
             if packet_index == self.current_packet_index:
                 self.current_packet_index += 1
             else:
-                print(
+                logging.info(
                     color(
                         f'!!! Unexpected packet, expected {self.current_packet_index} '
                         f'but received {packet_index}'
@@ -482,6 +486,8 @@ class Ping:
 # Pong
 # -----------------------------------------------------------------------------
 class Pong:
+    expected_packet_index: int
+
     def __init__(self, packet_io):
         self.reset()
         self.packet_io = packet_io
@@ -498,7 +504,7 @@ class Pong:
             return
 
         if packet_type == PacketType.RESET:
-            print(color('=== Received RESET', 'magenta'))
+            logging.info(color('=== Received RESET', 'magenta'))
             self.reset()
             return
 
@@ -506,7 +512,7 @@ class Pong:
             packet_flags, packet_index = parse_packet_sequence(packet_data)
         except ValueError:
             return
-        print(
+        logging.info(
             color(
                 f'<<< Received packet {packet_index}: '
                 f'flags=0x{packet_flags:02X}, {len(packet)} bytes',
@@ -515,7 +521,7 @@ class Pong:
         )
 
         if packet_index != self.expected_packet_index:
-            print(
+            logging.info(
                 color(
                     f'!!! Unexpected packet, expected {self.expected_packet_index} '
                     f'but received {packet_index}'
@@ -535,7 +541,7 @@ class Pong:
 
     async def run(self):
         await self.done.wait()
-        print(color('=== Done!', 'magenta'))
+        logging.info(color('=== Done!', 'magenta'))
 
 
 # -----------------------------------------------------------------------------
@@ -553,36 +559,36 @@ class GattClient:
         peer = Peer(connection)
 
         if self.att_mtu:
-            print(color(f'*** Requesting MTU update: {self.att_mtu}', 'blue'))
+            logging.info(color(f'*** Requesting MTU update: {self.att_mtu}', 'blue'))
             await peer.request_mtu(self.att_mtu)
 
-        print(color('*** Discovering services...', 'blue'))
+        logging.info(color('*** Discovering services...', 'blue'))
         await peer.discover_services()
 
         speed_services = peer.get_services_by_uuid(SPEED_SERVICE_UUID)
         if not speed_services:
-            print(color('!!! Speed Service not found', 'red'))
+            logging.info(color('!!! Speed Service not found', 'red'))
             return
         speed_service = speed_services[0]
-        print(color('*** Discovering characteristics...', 'blue'))
+        logging.info(color('*** Discovering characteristics...', 'blue'))
         await speed_service.discover_characteristics()
 
         speed_txs = speed_service.get_characteristics_by_uuid(SPEED_TX_UUID)
         if not speed_txs:
-            print(color('!!! Speed TX not found', 'red'))
+            logging.info(color('!!! Speed TX not found', 'red'))
             return
         self.speed_tx = speed_txs[0]
 
         speed_rxs = speed_service.get_characteristics_by_uuid(SPEED_RX_UUID)
         if not speed_rxs:
-            print(color('!!! Speed RX not found', 'red'))
+            logging.info(color('!!! Speed RX not found', 'red'))
             return
         self.speed_rx = speed_rxs[0]
 
-        print(color('*** Subscribing to RX', 'blue'))
+        logging.info(color('*** Subscribing to RX', 'blue'))
         await self.speed_rx.subscribe(self.on_packet_received)
 
-        print(color('*** Discovery complete', 'blue'))
+        logging.info(color('*** Discovery complete', 'blue'))
 
         connection.on('disconnection', self.on_disconnection)
         self.ready.set()
@@ -634,10 +640,10 @@ class GattServer:
 
     def on_rx_subscription(self, _connection, notify_enabled, _indicate_enabled):
         if notify_enabled:
-            print(color('*** RX subscription', 'blue'))
+            logging.info(color('*** RX subscription', 'blue'))
             self.ready.set()
         else:
-            print(color('*** RX un-subscription', 'blue'))
+            logging.info(color('*** RX un-subscription', 'blue'))
             self.ready.clear()
 
     def on_tx_write(self, _, value):
@@ -685,7 +691,7 @@ class StreamedPacketIO:
 
     async def send_packet(self, packet):
         if not self.io_sink:
-            print(color('!!! No sink, dropping packet', 'red'))
+            logging.info(color('!!! No sink, dropping packet', 'red'))
             return
 
         # pylint: disable-next=not-callable
@@ -715,7 +721,7 @@ class L2capClient(StreamedPacketIO):
         connection.on('disconnection', self.on_disconnection)
 
         # Connect a new L2CAP channel
-        print(color(f'>>> Opening L2CAP channel on PSM = {self.psm}', 'yellow'))
+        logging.info(color(f'>>> Opening L2CAP channel on PSM = {self.psm}', 'yellow'))
         try:
             l2cap_channel = await connection.create_l2cap_channel(
                 spec=l2cap.LeCreditBasedChannelSpec(
@@ -725,9 +731,9 @@ class L2capClient(StreamedPacketIO):
                     mps=self.mps,
                 )
             )
-            print(color('*** L2CAP channel:', 'cyan'), l2cap_channel)
+            logging.info(color(f'*** L2CAP channel: {l2cap_channel}', 'cyan'))
         except Exception as error:
-            print(color(f'!!! Connection failed: {error}', 'red'))
+            logging.info(color(f'!!! Connection failed: {error}', 'red'))
             return
 
         l2cap_channel.sink = self.on_packet
@@ -740,7 +746,7 @@ class L2capClient(StreamedPacketIO):
         pass
 
     def on_l2cap_close(self):
-        print(color('*** L2CAP channel closed', 'red'))
+        logging.info(color('*** L2CAP channel closed', 'red'))
 
 
 # -----------------------------------------------------------------------------
@@ -766,7 +772,9 @@ class L2capServer(StreamedPacketIO):
             ),
             handler=self.on_l2cap_channel,
         )
-        print(color(f'### Listening for L2CAP connection on PSM {psm}', 'yellow'))
+        logging.info(
+            color(f'### Listening for L2CAP connection on PSM {psm}', 'yellow')
+        )
 
     async def on_connection(self, connection):
         connection.on('disconnection', self.on_disconnection)
@@ -775,7 +783,7 @@ class L2capServer(StreamedPacketIO):
         pass
 
     def on_l2cap_channel(self, l2cap_channel):
-        print(color('*** L2CAP channel:', 'cyan'), l2cap_channel)
+        logging.info(color(f'*** L2CAP channel: {l2cap_channel}', 'cyan'))
 
         self.io_sink = l2cap_channel.write
         l2cap_channel.on('close', self.on_l2cap_close)
@@ -784,7 +792,7 @@ class L2capServer(StreamedPacketIO):
         self.ready.set()
 
     def on_l2cap_close(self):
-        print(color('*** L2CAP channel closed', 'red'))
+        logging.info(color('*** L2CAP channel closed', 'red'))
         self.l2cap_channel = None
 
 
@@ -805,28 +813,28 @@ class RfcommClient(StreamedPacketIO):
         # Find the channel number if not specified
         channel = self.channel
         if channel == 0:
-            print(
+            logging.info(
                 color(f'@@@ Discovering channel number from UUID {self.uuid}', 'cyan')
             )
             channel = await find_rfcomm_channel_with_uuid(connection, self.uuid)
-            print(color(f'@@@ Channel number = {channel}', 'cyan'))
+            logging.info(color(f'@@@ Channel number = {channel}', 'cyan'))
             if channel == 0:
-                print(color('!!! No RFComm service with this UUID found', 'red'))
+                logging.info(color('!!! No RFComm service with this UUID found', 'red'))
                 await connection.disconnect()
                 return
 
         # Create a client and start it
-        print(color('*** Starting RFCOMM client...', 'blue'))
+        logging.info(color('*** Starting RFCOMM client...', 'blue'))
         rfcomm_client = bumble.rfcomm.Client(connection)
         rfcomm_mux = await rfcomm_client.start()
-        print(color('*** Started', 'blue'))
+        logging.info(color('*** Started', 'blue'))
 
-        print(color(f'### Opening session for channel {channel}...', 'yellow'))
+        logging.info(color(f'### Opening session for channel {channel}...', 'yellow'))
         try:
             rfcomm_session = await rfcomm_mux.open_dlc(channel)
-            print(color('### Session open', 'yellow'), rfcomm_session)
+            logging.info(color(f'### Session open: {rfcomm_session}', 'yellow'))
         except bumble.core.ConnectionError as error:
-            print(color(f'!!! Session open failed: {error}', 'red'))
+            logging.info(color(f'!!! Session open failed: {error}', 'red'))
             await rfcomm_mux.disconnect()
             return
 
@@ -856,7 +864,7 @@ class RfcommServer(StreamedPacketIO):
         # Setup the SDP to advertise this channel
         device.sdp_service_records = make_sdp_records(channel_number)
 
-        print(
+        logging.info(
             color(
                 f'### Listening for RFComm connection on channel {channel_number}',
                 'yellow',
@@ -870,7 +878,7 @@ class RfcommServer(StreamedPacketIO):
         pass
 
     def on_dlc(self, dlc):
-        print(color('*** DLC connected:', 'blue'), dlc)
+        logging.info(color(f'*** DLC connected: {dlc}', 'blue'))
         dlc.sink = self.on_packet
         self.io_sink = dlc.write
 
@@ -936,12 +944,12 @@ class Central(Connection.Listener):
             self.connection_parameter_preferences = None
 
     async def run(self):
-        print(color('>>> Connecting to HCI...', 'green'))
+        logging.info(color('>>> Connecting to HCI...', 'green'))
         async with await open_transport_or_link(self.transport) as (
             hci_source,
             hci_sink,
         ):
-            print(color('>>> Connected', 'green'))
+            logging.info(color('>>> Connected', 'green'))
 
             central_address = DEFAULT_CENTRAL_ADDRESS
             self.device = Device.with_hci(
@@ -957,7 +965,9 @@ class Central(Connection.Listener):
                 await self.device.set_discoverable(False)
                 await self.device.set_connectable(False)
 
-            print(color(f'### Connecting to {self.peripheral_address}...', 'cyan'))
+            logging.info(
+                color(f'### Connecting to {self.peripheral_address}...', 'cyan')
+            )
             try:
                 self.connection = await self.device.connect(
                     self.peripheral_address,
@@ -965,15 +975,15 @@ class Central(Connection.Listener):
                     transport=BT_BR_EDR_TRANSPORT if self.classic else BT_LE_TRANSPORT,
                 )
             except CommandTimeoutError:
-                print(color('!!! Connection timed out', 'red'))
+                logging.info(color('!!! Connection timed out', 'red'))
                 return
             except bumble.core.ConnectionError as error:
-                print(color(f'!!! Connection error: {error}', 'red'))
+                logging.info(color(f'!!! Connection error: {error}', 'red'))
                 return
             except HCI_StatusError as error:
-                print(color(f'!!! Connection failed: {error.error_name}'))
+                logging.info(color(f'!!! Connection failed: {error.error_name}'))
                 return
-            print(color('### Connected', 'cyan'))
+            logging.info(color('### Connected', 'cyan'))
             self.connection.listener = self
             print_connection(self.connection)
 
@@ -984,7 +994,7 @@ class Central(Connection.Listener):
 
             # Request a new data length if requested
             if self.extended_data_length:
-                print(color('+++ Requesting extended data length', 'cyan'))
+                logging.info(color('+++ Requesting extended data length', 'cyan'))
                 await self.connection.set_data_length(
                     self.extended_data_length[0], self.extended_data_length[1]
                 )
@@ -992,16 +1002,16 @@ class Central(Connection.Listener):
             # Authenticate if requested
             if self.authenticate:
                 # Request authentication
-                print(color('*** Authenticating...', 'cyan'))
+                logging.info(color('*** Authenticating...', 'cyan'))
                 await self.connection.authenticate()
-                print(color('*** Authenticated', 'cyan'))
+                logging.info(color('*** Authenticated', 'cyan'))
 
             # Encrypt if requested
             if self.encrypt:
                 # Enable encryption
-                print(color('*** Enabling encryption...', 'cyan'))
+                logging.info(color('*** Enabling encryption...', 'cyan'))
                 await self.connection.encrypt()
-                print(color('*** Encryption on', 'cyan'))
+                logging.info(color('*** Encryption on', 'cyan'))
 
             # Set the PHY if requested
             if self.phy is not None:
@@ -1010,7 +1020,7 @@ class Central(Connection.Listener):
                         tx_phys=[self.phy], rx_phys=[self.phy]
                     )
                 except HCI_Error as error:
-                    print(
+                    logging.info(
                         color(
                             f'!!! Unable to set the PHY: {error.error_name}', 'yellow'
                         )
@@ -1022,7 +1032,7 @@ class Central(Connection.Listener):
             await asyncio.sleep(DEFAULT_LINGER_TIME)
 
     def on_disconnection(self, reason):
-        print(color(f'!!! Disconnection: reason={reason}', 'red'))
+        logging.info(color(f'!!! Disconnection: reason={reason}', 'red'))
         self.connection = None
 
     def on_connection_parameters_update(self):
@@ -1057,12 +1067,12 @@ class Peripheral(Device.Listener, Connection.Listener):
         self.connected = asyncio.Event()
 
     async def run(self):
-        print(color('>>> Connecting to HCI...', 'green'))
+        logging.info(color('>>> Connecting to HCI...', 'green'))
         async with await open_transport_or_link(self.transport) as (
             hci_source,
             hci_sink,
         ):
-            print(color('>>> Connected', 'green'))
+            logging.info(color('>>> Connected', 'green'))
 
             peripheral_address = DEFAULT_PERIPHERAL_ADDRESS
             self.device = Device.with_hci(
@@ -1082,7 +1092,7 @@ class Peripheral(Device.Listener, Connection.Listener):
                 await self.device.start_advertising(auto_restart=True)
 
             if self.classic:
-                print(
+                logging.info(
                     color(
                         '### Waiting for connection on'
                         f' {self.device.public_address}...',
@@ -1090,14 +1100,14 @@ class Peripheral(Device.Listener, Connection.Listener):
                     )
                 )
             else:
-                print(
+                logging.info(
                     color(
                         f'### Waiting for connection on {peripheral_address}...',
                         'cyan',
                     )
                 )
             await self.connected.wait()
-            print(color('### Connected', 'cyan'))
+            logging.info(color('### Connected', 'cyan'))
 
             await self.mode.on_connection(self.connection)
             await self.role.run()
@@ -1119,7 +1129,7 @@ class Peripheral(Device.Listener, Connection.Listener):
 
         # Request a new data length if needed
         if self.extended_data_length:
-            print("+++ Requesting extended data length")
+            logging.info("+++ Requesting extended data length")
             AsyncRunner.spawn(
                 connection.set_data_length(
                     self.extended_data_length[0], self.extended_data_length[1]
@@ -1127,7 +1137,7 @@ class Peripheral(Device.Listener, Connection.Listener):
             )
 
     def on_disconnection(self, reason):
-        print(color(f'!!! Disconnection: reason={reason}', 'red'))
+        logging.info(color(f'!!! Disconnection: reason={reason}', 'red'))
         self.connection = None
         self.role.reset()
 
