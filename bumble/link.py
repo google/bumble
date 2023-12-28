@@ -26,9 +26,13 @@ from bumble.hci import (
     HCI_SUCCESS,
     HCI_CONNECTION_ACCEPT_TIMEOUT_ERROR,
     HCI_CONNECTION_TIMEOUT_ERROR,
+    HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
     HCI_PAGE_TIMEOUT_ERROR,
     HCI_Connection_Complete_Event,
 )
+from bumble import controller
+
+from typing import Optional, Set
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -57,6 +61,8 @@ class LocalLink:
     Link bus for controllers to communicate with each other
     '''
 
+    controllers: Set[controller.Controller]
+
     def __init__(self):
         self.controllers = set()
         self.pending_connection = None
@@ -79,7 +85,9 @@ class LocalLink:
                 return controller
         return None
 
-    def find_classic_controller(self, address):
+    def find_classic_controller(
+        self, address: Address
+    ) -> Optional[controller.Controller]:
         for controller in self.controllers:
             if controller.public_address == address:
                 return controller
@@ -269,6 +277,52 @@ class LocalLink:
         asyncio.create_task(task())
         responder_controller.on_classic_role_change(
             initiator_controller.public_address, int(not (initiator_new_role))
+        )
+
+    def classic_sco_connect(
+        self,
+        initiator_controller: controller.Controller,
+        responder_address: Address,
+        link_type: int,
+    ):
+        logger.debug(
+            f'[Classic] {initiator_controller.public_address} connects SCO to {responder_address}'
+        )
+        responder_controller = self.find_classic_controller(responder_address)
+        # Initiator controller should handle it.
+        assert responder_controller
+
+        responder_controller.on_classic_connection_request(
+            initiator_controller.public_address,
+            link_type,
+        )
+
+    def classic_accept_sco_connection(
+        self,
+        responder_controller: controller.Controller,
+        initiator_address: Address,
+        link_type: int,
+    ):
+        logger.debug(
+            f'[Classic] {responder_controller.public_address} accepts to connect SCO {initiator_address}'
+        )
+        initiator_controller = self.find_classic_controller(initiator_address)
+        if initiator_controller is None:
+            responder_controller.on_classic_sco_connection_complete(
+                responder_controller.public_address,
+                HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+                link_type,
+            )
+            return
+
+        async def task():
+            initiator_controller.on_classic_sco_connection_complete(
+                responder_controller.public_address, HCI_SUCCESS, link_type
+            )
+
+        asyncio.create_task(task())
+        responder_controller.on_classic_sco_connection_complete(
+            initiator_controller.public_address, HCI_SUCCESS, link_type
         )
 
 

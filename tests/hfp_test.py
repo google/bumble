@@ -23,9 +23,11 @@ import pytest
 from typing import Tuple
 
 from .test_utils import TwoDevices
+from bumble import core
+from bumble import device
 from bumble import hfp
 from bumble import rfcomm
-
+from bumble import hci
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -85,6 +87,63 @@ async def test_slc():
 
     await hf.initiate_slc()
     ag_task.cancel()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_sco_setup():
+    devices = TwoDevices()
+
+    # Enable Classic connections
+    devices[0].classic_enabled = True
+    devices[1].classic_enabled = True
+
+    # Start
+    await devices[0].power_on()
+    await devices[1].power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect(
+            devices[1].public_address, transport=core.BT_BR_EDR_TRANSPORT
+        ),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    def on_sco_request(_connection: device.Connection, _link_type: int):
+        connections[1].abort_on(
+            'disconnection',
+            devices[1].send_command(
+                hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(
+                    bd_addr=connections[1].peer_address,
+                    **hfp.ESCO_PARAMETERS[
+                        hfp.DefaultCodecParameters.ESCO_CVSD_S1
+                    ].asdict(),
+                )
+            ),
+        )
+
+    devices[1].on('sco_request', on_sco_request)
+
+    sco_connections = [
+        asyncio.get_running_loop().create_future(),
+        asyncio.get_running_loop().create_future(),
+    ]
+
+    devices[0].on(
+        'sco_connection', lambda sco_link: sco_connections[0].set_result(sco_link)
+    )
+    devices[1].on(
+        'sco_connection', lambda sco_link: sco_connections[1].set_result(sco_link)
+    )
+
+    await devices[0].send_command(
+        hci.HCI_Enhanced_Setup_Synchronous_Connection_Command(
+            connection_handle=connections[0].handle,
+            **hfp.ESCO_PARAMETERS[hfp.DefaultCodecParameters.ESCO_CVSD_S1].asdict(),
+        )
+    )
+
+    await asyncio.gather(*sco_connections)
 
 
 # -----------------------------------------------------------------------------

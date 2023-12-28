@@ -61,7 +61,6 @@ from .hci import (
     HCI_LE_1M_PHY_BIT,
     HCI_LE_2M_PHY,
     HCI_LE_2M_PHY_LE_SUPPORTED_FEATURE,
-    HCI_LE_CLEAR_RESOLVING_LIST_COMMAND,
     HCI_LE_CODED_PHY,
     HCI_LE_CODED_PHY_BIT,
     HCI_LE_CODED_PHY_LE_SUPPORTED_FEATURE,
@@ -86,7 +85,7 @@ from .hci import (
     HCI_Constant,
     HCI_Create_Connection_Cancel_Command,
     HCI_Create_Connection_Command,
-    HCI_Create_Connection_Command,
+    HCI_Connection_Complete_Event,
     HCI_Disconnect_Command,
     HCI_Encryption_Change_Event,
     HCI_Error,
@@ -3319,8 +3318,21 @@ class Device(CompositeEventEmitter):
     def on_connection_request(self, bd_addr, class_of_device, link_type):
         logger.debug(f'*** Connection request: {bd_addr}')
 
+        # Handle SCO request.
+        if link_type in (
+            HCI_Connection_Complete_Event.SCO_LINK_TYPE,
+            HCI_Connection_Complete_Event.ESCO_LINK_TYPE,
+        ):
+            if connection := self.find_connection_by_bd_addr(
+                bd_addr, transport=BT_BR_EDR_TRANSPORT
+            ):
+                self.emit('sco_request', connection, link_type)
+            else:
+                logger.error(f'SCO request from a non-connected device {bd_addr}')
+            return
+
         # match a pending future using `bd_addr`
-        if bd_addr in self.classic_pending_accepts:
+        elif bd_addr in self.classic_pending_accepts:
             future, *_ = self.classic_pending_accepts.pop(bd_addr)
             future.set_result((bd_addr, class_of_device, link_type))
 

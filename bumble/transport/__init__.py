@@ -198,12 +198,13 @@ async def open_transport_or_link(name: str) -> Transport:
 
     """
     if name.startswith('link-relay:'):
+        logger.warning('Link Relay has been deprecated.')
         from ..controller import Controller
         from ..link import RemoteLink  # lazy import
 
         link = RemoteLink(name[11:])
         await link.wait_until_connected()
-        controller = Controller('remote', link=link)
+        controller = Controller('remote', link=link)  # type:ignore[arg-type]
 
         class LinkTransport(Transport):
             async def close(self):
