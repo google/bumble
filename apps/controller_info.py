@@ -32,10 +32,14 @@ from bumble.hci import (
     HCI_Command,
     HCI_Command_Complete_Event,
     HCI_Command_Status_Event,
+    HCI_READ_BUFFER_SIZE_COMMAND,
+    HCI_Read_Buffer_Size_Command,
     HCI_READ_BD_ADDR_COMMAND,
     HCI_Read_BD_ADDR_Command,
     HCI_READ_LOCAL_NAME_COMMAND,
     HCI_Read_Local_Name_Command,
+    HCI_LE_READ_BUFFER_SIZE_COMMAND,
+    HCI_LE_Read_Buffer_Size_Command,
     HCI_LE_READ_MAXIMUM_DATA_LENGTH_COMMAND,
     HCI_LE_Read_Maximum_Data_Length_Command,
     HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND,
@@ -59,7 +63,7 @@ def command_succeeded(response):
 
 
 # -----------------------------------------------------------------------------
-async def get_classic_info(host):
+async def get_classic_info(host: Host) -> None:
     if host.supports_command(HCI_READ_BD_ADDR_COMMAND):
         response = await host.send_command(HCI_Read_BD_ADDR_Command())
         if command_succeeded(response):
@@ -80,7 +84,7 @@ async def get_classic_info(host):
 
 
 # -----------------------------------------------------------------------------
-async def get_le_info(host):
+async def get_le_info(host: Host) -> None:
     print()
 
     if host.supports_command(HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND):
@@ -137,6 +141,31 @@ async def get_le_info(host):
 
 
 # -----------------------------------------------------------------------------
+async def get_acl_flow_control_info(host: Host) -> None:
+    print()
+
+    if host.supports_command(HCI_READ_BUFFER_SIZE_COMMAND):
+        response = await host.send_command(
+            HCI_Read_Buffer_Size_Command(), check_result=True
+        )
+        print(
+            color('ACL Flow Control:', 'yellow'),
+            f'{response.return_parameters.hc_total_num_acl_data_packets} '
+            f'packets of size {response.return_parameters.hc_acl_data_packet_length}',
+        )
+
+    if host.supports_command(HCI_LE_READ_BUFFER_SIZE_COMMAND):
+        response = await host.send_command(
+            HCI_LE_Read_Buffer_Size_Command(), check_result=True
+        )
+        print(
+            color('LE ACL Flow Control:', 'yellow'),
+            f'{response.return_parameters.hc_total_num_le_acl_data_packets} '
+            f'packets of size {response.return_parameters.hc_le_acl_data_packet_length}',
+        )
+
+
+# -----------------------------------------------------------------------------
 async def async_main(transport):
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(transport) as (hci_source, hci_sink):
@@ -167,6 +196,9 @@ async def async_main(transport):
 
         # Get the LE info
         await get_le_info(host)
+
+        # Print the ACL flow control info
+        await get_acl_flow_control_info(host)
 
         # Print the list of commands supported by the controller
         print()

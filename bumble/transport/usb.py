@@ -108,7 +108,7 @@ async def open_usb_transport(spec: str) -> Transport:
         USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER,
     )
 
-    READ_SIZE = 1024
+    READ_SIZE = 4096
 
     class UsbPacketSink:
         def __init__(self, device, acl_out):

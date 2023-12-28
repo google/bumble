@@ -42,6 +42,7 @@ public class HciServer {
         try (ServerSocket serverSocket = new ServerSocket(mPort)) {
             mListener.onMessage("Waiting for connection on port " + serverSocket.getLocalPort());
             try (Socket clientSocket = serverSocket.accept()) {
+                clientSocket.setTcpNoDelay(true);
                 mListener.onHostConnectionState(true);
                 mListener.onMessage("Connected");
                 HciParser parser = new HciParser(mListener);

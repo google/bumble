@@ -82,10 +82,11 @@ SPEED_RX_UUID = '016A2CC7-E14B-4819-935F-1F56EAE4098D'
 DEFAULT_RFCOMM_UUID = 'E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'
 DEFAULT_L2CAP_PSM = 1234
 DEFAULT_L2CAP_MAX_CREDITS = 128
-DEFAULT_L2CAP_MTU = 1022
-DEFAULT_L2CAP_MPS = 1024
+DEFAULT_L2CAP_MTU = 1024
+DEFAULT_L2CAP_MPS = 1022
 
 DEFAULT_LINGER_TIME = 1.0
+DEFAULT_POST_CONNECTION_WAIT_TIME = 1.0
 
 DEFAULT_RFCOMM_CHANNEL = 8
 
@@ -952,6 +953,10 @@ class Central(Connection.Listener):
 
             await self.device.power_on()
 
+            if self.classic:
+                await self.device.set_discoverable(False)
+                await self.device.set_connectable(False)
+
             print(color(f'### Connecting to {self.peripheral_address}...', 'cyan'))
             try:
                 self.connection = await self.device.connect(
@@ -971,6 +976,11 @@ class Central(Connection.Listener):
             print(color('### Connected', 'cyan'))
             self.connection.listener = self
             print_connection(self.connection)
+
+            # Wait a bit after the connection, some controllers aren't very good when
+            # we start sending data right away while some connection parameters are
+            # updated post connection
+            await asyncio.sleep(DEFAULT_POST_CONNECTION_WAIT_TIME)
 
             # Request a new data length if requested
             if self.extended_data_length:
@@ -1097,6 +1107,15 @@ class Peripheral(Device.Listener, Connection.Listener):
         connection.listener = self
         self.connection = connection
         self.connected.set()
+
+        # Stop being discoverable and connectable
+        if self.classic:
+
+            async def stop_being_discoverable_connectable():
+                await self.device.set_discoverable(False)
+                await self.device.set_connectable(False)
+
+            AsyncRunner.spawn(stop_being_discoverable_connectable())
 
         # Request a new data length if needed
         if self.extended_data_length:

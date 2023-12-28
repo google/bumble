@@ -21,7 +21,7 @@ import collections
 import logging
 import struct
 
-from typing import Any, Awaitable, Callable, Dict, Optional, Union, cast, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, Deque, Dict, Optional, cast, TYPE_CHECKING
 
 from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
@@ -91,16 +91,49 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-# Constants
-# -----------------------------------------------------------------------------
-# fmt: off
+class AclPacketQueue:
+    max_packet_size: int
 
-HOST_DEFAULT_HC_LE_ACL_DATA_PACKET_LENGTH = 27
-HOST_HC_TOTAL_NUM_LE_ACL_DATA_PACKETS     = 1
-HOST_DEFAULT_HC_ACL_DATA_PACKET_LENGTH    = 27
-HOST_HC_TOTAL_NUM_ACL_DATA_PACKETS        = 1
+    def __init__(
+        self,
+        max_packet_size: int,
+        max_in_flight: int,
+        send: Callable[[HCI_Packet], None],
+    ) -> None:
+        self.max_packet_size = max_packet_size
+        self.max_in_flight = max_in_flight
+        self.in_flight = 0
+        self.send = send
+        self.packets: Deque[HCI_AclDataPacket] = collections.deque()
 
-# fmt: on
+    def enqueue(self, packet: HCI_AclDataPacket) -> None:
+        self.packets.appendleft(packet)
+        self.check_queue()
+
+        if self.packets:
+            logger.debug(
+                f'{self.in_flight} ACL packets in flight, '
+                f'{len(self.packets)} in queue'
+            )
+
+    def check_queue(self) -> None:
+        while self.packets and self.in_flight < self.max_in_flight:
+            packet = self.packets.pop()
+            self.send(packet)
+            self.in_flight += 1
+
+    def on_packets_completed(self, packet_count: int) -> None:
+        if packet_count > self.in_flight:
+            logger.warning(
+                color(
+                    '!!! {packet_count} completed but only '
+                    f'{self.in_flight} in flight'
+                )
+            )
+            packet_count = self.in_flight
+
+        self.in_flight -= packet_count
+        self.check_queue()
 
 
 # -----------------------------------------------------------------------------
@@ -111,6 +144,13 @@ class Connection:
         self.peer_address = peer_address
         self.assembler = HCI_AclDataPacketAssembler(self.on_acl_pdu)
         self.transport = transport
+        acl_packet_queue: Optional[AclPacketQueue] = (
+            host.le_acl_packet_queue
+            if transport == BT_LE_TRANSPORT
+            else host.acl_packet_queue
+        )
+        assert acl_packet_queue
+        self.acl_packet_queue = acl_packet_queue
 
     def on_hci_acl_data_packet(self, packet: HCI_AclDataPacket) -> None:
         self.assembler.feed_packet(packet)
@@ -123,7 +163,8 @@ class Connection:
 # -----------------------------------------------------------------------------
 class Host(AbortableEventEmitter):
     connections: Dict[int, Connection]
-    acl_packet_queue: collections.deque[HCI_AclDataPacket]
+    acl_packet_queue: Optional[AclPacketQueue] = None
+    le_acl_packet_queue: Optional[AclPacketQueue] = None
     hci_sink: Optional[TransportSink] = None
     hci_metadata: Dict[str, Any]
     long_term_key_provider: Optional[
@@ -143,12 +184,6 @@ class Host(AbortableEventEmitter):
         self.connections = {}  # Connections, by connection handle
         self.pending_command = None
         self.pending_response = None
-        self.hc_le_acl_data_packet_length = HOST_DEFAULT_HC_LE_ACL_DATA_PACKET_LENGTH
-        self.hc_total_num_le_acl_data_packets = HOST_HC_TOTAL_NUM_LE_ACL_DATA_PACKETS
-        self.hc_acl_data_packet_length = HOST_DEFAULT_HC_ACL_DATA_PACKET_LENGTH
-        self.hc_total_num_acl_data_packets = HOST_HC_TOTAL_NUM_ACL_DATA_PACKETS
-        self.acl_packet_queue = collections.deque()
-        self.acl_packets_in_flight = 0
         self.local_version = None
         self.local_supported_commands = bytes(64)
         self.local_le_features = 0
@@ -254,46 +289,54 @@ class Host(AbortableEventEmitter):
             response = await self.send_command(
                 HCI_Read_Buffer_Size_Command(), check_result=True
             )
-            self.hc_acl_data_packet_length = (
+            hc_acl_data_packet_length = (
                 response.return_parameters.hc_acl_data_packet_length
             )
-            self.hc_total_num_acl_data_packets = (
+            hc_total_num_acl_data_packets = (
                 response.return_parameters.hc_total_num_acl_data_packets
             )
 
             logger.debug(
                 'HCI ACL flow control: '
-                f'hc_acl_data_packet_length={self.hc_acl_data_packet_length},'
-                f'hc_total_num_acl_data_packets={self.hc_total_num_acl_data_packets}'
+                f'hc_acl_data_packet_length={hc_acl_data_packet_length},'
+                f'hc_total_num_acl_data_packets={hc_total_num_acl_data_packets}'
             )
 
+            self.acl_packet_queue = AclPacketQueue(
+                max_packet_size=hc_acl_data_packet_length,
+                max_in_flight=hc_total_num_acl_data_packets,
+                send=self.send_hci_packet,
+            )
+
+        hc_le_acl_data_packet_length = 0
+        hc_total_num_le_acl_data_packets = 0
         if self.supports_command(HCI_LE_READ_BUFFER_SIZE_COMMAND):
             response = await self.send_command(
                 HCI_LE_Read_Buffer_Size_Command(), check_result=True
             )
-            self.hc_le_acl_data_packet_length = (
+            hc_le_acl_data_packet_length = (
                 response.return_parameters.hc_le_acl_data_packet_length
             )
-            self.hc_total_num_le_acl_data_packets = (
+            hc_total_num_le_acl_data_packets = (
                 response.return_parameters.hc_total_num_le_acl_data_packets
             )
 
             logger.debug(
                 'HCI LE ACL flow control: '
-                f'hc_le_acl_data_packet_length={self.hc_le_acl_data_packet_length},'
-                'hc_total_num_le_acl_data_packets='
-                f'{self.hc_total_num_le_acl_data_packets}'
+                f'hc_le_acl_data_packet_length={hc_le_acl_data_packet_length},'
+                f'hc_total_num_le_acl_data_packets={hc_total_num_le_acl_data_packets}'
             )
 
-            if (
-                response.return_parameters.hc_le_acl_data_packet_length == 0
-                or response.return_parameters.hc_total_num_le_acl_data_packets == 0
-            ):
-                # LE and Classic share the same values
-                self.hc_le_acl_data_packet_length = self.hc_acl_data_packet_length
-                self.hc_total_num_le_acl_data_packets = (
-                    self.hc_total_num_acl_data_packets
-                )
+        if hc_le_acl_data_packet_length == 0 or hc_total_num_le_acl_data_packets == 0:
+            # LE and Classic share the same queue
+            self.le_acl_packet_queue = self.acl_packet_queue
+        else:
+            # Create a separate queue for LE
+            self.le_acl_packet_queue = AclPacketQueue(
+                max_packet_size=hc_le_acl_data_packet_length,
+                max_in_flight=hc_total_num_le_acl_data_packets,
+                send=self.send_hci_packet,
+            )
 
         if self.supports_command(
             HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND
@@ -332,14 +375,13 @@ class Host(AbortableEventEmitter):
         self.hci_metadata = getattr(source, 'metadata', self.hci_metadata)
 
     def send_hci_packet(self, packet: HCI_Packet) -> None:
+        logger.debug(f'{color("### HOST -> CONTROLLER", "blue")}: {packet}')
         if self.snooper:
             self.snooper.snoop(bytes(packet), Snooper.Direction.HOST_TO_CONTROLLER)
         if self.hci_sink:
             self.hci_sink.on_packet(bytes(packet))
 
     async def send_command(self, command, check_result=False):
-        logger.debug(f'{color("### HOST -> CONTROLLER", "blue")}: {command}')
-
         # Wait until we can send (only one pending command at a time)
         async with self.command_semaphore:
             assert self.pending_command is None
@@ -387,6 +429,17 @@ class Host(AbortableEventEmitter):
         asyncio.create_task(send_command(command))
 
     def send_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes) -> None:
+        if not (connection := self.connections.get(connection_handle)):
+            logger.warning(f'connection 0x{connection_handle:04X} not found')
+            return
+        packet_queue = connection.acl_packet_queue
+        if packet_queue is None:
+            logger.warning(
+                f'no ACL packet queue for connection 0x{connection_handle:04X}'
+            )
+            return
+
+        # Create a PDU
         l2cap_pdu = bytes(L2CAP_PDU(cid, pdu))
 
         # Send the data to the controller via ACL packets
@@ -394,8 +447,7 @@ class Host(AbortableEventEmitter):
         offset = 0
         pb_flag = 0
         while bytes_remaining:
-            # TODO: support different LE/Classic lengths
-            data_total_length = min(bytes_remaining, self.hc_le_acl_data_packet_length)
+            data_total_length = min(bytes_remaining, packet_queue.max_packet_size)
             acl_packet = HCI_AclDataPacket(
                 connection_handle=connection_handle,
                 pb_flag=pb_flag,
@@ -403,33 +455,11 @@ class Host(AbortableEventEmitter):
                 data_total_length=data_total_length,
                 data=l2cap_pdu[offset : offset + data_total_length],
             )
-            logger.debug(
-                f'{color("### HOST -> CONTROLLER", "blue")}: (CID={cid}) {acl_packet}'
-            )
-            self.queue_acl_packet(acl_packet)
+            logger.debug(f'>>> ACL packet enqueue: (CID={cid}) {acl_packet}')
+            packet_queue.enqueue(acl_packet)
             pb_flag = 1
             offset += data_total_length
             bytes_remaining -= data_total_length
-
-    def queue_acl_packet(self, acl_packet: HCI_AclDataPacket) -> None:
-        self.acl_packet_queue.appendleft(acl_packet)
-        self.check_acl_packet_queue()
-
-        if len(self.acl_packet_queue):
-            logger.debug(
-                f'{self.acl_packets_in_flight} ACL packets in flight, '
-                f'{len(self.acl_packet_queue)} in queue'
-            )
-
-    def check_acl_packet_queue(self) -> None:
-        # Send all we can (TODO: support different LE/Classic limits)
-        while (
-            len(self.acl_packet_queue) > 0
-            and self.acl_packets_in_flight < self.hc_total_num_le_acl_data_packets
-        ):
-            packet = self.acl_packet_queue.pop()
-            self.send_hci_packet(packet)
-            self.acl_packets_in_flight += 1
 
     def supports_command(self, command):
         # Find the support flag position for this command
@@ -553,7 +583,7 @@ class Host(AbortableEventEmitter):
             # This is used just for the Num_HCI_Command_Packets field, not related to
             # an actual command
             logger.debug('no-command event')
-            return None
+            return
 
         return self.on_command_processed(event)
 
@@ -561,18 +591,17 @@ class Host(AbortableEventEmitter):
         return self.on_command_processed(event)
 
     def on_hci_number_of_completed_packets_event(self, event):
-        total_packets = sum(event.num_completed_packets)
-        if total_packets <= self.acl_packets_in_flight:
-            self.acl_packets_in_flight -= total_packets
-            self.check_acl_packet_queue()
-        else:
-            logger.warning(
-                color(
-                    '!!! {total_packets} completed but only '
-                    f'{self.acl_packets_in_flight} in flight'
+        for connection_handle, num_completed_packets in zip(
+            event.connection_handles, event.num_completed_packets
+        ):
+            if not (connection := self.connections.get(connection_handle)):
+                logger.warning(
+                    'received packet completion event for unknown handle '
+                    f'0x{connection_handle:04X}'
                 )
-            )
-            self.acl_packets_in_flight = 0
+                continue
+
+            connection.acl_packet_queue.on_packets_completed(num_completed_packets)
 
     # Classic only
     def on_hci_connection_request_event(self, event):
