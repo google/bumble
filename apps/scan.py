@@ -26,7 +26,7 @@ from bumble.transport import open_transport_or_link
 from bumble.keys import JsonKeyStore
 from bumble.smp import AddressResolver
 from bumble.device import Advertisement
-from bumble.hci import HCI_Constant, HCI_LE_1M_PHY, HCI_LE_CODED_PHY
+from bumble.hci import Address, HCI_Constant, HCI_LE_1M_PHY, HCI_LE_CODED_PHY
 
 
 # -----------------------------------------------------------------------------
@@ -66,10 +66,15 @@ class AdvertisementPrinter:
         address_type_string = ('PUBLIC', 'RANDOM', 'PUBLIC_ID', 'RANDOM_ID')[
             address.address_type
         ]
-        if address.is_public:
-            type_color = 'cyan'
+        if address.address_type in (
+            Address.RANDOM_IDENTITY_ADDRESS,
+            Address.PUBLIC_IDENTITY_ADDRESS,
+        ):
+            type_color = 'yellow'
         else:
-            if address.is_static:
+            if address.is_public:
+                type_color = 'cyan'
+            elif address.is_static:
                 type_color = 'green'
                 address_qualifier = '(static)'
             elif address.is_resolvable:
@@ -116,6 +121,7 @@ async def scan(
     phy,
     filter_duplicates,
     raw,
+    irks,
     keystore_file,
     device_config,
     transport,
@@ -140,9 +146,21 @@ async def scan(
 
         if device.keystore:
             resolving_keys = await device.keystore.get_resolving_keys()
-            resolver = AddressResolver(resolving_keys)
         else:
-            resolver = None
+            resolving_keys = []
+
+        for irk_and_address in irks:
+            if ':' not in irk_and_address:
+                raise ValueError('invalid IRK:ADDRESS value')
+            irk_hex, address_str = irk_and_address.split(':', 1)
+            resolving_keys.append(
+                (
+                    bytes.fromhex(irk_hex),
+                    Address(address_str, Address.RANDOM_DEVICE_ADDRESS),
+                )
+            )
+
+        resolver = AddressResolver(resolving_keys) if resolving_keys else None
 
         printer = AdvertisementPrinter(min_rssi, resolver)
         if raw:
@@ -187,8 +205,24 @@ async def scan(
     default=False,
     help='Listen for raw advertising reports instead of processed ones',
 )
-@click.option('--keystore-file', help='Keystore file to use when resolving addresses')
-@click.option('--device-config', help='Device config file for the scanning device')
+@click.option(
+    '--irk',
+    metavar='<IRK_HEX>:<ADDRESS>',
+    help=(
+        'Use this IRK for resolving private addresses ' '(may be used more than once)'
+    ),
+    multiple=True,
+)
+@click.option(
+    '--keystore-file',
+    metavar='FILE_PATH',
+    help='Keystore file to use when resolving addresses',
+)
+@click.option(
+    '--device-config',
+    metavar='FILE_PATH',
+    help='Device config file for the scanning device',
+)
 @click.argument('transport')
 def main(
     min_rssi,
@@ -198,6 +232,7 @@ def main(
     phy,
     filter_duplicates,
     raw,
+    irk,
     keystore_file,
     device_config,
     transport,
@@ -212,6 +247,7 @@ def main(
             phy,
             filter_duplicates,
             raw,
+            irk,
             keystore_file,
             device_config,
             transport,
