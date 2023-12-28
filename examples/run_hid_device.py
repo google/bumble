@@ -590,12 +590,12 @@ async def main():
     def on_set_protocol_cb(protocol: int):
         retValue = hid_device.GetSetStatus()
         # We do not support SET_PROTOCOL.
-        print("SET_PROTOCOL report_id: " + str(protocol))
+        print(f"SET_PROTOCOL report_id: {protocol}")
         retValue.status = hid_device.GetSetReturn.ERR_UNSUPPORTED_REQUEST
         return retValue
 
     def on_virtual_cable_unplug_cb():
-        print(f'Received Virtual Cable Unplug')
+        print('Received Virtual Cable Unplug')
         asyncio.create_task(handle_virtual_cable_unplug())
 
     print('<<< connecting to HCI...')
