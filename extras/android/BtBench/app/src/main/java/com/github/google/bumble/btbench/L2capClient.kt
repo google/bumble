@@ -28,8 +28,8 @@ private val Log = Logger.getLogger("btbench.l2cap-client")
 
 class L2capClient(
     private val viewModel: AppViewModel,
-    val bluetoothAdapter: BluetoothAdapter,
-    val context: Context
+    private val bluetoothAdapter: BluetoothAdapter,
+    private val context: Context
 ) {
     @SuppressLint("MissingPermission")
     fun run() {
@@ -80,6 +80,10 @@ class L2capClient(
                             BluetoothDevice.PHY_OPTION_NO_PREFERRED
                         )
                         gatt.readPhy()
+
+                        // Request an MTU update, even though we don't use GATT, because Android
+                        // won't request a larger link layer maximum data length otherwise.
+                        gatt.requestMtu(517)
                     }
                 }
             },
