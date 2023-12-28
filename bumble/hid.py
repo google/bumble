@@ -402,7 +402,7 @@ class Device(HID):
         report_type = pdu[0] & 0x03
         buffer_flag = (pdu[0] & 0x08) >> 3
         report_id = pdu[1]
-        logger.debug("buffer_flag: " + str(buffer_flag))
+        logger.debug(f"buffer_flag: {buffer_flag}")
         if buffer_flag == 1:
             buffer_size = (pdu[3] << 8) | pdu[2]
         else:
