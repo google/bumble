@@ -23,7 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import java.util.UUID
 
-val DEFAULT_RFCOMM_UUID = UUID.fromString("E6D55659-C8B4-4B85-96BB-B1143AF6D3AE")
+val DEFAULT_RFCOMM_UUID: UUID = UUID.fromString("E6D55659-C8B4-4B85-96BB-B1143AF6D3AE")
 const val DEFAULT_PEER_BLUETOOTH_ADDRESS = "AA:BB:CC:DD:EE:FF"
 const val DEFAULT_SENDER_PACKET_COUNT = 100
 const val DEFAULT_SENDER_PACKET_SIZE = 1024
@@ -31,11 +31,11 @@ const val DEFAULT_SENDER_PACKET_SIZE = 1024
 class AppViewModel : ViewModel() {
     private var preferences: SharedPreferences? = null
     var peerBluetoothAddress by mutableStateOf(DEFAULT_PEER_BLUETOOTH_ADDRESS)
-    var l2capPsm by mutableStateOf(0)
+    var l2capPsm by mutableIntStateOf(0)
     var use2mPhy by mutableStateOf(true)
-    var mtu by mutableStateOf(0)
-    var rxPhy by mutableStateOf(0)
-    var txPhy by mutableStateOf(0)
+    var mtu by mutableIntStateOf(0)
+    var rxPhy by mutableIntStateOf(0)
+    var txPhy by mutableIntStateOf(0)
     var senderPacketCountSlider by mutableFloatStateOf(0.0F)
     var senderPacketSizeSlider by mutableFloatStateOf(0.0F)
     var senderPacketCount by mutableIntStateOf(DEFAULT_SENDER_PACKET_COUNT)
@@ -79,18 +79,18 @@ class AppViewModel : ViewModel() {
     }
 
     fun updateSenderPacketCountSlider() {
-        if (senderPacketCount <= 10) {
-            senderPacketCountSlider = 0.0F
+        senderPacketCountSlider = if (senderPacketCount <= 10) {
+            0.0F
         } else if (senderPacketCount <= 50) {
-            senderPacketCountSlider = 0.2F
+            0.2F
         } else if (senderPacketCount <= 100) {
-            senderPacketCountSlider = 0.4F
+            0.4F
         } else if (senderPacketCount <= 500) {
-            senderPacketCountSlider = 0.6F
+            0.6F
         } else if (senderPacketCount <= 1000) {
-            senderPacketCountSlider = 0.8F
+            0.8F
         } else {
-            senderPacketCountSlider = 1.0F
+            1.0F
         }
 
         with(preferences!!.edit()) {
@@ -100,18 +100,18 @@ class AppViewModel : ViewModel() {
     }
 
     fun updateSenderPacketCount() {
-        if (senderPacketCountSlider < 0.1F) {
-            senderPacketCount = 10
+        senderPacketCount = if (senderPacketCountSlider < 0.1F) {
+            10
         } else if (senderPacketCountSlider < 0.3F) {
-            senderPacketCount = 50
+            50
         } else if (senderPacketCountSlider < 0.5F) {
-            senderPacketCount = 100
+            100
         } else if (senderPacketCountSlider < 0.7F) {
-            senderPacketCount = 500
+            500
         } else if (senderPacketCountSlider < 0.9F) {
-            senderPacketCount = 1000
+            1000
         } else {
-            senderPacketCount = 10000
+            10000
         }
 
         with(preferences!!.edit()) {
@@ -121,18 +121,18 @@ class AppViewModel : ViewModel() {
     }
 
     fun updateSenderPacketSizeSlider() {
-        if (senderPacketSize <= 16) {
-            senderPacketSizeSlider = 0.0F
+        senderPacketSizeSlider = if (senderPacketSize <= 16) {
+            0.0F
         } else if (senderPacketSize <= 256) {
-            senderPacketSizeSlider = 0.02F
+            0.02F
         } else if (senderPacketSize <= 512) {
-            senderPacketSizeSlider = 0.4F
+            0.4F
         } else if (senderPacketSize <= 1024) {
-            senderPacketSizeSlider = 0.6F
+            0.6F
         } else if (senderPacketSize <= 2048) {
-            senderPacketSizeSlider = 0.8F
+            0.8F
         } else {
-            senderPacketSizeSlider = 1.0F
+            1.0F
         }
 
         with(preferences!!.edit()) {
@@ -142,18 +142,18 @@ class AppViewModel : ViewModel() {
     }
 
     fun updateSenderPacketSize() {
-        if (senderPacketSizeSlider < 0.1F) {
-            senderPacketSize = 16
+        senderPacketSize = if (senderPacketSizeSlider < 0.1F) {
+            16
         } else if (senderPacketSizeSlider < 0.3F) {
-            senderPacketSize = 256
+            256
         } else if (senderPacketSizeSlider < 0.5F) {
-            senderPacketSize = 512
+            512
         } else if (senderPacketSizeSlider < 0.7F) {
-            senderPacketSize = 1024
+            1024
         } else if (senderPacketSizeSlider < 0.9F) {
-            senderPacketSize = 2048
+            2048
         } else {
-            senderPacketSize = 4096
+            4096
         }
 
         with(preferences!!.edit()) {
