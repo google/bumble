@@ -114,7 +114,7 @@ class SamplingFrequency(enum.IntEnum):
     '''Bluetooth Assigned Numbers, Section 6.12.5.1 - Sampling Frequency'''
 
     # fmt: off
-    FREQ_8000    = 0x01 
+    FREQ_8000    = 0x01
     FREQ_11025   = 0x02
     FREQ_16000   = 0x03
     FREQ_22050   = 0x04
@@ -430,7 +430,7 @@ class AseResponseCode(enum.IntEnum):
     REJECTED_METADATA                           = 0x0B
     INVALID_METADATA                            = 0x0C
     INSUFFICIENT_RESOURCES                      = 0x0D
-    UNSPECIFIED_ERROR                           = 0x0E    
+    UNSPECIFIED_ERROR                           = 0x0E
 
 
 class AseReasonCode(enum.IntEnum):
@@ -1066,7 +1066,7 @@ class AseStateMachine(gatt.Characteristic):
         # Readonly. Do nothing in the setter.
         pass
 
-    def on_read(self, _: device.Connection) -> bytes:
+    def on_read(self, _: Optional[device.Connection]) -> bytes:
         return self.value
 
     def __str__(self) -> str:

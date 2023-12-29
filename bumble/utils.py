@@ -280,17 +280,14 @@ class AsyncRunner:
             def wrapper(*args, **kwargs):
                 coroutine = func(*args, **kwargs)
                 if queue is None:
-                    # Create a task to run the coroutine
+                    # Spawn the coroutine as a task
                     async def run():
                         try:
                             await coroutine
                         except Exception:
-                            logger.warning(
-                                f'{color("!!! Exception in wrapper:", "red")} '
-                                f'{traceback.format_exc()}'
-                            )
+                            logger.exception(color("!!! Exception in wrapper:", "red"))
 
-                    asyncio.create_task(run())
+                    AsyncRunner.spawn(run())
                 else:
                     # Queue the coroutine to be awaited by the work queue
                     queue.enqueue(coroutine)

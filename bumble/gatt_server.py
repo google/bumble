@@ -31,9 +31,9 @@ import struct
 from typing import List, Tuple, Optional, TypeVar, Type, Dict, Iterable, TYPE_CHECKING
 from pyee import EventEmitter
 
-from .colors import color
-from .core import UUID
-from .att import (
+from bumble.colors import color
+from bumble.core import UUID
+from bumble.att import (
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     ATT_ATTRIBUTE_NOT_LONG_ERROR,
     ATT_CID,
@@ -60,7 +60,7 @@ from .att import (
     ATT_Write_Response,
     Attribute,
 )
-from .gatt import (
+from bumble.gatt import (
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
     GATT_MAX_ATTRIBUTE_VALUE_SIZE,
@@ -74,6 +74,7 @@ from .gatt import (
     Descriptor,
     Service,
 )
+from bumble.utils import AsyncRunner
 
 if TYPE_CHECKING:
     from bumble.device import Device, Connection
@@ -379,7 +380,7 @@ class Server(EventEmitter):
 
         # Get or encode the value
         value = (
-            attribute.read_value(connection)
+            await attribute.read_value(connection)
             if value is None
             else attribute.encode_value(value)
         )
@@ -422,7 +423,7 @@ class Server(EventEmitter):
 
         # Get or encode the value
         value = (
-            attribute.read_value(connection)
+            await attribute.read_value(connection)
             if value is None
             else attribute.encode_value(value)
         )
@@ -650,7 +651,8 @@ class Server(EventEmitter):
 
         self.send_response(connection, response)
 
-    def on_att_find_by_type_value_request(self, connection, request):
+    @AsyncRunner.run_in_task()
+    async def on_att_find_by_type_value_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.3.3 Find By Type Value Request
         '''
@@ -658,13 +660,13 @@ class Server(EventEmitter):
         # Build list of returned attributes
         pdu_space_available = connection.att_mtu - 2
         attributes = []
-        for attribute in (
+        async for attribute in (
             attribute
             for attribute in self.attributes
             if attribute.handle >= request.starting_handle
             and attribute.handle <= request.ending_handle
             and attribute.type == request.attribute_type
-            and attribute.read_value(connection) == request.attribute_value
+            and (await attribute.read_value(connection)) == request.attribute_value
             and pdu_space_available >= 4
         ):
             # TODO: check permissions
@@ -702,7 +704,8 @@ class Server(EventEmitter):
 
         self.send_response(connection, response)
 
-    def on_att_read_by_type_request(self, connection, request):
+    @AsyncRunner.run_in_task()
+    async def on_att_read_by_type_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.1 Read By Type Request
         '''
@@ -725,7 +728,7 @@ class Server(EventEmitter):
             and pdu_space_available
         ):
             try:
-                attribute_value = attribute.read_value(connection)
+                attribute_value = await attribute.read_value(connection)
             except ATT_Error as error:
                 # If the first attribute is unreadable, return an error
                 # Otherwise return attributes up to this point
@@ -767,14 +770,15 @@ class Server(EventEmitter):
 
         self.send_response(connection, response)
 
-    def on_att_read_request(self, connection, request):
+    @AsyncRunner.run_in_task()
+    async def on_att_read_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.3 Read Request
         '''
 
         if attribute := self.get_attribute(request.attribute_handle):
             try:
-                value = attribute.read_value(connection)
+                value = await attribute.read_value(connection)
             except ATT_Error as error:
                 response = ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
@@ -792,14 +796,15 @@ class Server(EventEmitter):
             )
         self.send_response(connection, response)
 
-    def on_att_read_blob_request(self, connection, request):
+    @AsyncRunner.run_in_task()
+    async def on_att_read_blob_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.5 Read Blob Request
         '''
 
         if attribute := self.get_attribute(request.attribute_handle):
             try:
-                value = attribute.read_value(connection)
+                value = await attribute.read_value(connection)
             except ATT_Error as error:
                 response = ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
@@ -836,7 +841,8 @@ class Server(EventEmitter):
             )
         self.send_response(connection, response)
 
-    def on_att_read_by_group_type_request(self, connection, request):
+    @AsyncRunner.run_in_task()
+    async def on_att_read_by_group_type_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.9 Read by Group Type Request
         '''
@@ -864,7 +870,7 @@ class Server(EventEmitter):
         ):
             # No need to catch permission errors here, since these attributes
             # must all be world-readable
-            attribute_value = attribute.read_value(connection)
+            attribute_value = await attribute.read_value(connection)
             # Check the attribute value size
             max_attribute_size = min(connection.att_mtu - 6, 251)
             if len(attribute_value) > max_attribute_size:
@@ -903,7 +909,8 @@ class Server(EventEmitter):
 
         self.send_response(connection, response)
 
-    def on_att_write_request(self, connection, request):
+    @AsyncRunner.run_in_task()
+    async def on_att_write_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.5.1 Write Request
         '''
@@ -936,12 +943,13 @@ class Server(EventEmitter):
             return
 
         # Accept the value
-        attribute.write_value(connection, request.attribute_value)
+        await attribute.write_value(connection, request.attribute_value)
 
         # Done
         self.send_response(connection, ATT_Write_Response())
 
-    def on_att_write_command(self, connection, request):
+    @AsyncRunner.run_in_task()
+    async def on_att_write_command(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.5.3 Write Command
         '''
@@ -959,7 +967,7 @@ class Server(EventEmitter):
 
         # Accept the value
         try:
-            attribute.write_value(connection, request.attribute_value)
+            await attribute.write_value(connection, request.attribute_value)
         except Exception as error:
             logger.exception(f'!!! ignoring exception: {error}')
 

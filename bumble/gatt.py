@@ -23,16 +23,28 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-import asyncio
 import enum
 import functools
 import logging
 import struct
-from typing import Optional, Sequence, Iterable, List, Union
+from typing import (
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Union,
+    TYPE_CHECKING,
+)
 
-from .colors import color
-from .core import UUID, get_dict_key_by_value
-from .att import Attribute
+from bumble.colors import color
+from bumble.core import UUID
+from bumble.att import Attribute, AttributeValue
+
+if TYPE_CHECKING:
+    from bumble.gatt_client import AttributeProxy
+    from bumble.device import Connection
 
 
 # -----------------------------------------------------------------------------
@@ -522,56 +534,43 @@ class CharacteristicDeclaration(Attribute):
 
 
 # -----------------------------------------------------------------------------
-class CharacteristicValue:
-    '''
-    Characteristic value where reading and/or writing is delegated to functions
-    passed as arguments to the constructor.
-    '''
-
-    def __init__(self, read=None, write=None):
-        self._read = read
-        self._write = write
-
-    def read(self, connection):
-        return self._read(connection) if self._read else b''
-
-    def write(self, connection, value):
-        if self._write:
-            self._write(connection, value)
+class CharacteristicValue(AttributeValue):
+    """Same as AttributeValue, for backward compatibility"""
 
 
 # -----------------------------------------------------------------------------
 class CharacteristicAdapter:
     '''
-    An adapter that can adapt any object with `read_value` and `write_value`
-    methods (like Characteristic and CharacteristicProxy objects) by wrapping
-    those methods with ones that return/accept encoded/decoded values.
-    Objects with async methods are considered proxies, so the adaptation is one
-    where the return value of `read_value` is decoded and the value passed to
-    `write_value` is encoded. Other objects are considered local characteristics
-    so the adaptation is one where the return value of `read_value` is encoded
-    and the value passed to `write_value` is decoded.
-    If the characteristic has a `subscribe` method, it is wrapped with one where
-    the values are decoded before being passed to the subscriber.
+    An adapter that can adapt Characteristic and AttributeProxy objects
+    by wrapping their `read_value()` and `write_value()` methods with ones that
+    return/accept encoded/decoded values.
+
+    For proxies (i.e used by a GATT client), the adaptation is one where the return
+    value of `read_value()` is decoded and the value passed to `write_value()` is
+    encoded. The `subscribe()` method, is wrapped with one where the values are decoded
+    before being passed to the subscriber.
+
+    For local values (i.e hosted by a GATT server) the adaptation is one where the
+    return value of `read_value()` is encoded and the value passed to `write_value()`
+    is decoded.
     '''
 
-    def __init__(self, characteristic):
-        self.wrapped_characteristic = characteristic
-        self.subscribers = {}  # Map from subscriber to proxy subscriber
+    read_value: Callable
+    write_value: Callable
 
-        if asyncio.iscoroutinefunction(
-            characteristic.read_value
-        ) and asyncio.iscoroutinefunction(characteristic.write_value):
-            self.read_value = self.read_decoded_value
-            self.write_value = self.write_decoded_value
-        else:
+    def __init__(self, characteristic: Union[Characteristic, AttributeProxy]):
+        self.wrapped_characteristic = characteristic
+        self.subscribers: Dict[
+            Callable, Callable
+        ] = {}  # Map from subscriber to proxy subscriber
+
+        if isinstance(characteristic, Characteristic):
             self.read_value = self.read_encoded_value
             self.write_value = self.write_encoded_value
-
-        if hasattr(self.wrapped_characteristic, 'subscribe'):
+        else:
+            self.read_value = self.read_decoded_value
+            self.write_value = self.write_decoded_value
             self.subscribe = self.wrapped_subscribe
-
-        if hasattr(self.wrapped_characteristic, 'unsubscribe'):
             self.unsubscribe = self.wrapped_unsubscribe
 
     def __getattr__(self, name):
@@ -590,11 +589,13 @@ class CharacteristicAdapter:
         else:
             setattr(self.wrapped_characteristic, name, value)
 
-    def read_encoded_value(self, connection):
-        return self.encode_value(self.wrapped_characteristic.read_value(connection))
+    async def read_encoded_value(self, connection):
+        return self.encode_value(
+            await self.wrapped_characteristic.read_value(connection)
+        )
 
-    def write_encoded_value(self, connection, value):
-        return self.wrapped_characteristic.write_value(
+    async def write_encoded_value(self, connection, value):
+        return await self.wrapped_characteristic.write_value(
             connection, self.decode_value(value)
         )
 
@@ -729,13 +730,24 @@ class Descriptor(Attribute):
     '''
 
     def __str__(self) -> str:
+        if isinstance(self.value, bytes):
+            value_str = self.value.hex()
+        elif isinstance(self.value, CharacteristicValue):
+            value = self.value.read(None)
+            if isinstance(value, bytes):
+                value_str = value.hex()
+            else:
+                value_str = '<async>'
+        else:
+            value_str = '<...>'
         return (
             f'Descriptor(handle=0x{self.handle:04X}, '
             f'type={self.type}, '
-            f'value={self.read_value(None).hex()})'
+            f'value={value_str})'
         )
 
 
+# -----------------------------------------------------------------------------
 class ClientCharacteristicConfigurationBits(enum.IntFlag):
     '''
     See Vol 3, Part G - 3.3.3.3 - Table 3.11 Client Characteristic Configuration bit
