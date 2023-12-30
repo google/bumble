@@ -20,6 +20,7 @@ import os
 import pytest
 import struct
 import logging
+from unittest import mock
 
 from bumble import device
 from bumble.profiles import csip
@@ -68,14 +69,18 @@ def test_sef():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_csis():
+@pytest.mark.parametrize(
+    'sirk_type,', [(csip.SirkType.ENCRYPTED), (csip.SirkType.PLAINTEXT)]
+)
+async def test_csis(sirk_type):
     SIRK = bytes.fromhex('2f62c8ae41867d1bb619e788a2605faa')
+    LTK = bytes.fromhex('2f62c8ae41867d1bb619e788a2605faa')
 
     devices = TwoDevices()
     devices[0].add_service(
         csip.CoordinatedSetIdentificationService(
             set_identity_resolving_key=SIRK,
-            set_identity_resolving_key_type=csip.SirkType.PLAINTEXT,
+            set_identity_resolving_key_type=sirk_type,
             coordinated_set_size=2,
             set_member_lock=csip.MemberLock.UNLOCKED,
             set_member_rank=0,
@@ -83,15 +88,19 @@ async def test_csis():
     )
 
     await devices.setup_connection()
+
+    # Mock encryption.
+    devices.connections[0].encryption = 1
+    devices.connections[1].encryption = 1
+    devices[0].get_long_term_key = mock.AsyncMock(return_value=LTK)
+    devices[1].get_long_term_key = mock.AsyncMock(return_value=LTK)
+
     peer = device.Peer(devices.connections[1])
     csis_client = await peer.discover_service_and_create_proxy(
         csip.CoordinatedSetIdentificationProxy
     )
 
-    assert (
-        await csis_client.set_identity_resolving_key.read_value()
-        == bytes([csip.SirkType.PLAINTEXT]) + SIRK
-    )
+    assert await csis_client.read_set_identity_resolving_key() == (sirk_type, SIRK)
     assert await csis_client.coordinated_set_size.read_value() == struct.pack('B', 2)
     assert await csis_client.set_member_lock.read_value() == struct.pack(
         'B', csip.MemberLock.UNLOCKED
