@@ -10,3 +10,5 @@ __pycache__
 bumble/_version.py
 .vscode/launch.json
 /.idea
+venv/
+.venv/
