@@ -70,6 +70,7 @@ from .hci import (
     HCI_Reset_Command,
     HCI_Set_Event_Mask_Command,
     HCI_SynchronousDataPacket,
+    LeFeatureMask,
 )
 from .core import (
     BT_BR_EDR_TRANSPORT,
@@ -487,8 +488,8 @@ class Host(AbortableEventEmitter):
 
         return commands
 
-    def supports_le_feature(self, feature):
-        return (self.local_le_features & (1 << feature)) != 0
+    def supports_le_features(self, feature: LeFeatureMask) -> bool:
+        return (self.local_le_features & feature) == feature
 
     @property
     def supported_le_features(self):
@@ -1033,3 +1034,15 @@ class Host(AbortableEventEmitter):
             event.bd_addr,
             event.host_supported_features,
         )
+
+    def on_hci_le_read_remote_features_complete_event(self, event):
+        if event.status != HCI_SUCCESS:
+            self.emit(
+                'le_remote_features_failure', event.connection_handle, event.status
+            )
+        else:
+            self.emit(
+                'le_remote_features',
+                event.connection_handle,
+                int.from_bytes(event.le_features, 'little'),
+            )

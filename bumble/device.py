@@ -49,7 +49,6 @@ from .hci import (
     HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
     HCI_CENTRAL_ROLE,
     HCI_COMMAND_STATUS_PENDING,
-    HCI_CONNECTED_ISOCHRONOUS_STREAM_LE_SUPPORTED_FEATURE,
     HCI_CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR,
     HCI_DISPLAY_YES_NO_IO_CAPABILITY,
     HCI_DISPLAY_ONLY_IO_CAPABILITY,
@@ -60,11 +59,8 @@ from .hci import (
     HCI_LE_1M_PHY,
     HCI_LE_1M_PHY_BIT,
     HCI_LE_2M_PHY,
-    HCI_LE_2M_PHY_LE_SUPPORTED_FEATURE,
     HCI_LE_CODED_PHY,
     HCI_LE_CODED_PHY_BIT,
-    HCI_LE_CODED_PHY_LE_SUPPORTED_FEATURE,
-    HCI_LE_EXTENDED_ADVERTISING_LE_SUPPORTED_FEATURE,
     HCI_LE_EXTENDED_CREATE_CONNECTION_COMMAND,
     HCI_LE_RAND_COMMAND,
     HCI_LE_READ_PHY_COMMAND,
@@ -106,6 +102,7 @@ from .hci import (
     HCI_LE_Extended_Create_Connection_Command,
     HCI_LE_Rand_Command,
     HCI_LE_Read_PHY_Command,
+    HCI_LE_Read_Remote_Features_Command,
     HCI_LE_Reject_CIS_Request_Command,
     HCI_LE_Remove_Advertising_Set_Command,
     HCI_LE_Set_Address_Resolution_Enable_Command,
@@ -151,6 +148,7 @@ from .hci import (
     HCI_Write_Secure_Connections_Host_Support_Command,
     HCI_Write_Simple_Pairing_Mode_Command,
     OwnAddressType,
+    LeFeatureMask,
     phy_list_to_bits,
 )
 from .host import Host
@@ -681,6 +679,7 @@ class Connection(CompositeEventEmitter):
     self_address: Address
     peer_address: Address
     peer_resolvable_address: Optional[Address]
+    peer_le_features: Optional[LeFeatureMask]
     role: int
     encryption: int
     authenticated: bool
@@ -757,6 +756,7 @@ class Connection(CompositeEventEmitter):
         )  # By default, use the device's shared server
         self.pairing_peer_io_capability = None
         self.pairing_peer_authentication_requirements = None
+        self.peer_le_features = None
 
     # [Classic only]
     @classmethod
@@ -904,6 +904,15 @@ class Connection(CompositeEventEmitter):
     # [Classic only]
     async def request_remote_name(self):
         return await self.device.request_remote_name(self)
+
+    async def get_remote_le_features(self) -> LeFeatureMask:
+        """[LE Only] Reads remote LE supported features.
+
+        Returns:
+            LE features supported by the remote device.
+        """
+        self.peer_le_features = await self.device.get_remote_le_features(self)
+        return self.peer_le_features
 
     async def __aenter__(self):
         return self
@@ -1537,9 +1546,7 @@ class Device(CompositeEventEmitter):
             if self.cis_enabled:
                 await self.send_command(
                     HCI_LE_Set_Host_Feature_Command(
-                        bit_number=(
-                            HCI_CONNECTED_ISOCHRONOUS_STREAM_LE_SUPPORTED_FEATURE
-                        ),
+                        bit_number=LeFeatureMask.CONNECTED_ISOCHRONOUS_STREAM,
                         bit_value=1,
                     )
                 )
@@ -1595,21 +1602,21 @@ class Device(CompositeEventEmitter):
                     )
                 )
 
-    def supports_le_feature(self, feature):
-        return self.host.supports_le_feature(feature)
+    def supports_le_features(self, feature: LeFeatureMask) -> bool:
+        return self.host.supports_le_features(feature)
 
     def supports_le_phy(self, phy):
         if phy == HCI_LE_1M_PHY:
             return True
 
         feature_map = {
-            HCI_LE_2M_PHY: HCI_LE_2M_PHY_LE_SUPPORTED_FEATURE,
-            HCI_LE_CODED_PHY: HCI_LE_CODED_PHY_LE_SUPPORTED_FEATURE,
+            HCI_LE_2M_PHY: LeFeatureMask.LE_2M_PHY,
+            HCI_LE_CODED_PHY: LeFeatureMask.LE_CODED_PHY,
         }
         if phy not in feature_map:
             raise ValueError('invalid PHY')
 
-        return self.host.supports_le_feature(feature_map[phy])
+        return self.host.supports_le_features(feature_map[phy])
 
     @deprecated("Please use start_legacy_advertising.")
     async def start_advertising(
@@ -1919,8 +1926,8 @@ class Device(CompositeEventEmitter):
         self.advertisement_accumulators = {}
 
         # Enable scanning
-        if not legacy and self.supports_le_feature(
-            HCI_LE_EXTENDED_ADVERTISING_LE_SUPPORTED_FEATURE
+        if not legacy and self.supports_le_features(
+            LeFeatureMask.LE_EXTENDED_ADVERTISING
         ):
             # Set the scanning parameters
             scan_type = (
@@ -1938,7 +1945,7 @@ class Device(CompositeEventEmitter):
                 scanning_phys_bits |= 1 << HCI_LE_1M_PHY_BIT
                 scanning_phy_count += 1
             if HCI_LE_CODED_PHY in scanning_phys:
-                if self.supports_le_feature(HCI_LE_CODED_PHY_LE_SUPPORTED_FEATURE):
+                if self.supports_le_features(LeFeatureMask.LE_CODED_PHY):
                     scanning_phys_bits |= 1 << HCI_LE_CODED_PHY_BIT
                     scanning_phy_count += 1
 
@@ -1999,7 +2006,7 @@ class Device(CompositeEventEmitter):
 
     async def stop_scanning(self) -> None:
         # Disable scanning
-        if self.supports_le_feature(HCI_LE_EXTENDED_ADVERTISING_LE_SUPPORTED_FEATURE):
+        if self.supports_le_features(LeFeatureMask.LE_EXTENDED_ADVERTISING):
             await self.send_command(
                 HCI_LE_Set_Extended_Scan_Enable_Command(
                     enable=0, filter_duplicates=0, duration=0, period=0
@@ -3140,6 +3147,32 @@ class Device(CompositeEventEmitter):
                 f'{HCI_Constant.error_name(result.status)}'
             )
             raise HCI_StatusError(result)
+
+    async def get_remote_le_features(self, connection: Connection) -> LeFeatureMask:
+        """[LE Only] Reads remote LE supported features.
+
+        Args:
+            handle: connection handle to read LE features.
+
+        Returns:
+            LE features supported by the remote device.
+        """
+        with closing(EventWatcher()) as watcher:
+            read_feature_future: asyncio.Future[
+                LeFeatureMask
+            ] = asyncio.get_running_loop().create_future()
+
+            def on_le_remote_features(handle: int, features: int):
+                if handle == connection.handle:
+                    read_feature_future.set_result(LeFeatureMask(features))
+
+            watcher.on(self.host, 'le_remote_features', on_le_remote_features)
+            await self.send_command(
+                HCI_LE_Read_Remote_Features_Command(
+                    connection_handle=connection.handle
+                ),
+            )
+            return await read_feature_future
 
     @host_event_handler
     def on_flush(self):
