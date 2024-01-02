@@ -520,11 +520,14 @@ class Ping:
             min_latency = min(self.latencies)
             max_latency = max(self.latencies)
             avg_latency = sum(self.latencies) / len(self.latencies)
-            logging.info(color(
-                '@@@ Latencies: '
-                f'min={min_latency:.2f}, '
-                f'max={max_latency:.2f}, '
-                f'average={avg_latency:.2f}'))
+            logging.info(
+                color(
+                    '@@@ Latencies: '
+                    f'min={min_latency:.2f}, '
+                    f'max={max_latency:.2f}, '
+                    f'average={avg_latency:.2f}'
+                )
+            )
 
             self.min_stats.append(min_latency)
             self.max_stats.append(max_latency)
