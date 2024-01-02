@@ -74,11 +74,13 @@ class L2capClient(
                     gatt: BluetoothGatt?, status: Int, newState: Int
                 ) {
                     if (gatt != null && newState == BluetoothProfile.STATE_CONNECTED) {
-                        gatt.setPreferredPhy(
-                            BluetoothDevice.PHY_LE_2M_MASK,
-                            BluetoothDevice.PHY_LE_2M_MASK,
-                            BluetoothDevice.PHY_OPTION_NO_PREFERRED
-                        )
+                        if (viewModel.use2mPhy) {
+                            gatt.setPreferredPhy(
+                                BluetoothDevice.PHY_LE_2M_MASK,
+                                BluetoothDevice.PHY_LE_2M_MASK,
+                                BluetoothDevice.PHY_OPTION_NO_PREFERRED
+                            )
+                        }
                         gatt.readPhy()
 
                         // Request an MTU update, even though we don't use GATT, because Android
