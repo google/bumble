@@ -454,6 +454,8 @@ class DLC(EventEmitter):
         self.c_r = 1 if self.role == Multiplexer.Role.INITIATOR else 0
         self.sink = None
         self.connection_result = None
+        self.drained = asyncio.Event()
+        self.drained.set()
 
         # Compute the MTU
         max_overhead = 4 + 1  # header with 2-byte length + fcs
@@ -633,6 +635,8 @@ class DLC(EventEmitter):
             )
 
             rx_credits_needed = 0
+            if not self.tx_buffer:
+                self.drained.set()
 
     # Stream protocol
     def write(self, data: Union[bytes, str]) -> None:
@@ -645,11 +649,11 @@ class DLC(EventEmitter):
                 raise ValueError('write only accept bytes or strings')
 
         self.tx_buffer += data
+        self.drained.clear()
         self.process_tx()
 
-    def drain(self) -> None:
-        # TODO
-        pass
+    async def drain(self) -> None:
+        await self.drained.wait()
 
     def __str__(self) -> str:
         return f'DLC(dlci={self.dlci},state={self.state.name})'

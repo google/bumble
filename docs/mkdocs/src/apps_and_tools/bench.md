@@ -7,16 +7,36 @@ throughput and/or latency between two devices.
 # General Usage
 
 ```
-Usage: bench.py [OPTIONS] COMMAND [ARGS]...
+Usage: bumble-bench [OPTIONS] COMMAND [ARGS]...
 
 Options:
   --device-config FILENAME        Device configuration file
   --role [sender|receiver|ping|pong]
   --mode [gatt-client|gatt-server|l2cap-client|l2cap-server|rfcomm-client|rfcomm-server]
   --att-mtu MTU                   GATT MTU (gatt-client mode)  [23<=x<=517]
-  -s, --packet-size SIZE          Packet size (server role)  [8<=x<=4096]
-  -c, --packet-count COUNT        Packet count (server role)
-  -sd, --start-delay SECONDS      Start delay (server role)
+  --extended-data-length TEXT     Request a data length upon connection,
+                                  specified as tx_octets/tx_time
+  --rfcomm-channel INTEGER        RFComm channel to use
+  --rfcomm-uuid TEXT              RFComm service UUID to use (ignored if
+                                  --rfcomm-channel is not 0)
+  --l2cap-psm INTEGER             L2CAP PSM to use
+  --l2cap-mtu INTEGER             L2CAP MTU to use
+  --l2cap-mps INTEGER             L2CAP MPS to use
+  --l2cap-max-credits INTEGER     L2CAP maximum number of credits allowed for
+                                  the peer
+  -s, --packet-size SIZE          Packet size (client or ping role)
+                                  [8<=x<=4096]
+  -c, --packet-count COUNT        Packet count (client or ping role)
+  -sd, --start-delay SECONDS      Start delay (client or ping role)
+  --repeat N                      Repeat the run N times (client and ping
+                                  roles)(0, which is the fault, to run just
+                                  once)
+  --repeat-delay SECONDS          Delay, in seconds, between repeats
+  --pace MILLISECONDS             Wait N milliseconds between packets (0,
+                                  which is the fault, to send as fast as
+                                  possible)
+  --linger                        Don't exit at the end of a run (server and
+                                  pong roles)
   --help                          Show this message and exit.
 
 Commands:
@@ -35,17 +55,18 @@ Options:
   --connection-interval, --ci CONNECTION_INTERVAL
                                   Connection interval (in ms)
   --phy [1m|2m|coded]             PHY to use
+  --authenticate                  Authenticate (RFComm only)
+  --encrypt                       Encrypt the connection (RFComm only)
   --help                          Show this message and exit.
 ```
 
-
-To test once device against another, one of the two devices must be running 
+To test once device against another, one of the two devices must be running
 the ``peripheral`` command and the other the ``central`` command. The device
 running the ``peripheral`` command will accept connections from the device
 running the ``central`` command.
 When using Bluetooth LE (all modes except for ``rfcomm-server`` and ``rfcomm-client``utils),
-the default addresses configured in the tool should be sufficient. But when using 
-Bluetooth Classic, the address of the Peripheral must be specified on the Central 
+the default addresses configured in the tool should be sufficient. But when using
+Bluetooth Classic, the address of the Peripheral must be specified on the Central
 using the ``--peripheral`` option. The address will be printed by the Peripheral when
 it starts.
 
@@ -83,7 +104,7 @@ the other on `usb:1`, and two consoles/terminals. We will run a command in each.
     $ bumble-bench central usb:1
     ```
 
-    In this default configuration, the Central runs a Sender, as a GATT client, 
+    In this default configuration, the Central runs a Sender, as a GATT client,
     connecting to the Peripheral running a Receiver, as a GATT server.
 
 !!! example "L2CAP Throughput"

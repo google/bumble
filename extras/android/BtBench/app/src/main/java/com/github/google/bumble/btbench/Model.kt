@@ -27,11 +27,12 @@ val DEFAULT_RFCOMM_UUID: UUID = UUID.fromString("E6D55659-C8B4-4B85-96BB-B1143AF
 const val DEFAULT_PEER_BLUETOOTH_ADDRESS = "AA:BB:CC:DD:EE:FF"
 const val DEFAULT_SENDER_PACKET_COUNT = 100
 const val DEFAULT_SENDER_PACKET_SIZE = 1024
+const val DEFAULT_PSM = 128
 
 class AppViewModel : ViewModel() {
     private var preferences: SharedPreferences? = null
     var peerBluetoothAddress by mutableStateOf(DEFAULT_PEER_BLUETOOTH_ADDRESS)
-    var l2capPsm by mutableIntStateOf(0)
+    var l2capPsm by mutableIntStateOf(DEFAULT_PSM)
     var use2mPhy by mutableStateOf(true)
     var mtu by mutableIntStateOf(0)
     var rxPhy by mutableIntStateOf(0)

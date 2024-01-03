@@ -149,10 +149,11 @@ L2CAP_INVALID_CID_IN_REQUEST_REASON = 0x0002
 
 L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_CREDITS             = 65535
 L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MTU                 = 23
+L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MTU                 = 65535
 L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MPS                 = 23
 L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MPS                 = 65533
 L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MTU             = 2048
-L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS             = 2046
+L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS             = 2048
 L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_INITIAL_CREDITS = 256
 
 L2CAP_MAXIMUM_TRANSMISSION_UNIT_CONFIGURATION_OPTION_TYPE = 0x01
@@ -188,8 +189,11 @@ class LeCreditBasedChannelSpec:
             or self.max_credits > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_CREDITS
         ):
             raise ValueError('max credits out of range')
-        if self.mtu < L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MTU:
-            raise ValueError('MTU too small')
+        if (
+            self.mtu < L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MTU
+            or self.mtu > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MTU
+        ):
+            raise ValueError('MTU out of range')
         if (
             self.mps < L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MPS
             or self.mps > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MPS
@@ -1644,12 +1648,13 @@ class ChannelManager:
 
     def send_pdu(self, connection, cid: int, pdu: Union[SupportsBytes, bytes]) -> None:
         pdu_str = pdu.hex() if isinstance(pdu, bytes) else str(pdu)
+        pdu_bytes = bytes(pdu)
         logger.debug(
             f'{color(">>> Sending L2CAP PDU", "blue")} '
             f'on connection [0x{connection.handle:04X}] (CID={cid}) '
-            f'{connection.peer_address}: {pdu_str}'
+            f'{connection.peer_address}: {len(pdu_bytes)} bytes, {pdu_str}'
         )
-        self.host.send_l2cap_pdu(connection.handle, cid, bytes(pdu))
+        self.host.send_l2cap_pdu(connection.handle, cid, pdu_bytes)
 
     def on_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         if cid in (L2CAP_SIGNALING_CID, L2CAP_LE_SIGNALING_CID):

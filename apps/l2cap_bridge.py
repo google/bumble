@@ -49,14 +49,16 @@ class ServerBridge:
         self.tcp_port = tcp_port
 
     async def start(self, device: Device) -> None:
-        # Listen for incoming L2CAP CoC connections
+        # Listen for incoming L2CAP channel connections
         device.create_l2cap_server(
             spec=l2cap.LeCreditBasedChannelSpec(
                 psm=self.psm, mtu=self.mtu, mps=self.mps, max_credits=self.max_credits
             ),
-            handler=self.on_coc,
+            handler=self.on_channel,
         )
-        print(color(f'### Listening for CoC connection on PSM {self.psm}', 'yellow'))
+        print(
+            color(f'### Listening for channel connection on PSM {self.psm}', 'yellow')
+        )
 
         def on_ble_connection(connection):
             def on_ble_disconnection(reason):
@@ -73,7 +75,7 @@ class ServerBridge:
         await device.start_advertising(auto_restart=True)
 
     # Called when a new L2CAP connection is established
-    def on_coc(self, l2cap_channel):
+    def on_channel(self, l2cap_channel):
         print(color('*** L2CAP channel:', 'cyan'), l2cap_channel)
 
         class Pipe:
@@ -83,7 +85,7 @@ class ServerBridge:
                 self.l2cap_channel = l2cap_channel
 
                 l2cap_channel.on('close', self.on_l2cap_close)
-                l2cap_channel.sink = self.on_coc_sdu
+                l2cap_channel.sink = self.on_channel_sdu
 
             async def connect_to_tcp(self):
                 # Connect to the TCP server
@@ -128,7 +130,7 @@ class ServerBridge:
                 if self.tcp_transport is not None:
                     self.tcp_transport.close()
 
-            def on_coc_sdu(self, sdu):
+            def on_channel_sdu(self, sdu):
                 print(color(f'<<< [L2CAP SDU]: {len(sdu)} bytes', 'cyan'))
                 if self.tcp_transport is None:
                     print(color('!!! TCP socket not open, dropping', 'red'))
@@ -183,7 +185,7 @@ class ClientBridge:
             peer_name = writer.get_extra_info('peer_name')
             print(color(f'<<< TCP connection from {peer_name}', 'magenta'))
 
-            def on_coc_sdu(sdu):
+            def on_channel_sdu(sdu):
                 print(color(f'<<< [L2CAP SDU]: {len(sdu)} bytes', 'cyan'))
                 l2cap_to_tcp_pipe.write(sdu)
 
@@ -209,7 +211,7 @@ class ClientBridge:
                 writer.close()
                 return
 
-            l2cap_channel.sink = on_coc_sdu
+            l2cap_channel.sink = on_channel_sdu
             l2cap_channel.on('close', on_l2cap_close)
 
             # Start a flow control pipe from L2CAP to TCP
@@ -274,23 +276,29 @@ async def run(device_config, hci_transport, bridge):
 @click.pass_context
 @click.option('--device-config', help='Device configuration file', required=True)
 @click.option('--hci-transport', help='HCI transport', required=True)
-@click.option('--psm', help='PSM for L2CAP CoC', type=int, default=1234)
+@click.option('--psm', help='PSM for L2CAP', type=int, default=1234)
 @click.option(
-    '--l2cap-coc-max-credits',
-    help='Maximum L2CAP CoC Credits',
+    '--l2cap-max-credits',
+    help='Maximum L2CAP Credits',
     type=click.IntRange(1, 65535),
     default=128,
 )
 @click.option(
-    '--l2cap-coc-mtu',
-    help='L2CAP CoC MTU',
-    type=click.IntRange(23, 65535),
-    default=1022,
+    '--l2cap-mtu',
+    help='L2CAP MTU',
+    type=click.IntRange(
+        l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MTU,
+        l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MTU,
+    ),
+    default=1024,
 )
 @click.option(
-    '--l2cap-coc-mps',
-    help='L2CAP CoC MPS',
-    type=click.IntRange(23, 65533),
+    '--l2cap-mps',
+    help='L2CAP MPS',
+    type=click.IntRange(
+        l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MPS,
+        l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MPS,
+    ),
     default=1024,
 )
 def cli(
@@ -298,17 +306,17 @@ def cli(
     device_config,
     hci_transport,
     psm,
-    l2cap_coc_max_credits,
-    l2cap_coc_mtu,
-    l2cap_coc_mps,
+    l2cap_max_credits,
+    l2cap_mtu,
+    l2cap_mps,
 ):
     context.ensure_object(dict)
     context.obj['device_config'] = device_config
     context.obj['hci_transport'] = hci_transport
     context.obj['psm'] = psm
-    context.obj['max_credits'] = l2cap_coc_max_credits
-    context.obj['mtu'] = l2cap_coc_mtu
-    context.obj['mps'] = l2cap_coc_mps
+    context.obj['max_credits'] = l2cap_max_credits
+    context.obj['mtu'] = l2cap_mtu
+    context.obj['mps'] = l2cap_mps
 
 
 # -----------------------------------------------------------------------------
