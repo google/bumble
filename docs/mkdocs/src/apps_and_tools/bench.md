@@ -17,7 +17,7 @@ Options:
   --extended-data-length TEXT     Request a data length upon connection,
                                   specified as tx_octets/tx_time
   --rfcomm-channel INTEGER        RFComm channel to use
-  --rfcomm-uuid TEXT              RFComm service UUID to use (ignored is
+  --rfcomm-uuid TEXT              RFComm service UUID to use (ignored if
                                   --rfcomm-channel is not 0)
   --l2cap-psm INTEGER             L2CAP PSM to use
   --l2cap-mtu INTEGER             L2CAP MTU to use

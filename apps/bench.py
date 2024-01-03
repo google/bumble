@@ -1428,7 +1428,7 @@ def create_role_factory(ctx, default_role):
 @click.option(
     '--rfcomm-uuid',
     default=DEFAULT_RFCOMM_UUID,
-    help='RFComm service UUID to use (ignored is --rfcomm-channel is not 0)',
+    help='RFComm service UUID to use (ignored if --rfcomm-channel is not 0)',
 )
 @click.option(
     '--l2cap-psm',
