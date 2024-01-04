@@ -21,7 +21,6 @@ import enum
 import struct
 from typing import Optional, Tuple
 
-from bumble import att
 from bumble import core
 from bumble import crypto
 from bumble import device
