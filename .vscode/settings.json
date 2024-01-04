@@ -22,6 +22,7 @@
         "cmac",
         "CONNECTIONLESS",
         "csip",
+        "csis",
         "csrcs",
         "CVSD",
         "datagram",

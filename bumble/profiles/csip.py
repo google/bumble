@@ -19,7 +19,7 @@
 from __future__ import annotations
 import enum
 import struct
-from typing import Optional
+from typing import Optional, Tuple
 
 from bumble import core
 from bumble import crypto
@@ -31,6 +31,9 @@ from bumble import gatt_client
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
+SET_IDENTITY_RESOLVING_KEY_LENGTH = 16
+
+
 class SirkType(enum.IntEnum):
     '''Coordinated Set Identification Service - 5.1 Set Identity Resolving Key.'''
 
@@ -66,6 +69,10 @@ def k1(n: bytes, salt: bytes, p: bytes) -> bytes:
 def sef(k: bytes, r: bytes) -> bytes:
     '''
     Coordinated Set Identification Service - 4.5 SIRK encryption function sef.
+
+    SIRK decryption function sdf shares the same algorithm. The only difference is that argument r is:
+      * Plaintext in encryption
+      * Cipher in decryption
     '''
     return crypto.xor(k1(k, s1(b'SIRKenc'[::-1]), b'csis'[::-1]), r)
 
@@ -105,6 +112,11 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
         set_member_lock: Optional[MemberLock] = None,
         set_member_rank: Optional[int] = None,
     ) -> None:
+        if len(set_identity_resolving_key) != SET_IDENTITY_RESOLVING_KEY_LENGTH:
+            raise ValueError(
+                f'Invalid SIRK length {len(set_identity_resolving_key)}, expected {SET_IDENTITY_RESOLVING_KEY_LENGTH}'
+            )
+
         characteristics = []
 
         self.set_identity_resolving_key = set_identity_resolving_key
@@ -113,7 +125,7 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
             uuid=gatt.GATT_SET_IDENTITY_RESOLVING_KEY_CHARACTERISTIC,
             properties=gatt.Characteristic.Properties.READ
             | gatt.Characteristic.Properties.NOTIFY,
-            permissions=gatt.Characteristic.Permissions.READABLE,
+            permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
             value=gatt.CharacteristicValue(read=self.on_sirk_read),
         )
         characteristics.append(self.set_identity_resolving_key_characteristic)
@@ -123,7 +135,7 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
                 uuid=gatt.GATT_COORDINATED_SET_SIZE_CHARACTERISTIC,
                 properties=gatt.Characteristic.Properties.READ
                 | gatt.Characteristic.Properties.NOTIFY,
-                permissions=gatt.Characteristic.Permissions.READABLE,
+                permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
                 value=struct.pack('B', coordinated_set_size),
             )
             characteristics.append(self.coordinated_set_size_characteristic)
@@ -134,7 +146,7 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
                 properties=gatt.Characteristic.Properties.READ
                 | gatt.Characteristic.Properties.NOTIFY
                 | gatt.Characteristic.Properties.WRITE,
-                permissions=gatt.Characteristic.Permissions.READABLE
+                permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
                 | gatt.Characteristic.Permissions.WRITEABLE,
                 value=struct.pack('B', set_member_lock),
             )
@@ -145,18 +157,32 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
                 uuid=gatt.GATT_SET_MEMBER_RANK_CHARACTERISTIC,
                 properties=gatt.Characteristic.Properties.READ
                 | gatt.Characteristic.Properties.NOTIFY,
-                permissions=gatt.Characteristic.Permissions.READABLE,
+                permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
                 value=struct.pack('B', set_member_rank),
             )
             characteristics.append(self.set_member_rank_characteristic)
 
         super().__init__(characteristics)
 
-    def on_sirk_read(self, _connection: Optional[device.Connection]) -> bytes:
+    async def on_sirk_read(self, connection: Optional[device.Connection]) -> bytes:
         if self.set_identity_resolving_key_type == SirkType.PLAINTEXT:
-            return bytes([SirkType.PLAINTEXT]) + self.set_identity_resolving_key
+            sirk_bytes = self.set_identity_resolving_key
         else:
-            raise NotImplementedError('TODO: Pending async Characteristic read.')
+            assert connection
+
+            if connection.transport == core.BT_LE_TRANSPORT:
+                key = await connection.device.get_long_term_key(
+                    connection_handle=connection.handle, rand=b'', ediv=0
+                )
+            else:
+                key = await connection.device.get_link_key(connection.peer_address)
+
+            if not key:
+                raise RuntimeError('LTK or LinkKey is not present')
+
+            sirk_bytes = sef(key, self.set_identity_resolving_key)
+
+        return bytes([self.set_identity_resolving_key_type]) + sirk_bytes
 
     def get_advertising_data(self) -> bytes:
         return bytes(
@@ -203,3 +229,29 @@ class CoordinatedSetIdentificationProxy(gatt_client.ProfileServiceProxy):
             gatt.GATT_SET_MEMBER_RANK_CHARACTERISTIC
         ):
             self.set_member_rank = characteristics[0]
+
+    async def read_set_identity_resolving_key(self) -> Tuple[SirkType, bytes]:
+        '''Reads SIRK and decrypts if encrypted.'''
+        response = await self.set_identity_resolving_key.read_value()
+        if len(response) != SET_IDENTITY_RESOLVING_KEY_LENGTH + 1:
+            raise RuntimeError('Invalid SIRK value')
+
+        sirk_type = SirkType(response[0])
+        if sirk_type == SirkType.PLAINTEXT:
+            sirk = response[1:]
+        else:
+            connection = self.service_proxy.client.connection
+            device = connection.device
+            if connection.transport == core.BT_LE_TRANSPORT:
+                key = await device.get_long_term_key(
+                    connection_handle=connection.handle, rand=b'', ediv=0
+                )
+            else:
+                key = await device.get_link_key(connection.peer_address)
+
+            if not key:
+                raise RuntimeError('LTK or LinkKey is not present')
+
+            sirk = sef(key, response[1:])
+
+        return (sirk_type, sirk)
