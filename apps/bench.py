@@ -513,6 +513,7 @@ class Ping:
             await self.packet_io.send_packet(bytes([PacketType.RESET]))
 
             self.current_packet_index = 0
+            self.latencies = []
             await self.send_next_ping()
 
             await self.done.wait()
