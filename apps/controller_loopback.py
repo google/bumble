@@ -65,7 +65,6 @@ class Loopback:
         self.expected_cid += 1
         if cid == 0:
             self.start_timestamp = now
-            self.last_timestamp = now
         else:
             elapsed_since_start = now - self.start_timestamp
             elapsed_since_last = now - self.last_timestamp
@@ -79,6 +78,9 @@ class Loopback:
                     'cyan',
                 )
             )
+
+        self.last_timestamp = now
+
         if self.expected_cid == self.packet_count:
             print(color('@@@ Received last packet', 'green'))
             self.done.set()
@@ -97,7 +99,7 @@ class Loopback:
 
             # make sure data can fit in one l2cap pdu
             l2cap_header_size = 4
-            max_packet_size = host.hc_acl_data_packet_length - l2cap_header_size
+            max_packet_size = host.acl_packet_queue.max_packet_size - l2cap_header_size
             if self.packet_size > max_packet_size:
                 print(
                     color(
