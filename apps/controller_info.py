@@ -191,7 +191,7 @@ async def async_main(latency_probes, transport):
                     f'max={max(latencies):.2f}, '
                     f'average={sum(latencies)/len(latencies):.2f}'
                 ),
-                '\n'
+                '\n',
             )
 
         # Print version
