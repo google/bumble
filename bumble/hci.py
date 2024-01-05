@@ -1988,6 +1988,17 @@ class OwnAddressType(enum.IntEnum):
 
 
 # -----------------------------------------------------------------------------
+class LoopbackMode(enum.IntEnum):
+    DISABLED = 0
+    LOCAL = 1
+    REMOTE = 2
+
+    @classmethod
+    def type_spec(cls):
+        return {'size': 1, 'mapper': lambda x: LoopbackMode(x).name}
+
+
+# -----------------------------------------------------------------------------
 class HCI_Packet:
     '''
     Abstract Base class for HCI packets
@@ -3310,6 +3321,27 @@ class HCI_Read_RSSI_Command(HCI_Command):
 class HCI_Read_Encryption_Key_Size_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.5.7 Read Encryption Key Size Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('loopback_mode', LoopbackMode.type_spec()),
+    ],
+)
+class HCI_Read_Loopback_Mode_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.6.1 Read Loopback Mode Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([('loopback_mode', 1)])
+class HCI_Write_Loopback_Mode_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.6.2 Write Loopback Mode Command
     '''
 
 
