@@ -18,9 +18,11 @@
 import asyncio
 import os
 import logging
-import click
-from bumble.company_ids import COMPANY_IDENTIFIERS
+import time
 
+import click
+
+from bumble.company_ids import COMPANY_IDENTIFIERS
 from bumble.colors import color
 from bumble.core import name_or_number
 from bumble.hci import (
@@ -48,6 +50,7 @@ from bumble.hci import (
     HCI_LE_Read_Maximum_Advertising_Data_Length_Command,
     HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
     HCI_LE_Read_Suggested_Default_Data_Length_Command,
+    HCI_Read_Local_Version_Information_Command,
 )
 from bumble.host import Host
 from bumble.transport import open_transport_or_link
@@ -166,13 +169,30 @@ async def get_acl_flow_control_info(host: Host) -> None:
 
 
 # -----------------------------------------------------------------------------
-async def async_main(transport):
+async def async_main(latency_probes, transport):
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(transport) as (hci_source, hci_sink):
         print('<<< connected')
 
         host = Host(hci_source, hci_sink)
         await host.reset()
+
+        # Measure the latency if requested
+        latencies = []
+        if latency_probes:
+            for _ in range(latency_probes):
+                start = time.time()
+                await host.send_command(HCI_Read_Local_Version_Information_Command())
+                latencies.append(1000 * (time.time() - start))
+            print(
+                color('HCI Command Latency:', 'yellow'),
+                (
+                    f'min={min(latencies):.2f}, '
+                    f'max={max(latencies):.2f}, '
+                    f'average={sum(latencies)/len(latencies):.2f}'
+                ),
+                '\n',
+            )
 
         # Print version
         print(color('Version:', 'yellow'))
@@ -209,10 +229,16 @@ async def async_main(transport):
 
 # -----------------------------------------------------------------------------
 @click.command()
+@click.option(
+    '--latency-probes',
+    metavar='N',
+    type=int,
+    help='Send N commands to measure HCI transport latency statistics',
+)
 @click.argument('transport')
-def main(transport):
+def main(latency_probes, transport):
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
-    asyncio.run(async_main(transport))
+    asyncio.run(async_main(latency_probes, transport))
 
 
 # -----------------------------------------------------------------------------
