@@ -1,0 +1,10 @@
+{
+    "name": "Bumble",
+    "class_of_device": 720896,
+    "keystore": "JsonKeyStore",
+    "hfp_configuration": {
+    	"supported_hf_features": ["THREE_WAY_CALLING", "REMOTE_VOLUME_CONTROL", "ENHANCED_CALL_STATUS"],
+    	"supported_hf_indicators": ["BATTERY_LEVEL"],
+    	"supported_audio_codecs": ["CVSD"]
+    }
+}

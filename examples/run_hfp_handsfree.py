@@ -76,7 +76,6 @@ async def main():
         print('<<< connected')
 
         # Hands-Free profile configuration.
-        # TODO: load configuration from file.
         configuration = hfp.Configuration(
             supported_hf_features=[
                 hfp.HfFeature.THREE_WAY_CALLING,
@@ -98,6 +97,9 @@ async def main():
 
         # Create a device
         device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        if device.hfp_configuration:
+            configuration = device.hfp_configuration
+
         device.classic_enabled = True
 
         # Create and register a server

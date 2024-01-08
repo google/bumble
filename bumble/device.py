@@ -181,6 +181,7 @@ from .keys import (
     PairingKeys,
 )
 from .pairing import PairingConfig
+from . import hfp
 from . import gatt_client
 from . import gatt_server
 from . import smp
@@ -956,6 +957,7 @@ class DeviceConfiguration:
         self.gatt_services: List[Dict[str, Any]] = []
         self.address_resolution_offload = False
         self.cis_enabled = False
+        self.hfp_configuration: hfp.Configuration = None
 
     def load_from_dict(self, config: Dict[str, Any]) -> None:
         # Load simple properties
@@ -1013,6 +1015,13 @@ class DeviceConfiguration:
                 AdvertisingData(
                     [(AdvertisingData.COMPLETE_LOCAL_NAME, bytes(self.name, 'utf-8'))]
                 )
+            )
+        hfp_configuration = config.get("hfp_configuration")
+        if hfp_configuration:
+            self.hfp_configuration = hfp.Configuration(
+                supported_hf_features=[getattr(hfp.HfFeature, feature) for feature in hfp_configuration.get("supported_hf_features", [])],
+                supported_hf_indicators=[getattr(hfp.HfIndicator, indicator) for indicator in hfp_configuration.get("supported_hf_indicators", [])],
+                supported_audio_codecs=[getattr(hfp.AudioCodec, codec) for codec in hfp_configuration.get("supported_audio_codecs", [])],
             )
 
     def load_from_file(self, filename):
@@ -1232,6 +1241,7 @@ class Device(CompositeEventEmitter):
         self.connectable = config.connectable
         self.classic_accept_any = config.classic_accept_any
         self.address_resolution_offload = config.address_resolution_offload
+        self.hfp_configuration = config.hfp_configuration
 
         for service in config.gatt_services:
             characteristics = []
