@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
+import dataclasses
 import itertools
 import random
 import struct
@@ -42,6 +43,7 @@ from bumble.hci import (
     HCI_LE_1M_PHY,
     HCI_SUCCESS,
     HCI_UNKNOWN_HCI_COMMAND_ERROR,
+    HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     HCI_VERSION_BLUETOOTH_CORE_5_0,
     Address,
@@ -53,6 +55,7 @@ from bumble.hci import (
     HCI_Connection_Request_Event,
     HCI_Disconnection_Complete_Event,
     HCI_Encryption_Change_Event,
+    HCI_Synchronous_Connection_Complete_Event,
     HCI_LE_Advertising_Report_Event,
     HCI_LE_Connection_Complete_Event,
     HCI_LE_Read_Remote_Features_Complete_Event,
@@ -60,10 +63,11 @@ from bumble.hci import (
     HCI_Packet,
     HCI_Role_Change_Event,
 )
-from typing import Optional, Union, Dict, TYPE_CHECKING
+from typing import Optional, Union, Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bumble.transport.common import TransportSink, TransportSource
+    from bumble.link import LocalLink
+    from bumble.transport.common import TransportSink
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -79,15 +83,18 @@ class DataObject:
 
 
 # -----------------------------------------------------------------------------
+@dataclasses.dataclass
 class Connection:
-    def __init__(self, controller, handle, role, peer_address, link, transport):
-        self.controller = controller
-        self.handle = handle
-        self.role = role
-        self.peer_address = peer_address
-        self.link = link
+    controller: Controller
+    handle: int
+    role: int
+    peer_address: Address
+    link: Any
+    transport: int
+    link_type: int
+
+    def __post_init__(self):
         self.assembler = HCI_AclDataPacketAssembler(self.on_acl_pdu)
-        self.transport = transport
 
     def on_hci_acl_data_packet(self, packet):
         self.assembler.feed_packet(packet)
@@ -106,10 +113,10 @@ class Connection:
 class Controller:
     def __init__(
         self,
-        name,
+        name: str,
         host_source=None,
         host_sink: Optional[TransportSink] = None,
-        link=None,
+        link: Optional[LocalLink] = None,
         public_address: Optional[Union[bytes, str, Address]] = None,
     ):
         self.name = name
@@ -359,12 +366,13 @@ class Controller:
         if connection is None:
             connection_handle = self.allocate_connection_handle()
             connection = Connection(
-                self,
-                connection_handle,
-                BT_PERIPHERAL_ROLE,
-                peer_address,
-                self.link,
-                BT_LE_TRANSPORT,
+                controller=self,
+                handle=connection_handle,
+                role=BT_PERIPHERAL_ROLE,
+                peer_address=peer_address,
+                link=self.link,
+                transport=BT_LE_TRANSPORT,
+                link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
             )
             self.peripheral_connections[peer_address] = connection
             logger.debug(f'New PERIPHERAL connection handle: 0x{connection_handle:04X}')
@@ -418,12 +426,13 @@ class Controller:
             if connection is None:
                 connection_handle = self.allocate_connection_handle()
                 connection = Connection(
-                    self,
-                    connection_handle,
-                    BT_CENTRAL_ROLE,
-                    peer_address,
-                    self.link,
-                    BT_LE_TRANSPORT,
+                    controller=self,
+                    handle=connection_handle,
+                    role=BT_CENTRAL_ROLE,
+                    peer_address=peer_address,
+                    link=self.link,
+                    transport=BT_LE_TRANSPORT,
+                    link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
                 )
                 self.central_connections[peer_address] = connection
                 logger.debug(
@@ -568,6 +577,7 @@ class Controller:
                     peer_address=peer_address,
                     link=self.link,
                     transport=BT_BR_EDR_TRANSPORT,
+                    link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
                 )
                 self.classic_connections[peer_address] = connection
                 logger.debug(
@@ -618,6 +628,42 @@ class Controller:
                 status=HCI_SUCCESS,
                 bd_addr=peer_address,
                 new_role=new_role,
+            )
+        )
+
+    def on_classic_sco_connection_complete(
+        self, peer_address: Address, status: int, link_type: int
+    ):
+        if status == HCI_SUCCESS:
+            # Allocate (or reuse) a connection handle
+            connection_handle = self.allocate_connection_handle()
+            connection = Connection(
+                controller=self,
+                handle=connection_handle,
+                # Role doesn't matter in SCO.
+                role=BT_CENTRAL_ROLE,
+                peer_address=peer_address,
+                link=self.link,
+                transport=BT_BR_EDR_TRANSPORT,
+                link_type=link_type,
+            )
+            self.classic_connections[peer_address] = connection
+            logger.debug(f'New SCO connection handle: 0x{connection_handle:04X}')
+        else:
+            connection_handle = 0
+
+        self.send_hci_packet(
+            HCI_Synchronous_Connection_Complete_Event(
+                status=status,
+                connection_handle=connection_handle,
+                bd_addr=peer_address,
+                link_type=link_type,
+                # TODO: Provide SCO connection parameters.
+                transmission_interval=0,
+                retransmission_window=0,
+                rx_packet_length=0,
+                tx_packet_length=0,
+                air_mode=0,
             )
         )
 
@@ -739,6 +785,68 @@ class Controller:
             )
         )
         self.link.classic_accept_connection(self, command.bd_addr, command.role)
+
+    def on_hci_enhanced_setup_synchronous_connection_command(self, command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.45 Enhanced Setup Synchronous Connection command
+        '''
+
+        if self.link is None:
+            return
+
+        if not (
+            connection := self.find_classic_connection_by_handle(
+                command.connection_handle
+            )
+        ):
+            self.send_hci_packet(
+                HCI_Command_Status_Event(
+                    status=HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                )
+            )
+            return
+
+        self.send_hci_packet(
+            HCI_Command_Status_Event(
+                status=HCI_SUCCESS,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
+        self.link.classic_sco_connect(
+            self, connection.peer_address, HCI_Connection_Complete_Event.ESCO_LINK_TYPE
+        )
+
+    def on_hci_enhanced_accept_synchronous_connection_request_command(self, command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.46 Enhanced Accept Synchronous Connection Request command
+        '''
+
+        if self.link is None:
+            return
+
+        if not (connection := self.find_classic_connection_by_address(command.bd_addr)):
+            self.send_hci_packet(
+                HCI_Command_Status_Event(
+                    status=HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                )
+            )
+            return
+
+        self.send_hci_packet(
+            HCI_Command_Status_Event(
+                status=HCI_SUCCESS,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
+        self.link.classic_accept_sco_connection(
+            self, connection.peer_address, HCI_Connection_Complete_Event.ESCO_LINK_TYPE
+        )
 
     def on_hci_switch_role_command(self, command):
         '''

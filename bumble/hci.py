@@ -4765,7 +4765,11 @@ class HCI_Event(HCI_Packet):
             HCI_Object.init_from_bytes(self, parameters, 0, fields)
         return self
 
-    def __init__(self, event_code, parameters=None, **kwargs):
+    def __init__(self, event_code=-1, parameters=None, **kwargs):
+        # Since the legacy implementation relies on an __init__ injector, typing always
+        # complains that positional argument event_code is not passed, so here sets a
+        # default value to allow building derived HCI_Event without event_code.
+        assert event_code != -1
         super().__init__(HCI_Event.event_name(event_code))
         if (fields := getattr(self, 'fields', None)) and kwargs:
             HCI_Object.init_from_fields(self, fields, kwargs)

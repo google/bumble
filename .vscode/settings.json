@@ -33,6 +33,7 @@
         "dhkey",
         "diversifier",
         "endianness",
+        "ESCO",
         "Fitbit",
         "GATTLINK",
         "HANDSFREE",

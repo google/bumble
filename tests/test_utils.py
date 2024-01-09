@@ -29,17 +29,18 @@ class TwoDevices:
         self.connections = [None, None]
 
         self.link = LocalLink()
+        addresses = ['F0:F1:F2:F3:F4:F5', 'F5:F4:F3:F2:F1:F0']
         self.controllers = [
-            Controller('C1', link=self.link),
-            Controller('C2', link=self.link),
+            Controller('C1', link=self.link, public_address=addresses[0]),
+            Controller('C2', link=self.link, public_address=addresses[1]),
         ]
         self.devices = [
             Device(
-                address=Address('F0:F1:F2:F3:F4:F5'),
+                address=Address(addresses[0]),
                 host=Host(self.controllers[0], AsyncPipeSink(self.controllers[0])),
             ),
             Device(
-                address=Address('F5:F4:F3:F2:F1:F0'),
+                address=Address(addresses[1]),
                 host=Host(self.controllers[1], AsyncPipeSink(self.controllers[1])),
             ),
         ]
