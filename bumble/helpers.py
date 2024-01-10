@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, MutableMapping
-from typing import cast, Any
+from typing import cast, Any, Optional
 import logging
 
 from bumble import avdtp
@@ -69,7 +69,7 @@ PSM_NAMES = {
 class PacketTracer:
     class AclStream:
         psms: MutableMapping[int, int]
-        peer: PacketTracer.AclStream
+        peer: Optional[PacketTracer.AclStream]
         avdtp_assemblers: MutableMapping[int, avdtp.MessageAssembler]
 
         def __init__(self, analyzer: PacketTracer.Analyzer) -> None:
@@ -77,6 +77,7 @@ class PacketTracer:
             self.packet_assembler = HCI_AclDataPacketAssembler(self.on_acl_pdu)
             self.avdtp_assemblers = {}  # AVDTP assemblers, by source_cid
             self.psms = {}  # PSM, by source_cid
+            self.peer = None
 
         # pylint: disable=too-many-nested-blocks
         def on_acl_pdu(self, pdu: bytes) -> None:

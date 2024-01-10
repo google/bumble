@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.github.google.bumble.remotehci"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 33
         versionCode = 1
         versionName = "1.0"

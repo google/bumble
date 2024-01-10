@@ -4,6 +4,7 @@ import android.hardware.bluetooth.V1_0.Status;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.Trace;
 import android.util.Log;
 
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ class HciHidlHal extends android.hardware.bluetooth.V1_0.IBluetoothHciCallbacks.
     private final android.hardware.bluetooth.V1_0.IBluetoothHci mHciService;
     private final HciHalCallback mHciCallbacks;
     private int mInitializationStatus = -1;
+    private final boolean mTracingEnabled = Trace.isEnabled();
 
 
     public static HciHidlHal create(HciHalCallback hciCallbacks) {
@@ -89,6 +91,7 @@ class HciHidlHal extends android.hardware.bluetooth.V1_0.IBluetoothHciCallbacks.
         }
 
         // Map the status code.
+        Log.d(TAG, "Initialization status = " + mInitializationStatus);
         switch (mInitializationStatus) {
             case android.hardware.bluetooth.V1_0.Status.SUCCESS:
                 return Status.SUCCESS;
@@ -108,6 +111,10 @@ class HciHidlHal extends android.hardware.bluetooth.V1_0.IBluetoothHciCallbacks.
     public void sendPacket(HciPacket.Type type, byte[] packet) {
         ArrayList<Byte> data = HciPacket.byteArrayToList(packet);
 
+        if (mTracingEnabled) {
+            Trace.beginAsyncSection("SEND_PACKET_TO_HAL", 1);
+        }
+
         try {
             switch (type) {
                 case COMMAND:
@@ -124,6 +131,10 @@ class HciHidlHal extends android.hardware.bluetooth.V1_0.IBluetoothHciCallbacks.
             }
         } catch (RemoteException error) {
             Log.w(TAG, "failed to forward packet: " + error);
+        }
+
+        if (mTracingEnabled) {
+            Trace.endAsyncSection("SEND_PACKET_TO_HAL", 1);
         }
     }
 
@@ -157,6 +168,7 @@ class HciAidlHal extends android.hardware.bluetooth.IBluetoothHciCallbacks.Stub 
     private final android.hardware.bluetooth.IBluetoothHci mHciService;
     private final HciHalCallback mHciCallbacks;
     private int mInitializationStatus = android.hardware.bluetooth.Status.SUCCESS;
+    private final boolean mTracingEnabled = Trace.isEnabled();
 
     public static HciAidlHal create(HciHalCallback hciCallbacks) {
         IBinder binder = ServiceManager.getService("android.hardware.bluetooth.IBluetoothHci/default");
@@ -187,6 +199,7 @@ class HciAidlHal extends android.hardware.bluetooth.IBluetoothHciCallbacks.Stub 
         }
 
         // Map the status code.
+        Log.d(TAG, "Initialization status = " + mInitializationStatus);
         switch (mInitializationStatus) {
             case android.hardware.bluetooth.Status.SUCCESS:
                 return Status.SUCCESS;
@@ -208,6 +221,10 @@ class HciAidlHal extends android.hardware.bluetooth.IBluetoothHciCallbacks.Stub 
     // HciHal methods.
     @Override
     public void sendPacket(HciPacket.Type type, byte[] packet) {
+        if (mTracingEnabled) {
+            Trace.beginAsyncSection("SEND_PACKET_TO_HAL", 1);
+        }
+
         try {
             switch (type) {
                 case COMMAND:
@@ -228,6 +245,10 @@ class HciAidlHal extends android.hardware.bluetooth.IBluetoothHciCallbacks.Stub 
             }
         } catch (RemoteException error) {
             Log.w(TAG, "failed to forward packet: " + error);
+        }
+
+        if (mTracingEnabled) {
+            Trace.endAsyncSection("SEND_PACKET_TO_HAL", 1);
         }
     }
 
