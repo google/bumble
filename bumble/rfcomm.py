@@ -538,7 +538,7 @@ class DLC(EventEmitter):
             f'[{self.dlci}] {len(data)} bytes, '
             f'rx_credits={self.rx_credits}: {data.hex()}'
         )
-        if len(data):
+        if data:
             if self.sink:
                 self.sink(data)  # pylint: disable=not-callable
 
