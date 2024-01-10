@@ -1212,6 +1212,18 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.21 LE Read Remote Features Command
         '''
 
+        handle = command.connection_handle
+
+        if not self.find_connection_by_handle(handle):
+            self.send_hci_packet(
+                HCI_Command_Status_Event(
+                    status=HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR,
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                )
+            )
+            return
+
         # First, say that the command is pending
         self.send_hci_packet(
             HCI_Command_Status_Event(
@@ -1225,7 +1237,7 @@ class Controller:
         self.send_hci_packet(
             HCI_LE_Read_Remote_Features_Complete_Event(
                 status=HCI_SUCCESS,
-                connection_handle=0,
+                connection_handle=handle,
                 le_features=bytes.fromhex('dd40000000000000'),
             )
         )

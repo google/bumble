@@ -50,6 +50,8 @@ from bumble.gatt import (
     GATT_APPEARANCE_CHARACTERISTIC,
 )
 
+from .test_utils import TwoDevices
+
 # -----------------------------------------------------------------------------
 # Logging
 # -----------------------------------------------------------------------------
@@ -410,6 +412,15 @@ async def test_extended_advertising_disconnection(auto_restart):
         )
     else:
         device.start_extended_advertising.assert_not_called()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_get_remote_le_features():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    assert (await devices.connections[0].get_remote_le_features()) is not None
 
 
 # -----------------------------------------------------------------------------
