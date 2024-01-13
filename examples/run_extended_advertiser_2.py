@@ -42,7 +42,7 @@ async def main() -> None:
         await device.power_on()
 
         if not device.supports_le_extended_advertising:
-            print("Device does not support extended adverising")
+            print("Device does not support extended advertising")
             return
 
         print("Max advertising sets:", device.host.number_of_supported_advertising_sets)

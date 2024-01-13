@@ -1946,9 +1946,7 @@ class Device(CompositeEventEmitter):
 
     @property
     def supports_le_extended_advertising(self):
-        return self.supports_le_features(
-            LeFeatureMask.LE_EXTENDED_ADVERTISING
-        )
+        return self.supports_le_features(LeFeatureMask.LE_EXTENDED_ADVERTISING)
 
     async def start_advertising(
         self,
