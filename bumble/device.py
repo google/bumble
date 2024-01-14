@@ -244,6 +244,9 @@ DEVICE_DEFAULT_ADVERTISING_TX_POWER           = (
 # fmt: on
 # pylint: enable=line-too-long
 
+# As specified in 7.8.56 LE Set Extended Advertising Enable command
+DEVICE_MAX_HIGH_DUTY_CYCLE_CONNECTABLE_DIRECTED_ADVERTISING_DURATION = 1.28
+
 
 # -----------------------------------------------------------------------------
 # Classes
@@ -2174,7 +2177,13 @@ class Device(CompositeEventEmitter):
         # Try to start the set if requested.
         if auto_start:
             try:
-                await advertising_set.start()
+                # pylint: disable=line-too-long
+                duration = (
+                    DEVICE_MAX_HIGH_DUTY_CYCLE_CONNECTABLE_DIRECTED_ADVERTISING_DURATION
+                    if advertising_parameters.advertising_event_properties.is_high_duty_cycle_directed_connectable
+                    else 0
+                )
+                await advertising_set.start(duration=duration)
             except Exception as error:
                 logger.exception(f'failed to start advertising set: {error}')
                 await advertising_set.remove()
