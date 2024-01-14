@@ -3632,7 +3632,7 @@ class Device(CompositeEventEmitter):
         self_address = None
         if role == HCI_CENTRAL_ROLE:
             own_address_type = self.connect_own_address_type
-            assert own_address_type
+            assert own_address_type is not None
         else:
             if self.supports_le_extended_advertising:
                 # We'll know the address when the advertising set terminates,
