@@ -82,14 +82,13 @@ async def open_transport(name: str) -> Transport:
 
     scheme, *tail = name.split(':', 1)
     spec = tail[0] if tail else None
+    metadata = None
     if spec:
         # Metadata may precede the spec
         if spec.startswith('['):
             metadata_str, *tail = spec[1:].split(']')
             spec = tail[0] if tail else None
             metadata = dict([entry.split('=') for entry in metadata_str.split(',')])
-        else:
-            metadata = None
 
     transport = await _open_transport(scheme, spec)
     if metadata:
