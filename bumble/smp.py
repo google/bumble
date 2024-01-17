@@ -1348,6 +1348,9 @@ class Session:
         if self.sc or self.connection.transport == BT_BR_EDR_TRANSPORT:
             keys.ltk = PairingKeys.Key(value=self.ltk, authenticated=authenticated)
         else:
+            if not self.peer_ltk:
+                raise RuntimeError('Peer LTK missing in LE legacy pairing')
+
             our_ltk_key = PairingKeys.Key(
                 value=self.ltk,
                 authenticated=authenticated,
