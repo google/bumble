@@ -1134,8 +1134,10 @@ class Session:
 
     async def get_link_key_and_derive_ltk(self) -> None:
         '''Retrieves BR/EDR Link Key from storage and derive it to LE LTK.'''
-        link_key = await self.manager.device.get_link_key(self.connection.peer_address)
-        if link_key is None:
+        self.link_key = await self.manager.device.get_link_key(
+            self.connection.peer_address
+        )
+        if self.link_key is None:
             logging.warning(
                 'Try to derive LTK but host does not have the LK. Send a SMP_PAIRING_FAILED but the procedure will not be paused!'
             )
@@ -1143,7 +1145,7 @@ class Session:
                 SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR
             )
         else:
-            self.ltk = self.derive_ltk(link_key, self.ct2)
+            self.ltk = self.derive_ltk(self.link_key, self.ct2)
 
     def distribute_keys(self) -> None:
         # Distribute the keys as required

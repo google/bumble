@@ -547,6 +547,13 @@ async def test_self_smp_over_classic():
         MockSmpSession.send_public_key_command.assert_not_called()
         MockSmpSession.send_pairing_random_command.assert_not_called()
 
+    for i in range(2):
+        assert (
+            await two_devices.devices[i].keystore.get(
+                str(two_devices.connections[i].peer_address)
+            )
+        ).link_key
+
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
