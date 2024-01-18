@@ -6371,7 +6371,7 @@ class HCI_AclDataPacketAssembler:
             self.current_data = None
             self.l2cap_pdu_length = 0
         else:
-            # Sanity check
+            # Compliance check
             if len(self.current_data) > self.l2cap_pdu_length + 4:
                 logger.warning('!!! ACL data exceeds L2CAP PDU')
                 self.current_data = None

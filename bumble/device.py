@@ -604,13 +604,13 @@ class AdvertisingSet(EventEmitter):
     async def set_advertising_parameters(
         self, advertising_parameters: AdvertisingParameters
     ) -> None:
-        # Sanity check
+        # Compliance check
         if (
             not advertising_parameters.advertising_event_properties.is_legacy
             and advertising_parameters.advertising_event_properties.is_connectable
             and advertising_parameters.advertising_event_properties.is_scannable
         ):
-            raise ValueError(
+            logger.warning(
                 "non-legacy extended advertising event properties may not be both "
                 "connectable and scannable"
             )

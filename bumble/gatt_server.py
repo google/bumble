@@ -328,7 +328,7 @@ class Server(EventEmitter):
             f'handle=0x{characteristic.handle:04X}: {value.hex()}'
         )
 
-        # Sanity check
+        # Check parameters
         if len(value) != 2:
             logger.warning('CCCD value not 2 bytes long')
             return

@@ -208,7 +208,7 @@ class L2CAP_PDU:
 
     @staticmethod
     def from_bytes(data: bytes) -> L2CAP_PDU:
-        # Sanity check
+        # Check parameters
         if len(data) < 4:
             raise ValueError('not enough data for L2CAP header')
 
