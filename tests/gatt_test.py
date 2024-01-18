@@ -50,6 +50,7 @@ from bumble.att import (
     ATT_Error_Response,
     ATT_Read_By_Group_Type_Request,
 )
+from .test_utils import async_barrier
 
 
 # -----------------------------------------------------------------------------
@@ -454,13 +455,6 @@ class LinkedDevices:
         ]
 
         self.paired = [None, None, None]
-
-
-# -----------------------------------------------------------------------------
-async def async_barrier():
-    ready = asyncio.get_running_loop().create_future()
-    asyncio.get_running_loop().call_soon(ready.set_result, None)
-    await ready
 
 
 # -----------------------------------------------------------------------------

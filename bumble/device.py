@@ -528,11 +528,12 @@ class AdvertisingEventProperties:
 
         return int(properties)
 
-    @staticmethod
+    @classmethod
     def from_advertising_type(
+        cls: Type[AdvertisingEventProperties],
         advertising_type: AdvertisingType,
     ) -> AdvertisingEventProperties:
-        return AdvertisingEventProperties(
+        return cls(
             is_connectable=advertising_type.is_connectable,
             is_scannable=advertising_type.is_scannable,
             is_directed=advertising_type.is_directed,
@@ -711,6 +712,16 @@ class AdvertisingSet(EventEmitter):
     async def start(
         self, duration: float = 0.0, max_advertising_events: int = 0
     ) -> None:
+        """
+        Start advertising.
+
+        Args:
+          duration: How long to advertise for, in seconds. Use 0 (the default) for
+          an unlimited duration, unless this advertising set is a High Duty Cycle
+          Directed Advertisement type.
+          max_advertising_events: Maximum number of events to advertise for. Use 0
+          (the default) for an unlimited number of advertisements.
+        """
         await self.device.send_command(
             HCI_LE_Set_Extended_Advertising_Enable_Command(
                 enable=1,
@@ -2154,11 +2165,11 @@ class Device(CompositeEventEmitter):
 
             if periodic_advertising_parameters:
                 # TODO: call LE Set Periodic Advertising Parameters command
-                pass
+                raise NotImplementedError('periodic advertising not yet supported')
 
             if periodic_advertising_data:
                 # TODO: call LE Set Periodic Advertising Data command
-                pass
+                raise NotImplementedError('periodic advertising not yet supported')
 
         except HCI_Error as error:
             # Remove the advertising set so that it doesn't stay dangling in the
@@ -2199,11 +2210,10 @@ class Device(CompositeEventEmitter):
         if self.legacy_advertising_set and self.legacy_advertising_set.enabled:
             return True
 
-        for advertising_set in self.extended_advertising_sets.values():
-            if advertising_set.enabled:
-                return True
-
-        return False
+        return any(
+            advertising_set.enabled
+            for advertising_set in self.extended_advertising_sets.values()
+        )
 
     async def start_scanning(
         self,
@@ -3532,7 +3542,10 @@ class Device(CompositeEventEmitter):
         number_of_completed_extended_advertising_events,
     ):
         if not (
-            advertising_set := self.extended_advertising_sets.get(advertising_handle)
+            advertising_set := (
+                self.extended_advertising_sets.get(advertising_handle)
+                or self.legacy_advertising_set
+            )
         ):
             logger.warning(f'advertising set {advertising_handle} not found')
             return
@@ -3565,9 +3578,9 @@ class Device(CompositeEventEmitter):
                 lambda _: self.abort_on('flush', advertising_set.start()),
             )
 
-        self.emit_le_connection(connection)
+        self._emit_le_connection(connection)
 
-    def emit_le_connection(self, connection: Connection) -> None:
+    def _emit_le_connection(self, connection: Connection) -> None:
         # If supported, read which PHY we're connected with before
         # notifying listeners of the new connection.
         if self.host.supports_command(HCI_LE_READ_PHY_COMMAND):
@@ -3642,6 +3655,7 @@ class Device(CompositeEventEmitter):
                 # We were connected via a legacy advertisement.
                 if self.legacy_advertiser:
                     own_address_type = self.legacy_advertiser.own_address_type
+                    self.legacy_advertiser = None
                 else:
                     # This should not happen, but just in case, pick a default.
                     logger.warning("connection without an advertiser")
@@ -3684,7 +3698,7 @@ class Device(CompositeEventEmitter):
 
         if role == HCI_CENTRAL_ROLE or not self.supports_le_extended_advertising:
             # We can emit now, we have all the info we need
-            self.emit_le_connection(connection)
+            self._emit_le_connection(connection)
 
     @host_event_handler
     def on_connection_failure(self, transport, peer_address, error_code):

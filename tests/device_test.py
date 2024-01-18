@@ -50,7 +50,8 @@ from bumble.gatt import (
     GATT_APPEARANCE_CHARACTERISTIC,
 )
 
-from .test_utils import TwoDevices
+from .test_utils import TwoDevices, async_barrier
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -310,14 +311,18 @@ async def test_legacy_advertising_disconnection(auto_restart):
         ConnectionParameters(0, 0, 0),
     )
 
-    device.start_advertising = mock.AsyncMock()
+    device.on_advertising_set_termination(
+        HCI_SUCCESS, device.legacy_advertising_set.advertising_handle, 0x0001, 0
+    )
 
     device.on_disconnection(0x0001, 0)
+    await async_barrier()
+    await async_barrier()
 
     if auto_restart:
         assert device.is_advertising
     else:
-        not device.is_advertising
+        assert not device.is_advertising
 
 
 # -----------------------------------------------------------------------------
