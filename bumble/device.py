@@ -148,6 +148,7 @@ from .hci import (
     HCI_Write_Secure_Connections_Host_Support_Command,
     HCI_Write_Simple_Pairing_Mode_Command,
     OwnAddressType,
+    LeFeature,
     LeFeatureMask,
     phy_list_to_bits,
 )
@@ -1546,7 +1547,7 @@ class Device(CompositeEventEmitter):
             if self.cis_enabled:
                 await self.send_command(
                     HCI_LE_Set_Host_Feature_Command(
-                        bit_number=LeFeatureMask.CONNECTED_ISOCHRONOUS_STREAM,
+                        bit_number=LeFeature.CONNECTED_ISOCHRONOUS_STREAM,
                         bit_value=1,
                     )
                 )
