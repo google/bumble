@@ -196,6 +196,60 @@ class LocalLink:
         if peripheral_controller := self.find_controller(peripheral_address):
             peripheral_controller.on_link_encrypted(central_address, rand, ediv, ltk)
 
+    def create_cis(
+        self,
+        central_controller: controller.Controller,
+        peripheral_address: Address,
+        cig_id: int,
+        cis_id: int,
+    ) -> None:
+        logger.debug(
+            f'$$$ CIS Request {central_controller.random_address} -> {peripheral_address}'
+        )
+        if peripheral_controller := self.find_controller(peripheral_address):
+            asyncio.get_running_loop().call_soon(
+                peripheral_controller.on_link_cis_request,
+                central_controller.random_address,
+                cig_id,
+                cis_id,
+            )
+
+    def accept_cis(
+        self,
+        peripheral_controller: controller.Controller,
+        central_address: Address,
+        cig_id: int,
+        cis_id: int,
+    ) -> None:
+        logger.debug(
+            f'$$$ CIS Accept {peripheral_controller.random_address} -> {central_address}'
+        )
+        if central_controller := self.find_controller(central_address):
+            asyncio.get_running_loop().call_soon(
+                central_controller.on_link_cis_established, cig_id, cis_id
+            )
+            asyncio.get_running_loop().call_soon(
+                peripheral_controller.on_link_cis_established, cig_id, cis_id
+            )
+
+    def disconnect_cis(
+        self,
+        initiator_controller: controller.Controller,
+        peer_address: Address,
+        cig_id: int,
+        cis_id: int,
+    ) -> None:
+        logger.debug(
+            f'$$$ CIS Disconnect {initiator_controller.random_address} -> {peer_address}'
+        )
+        if peer_controller := self.find_controller(peer_address):
+            asyncio.get_running_loop().call_soon(
+                initiator_controller.on_link_cis_disconnected, cig_id, cis_id
+            )
+            asyncio.get_running_loop().call_soon(
+                peer_controller.on_link_cis_disconnected, cig_id, cis_id
+            )
+
     ############################################################
     # Classic handlers
     ############################################################

@@ -57,6 +57,8 @@ from bumble.hci import (
     HCI_Encryption_Change_Event,
     HCI_Synchronous_Connection_Complete_Event,
     HCI_LE_Advertising_Report_Event,
+    HCI_LE_CIS_Established_Event,
+    HCI_LE_CIS_Request_Event,
     HCI_LE_Connection_Complete_Event,
     HCI_LE_Read_Remote_Features_Complete_Event,
     HCI_Number_Of_Completed_Packets_Event,
@@ -80,6 +82,15 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 class DataObject:
     pass
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class CisLink:
+    handle: int
+    cis_id: int
+    cig_id: int
+    acl_connection: Optional[Connection] = None
 
 
 # -----------------------------------------------------------------------------
@@ -132,6 +143,8 @@ class Controller:
         self.classic_connections: Dict[
             Address, Connection
         ] = {}  # Connections in BR/EDR
+        self.central_cis_links: Dict[int, CisLink] = {}  # CIS links by handle
+        self.peripheral_cis_links: Dict[int, CisLink] = {}  # CIS links by handle
 
         self.hci_version = HCI_VERSION_BLUETOOTH_CORE_5_0
         self.hci_revision = 0
@@ -310,7 +323,7 @@ class Controller:
     ############################################################
     # Link connections
     ############################################################
-    def allocate_connection_handle(self):
+    def allocate_connection_handle(self) -> int:
         handle = 0
         max_handle = 0
         for connection in itertools.chain(
@@ -320,6 +333,13 @@ class Controller:
         ):
             max_handle = max(max_handle, connection.handle)
             if connection.handle == handle:
+                # Already used, continue searching after the current max
+                handle = max_handle + 1
+        for cis_handle in itertools.chain(
+            self.central_cis_links.keys(), self.peripheral_cis_links.keys()
+        ):
+            max_handle = max(max_handle, cis_handle)
+            if cis_handle == handle:
                 # Already used, continue searching after the current max
                 handle = max_handle + 1
         return handle
@@ -549,6 +569,104 @@ class Controller:
         )
         self.send_hci_packet(HCI_LE_Advertising_Report_Event([report]))
 
+    def on_link_cis_request(
+        self, central_address: Address, cig_id: int, cis_id: int
+    ) -> None:
+        '''
+        Called when an incoming CIS request occurs from a central on the link
+        '''
+
+        connection = self.peripheral_connections.get(central_address)
+        assert connection
+
+        pending_cis_link = CisLink(
+            handle=self.allocate_connection_handle(),
+            cis_id=cis_id,
+            cig_id=cig_id,
+            acl_connection=connection,
+        )
+        self.peripheral_cis_links[pending_cis_link.handle] = pending_cis_link
+
+        self.send_hci_packet(
+            HCI_LE_CIS_Request_Event(
+                acl_connection_handle=connection.handle,
+                cis_connection_handle=pending_cis_link.handle,
+                cig_id=cig_id,
+                cis_id=cis_id,
+            )
+        )
+
+    def on_link_cis_established(self, cig_id: int, cis_id: int) -> None:
+        '''
+        Called when an incoming CIS established.
+        '''
+
+        cis_link = next(
+            cis_link
+            for cis_link in itertools.chain(
+                self.central_cis_links.values(), self.peripheral_cis_links.values()
+            )
+            if cis_link.cis_id == cis_id and cis_link.cig_id == cig_id
+        )
+
+        self.send_hci_packet(
+            HCI_LE_CIS_Established_Event(
+                status=HCI_SUCCESS,
+                connection_handle=cis_link.handle,
+                # CIS parameters are ignored.
+                cig_sync_delay=0,
+                cis_sync_delay=0,
+                transport_latency_c_to_p=0,
+                transport_latency_p_to_c=0,
+                phy_c_to_p=0,
+                phy_p_to_c=0,
+                nse=0,
+                bn_c_to_p=0,
+                bn_p_to_c=0,
+                ft_c_to_p=0,
+                ft_p_to_c=0,
+                max_pdu_c_to_p=0,
+                max_pdu_p_to_c=0,
+                iso_interval=0,
+            )
+        )
+
+    def on_link_cis_disconnected(self, cig_id: int, cis_id: int) -> None:
+        '''
+        Called when a CIS disconnected.
+        '''
+
+        if cis_link := next(
+            (
+                cis_link
+                for cis_link in self.peripheral_cis_links.values()
+                if cis_link.cis_id == cis_id and cis_link.cig_id == cig_id
+            ),
+            None,
+        ):
+            # Remove peripheral CIS on disconnection.
+            self.peripheral_cis_links.pop(cis_link.handle)
+        elif cis_link := next(
+            (
+                cis_link
+                for cis_link in self.central_cis_links.values()
+                if cis_link.cis_id == cis_id and cis_link.cig_id == cig_id
+            ),
+            None,
+        ):
+            # Keep central CIS on disconnection. They should be removed by HCI_LE_Remove_CIG_Command.
+            cis_link.acl_connection = None
+        else:
+            return
+
+        self.send_hci_packet(
+            HCI_Disconnection_Complete_Event(
+                status=HCI_SUCCESS,
+                connection_handle=cis_link.handle,
+                reason=HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
+            )
+        )
+
     ############################################################
     # Classic link connections
     ############################################################
@@ -769,6 +887,17 @@ class Controller:
             else:
                 # Remove the connection
                 del self.classic_connections[connection.peer_address]
+        elif cis_link := (
+            self.central_cis_links.get(handle) or self.peripheral_cis_links.get(handle)
+        ):
+            if self.link:
+                self.link.disconnect_cis(
+                    initiator_controller=self,
+                    peer_address=cis_link.acl_connection.peer_address,
+                    cig_id=cis_link.cig_id,
+                    cis_id=cis_link.cis_id,
+                )
+            # Spec requires handle to be kept after disconnection.
 
     def on_hci_accept_connection_request_command(self, command):
         '''
@@ -1398,6 +1527,107 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.74 LE Read Transmit Power Command
         '''
         return struct.pack('<BBB', HCI_SUCCESS, 0, 0)
+
+    def on_hci_le_set_cig_parameters_command(self, command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.97 LE Set CIG Parameter Command
+        '''
+
+        # Remove old CIG implicitly.
+        for handle, cis_link in self.central_cis_links.items():
+            if cis_link.cig_id == command.cig_id:
+                self.central_cis_links.pop(handle)
+
+        handles = []
+        for cis_id in command.cis_id:
+            handle = self.allocate_connection_handle()
+            handles.append(handle)
+            self.central_cis_links[handle] = CisLink(
+                cis_id=cis_id,
+                cig_id=command.cig_id,
+                handle=handle,
+            )
+        return struct.pack(
+            '<BBB', HCI_SUCCESS, command.cig_id, len(handles)
+        ) + b''.join([struct.pack('<H', handle) for handle in handles])
+
+    def on_hci_le_create_cis_command(self, command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.99 LE Create CIS Command
+        '''
+        if not self.link:
+            return
+
+        for cis_handle, acl_handle in zip(
+            command.cis_connection_handle, command.acl_connection_handle
+        ):
+            if not (connection := self.find_connection_by_handle(acl_handle)):
+                logger.error(f'Cannot find connection with handle={acl_handle}')
+                return bytes([HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
+
+            if not (cis_link := self.central_cis_links.get(cis_handle)):
+                logger.error(f'Cannot find CIS with handle={cis_handle}')
+                return bytes([HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
+
+            cis_link.acl_connection = connection
+
+            self.link.create_cis(
+                self,
+                peripheral_address=connection.peer_address,
+                cig_id=cis_link.cig_id,
+                cis_id=cis_link.cis_id,
+            )
+
+        self.send_hci_packet(
+            HCI_Command_Status_Event(
+                status=HCI_COMMAND_STATUS_PENDING,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
+
+    def on_hci_le_remove_cig_command(self, command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.100 LE Remove CIG Command
+        '''
+
+        status = HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
+
+        for cis_handle, cis_link in self.central_cis_links.items():
+            if cis_link.cig_id == command.cig_id:
+                self.central_cis_links.pop(cis_handle)
+                status = HCI_SUCCESS
+
+        return struct.pack('<BH', status, command.cig_id)
+
+    def on_hci_le_accept_cis_request_command(self, command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.101 LE Accept CIS Request Command
+        '''
+        if not self.link:
+            return
+
+        if not (
+            pending_cis_link := self.peripheral_cis_links.get(command.connection_handle)
+        ):
+            logger.error(f'Cannot find CIS with handle={command.connection_handle}')
+            return bytes([HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
+
+        assert pending_cis_link.acl_connection
+        self.link.accept_cis(
+            peripheral_controller=self,
+            central_address=pending_cis_link.acl_connection.peer_address,
+            cig_id=pending_cis_link.cig_id,
+            cis_id=pending_cis_link.cis_id,
+        )
+
+        self.send_hci_packet(
+            HCI_Command_Status_Event(
+                status=HCI_COMMAND_STATUS_PENDING,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
 
     def on_hci_le_setup_iso_data_path_command(self, command):
         '''

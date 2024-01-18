@@ -4859,7 +4859,8 @@ class HCI_Extended_Event(HCI_Event):
             HCI_Object.init_from_bytes(self, parameters, 1, fields)
         return self
 
-    def __init__(self, subevent_code, parameters, **kwargs):
+    def __init__(self, subevent_code=None, parameters=None, **kwargs):
+        assert subevent_code is not None
         self.subevent_code = subevent_code
         if parameters is None and (fields := getattr(self, 'fields', None)) and kwargs:
             parameters = bytes([subevent_code]) + HCI_Object.dict_to_bytes(
