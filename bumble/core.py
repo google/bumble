@@ -821,8 +821,8 @@ class AdvertisingData:
             ad_structures = []
         self.ad_structures = ad_structures[:]
 
-    @staticmethod
-    def from_bytes(data):
+    @classmethod
+    def from_bytes(cls, data: bytes) -> AdvertisingData:
         instance = AdvertisingData()
         instance.append(data)
         return instance
@@ -978,7 +978,7 @@ class AdvertisingData:
 
         return ad_data
 
-    def append(self, data):
+    def append(self, data: bytes) -> None:
         offset = 0
         while offset + 1 < len(data):
             length = data[offset]
