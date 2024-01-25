@@ -1,4 +1,4 @@
-# Copyright 2021-2023 Google LLC
+# Copyright 2021-2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,15 +19,16 @@ import asyncio
 import logging
 import sys
 import os
-import struct
 import secrets
+import websockets
+import json
+
 from bumble.core import AdvertisingData
-from bumble.device import Device, CisLink
+from bumble.device import Device
 from bumble.hci import (
     CodecID,
     CodingFormat,
     OwnAddressType,
-    HCI_IsoDataPacket,
     HCI_LE_Set_Extended_Advertising_Parameters_Command,
 )
 from bumble.profiles.bap import (
@@ -42,14 +43,27 @@ from bumble.profiles.bap import (
 )
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
+from bumble.profiles.vcp import VolumeControlService
 
 from bumble.transport import open_transport_or_link
+
+from typing import Optional
+
+
+def dumps_volume_state(volume_setting: int, muted: int, change_counter: int) -> str:
+    return json.dumps(
+        {
+            'volume_setting': volume_setting,
+            'muted': muted,
+            'change_counter': change_counter,
+        }
+    )
 
 
 # -----------------------------------------------------------------------------
 async def main() -> None:
     if len(sys.argv) < 3:
-        print('Usage: run_cig_setup.py <config-file>' '<transport-spec-for-device>')
+        print('Usage: run_vcp_renderer.py <config-file>' '<transport-spec-for-device>')
         return
 
     print('<<< connecting to HCI...')
@@ -59,10 +73,10 @@ async def main() -> None:
         device = Device.from_config_file_with_hci(
             sys.argv[1], hci_transport.source, hci_transport.sink
         )
-        device.cis_enabled = True
 
         await device.power_on()
 
+        # Add "placeholder" services to enable Android LEA features.
         csis = CoordinatedSetIdentificationService(
             set_identity_resolving_key=secrets.token_bytes(16),
             set_identity_resolving_key_type=SirkType.PLAINTEXT,
@@ -78,23 +92,7 @@ async def main() -> None:
                     AudioLocation.FRONT_LEFT | AudioLocation.FRONT_RIGHT
                 ),
                 sink_pac=[
-                    # Codec Capability Setting 16_2
-                    PacRecord(
-                        coding_format=CodingFormat(CodecID.LC3),
-                        codec_specific_capabilities=CodecSpecificCapabilities(
-                            supported_sampling_frequencies=(
-                                SupportedSamplingFrequency.FREQ_16000
-                            ),
-                            supported_frame_durations=(
-                                SupportedFrameDuration.DURATION_10000_US_SUPPORTED
-                            ),
-                            supported_audio_channel_counts=[1],
-                            min_octets_per_codec_frame=40,
-                            max_octets_per_codec_frame=40,
-                            supported_max_codec_frames_per_sdu=1,
-                        ),
-                    ),
-                    # Codec Capability Setting 24_2
+                    # Codec Capability Setting 48_4
                     PacRecord(
                         coding_format=CodingFormat(CodecID.LC3),
                         codec_specific_capabilities=CodecSpecificCapabilities(
@@ -113,8 +111,20 @@ async def main() -> None:
                 ],
             )
         )
-
         device.add_service(AudioStreamControlService(device, sink_ase_id=[1, 2]))
+
+        vcs = VolumeControlService()
+        device.add_service(vcs)
+
+        ws: Optional[websockets.WebSocketServerProtocol] = None
+
+        def on_volume_state(volume_setting: int, muted: int, change_counter: int):
+            if ws:
+                asyncio.create_task(
+                    ws.send(dumps_volume_state(volume_setting, muted, change_counter))
+                )
+
+        vcs.on('volume_state', on_volume_state)
 
         advertising_data = (
             bytes(
@@ -143,49 +153,36 @@ async def main() -> None:
             )
             + csis.get_advertising_data()
         )
-        subprocess = await asyncio.create_subprocess_shell(
-            f'dlc3 | ffplay pipe:0',
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
-        stdin = subprocess.stdin
-        assert stdin
-
-        # Write a fake LC3 header to dlc3.
-        stdin.write(
-            bytes([0x1C, 0xCC])  # Header.
-            + struct.pack(
-                '<HHHHHHI',
-                18,  # Header length.
-                48000 // 100,  # Sampling Rate(/100Hz).
-                0,  # Bitrate(unused).
-                1,  # Channels.
-                10000 // 10,  # Frame duration(/10us).
-                0,  # RFU.
-                0x0FFFFFFF,  # Frame counts.
-            )
-        )
-
-        def on_pdu(pdu: HCI_IsoDataPacket):
-            # LC3 format: |frame_length(2)| + |frame(length)|.
-            if pdu.iso_sdu_length:
-                stdin.write(struct.pack('<H', pdu.iso_sdu_length))
-            stdin.write(pdu.iso_sdu_fragment)
-
-        def on_cis(cis_link: CisLink):
-            cis_link.on('pdu', on_pdu)
-
-        device.once('cis_establishment', on_cis)
 
         await device.start_extended_advertising(
             advertising_properties=(
                 HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.CONNECTABLE_ADVERTISING
             ),
-            own_address_type=OwnAddressType.RANDOM,
+            own_address_type=OwnAddressType.PUBLIC,
             advertising_data=advertising_data,
         )
+
+        async def serve(websocket: websockets.WebSocketServerProtocol, _path):
+            nonlocal ws
+            await websocket.send(
+                dumps_volume_state(vcs.volume_setting, vcs.muted, vcs.change_counter)
+            )
+            ws = websocket
+            async for message in websocket:
+                volume_state = json.loads(message)
+                vcs.volume_state_bytes = bytes(
+                    [
+                        volume_state['volume_setting'],
+                        volume_state['muted'],
+                        volume_state['change_counter'],
+                    ]
+                )
+                await device.notify_subscribers(
+                    vcs.volume_state, vcs.volume_state_bytes
+                )
+            ws = None
+
+        await websockets.serve(serve, 'localhost', 8989)
 
         await hci_transport.source.terminated
 

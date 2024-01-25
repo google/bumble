@@ -1,0 +1,103 @@
+<html data-bs-theme="dark">
+
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <label for="server-port" class="form-label">Server Port</label>
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" aria-label="Port Number" value="8989" id="port">
+            <button class="btn btn-primary" type="button" onclick="connect()">Connect</button>
+        </div>
+
+        <div class="row">
+            <div class="col">
+                <label for="volume_setting" class="form-label">Volume Setting</label>
+                <input type="range" class="form-range" min="0" max="255" id="volume_setting">
+            </div>
+            <div class="col">
+                <label for="change_counter" class="form-label">Change Counter</label>
+                <input type="range" class="form-range" min="0" max="255" id="change_counter">
+            </div>
+            <div class="col">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="muted">
+                    <label class="form-check-label" for="muted">Muted</label>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" type="button" onclick="update_state()">Notify New Volume State</button>
+
+
+        <hr>
+        <div id="socketStateContainer" class="bg-body-tertiary p-3 rounded-2">
+            <h3>Log</h3>
+            <code id="socketState">
+            </code>
+        </div>
+    </div>
+
+    <script>
+        let portInput = document.getElementById("port")
+        let volumeSetting = document.getElementById("volume_setting")
+        let muted = document.getElementById("muted")
+        let changeCounter = document.getElementById("change_counter")
+        let socket = null
+
+        function connect() {
+            if (socket != null) {
+                return
+            }
+            socket = new WebSocket(`ws://localhost:${portInput.value}`);
+            socket.onopen = _ => {
+                socketState.innerText += 'OPEN\n'
+            }
+            socket.onclose = _ => {
+                socketState.innerText += 'CLOSED\n'
+                socket = null
+            }
+            socket.onerror = (error) => {
+                socketState.innerText += 'ERROR\n'
+                console.log(`ERROR: ${error}`)
+            }
+            socket.onmessage = (event) => {
+                socketState.innerText += `<- ${event.data}\n`
+                let volume_state = JSON.parse(event.data)
+                volumeSetting.value = volume_state.volume_setting
+                changeCounter.value = volume_state.change_counter
+                muted.checked = volume_state.muted ? true : false
+            }
+        }
+
+        function send(message) {
+            if (socket && socket.readyState == WebSocket.OPEN) {
+                let jsonMessage = JSON.stringify(message)
+                socketState.innerText += `-> ${jsonMessage}\n`
+                socket.send(jsonMessage)
+            } else {
+                socketState.innerText += 'NOT CONNECTED\n'
+            }
+        }
+
+        function update_state() {
+            send({
+                volume_setting: parseInt(volumeSetting.value),
+                change_counter: parseInt(changeCounter.value),
+                muted: muted.checked ? 1 : 0
+            })
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous"></script>
+
+</body>
+
+</html>

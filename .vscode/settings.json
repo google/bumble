@@ -72,6 +72,8 @@
         "substates",
         "tobytes",
         "tsep",
+        "UNMUTE",
+        "unmuted",
         "usbmodem",
         "vhci",
         "websockets",
