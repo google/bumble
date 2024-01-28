@@ -467,9 +467,8 @@ async def test_cis():
     await asyncio.gather(*peripheral_cis_futures.values())
     assert len(cis_links) == 2
 
-    # TODO: Fix Host CIS support.
-    # await cis_links[0].disconnect()
-    # await cis_links[1].disconnect()
+    await cis_links[0].disconnect()
+    await cis_links[1].disconnect()
 
 
 # -----------------------------------------------------------------------------
