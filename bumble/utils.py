@@ -35,7 +35,6 @@ from typing import (
     Union,
     overload,
 )
-import traceback
 
 from pyee import EventEmitter
 
@@ -459,7 +458,7 @@ def experimental(msg: str):
     """
 
     def wrapper(function):
-        @wraps(function)
+        @functools.wraps(function)
         def inner(*args, **kwargs):
             warnings.warn(msg, FutureWarning)
             return function(*args, **kwargs)
