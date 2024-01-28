@@ -24,12 +24,7 @@ import itertools
 import random
 import struct
 from bumble.colors import color
-from bumble.core import (
-    BT_CENTRAL_ROLE,
-    BT_PERIPHERAL_ROLE,
-    BT_LE_TRANSPORT,
-    BT_BR_EDR_TRANSPORT,
-)
+from bumble.core import PhysicalTransport, Role
 
 from bumble.hci import (
     HCI_ACL_DATA_PACKET,
@@ -98,10 +93,10 @@ class CisLink:
 class Connection:
     controller: Controller
     handle: int
-    role: int
+    role: Role
     peer_address: Address
     link: Any
-    transport: int
+    transport: PhysicalTransport
     link_type: int
 
     def __post_init__(self):
@@ -388,10 +383,10 @@ class Controller:
             connection = Connection(
                 controller=self,
                 handle=connection_handle,
-                role=BT_PERIPHERAL_ROLE,
+                role=Role.PERIPHERAL,
                 peer_address=peer_address,
                 link=self.link,
-                transport=BT_LE_TRANSPORT,
+                transport=PhysicalTransport.LE,
                 link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
             )
             self.peripheral_connections[peer_address] = connection
@@ -448,10 +443,10 @@ class Controller:
                 connection = Connection(
                     controller=self,
                     handle=connection_handle,
-                    role=BT_CENTRAL_ROLE,
+                    role=Role.CENTRAL,
                     peer_address=peer_address,
                     link=self.link,
-                    transport=BT_LE_TRANSPORT,
+                    transport=PhysicalTransport.LE,
                     link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
                 )
                 self.central_connections[peer_address] = connection
@@ -467,7 +462,7 @@ class Controller:
             HCI_LE_Connection_Complete_Event(
                 status=status,
                 connection_handle=connection.handle if connection else 0,
-                role=BT_CENTRAL_ROLE,
+                role=Role.CENTRAL,
                 peer_address_type=le_create_connection_command.peer_address_type,
                 peer_address=le_create_connection_command.peer_address,
                 connection_interval=le_create_connection_command.connection_interval_min,
@@ -529,7 +524,7 @@ class Controller:
 
     def on_link_acl_data(self, sender_address, transport, data):
         # Look for the connection to which this data belongs
-        if transport == BT_LE_TRANSPORT:
+        if transport == PhysicalTransport.LE:
             connection = self.find_le_connection_by_address(sender_address)
         else:
             connection = self.find_classic_connection_by_address(sender_address)
@@ -691,10 +686,10 @@ class Controller:
                     controller=self,
                     handle=connection_handle,
                     # Role doesn't matter in Classic because they are managed by HCI_Role_Change and HCI_Role_Discovery
-                    role=BT_CENTRAL_ROLE,
+                    role=Role.CENTRAL,
                     peer_address=peer_address,
                     link=self.link,
-                    transport=BT_BR_EDR_TRANSPORT,
+                    transport=PhysicalTransport.BR_EDR,
                     link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
                 )
                 self.classic_connections[peer_address] = connection
@@ -759,10 +754,10 @@ class Controller:
                 controller=self,
                 handle=connection_handle,
                 # Role doesn't matter in SCO.
-                role=BT_CENTRAL_ROLE,
+                role=Role.CENTRAL,
                 peer_address=peer_address,
                 link=self.link,
-                transport=BT_BR_EDR_TRANSPORT,
+                transport=PhysicalTransport.BR_EDR,
                 link_type=link_type,
             )
             self.classic_connections[peer_address] = connection

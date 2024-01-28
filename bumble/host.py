@@ -74,8 +74,7 @@ from .hci import (
     LeFeatureMask,
 )
 from .core import (
-    BT_BR_EDR_TRANSPORT,
-    BT_LE_TRANSPORT,
+    PhysicalTransport,
     ConnectionPHY,
     ConnectionParameters,
 )
@@ -140,7 +139,13 @@ class AclPacketQueue:
 
 # -----------------------------------------------------------------------------
 class Connection:
-    def __init__(self, host: Host, handle: int, peer_address: Address, transport: int):
+    def __init__(
+        self,
+        host: Host,
+        handle: int,
+        peer_address: Address,
+        transport: PhysicalTransport,
+    ):
         self.host = host
         self.handle = handle
         self.peer_address = peer_address
@@ -148,7 +153,7 @@ class Connection:
         self.transport = transport
         acl_packet_queue: Optional[AclPacketQueue] = (
             host.le_acl_packet_queue
-            if transport == BT_LE_TRANSPORT
+            if transport == PhysicalTransport.LE
             else host.acl_packet_queue
         )
         assert acl_packet_queue
@@ -224,7 +229,7 @@ class Host(AbortableEventEmitter):
     def find_connection_by_bd_addr(
         self,
         bd_addr: Address,
-        transport: Optional[int] = None,
+        transport: Optional[PhysicalTransport] = None,
         check_address_type: bool = False,
     ) -> Optional[Connection]:
         for connection in self.connections.values():
@@ -648,7 +653,7 @@ class Host(AbortableEventEmitter):
                     self,
                     event.connection_handle,
                     event.peer_address,
-                    BT_LE_TRANSPORT,
+                    PhysicalTransport.LE,
                 )
                 self.connections[event.connection_handle] = connection
 
@@ -661,7 +666,7 @@ class Host(AbortableEventEmitter):
             self.emit(
                 'connection',
                 event.connection_handle,
-                BT_LE_TRANSPORT,
+                PhysicalTransport.LE,
                 event.peer_address,
                 event.role,
                 connection_parameters,
@@ -671,7 +676,10 @@ class Host(AbortableEventEmitter):
 
             # Notify the listeners
             self.emit(
-                'connection_failure', BT_LE_TRANSPORT, event.peer_address, event.status
+                'connection_failure',
+                PhysicalTransport.LE,
+                event.peer_address,
+                event.status,
             )
 
     def on_hci_le_enhanced_connection_complete_event(self, event):
@@ -692,7 +700,7 @@ class Host(AbortableEventEmitter):
                     self,
                     event.connection_handle,
                     event.bd_addr,
-                    BT_BR_EDR_TRANSPORT,
+                    PhysicalTransport.BR_EDR,
                 )
                 self.connections[event.connection_handle] = connection
 
@@ -700,7 +708,7 @@ class Host(AbortableEventEmitter):
             self.emit(
                 'connection',
                 event.connection_handle,
-                BT_BR_EDR_TRANSPORT,
+                PhysicalTransport.BR_EDR,
                 event.bd_addr,
                 None,
                 None,
@@ -710,7 +718,10 @@ class Host(AbortableEventEmitter):
 
             # Notify the client
             self.emit(
-                'connection_failure', BT_BR_EDR_TRANSPORT, event.bd_addr, event.status
+                'connection_failure',
+                PhysicalTransport.BR_EDR,
+                event.bd_addr,
+                event.status,
             )
 
     def on_hci_disconnection_complete_event(self, event):
