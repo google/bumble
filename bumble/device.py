@@ -1204,6 +1204,7 @@ class Device(CompositeEventEmitter):
         }  # Futures, by BD address OR [Futures] for Address.ANY
         self.legacy_advertiser = None
         self.extended_advertisers = {}
+        self.cis_lock = asyncio.Lock()
 
         # Own address type cache
         self.connect_own_address_type = None
@@ -3109,26 +3110,41 @@ class Device(CompositeEventEmitter):
     # [LE only]
     @experimental('Only for testing.')
     async def accept_cis_request(self, handle: int) -> CisLink:
-        result = await self.send_command(
-            HCI_LE_Accept_CIS_Request_Command(connection_handle=handle),
-        )
-        if result.status != HCI_COMMAND_STATUS_PENDING:
-            logger.warning(
-                'HCI_LE_Accept_CIS_Request_Command failed: '
-                f'{HCI_Constant.error_name(result.status)}'
+        """[LE Only] Accepts an incoming CIS request.
+
+        When the specified CIS handle is already created, this method returns the
+        existed CIS link object immediately.
+
+        Args:
+            handle: CIS handle to accept.
+
+        Returns:
+            CIS link object on the given handle.
+        """
+        async with self.cis_lock:
+            if cis_link := self.cis_links.get(handle):
+                return cis_link
+
+            result = await self.send_command(
+                HCI_LE_Accept_CIS_Request_Command(connection_handle=handle),
             )
-            raise HCI_StatusError(result)
+            if result.status != HCI_COMMAND_STATUS_PENDING:
+                logger.warning(
+                    'HCI_LE_Accept_CIS_Request_Command failed: '
+                    f'{HCI_Constant.error_name(result.status)}'
+                )
+                raise HCI_StatusError(result)
 
-        pending_cis_establishment = asyncio.get_running_loop().create_future()
+            pending_cis_establishment = asyncio.get_running_loop().create_future()
 
-        with closing(EventWatcher()) as watcher:
+            with closing(EventWatcher()) as watcher:
 
-            @watcher.on(self, 'cis_establishment')
-            def on_cis_establishment(cis_link: CisLink) -> None:
-                if cis_link.handle == handle:
-                    pending_cis_establishment.set_result(cis_link)
+                @watcher.on(self, 'cis_establishment')
+                def on_cis_establishment(cis_link: CisLink) -> None:
+                    if cis_link.handle == handle:
+                        pending_cis_establishment.set_result(cis_link)
 
-            return await pending_cis_establishment
+                return await pending_cis_establishment
 
     # [LE only]
     @experimental('Only for testing.')

@@ -217,6 +217,13 @@ class FrameDuration(enum.IntEnum):
     DURATION_7500_US  = 0x00
     DURATION_10000_US = 0x01
 
+    @property
+    def us(self) -> int:
+        return {
+            FrameDuration.DURATION_7500_US: 7500,
+            FrameDuration.DURATION_10000_US: 10000,
+        }[self]
+
 
 class SupportedFrameDuration(enum.IntFlag):
     '''Bluetooth Assigned Numbers, Section 6.12.4.2 - Frame Duration'''
@@ -833,15 +840,23 @@ class AseStateMachine(gatt.Characteristic):
         cig_id: int,
         cis_id: int,
     ) -> None:
-        if cis_id == self.cis_id and self.state == self.State.ENABLING:
+        if (
+            cig_id == self.cig_id
+            and cis_id == self.cis_id
+            and self.state == self.State.ENABLING
+        ):
             acl_connection.abort_on(
                 'flush', self.service.device.accept_cis_request(cis_handle)
             )
 
     def on_cis_establishment(self, cis_link: device.CisLink) -> None:
-        if cis_link.cis_id == self.cis_id and self.state == self.State.ENABLING:
-            self.state = self.State.STREAMING
+        if (
+            cis_link.cig_id == self.cig_id
+            and cis_link.cis_id == self.cis_id
+            and self.state == self.State.ENABLING
+        ):
             self.cis_link = cis_link
+            self.cis_link.on('disconnection', self.on_cis_disconnection)
 
             async def post_cis_established():
                 await self.service.device.send_command(
@@ -854,9 +869,14 @@ class AseStateMachine(gatt.Characteristic):
                         codec_configuration=b'',
                     )
                 )
+                if self.role == AudioRole.SINK:
+                    self.state = self.State.STREAMING
                 await self.service.device.notify_subscribers(self, self.value)
 
             cis_link.acl_connection.abort_on('flush', post_cis_established())
+
+    def on_cis_disconnection(self, _reason) -> None:
+        self.cis_link = None
 
     def on_config_codec(
         self,
@@ -954,11 +974,17 @@ class AseStateMachine(gatt.Characteristic):
                 AseResponseCode.INVALID_ASE_STATE_MACHINE_TRANSITION,
                 AseReasonCode.NONE,
             )
-        self.state = self.State.DISABLING
+        if self.role == AudioRole.SINK:
+            self.state = self.State.QOS_CONFIGURED
+        else:
+            self.state = self.State.DISABLING
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
 
     def on_receiver_stop_ready(self) -> Tuple[AseResponseCode, AseReasonCode]:
-        if self.state != AseStateMachine.State.DISABLING:
+        if (
+            self.role != AudioRole.SOURCE
+            or self.state != AseStateMachine.State.DISABLING
+        ):
             return (
                 AseResponseCode.INVALID_ASE_STATE_MACHINE_TRANSITION,
                 AseReasonCode.NONE,
@@ -1009,6 +1035,7 @@ class AseStateMachine(gatt.Characteristic):
     def state(self, new_state: State) -> None:
         logger.debug(f'{self} state change -> {colors.color(new_state.name, "cyan")}')
         self._state = new_state
+        self.emit('state_change', new_state)
 
     @property
     def value(self):
