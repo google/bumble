@@ -454,7 +454,7 @@ class NotImplementedResponse(Response):
 # -----------------------------------------------------------------------------
 class GetCapabilitiesResponse(Response):
     capability_id: GetCapabilitiesCommand.CapabilityId
-    capabilities: List[SupportsBytes]
+    capabilities: List[Union[SupportsBytes, bytes]]
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> GetCapabilitiesResponse:
@@ -467,7 +467,7 @@ class GetCapabilitiesResponse(Response):
         capability_id = GetCapabilitiesCommand.CapabilityId(pdu[0])
         capability_count = pdu[1]
 
-        capabilities: List[SupportsBytes]
+        capabilities: List[Union[SupportsBytes, bytes]]
         if capability_id == GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED:
             capabilities = [EventId(pdu[2 + x]) for x in range(capability_count)]
         else:
@@ -482,7 +482,7 @@ class GetCapabilitiesResponse(Response):
     def __init__(
         self,
         capability_id: GetCapabilitiesCommand.CapabilityId,
-        capabilities: Sequence[SupportsBytes],
+        capabilities: Sequence[Union[SupportsBytes, bytes]],
     ) -> None:
         super().__init__(
             Protocol.PduId.GET_CAPABILITIES,
