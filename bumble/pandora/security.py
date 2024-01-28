@@ -110,7 +110,7 @@ class PairingDelegate(BasePairingDelegate):
 
         event = self.add_origin(PairingEvent(just_works=empty_pb2.Empty()))
         self.service.event_queue.put_nowait(event)
-        answer = await anext(self.service.event_answer)  # pytype: disable=name-error
+        answer = await anext(self.service.event_answer)  # type: ignore
         assert answer.event == event
         assert answer.answer_variant() == 'confirm' and answer.confirm is not None
         return answer.confirm
@@ -125,7 +125,7 @@ class PairingDelegate(BasePairingDelegate):
 
         event = self.add_origin(PairingEvent(numeric_comparison=number))
         self.service.event_queue.put_nowait(event)
-        answer = await anext(self.service.event_answer)  # pytype: disable=name-error
+        answer = await anext(self.service.event_answer)  # type: ignore
         assert answer.event == event
         assert answer.answer_variant() == 'confirm' and answer.confirm is not None
         return answer.confirm
@@ -140,7 +140,7 @@ class PairingDelegate(BasePairingDelegate):
 
         event = self.add_origin(PairingEvent(passkey_entry_request=empty_pb2.Empty()))
         self.service.event_queue.put_nowait(event)
-        answer = await anext(self.service.event_answer)  # pytype: disable=name-error
+        answer = await anext(self.service.event_answer)  # type: ignore
         assert answer.event == event
         if answer.answer_variant() is None:
             return None
@@ -157,7 +157,7 @@ class PairingDelegate(BasePairingDelegate):
 
         event = self.add_origin(PairingEvent(pin_code_request=empty_pb2.Empty()))
         self.service.event_queue.put_nowait(event)
-        answer = await anext(self.service.event_answer)  # pytype: disable=name-error
+        answer = await anext(self.service.event_answer)  # type: ignore
         assert answer.event == event
         if answer.answer_variant() is None:
             return None

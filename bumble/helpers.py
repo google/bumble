@@ -21,7 +21,13 @@ from collections.abc import Callable, MutableMapping
 from typing import cast, Any, Optional
 import logging
 
+from bumble import avc
+from bumble import avctp
 from bumble import avdtp
+from bumble import avrcp
+from bumble import crypto
+from bumble import rfcomm
+from bumble import sdp
 from bumble.colors import color
 from bumble.att import ATT_CID, ATT_PDU
 from bumble.smp import SMP_CID, SMP_Command
@@ -47,9 +53,7 @@ from bumble.hci import (
     HCI_AclDataPacket,
     HCI_Disconnection_Complete_Event,
 )
-from bumble.rfcomm import RFCOMM_Frame, RFCOMM_PSM
-from bumble.sdp import SDP_PDU, SDP_PSM
-from bumble import crypto
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -59,11 +63,14 @@ logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
 PSM_NAMES = {
-    RFCOMM_PSM: 'RFCOMM',
-    SDP_PSM: 'SDP',
+    rfcomm.RFCOMM_PSM: 'RFCOMM',
+    sdp.SDP_PSM: 'SDP',
     avdtp.AVDTP_PSM: 'AVDTP',
+    avctp.AVCTP_PSM: 'AVCTP'
+    # TODO: add more PSM values
 }
 
+AVCTP_PID_NAMES = {avrcp.AVRCP_PID: 'AVRCP'}
 
 # -----------------------------------------------------------------------------
 class PacketTracer:
@@ -71,17 +78,20 @@ class PacketTracer:
         psms: MutableMapping[int, int]
         peer: Optional[PacketTracer.AclStream]
         avdtp_assemblers: MutableMapping[int, avdtp.MessageAssembler]
+        avctp_assemblers: MutableMapping[int, avctp.MessageAssembler]
 
         def __init__(self, analyzer: PacketTracer.Analyzer) -> None:
             self.analyzer = analyzer
             self.packet_assembler = HCI_AclDataPacketAssembler(self.on_acl_pdu)
             self.avdtp_assemblers = {}  # AVDTP assemblers, by source_cid
+            self.avctp_assemblers = {}  # AVCTP assemblers, by source_cid
             self.psms = {}  # PSM, by source_cid
             self.peer = None
 
         # pylint: disable=too-many-nested-blocks
         def on_acl_pdu(self, pdu: bytes) -> None:
             l2cap_pdu = L2CAP_PDU.from_bytes(pdu)
+            self.analyzer.emit(l2cap_pdu)
 
             if l2cap_pdu.cid == ATT_CID:
                 att_pdu = ATT_PDU.from_bytes(l2cap_pdu.payload)
@@ -103,42 +113,51 @@ class PacketTracer:
                         connection_response.result
                         == L2CAP_Connection_Response.CONNECTION_SUCCESSFUL
                     ):
-                        if self.peer:
-                            if psm := self.peer.psms.get(
-                                connection_response.source_cid
-                            ):
-                                # Found a pending connection
-                                self.psms[connection_response.destination_cid] = psm
+                        if self.peer and (
+                            psm := self.peer.psms.get(connection_response.source_cid)
+                        ):
+                            # Found a pending connection
+                            self.psms[connection_response.destination_cid] = psm
 
-                                # For AVDTP connections, create a packet assembler for
-                                # each direction
-                                if psm == avdtp.AVDTP_PSM:
-                                    self.avdtp_assemblers[
-                                        connection_response.source_cid
-                                    ] = avdtp.MessageAssembler(self.on_avdtp_message)
-                                    self.peer.avdtp_assemblers[
-                                        connection_response.destination_cid
-                                    ] = avdtp.MessageAssembler(
-                                        self.peer.on_avdtp_message
-                                    )
-
+                            # For AVDTP connections, create a packet assembler for
+                            # each direction
+                            if psm == avdtp.AVDTP_PSM:
+                                self.avdtp_assemblers[
+                                    connection_response.source_cid
+                                ] = avdtp.MessageAssembler(self.on_avdtp_message)
+                                self.peer.avdtp_assemblers[
+                                    connection_response.destination_cid
+                                ] = avdtp.MessageAssembler(self.peer.on_avdtp_message)
+                            elif psm == avctp.AVCTP_PSM:
+                                self.avctp_assemblers[
+                                    connection_response.source_cid
+                                ] = avctp.MessageAssembler(self.on_avctp_message)
+                                self.peer.avctp_assemblers[
+                                    connection_response.destination_cid
+                                ] = avctp.MessageAssembler(self.peer.on_avctp_message)
             else:
                 # Try to find the PSM associated with this PDU
                 if self.peer and (psm := self.peer.psms.get(l2cap_pdu.cid)):
-                    if psm == SDP_PSM:
-                        sdp_pdu = SDP_PDU.from_bytes(l2cap_pdu.payload)
+                    if psm == sdp.SDP_PSM:
+                        sdp_pdu = sdp.SDP_PDU.from_bytes(l2cap_pdu.payload)
                         self.analyzer.emit(sdp_pdu)
-                    elif psm == RFCOMM_PSM:
-                        rfcomm_frame = RFCOMM_Frame.from_bytes(l2cap_pdu.payload)
+                    elif psm == rfcomm.RFCOMM_PSM:
+                        rfcomm_frame = rfcomm.RFCOMM_Frame.from_bytes(l2cap_pdu.payload)
                         self.analyzer.emit(rfcomm_frame)
                     elif psm == avdtp.AVDTP_PSM:
                         self.analyzer.emit(
                             f'{color("L2CAP", "green")} [CID={l2cap_pdu.cid}, '
                             f'PSM=AVDTP]: {l2cap_pdu.payload.hex()}'
                         )
-                        assembler = self.avdtp_assemblers.get(l2cap_pdu.cid)
-                        if assembler:
-                            assembler.on_pdu(l2cap_pdu.payload)
+                        if avdtp_assembler := self.avdtp_assemblers.get(l2cap_pdu.cid):
+                            avdtp_assembler.on_pdu(l2cap_pdu.payload)
+                    elif psm == avctp.AVCTP_PSM:
+                        self.analyzer.emit(
+                            f'{color("L2CAP", "green")} [CID={l2cap_pdu.cid}, '
+                            f'PSM=AVCTP]: {l2cap_pdu.payload.hex()}'
+                        )
+                        if avctp_assembler := self.avctp_assemblers.get(l2cap_pdu.cid):
+                            avctp_assembler.on_pdu(l2cap_pdu.payload)
                     else:
                         psm_string = name_or_number(PSM_NAMES, psm)
                         self.analyzer.emit(
@@ -153,6 +172,28 @@ class PacketTracer:
         ) -> None:
             self.analyzer.emit(
                 f'{color("AVDTP", "green")} [{transaction_label}] {message}'
+            )
+
+        def on_avctp_message(
+            self,
+            transaction_label: int,
+            is_command: bool,
+            ipid: bool,
+            pid: int,
+            payload: bytes,
+        ):
+            if pid == avrcp.AVRCP_PID:
+                avc_frame = avc.Frame.from_bytes(payload)
+                details = str(avc_frame)
+            else:
+                details = payload.hex()
+
+            c_r = 'Command' if is_command else 'Response'
+            self.analyzer.emit(
+                f'{color("AVCTP", "green")} '
+                f'{c_r}[{transaction_label}][{name_or_number(AVCTP_PID_NAMES, pid)}] '
+                f'{"#" if ipid else ""}'
+                f'{details}'
             )
 
         def feed_packet(self, packet: HCI_AclDataPacket) -> None:

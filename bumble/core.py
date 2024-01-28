@@ -97,12 +97,16 @@ class BaseError(Exception):
             namespace = f'{self.error_namespace}/'
         else:
             namespace = ''
-        error_text = {
-            (True, True): f'{self.error_name} [0x{self.error_code:X}]',
-            (True, False): self.error_name,
-            (False, True): f'0x{self.error_code:X}',
-            (False, False): '',
-        }[(self.error_name != '', self.error_code is not None)]
+        have_name = self.error_name != ''
+        have_code = self.error_code is not None
+        if have_name and have_code:
+            error_text = f'{self.error_name} [0x{self.error_code:X}]'
+        elif have_name and not have_code:
+            error_text = self.error_name
+        elif not have_name and have_code:
+            error_text = f'0x{self.error_code:X}'
+        else:
+            error_text = '<unspecified>'
 
         return f'{type(self).__name__}({namespace}{error_text})'
 
@@ -319,7 +323,7 @@ BT_HIDP_PROTOCOL_ID                     = UUID.from_16_bits(0x0011, 'HIDP')
 BT_HARDCOPY_CONTROL_CHANNEL_PROTOCOL_ID = UUID.from_16_bits(0x0012, 'HardcopyControlChannel')
 BT_HARDCOPY_DATA_CHANNEL_PROTOCOL_ID    = UUID.from_16_bits(0x0014, 'HardcopyDataChannel')
 BT_HARDCOPY_NOTIFICATION_PROTOCOL_ID    = UUID.from_16_bits(0x0016, 'HardcopyNotification')
-BT_AVTCP_PROTOCOL_ID                    = UUID.from_16_bits(0x0017, 'AVCTP')
+BT_AVCTP_PROTOCOL_ID                    = UUID.from_16_bits(0x0017, 'AVCTP')
 BT_AVDTP_PROTOCOL_ID                    = UUID.from_16_bits(0x0019, 'AVDTP')
 BT_CMTP_PROTOCOL_ID                     = UUID.from_16_bits(0x001B, 'CMTP')
 BT_MCAP_CONTROL_CHANNEL_PROTOCOL_ID     = UUID.from_16_bits(0x001E, 'MCAPControlChannel')
