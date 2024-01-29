@@ -136,7 +136,14 @@ class ServiceProxy(AttributeProxy):
         service = services[0] if services else None
         return service_class(service) if service else None
 
-    def __init__(self, client, handle, end_group_handle, uuid, primary=True):
+    def __init__(
+        self,
+        client: Client,
+        handle: int,
+        end_group_handle: int,
+        uuid: UUID,
+        primary: bool = True,
+    ) -> None:
         attribute_type = (
             GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE
             if primary
@@ -146,10 +153,14 @@ class ServiceProxy(AttributeProxy):
         self.uuid = uuid
         self.characteristics = []
 
-    async def discover_characteristics(self, uuids=()):
+    async def discover_characteristics(
+        self, uuids: Iterable[Union[str, UUID]] = ()
+    ) -> List[CharacteristicProxy]:
         return await self.client.discover_characteristics(uuids, self)
 
-    def get_characteristics_by_uuid(self, uuid):
+    def get_characteristics_by_uuid(
+        self, uuid: Union[str, UUID]
+    ) -> List[CharacteristicProxy]:
         return self.client.get_characteristics_by_uuid(uuid, self)
 
     def __str__(self) -> str:
@@ -163,10 +174,10 @@ class CharacteristicProxy(AttributeProxy):
 
     def __init__(
         self,
-        client,
-        handle,
-        end_group_handle,
-        uuid,
+        client: Client,
+        handle: int,
+        end_group_handle: int,
+        uuid: UUID,
         properties: int,
     ):
         super().__init__(client, handle, end_group_handle, uuid)
@@ -176,21 +187,26 @@ class CharacteristicProxy(AttributeProxy):
         self.descriptors_discovered = False
         self.subscribers = {}  # Map from subscriber to proxy subscriber
 
-    def get_descriptor(self, descriptor_type):
-        for descriptor in self.descriptors:
-            if descriptor.type == descriptor_type:
-                return descriptor
+    def get_descriptor(
+        self, descriptor_type: Union[str, UUID]
+    ) -> Optional[DescriptorProxy]:
+        return next(
+            (
+                descriptor
+                for descriptor in self.descriptors
+                if descriptor.type == descriptor_type
+            ),
+            None,
+        )
 
-        return None
-
-    async def discover_descriptors(self):
+    async def discover_descriptors(self) -> List[DescriptorProxy]:
         return await self.client.discover_descriptors(self)
 
     async def subscribe(
         self,
         subscriber: Optional[Callable[[bytes], Any]] = None,
         prefer_notify: bool = True,
-    ):
+    ) -> None:
         if subscriber is not None:
             if subscriber in self.subscribers:
                 # We already have a proxy subscriber
@@ -207,7 +223,9 @@ class CharacteristicProxy(AttributeProxy):
 
         return await self.client.subscribe(self, subscriber, prefer_notify)
 
-    async def unsubscribe(self, subscriber=None, force=False):
+    async def unsubscribe(
+        self, subscriber: Optional[Callable[[bytes], Any]] = None, force: bool = False
+    ) -> None:
         if subscriber in self.subscribers:
             subscriber = self.subscribers.pop(subscriber)
 
@@ -222,7 +240,7 @@ class CharacteristicProxy(AttributeProxy):
 
 
 class DescriptorProxy(AttributeProxy):
-    def __init__(self, client, handle, descriptor_type):
+    def __init__(self, client: Client, handle: int, descriptor_type: UUID) -> None:
         super().__init__(client, handle, 0, descriptor_type)
 
     def __str__(self) -> str:
@@ -339,11 +357,11 @@ class Client:
 
         return self.connection.att_mtu
 
-    def get_services_by_uuid(self, uuid: UUID) -> List[ServiceProxy]:
+    def get_services_by_uuid(self, uuid: Union[str, UUID]) -> List[ServiceProxy]:
         return [service for service in self.services if service.uuid == uuid]
 
     def get_characteristics_by_uuid(
-        self, uuid: UUID, service: Optional[ServiceProxy] = None
+        self, uuid: Union[str, UUID], service: Optional[ServiceProxy] = None
     ) -> List[CharacteristicProxy]:
         services = [service] if service else self.services
         return [
@@ -597,7 +615,7 @@ class Client:
         return included_services
 
     async def discover_characteristics(
-        self, uuids, service: Optional[ServiceProxy]
+        self, uuids: Iterable[Union[str, UUID]], service: Optional[ServiceProxy]
     ) -> List[CharacteristicProxy]:
         '''
         See Vol 3, Part G - 4.6.1 Discover All Characteristics of a Service and 4.6.2
