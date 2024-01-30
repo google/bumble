@@ -1151,7 +1151,28 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.4.3 Read Local Supported Features Command
         '''
-        return bytes([HCI_SUCCESS]) + self.lmp_features
+        return bytes([HCI_SUCCESS]) + self.lmp_features[:8]
+
+    def on_hci_read_local_extended_features_command(self, command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.4.4 Read Local Extended Features Command
+        '''
+        if command.page_number * 8 > len(self.lmp_features):
+            return bytes([HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
+        return (
+            bytes(
+                [
+                    # Status
+                    HCI_SUCCESS,
+                    # Page number
+                    command.page_number,
+                    # Max page number
+                    len(self.lmp_features) // 8 - 1,
+                ]
+            )
+            # Features of the current page
+            + self.lmp_features[command.page_number * 8 : (command.page_number + 1) * 8]
+        )
 
     def on_hci_read_buffer_size_command(self, _command):
         '''
@@ -1521,6 +1542,20 @@ class Controller:
             'rx_phys': command.rx_phys,
         }
         return bytes([HCI_SUCCESS])
+
+    def on_hci_le_read_maximum_advertising_data_length_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.57 LE Read Maximum Advertising Data
+        Length Command
+        '''
+        return struct.pack('<BH', HCI_SUCCESS, 0x0672)
+
+    def on_hci_le_read_number_of_supported_advertising_sets_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.58 LE Read Number of Supported
+        Advertising Set Command
+        '''
+        return struct.pack('<BB', HCI_SUCCESS, 0xF0)
 
     def on_hci_le_read_transmit_power_command(self, _command):
         '''

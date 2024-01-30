@@ -1417,6 +1417,180 @@ class LeFeatureMask(enum.IntFlag):
     PERIODIC_ADVERTISING_WITH_RESPONSES_ADVERTISER = 1 << LeFeature.PERIODIC_ADVERTISING_WITH_RESPONSES_ADVERTISER
     PERIODIC_ADVERTISING_WITH_RESPONSES_SCANNER    = 1 << LeFeature.PERIODIC_ADVERTISING_WITH_RESPONSES_SCANNER
 
+class LmpFeature(enum.IntEnum):
+    # Page 0 (Legacy LMP features)
+    LMP_3_SLOT_PACKETS                                           = 0
+    LMP_5_SLOT_PACKETS                                           = 1
+    ENCRYPTION                                                   = 2
+    SLOT_OFFSET                                                  = 3
+    TIMING_ACCURACY                                              = 4
+    ROLE_SWITCH                                                  = 5
+    HOLD_MODE                                                    = 6
+    SNIFF_MODE                                                   = 7
+    # PREVIOUSLY_USED                                            = 8
+    POWER_CONTROL_REQUESTS                                       = 9
+    CHANNEL_QUALITY_DRIVEN_DATA_RATE_CQDDR                       = 10
+    SCO_LINK                                                     = 11
+    HV2_PACKETS                                                  = 12
+    HV3_PACKETS                                                  = 13
+    U_LAW_LOG_SYNCHRONOUS_DATA                                   = 14
+    A_LAW_LOG_SYNCHRONOUS_DATA                                   = 15
+    CVSD_SYNCHRONOUS_DATA                                        = 16
+    PAGING_PARAMETER_NEGOTIATION                                 = 17
+    POWER_CONTROL                                                = 18
+    TRANSPARENT_SYNCHRONOUS_DATA                                 = 19
+    FLOW_CONTROL_LAG_LEAST_SIGNIFICANT_BIT                       = 20
+    FLOW_CONTROL_LAG_MIDDLE_BIT                                  = 21
+    FLOW_CONTROL_LAG_MOST_SIGNIFICANT_BIT                        = 22
+    BROADCAST_ENCRYPTION                                         = 23
+    # RESERVED_FOR_FUTURE_USE                                    = 24
+    ENHANCED_DATA_RATE_ACL_2_MBPS_MODE                           = 25
+    ENHANCED_DATA_RATE_ACL_3_MBPS_MODE                           = 26
+    ENHANCED_INQUIRY_SCAN                                        = 27
+    INTERLACED_INQUIRY_SCAN                                      = 28
+    INTERLACED_PAGE_SCAN                                         = 29
+    RSSI_WITH_INQUIRY_RESULTS                                    = 30
+    EXTENDED_SCO_LINK_EV3_PACKETS                                = 31
+    EV4_PACKETS                                                  = 32
+    EV5_PACKETS                                                  = 33
+    # RESERVED_FOR_FUTURE_USE                                    = 34
+    AFH_CAPABLE_PERIPHERAL                                       = 35
+    AFH_CLASSIFICATION_PERIPHERAL                                = 36
+    BR_EDR_NOT_SUPPORTED                                         = 37
+    LE_SUPPORTED_CONTROLLER                                      = 38
+    LMP_3_SLOT_ENHANCED_DATA_RATE_ACL_PACKETS                    = 39
+    LMP_5_SLOT_ENHANCED_DATA_RATE_ACL_PACKETS                    = 40
+    SNIFF_SUBRATING                                              = 41
+    PAUSE_ENCRYPTION                                             = 42
+    AFH_CAPABLE_CENTRAL                                          = 43
+    AFH_CLASSIFICATION_CENTRAL                                   = 44
+    ENHANCED_DATA_RATE_ESCO_2_MBPS_MODE                          = 45
+    ENHANCED_DATA_RATE_ESCO_3_MBPS_MODE                          = 46
+    LMP_3_SLOT_ENHANCED_DATA_RATE_ESCO_PACKETS                   = 47
+    EXTENDED_INQUIRY_RESPONSE                                    = 48
+    SIMULTANEOUS_LE_AND_BR_EDR_TO_SAME_DEVICE_CAPABLE_CONTROLLER = 49
+    # RESERVED_FOR_FUTURE_USE                                    = 50
+    SECURE_SIMPLE_PAIRING_CONTROLLER_SUPPORT                     = 51
+    ENCAPSULATED_PDU                                             = 52
+    ERRONEOUS_DATA_REPORTING                                     = 53
+    NON_FLUSHABLE_PACKET_BOUNDARY_FLAG                           = 54
+    # RESERVED_FOR_FUTURE_USE                                    = 55
+    HCI_LINK_SUPERVISION_TIMEOUT_CHANGED_EVENT                   = 56
+    VARIABLE_INQUIRY_TX_POWER_LEVEL                              = 57
+    ENHANCED_POWER_CONTROL                                       = 58
+    # RESERVED_FOR_FUTURE_USE                                    = 59
+    # RESERVED_FOR_FUTURE_USE                                    = 60
+    # RESERVED_FOR_FUTURE_USE                                    = 61
+    # RESERVED_FOR_FUTURE_USE                                    = 62
+    EXTENDED_FEATURES                                            = 63
+
+    # Page 1
+    SECURE_SIMPLE_PAIRING_HOST_SUPPORT                           = 64
+    LE_SUPPORTED_HOST                                            = 65
+    # PREVIOUSLY_USED                                            = 66
+    SECURE_CONNECTIONS_HOST_SUPPORT                              = 67
+
+    # Page 2
+    CONNECTIONLESS_PERIPHERAL_BROADCAST_TRANSMITTER_OPERATION    = 128
+    CONNECTIONLESS_PERIPHERAL_BROADCAST_RECEIVER_OPERATION       = 129
+    SYNCHRONIZATION_TRAIN                                        = 130
+    SYNCHRONIZATION_SCAN                                         = 131
+    HCI_INQUIRY_RESPONSE_NOTIFICATION_EVENT                      = 132
+    GENERALIZED_INTERLACED_SCAN                                  = 133
+    COARSE_CLOCK_ADJUSTMENT                                      = 134
+    RESERVED_FOR_FUTURE_USE                                      = 135
+    SECURE_CONNECTIONS_CONTROLLER_SUPPORT                        = 136
+    PING                                                         = 137
+    SLOT_AVAILABILITY_MASK                                       = 138
+    TRAIN_NUDGING                                                = 139
+
+class LmpFeatureMask(enum.IntFlag):
+    # Page 0 (Legacy LMP features)
+    LMP_3_SLOT_PACKETS                                           = (1 << LmpFeature.LMP_3_SLOT_PACKETS)
+    LMP_5_SLOT_PACKETS                                           = (1 << LmpFeature.LMP_5_SLOT_PACKETS)
+    ENCRYPTION                                                   = (1 << LmpFeature.ENCRYPTION)
+    SLOT_OFFSET                                                  = (1 << LmpFeature.SLOT_OFFSET)
+    TIMING_ACCURACY                                              = (1 << LmpFeature.TIMING_ACCURACY)
+    ROLE_SWITCH                                                  = (1 << LmpFeature.ROLE_SWITCH)
+    HOLD_MODE                                                    = (1 << LmpFeature.HOLD_MODE)
+    SNIFF_MODE                                                   = (1 << LmpFeature.SNIFF_MODE)
+    # PREVIOUSLY_USED                                            = (1 << LmpFeature.PREVIOUSLY_USED)
+    POWER_CONTROL_REQUESTS                                       = (1 << LmpFeature.POWER_CONTROL_REQUESTS)
+    CHANNEL_QUALITY_DRIVEN_DATA_RATE_CQDDR                       = (1 << LmpFeature.CHANNEL_QUALITY_DRIVEN_DATA_RATE_CQDDR)
+    SCO_LINK                                                     = (1 << LmpFeature.SCO_LINK)
+    HV2_PACKETS                                                  = (1 << LmpFeature.HV2_PACKETS)
+    HV3_PACKETS                                                  = (1 << LmpFeature.HV3_PACKETS)
+    U_LAW_LOG_SYNCHRONOUS_DATA                                   = (1 << LmpFeature.U_LAW_LOG_SYNCHRONOUS_DATA)
+    A_LAW_LOG_SYNCHRONOUS_DATA                                   = (1 << LmpFeature.A_LAW_LOG_SYNCHRONOUS_DATA)
+    CVSD_SYNCHRONOUS_DATA                                        = (1 << LmpFeature.CVSD_SYNCHRONOUS_DATA)
+    PAGING_PARAMETER_NEGOTIATION                                 = (1 << LmpFeature.PAGING_PARAMETER_NEGOTIATION)
+    POWER_CONTROL                                                = (1 << LmpFeature.POWER_CONTROL)
+    TRANSPARENT_SYNCHRONOUS_DATA                                 = (1 << LmpFeature.TRANSPARENT_SYNCHRONOUS_DATA)
+    FLOW_CONTROL_LAG_LEAST_SIGNIFICANT_BIT                       = (1 << LmpFeature.FLOW_CONTROL_LAG_LEAST_SIGNIFICANT_BIT)
+    FLOW_CONTROL_LAG_MIDDLE_BIT                                  = (1 << LmpFeature.FLOW_CONTROL_LAG_MIDDLE_BIT)
+    FLOW_CONTROL_LAG_MOST_SIGNIFICANT_BIT                        = (1 << LmpFeature.FLOW_CONTROL_LAG_MOST_SIGNIFICANT_BIT)
+    BROADCAST_ENCRYPTION                                         = (1 << LmpFeature.BROADCAST_ENCRYPTION)
+    # RESERVED_FOR_FUTURE_USE                                    = (1 << LmpFeature.RESERVED_FOR_FUTURE_USE)
+    ENHANCED_DATA_RATE_ACL_2_MBPS_MODE                           = (1 << LmpFeature.ENHANCED_DATA_RATE_ACL_2_MBPS_MODE)
+    ENHANCED_DATA_RATE_ACL_3_MBPS_MODE                           = (1 << LmpFeature.ENHANCED_DATA_RATE_ACL_3_MBPS_MODE)
+    ENHANCED_INQUIRY_SCAN                                        = (1 << LmpFeature.ENHANCED_INQUIRY_SCAN)
+    INTERLACED_INQUIRY_SCAN                                      = (1 << LmpFeature.INTERLACED_INQUIRY_SCAN)
+    INTERLACED_PAGE_SCAN                                         = (1 << LmpFeature.INTERLACED_PAGE_SCAN)
+    RSSI_WITH_INQUIRY_RESULTS                                    = (1 << LmpFeature.RSSI_WITH_INQUIRY_RESULTS)
+    EXTENDED_SCO_LINK_EV3_PACKETS                                = (1 << LmpFeature.EXTENDED_SCO_LINK_EV3_PACKETS)
+    EV4_PACKETS                                                  = (1 << LmpFeature.EV4_PACKETS)
+    EV5_PACKETS                                                  = (1 << LmpFeature.EV5_PACKETS)
+    # RESERVED_FOR_FUTURE_USE                                    = (1 << LmpFeature.RESERVED_FOR_FUTURE_USE)
+    AFH_CAPABLE_PERIPHERAL                                       = (1 << LmpFeature.AFH_CAPABLE_PERIPHERAL)
+    AFH_CLASSIFICATION_PERIPHERAL                                = (1 << LmpFeature.AFH_CLASSIFICATION_PERIPHERAL)
+    BR_EDR_NOT_SUPPORTED                                         = (1 << LmpFeature.BR_EDR_NOT_SUPPORTED)
+    LE_SUPPORTED_CONTROLLER                                      = (1 << LmpFeature.LE_SUPPORTED_CONTROLLER)
+    LMP_3_SLOT_ENHANCED_DATA_RATE_ACL_PACKETS                    = (1 << LmpFeature.LMP_3_SLOT_ENHANCED_DATA_RATE_ACL_PACKETS)
+    LMP_5_SLOT_ENHANCED_DATA_RATE_ACL_PACKETS                    = (1 << LmpFeature.LMP_5_SLOT_ENHANCED_DATA_RATE_ACL_PACKETS)
+    SNIFF_SUBRATING                                              = (1 << LmpFeature.SNIFF_SUBRATING)
+    PAUSE_ENCRYPTION                                             = (1 << LmpFeature.PAUSE_ENCRYPTION)
+    AFH_CAPABLE_CENTRAL                                          = (1 << LmpFeature.AFH_CAPABLE_CENTRAL)
+    AFH_CLASSIFICATION_CENTRAL                                   = (1 << LmpFeature.AFH_CLASSIFICATION_CENTRAL)
+    ENHANCED_DATA_RATE_ESCO_2_MBPS_MODE                          = (1 << LmpFeature.ENHANCED_DATA_RATE_ESCO_2_MBPS_MODE)
+    ENHANCED_DATA_RATE_ESCO_3_MBPS_MODE                          = (1 << LmpFeature.ENHANCED_DATA_RATE_ESCO_3_MBPS_MODE)
+    LMP_3_SLOT_ENHANCED_DATA_RATE_ESCO_PACKETS                   = (1 << LmpFeature.LMP_3_SLOT_ENHANCED_DATA_RATE_ESCO_PACKETS)
+    EXTENDED_INQUIRY_RESPONSE                                    = (1 << LmpFeature.EXTENDED_INQUIRY_RESPONSE)
+    SIMULTANEOUS_LE_AND_BR_EDR_TO_SAME_DEVICE_CAPABLE_CONTROLLER = (1 << LmpFeature.SIMULTANEOUS_LE_AND_BR_EDR_TO_SAME_DEVICE_CAPABLE_CONTROLLER)
+    # RESERVED_FOR_FUTURE_USE                                    = (1 << LmpFeature.RESERVED_FOR_FUTURE_USE)
+    SECURE_SIMPLE_PAIRING_CONTROLLER_SUPPORT                     = (1 << LmpFeature.SECURE_SIMPLE_PAIRING_CONTROLLER_SUPPORT)
+    ENCAPSULATED_PDU                                             = (1 << LmpFeature.ENCAPSULATED_PDU)
+    ERRONEOUS_DATA_REPORTING                                     = (1 << LmpFeature.ERRONEOUS_DATA_REPORTING)
+    NON_FLUSHABLE_PACKET_BOUNDARY_FLAG                           = (1 << LmpFeature.NON_FLUSHABLE_PACKET_BOUNDARY_FLAG)
+    # RESERVED_FOR_FUTURE_USE                                    = (1 << LmpFeature.RESERVED_FOR_FUTURE_USE)
+    HCI_LINK_SUPERVISION_TIMEOUT_CHANGED_EVENT                   = (1 << LmpFeature.HCI_LINK_SUPERVISION_TIMEOUT_CHANGED_EVENT)
+    VARIABLE_INQUIRY_TX_POWER_LEVEL                              = (1 << LmpFeature.VARIABLE_INQUIRY_TX_POWER_LEVEL)
+    ENHANCED_POWER_CONTROL                                       = (1 << LmpFeature.ENHANCED_POWER_CONTROL)
+    # RESERVED_FOR_FUTURE_USE                                    = (1 << LmpFeature.RESERVED_FOR_FUTURE_USE)
+    # RESERVED_FOR_FUTURE_USE                                    = (1 << LmpFeature.RESERVED_FOR_FUTURE_USE)
+    # RESERVED_FOR_FUTURE_USE                                    = (1 << LmpFeature.RESERVED_FOR_FUTURE_USE)
+    # RESERVED_FOR_FUTURE_USE                                    = (1 << LmpFeature.RESERVED_FOR_FUTURE_USE)
+    EXTENDED_FEATURES                                            = (1 << LmpFeature.EXTENDED_FEATURES)
+
+    # Page 1
+    SECURE_SIMPLE_PAIRING_HOST_SUPPORT                           = (1 << LmpFeature.SECURE_SIMPLE_PAIRING_HOST_SUPPORT)
+    LE_SUPPORTED_HOST                                            = (1 << LmpFeature.LE_SUPPORTED_HOST)
+    # PREVIOUSLY_USED                                            = (1 << LmpFeature.PREVIOUSLY_USED)
+    SECURE_CONNECTIONS_HOST_SUPPORT                              = (1 << LmpFeature.SECURE_CONNECTIONS_HOST_SUPPORT)
+
+    # Page 2
+    CONNECTIONLESS_PERIPHERAL_BROADCAST_TRANSMITTER_OPERATION    = (1 << LmpFeature.CONNECTIONLESS_PERIPHERAL_BROADCAST_TRANSMITTER_OPERATION)
+    CONNECTIONLESS_PERIPHERAL_BROADCAST_RECEIVER_OPERATION       = (1 << LmpFeature.CONNECTIONLESS_PERIPHERAL_BROADCAST_RECEIVER_OPERATION)
+    SYNCHRONIZATION_TRAIN                                        = (1 << LmpFeature.SYNCHRONIZATION_TRAIN)
+    SYNCHRONIZATION_SCAN                                         = (1 << LmpFeature.SYNCHRONIZATION_SCAN)
+    HCI_INQUIRY_RESPONSE_NOTIFICATION_EVENT                      = (1 << LmpFeature.HCI_INQUIRY_RESPONSE_NOTIFICATION_EVENT)
+    GENERALIZED_INTERLACED_SCAN                                  = (1 << LmpFeature.GENERALIZED_INTERLACED_SCAN)
+    COARSE_CLOCK_ADJUSTMENT                                      = (1 << LmpFeature.COARSE_CLOCK_ADJUSTMENT)
+    RESERVED_FOR_FUTURE_USE                                      = (1 << LmpFeature.RESERVED_FOR_FUTURE_USE)
+    SECURE_CONNECTIONS_CONTROLLER_SUPPORT                        = (1 << LmpFeature.SECURE_CONNECTIONS_CONTROLLER_SUPPORT)
+    PING                                                         = (1 << LmpFeature.PING)
+    SLOT_AVAILABILITY_MASK                                       = (1 << LmpFeature.SLOT_AVAILABILITY_MASK)
+    TRAIN_NUDGING                                                = (1 << LmpFeature.TRAIN_NUDGING)
+
 
 # fmt: on
 # pylint: enable=line-too-long
@@ -3298,7 +3472,12 @@ class HCI_Read_Local_Supported_Commands_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command()
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('lmp_features', 8),
+    ]
+)
 class HCI_Read_Local_Supported_Features_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.4.3 Read Local Supported Features Command
