@@ -21,11 +21,13 @@ import os
 import logging
 import json
 import websockets
+import functools
 from typing import Optional
 
-from bumble.device import Device
+from bumble import rfcomm
+from bumble import hci
+from bumble.device import Device, Connection
 from bumble.transport import open_transport_or_link
-from bumble.rfcomm import Server as RfcommServer
 from bumble import hfp
 from bumble.hfp import HfProtocol
 
@@ -57,11 +59,43 @@ class UiServer:
 
 
 # -----------------------------------------------------------------------------
-def on_dlc(dlc, configuration: hfp.Configuration):
+def on_dlc(dlc: rfcomm.DLC, configuration: hfp.Configuration):
     print('*** DLC connected', dlc)
     protocol = HfProtocol(dlc, configuration)
     UiServer.protocol = protocol
     asyncio.create_task(protocol.run())
+
+    def on_sco_request(connection: Connection, link_type: int, protocol: HfProtocol):
+        if connection == protocol.dlc.multiplexer.l2cap_channel.connection:
+            if link_type == hci.HCI_Connection_Complete_Event.SCO_LINK_TYPE:
+                esco_parameters = hfp.ESCO_PARAMETERS[
+                    hfp.DefaultCodecParameters.SCO_CVSD_D1
+                ]
+            elif protocol.active_codec == hfp.AudioCodec.MSBC:
+                esco_parameters = hfp.ESCO_PARAMETERS[
+                    hfp.DefaultCodecParameters.ESCO_MSBC_T2
+                ]
+            elif protocol.active_codec == hfp.AudioCodec.CVSD:
+                esco_parameters = hfp.ESCO_PARAMETERS[
+                    hfp.DefaultCodecParameters.ESCO_CVSD_S4
+                ]
+            connection.abort_on(
+                'disconnection',
+                connection.device.send_command(
+                    hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(
+                        bd_addr=connection.peer_address, **esco_parameters.asdict()
+                    )
+                ),
+            )
+
+    handler = functools.partial(on_sco_request, protocol=protocol)
+    dlc.multiplexer.l2cap_channel.connection.device.on('sco_request', handler)
+    dlc.multiplexer.l2cap_channel.once(
+        'close',
+        lambda: dlc.multiplexer.l2cap_channel.connection.device.remove_listener(
+            'sco_request', handler
+        ),
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -101,7 +135,7 @@ async def main():
         device.classic_enabled = True
 
         # Create and register a server
-        rfcomm_server = RfcommServer(device)
+        rfcomm_server = rfcomm.Server(device)
 
         # Listen for incoming DLC connections
         channel_number = rfcomm_server.listen(lambda dlc: on_dlc(dlc, configuration))
