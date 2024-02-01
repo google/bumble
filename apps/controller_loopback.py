@@ -99,7 +99,12 @@ class Loopback:
 
             # make sure data can fit in one l2cap pdu
             l2cap_header_size = 4
-            max_packet_size = host.acl_packet_queue.max_packet_size - l2cap_header_size
+
+            max_packet_size = (
+                host.acl_packet_queue
+                if host.acl_packet_queue
+                else host.le_acl_packet_queue
+            ).max_packet_size - l2cap_header_size
             if self.packet_size > max_packet_size:
                 print(
                     color(
@@ -183,7 +188,7 @@ class Loopback:
     '--packet-count',
     '-c',
     metavar='COUNT',
-    type=int,
+    type=click.IntRange(1, 65535),
     default=10,
     help='Packet count',
 )
