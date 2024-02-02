@@ -228,11 +228,33 @@ async def test_bidirectional_transfer():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_mtu():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    def on_channel_open(channel):
+        assert channel.peer_mtu == 456
+
+    def on_channel(channel):
+        channel.on('open', lambda: on_channel_open(channel))
+
+    server = devices.devices[1].create_l2cap_server(
+        spec=ClassicChannelSpec(mtu=345), handler=on_channel
+    )
+    client_channel = await devices.connections[0].create_l2cap_channel(
+        spec=ClassicChannelSpec(server.psm, mtu=456)
+    )
+    assert client_channel.peer_mtu == 345
+
+
+# -----------------------------------------------------------------------------
 async def run():
     test_helpers()
     await test_basic_connection()
     await test_transfer()
     await test_bidirectional_transfer()
+    await test_mtu()
 
 
 # -----------------------------------------------------------------------------

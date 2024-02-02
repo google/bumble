@@ -416,7 +416,7 @@ class Device(HID):
             data = bytearray()
             data.append(report_id)
             data.extend(ret.data)
-            if len(data) < self.l2cap_ctrl_channel.mtu:  # type: ignore[union-attr]
+            if len(data) < self.l2cap_ctrl_channel.peer_mtu:  # type: ignore[union-attr]
                 self.send_control_data(report_type=report_type, data=data)
             else:
                 self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
