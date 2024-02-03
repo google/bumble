@@ -50,10 +50,8 @@ from bumble.sdp import (
     SDP_PUBLIC_BROWSE_ROOT,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     DataElement,
     ServiceAttribute,
-    Client as SdpClient,
 )
 from bumble.transport import open_transport_or_link
 import bumble.rfcomm
@@ -196,48 +194,6 @@ def make_sdp_records(channel):
             ),
         ]
     }
-
-
-async def find_rfcomm_channel_with_uuid(connection: Connection, uuid: str) -> int:
-    # Connect to the SDP Server
-    sdp_client = SdpClient(connection)
-    await sdp_client.connect()
-
-    # Search for services with an L2CAP service attribute
-    search_result = await sdp_client.search_attributes(
-        [BT_L2CAP_PROTOCOL_ID],
-        [
-            SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-        ],
-    )
-    for attribute_list in search_result:
-        service_uuid = None
-        service_class_id_list = ServiceAttribute.find_attribute_in_list(
-            attribute_list, SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID
-        )
-        if service_class_id_list:
-            if service_class_id_list.value:
-                for service_class_id in service_class_id_list.value:
-                    service_uuid = service_class_id.value
-        if str(service_uuid) != uuid:
-            # This service doesn't have a UUID or isn't the right one.
-            continue
-
-        # Look for the RFCOMM Channel number
-        protocol_descriptor_list = ServiceAttribute.find_attribute_in_list(
-            attribute_list, SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID
-        )
-        if protocol_descriptor_list:
-            for protocol_descriptor in protocol_descriptor_list.value:
-                if len(protocol_descriptor.value) >= 2:
-                    if protocol_descriptor.value[0].value == BT_RFCOMM_PROTOCOL_ID:
-                        await sdp_client.disconnect()
-                        return protocol_descriptor.value[1].value
-
-    await sdp_client.disconnect()
-    return 0
 
 
 def log_stats(title, stats):
@@ -957,7 +913,9 @@ class RfcommClient(StreamedPacketIO):
             logging.info(
                 color(f'@@@ Discovering channel number from UUID {self.uuid}', 'cyan')
             )
-            channel = await find_rfcomm_channel_with_uuid(connection, self.uuid)
+            channel = await bumble.rfcomm.find_rfcomm_channel_with_uuid(
+                connection, self.uuid
+            )
             logging.info(color(f'@@@ Channel number = {channel}', 'cyan'))
             if channel == 0:
                 logging.info(color('!!! No RFComm service with this UUID found', 'red'))

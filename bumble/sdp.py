@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import struct
 from typing import Dict, List, Type, Optional, Tuple, Union, NewType, TYPE_CHECKING
+from typing_extensions import Self
 
 from . import core, l2cap
 from .colors import color
@@ -919,6 +920,13 @@ class Client:
             return []
 
         return ServiceAttribute.list_from_data_elements(attribute_list_sequence.value)
+
+    async def __aenter__(self) -> Self:
+        await self.connect()
+        return self
+
+    async def __aexit__(self, *args) -> None:
+        await self.disconnect()
 
 
 # -----------------------------------------------------------------------------

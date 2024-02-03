@@ -22,10 +22,13 @@ import asyncio
 import dataclasses
 import enum
 from typing import Callable, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing_extensions import Self
 
 from pyee import EventEmitter
 
-from . import core, l2cap
+from bumble import core
+from bumble import l2cap
+from bumble import sdp
 from .colors import color
 from .core import (
     UUID,
@@ -34,15 +37,6 @@ from .core import (
     BT_L2CAP_PROTOCOL_ID,
     InvalidStateError,
     ProtocolError,
-)
-from .sdp import (
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_PUBLIC_BROWSE_ROOT,
-    DataElement,
-    ServiceAttribute,
 )
 
 if TYPE_CHECKING:
@@ -122,29 +116,33 @@ RFCOMM_DYNAMIC_CHANNEL_NUMBER_END   = 30
 # -----------------------------------------------------------------------------
 def make_service_sdp_records(
     service_record_handle: int, channel: int, uuid: Optional[UUID] = None
-) -> List[ServiceAttribute]:
+) -> List[sdp.ServiceAttribute]:
     """
     Create SDP records for an RFComm service given a channel number and an
     optional UUID. A Service Class Attribute is included only if the UUID is not None.
     """
     records = [
-        ServiceAttribute(
-            SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-            DataElement.unsigned_integer_32(service_record_handle),
+        sdp.ServiceAttribute(
+            sdp.SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+            sdp.DataElement.unsigned_integer_32(service_record_handle),
         ),
-        ServiceAttribute(
-            SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-            DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
+        sdp.ServiceAttribute(
+            sdp.SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+            sdp.DataElement.sequence(
+                [sdp.DataElement.uuid(sdp.SDP_PUBLIC_BROWSE_ROOT)]
+            ),
         ),
-        ServiceAttribute(
-            SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            DataElement.sequence(
+        sdp.ServiceAttribute(
+            sdp.SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+            sdp.DataElement.sequence(
                 [
-                    DataElement.sequence([DataElement.uuid(BT_L2CAP_PROTOCOL_ID)]),
-                    DataElement.sequence(
+                    sdp.DataElement.sequence(
+                        [sdp.DataElement.uuid(BT_L2CAP_PROTOCOL_ID)]
+                    ),
+                    sdp.DataElement.sequence(
                         [
-                            DataElement.uuid(BT_RFCOMM_PROTOCOL_ID),
-                            DataElement.unsigned_integer_8(channel),
+                            sdp.DataElement.uuid(BT_RFCOMM_PROTOCOL_ID),
+                            sdp.DataElement.unsigned_integer_8(channel),
                         ]
                     ),
                 ]
@@ -154,13 +152,79 @@ def make_service_sdp_records(
 
     if uuid:
         records.append(
-            ServiceAttribute(
-                SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-                DataElement.sequence([DataElement.uuid(uuid)]),
+            sdp.ServiceAttribute(
+                sdp.SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+                sdp.DataElement.sequence([sdp.DataElement.uuid(uuid)]),
             )
         )
 
     return records
+
+
+# -----------------------------------------------------------------------------
+async def find_rfcomm_channels(connection: Connection) -> Dict[int, List[UUID]]:
+    """Searches all RFCOMM channels and their associated UUID from SDP service records.
+
+    Args:
+        connection: ACL connection to make SDP search.
+
+    Returns:
+        Dictionary mapping from channel number to service class UUID list.
+    """
+    results = {}
+    async with sdp.Client(connection) as sdp_client:
+        search_result = await sdp_client.search_attributes(
+            uuids=[core.BT_RFCOMM_PROTOCOL_ID],
+            attribute_ids=[
+                sdp.SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                sdp.SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+            ],
+        )
+        for attribute_lists in search_result:
+            service_classes: List[UUID] = []
+            channel: Optional[int] = None
+            for attribute in attribute_lists:
+                # The layout is [[L2CAP_PROTOCOL], [RFCOMM_PROTOCOL, RFCOMM_CHANNEL]].
+                if attribute.id == sdp.SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID:
+                    protocol_descriptor_list = attribute.value.value
+                    channel = protocol_descriptor_list[1].value[1].value
+                elif attribute.id == sdp.SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID:
+                    service_class_id_list = attribute.value.value
+                    service_classes = [
+                        service_class.value for service_class in service_class_id_list
+                    ]
+            if not service_classes or not channel:
+                logger.warning(f"Bad result {attribute_lists}.")
+            else:
+                results[channel] = service_classes
+    return results
+
+
+# -----------------------------------------------------------------------------
+async def find_rfcomm_channel_with_uuid(
+    connection: Connection, uuid: str | UUID
+) -> Optional[int]:
+    """Searches an RFCOMM channel associated with given UUID from service records.
+
+    Args:
+        connection: ACL connection to make SDP search.
+        uuid: UUID of service record to search for.
+
+    Returns:
+        RFCOMM channel number if found, otherwise None.
+    """
+    if isinstance(uuid, str):
+        uuid = UUID(uuid)
+    return next(
+        (
+            channel
+            for channel, class_id_list in (
+                await find_rfcomm_channels(connection)
+            ).items()
+            if uuid in class_id_list
+        ),
+        None,
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -876,7 +940,15 @@ class Client:
         self.multiplexer = None
 
         # Close the L2CAP channel
-        # TODO
+        if self.l2cap_channel:
+            await self.l2cap_channel.disconnect()
+            self.l2cap_channel = None
+
+    async def __aenter__(self) -> Multiplexer:
+        return await self.start()
+
+    async def __aexit__(self, *args) -> None:
+        await self.shutdown()
 
 
 # -----------------------------------------------------------------------------
@@ -890,7 +962,7 @@ class Server(EventEmitter):
         self.acceptors = {}
 
         # Register ourselves with the L2CAP channel manager
-        device.create_l2cap_server(
+        self.l2cap_server = device.create_l2cap_server(
             spec=l2cap.ClassicChannelSpec(psm=RFCOMM_PSM), handler=self.on_connection
         )
 
@@ -941,3 +1013,9 @@ class Server(EventEmitter):
         acceptor = self.acceptors.get(dlc.dlci >> 1)
         if acceptor:
             acceptor(dlc)
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args) -> None:
+        self.l2cap_server.close()

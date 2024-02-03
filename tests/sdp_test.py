@@ -38,6 +38,7 @@ from .test_utils import TwoDevices
 # pylint: disable=invalid-name
 # -----------------------------------------------------------------------------
 
+
 # -----------------------------------------------------------------------------
 def basic_check(x: DataElement) -> None:
     serialized = bytes(x)
@@ -267,6 +268,20 @@ async def test_service_search_attribute():
     for expect, actual in zip(attributes, sdp_records().values()):
         assert expect.id == actual.id
         assert expect.value == actual.value
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_client_async_context():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    client = Client(devices.connections[1])
+
+    async with client:
+        assert client.channel is not None
+
+    assert client.channel is None
 
 
 # -----------------------------------------------------------------------------
