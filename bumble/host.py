@@ -167,6 +167,7 @@ class Host(AbortableEventEmitter):
         self.local_version = None
         self.local_supported_commands = bytes(64)
         self.local_le_features = 0
+        self.local_lmp_features = hci.LmpFeatureMask(0)  # Classic LMP features
         self.suggested_max_tx_octets = 251  # Max allowed
         self.suggested_max_tx_time = 2120  # Max allowed
         self.command_semaphore = asyncio.Semaphore(1)
@@ -246,6 +247,32 @@ class Host(AbortableEventEmitter):
                 hci.HCI_Read_Local_Version_Information_Command(), check_result=True
             )
             self.local_version = response.return_parameters
+
+        if self.supports_command(hci.HCI_READ_LOCAL_EXTENDED_FEATURES_COMMAND):
+            max_page_number = 0
+            page_number = 0
+            lmp_features = 0
+            while page_number <= max_page_number:
+                response = await self.send_command(
+                    hci.HCI_Read_Local_Extended_Features_Command(
+                        page_number=page_number
+                    ),
+                    check_result=True,
+                )
+                lmp_features |= int.from_bytes(
+                    response.return_parameters.extended_lmp_features, 'little'
+                ) << (64 * page_number)
+                max_page_number = response.return_parameters.maximum_page_number
+                page_number += 1
+            self.local_lmp_features = hci.LmpFeatureMask(lmp_features)
+
+        elif self.supports_command(hci.HCI_READ_LOCAL_SUPPORTED_FEATURES_COMMAND):
+            response = await self.send_command(
+                hci.HCI_Read_Local_Supported_Features_Command(), check_result=True
+            )
+            self.local_lmp_features = hci.LmpFeatureMask(
+                int.from_bytes(response.return_parameters.lmp_features, 'little')
+            )
 
         await self.send_command(
             hci.HCI_Set_Event_Mask_Command(
@@ -584,6 +611,9 @@ class Host(AbortableEventEmitter):
 
     def supports_le_features(self, feature: hci.LeFeatureMask) -> bool:
         return (self.local_le_features & feature) == feature
+
+    def supports_lmp_features(self, feature: hci.LmpFeatureMask) -> bool:
+        return self.local_lmp_features & (feature) == feature
 
     @property
     def supported_le_features(self):
