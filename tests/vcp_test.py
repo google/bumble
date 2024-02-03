@@ -15,13 +15,11 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-import asyncio
-import os
 import pytest
+import pytest_asyncio
 import logging
 
 from bumble import device
-from bumble import gatt
 from bumble.profiles import vcp
 from .test_utils import TwoDevices
 
@@ -32,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-@pytest.fixture
+@pytest_asyncio.fixture
 async def vcp_client():
     devices = TwoDevices()
     devices[0].add_service(
