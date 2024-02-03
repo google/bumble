@@ -23,6 +23,8 @@ from bumble.hci import (
     HCI_LE_READ_BUFFER_SIZE_COMMAND,
     HCI_RESET_COMMAND,
     HCI_SUCCESS,
+    HCI_LE_CONNECTION_COMPLETE_EVENT,
+    HCI_LE_ENHANCED_CONNECTION_COMPLETE_V2_EVENT,
     Address,
     CodingFormat,
     CodecID,
@@ -274,8 +276,14 @@ def test_HCI_Set_Event_Mask_Command():
 # -----------------------------------------------------------------------------
 def test_HCI_LE_Set_Event_Mask_Command():
     command = HCI_LE_Set_Event_Mask_Command(
-        le_event_mask=bytes.fromhex('0011223344556677')
+        le_event_mask=HCI_LE_Set_Event_Mask_Command.mask(
+            [
+                HCI_LE_CONNECTION_COMPLETE_EVENT,
+                HCI_LE_ENHANCED_CONNECTION_COMPLETE_V2_EVENT,
+            ]
+        )
     )
+    assert command.le_event_mask == bytes.fromhex('0100000000010000')
     basic_check(command)
 
 

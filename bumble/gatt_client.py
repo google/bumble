@@ -1068,7 +1068,7 @@ class Client:
                 logger.warning('!!! unexpected response, there is no pending request')
                 return
 
-            # Sanity check: the response should match the pending request unless it is
+            # The response should match the pending request unless it is
             # an error response
             if att_pdu.op_code != ATT_ERROR_RESPONSE:
                 expected_response_name = self.pending_request.name.replace(

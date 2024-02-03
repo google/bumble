@@ -28,7 +28,7 @@ from bumble.core import (
     BT_PERIPHERAL_ROLE,
     ConnectionParameters,
 )
-from bumble.device import Connection, Device
+from bumble.device import AdvertisingParameters, Connection, Device
 from bumble.host import AclPacketQueue, Host
 from bumble.hci import (
     HCI_ACCEPT_CONNECTION_REQUEST_COMMAND,
@@ -50,7 +50,8 @@ from bumble.gatt import (
     GATT_APPEARANCE_CHARACTERISTIC,
 )
 
-from .test_utils import TwoDevices
+from .test_utils import TwoDevices, async_barrier
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -254,12 +255,12 @@ async def test_legacy_advertising():
     device = Device(host=mock.AsyncMock(Host))
 
     # Start advertising
-    advertiser = await device.start_legacy_advertising()
-    assert device.legacy_advertiser
+    await device.start_advertising()
+    assert device.is_advertising
 
     # Stop advertising
-    await advertiser.stop()
-    assert not device.legacy_advertiser
+    await device.stop_advertising()
+    assert not device.is_advertising
 
 
 # -----------------------------------------------------------------------------
@@ -273,7 +274,7 @@ async def test_legacy_advertising_connection(own_address_type):
     peer_address = Address('F0:F1:F2:F3:F4:F5')
 
     # Start advertising
-    advertiser = await device.start_legacy_advertising()
+    await device.start_advertising()
     device.on_connection(
         0x0001,
         BT_LE_TRANSPORT,
@@ -301,7 +302,7 @@ async def test_legacy_advertising_connection(own_address_type):
 async def test_legacy_advertising_disconnection(auto_restart):
     device = Device(host=mock.AsyncMock(spec=Host))
     peer_address = Address('F0:F1:F2:F3:F4:F5')
-    advertiser = await device.start_legacy_advertising(auto_restart=auto_restart)
+    await device.start_advertising(auto_restart=auto_restart)
     device.on_connection(
         0x0001,
         BT_LE_TRANSPORT,
@@ -310,20 +311,18 @@ async def test_legacy_advertising_disconnection(auto_restart):
         ConnectionParameters(0, 0, 0),
     )
 
-    device.start_legacy_advertising = mock.AsyncMock()
+    device.on_advertising_set_termination(
+        HCI_SUCCESS, device.legacy_advertising_set.advertising_handle, 0x0001, 0
+    )
 
     device.on_disconnection(0x0001, 0)
+    await async_barrier()
+    await async_barrier()
 
     if auto_restart:
-        device.start_legacy_advertising.assert_called_with(
-            advertising_type=advertiser.advertising_type,
-            own_address_type=advertiser.own_address_type,
-            auto_restart=advertiser.auto_restart,
-            advertising_data=advertiser.advertising_data,
-            scan_response_data=advertiser.scan_response_data,
-        )
+        assert device.is_advertising
     else:
-        device.start_legacy_advertising.assert_not_called()
+        assert not device.is_advertising
 
 
 # -----------------------------------------------------------------------------
@@ -332,12 +331,13 @@ async def test_extended_advertising():
     device = Device(host=mock.AsyncMock(Host))
 
     # Start advertising
-    advertiser = await device.start_extended_advertising()
-    assert device.extended_advertisers
+    advertising_set = await device.create_advertising_set()
+    assert device.extended_advertising_sets
+    assert advertising_set.enabled
 
     # Stop advertising
-    await advertiser.stop()
-    assert not device.extended_advertisers
+    await advertising_set.stop()
+    assert not advertising_set.enabled
 
 
 # -----------------------------------------------------------------------------
@@ -349,8 +349,8 @@ async def test_extended_advertising():
 async def test_extended_advertising_connection(own_address_type):
     device = Device(host=mock.AsyncMock(spec=Host))
     peer_address = Address('F0:F1:F2:F3:F4:F5')
-    advertiser = await device.start_extended_advertising(
-        own_address_type=own_address_type
+    advertising_set = await device.create_advertising_set(
+        advertising_parameters=AdvertisingParameters(own_address_type=own_address_type)
     )
     device.on_connection(
         0x0001,
@@ -361,8 +361,9 @@ async def test_extended_advertising_connection(own_address_type):
     )
     device.on_advertising_set_termination(
         HCI_SUCCESS,
-        advertiser.handle,
+        advertising_set.advertising_handle,
         0x0001,
+        0,
     )
 
     if own_address_type == OwnAddressType.PUBLIC:
@@ -373,45 +374,6 @@ async def test_extended_advertising_connection(own_address_type):
     # For unknown reason, read_phy() in on_connection() would be killed at the end of
     # test, so we force scheduling here to avoid an warning.
     await asyncio.sleep(0.0001)
-
-
-# -----------------------------------------------------------------------------
-@pytest.mark.parametrize(
-    'auto_restart,',
-    (True, False),
-)
-@pytest.mark.asyncio
-async def test_extended_advertising_disconnection(auto_restart):
-    device = Device(host=mock.AsyncMock(spec=Host))
-    peer_address = Address('F0:F1:F2:F3:F4:F5')
-    advertiser = await device.start_extended_advertising(auto_restart=auto_restart)
-    device.on_connection(
-        0x0001,
-        BT_LE_TRANSPORT,
-        peer_address,
-        BT_PERIPHERAL_ROLE,
-        ConnectionParameters(0, 0, 0),
-    )
-    device.on_advertising_set_termination(
-        HCI_SUCCESS,
-        advertiser.handle,
-        0x0001,
-    )
-
-    device.start_extended_advertising = mock.AsyncMock()
-
-    device.on_disconnection(0x0001, 0)
-
-    if auto_restart:
-        device.start_extended_advertising.assert_called_with(
-            advertising_properties=advertiser.advertising_properties,
-            own_address_type=advertiser.own_address_type,
-            auto_restart=advertiser.auto_restart,
-            advertising_data=advertiser.advertising_data,
-            scan_response_data=advertiser.scan_response_data,
-        )
-    else:
-        device.start_extended_advertising.assert_not_called()
 
 
 # -----------------------------------------------------------------------------

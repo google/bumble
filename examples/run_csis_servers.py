@@ -98,13 +98,7 @@ async def main() -> None:
             )
             + csis.get_advertising_data()
         )
-        await device.start_extended_advertising(
-            advertising_properties=(
-                HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.CONNECTABLE_ADVERTISING
-            ),
-            own_address_type=OwnAddressType.RANDOM,
-            advertising_data=advertising_data,
-        )
+        await device.create_advertising_set(advertising_data=advertising_data)
 
     await asyncio.gather(
         *[hci_transport.source.terminated for hci_transport in hci_transports]

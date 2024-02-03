@@ -23,7 +23,7 @@ import functools
 import logging
 import secrets
 import struct
-from typing import Any, Dict, Callable, Optional, Type, Union, List
+from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Union
 
 from bumble import crypto
 from .colors import color
@@ -223,41 +223,47 @@ HCI_VENDOR_EVENT = 0xFF
 
 
 # HCI Subevent Codes
-HCI_LE_CONNECTION_COMPLETE_EVENT                         = 0x01
-HCI_LE_ADVERTISING_REPORT_EVENT                          = 0x02
-HCI_LE_CONNECTION_UPDATE_COMPLETE_EVENT                  = 0x03
-HCI_LE_READ_REMOTE_FEATURES_COMPLETE_EVENT               = 0x04
-HCI_LE_LONG_TERM_KEY_REQUEST_EVENT                       = 0x05
-HCI_LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT         = 0x06
-HCI_LE_DATA_LENGTH_CHANGE_EVENT                          = 0x07
-HCI_LE_READ_LOCAL_P_256_PUBLIC_KEY_COMPLETE_EVENT        = 0x08
-HCI_LE_GENERATE_DHKEY_COMPLETE_EVENT                     = 0x09
-HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT                = 0x0A
-HCI_LE_DIRECTED_ADVERTISING_REPORT_EVENT                 = 0x0B
-HCI_LE_PHY_UPDATE_COMPLETE_EVENT                         = 0x0C
-HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT                 = 0x0D
-HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_EVENT       = 0x0E
-HCI_LE_PERIODIC_ADVERTISING_REPORT_EVENT                 = 0x0F
-HCI_LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT              = 0x10
-HCI_LE_SCAN_TIMEOUT_EVENT                                = 0x11
-HCI_LE_ADVERTISING_SET_TERMINATED_EVENT                  = 0x12
-HCI_LE_SCAN_REQUEST_RECEIVED_EVENT                       = 0x13
-HCI_LE_CHANNEL_SELECTION_ALGORITHM_EVENT                 = 0x14
-HCI_LE_CONNECTIONLESS_IQ_REPORT_EVENT                    = 0X15
-HCI_LE_CONNECTION_IQ_REPORT_EVENT                        = 0X16
-HCI_LE_CTE_REQUEST_FAILED_EVENT                          = 0X17
-HCI_LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_EVENT = 0X18
-HCI_LE_CIS_ESTABLISHED_EVENT                             = 0X19
-HCI_LE_CIS_REQUEST_EVENT                                 = 0X1A
-HCI_LE_CREATE_BIG_COMPLETE_EVENT                         = 0X1B
-HCI_LE_TERMINATE_BIG_COMPLETE_EVENT                      = 0X1C
-HCI_LE_BIG_SYNC_ESTABLISHED_EVENT                        = 0X1D
-HCI_LE_BIG_SYNC_LOST_EVENT                               = 0X1E
-HCI_LE_REQUEST_PEER_SCA_COMPLETE_EVENT                   = 0X1F
-HCI_LE_PATH_LOSS_THRESHOLD_EVENT                         = 0X20
-HCI_LE_TRANSMIT_POWER_REPORTING_EVENT                    = 0X21
-HCI_LE_BIGINFO_ADVERTISING_REPORT_EVENT                  = 0X22
-HCI_LE_SUBRATE_CHANGE_EVENT                              = 0X23
+HCI_LE_CONNECTION_COMPLETE_EVENT                            = 0x01
+HCI_LE_ADVERTISING_REPORT_EVENT                             = 0x02
+HCI_LE_CONNECTION_UPDATE_COMPLETE_EVENT                     = 0x03
+HCI_LE_READ_REMOTE_FEATURES_COMPLETE_EVENT                  = 0x04
+HCI_LE_LONG_TERM_KEY_REQUEST_EVENT                          = 0x05
+HCI_LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT            = 0x06
+HCI_LE_DATA_LENGTH_CHANGE_EVENT                             = 0x07
+HCI_LE_READ_LOCAL_P_256_PUBLIC_KEY_COMPLETE_EVENT           = 0x08
+HCI_LE_GENERATE_DHKEY_COMPLETE_EVENT                        = 0x09
+HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT                   = 0x0A
+HCI_LE_DIRECTED_ADVERTISING_REPORT_EVENT                    = 0x0B
+HCI_LE_PHY_UPDATE_COMPLETE_EVENT                            = 0x0C
+HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT                    = 0x0D
+HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_EVENT          = 0x0E
+HCI_LE_PERIODIC_ADVERTISING_REPORT_EVENT                    = 0x0F
+HCI_LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT                 = 0x10
+HCI_LE_SCAN_TIMEOUT_EVENT                                   = 0x11
+HCI_LE_ADVERTISING_SET_TERMINATED_EVENT                     = 0x12
+HCI_LE_SCAN_REQUEST_RECEIVED_EVENT                          = 0x13
+HCI_LE_CHANNEL_SELECTION_ALGORITHM_EVENT                    = 0x14
+HCI_LE_CONNECTIONLESS_IQ_REPORT_EVENT                       = 0X15
+HCI_LE_CONNECTION_IQ_REPORT_EVENT                           = 0X16
+HCI_LE_CTE_REQUEST_FAILED_EVENT                             = 0X17
+HCI_LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_EVENT    = 0X18
+HCI_LE_CIS_ESTABLISHED_EVENT                                = 0X19
+HCI_LE_CIS_REQUEST_EVENT                                    = 0X1A
+HCI_LE_CREATE_BIG_COMPLETE_EVENT                            = 0X1B
+HCI_LE_TERMINATE_BIG_COMPLETE_EVENT                         = 0X1C
+HCI_LE_BIG_SYNC_ESTABLISHED_EVENT                           = 0X1D
+HCI_LE_BIG_SYNC_LOST_EVENT                                  = 0X1E
+HCI_LE_REQUEST_PEER_SCA_COMPLETE_EVENT                      = 0X1F
+HCI_LE_PATH_LOSS_THRESHOLD_EVENT                            = 0X20
+HCI_LE_TRANSMIT_POWER_REPORTING_EVENT                       = 0X21
+HCI_LE_BIGINFO_ADVERTISING_REPORT_EVENT                     = 0X22
+HCI_LE_SUBRATE_CHANGE_EVENT                                 = 0X23
+HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V2_EVENT       = 0X24
+HCI_LE_PERIODIC_ADVERTISING_REPORT_V2_EVENT                 = 0X25
+HCI_LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_V2_EVENT = 0X26
+HCI_LE_PERIODIC_ADVERTISING_SUBEVENT_DATA_REQUEST_EVENT     = 0X27
+HCI_LE_PERIODIC_ADVERTISING_RESPONSE_REPORT_EVENT           = 0X28
+HCI_LE_ENHANCED_CONNECTION_COMPLETE_V2_EVENT                = 0X29
 
 
 # HCI Command
@@ -650,47 +656,6 @@ HCI_ERROR_NAMES[HCI_SUCCESS] = 'HCI_SUCCESS'
 # Command Status codes
 HCI_COMMAND_STATUS_PENDING = 0
 
-# LE Event Masks
-HCI_LE_CONNECTION_COMPLETE_EVENT_MASK                         = (1 << 0)
-HCI_LE_ADVERTISING_REPORT_EVENT_MASK                          = (1 << 1)
-HCI_LE_CONNECTION_UPDATE_COMPLETE_EVENT_MASK                  = (1 << 2)
-HCI_LE_READ_REMOTE_FEATURES_COMPLETE_EVENT_MASK               = (1 << 3)
-HCI_LE_LONG_TERM_KEY_REQUEST_EVENT_MASK                       = (1 << 4)
-HCI_LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT_MASK         = (1 << 5)
-HCI_LE_DATA_LENGTH_CHANGE_EVENT_MASK                          = (1 << 6)
-HCI_LE_READ_LOCAL_P_256_PUBLIC_KEY_COMPLETE_EVENT_MASK        = (1 << 7)
-HCI_LE_GENERATE_DHKEY_COMPLETE_EVENT_MASK                     = (1 << 8)
-HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT_MASK                = (1 << 9)
-HCI_LE_DIRECTED_ADVERTISING_REPORT_EVENT_MASK                 = (1 << 10)
-HCI_LE_PHY_UPDATE_COMPLETE_EVENT_MASK                         = (1 << 11)
-HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT_MASK                 = (1 << 12)
-HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_EVENT_MASK       = (1 << 13)
-HCI_LE_PERIODIC_ADVERTISING_REPORT_EVENT_MASK                 = (1 << 14)
-HCI_LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT_MASK              = (1 << 15)
-HCI_LE_EXTENDED_SCAN_TIMEOUT_EVENT_MASK                       = (1 << 16)
-HCI_LE_EXTENDED_ADVERTISING_SET_TERMINATED_EVENT_MASK         = (1 << 17)
-HCI_LE_SCAN_REQUEST_RECEIVED_EVENT_MASK                       = (1 << 18)
-HCI_LE_CHANNEL_SELECTION_ALGORITHM_EVENT_MASK                 = (1 << 19)
-HCI_LE_CONNECTIONLESS_IQ_REPORT_EVENT_MASK                    = (1 << 20)
-HCI_LE_CONNECTION_IQ_REPORT_EVENT_MASK                        = (1 << 21)
-HCI_LE_CTE_REQUEST_FAILED_EVENT_MASK                          = (1 << 22)
-HCI_LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_EVENT_MASK = (1 << 23)
-HCI_LE_CIS_ESTABLISHED_EVENT_MASK                             = (1 << 24)
-HCI_LE_CIS_REQUEST_EVENT_MASK                                 = (1 << 25)
-HCI_LE_CREATE_BIG_COMPLETE_EVENT_MASK                         = (1 << 26)
-HCI_LE_TERMINATE_BIG_COMPLETE_EVENT_MASK                      = (1 << 27)
-HCI_LE_BIG_SYNC_ESTABLISHED_EVENT_MASK                        = (1 << 28)
-HCI_LE_BIG_SYNC_LOST_EVENT_MASK                               = (1 << 29)
-HCI_LE_REQUEST_PEER_SCA_COMPLETE_EVENT_MASK                   = (1 << 30)
-HCI_LE_PATH_LOSS_THRESHOLD_EVENT_MASK                         = (1 << 31)
-HCI_LE_TRANSMIT_POWER_REPORTING_EVENT_MASK                    = (1 << 32)
-HCI_LE_BIGINFO_ADVERTISING_REPORT_EVENT_MASK                  = (1 << 33)
-HCI_LE_SUBRATE_CHANGE_EVENT_MASK                              = (1 << 34)
-
-HCI_LE_EVENT_MASK_NAMES = {
-    mask: mask_name for (mask_name, mask) in globals().items()
-    if mask_name.startswith('HCI_LE_') and mask_name.endswith('_EVENT_MASK')
-}
 
 # ACL
 HCI_ACL_PB_FIRST_NON_FLUSHABLE = 0
@@ -732,15 +697,15 @@ HCI_LE_PHY_TYPE_TO_BIT = {
 
 
 class Phy(enum.IntEnum):
-    LE_1M    = 0x01
-    LE_2M    = 0x02
-    LE_CODED = 0x03
+    LE_1M    = HCI_LE_1M_PHY
+    LE_2M    = HCI_LE_2M_PHY
+    LE_CODED = HCI_LE_CODED_PHY
 
 
 class PhyBit(enum.IntFlag):
-    LE_1M    = 0b00000001
-    LE_2M    = 0b00000010
-    LE_CODED = 0b00000100
+    LE_1M    = 1 << HCI_LE_1M_PHY_BIT
+    LE_2M    = 1 << HCI_LE_2M_PHY_BIT
+    LE_CODED = 1 << HCI_LE_CODED_PHY_BIT
 
 
 # Connection Parameters
@@ -2910,6 +2875,20 @@ class HCI_Set_Event_Mask_Command(HCI_Command):
     See Bluetooth spec @ 7.3.1 Set Event Mask Command
     '''
 
+    @staticmethod
+    def mask(event_codes: Iterable[int]) -> bytes:
+        '''
+        Compute the event mask value for a list of events.
+        '''
+        # NOTE: this implementation takes advantage of the fact that as of version 5.4
+        # of the core specification, the bit number for each event code is equal to one
+        # less than the event code.
+        # If future versions of the specification deviate from that, a different
+        # implementation would be needed.
+        return sum((1 << event_code - 1) for event_code in event_codes).to_bytes(
+            8, 'little'
+        )
+
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command()
@@ -3432,6 +3411,20 @@ class HCI_LE_Set_Event_Mask_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.1 LE Set Event Mask Command
     '''
+
+    @staticmethod
+    def mask(event_codes: Iterable[int]) -> bytes:
+        '''
+        Compute the event mask value for a list of events.
+        '''
+        # NOTE: this implementation takes advantage of the fact that as of version 5.4
+        # of the core specification, the bit number for each event code is equal to one
+        # less than the event code.
+        # If future versions of the specification deviate from that, a different
+        # implementation would be needed.
+        return sum((1 << event_code - 1) for event_code in event_codes).to_bytes(
+            8, 'little'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -4040,12 +4033,15 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
         ('advertising_sid', 1),
         ('scan_request_notification_enable', 1),
     ],
-    return_parameters_fields=[('status', STATUS_SPEC), ('selected_tx__power', 1)],
+    return_parameters_fields=[('status', STATUS_SPEC), ('selected_tx_power', 1)],
 )
 class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.53 LE Set Extended Advertising Parameters Command
     '''
+
+    TX_POWER_NO_PREFERENCE = 0x7F
+    SHOULD_NOT_FRAGMENT = 0x01
 
     class AdvertisingProperties(enum.IntFlag):
         CONNECTABLE_ADVERTISING = 1 << 0
@@ -4291,7 +4287,7 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
             ('scanning_filter_policy:', self.scanning_filter_policy),
             ('scanning_phys:         ', ','.join(scanning_phys_strs)),
         ]
-        for (i, scanning_phy_str) in enumerate(scanning_phys_strs):
+        for i, scanning_phy_str in enumerate(scanning_phys_strs):
             fields.append(
                 (
                     f'{scanning_phy_str}.scan_type:    ',
@@ -4434,7 +4430,7 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
             ('peer_address:           ', str(self.peer_address)),
             ('initiating_phys:        ', ','.join(initiating_phys_strs)),
         ]
-        for (i, initiating_phys_str) in enumerate(initiating_phys_strs):
+        for i, initiating_phys_str in enumerate(initiating_phys_strs):
             fields.append(
                 (
                     f'{initiating_phys_str}.scan_interval:          ',
@@ -5321,7 +5317,7 @@ HCI_LE_Meta_Event.subevent_classes[
         ('status', 1),
         ('advertising_handle', 1),
         ('connection_handle', 2),
-        ('number_completed_extended_advertising_events', 1),
+        ('num_completed_extended_advertising_events', 1),
     ]
 )
 class HCI_LE_Advertising_Set_Terminated_Event(HCI_LE_Meta_Event):
@@ -6262,7 +6258,7 @@ class HCI_IsoDataPacket(HCI_Packet):
 
         if ts_flag:
             if not should_include_sdu_info:
-                logger.warn(f'Timestamp included when pb_flag={bin(pb_flag)}')
+                logger.warning(f'Timestamp included when pb_flag={bin(pb_flag)}')
             time_stamp, *_ = struct.unpack_from('<I', packet, pos)
             pos += 4
 
@@ -6375,7 +6371,7 @@ class HCI_AclDataPacketAssembler:
             self.current_data = None
             self.l2cap_pdu_length = 0
         else:
-            # Sanity check
+            # Compliance check
             if len(self.current_data) > self.l2cap_pdu_length + 4:
                 logger.warning('!!! ACL data exceeds L2CAP PDU')
                 self.current_data = None

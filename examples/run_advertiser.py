@@ -19,9 +19,11 @@ import asyncio
 import logging
 import sys
 import os
+import struct
+
+from bumble.core import AdvertisingData
 from bumble.device import AdvertisingType, Device
 from bumble.hci import Address
-
 from bumble.transport import open_transport_or_link
 
 
@@ -52,6 +54,16 @@ async def main():
         print('<<< connected')
 
         device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+
+        if advertising_type.is_scannable:
+            device.scan_response_data = bytes(
+                AdvertisingData(
+                    [
+                        (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340)),
+                    ]
+                )
+            )
+
         await device.power_on()
         await device.start_advertising(advertising_type=advertising_type, target=target)
         await hci_source.wait_for_termination()

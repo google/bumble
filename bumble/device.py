@@ -23,7 +23,7 @@ import asyncio
 import logging
 import secrets
 from contextlib import asynccontextmanager, AsyncExitStack, closing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections.abc import Iterable
 from typing import (
     Any,
@@ -41,6 +41,8 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from pyee import EventEmitter
+
 from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
 from .gatt import Characteristic, Descriptor, Service
@@ -48,6 +50,7 @@ from .hci import (
     HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE,
     HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
     HCI_CENTRAL_ROLE,
+    HCI_PERIPHERAL_ROLE,
     HCI_COMMAND_STATUS_PENDING,
     HCI_CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR,
     HCI_DISPLAY_YES_NO_IO_CAPABILITY,
@@ -74,7 +77,6 @@ from .hci import (
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     HCI_SUCCESS,
     HCI_WRITE_LE_HOST_SUPPORT_COMMAND,
-    Address,
     HCI_Accept_Connection_Request_Command,
     HCI_Authentication_Requested_Command,
     HCI_Command_Status_Event,
@@ -120,6 +122,7 @@ from .hci import (
     HCI_LE_Set_Extended_Advertising_Enable_Command,
     HCI_LE_Set_Extended_Advertising_Parameters_Command,
     HCI_LE_Set_Host_Feature_Command,
+    HCI_LE_Set_Periodic_Advertising_Enable_Command,
     HCI_LE_Set_PHY_Command,
     HCI_LE_Set_Random_Address_Command,
     HCI_LE_Set_Scan_Enable_Command,
@@ -147,9 +150,11 @@ from .hci import (
     HCI_Write_Scan_Enable_Command,
     HCI_Write_Secure_Connections_Host_Support_Command,
     HCI_Write_Simple_Pairing_Mode_Command,
+    Address,
     OwnAddressType,
     LeFeature,
     LeFeatureMask,
+    Phy,
     phy_list_to_bits,
 )
 from .host import Host
@@ -232,9 +237,15 @@ DEVICE_DEFAULT_CONNECTION_MAX_CE_LENGTH       = 0   # ms
 DEVICE_DEFAULT_L2CAP_COC_MTU                  = l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MTU
 DEVICE_DEFAULT_L2CAP_COC_MPS                  = l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS
 DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS          = l2cap.L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_INITIAL_CREDITS
+DEVICE_DEFAULT_ADVERTISING_TX_POWER           = (
+    HCI_LE_Set_Extended_Advertising_Parameters_Command.TX_POWER_NO_PREFERENCE
+)
 
 # fmt: on
 # pylint: enable=line-too-long
+
+# As specified in 7.8.56 LE Set Extended Advertising Enable command
+DEVICE_MAX_HIGH_DUTY_CYCLE_CONNECTABLE_DIRECTED_ADVERTISING_DURATION = 1.28
 
 
 # -----------------------------------------------------------------------------
@@ -423,6 +434,10 @@ class AdvertisingType(IntEnum):
             AdvertisingType.DIRECTED_CONNECTABLE_LOW_DUTY,
         )
 
+    @property
+    def is_high_duty_cycle_directed_connectable(self):
+        return self == AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY
+
 
 # -----------------------------------------------------------------------------
 @dataclass
@@ -430,30 +445,344 @@ class LegacyAdvertiser:
     device: Device
     advertising_type: AdvertisingType
     own_address_type: OwnAddressType
+    peer_address: Address
     auto_restart: bool
-    advertising_data: Optional[bytes]
-    scan_response_data: Optional[bytes]
+
+    async def start(self) -> None:
+        # Set/update the advertising data if the advertising type allows it
+        if self.advertising_type.has_data:
+            await self.device.send_command(
+                HCI_LE_Set_Advertising_Data_Command(
+                    advertising_data=self.device.advertising_data
+                ),
+                check_result=True,
+            )
+
+        # Set/update the scan response data if the advertising is scannable
+        if self.advertising_type.is_scannable:
+            await self.device.send_command(
+                HCI_LE_Set_Scan_Response_Data_Command(
+                    scan_response_data=self.device.scan_response_data
+                ),
+                check_result=True,
+            )
+
+        # Set the advertising parameters
+        await self.device.send_command(
+            HCI_LE_Set_Advertising_Parameters_Command(
+                advertising_interval_min=self.device.advertising_interval_min,
+                advertising_interval_max=self.device.advertising_interval_max,
+                advertising_type=int(self.advertising_type),
+                own_address_type=self.own_address_type,
+                peer_address_type=self.peer_address.address_type,
+                peer_address=self.peer_address,
+                advertising_channel_map=7,
+                advertising_filter_policy=0,
+            ),
+            check_result=True,
+        )
+
+        # Enable advertising
+        await self.device.send_command(
+            HCI_LE_Set_Advertising_Enable_Command(advertising_enable=1),
+            check_result=True,
+        )
 
     async def stop(self) -> None:
-        await self.device.stop_legacy_advertising()
+        # Disable advertising
+        await self.device.send_command(
+            HCI_LE_Set_Advertising_Enable_Command(advertising_enable=0),
+            check_result=True,
+        )
 
 
 # -----------------------------------------------------------------------------
 @dataclass
-class ExtendedAdvertiser(CompositeEventEmitter):
+class AdvertisingEventProperties:
+    is_connectable: bool = True
+    is_scannable: bool = False
+    is_directed: bool = False
+    is_high_duty_cycle_directed_connectable: bool = False
+    is_legacy: bool = False
+    is_anonymous: bool = False
+    include_tx_power: bool = False
+
+    def __int__(self) -> int:
+        properties = (
+            HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties(0)
+        )
+        if self.is_connectable:
+            properties |= properties.CONNECTABLE_ADVERTISING
+        if self.is_scannable:
+            properties |= properties.SCANNABLE_ADVERTISING
+        if self.is_directed:
+            properties |= properties.DIRECTED_ADVERTISING
+        if self.is_high_duty_cycle_directed_connectable:
+            properties |= properties.HIGH_DUTY_CYCLE_DIRECTED_CONNECTABLE_ADVERTISING
+        if self.is_legacy:
+            properties |= properties.USE_LEGACY_ADVERTISING_PDUS
+        if self.is_anonymous:
+            properties |= properties.ANONYMOUS_ADVERTISING
+        if self.include_tx_power:
+            properties |= properties.INCLUDE_TX_POWER
+
+        return int(properties)
+
+    @classmethod
+    def from_advertising_type(
+        cls: Type[AdvertisingEventProperties],
+        advertising_type: AdvertisingType,
+    ) -> AdvertisingEventProperties:
+        return cls(
+            is_connectable=advertising_type.is_connectable,
+            is_scannable=advertising_type.is_scannable,
+            is_directed=advertising_type.is_directed,
+            is_high_duty_cycle_directed_connectable=advertising_type.is_high_duty_cycle_directed_connectable,
+            is_legacy=True,
+            is_anonymous=False,
+            include_tx_power=False,
+        )
+
+
+# -----------------------------------------------------------------------------
+# TODO: replace with typing.TypeAlias when the code base is all Python >= 3.10
+AdvertisingChannelMap = HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class AdvertisingParameters:
+    # pylint: disable=line-too-long
+    advertising_event_properties: AdvertisingEventProperties = field(
+        default_factory=AdvertisingEventProperties
+    )
+    primary_advertising_interval_min: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
+    primary_advertising_interval_max: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
+    primary_advertising_channel_map: HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap = (
+        AdvertisingChannelMap.CHANNEL_37
+        | AdvertisingChannelMap.CHANNEL_38
+        | AdvertisingChannelMap.CHANNEL_39
+    )
+    own_address_type: OwnAddressType = OwnAddressType.RANDOM
+    peer_address: Address = Address.ANY
+    advertising_filter_policy: int = 0
+    advertising_tx_power: int = DEVICE_DEFAULT_ADVERTISING_TX_POWER
+    primary_advertising_phy: Phy = Phy.LE_1M
+    secondary_advertising_max_skip: int = 0
+    secondary_advertising_phy: Phy = Phy.LE_1M
+    advertising_sid: int = 0
+    enable_scan_request_notifications: bool = False
+    primary_advertising_phy_options: int = 0
+    secondary_advertising_phy_options: int = 0
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class PeriodicAdvertisingParameters:
+    # TODO implement this class
+    pass
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class AdvertisingSet(EventEmitter):
     device: Device
-    handle: int
-    advertising_properties: HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties
-    own_address_type: OwnAddressType
+    advertising_handle: int
     auto_restart: bool
-    advertising_data: Optional[bytes]
-    scan_response_data: Optional[bytes]
+    random_address: Optional[Address]
+    advertising_parameters: AdvertisingParameters
+    advertising_data: bytes
+    scan_response_data: bytes
+    periodic_advertising_parameters: Optional[PeriodicAdvertisingParameters]
+    periodic_advertising_data: bytes
+    selected_tx_power: int = 0
+    enabled: bool = False
 
     def __post_init__(self) -> None:
         super().__init__()
 
+    async def set_advertising_parameters(
+        self, advertising_parameters: AdvertisingParameters
+    ) -> None:
+        # Compliance check
+        if (
+            not advertising_parameters.advertising_event_properties.is_legacy
+            and advertising_parameters.advertising_event_properties.is_connectable
+            and advertising_parameters.advertising_event_properties.is_scannable
+        ):
+            logger.warning(
+                "non-legacy extended advertising event properties may not be both "
+                "connectable and scannable"
+            )
+
+        response = await self.device.send_command(
+            HCI_LE_Set_Extended_Advertising_Parameters_Command(
+                advertising_handle=self.advertising_handle,
+                advertising_event_properties=int(
+                    advertising_parameters.advertising_event_properties
+                ),
+                primary_advertising_interval_min=(
+                    int(advertising_parameters.primary_advertising_interval_min / 0.625)
+                ),
+                primary_advertising_interval_max=(
+                    int(advertising_parameters.primary_advertising_interval_min / 0.625)
+                ),
+                primary_advertising_channel_map=int(
+                    advertising_parameters.primary_advertising_channel_map
+                ),
+                own_address_type=advertising_parameters.own_address_type,
+                peer_address_type=advertising_parameters.peer_address.address_type,
+                peer_address=advertising_parameters.peer_address,
+                advertising_tx_power=advertising_parameters.advertising_tx_power,
+                advertising_filter_policy=(
+                    advertising_parameters.advertising_filter_policy
+                ),
+                primary_advertising_phy=advertising_parameters.primary_advertising_phy,
+                secondary_advertising_max_skip=(
+                    advertising_parameters.secondary_advertising_max_skip
+                ),
+                secondary_advertising_phy=(
+                    advertising_parameters.secondary_advertising_phy
+                ),
+                advertising_sid=advertising_parameters.advertising_sid,
+                scan_request_notification_enable=(
+                    1 if advertising_parameters.enable_scan_request_notifications else 0
+                ),
+            ),
+            check_result=True,
+        )
+        self.selected_tx_power = response.return_parameters.selected_tx_power
+        self.advertising_parameters = advertising_parameters
+
+    async def set_advertising_data(self, advertising_data: bytes) -> None:
+        # pylint: disable=line-too-long
+        await self.device.send_command(
+            HCI_LE_Set_Extended_Advertising_Data_Command(
+                advertising_handle=self.advertising_handle,
+                operation=HCI_LE_Set_Extended_Advertising_Data_Command.Operation.COMPLETE_DATA,
+                fragment_preference=HCI_LE_Set_Extended_Advertising_Parameters_Command.SHOULD_NOT_FRAGMENT,
+                advertising_data=advertising_data,
+            ),
+            check_result=True,
+        )
+        self.advertising_data = advertising_data
+
+    async def set_scan_response_data(self, scan_response_data: bytes) -> None:
+        # pylint: disable=line-too-long
+        if (
+            scan_response_data
+            and not self.advertising_parameters.advertising_event_properties.is_scannable
+        ):
+            logger.warning(
+                "ignoring attempt to set non-empty scan response data on non-scannable "
+                "advertising set"
+            )
+            return
+
+        await self.device.send_command(
+            HCI_LE_Set_Extended_Scan_Response_Data_Command(
+                advertising_handle=self.advertising_handle,
+                operation=HCI_LE_Set_Extended_Advertising_Data_Command.Operation.COMPLETE_DATA,
+                fragment_preference=HCI_LE_Set_Extended_Advertising_Parameters_Command.SHOULD_NOT_FRAGMENT,
+                scan_response_data=scan_response_data,
+            ),
+            check_result=True,
+        )
+        self.scan_response_data = scan_response_data
+
+    async def set_periodic_advertising_parameters(
+        self, advertising_parameters: PeriodicAdvertisingParameters
+    ) -> None:
+        # TODO: send command
+        self.periodic_advertising_parameters = advertising_parameters
+
+    async def set_periodic_advertising_data(self, advertising_data: bytes) -> None:
+        # TODO: send command
+        self.periodic_advertising_data = advertising_data
+
+    async def set_random_address(self, random_address: Address) -> None:
+        await self.device.send_command(
+            HCI_LE_Set_Advertising_Set_Random_Address_Command(
+                advertising_handle=self.advertising_handle,
+                random_address=(random_address or self.device.random_address),
+            ),
+            check_result=True,
+        )
+
+    async def start(
+        self, duration: float = 0.0, max_advertising_events: int = 0
+    ) -> None:
+        """
+        Start advertising.
+
+        Args:
+          duration: How long to advertise for, in seconds. Use 0 (the default) for
+          an unlimited duration, unless this advertising set is a High Duty Cycle
+          Directed Advertisement type.
+          max_advertising_events: Maximum number of events to advertise for. Use 0
+          (the default) for an unlimited number of advertisements.
+        """
+        await self.device.send_command(
+            HCI_LE_Set_Extended_Advertising_Enable_Command(
+                enable=1,
+                advertising_handles=[self.advertising_handle],
+                durations=[round(duration * 100)],
+                max_extended_advertising_events=[max_advertising_events],
+            ),
+            check_result=True,
+        )
+        self.enabled = True
+
+        self.emit('start')
+
+    async def start_periodic(self, include_adi: bool = False) -> None:
+        await self.device.send_command(
+            HCI_LE_Set_Periodic_Advertising_Enable_Command(
+                enable=1 | (2 if include_adi else 0),
+                advertising_handles=self.advertising_handle,
+            ),
+            check_result=True,
+        )
+
+        self.emit('start_periodic')
+
     async def stop(self) -> None:
-        await self.device.stop_extended_advertising(self.handle)
+        await self.device.send_command(
+            HCI_LE_Set_Extended_Advertising_Enable_Command(
+                enable=0,
+                advertising_handles=[self.advertising_handle],
+                durations=[0],
+                max_extended_advertising_events=[0],
+            ),
+            check_result=True,
+        )
+        self.enabled = False
+
+        self.emit('stop')
+
+    async def stop_periodic(self) -> None:
+        await self.device.send_command(
+            HCI_LE_Set_Periodic_Advertising_Enable_Command(
+                enable=0,
+                advertising_handles=self.advertising_handle,
+            ),
+            check_result=True,
+        )
+
+        self.emit('stop_periodic')
+
+    async def remove(self) -> None:
+        await self.device.send_command(
+            HCI_LE_Remove_Advertising_Set_Command(
+                advertising_handle=self.advertising_handle
+            ),
+            check_result=True,
+        )
+        del self.device.extended_advertising_sets[self.advertising_handle]
+
+    def on_termination(self, status: int) -> None:
+        self.enabled = False
+        self.emit('termination', status)
 
 
 # -----------------------------------------------------------------------------
@@ -678,9 +1007,6 @@ class Connection(CompositeEventEmitter):
     gatt_client: gatt_client.Client
     pairing_peer_io_capability: Optional[int]
     pairing_peer_authentication_requirements: Optional[int]
-    advertiser_after_disconnection: Union[
-        LegacyAdvertiser, ExtendedAdvertiser, None
-    ] = None
 
     @composite_listener
     class Listener:
@@ -920,7 +1246,8 @@ class Connection(CompositeEventEmitter):
         return (
             f'Connection(handle=0x{self.handle:04X}, '
             f'role={self.role_name}, '
-            f'address={self.peer_address})'
+            f'self_address={self.self_address}, '
+            f'peer_address={self.peer_address})'
         )
 
 
@@ -1033,7 +1360,7 @@ def with_connection_from_handle(function):
     @functools.wraps(function)
     def wrapper(self, connection_handle, *args, **kwargs):
         if (connection := self.lookup_connection(connection_handle)) is None:
-            raise ValueError(f"no connection for handle: 0x{connection_handle:04x}")
+            raise ValueError(f'no connection for handle: 0x{connection_handle:04x}')
         return function(self, connection, *args, **kwargs)
 
     return wrapper
@@ -1100,7 +1427,6 @@ class Device(CompositeEventEmitter):
     advertisement_accumulators: Dict[Address, AdvertisementDataAccumulator]
     config: DeviceConfiguration
     legacy_advertiser: Optional[LegacyAdvertiser]
-    extended_advertisers: Dict[int, ExtendedAdvertiser]
     sco_links: Dict[int, ScoLink]
     cis_links: Dict[int, CisLink]
     _pending_cis: Dict[int, Tuple[int, int]]
@@ -1202,8 +1528,6 @@ class Device(CompositeEventEmitter):
         self.classic_pending_accepts = {
             Address.ANY: []
         }  # Futures, by BD address OR [Futures] for Address.ANY
-        self.legacy_advertiser = None
-        self.extended_advertisers = {}
 
         # Own address type cache
         self.connect_own_address_type = None
@@ -1216,10 +1540,6 @@ class Device(CompositeEventEmitter):
         self.name = config.name
         self.random_address = config.address
         self.class_of_device = config.class_of_device
-        self.scan_response_data = config.scan_response_data
-        self.advertising_data = config.advertising_data
-        self.advertising_interval_min = config.advertising_interval_min
-        self.advertising_interval_max = config.advertising_interval_max
         self.keystore = None
         self.irk = config.irk
         self.le_enabled = config.le_enabled
@@ -1234,6 +1554,22 @@ class Device(CompositeEventEmitter):
         self.classic_accept_any = config.classic_accept_any
         self.address_resolution_offload = config.address_resolution_offload
 
+        # Extended advertising.
+        self.extended_advertising_sets: Dict[int, AdvertisingSet] = {}
+
+        # Legacy advertising.
+        # The advertising and scan response data, as well as the advertising interval
+        # values are stored as properties of this object for convenience so that they
+        # can be initialized from a config object, and for backward compatibility for
+        # client code that may set those values directly before calling
+        # start_advertising().
+        self.legacy_advertising_set: Optional[AdvertisingSet] = None
+        self.legacy_advertiser: Optional[LegacyAdvertiser] = None
+        self.advertising_data = config.advertising_data
+        self.scan_response_data = config.scan_response_data
+        self.advertising_interval_min = config.advertising_interval_min
+        self.advertising_interval_max = config.advertising_interval_max
+
         for service in config.gatt_services:
             characteristics = []
             for characteristic in service.get("characteristics", []):
@@ -1242,7 +1578,8 @@ class Device(CompositeEventEmitter):
                     # Leave this check until 5/25/2023
                     if descriptor.get("permission", False):
                         raise Exception(
-                            "Error parsing Device Config's GATT Services. The key 'permission' must be renamed to 'permissions'"
+                            "Error parsing Device Config's GATT Services. "
+                            "The key 'permission' must be renamed to 'permissions'"
                         )
                     new_descriptor = Descriptor(
                         attribute_type=descriptor["descriptor_type"],
@@ -1619,290 +1956,264 @@ class Device(CompositeEventEmitter):
         if phy not in feature_map:
             raise ValueError('invalid PHY')
 
-        return self.host.supports_le_features(feature_map[phy])
+        return self.supports_le_features(feature_map[phy])
 
-    @deprecated("Please use start_legacy_advertising.")
+    @property
+    def supports_le_extended_advertising(self):
+        return self.supports_le_features(LeFeatureMask.LE_EXTENDED_ADVERTISING)
+
     async def start_advertising(
         self,
         advertising_type: AdvertisingType = AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
         target: Optional[Address] = None,
         own_address_type: int = OwnAddressType.RANDOM,
         auto_restart: bool = False,
-    ) -> None:
-        await self.start_legacy_advertising(
-            advertising_type=advertising_type,
-            target=target,
-            own_address_type=OwnAddressType(own_address_type),
-            auto_restart=auto_restart,
-        )
-
-    async def start_legacy_advertising(
-        self,
-        advertising_type: AdvertisingType = AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
-        target: Optional[Address] = None,
-        own_address_type: OwnAddressType = OwnAddressType.RANDOM,
-        auto_restart: bool = False,
         advertising_data: Optional[bytes] = None,
         scan_response_data: Optional[bytes] = None,
-    ) -> LegacyAdvertiser:
-        """Starts an legacy advertisement.
+        advertising_interval_min: Optional[int] = None,
+        advertising_interval_max: Optional[int] = None,
+    ) -> None:
+        """Start legacy advertising.
+
+        If the controller supports it, extended advertising commands with legacy PDUs
+        will be used to advertise. If not, legacy advertising commands will be used.
 
         Args:
-          advertising_type: Advertising type passed to HCI_LE_Set_Advertising_Parameters_Command.
-          target: Directed advertising target. Directed type should be set in advertising_type arg.
-          own_address_type: own address type to use in the advertising.
-          auto_restart: whether the advertisement will be restarted after disconnection.
-          scan_response_data: raw scan response.
-          advertising_data: raw advertising data.
-
-        Returns:
-          LegacyAdvertiser object containing the metadata of advertisement.
+          advertising_type:
+            Type of advertising events.
+          target:
+            Peer address for directed advertising target.
+            (Ignored if `advertising_type` is not directed)
+          own_address_type:
+            Own address type to use in the advertising.
+          auto_restart:
+            Whether the advertisement will be restarted after disconnection.
+          advertising_data:
+            Raw advertising data. If None, the value of the property
+            self.advertising_data will be used.
+          scan_response_data:
+            Raw scan response. If None, the value of the property
+            self.scan_response_data will be used.
+          advertising_interval_min:
+            Minimum advertising interval, in milliseconds. If None, the value of the
+            property self.advertising_interval_min will be used.
+          advertising_interval_max:
+            Maximum advertising interval, in milliseconds. If None, the value of the
+            property self.advertising_interval_max will be used.
         """
-        if self.extended_advertisers:
-            logger.warning(
-                'Trying to start Legacy and Extended Advertising at the same time!'
-            )
-
-        # If we're advertising, stop first
-        if self.legacy_advertiser:
-            await self.stop_advertising()
-
-        # Set/update the advertising data if the advertising type allows it
-        if advertising_type.has_data:
-            await self.send_command(
-                HCI_LE_Set_Advertising_Data_Command(
-                    advertising_data=advertising_data or self.advertising_data or b''
-                ),
-                check_result=True,
-            )
-
-        # Set/update the scan response data if the advertising is scannable
-        if advertising_type.is_scannable:
-            await self.send_command(
-                HCI_LE_Set_Scan_Response_Data_Command(
-                    scan_response_data=scan_response_data
-                    or self.scan_response_data
-                    or b''
-                ),
-                check_result=True,
-            )
+        # Update backing properties.
+        if advertising_data is not None:
+            self.advertising_data = advertising_data
+        if scan_response_data is not None:
+            self.scan_response_data = scan_response_data
+        if advertising_interval_min is not None:
+            self.advertising_interval_min = advertising_interval_min
+        if advertising_interval_max is not None:
+            self.advertising_interval_max = advertising_interval_max
 
         # Decide what peer address to use
         if advertising_type.is_directed:
             if target is None:
-                raise ValueError('directed advertising requires a target address')
-
+                raise ValueError('directed advertising requires a target')
             peer_address = target
-            peer_address_type = target.address_type
         else:
             peer_address = Address.ANY
-            peer_address_type = Address.ANY.address_type
 
-        # Set the advertising parameters
-        await self.send_command(
-            HCI_LE_Set_Advertising_Parameters_Command(
-                advertising_interval_min=self.advertising_interval_min,
-                advertising_interval_max=self.advertising_interval_max,
-                advertising_type=int(advertising_type),
-                own_address_type=own_address_type,
-                peer_address_type=peer_address_type,
-                peer_address=peer_address,
-                advertising_channel_map=7,
-                advertising_filter_policy=0,
-            ),
-            check_result=True,
-        )
+        # If we're already advertising, stop now because we'll be re-creating
+        # a new advertiser or advertising set.
+        await self.stop_advertising()
+        assert self.legacy_advertiser is None
+        assert self.legacy_advertising_set is None
 
-        # Enable advertising
-        await self.send_command(
-            HCI_LE_Set_Advertising_Enable_Command(advertising_enable=1),
-            check_result=True,
-        )
-
-        self.legacy_advertiser = LegacyAdvertiser(
-            device=self,
-            advertising_type=advertising_type,
-            own_address_type=own_address_type,
-            auto_restart=auto_restart,
-            advertising_data=advertising_data,
-            scan_response_data=scan_response_data,
-        )
-        return self.legacy_advertiser
-
-    @deprecated("Please use stop_legacy_advertising.")
-    async def stop_advertising(self) -> None:
-        await self.stop_legacy_advertising()
-
-    async def stop_legacy_advertising(self) -> None:
-        # Disable advertising
-        if self.legacy_advertiser:
-            await self.send_command(
-                HCI_LE_Set_Advertising_Enable_Command(advertising_enable=0),
-                check_result=True,
-            )
-
-            self.legacy_advertiser = None
-
-    @experimental('Extended Advertising is still experimental - Might be changed soon.')
-    async def start_extended_advertising(
-        self,
-        advertising_properties: HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties = HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.CONNECTABLE_ADVERTISING,
-        target: Address = Address.ANY,
-        own_address_type: OwnAddressType = OwnAddressType.RANDOM,
-        auto_restart: bool = True,
-        advertising_data: Optional[bytes] = None,
-        scan_response_data: Optional[bytes] = None,
-    ) -> ExtendedAdvertiser:
-        """Starts an extended advertising set.
-
-        Args:
-          advertising_properties: Properties to pass in HCI_LE_Set_Extended_Advertising_Parameters_Command
-          target: Directed advertising target. Directed property should be set in advertising_properties arg.
-          own_address_type: own address type to use in the advertising.
-          auto_restart: whether the advertisement will be restarted after disconnection.
-          advertising_data: raw advertising data. When a non-none value is set, HCI_LE_Set_Advertising_Set_Random_Address_Command will be sent.
-          scan_response_data: raw scan response. When a non-none value is set, HCI_LE_Set_Extended_Scan_Response_Data_Command will be sent.
-
-        Returns:
-          ExtendedAdvertiser object containing the metadata of advertisement.
-        """
-        if self.legacy_advertiser:
-            logger.warning(
-                'Trying to start Legacy and Extended Advertising at the same time!'
-            )
-
-        adv_handle = -1
-        # Find a free handle
-        for i in range(
-            DEVICE_MIN_EXTENDED_ADVERTISING_SET_HANDLE,
-            DEVICE_MAX_EXTENDED_ADVERTISING_SET_HANDLE + 1,
-        ):
-            if i not in self.extended_advertisers:
-                adv_handle = i
-                break
-
-        if adv_handle == -1:
-            raise InvalidStateError('No available advertising set.')
-
-        try:
-            # Set the advertising parameters
-            await self.send_command(
-                HCI_LE_Set_Extended_Advertising_Parameters_Command(
-                    advertising_handle=adv_handle,
-                    advertising_event_properties=advertising_properties,
+        if self.supports_le_extended_advertising:
+            # Use extended advertising commands with legacy PDUs.
+            self.legacy_advertising_set = await self.create_advertising_set(
+                auto_start=True,
+                auto_restart=auto_restart,
+                random_address=self.random_address,
+                advertising_parameters=AdvertisingParameters(
+                    advertising_event_properties=(
+                        AdvertisingEventProperties.from_advertising_type(
+                            advertising_type
+                        )
+                    ),
                     primary_advertising_interval_min=self.advertising_interval_min,
                     primary_advertising_interval_max=self.advertising_interval_max,
-                    primary_advertising_channel_map=(
-                        HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap.CHANNEL_37
-                        | HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap.CHANNEL_38
-                        | HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap.CHANNEL_39
-                    ),
-                    own_address_type=own_address_type,
-                    peer_address_type=target.address_type,
-                    peer_address=target,
-                    advertising_tx_power=7,
-                    advertising_filter_policy=0,
-                    primary_advertising_phy=1,  # LE 1M
-                    secondary_advertising_max_skip=0,
-                    secondary_advertising_phy=1,  # LE 1M
-                    advertising_sid=0,
-                    scan_request_notification_enable=0,
+                    own_address_type=OwnAddressType(own_address_type),
+                    peer_address=peer_address,
                 ),
-                check_result=True,
+                advertising_data=(
+                    self.advertising_data if advertising_type.has_data else b''
+                ),
+                scan_response_data=(
+                    self.scan_response_data if advertising_type.is_scannable else b''
+                ),
+            )
+        else:
+            # Use legacy commands.
+            self.legacy_advertiser = LegacyAdvertiser(
+                device=self,
+                advertising_type=advertising_type,
+                own_address_type=OwnAddressType(own_address_type),
+                peer_address=peer_address,
+                auto_restart=auto_restart,
             )
 
-            # Set the advertising data if present
-            if advertising_data is not None:
-                await self.send_command(
-                    HCI_LE_Set_Extended_Advertising_Data_Command(
-                        advertising_handle=adv_handle,
-                        operation=HCI_LE_Set_Extended_Advertising_Data_Command.Operation.COMPLETE_DATA,
-                        fragment_preference=0x01,  # Should not fragment
-                        advertising_data=advertising_data,
-                    ),
-                    check_result=True,
-                )
+            await self.legacy_advertiser.start()
 
-            # Set the scan response if present
-            if scan_response_data is not None:
-                await self.send_command(
-                    HCI_LE_Set_Extended_Scan_Response_Data_Command(
-                        advertising_handle=adv_handle,
-                        operation=HCI_LE_Set_Extended_Advertising_Data_Command.Operation.COMPLETE_DATA,
-                        fragment_preference=0x01,  # Should not fragment
-                        scan_response_data=scan_response_data,
-                    ),
-                    check_result=True,
-                )
+    async def stop_advertising(self) -> None:
+        """Stop legacy advertising."""
+        # Disable advertising
+        if self.legacy_advertising_set:
+            await self.legacy_advertising_set.stop()
+            self.legacy_advertising_set = None
+        elif self.legacy_advertiser:
+            await self.legacy_advertiser.stop()
+            self.legacy_advertiser = None
 
-            if own_address_type in (
-                OwnAddressType.RANDOM,
-                OwnAddressType.RESOLVABLE_OR_RANDOM,
-            ):
-                await self.send_command(
-                    HCI_LE_Set_Advertising_Set_Random_Address_Command(
-                        advertising_handle=adv_handle,
-                        random_address=self.random_address,
-                    ),
-                    check_result=True,
-                )
+    async def create_advertising_set(
+        self,
+        advertising_parameters: Optional[AdvertisingParameters] = None,
+        random_address: Optional[Address] = None,
+        advertising_data: bytes = b'',
+        scan_response_data: bytes = b'',
+        periodic_advertising_parameters: Optional[PeriodicAdvertisingParameters] = None,
+        periodic_advertising_data: bytes = b'',
+        auto_start: bool = True,
+        auto_restart: bool = False,
+    ) -> AdvertisingSet:
+        """
+        Create an advertising set.
 
-            # Enable advertising
-            await self.send_command(
-                HCI_LE_Set_Extended_Advertising_Enable_Command(
-                    enable=1,
-                    advertising_handles=[adv_handle],
-                    durations=[0],  # Forever
-                    max_extended_advertising_events=[0],  # Infinite
-                ),
-                check_result=True,
+        This method allows the creation of advertising sets for controllers that
+        support extended advertising.
+
+        Args:
+          advertising_parameters:
+            The parameters to use for this set. If None, default parameters are used.
+          random_address:
+            The random address to use (only relevant when the parameters specify that
+            own_address_type is random).
+          advertising_data:
+            Initial value for the set's advertising data.
+          scan_response_data:
+            Initial value for the set's scan response data.
+          periodic_advertising_parameters:
+            The parameters to use for periodic advertising (if needed).
+          periodic_advertising_data:
+            Initial value for the set's periodic advertising data.
+          auto_start:
+            True if the set should be automatically started upon creation.
+          auto_restart:
+            True if the set should be automatically restated after a disconnection.
+
+        Returns:
+          An AdvertisingSet instance.
+        """
+        # Allocate a new handle
+        try:
+            advertising_handle = next(
+                handle
+                for handle in range(
+                    DEVICE_MIN_EXTENDED_ADVERTISING_SET_HANDLE,
+                    DEVICE_MAX_EXTENDED_ADVERTISING_SET_HANDLE + 1,
+                )
+                if handle not in self.extended_advertising_sets
             )
+        except StopIteration as exc:
+            raise RuntimeError("all valid advertising handles already in use") from exc
+
+        # Instantiate default values
+        if advertising_parameters is None:
+            advertising_parameters = AdvertisingParameters()
+
+        # Use the device's random address if a random address is needed but none was
+        # provided.
+        if (
+            advertising_parameters.own_address_type
+            in (OwnAddressType.RANDOM, OwnAddressType.RESOLVABLE_OR_RANDOM)
+            and random_address is None
+        ):
+            random_address = self.random_address
+
+        # Create the object that represents the set.
+        advertising_set = AdvertisingSet(
+            device=self,
+            advertising_handle=advertising_handle,
+            auto_restart=auto_restart,
+            random_address=random_address,
+            advertising_parameters=advertising_parameters,
+            advertising_data=advertising_data,
+            scan_response_data=scan_response_data,
+            periodic_advertising_parameters=periodic_advertising_parameters,
+            periodic_advertising_data=periodic_advertising_data,
+        )
+
+        # Create the set in the controller.
+        await advertising_set.set_advertising_parameters(advertising_parameters)
+
+        # Update the set in the controller.
+        try:
+            if random_address:
+                await advertising_set.set_random_address(random_address)
+
+            if advertising_data:
+                await advertising_set.set_advertising_data(advertising_data)
+
+            if scan_response_data:
+                await advertising_set.set_scan_response_data(scan_response_data)
+
+            if periodic_advertising_parameters:
+                # TODO: call LE Set Periodic Advertising Parameters command
+                raise NotImplementedError('periodic advertising not yet supported')
+
+            if periodic_advertising_data:
+                # TODO: call LE Set Periodic Advertising Data command
+                raise NotImplementedError('periodic advertising not yet supported')
+
         except HCI_Error as error:
-            # When any step fails, cleanup the advertising handle.
+            # Remove the advertising set so that it doesn't stay dangling in the
+            # controller.
             await self.send_command(
-                HCI_LE_Remove_Advertising_Set_Command(advertising_handle=adv_handle),
+                HCI_LE_Remove_Advertising_Set_Command(
+                    advertising_handle=advertising_data
+                ),
                 check_result=False,
             )
             raise error
 
-        advertiser = self.extended_advertisers[adv_handle] = ExtendedAdvertiser(
-            device=self,
-            handle=adv_handle,
-            advertising_properties=advertising_properties,
-            own_address_type=own_address_type,
-            auto_restart=auto_restart,
-            advertising_data=advertising_data,
-            scan_response_data=scan_response_data,
-        )
-        return advertiser
+        # Remember the set.
+        self.extended_advertising_sets[advertising_handle] = advertising_set
 
-    @experimental('Extended Advertising is still experimental - Might be changed soon.')
-    async def stop_extended_advertising(self, adv_handle: int) -> None:
-        """Stops an extended advertising set.
+        # Try to start the set if requested.
+        if auto_start:
+            try:
+                # pylint: disable=line-too-long
+                duration = (
+                    DEVICE_MAX_HIGH_DUTY_CYCLE_CONNECTABLE_DIRECTED_ADVERTISING_DURATION
+                    if advertising_parameters.advertising_event_properties.is_high_duty_cycle_directed_connectable
+                    else 0
+                )
+                await advertising_set.start(duration=duration)
+            except Exception as error:
+                logger.exception(f'failed to start advertising set: {error}')
+                await advertising_set.remove()
+                raise
 
-        Args:
-          adv_handle: Handle of the advertising set to stop.
-        """
-        # Disable advertising
-        await self.send_command(
-            HCI_LE_Set_Extended_Advertising_Enable_Command(
-                enable=0,
-                advertising_handles=[adv_handle],
-                durations=[0],
-                max_extended_advertising_events=[0],
-            ),
-            check_result=True,
-        )
-        # Remove advertising set
-        await self.send_command(
-            HCI_LE_Remove_Advertising_Set_Command(advertising_handle=adv_handle),
-            check_result=True,
-        )
-        del self.extended_advertisers[adv_handle]
+        return advertising_set
 
     @property
     def is_advertising(self):
-        return self.legacy_advertiser or self.extended_advertisers
+        if self.legacy_advertiser:
+            return True
+
+        if self.legacy_advertising_set and self.legacy_advertising_set.enabled:
+            return True
+
+        return any(
+            advertising_set.enabled
+            for advertising_set in self.extended_advertising_sets.values()
+        )
 
     async def start_scanning(
         self,
@@ -1929,9 +2240,7 @@ class Device(CompositeEventEmitter):
         self.advertisement_accumulators = {}
 
         # Enable scanning
-        if not legacy and self.supports_le_features(
-            LeFeatureMask.LE_EXTENDED_ADVERTISING
-        ):
+        if not legacy and self.supports_le_extended_advertising:
             # Set the scanning parameters
             scan_type = (
                 HCI_LE_Set_Extended_Scan_Parameters_Command.ACTIVE_SCANNING
@@ -2007,9 +2316,9 @@ class Device(CompositeEventEmitter):
         self.scanning_is_passive = not active
         self.scanning = True
 
-    async def stop_scanning(self) -> None:
+    async def stop_scanning(self, legacy: bool = False) -> None:
         # Disable scanning
-        if self.supports_le_features(LeFeatureMask.LE_EXTENDED_ADVERTISING):
+        if not legacy and self.supports_le_extended_advertising:
             await self.send_command(
                 HCI_LE_Set_Extended_Scan_Enable_Command(
                     enable=0, filter_duplicates=0, duration=0, period=0
@@ -3225,6 +3534,76 @@ class Device(CompositeEventEmitter):
         await self.gatt_server.indicate_subscribers(attribute, value, force)
 
     @host_event_handler
+    def on_advertising_set_termination(
+        self,
+        status,
+        advertising_handle,
+        connection_handle,
+        number_of_completed_extended_advertising_events,
+    ):
+        if not (
+            advertising_set := (
+                self.extended_advertising_sets.get(advertising_handle)
+                or self.legacy_advertising_set
+            )
+        ):
+            logger.warning(f'advertising set {advertising_handle} not found')
+            return
+
+        advertising_set.on_termination(status)
+
+        if status != HCI_SUCCESS:
+            logger.debug(
+                f'advertising set {advertising_handle} '
+                f'terminated with status {status}'
+            )
+            return
+
+        if not (connection := self.lookup_connection(connection_handle)):
+            logger.warning(f'no connection for handle 0x{connection_handle:04x}')
+            return
+
+        # Update the connection address.
+        connection.self_address = (
+            advertising_set.random_address
+            if advertising_set.advertising_parameters.own_address_type
+            in (OwnAddressType.RANDOM, OwnAddressType.RESOLVABLE_OR_RANDOM)
+            else self.public_address
+        )
+
+        # Setup auto-restart of the advertising set if needed.
+        if advertising_set.auto_restart:
+            connection.once(
+                'disconnection',
+                lambda _: self.abort_on('flush', advertising_set.start()),
+            )
+
+        self._emit_le_connection(connection)
+
+    def _emit_le_connection(self, connection: Connection) -> None:
+        # If supported, read which PHY we're connected with before
+        # notifying listeners of the new connection.
+        if self.host.supports_command(HCI_LE_READ_PHY_COMMAND):
+
+            async def read_phy():
+                result = await self.send_command(
+                    HCI_LE_Read_PHY_Command(connection_handle=connection.handle),
+                    check_result=True,
+                )
+                connection.phy = ConnectionPHY(
+                    result.return_parameters.tx_phy, result.return_parameters.rx_phy
+                )
+                # Emit an event to notify listeners of the new connection
+                self.emit('connection', connection)
+
+            # Do so asynchronously to not block the current event handler
+            connection.abort_on('disconnection', read_phy())
+
+            return
+
+        self.emit('connection', connection)
+
+    @host_event_handler
     def on_connection(
         self,
         connection_handle,
@@ -3242,8 +3621,6 @@ class Device(CompositeEventEmitter):
                 'new connection reuses the same handle as a previous connection'
             )
 
-        peer_resolvable_address = None
-
         if transport == BT_BR_EDR_TRANSPORT:
             # Create a new connection
             connection = self.pending_connections.pop(peer_address)
@@ -3252,76 +3629,76 @@ class Device(CompositeEventEmitter):
 
             # Emit an event to notify listeners of the new connection
             self.emit('connection', connection)
+
+            return
+
+        # Resolve the peer address if we can
+        peer_resolvable_address = None
+        if self.address_resolver:
+            if peer_address.is_resolvable:
+                resolved_address = self.address_resolver.resolve(peer_address)
+                if resolved_address is not None:
+                    logger.debug(f'*** Address resolved as {resolved_address}')
+                    peer_resolvable_address = peer_address
+                    peer_address = resolved_address
+
+        self_address = None
+        if role == HCI_CENTRAL_ROLE:
+            own_address_type = self.connect_own_address_type
+            assert own_address_type is not None
         else:
-            # Resolve the peer address if we can
-            if self.address_resolver:
-                if peer_address.is_resolvable:
-                    resolved_address = self.address_resolver.resolve(peer_address)
-                    if resolved_address is not None:
-                        logger.debug(f'*** Address resolved as {resolved_address}')
-                        peer_resolvable_address = peer_address
-                        peer_address = resolved_address
-
-            # Guess which own address type is used for this connection.
-            # This logic is somewhat correct but may need to be improved
-            # when multiple advertising are run simultaneously.
-            advertiser = None
-            if self.connect_own_address_type is not None:
-                own_address_type = self.connect_own_address_type
-            elif self.legacy_advertiser:
-                own_address_type = self.legacy_advertiser.own_address_type
-                # Store advertiser for restarting - it's only required for legacy, since
-                # extended advertisement produces HCI_Advertising_Set_Terminated.
-                if self.legacy_advertiser.auto_restart:
-                    advertiser = self.legacy_advertiser
+            if self.supports_le_extended_advertising:
+                # We'll know the address when the advertising set terminates,
+                # Use a temporary placeholder value for self_address.
+                self_address = Address.ANY_RANDOM
             else:
-                # For extended advertisement, determining own address type later.
-                own_address_type = OwnAddressType.RANDOM
+                # We were connected via a legacy advertisement.
+                if self.legacy_advertiser:
+                    own_address_type = self.legacy_advertiser.own_address_type
+                    self.legacy_advertiser = None
+                else:
+                    # This should not happen, but just in case, pick a default.
+                    logger.warning("connection without an advertiser")
+                    self_address = self.random_address
 
-            if own_address_type in (
-                OwnAddressType.PUBLIC,
-                OwnAddressType.RESOLVABLE_OR_PUBLIC,
-            ):
-                self_address = self.public_address
-            else:
-                self_address = self.random_address
-
-            # Create a new connection
-            connection = Connection(
-                self,
-                connection_handle,
-                transport,
-                self_address,
-                peer_address,
-                peer_resolvable_address,
-                role,
-                connection_parameters,
-                ConnectionPHY(HCI_LE_1M_PHY, HCI_LE_1M_PHY),
+        if self_address is None:
+            self_address = (
+                self.public_address
+                if own_address_type
+                in (
+                    OwnAddressType.PUBLIC,
+                    OwnAddressType.RESOLVABLE_OR_PUBLIC,
+                )
+                else self.random_address
             )
-            connection.advertiser_after_disconnection = advertiser
-            self.connections[connection_handle] = connection
 
-            # If supported, read which PHY we're connected with before
-            # notifying listeners of the new connection.
-            if self.host.supports_command(HCI_LE_READ_PHY_COMMAND):
+        # Create a connection.
+        connection = Connection(
+            self,
+            connection_handle,
+            transport,
+            self_address,
+            peer_address,
+            peer_resolvable_address,
+            role,
+            connection_parameters,
+            ConnectionPHY(HCI_LE_1M_PHY, HCI_LE_1M_PHY),
+        )
+        self.connections[connection_handle] = connection
 
-                async def read_phy():
-                    result = await self.send_command(
-                        HCI_LE_Read_PHY_Command(connection_handle=connection_handle),
-                        check_result=True,
-                    )
-                    connection.phy = ConnectionPHY(
-                        result.return_parameters.tx_phy, result.return_parameters.rx_phy
-                    )
-                    # Emit an event to notify listeners of the new connection
-                    self.emit('connection', connection)
+        if (
+            role == HCI_PERIPHERAL_ROLE
+            and self.legacy_advertiser
+            and self.legacy_advertiser.auto_restart
+        ):
+            connection.once(
+                'disconnection',
+                lambda _: self.abort_on('flush', self.legacy_advertiser.start()),
+            )
 
-                # Do so asynchronously to not block the current event handler
-                connection.abort_on('disconnection', read_phy())
-
-            else:
-                # Emit an event to notify listeners of the new connection
-                self.emit('connection', connection)
+        if role == HCI_CENTRAL_ROLE or not self.supports_le_extended_advertising:
+            # We can emit now, we have all the info we need
+            self._emit_le_connection(connection)
 
     @host_event_handler
     def on_connection_failure(self, transport, peer_address, error_code):
@@ -3406,32 +3783,6 @@ class Device(CompositeEventEmitter):
 
             # Cleanup subsystems that maintain per-connection state
             self.gatt_server.on_disconnection(connection)
-
-            # Restart advertising if auto-restart is enabled
-            if advertiser := connection.advertiser_after_disconnection:
-                logger.debug('restarting advertising')
-                if isinstance(advertiser, LegacyAdvertiser):
-                    self.abort_on(
-                        'flush',
-                        self.start_legacy_advertising(
-                            advertising_type=advertiser.advertising_type,
-                            own_address_type=advertiser.own_address_type,
-                            advertising_data=advertiser.advertising_data,
-                            scan_response_data=advertiser.scan_response_data,
-                            auto_restart=True,
-                        ),
-                    )
-                elif isinstance(advertiser, ExtendedAdvertiser):
-                    self.abort_on(
-                        'flush',
-                        self.start_extended_advertising(
-                            advertising_properties=advertiser.advertising_properties,
-                            own_address_type=advertiser.own_address_type,
-                            advertising_data=advertiser.advertising_data,
-                            scan_response_data=advertiser.scan_response_data,
-                            auto_restart=True,
-                        ),
-                    )
         elif sco_link := self.sco_links.pop(connection_handle, None):
             sco_link.emit('disconnection', reason)
         elif cis_link := self.cis_links.pop(connection_handle, None):
@@ -3753,30 +4104,6 @@ class Device(CompositeEventEmitter):
     def on_sco_packet(self, sco_handle: int, packet: HCI_SynchronousDataPacket) -> None:
         if sco_link := self.sco_links.get(sco_handle):
             sco_link.emit('pdu', packet)
-
-    # [LE only]
-    @host_event_handler
-    @experimental('Only for testing')
-    def on_advertising_set_termination(
-        self,
-        status: int,
-        advertising_handle: int,
-        connection_handle: int,
-    ) -> None:
-        if status == HCI_SUCCESS:
-            connection = self.lookup_connection(connection_handle)
-        if advertiser := self.extended_advertisers.pop(advertising_handle, None):
-            if connection:
-                if advertiser.auto_restart:
-                    connection.advertiser_after_disconnection = advertiser
-                if advertiser.own_address_type in (
-                    OwnAddressType.PUBLIC,
-                    OwnAddressType.RESOLVABLE_OR_PUBLIC,
-                ):
-                    connection.self_address = self.public_address
-                else:
-                    connection.self_address = self.random_address
-            advertiser.emit('termination', status)
 
     # [LE only]
     @host_event_handler

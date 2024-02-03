@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# -----------------------------------------------------------------------------
+# Imports
+# -----------------------------------------------------------------------------
+import asyncio
 from typing import List, Optional
 
 from bumble.controller import Controller
@@ -22,6 +26,7 @@ from bumble.transport import AsyncPipeSink
 from bumble.hci import Address
 
 
+# -----------------------------------------------------------------------------
 class TwoDevices:
     connections: List[Optional[Connection]]
 
@@ -75,3 +80,10 @@ class TwoDevices:
 
     def __getitem__(self, index: int) -> Device:
         return self.devices[index]
+
+
+# -----------------------------------------------------------------------------
+async def async_barrier():
+    ready = asyncio.get_running_loop().create_future()
+    asyncio.get_running_loop().call_soon(ready.set_result, None)
+    await ready
