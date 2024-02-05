@@ -173,7 +173,7 @@ L2CAP_MTU_CONFIGURATION_PARAMETER_TYPE = 0x01
 @dataclasses.dataclass
 class ClassicChannelSpec:
     psm: Optional[int] = None
-    mtu: int = L2CAP_MIN_BR_EDR_MTU
+    mtu: int = L2CAP_DEFAULT_MTU
 
 
 @dataclasses.dataclass
@@ -749,6 +749,8 @@ class ClassicChannel(EventEmitter):
     sink: Optional[Callable[[bytes], Any]]
     state: State
     connection: Connection
+    mtu: int
+    peer_mtu: int
 
     def __init__(
         self,
@@ -765,6 +767,7 @@ class ClassicChannel(EventEmitter):
         self.signaling_cid = signaling_cid
         self.state = self.State.CLOSED
         self.mtu = mtu
+        self.peer_mtu = L2CAP_MIN_BR_EDR_MTU
         self.psm = psm
         self.source_cid = source_cid
         self.destination_cid = 0
@@ -861,7 +864,7 @@ class ClassicChannel(EventEmitter):
             [
                 (
                     L2CAP_MAXIMUM_TRANSMISSION_UNIT_CONFIGURATION_OPTION_TYPE,
-                    struct.pack('<H', L2CAP_DEFAULT_MTU),
+                    struct.pack('<H', self.mtu),
                 )
             ]
         )
@@ -926,8 +929,8 @@ class ClassicChannel(EventEmitter):
         options = L2CAP_Control_Frame.decode_configuration_options(request.options)
         for option in options:
             if option[0] == L2CAP_MTU_CONFIGURATION_PARAMETER_TYPE:
-                self.mtu = struct.unpack('<H', option[1])[0]
-                logger.debug(f'MTU = {self.mtu}')
+                self.peer_mtu = struct.unpack('<H', option[1])[0]
+                logger.debug(f'peer MTU = {self.peer_mtu}')
 
         self.send_control_frame(
             L2CAP_Configure_Response(
@@ -1026,7 +1029,7 @@ class ClassicChannel(EventEmitter):
         return (
             f'Channel({self.source_cid}->{self.destination_cid}, '
             f'PSM={self.psm}, '
-            f'MTU={self.mtu}, '
+            f'MTU={self.mtu}/{self.peer_mtu}, '
             f'state={self.state.name})'
         )
 

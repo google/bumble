@@ -1470,10 +1470,10 @@ class Protocol(EventEmitter):
             f'[{transaction_label}] {message}'
         )
         max_fragment_size = (
-            self.l2cap_channel.mtu - 3
+            self.l2cap_channel.peer_mtu - 3
         )  # Enough space for a 3-byte start packet header
         payload = message.payload
-        if len(payload) + 2 <= self.l2cap_channel.mtu:
+        if len(payload) + 2 <= self.l2cap_channel.peer_mtu:
             # Fits in a single packet
             packet_type = self.PacketType.SINGLE_PACKET
         else:

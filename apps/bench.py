@@ -87,6 +87,7 @@ DEFAULT_LINGER_TIME = 1.0
 DEFAULT_POST_CONNECTION_WAIT_TIME = 1.0
 
 DEFAULT_RFCOMM_CHANNEL = 8
+DEFAULT_RFCOMM_MTU = 2048
 
 
 # -----------------------------------------------------------------------------
@@ -896,11 +897,14 @@ class L2capServer(StreamedPacketIO):
 # RfcommClient
 # -----------------------------------------------------------------------------
 class RfcommClient(StreamedPacketIO):
-    def __init__(self, device, channel, uuid):
+    def __init__(self, device, channel, uuid, l2cap_mtu, max_frame_size, window_size):
         super().__init__()
         self.device = device
         self.channel = channel
         self.uuid = uuid
+        self.l2cap_mtu = l2cap_mtu
+        self.max_frame_size = max_frame_size
+        self.window_size = window_size
         self.rfcomm_session = None
         self.ready = asyncio.Event()
 
@@ -924,13 +928,21 @@ class RfcommClient(StreamedPacketIO):
 
         # Create a client and start it
         logging.info(color('*** Starting RFCOMM client...', 'blue'))
-        rfcomm_client = bumble.rfcomm.Client(connection)
+        rfcomm_options = {}
+        if self.l2cap_mtu:
+            rfcomm_options['l2cap_mtu'] = self.l2cap_mtu
+        rfcomm_client = bumble.rfcomm.Client(connection, **rfcomm_options)
         rfcomm_mux = await rfcomm_client.start()
         logging.info(color('*** Started', 'blue'))
 
         logging.info(color(f'### Opening session for channel {channel}...', 'yellow'))
         try:
-            rfcomm_session = await rfcomm_mux.open_dlc(channel)
+            dlc_options = {}
+            if self.max_frame_size:
+                dlc_options['max_frame_size'] = self.max_frame_size
+            if self.window_size:
+                dlc_options['window_size'] = self.window_size
+            rfcomm_session = await rfcomm_mux.open_dlc(channel, **dlc_options)
             logging.info(color(f'### Session open: {rfcomm_session}', 'yellow'))
         except bumble.core.ConnectionError as error:
             logging.info(color(f'!!! Session open failed: {error}', 'red'))
@@ -955,13 +967,16 @@ class RfcommClient(StreamedPacketIO):
 # RfcommServer
 # -----------------------------------------------------------------------------
 class RfcommServer(StreamedPacketIO):
-    def __init__(self, device, channel):
+    def __init__(self, device, channel, l2cap_mtu):
         super().__init__()
         self.dlc = None
         self.ready = asyncio.Event()
 
         # Create and register a server
-        rfcomm_server = bumble.rfcomm.Server(device)
+        server_options = {}
+        if l2cap_mtu:
+            server_options['l2cap_mtu'] = l2cap_mtu
+        rfcomm_server = bumble.rfcomm.Server(device, **server_options)
 
         # Listen for incoming DLC connections
         channel_number = rfcomm_server.listen(self.on_dlc, channel)
@@ -1298,11 +1313,20 @@ def create_mode_factory(ctx, default_mode):
 
         if mode == 'rfcomm-client':
             return RfcommClient(
-                device, channel=ctx.obj['rfcomm_channel'], uuid=ctx.obj['rfcomm_uuid']
+                device,
+                channel=ctx.obj['rfcomm_channel'],
+                uuid=ctx.obj['rfcomm_uuid'],
+                l2cap_mtu=ctx.obj['rfcomm_l2cap_mtu'],
+                max_frame_size=ctx.obj['rfcomm_max_frame_size'],
+                window_size=ctx.obj['rfcomm_window_size'],
             )
 
         if mode == 'rfcomm-server':
-            return RfcommServer(device, channel=ctx.obj['rfcomm_channel'])
+            return RfcommServer(
+                device,
+                channel=ctx.obj['rfcomm_channel'],
+                l2cap_mtu=ctx.obj['rfcomm_l2cap_mtu'],
+            )
 
         raise ValueError('invalid mode')
 
@@ -1388,6 +1412,21 @@ def create_role_factory(ctx, default_role):
     '--rfcomm-uuid',
     default=DEFAULT_RFCOMM_UUID,
     help='RFComm service UUID to use (ignored if --rfcomm-channel is not 0)',
+)
+@click.option(
+    '--rfcomm-l2cap-mtu',
+    type=int,
+    help='RFComm L2CAP MTU',
+)
+@click.option(
+    '--rfcomm-max-frame-size',
+    type=int,
+    help='RFComm maximum frame size',
+)
+@click.option(
+    '--rfcomm-window-size',
+    type=int,
+    help='RFComm window size',
 )
 @click.option(
     '--l2cap-psm',
@@ -1486,6 +1525,9 @@ def bench(
     linger,
     rfcomm_channel,
     rfcomm_uuid,
+    rfcomm_l2cap_mtu,
+    rfcomm_max_frame_size,
+    rfcomm_window_size,
     l2cap_psm,
     l2cap_mtu,
     l2cap_mps,
@@ -1498,6 +1540,9 @@ def bench(
     ctx.obj['att_mtu'] = att_mtu
     ctx.obj['rfcomm_channel'] = rfcomm_channel
     ctx.obj['rfcomm_uuid'] = rfcomm_uuid
+    ctx.obj['rfcomm_l2cap_mtu'] = rfcomm_l2cap_mtu
+    ctx.obj['rfcomm_max_frame_size'] = rfcomm_max_frame_size
+    ctx.obj['rfcomm_window_size'] = rfcomm_window_size
     ctx.obj['l2cap_psm'] = l2cap_psm
     ctx.obj['l2cap_mtu'] = l2cap_mtu
     ctx.obj['l2cap_mps'] = l2cap_mps

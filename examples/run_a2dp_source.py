@@ -74,7 +74,7 @@ def codec_capabilities():
 # -----------------------------------------------------------------------------
 def on_avdtp_connection(read_function, protocol):
     packet_source = SbcPacketSource(
-        read_function, protocol.l2cap_channel.mtu, codec_capabilities()
+        read_function, protocol.l2cap_channel.peer_mtu, codec_capabilities()
     )
     packet_pump = MediaPacketPump(packet_source.packets)
     protocol.add_source(packet_source.codec_capabilities, packet_pump)
@@ -98,7 +98,7 @@ async def stream_packets(read_function, protocol):
 
     # Stream the packets
     packet_source = SbcPacketSource(
-        read_function, protocol.l2cap_channel.mtu, codec_capabilities()
+        read_function, protocol.l2cap_channel.peer_mtu, codec_capabilities()
     )
     packet_pump = MediaPacketPump(packet_source.packets)
     source = protocol.add_source(packet_source.codec_capabilities, packet_pump)

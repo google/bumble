@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import pytest
+from typing import List
 
 from . import test_utils
 from bumble import core
@@ -59,17 +60,18 @@ def test_frames():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_basic_connection():
+async def test_basic_connection() -> None:
     devices = test_utils.TwoDevices()
     await devices.setup_connection()
 
     accept_future: asyncio.Future[DLC] = asyncio.get_running_loop().create_future()
     channel = Server(devices[0]).listen(acceptor=accept_future.set_result)
 
+    assert devices.connections[1]
     multiplexer = await Client(devices.connections[1]).start()
     dlcs = await asyncio.gather(accept_future, multiplexer.open_dlc(channel))
 
-    queues = [asyncio.Queue(), asyncio.Queue()]
+    queues: List[asyncio.Queue] = [asyncio.Queue(), asyncio.Queue()]
     for dlc, queue in zip(dlcs, queues):
         dlc.sink = queue.put_nowait
 

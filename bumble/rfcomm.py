@@ -104,6 +104,7 @@ CRC_TABLE = bytes([
     0XBA, 0X2B, 0X59, 0XC8, 0XBD, 0X2C, 0X5E, 0XCF
 ])
 
+RFCOMM_DEFAULT_L2CAP_MTU      = 2048
 RFCOMM_DEFAULT_WINDOW_SIZE    = 7
 RFCOMM_DEFAULT_MAX_FRAME_SIZE = 2000
 
@@ -473,7 +474,7 @@ class DLC(EventEmitter):
         # Compute the MTU
         max_overhead = 4 + 1  # header with 2-byte length + fcs
         self.mtu = min(
-            max_frame_size, self.multiplexer.l2cap_channel.mtu - max_overhead
+            max_frame_size, self.multiplexer.l2cap_channel.peer_mtu - max_overhead
         )
 
     def change_state(self, new_state: State) -> None:
@@ -908,8 +909,11 @@ class Client:
     multiplexer: Optional[Multiplexer]
     l2cap_channel: Optional[l2cap.ClassicChannel]
 
-    def __init__(self, connection: Connection) -> None:
+    def __init__(
+        self, connection: Connection, l2cap_mtu: int = RFCOMM_DEFAULT_L2CAP_MTU
+    ) -> None:
         self.connection = connection
+        self.l2cap_mtu = l2cap_mtu
         self.l2cap_channel = None
         self.multiplexer = None
 
@@ -917,7 +921,7 @@ class Client:
         # Create a new L2CAP connection
         try:
             self.l2cap_channel = await self.connection.create_l2cap_channel(
-                spec=l2cap.ClassicChannelSpec(RFCOMM_PSM)
+                spec=l2cap.ClassicChannelSpec(psm=RFCOMM_PSM, mtu=self.l2cap_mtu)
             )
         except ProtocolError as error:
             logger.warning(f'L2CAP connection failed: {error}')
@@ -955,7 +959,9 @@ class Client:
 class Server(EventEmitter):
     acceptors: Dict[int, Callable[[DLC], None]]
 
-    def __init__(self, device: Device) -> None:
+    def __init__(
+        self, device: Device, l2cap_mtu: int = RFCOMM_DEFAULT_L2CAP_MTU
+    ) -> None:
         super().__init__()
         self.device = device
         self.multiplexer = None
@@ -963,7 +969,8 @@ class Server(EventEmitter):
 
         # Register ourselves with the L2CAP channel manager
         self.l2cap_server = device.create_l2cap_server(
-            spec=l2cap.ClassicChannelSpec(psm=RFCOMM_PSM), handler=self.on_connection
+            spec=l2cap.ClassicChannelSpec(psm=RFCOMM_PSM, mtu=l2cap_mtu),
+            handler=self.on_connection,
         )
 
     def listen(self, acceptor: Callable[[DLC], None], channel: int = 0) -> int:
