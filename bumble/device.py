@@ -2065,7 +2065,9 @@ class Device(CompositeEventEmitter):
         """Stop legacy advertising."""
         # Disable advertising
         if self.legacy_advertising_set:
-            await self.legacy_advertising_set.stop()
+            if self.legacy_advertising_set.enabled:
+                await self.legacy_advertising_set.stop()
+            await self.legacy_advertising_set.remove()
             self.legacy_advertising_set = None
         elif self.legacy_advertiser:
             await self.legacy_advertiser.stop()
@@ -2205,9 +2207,6 @@ class Device(CompositeEventEmitter):
     @property
     def is_advertising(self):
         if self.legacy_advertiser:
-            return True
-
-        if self.legacy_advertising_set and self.legacy_advertising_set.enabled:
             return True
 
         return any(
@@ -3541,11 +3540,9 @@ class Device(CompositeEventEmitter):
         connection_handle,
         number_of_completed_extended_advertising_events,
     ):
+        # Legacy advertising set is also one of extended advertising sets.
         if not (
-            advertising_set := (
-                self.extended_advertising_sets.get(advertising_handle)
-                or self.legacy_advertising_set
-            )
+            advertising_set := self.extended_advertising_sets.get(advertising_handle)
         ):
             logger.warning(f'advertising set {advertising_handle} not found')
             return
