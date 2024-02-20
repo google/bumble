@@ -119,7 +119,10 @@ def parse_intel_version_tlvs(data: bytes, offset: int) -> IntelVersionTLV:
 HCI_INTEL_READ_VERSION_COMMAND = hci_vendor_command_op_code(0xFC05)  # type: ignore
 HCI_INTEL_SECURE_SEND_COMMAND = hci_vendor_command_op_code(0xFC09)  # type: ignore
 HCI_INTEL_RESET_COMMAND = hci_vendor_command_op_code(0xFC01)  # type: ignore
+HCI_INTEL_DDC_CONFIG_WRITE_COMMAND = hci_vendor_command_op_code(0xFC8B)  # type: ignore
 HCI_Command.register_commands(globals())
+
+HCI_INTEL_DDC_CONFIG_WRITE_PAYLOAD = [0x03, 0xE4, 0x02, 0x00]
 
 
 @HCI_Command.command(  # type: ignore
@@ -140,6 +143,16 @@ class HCI_Intel_Read_Version_Command(HCI_Command):
     ],
 )
 class Hci_Intel_Secure_Send_Command(HCI_Command):
+    pass
+
+
+@HCI_Command.command(  # type: ignore
+    fields=[("params", "*")],
+    return_parameters_fields=[
+        ("params", "*"),
+    ],
+)
+class Hci_Intel_DDC_Config_Write_Command(HCI_Command):
     pass
 
 
@@ -273,6 +286,12 @@ class Driver(common.Driver):
         try:
             await download_firmware(self.host, self.version, self.firmware)
             await self.host.send_command(HCI_Reset_Command(), check_result=True)
+            # Enable host-initiated role-switching
+            await self.host.send_command(
+                Hci_Intel_DDC_Config_Write_Command(
+                    params=HCI_INTEL_DDC_CONFIG_WRITE_PAYLOAD
+                )
+            )
             logger.info(f"Firmware loaded, image: {self.fw_name}")
         except Exception:
             logging.exception("Failed to download the firmware")
