@@ -2112,6 +2112,20 @@ class Device(CompositeEventEmitter):
         Returns:
           An AdvertisingSet instance.
         """
+        # Instantiate default values
+        if advertising_parameters is None:
+            advertising_parameters = AdvertisingParameters()
+
+        if (
+            not advertising_parameters.advertising_event_properties.is_legacy
+            and advertising_data
+            and scan_response_data
+        ):
+            raise ValueError(
+                "Extended advertisements can't have both data and scan \
+                              response data"
+            )
+
         # Allocate a new handle
         try:
             advertising_handle = next(
@@ -2124,10 +2138,6 @@ class Device(CompositeEventEmitter):
             )
         except StopIteration as exc:
             raise RuntimeError("all valid advertising handles already in use") from exc
-
-        # Instantiate default values
-        if advertising_parameters is None:
-            advertising_parameters = AdvertisingParameters()
 
         # Use the device's random address if a random address is needed but none was
         # provided.
@@ -2222,7 +2232,7 @@ class Device(CompositeEventEmitter):
         scan_window: int = DEVICE_DEFAULT_SCAN_WINDOW,  # Scan window in ms
         own_address_type: int = OwnAddressType.RANDOM,
         filter_duplicates: bool = False,
-        scanning_phys: Tuple[int, int] = (HCI_LE_1M_PHY, HCI_LE_CODED_PHY),
+        scanning_phys: List[int] = [HCI_LE_1M_PHY, HCI_LE_CODED_PHY],
     ) -> None:
         # Check that the arguments are legal
         if scan_interval < scan_window:
