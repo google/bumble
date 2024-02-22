@@ -47,7 +47,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ "3.8", "3.9", "3.10", "3.11" ]
-        rust-version: [ "1.70.0", "stable" ]
+        rust-version: [ "1.76.0", "stable" ]
       fail-fast: false
     steps:
       - name: Check out from Git
