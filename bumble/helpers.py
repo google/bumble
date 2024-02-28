@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, MutableMapping
+import datetime
 from typing import cast, Any, Optional
 import logging
 
@@ -66,11 +67,12 @@ PSM_NAMES = {
     rfcomm.RFCOMM_PSM: 'RFCOMM',
     sdp.SDP_PSM: 'SDP',
     avdtp.AVDTP_PSM: 'AVDTP',
-    avctp.AVCTP_PSM: 'AVCTP'
+    avctp.AVCTP_PSM: 'AVCTP',
     # TODO: add more PSM values
 }
 
 AVCTP_PID_NAMES = {avrcp.AVRCP_PID: 'AVRCP'}
+
 
 # -----------------------------------------------------------------------------
 class PacketTracer:
@@ -207,6 +209,7 @@ class PacketTracer:
             self.label = label
             self.emit_message = emit_message
             self.acl_streams = {}  # ACL streams, by connection handle
+            self.packet_timestamp: Optional[datetime.datetime] = None
 
         def start_acl_stream(self, connection_handle: int) -> PacketTracer.AclStream:
             logger.info(
@@ -234,7 +237,10 @@ class PacketTracer:
                 # Let the other forwarder know so it can cleanup its stream as well
                 self.peer.end_acl_stream(connection_handle)
 
-        def on_packet(self, packet: HCI_Packet) -> None:
+        def on_packet(
+            self, timestamp: Optional[datetime.datetime], packet: HCI_Packet
+        ) -> None:
+            self.packet_timestamp = timestamp
             self.emit(packet)
 
             if packet.hci_packet_type == HCI_ACL_DATA_PACKET:
@@ -254,13 +260,22 @@ class PacketTracer:
                     )
 
         def emit(self, message: Any) -> None:
-            self.emit_message(f'[{self.label}] {message}')
+            if self.packet_timestamp:
+                prefix = f"[{self.packet_timestamp.strftime('%Y-%m-%d %H:%M:%S.%f')}]"
+            else:
+                prefix = ""
+            self.emit_message(f'{prefix}[{self.label}] {message}')
 
-    def trace(self, packet: HCI_Packet, direction: int = 0) -> None:
+    def trace(
+        self,
+        packet: HCI_Packet,
+        direction: int = 0,
+        timestamp: Optional[datetime.datetime] = None,
+    ) -> None:
         if direction == 0:
-            self.host_to_controller_analyzer.on_packet(packet)
+            self.host_to_controller_analyzer.on_packet(timestamp, packet)
         else:
-            self.controller_to_host_analyzer.on_packet(packet)
+            self.controller_to_host_analyzer.on_packet(timestamp, packet)
 
     def __init__(
         self,

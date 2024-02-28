@@ -168,11 +168,13 @@ class PacketReader:
 
     def __init__(self, source: io.BufferedReader) -> None:
         self.source = source
+        self.at_end = False
 
     def next_packet(self) -> Optional[bytes]:
         # Get the packet type
         packet_type = self.source.read(1)
         if len(packet_type) != 1:
+            self.at_end = True
             return None
 
         # Get the packet info based on its type
