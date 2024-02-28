@@ -130,7 +130,7 @@ class Printer:
 
     def print(self, message: str) -> None:
         self.index += 1
-        print(f"[{self.index}]{message}")
+        print(f"[{self.index:8}]{message}")
 
 
 # -----------------------------------------------------------------------------
