@@ -1,79 +1,132 @@
-<html>
-    <head>
-        <style>
-* {
-    font-family: sans-serif;
-}
+<html data-bs-theme="dark">
 
-label {
-    display: block;
-}
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+</head>
 
-input, label {
-    margin: .4rem 0;
-}
-        </style>
-    </head>
-    <body>
-        Server Port <input id="port" type="text" value="8989"></input> <button onclick="connect()">Connect</button><br>
-        AT Command <input type="text" id="at_command" required size="10"> <button onclick="send_at_command()">Send</button><br>
-        Dial Phone Number <input type="text" id="dial_number" required size="10"> <button onclick="dial()">Dial</button><br>
-        <button onclick="answer()">Answer</button>
-        <button onclick="hangup()">Hang Up</button>
-        <button onclick="start_voice_assistant()">Start Voice Assistant</button>
-        <button onclick="stop_voice_assistant()">Stop Voice Assistant</button>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">Bumble Handsfree</span>
+        </div>
+    </nav>
+    <br>
+
+    <div class="container">
+
+        <label class="form-label">Server Port</label>
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" aria-label="Port Number" value="8989" id="port">
+            <button class="btn btn-primary" type="button" onclick="connect()">Connect</button>
+        </div>
+
+        <label class="form-label">Dial Phone Number</label>
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" placeholder="Phone Number" aria-label="Phone Number"
+                id="dial_number">
+            <button class="btn btn-primary" type="button"
+                onclick="send_at_command(`ATD${dialNumberInput.value}`)">Dial</button>
+        </div>
+
+        <label class="form-label">Send AT Command</label>
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" placeholder="AT Command" aria-label="AT command" id="at_command">
+            <button class="btn btn-primary" type="button"
+                onclick="send_at_command(document.getElementById('at_command').value)">Send</button>
+        </div>
+
+        <div class="row">
+            <div class="col-auto">
+                <label class="form-label">Battery Level</label>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" placeholder="0 - 100" aria-label="Battery Level"
+                        id="battery_level">
+                    <button class="btn btn-primary" type="button"
+                        onclick="send_at_command(`AT+BIEV=2,${document.getElementById('battery_level').value}`)">Set</button>
+                </div>
+            </div>
+            <div class="col-auto">
+                <label class="form-label">Speaker Volume</label>
+                <div class="input-group mb-3 col-auto">
+                    <input type="text" class="form-control" placeholder="0 - 15" aria-label="Speaker Volume"
+                        id="speaker_volume">
+                    <button class="btn btn-primary" type="button"
+                        onclick="send_at_command(`AT+VGS=${document.getElementById('speaker_volume').value}`)">Set</button>
+                </div>
+            </div>
+            <div class="col-auto">
+                <label class="form-label">Mic Volume</label>
+                <div class="input-group mb-3 col-auto">
+                    <input type="text" class="form-control" placeholder="0 - 15" aria-label="Mic Volume"
+                        id="mic_volume">
+                    <button class="btn btn-primary" type="button"
+                        onclick="send_at_command(`AT+VGM=${document.getElementById('mic_volume').value}`)">Set</button>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="send_at_command('ATA')">Answer</button>
+        <button class="btn btn-primary" onclick="send_at_command('AT+CHUP')">Hang Up</button>
+        <button class="btn btn-primary" onclick="send_at_command('AT+BLDN')">Redial</button>
+        <button class="btn btn-primary" onclick="send({ type: 'query_call'})">Get Call Status</button>
+
+        <br><br>
+
+        <button class="btn btn-primary" onclick="send_at_command('AT+BVRA=1')">Start Voice Assistant</button>
+        <button class="btn btn-primary" onclick="send_at_command('AT+BVRA=0')">Stop Voice Assistant</button>
+
         <hr>
-        <div id="socketState"></div>
-        <script>
+
+        <div id="socketStateContainer" class="bg-body-tertiary p-3 rounded-2">
+            <h3>Log</h3>
+            <code id="log" style="white-space: pre-line;"></code>
+        </div>
+    </div>
+
+
+    <script>
         let portInput = document.getElementById("port")
         let atCommandInput = document.getElementById("at_command")
-        let dialNumberInput = document.getElementById("dial_number")
-        let socketState = document.getElementById("socketState")
+        let log = document.getElementById("log")
         let socket
 
         function connect() {
             socket = new WebSocket(`ws://localhost:${portInput.value}`);
             socket.onopen = _ => {
-                socketState.innerText = 'OPEN'
+                log.textContent += 'OPEN\n'
             }
             socket.onclose = _ => {
-                socketState.innerText = 'CLOSED'
+                log.textContent += 'CLOSED\n'
             }
             socket.onerror = (error) => {
-                socketState.innerText = 'ERROR'
+                log.textContent += 'ERROR\n'
                 console.log(`ERROR: ${error}`)
+            }
+            socket.onmessage = (event) => {
+                log.textContent += `<-- ${event.data}\n`
+                let volume_state = JSON.parse(event.data)
+                volumeSetting.value = volume_state.volume_setting
+                changeCounter.value = volume_state.change_counter
+                muted.checked = volume_state.muted ? true : false
             }
         }
 
         function send(message) {
             if (socket && socket.readyState == WebSocket.OPEN) {
-                socket.send(JSON.stringify(message))
+                let jsonMessage = JSON.stringify(message)
+                log.textContent += `--> ${jsonMessage}\n`
+                socket.send(jsonMessage)
+            } else {
+                log.textContent += 'NOT CONNECTED\n'
             }
         }
 
-        function send_at_command() {
-            send({ type:'at_command', command: atCommandInput.value })
+        function send_at_command(command) {
+            send({ type: 'at_command', 'command': command })
         }
+    </script>
+    </div>
+</body>
 
-        function answer() {
-            send({ type:'at_command', command: 'ATA' })
-        }
-
-        function hangup() {
-            send({ type:'at_command', command: 'AT+CHUP' })
-        }
-
-        function dial() {
-            send({ type:'at_command', command: `ATD${dialNumberInput.value}` })
-        }
-
-        function start_voice_assistant() {
-            send(({ type:'at_command', command: 'AT+BVRA=1' }))
-        }
-
-        function stop_voice_assistant() {
-            send(({ type:'at_command', command: 'AT+BVRA=0' }))
-        }
-</script>
-    </body>
 </html>
