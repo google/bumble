@@ -39,6 +39,7 @@ nav:
   - Drivers:
     - drivers/index.md
     - Realtek: drivers/realtek.md
+    - Intel: drivers/intel.md
   - API:
     - Guide: api/guide.md
     - Examples: api/examples.md

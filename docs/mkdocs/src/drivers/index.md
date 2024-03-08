@@ -17,3 +17,4 @@ USB vendor ID and product ID.
 Drivers included in the module are:
 
   * [Realtek](realtek.md): Loading of Firmware and Config for Realtek USB dongles.
+  * [Intel](intel.md): Loading of Firmware for Intel dongles.
