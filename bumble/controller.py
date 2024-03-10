@@ -374,6 +374,12 @@ class Controller:
                 return connection
         return None
 
+    def find_peripheral_connection_by_handle(self, handle):
+        for connection in self.peripheral_connections.values():
+            if connection.handle == handle:
+                return connection
+        return None
+
     def on_link_central_connected(self, central_address):
         '''
         Called when an incoming connection occurs from a central on the link
@@ -877,6 +883,14 @@ class Controller:
             else:
                 # Remove the connection
                 del self.central_connections[connection.peer_address]
+        elif connection := self.find_peripheral_connection_by_handle(handle):
+            if self.link:
+                self.link.disconnect(
+                    connection.peer_address, self.random_address, command
+                )
+            else:
+                # Remove the connection
+                del self.peripheral_connections[connection.peer_address]
         elif connection := self.find_classic_connection_by_handle(handle):
             if self.link:
                 self.link.classic_disconnect(
