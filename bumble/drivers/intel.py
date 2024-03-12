@@ -53,8 +53,12 @@ class Driver(common.Driver):
         self.host = host
 
     @classmethod
-    async def for_host(cls, host, force=False):  # type: ignore
-        return cls(host)
+    async def for_host(cls, host):  # type: ignore
+        # Only instantiate this driver if explicitly selected
+        if host.hci_metadata.get("driver") == "intel":
+            return cls(host)
+
+        return None
 
     async def init_controller(self):
         self.host.ready = True
