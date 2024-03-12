@@ -498,7 +498,7 @@ class Host(AbortableEventEmitter):
     def controller(self, controller) -> None:
         self.set_packet_sink(controller)
         if controller:
-            controller.set_packet_sink(self)
+            self.set_packet_source(controller)
 
     def set_packet_sink(self, sink: Optional[TransportSink]) -> None:
         self.hci_sink = sink
