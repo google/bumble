@@ -396,6 +396,16 @@ async def open_usb_transport(spec: str) -> Transport:
                         break
                     device_index -= 1
                 device.close()
+        elif '-' in spec:
+
+            def device_path(device):
+                return f'{device.getBusNumber()}-{".".join(map(str, device.getPortNumberList()))}'
+
+            for device in context.getDeviceIterator(skip_on_error=True):
+                if device_path(device) == spec:
+                    found = device
+                    break
+                device.close()
         else:
             # Look for a compatible device by index
             def device_is_bluetooth_hci(device):

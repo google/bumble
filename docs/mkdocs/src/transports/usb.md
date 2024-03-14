@@ -10,12 +10,15 @@ The moniker for a USB transport is either:
   * `usb:<vendor>:<product>`
   * `usb:<vendor>:<product>/<serial-number>`
   * `usb:<vendor>:<product>#<index>`
+  * `usb:<bus>-<port_numbers>`
 
 with `<index>` as a 0-based index (0 being the first one) to select amongst all the matching devices when there are more than one.
 In the `usb:<index>` form, matching devices are the ones supporting Bluetooth HCI, as declared by their Class, Subclass and Protocol.
 In the `usb:<vendor>:<product>#<index>` form, matching devices are the ones with the specified `<vendor>` and `<product>` identification.
 
 `<vendor>` and `<product>` are a vendor ID and product ID in hexadecimal.
+
+with `<port_numbers>` as a list of all port numbers from root separated with dots `.`
 
 In addition, if the moniker ends with the symbol "!", the device will be used in "forced" mode:
 the first USB interface of the device will be used, regardless of the interface class/subclass.
@@ -36,6 +39,9 @@ This may be useful for some devices that use a custom class/subclass but may non
 
     `usb:0B05:17CB!`
     The BT USB dongle vendor=0B05 and product=17CB, in "forced" mode.
+
+    `usb:3-3.4.1`
+    The BT USB dongle on bus 3 on port path 3, 4, 1.
 
 
 ## Alternative

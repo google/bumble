@@ -216,6 +216,15 @@ async def open_pyusb_transport(spec: str) -> Transport:
     if ':' in spec:
         vendor_id, product_id = spec.split(':')
         device = usb_find(idVendor=int(vendor_id, 16), idProduct=int(product_id, 16))
+    elif '-' in spec:
+
+        def device_path(device):
+            if device.port_numbers:
+                return f'{device.bus}-{".".join(map(str, device.port_numbers))}'
+            else:
+                return str(device.bus)
+
+        device = usb_find(custom_match=lambda device: device_path(device) == spec)
     else:
         device_index = int(spec)
         devices = list(
