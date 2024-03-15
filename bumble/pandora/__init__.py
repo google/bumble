@@ -26,11 +26,13 @@ from .config import Config
 from .device import PandoraDevice
 from .host import HostService
 from .security import SecurityService, SecurityStorageService
+from .l2cap import L2CAPService
 from pandora.host_grpc_aio import add_HostServicer_to_server
 from pandora.security_grpc_aio import (
     add_SecurityServicer_to_server,
     add_SecurityStorageServicer_to_server,
 )
+from pandora.l2cap_grpc_aio import add_L2CAPServicer_to_server
 from typing import Callable, List, Optional
 
 # public symbols
@@ -77,6 +79,7 @@ async def serve(
             add_SecurityStorageServicer_to_server(
                 SecurityStorageService(bumble.device, config), server
             )
+            add_L2CAPServicer_to_server(L2CAPService(bumble.device, config), server)
 
             # call hooks if any.
             for hook in _SERVICERS_HOOKS:
