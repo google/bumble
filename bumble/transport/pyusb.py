@@ -113,9 +113,10 @@ async def open_pyusb_transport(spec: str) -> Transport:
             self.loop.call_soon_threadsafe(self.stop_event.set)
 
     class UsbPacketSource(asyncio.Protocol, ParserSource):
-        def __init__(self, device, sco_enabled):
+        def __init__(self, device, metadata, sco_enabled):
             super().__init__()
             self.device = device
+            self.metadata = metadata
             self.loop = asyncio.get_running_loop()
             self.queue = asyncio.Queue()
             self.dequeue_task = None
@@ -244,6 +245,9 @@ async def open_pyusb_transport(spec: str) -> Transport:
         raise ValueError('device not found')
     logger.debug(f'USB Device: {device}')
 
+    # Collect the metadata
+    device_metadata = {'vendor_id': device.idVendor, 'product_id': device.idProduct}
+
     # Detach the kernel driver if needed
     if device.is_kernel_driver_active(0):
         logger.debug("detaching kernel driver")
@@ -298,7 +302,7 @@ async def open_pyusb_transport(spec: str) -> Transport:
     #     except usb.USBError:
     #         logger.warning('failed to set alternate setting')
 
-    packet_source = UsbPacketSource(device, sco_enabled)
+    packet_source = UsbPacketSource(device, device_metadata, sco_enabled)
     packet_sink = UsbPacketSink(device)
     packet_source.start()
     packet_sink.start()
