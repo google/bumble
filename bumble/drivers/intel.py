@@ -30,6 +30,17 @@ from bumble.hci import (
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
+# Constant
+# -----------------------------------------------------------------------------
+
+INTEL_USB_PRODUCTS = {
+    # Intel AX210
+    (0x8087, 0x0032),
+    # Intel BE200
+    (0x8087, 0x0036),
+}
+
+# -----------------------------------------------------------------------------
 # HCI Commands
 # -----------------------------------------------------------------------------
 HCI_INTEL_DDC_CONFIG_WRITE_COMMAND = hci_vendor_command_op_code(0xFC8B)  # type: ignore
@@ -52,13 +63,34 @@ class Driver(common.Driver):
     def __init__(self, host):
         self.host = host
 
-    @classmethod
-    async def for_host(cls, host):  # type: ignore
-        # Only instantiate this driver if explicitly selected
-        if host.hci_metadata.get("driver") == "intel":
-            return cls(host)
+    @staticmethod
+    def check(host):
+        driver = host.hci_metadata.get("driver")
+        if driver == "intel":
+            return True
 
-        return None
+        vendor_id = host.hci_metadata.get("vendor_id")
+        product_id = host.hci_metadata.get("product_id")
+
+        if vendor_id is None or product_id is None:
+            logger.debug("USB metadata not sufficient")
+            return False
+
+        if (vendor_id, product_id) not in INTEL_USB_PRODUCTS:
+            logger.debug(
+                f"USB device ({vendor_id:04X}, {product_id:04X}) " "not in known list"
+            )
+            return False
+
+        return True
+
+    @classmethod
+    async def for_host(cls, host, force=False):  # type: ignore
+        # Only instantiate this driver if explicitly selected
+        if not force and not cls.check(host):
+            return None
+
+        return cls(host)
 
     async def init_controller(self):
         self.host.ready = True
