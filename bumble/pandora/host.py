@@ -486,14 +486,10 @@ class HostService(HostServicer):
             target_bytes = bytes(reversed(request.target))
             if request.target_variant() == "public":
                 target = Address(target_bytes, Address.PUBLIC_DEVICE_ADDRESS)
-                advertising_type = (
-                    AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY
-                )  # FIXME: HIGH_DUTY ?
+                advertising_type = AdvertisingType.DIRECTED_CONNECTABLE_LOW_DUTY
             else:
                 target = Address(target_bytes, Address.RANDOM_DEVICE_ADDRESS)
-                advertising_type = (
-                    AdvertisingType.DIRECTED_CONNECTABLE_HIGH_DUTY
-                )  # FIXME: HIGH_DUTY ?
+                advertising_type = AdvertisingType.DIRECTED_CONNECTABLE_LOW_DUTY
 
         if request.connectable:
 
