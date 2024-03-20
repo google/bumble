@@ -632,7 +632,7 @@ class SbcPacketSource:
             # NOTE: this doesn't support frame fragments
             sbc_parser = SbcParser(self.read)
             async for frame in sbc_parser.frames:
-                print(frame)
+                # print(frame)
 
                 if (
                     frames_size + len(frame.payload) > max_rtp_payload
