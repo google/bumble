@@ -35,7 +35,7 @@ impl Controller {
     /// module specifies the defaults. Must be called from a thread with a Python event loop, which
     /// should be true on `tokio::main` and `async_std::main`.
     ///
-    /// For more info, see https://awestlake87.github.io/pyo3-asyncio/master/doc/pyo3_asyncio/#event-loop-references-and-contextvars.
+    /// For more info, see <https://awestlake87.github.io/pyo3-asyncio/master/doc/pyo3_asyncio/#event-loop-references-and-contextvars>.
     pub async fn new(
         name: &str,
         host_source: Option<TransportSource>,

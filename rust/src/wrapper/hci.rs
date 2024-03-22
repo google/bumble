@@ -149,7 +149,7 @@ impl ToPyObject for Address {
 
 /// An error meaning that the u64 value did not represent a valid BT address.
 #[derive(Debug)]
-pub struct InvalidAddress(u64);
+pub struct InvalidAddress(#[allow(unused)] u64);
 
 impl TryInto<packets::Address> for Address {
     type Error = ConversionError<InvalidAddress>;

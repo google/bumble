@@ -37,6 +37,11 @@ PYTHONPATH=..:[virtualenv site-packages] \
     cargo run --features bumble-tools --bin bumble -- --help
 ```
 
+Notable subcommands:
+
+- `firmware realtek download`: download Realtek firmware for various chipsets so that it can be automatically loaded when needed
+- `usb probe`: show USB devices, highlighting the ones usable for Bluetooth
+
 # Development
 
 Run the tests:
