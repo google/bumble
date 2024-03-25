@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,22 +44,20 @@ async fn main() -> PyResult<()> {
         &cli.device_config,
         transport.source()?,
         transport.sink()?,
-    )?;
+    )
+    .await?;
 
     let mut adv_data = AdvertisementDataBuilder::new();
 
     adv_data
-        .append(
-            CommonDataType::CompleteLocalName,
-            "Bumble from Rust".as_bytes(),
-        )
+        .append(CommonDataType::CompleteLocalName, "Bumble from Rust")
         .map_err(|e| anyhow!(e))?;
 
     // Randomized TX power
     adv_data
         .append(
             CommonDataType::TxPowerLevel,
-            &[rand::thread_rng().gen_range(-100_i8..=20) as u8],
+            [rand::thread_rng().gen_range(-100_i8..=20) as u8].as_slice(),
         )
         .map_err(|e| anyhow!(e))?;
 

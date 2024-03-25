@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::anyhow;
 use bumble::wrapper::{
     controller::Controller,
+    core::{TryFromPy, TryToPy},
     device::Device,
     hci::{
         packets::{
@@ -28,12 +30,13 @@ use bumble::wrapper::{
 };
 use pyo3::{
     exceptions::PyException,
-    {PyErr, PyResult},
+    Python, {PyErr, PyResult},
 };
 
 #[pyo3_asyncio::tokio::test]
 async fn test_hci_roundtrip_success_and_failure() -> PyResult<()> {
-    let address = Address::new("F0:F1:F2:F3:F4:F5", AddressType::RandomDeviceAddress)?;
+    let address = Address::from_be_hex("F0:F1:F2:F3:F4:F5", AddressType::RandomDeviceAddress)
+        .map_err(|e| anyhow!(e))?;
     let device = create_local_device(address).await?;
 
     device.power_on().await?;
@@ -78,9 +81,29 @@ async fn test_hci_roundtrip_success_and_failure() -> PyResult<()> {
     Ok(())
 }
 
+#[pyo3_asyncio::tokio::test]
+async fn address_roundtrip() -> PyResult<()> {
+    for addr_type in [
+        AddressType::PublicDeviceAddress,
+        AddressType::RandomDeviceAddress,
+        AddressType::PublicIdentityAddress,
+        AddressType::RandomIdentityAddress,
+    ] {
+        let addr = Address::from_be_hex("F0:F1:F2:F3:F4:F5", addr_type).map_err(|e| anyhow!(e))?;
+
+        Python::with_gil(|py| {
+            assert_eq!(addr, Address::try_from_py(py, addr.try_to_py(py)?)?);
+
+            Ok::<(), PyErr>(())
+        })?;
+    }
+
+    Ok(())
+}
+
 async fn create_local_device(address: Address) -> PyResult<Device> {
     let link = Link::new_local_link()?;
-    let controller = Controller::new("C1", None, None, Some(link), Some(address.clone())).await?;
+    let controller = Controller::new("C1", None, None, Some(link), Some(address)).await?;
     let host = Host::new(controller.clone().into(), controller.into()).await?;
-    Device::new(None, Some(address), None, Some(host), None)
+    Device::new(None, Some(address), None, Some(host), None).await
 }

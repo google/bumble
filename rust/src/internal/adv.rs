@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -174,7 +174,9 @@ impl CommonDataType {
                             .map(|uuid| {
                                 SERVICE_IDS
                                     .get(&uuid)
-                                    .map(|name| format!("{:?} ({name})", uuid))
+                                    .map(|service_info| {
+                                        format!("{:?} ({})", uuid, service_info.name())
+                                    })
                                     .unwrap_or_else(|| format!("{:?}", uuid))
                             })
                             .join(", ")
@@ -201,7 +203,7 @@ impl CommonDataType {
                         "service={:?}, data={}",
                         SERVICE_IDS
                             .get(&uuid)
-                            .map(|name| format!("{:?} ({name})", uuid))
+                            .map(|service_info| format!("{:?} ({})", uuid, service_info.name()))
                             .unwrap_or_else(|| format!("{:?}", uuid)),
                         hex::encode_upper(rem)
                     )
@@ -364,26 +366,52 @@ impl AdvertisementDataBuilder {
     /// Append advertising data to the builder.
     ///
     /// Returns an error if the data cannot be appended.
-    pub fn append(
+    pub fn append<T: AdvertisementDataValue + ?Sized>(
         &mut self,
         type_code: impl Into<CommonDataTypeCode>,
-        data: &[u8],
+        value: &T,
     ) -> Result<(), AdvertisementDataBuilderError> {
+        // write to an intermediate buffer rather than ask the value its length, since that could
+        // be implemented incorrectly
+        let mut encode_buf = Vec::new();
+        value.write_to(&mut encode_buf);
+
         self.encoded_data.push(
-            data.len()
+            encode_buf
+                .len()
                 .try_into()
                 .ok()
                 .and_then(|len: u8| len.checked_add(1))
                 .ok_or(AdvertisementDataBuilderError::DataTooLong)?,
         );
         self.encoded_data.push(type_code.into().0);
-        self.encoded_data.extend_from_slice(data);
+        self.encoded_data.extend_from_slice(&encode_buf);
 
         Ok(())
     }
 
     pub(crate) fn into_bytes(self) -> Vec<u8> {
         self.encoded_data
+    }
+}
+
+/// Encode values per the spec for advertising data
+pub trait AdvertisementDataValue {
+    /// Write this value's data to the buffer
+    fn write_to(&self, buf: &mut impl bytes::BufMut);
+}
+
+impl AdvertisementDataValue for [u8] {
+    fn write_to(&self, buf: &mut impl bytes::BufMut) {
+        // write slices as-is
+        buf.put(self)
+    }
+}
+
+impl AdvertisementDataValue for str {
+    fn write_to(&self, buf: &mut impl bytes::BufMut) {
+        // write strings as UTF-8
+        buf.put(self.as_bytes())
     }
 }
 
