@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,13 +36,14 @@ pub mod controller;
 pub mod core;
 pub mod device;
 pub mod drivers;
-pub mod gatt_client;
+
+pub mod att;
+pub mod gatt;
 pub mod hci;
 pub mod host;
 pub mod l2cap;
 pub mod link;
 pub mod logging;
-pub mod profile;
 pub mod transport;
 
 /// Convenience extensions to [PyObject]
@@ -78,11 +79,23 @@ impl PyObjectExt for PyObject {
 
 /// Convenience extensions to [PyDict]
 pub trait PyDictExt {
+    /// Build a dict from name/value pairs.
+    fn from_pairs<'py>(py: Python<'py>, pairs: &[(&str, impl ToPyObject)]) -> PyResult<&'py Self>;
     /// Set item in dict only if value is Some, otherwise do nothing.
     fn set_opt_item<K: ToPyObject, V: ToPyObject>(&self, key: K, value: Option<V>) -> PyResult<()>;
 }
 
 impl PyDictExt for PyDict {
+    fn from_pairs<'py>(py: Python<'py>, pairs: &[(&str, impl ToPyObject)]) -> PyResult<&'py Self> {
+        let dict = PyDict::new(py);
+
+        for (name, value) in pairs {
+            dict.set_item(name, value)?;
+        }
+
+        Ok(dict)
+    }
+
     fn set_opt_item<K: ToPyObject, V: ToPyObject>(&self, key: K, value: Option<V>) -> PyResult<()> {
         if let Some(value) = value {
             self.set_item(key, value)?
@@ -94,10 +107,11 @@ impl PyDictExt for PyDict {
 /// Wrapper to make Rust closures ([Fn] implementations) callable from Python.
 ///
 /// The Python callable form returns a Python `None`.
-#[pyclass(name = "SubscribeCallback")]
+#[pyclass(module = "bumble.rust")]
 pub(crate) struct ClosureCallback {
     // can't use generics in a pyclass, so have to box
     #[allow(clippy::type_complexity)]
+    // TODO should this require Sync?
     callback: Box<dyn Fn(Python, &PyTuple, Option<&PyDict>) -> PyResult<()> + Send + 'static>,
 }
 
@@ -114,7 +128,7 @@ impl ClosureCallback {
 
 #[pymethods]
 impl ClosureCallback {
-    #[pyo3(signature = (*args, **kwargs))]
+    #[pyo3(signature = (* args, * * kwargs))]
     fn __call__(
         &self,
         py: Python<'_>,
