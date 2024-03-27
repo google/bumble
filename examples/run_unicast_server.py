@@ -22,14 +22,14 @@ import os
 import struct
 import secrets
 from bumble.core import AdvertisingData
-from bumble.device import Device, CisLink, AdvertisingParameters
+from bumble.device import Device, CisLink
 from bumble.hci import (
     CodecID,
     CodingFormat,
-    OwnAddressType,
     HCI_IsoDataPacket,
 )
 from bumble.profiles.bap import (
+    UnicastServerAdvertisingData,
     CodecSpecificCapabilities,
     ContextType,
     AudioLocation,
@@ -141,6 +141,7 @@ async def main() -> None:
                 )
             )
             + csis.get_advertising_data()
+            + bytes(UnicastServerAdvertisingData())
         )
         subprocess = await asyncio.create_subprocess_shell(
             f'dlc3 | ffplay pipe:0',
@@ -178,7 +179,7 @@ async def main() -> None:
 
         device.once('cis_establishment', on_cis)
 
-        advertising_set = await device.create_advertising_set(
+        await device.create_advertising_set(
             advertising_data=advertising_data,
         )
 

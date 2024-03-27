@@ -24,8 +24,9 @@ import enum
 import struct
 import functools
 import logging
-from typing import Optional, List, Union, Type, Dict, Any, Tuple, cast
+from typing import Optional, List, Union, Type, Dict, Any, Tuple
 
+from bumble import core
 from bumble import colors
 from bumble import device
 from bumble import hci
@@ -226,6 +227,14 @@ class SupportedFrameDuration(enum.IntFlag):
     DURATION_10000_US_SUPPORTED = 0b0010
     DURATION_7500_US_PREFERRED  = 0b0001
     DURATION_10000_US_PREFERRED = 0b0010
+
+
+class AnnouncementType(enum.IntEnum):
+    '''Basic Audio Profile, 3.5.3. Additional Audio Stream Control Service requirements'''
+
+    # fmt: off
+    GENERAL  = 0x00
+    TARGETED = 0x01
 
 
 # -----------------------------------------------------------------------------
@@ -451,6 +460,34 @@ class AseReasonCode(enum.IntEnum):
 class AudioRole(enum.IntEnum):
     SINK = hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.CONTROLLER_TO_HOST
     SOURCE = hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.HOST_TO_CONTROLLER
+
+
+@dataclasses.dataclass
+class UnicastServerAdvertisingData:
+    """Advertising Data for ASCS."""
+
+    announcement_type: AnnouncementType = AnnouncementType.TARGETED
+    available_audio_contexts: ContextType = ContextType.MEDIA
+    metadata: bytes = b''
+
+    def __bytes__(self) -> bytes:
+        return bytes(
+            core.AdvertisingData(
+                [
+                    (
+                        core.AdvertisingData.SERVICE_DATA_16_BIT_UUID,
+                        struct.pack(
+                            '<2sBIB',
+                            gatt.GATT_AUDIO_STREAM_CONTROL_SERVICE.to_bytes(),
+                            self.announcement_type,
+                            self.available_audio_contexts,
+                            len(self.metadata),
+                        )
+                        + self.metadata,
+                    )
+                ]
+            )
+        )
 
 
 # -----------------------------------------------------------------------------

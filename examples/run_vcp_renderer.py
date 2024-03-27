@@ -31,6 +31,7 @@ from bumble.hci import (
     OwnAddressType,
 )
 from bumble.profiles.bap import (
+    UnicastServerAdvertisingData,
     CodecSpecificCapabilities,
     ContextType,
     AudioLocation,
@@ -151,6 +152,7 @@ async def main() -> None:
                 )
             )
             + csis.get_advertising_data()
+            + bytes(UnicastServerAdvertisingData())
         )
 
         await device.create_advertising_set(
