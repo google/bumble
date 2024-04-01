@@ -509,9 +509,11 @@ class Ping:
         packet = struct.pack(
             '>bbI',
             PacketType.SEQUENCE,
-            PACKET_FLAG_LAST
-            if self.current_packet_index == self.tx_packet_count - 1
-            else 0,
+            (
+                PACKET_FLAG_LAST
+                if self.current_packet_index == self.tx_packet_count - 1
+                else 0
+            ),
             self.current_packet_index,
         ) + bytes(self.tx_packet_size - 6)
         logging.info(color(f'Sending packet {self.current_packet_index}', 'yellow'))
@@ -1062,9 +1064,9 @@ class Central(Connection.Listener):
 
             if self.phy not in (None, HCI_LE_1M_PHY):
                 # Add an connections parameters entry for this PHY.
-                self.connection_parameter_preferences[
-                    self.phy
-                ] = connection_parameter_preferences
+                self.connection_parameter_preferences[self.phy] = (
+                    connection_parameter_preferences
+                )
         else:
             self.connection_parameter_preferences = None
 
@@ -1232,6 +1234,7 @@ class Peripheral(Device.Listener, Connection.Listener):
                         'cyan',
                     )
                 )
+
             await self.connected.wait()
             logging.info(color('### Connected', 'cyan'))
 
@@ -1591,8 +1594,8 @@ def central(
     mode_factory = create_mode_factory(ctx, 'gatt-client')
     classic = ctx.obj['classic']
 
-    asyncio.run(
-        Central(
+    async def run_central():
+        await Central(
             transport,
             peripheral_address,
             classic,
@@ -1604,7 +1607,8 @@ def central(
             encrypt or authenticate,
             ctx.obj['extended_data_length'],
         ).run()
-    )
+
+    asyncio.run(run_central())
 
 
 @bench.command()
@@ -1615,15 +1619,16 @@ def peripheral(ctx, transport):
     role_factory = create_role_factory(ctx, 'receiver')
     mode_factory = create_mode_factory(ctx, 'gatt-server')
 
-    asyncio.run(
-        Peripheral(
+    async def run_peripheral():
+        await Peripheral(
             transport,
             ctx.obj['classic'],
             ctx.obj['extended_data_length'],
             role_factory,
             mode_factory,
         ).run()
-    )
+
+    asyncio.run(run_peripheral())
 
 
 def main():
