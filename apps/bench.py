@@ -1064,9 +1064,9 @@ class Central(Connection.Listener):
 
             if self.phy not in (None, HCI_LE_1M_PHY):
                 # Add an connections parameters entry for this PHY.
-                self.connection_parameter_preferences[self.phy] = (
-                    connection_parameter_preferences
-                )
+                self.connection_parameter_preferences[
+                    self.phy
+                ] = connection_parameter_preferences
         else:
             self.connection_parameter_preferences = None
 
