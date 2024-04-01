@@ -1745,9 +1745,11 @@ class Protocol(pyee.EventEmitter):
                 avc.CommandFrame.CommandType.CONTROL,
                 avc.Frame.SubunitType.PANEL,
                 0,
-                avc.PassThroughFrame.StateFlag.PRESSED
-                if pressed
-                else avc.PassThroughFrame.StateFlag.RELEASED,
+                (
+                    avc.PassThroughFrame.StateFlag.PRESSED
+                    if pressed
+                    else avc.PassThroughFrame.StateFlag.RELEASED
+                ),
                 key,
                 b'',
             )

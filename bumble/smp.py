@@ -737,9 +737,9 @@ class Session:
 
         # Create a future that can be used to wait for the session to complete
         if self.is_initiator:
-            self.pairing_result: Optional[
-                asyncio.Future[None]
-            ] = asyncio.get_running_loop().create_future()
+            self.pairing_result: Optional[asyncio.Future[None]] = (
+                asyncio.get_running_loop().create_future()
+            )
         else:
             self.pairing_result = None
 

@@ -24,6 +24,7 @@ from bumble.device import Device
 from bumble.keys import JsonKeyStore
 from bumble.transport import open_transport
 
+
 # -----------------------------------------------------------------------------
 async def unbond_with_keystore(keystore, address):
     if address is None:

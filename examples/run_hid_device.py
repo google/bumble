@@ -229,6 +229,7 @@ HID_REPORT_MAP = bytes(  # Text String, 50 Octet Report Descriptor
 # Default protocol mode set to report protocol
 protocol_mode = Message.ProtocolMode.REPORT_PROTOCOL
 
+
 # -----------------------------------------------------------------------------
 def sdp_records():
     service_record_handle = 0x00010002
@@ -426,6 +427,7 @@ class DeviceData:
 
 # Device's live data - Mouse and Keyboard will be stored in this
 deviceData = DeviceData()
+
 
 # -----------------------------------------------------------------------------
 async def keyboard_device(hid_device):

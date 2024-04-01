@@ -25,6 +25,7 @@ from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.snoop import BtSnooper
 
+
 # -----------------------------------------------------------------------------
 async def main():
     if len(sys.argv) != 3:

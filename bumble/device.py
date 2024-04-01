@@ -276,12 +276,12 @@ class Advertisement:
     data_bytes: bytes = b''
 
     # Constants
-    TX_POWER_NOT_AVAILABLE: ClassVar[
-        int
-    ] = HCI_LE_Extended_Advertising_Report_Event.TX_POWER_INFORMATION_NOT_AVAILABLE
-    RSSI_NOT_AVAILABLE: ClassVar[
-        int
-    ] = HCI_LE_Extended_Advertising_Report_Event.RSSI_NOT_AVAILABLE
+    TX_POWER_NOT_AVAILABLE: ClassVar[int] = (
+        HCI_LE_Extended_Advertising_Report_Event.TX_POWER_INFORMATION_NOT_AVAILABLE
+    )
+    RSSI_NOT_AVAILABLE: ClassVar[int] = (
+        HCI_LE_Extended_Advertising_Report_Event.RSSI_NOT_AVAILABLE
+    )
 
     def __post_init__(self) -> None:
         self.data = AdvertisingData.from_bytes(self.data_bytes)
@@ -558,7 +558,9 @@ class AdvertisingParameters:
     )
     primary_advertising_interval_min: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
     primary_advertising_interval_max: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
-    primary_advertising_channel_map: HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap = (
+    primary_advertising_channel_map: (
+        HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap
+    ) = (
         AdvertisingChannelMap.CHANNEL_37
         | AdvertisingChannelMap.CHANNEL_38
         | AdvertisingChannelMap.CHANNEL_39
@@ -1138,14 +1140,12 @@ class Connection(CompositeEventEmitter):
     @overload
     async def create_l2cap_channel(
         self, spec: l2cap.ClassicChannelSpec
-    ) -> l2cap.ClassicChannel:
-        ...
+    ) -> l2cap.ClassicChannel: ...
 
     @overload
     async def create_l2cap_channel(
         self, spec: l2cap.LeCreditBasedChannelSpec
-    ) -> l2cap.LeCreditBasedChannel:
-        ...
+    ) -> l2cap.LeCreditBasedChannel: ...
 
     async def create_l2cap_channel(
         self, spec: Union[l2cap.ClassicChannelSpec, l2cap.LeCreditBasedChannelSpec]
@@ -1723,16 +1723,14 @@ class Device(CompositeEventEmitter):
         self,
         connection: Connection,
         spec: l2cap.ClassicChannelSpec,
-    ) -> l2cap.ClassicChannel:
-        ...
+    ) -> l2cap.ClassicChannel: ...
 
     @overload
     async def create_l2cap_channel(
         self,
         connection: Connection,
         spec: l2cap.LeCreditBasedChannelSpec,
-    ) -> l2cap.LeCreditBasedChannel:
-        ...
+    ) -> l2cap.LeCreditBasedChannel: ...
 
     async def create_l2cap_channel(
         self,
@@ -1753,16 +1751,14 @@ class Device(CompositeEventEmitter):
         self,
         spec: l2cap.ClassicChannelSpec,
         handler: Optional[Callable[[l2cap.ClassicChannel], Any]] = None,
-    ) -> l2cap.ClassicChannelServer:
-        ...
+    ) -> l2cap.ClassicChannelServer: ...
 
     @overload
     def create_l2cap_server(
         self,
         spec: l2cap.LeCreditBasedChannelSpec,
         handler: Optional[Callable[[l2cap.LeCreditBasedChannel], Any]] = None,
-    ) -> l2cap.LeCreditBasedChannelServer:
-        ...
+    ) -> l2cap.LeCreditBasedChannelServer: ...
 
     def create_l2cap_server(
         self,
@@ -3289,17 +3285,19 @@ class Device(CompositeEventEmitter):
 
         handler = self.on(
             'remote_name',
-            lambda address, remote_name: pending_name.set_result(remote_name)
-            if address == peer_address
-            else None,
+            lambda address, remote_name: (
+                pending_name.set_result(remote_name)
+                if address == peer_address
+                else None
+            ),
         )
         failure_handler = self.on(
             'remote_name_failure',
-            lambda address, error_code: pending_name.set_exception(
-                HCI_Error(error_code)
-            )
-            if address == peer_address
-            else None,
+            lambda address, error_code: (
+                pending_name.set_exception(HCI_Error(error_code))
+                if address == peer_address
+                else None
+            ),
         )
 
         try:
@@ -3475,9 +3473,9 @@ class Device(CompositeEventEmitter):
             LE features supported by the remote device.
         """
         with closing(EventWatcher()) as watcher:
-            read_feature_future: asyncio.Future[
-                LeFeatureMask
-            ] = asyncio.get_running_loop().create_future()
+            read_feature_future: asyncio.Future[LeFeatureMask] = (
+                asyncio.get_running_loop().create_future()
+            )
 
             def on_le_remote_features(handle: int, features: int):
                 if handle == connection.handle:

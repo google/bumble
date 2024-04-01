@@ -825,11 +825,13 @@ class Client:
         )
         attribute_id_list = DataElement.sequence(
             [
-                DataElement.unsigned_integer(
-                    attribute_id[0], value_size=attribute_id[1]
+                (
+                    DataElement.unsigned_integer(
+                        attribute_id[0], value_size=attribute_id[1]
+                    )
+                    if isinstance(attribute_id, tuple)
+                    else DataElement.unsigned_integer_16(attribute_id)
                 )
-                if isinstance(attribute_id, tuple)
-                else DataElement.unsigned_integer_16(attribute_id)
                 for attribute_id in attribute_ids
             ]
         )
@@ -881,11 +883,13 @@ class Client:
 
         attribute_id_list = DataElement.sequence(
             [
-                DataElement.unsigned_integer(
-                    attribute_id[0], value_size=attribute_id[1]
+                (
+                    DataElement.unsigned_integer(
+                        attribute_id[0], value_size=attribute_id[1]
+                    )
+                    if isinstance(attribute_id, tuple)
+                    else DataElement.unsigned_integer_16(attribute_id)
                 )
-                if isinstance(attribute_id, tuple)
-                else DataElement.unsigned_integer_16(attribute_id)
                 for attribute_id in attribute_ids
             ]
         )

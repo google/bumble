@@ -49,6 +49,7 @@ LINUX_FROM_SCRATCH_SOURCE = (
     False,
 )
 
+
 # -----------------------------------------------------------------------------
 # Functions
 # -----------------------------------------------------------------------------
@@ -111,7 +112,7 @@ def main(output_dir, source, single, force, parse):
             for driver_info in rtk.Driver.DRIVER_INFOS
         ]
 
-    for (fw_name, config_name, config_needed) in images:
+    for fw_name, config_name, config_needed in images:
         print(color("---", "yellow"))
         fw_image_out = output_dir / fw_name
         if not force and fw_image_out.exists():
