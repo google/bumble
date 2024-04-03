@@ -1234,6 +1234,7 @@ class Peripheral(Device.Listener, Connection.Listener):
                         'cyan',
                     )
                 )
+
             await self.connected.wait()
             logging.info(color('### Connected', 'cyan'))
 
@@ -1593,8 +1594,8 @@ def central(
     mode_factory = create_mode_factory(ctx, 'gatt-client')
     classic = ctx.obj['classic']
 
-    asyncio.run(
-        Central(
+    async def run_central():
+        await Central(
             transport,
             peripheral_address,
             classic,
@@ -1606,7 +1607,8 @@ def central(
             encrypt or authenticate,
             ctx.obj['extended_data_length'],
         ).run()
-    )
+
+    asyncio.run(run_central())
 
 
 @bench.command()
@@ -1617,15 +1619,16 @@ def peripheral(ctx, transport):
     role_factory = create_role_factory(ctx, 'receiver')
     mode_factory = create_mode_factory(ctx, 'gatt-server')
 
-    asyncio.run(
-        Peripheral(
+    async def run_peripheral():
+        await Peripheral(
             transport,
             ctx.obj['classic'],
             ctx.obj['extended_data_length'],
             role_factory,
             mode_factory,
         ).run()
-    )
+
+    asyncio.run(run_peripheral())
 
 
 def main():
