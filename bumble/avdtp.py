@@ -325,8 +325,8 @@ class MediaPacket:
         self.padding = padding
         self.extension = extension
         self.marker = marker
-        self.sequence_number = sequence_number
-        self.timestamp = timestamp
+        self.sequence_number = sequence_number & 0xFFFF
+        self.timestamp = timestamp & 0xFFFFFFFF
         self.ssrc = ssrc
         self.csrc_list = csrc_list
         self.payload_type = payload_type
@@ -341,7 +341,12 @@ class MediaPacket:
                 | len(self.csrc_list),
                 self.marker << 7 | self.payload_type,
             ]
-        ) + struct.pack('>HII', self.sequence_number, self.timestamp, self.ssrc)
+        ) + struct.pack(
+            '>HII',
+            self.sequence_number,
+            self.timestamp,
+            self.ssrc,
+        )
         for csrc in self.csrc_list:
             header += struct.pack('>I', csrc)
         return header + self.payload

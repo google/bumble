@@ -652,7 +652,9 @@ class SbcPacketSource:
 
                     # Prepare for next packets
                     sequence_number += 1
+                    sequence_number &= 0xFFFF
                     timestamp += sum((frame.sample_count for frame in frames))
+                    timestamp &= 0xFFFFFFFF
                     frames = [frame]
                     frames_size = len(frame.payload)
                 else:
