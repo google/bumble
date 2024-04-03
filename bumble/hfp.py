@@ -820,11 +820,11 @@ class HfProtocol(pyee.EventEmitter):
         return calls
 
     async def update_ag_indicator(self, index: int, value: int):
-        self.ag_indicators[index].current_status = value
-        self.emit('ag_indicator', self.ag_indicators[index])
-        logger.info(
-            f"AG indicator updated: {self.ag_indicators[index].description}, {value}"
-        )
+        # CIEV is in 1-index, while ag_indicators is in 0-index.
+        ag_indicator = self.ag_indicators[index - 1]
+        ag_indicator.current_status = value
+        self.emit('ag_indicator', ag_indicator)
+        logger.info(f"AG indicator updated: {ag_indicator.description}, {value}")
 
     async def handle_unsolicited(self):
         """Handle unsolicited result codes sent by the audio gateway."""
