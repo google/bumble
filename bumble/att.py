@@ -655,7 +655,7 @@ class ATT_Write_Command(ATT_PDU):
 @ATT_PDU.subclass(
     [
         ('attribute_handle', HANDLE_FIELD_SPEC),
-        ('attribute_value', '*')
+        ('attribute_value', '*'),
         # ('authentication_signature', 'TODO')
     ]
 )

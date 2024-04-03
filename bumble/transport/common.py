@@ -59,15 +59,13 @@ class TransportLostError(Exception):
 # Typing Protocols
 # -----------------------------------------------------------------------------
 class TransportSink(Protocol):
-    def on_packet(self, packet: bytes) -> None:
-        ...
+    def on_packet(self, packet: bytes) -> None: ...
 
 
 class TransportSource(Protocol):
     terminated: asyncio.Future[None]
 
-    def set_packet_sink(self, sink: TransportSink) -> None:
-        ...
+    def set_packet_sink(self, sink: TransportSink) -> None: ...
 
 
 # -----------------------------------------------------------------------------

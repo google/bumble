@@ -352,9 +352,7 @@ class Client:
             if c.uuid == uuid
         ]
 
-    def get_attribute_grouping(
-        self, attribute_handle: int
-    ) -> Optional[
+    def get_attribute_grouping(self, attribute_handle: int) -> Optional[
         Union[
             ServiceProxy,
             Tuple[ServiceProxy, CharacteristicProxy],

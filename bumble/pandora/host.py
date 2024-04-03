@@ -287,9 +287,9 @@ class HostService(HostServicer):
         self.log.debug(f"WaitDisconnection: {connection_handle}")
 
         if connection := self.device.lookup_connection(connection_handle):
-            disconnection_future: asyncio.Future[
-                None
-            ] = asyncio.get_running_loop().create_future()
+            disconnection_future: asyncio.Future[None] = (
+                asyncio.get_running_loop().create_future()
+            )
 
             def on_disconnection(_: None) -> None:
                 disconnection_future.set_result(None)
@@ -370,9 +370,9 @@ class HostService(HostServicer):
             scan_response_data=scan_response_data,
         )
 
-        pending_connection: asyncio.Future[
-            bumble.device.Connection
-        ] = asyncio.get_running_loop().create_future()
+        pending_connection: asyncio.Future[bumble.device.Connection] = (
+            asyncio.get_running_loop().create_future()
+        )
 
         if request.connectable:
 
@@ -516,9 +516,9 @@ class HostService(HostServicer):
                     await asyncio.sleep(1)
                     continue
 
-                pending_connection: asyncio.Future[
-                    bumble.device.Connection
-                ] = asyncio.get_running_loop().create_future()
+                pending_connection: asyncio.Future[bumble.device.Connection] = (
+                    asyncio.get_running_loop().create_future()
+                )
 
                 self.log.debug('Wait for LE connection...')
                 connection = await pending_connection
@@ -563,12 +563,14 @@ class HostService(HostServicer):
             legacy=request.legacy,
             active=not request.passive,
             own_address_type=request.own_address_type,
-            scan_interval=int(request.interval)
-            if request.interval
-            else DEVICE_DEFAULT_SCAN_INTERVAL,
-            scan_window=int(request.window)
-            if request.window
-            else DEVICE_DEFAULT_SCAN_WINDOW,
+            scan_interval=(
+                int(request.interval)
+                if request.interval
+                else DEVICE_DEFAULT_SCAN_INTERVAL
+            ),
+            scan_window=(
+                int(request.window) if request.window else DEVICE_DEFAULT_SCAN_WINDOW
+            ),
             scanning_phys=scanning_phys,
         )
 
@@ -782,9 +784,11 @@ class HostService(HostServicer):
                             *struct.pack('<H', dt.peripheral_connection_interval_min),
                             *struct.pack(
                                 '<H',
-                                dt.peripheral_connection_interval_max
-                                if dt.peripheral_connection_interval_max
-                                else dt.peripheral_connection_interval_min,
+                                (
+                                    dt.peripheral_connection_interval_max
+                                    if dt.peripheral_connection_interval_max
+                                    else dt.peripheral_connection_interval_min
+                                ),
                             ),
                         ]
                     ),

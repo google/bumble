@@ -316,13 +316,13 @@ async def _test_self_smp_with_configs(pairing_config1, pairing_config2):
 
     # Set up the pairing configs
     if pairing_config1:
-        two_devices.devices[
-            0
-        ].pairing_config_factory = lambda connection: pairing_config1
+        two_devices.devices[0].pairing_config_factory = (
+            lambda connection: pairing_config1
+        )
     if pairing_config2:
-        two_devices.devices[
-            1
-        ].pairing_config_factory = lambda connection: pairing_config2
+        two_devices.devices[1].pairing_config_factory = (
+            lambda connection: pairing_config2
+        )
 
     # Pair
     await two_devices.devices[0].pair(connection)

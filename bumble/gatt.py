@@ -342,9 +342,11 @@ class Service(Attribute):
             uuid = UUID(uuid)
 
         super().__init__(
-            GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE
-            if primary
-            else GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
+            (
+                GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE
+                if primary
+                else GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE
+            ),
             Attribute.READABLE,
             uuid.to_pdu_bytes(),
         )
@@ -560,9 +562,9 @@ class CharacteristicAdapter:
 
     def __init__(self, characteristic: Union[Characteristic, AttributeProxy]):
         self.wrapped_characteristic = characteristic
-        self.subscribers: Dict[
-            Callable, Callable
-        ] = {}  # Map from subscriber to proxy subscriber
+        self.subscribers: Dict[Callable, Callable] = (
+            {}
+        )  # Map from subscriber to proxy subscriber
 
         if isinstance(characteristic, Characteristic):
             self.read_value = self.read_encoded_value

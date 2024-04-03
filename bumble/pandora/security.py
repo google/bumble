@@ -383,9 +383,9 @@ class SecurityService(SecurityServicer):
             connection.transport
         ] == request.level_variant()
 
-        wait_for_security: asyncio.Future[
-            str
-        ] = asyncio.get_running_loop().create_future()
+        wait_for_security: asyncio.Future[str] = (
+            asyncio.get_running_loop().create_future()
+        )
         authenticate_task: Optional[asyncio.Future[None]] = None
         pair_task: Optional[asyncio.Future[None]] = None
 

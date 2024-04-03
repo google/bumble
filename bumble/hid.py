@@ -48,6 +48,7 @@ HID_INTERRUPT_PSM = 0x0013
 
 class Message:
     message_type: MessageType
+
     # Report types
     class ReportType(enum.IntEnum):
         OTHER_REPORT = 0x00

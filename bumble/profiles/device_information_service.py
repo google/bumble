@@ -59,7 +59,7 @@ class DeviceInformationService(TemplateService):
         firmware_revision: Optional[str] = None,
         software_revision: Optional[str] = None,
         system_id: Optional[Tuple[int, int]] = None,  # (OUI, Manufacturer ID)
-        ieee_regulatory_certification_data_list: Optional[bytes] = None
+        ieee_regulatory_certification_data_list: Optional[bytes] = None,
         # TODO: pnp_id
     ):
         characteristics = [
@@ -107,7 +107,7 @@ class DeviceInformationServiceProxy(ProfileServiceProxy):
     def __init__(self, service_proxy):
         self.service_proxy = service_proxy
 
-        for (field, uuid) in (
+        for field, uuid in (
             ('manufacturer_name', GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC),
             ('model_number', GATT_MODEL_NUMBER_STRING_CHARACTERISTIC),
             ('serial_number', GATT_SERIAL_NUMBER_STRING_CHARACTERISTIC),

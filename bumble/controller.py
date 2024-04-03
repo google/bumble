@@ -134,15 +134,15 @@ class Controller:
         self.hci_sink = None
         self.link = link
 
-        self.central_connections: Dict[
-            Address, Connection
-        ] = {}  # Connections where this controller is the central
-        self.peripheral_connections: Dict[
-            Address, Connection
-        ] = {}  # Connections where this controller is the peripheral
-        self.classic_connections: Dict[
-            Address, Connection
-        ] = {}  # Connections in BR/EDR
+        self.central_connections: Dict[Address, Connection] = (
+            {}
+        )  # Connections where this controller is the central
+        self.peripheral_connections: Dict[Address, Connection] = (
+            {}
+        )  # Connections where this controller is the peripheral
+        self.classic_connections: Dict[Address, Connection] = (
+            {}
+        )  # Connections in BR/EDR
         self.central_cis_links: Dict[int, CisLink] = {}  # CIS links by handle
         self.peripheral_cis_links: Dict[int, CisLink] = {}  # CIS links by handle
 

@@ -1545,9 +1545,10 @@ class Protocol(EventEmitter):
 
         assert False  # Should never reach this
 
-    async def get_capabilities(
-        self, seid: int
-    ) -> Union[Get_Capabilities_Response, Get_All_Capabilities_Response,]:
+    async def get_capabilities(self, seid: int) -> Union[
+        Get_Capabilities_Response,
+        Get_All_Capabilities_Response,
+    ]:
         if self.version > (1, 2):
             return await self.send_command(Get_All_Capabilities_Command(seid))
 

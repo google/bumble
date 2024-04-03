@@ -25,6 +25,7 @@ from bumble.utils import AsyncRunner
 my_work_queue1 = AsyncRunner.WorkQueue()
 my_work_queue2 = AsyncRunner.WorkQueue(create_task=False)
 
+
 # -----------------------------------------------------------------------------
 @AsyncRunner.run_in_task()
 async def func1(x, y):

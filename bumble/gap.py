@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 # Classes
 # -----------------------------------------------------------------------------
 
+
 # -----------------------------------------------------------------------------
 class GenericAccessService(Service):
     def __init__(self, device_name, appearance=(0, 0)):

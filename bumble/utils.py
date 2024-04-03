@@ -117,12 +117,12 @@ class EventWatcher:
         self.handlers = []
 
     @overload
-    def on(self, emitter: EventEmitter, event: str) -> Callable[[_Handler], _Handler]:
-        ...
+    def on(
+        self, emitter: EventEmitter, event: str
+    ) -> Callable[[_Handler], _Handler]: ...
 
     @overload
-    def on(self, emitter: EventEmitter, event: str, handler: _Handler) -> _Handler:
-        ...
+    def on(self, emitter: EventEmitter, event: str, handler: _Handler) -> _Handler: ...
 
     def on(
         self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None
@@ -144,12 +144,14 @@ class EventWatcher:
         return wrapper if handler is None else wrapper(handler)
 
     @overload
-    def once(self, emitter: EventEmitter, event: str) -> Callable[[_Handler], _Handler]:
-        ...
+    def once(
+        self, emitter: EventEmitter, event: str
+    ) -> Callable[[_Handler], _Handler]: ...
 
     @overload
-    def once(self, emitter: EventEmitter, event: str, handler: _Handler) -> _Handler:
-        ...
+    def once(
+        self, emitter: EventEmitter, event: str, handler: _Handler
+    ) -> _Handler: ...
 
     def once(
         self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None

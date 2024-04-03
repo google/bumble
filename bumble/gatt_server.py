@@ -445,9 +445,9 @@ class Server(EventEmitter):
             assert self.pending_confirmations[connection.handle] is None
 
             # Create a future value to hold the eventual response
-            pending_confirmation = self.pending_confirmations[
-                connection.handle
-            ] = asyncio.get_running_loop().create_future()
+            pending_confirmation = self.pending_confirmations[connection.handle] = (
+                asyncio.get_running_loop().create_future()
+            )
 
             try:
                 self.send_gatt_pdu(connection.handle, indication.to_bytes())
