@@ -31,13 +31,12 @@ use pyo3::{
 };
 
 pub mod assigned_numbers;
+pub mod att;
 pub mod common;
 pub mod controller;
 pub mod core;
 pub mod device;
 pub mod drivers;
-
-pub mod att;
 pub mod gatt;
 pub mod hci;
 pub mod host;

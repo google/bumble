@@ -271,11 +271,16 @@ async fn with_dir_lock<T>(
     closure: impl Future<Output = anyhow::Result<T>>,
 ) -> anyhow::Result<T> {
     // wait until we can create the dir
+    let mut printed_contention_msg = false;
     loop {
         match fs::create_dir(dir) {
             Ok(_) => break,
             Err(e) => {
                 if e.kind() == io::ErrorKind::AlreadyExists {
+                    if !printed_contention_msg {
+                        printed_contention_msg = true;
+                        eprintln!("Dir lock contention; sleeping");
+                    }
                     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                 } else {
                     warn!(

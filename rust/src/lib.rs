@@ -30,3 +30,10 @@ pub mod wrapper;
 
 pub use internal::adv;
 pub(crate) mod internal;
+
+/// Directory for Bumble local storage for the current user according to the OS's conventions,
+/// if a convention is known for the current OS
+#[cfg(any(feature = "bumble-tools", test))]
+pub fn project_dir() -> Option<directories::ProjectDirs> {
+    directories::ProjectDirs::from("com", "google", "bumble")
+}

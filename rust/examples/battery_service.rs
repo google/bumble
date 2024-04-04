@@ -31,6 +31,20 @@
 //!     client \
 //!     --target-addr F0:F1:F2:F3:F4:F5
 //! ```
+//!
+//! Any combo will work, e.g. a Rust server and Python client:
+//!
+//! ```
+//! PYTHONPATH=..:/path/to/virtualenv/site-packages/ \
+//!     cargo run --example battery_service -- \
+//!     --transport android-netsim \
+//!     server
+//! ```
+//!
+//! ```
+//! PYTHONPATH=. python examples/battery_client.py \
+//!     android-netsim F0:F1:F2:F3:F4:F5
+//! ```
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -53,6 +67,8 @@ use owo_colors::OwoColorize;
 use pyo3::prelude::*;
 use rand::Rng;
 use std::time::Duration;
+use tokio::select;
+use tokio_util::sync::CancellationToken;
 
 #[pyo3_asyncio::tokio::main]
 async fn main() -> PyResult<()> {
@@ -116,7 +132,7 @@ async fn run_client(device: Device, target_addr: Address) -> anyhow::Result<()> 
 }
 
 async fn run_server(mut device: Device) -> anyhow::Result<()> {
-    let uuid = services::BATTERY.uuid();
+    let battery_service_uuid = services::BATTERY.uuid();
     let battery_level_uuid = Uuid16::from(0x2A19).into();
     let battery_level = Characteristic::new(
         battery_level_uuid,
@@ -124,14 +140,14 @@ async fn run_server(mut device: Device) -> anyhow::Result<()> {
         AttributePermission::Readable.into(),
         CharacteristicValueHandler::new(Box::new(BatteryRead), Box::new(NoOpWrite)),
     );
-    let service = Service::new(uuid.into(), vec![battery_level]);
+    let service = Service::new(battery_service_uuid.into(), vec![battery_level]);
     let service_handle = device.add_service(&service)?;
 
     let mut builder = AdvertisementDataBuilder::new();
     builder.append(CommonDataType::CompleteLocalName, "Bumble Battery")?;
     builder.append(
         CommonDataType::IncompleteListOf16BitServiceClassUuids,
-        &uuid,
+        &battery_service_uuid,
     )?;
     builder.append(
         CommonDataType::Appearance,
@@ -146,10 +162,28 @@ async fn run_server(mut device: Device) -> anyhow::Result<()> {
         .characteristic_handle(battery_level_uuid)
         .expect("Battery level should be present");
 
+    let cancellation_token = CancellationToken::new();
+
+    let ct = cancellation_token.clone();
+    tokio::spawn(async move {
+        let _ = tokio::signal::ctrl_c().await;
+        println!("Ctrl-C caught");
+        ct.cancel();
+    });
+
     loop {
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        select! {
+            _ = tokio::time::sleep(Duration::from_secs(3)) => {}
+            _ = cancellation_token.cancelled() => { break }
+        }
+
         device.notify_subscribers(char_handle).await?;
     }
+
+    println!("Stopping advertising");
+    device.stop_advertising().await?;
+
+    Ok(())
 }
 
 struct BatteryRead;
