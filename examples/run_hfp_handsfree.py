@@ -37,7 +37,7 @@ hf_protocol: Optional[HfProtocol] = None
 
 
 # -----------------------------------------------------------------------------
-def on_dlc(dlc: rfcomm.DLC, configuration: hfp.Configuration):
+def on_dlc(dlc: rfcomm.DLC, configuration: hfp.HfConfiguration):
     print('*** DLC connected', dlc)
     global hf_protocol
     hf_protocol = HfProtocol(dlc, configuration)
@@ -96,7 +96,7 @@ async def main():
 
         # Hands-Free profile configuration.
         # TODO: load configuration from file.
-        configuration = hfp.Configuration(
+        configuration = hfp.HfConfiguration(
             supported_hf_features=[
                 hfp.HfFeature.THREE_WAY_CALLING,
                 hfp.HfFeature.REMOTE_VOLUME_CONTROL,
