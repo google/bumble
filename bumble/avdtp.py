@@ -46,12 +46,9 @@ from .core import (
     name_or_number,
 )
 from .a2dp import (
-    A2DP_CODEC_TYPE_NAMES,
-    A2DP_MPEG_2_4_AAC_CODEC_TYPE,
-    A2DP_NON_A2DP_CODEC_TYPE,
-    A2DP_SBC_CODEC_TYPE,
     AacMediaCodecInformation,
     SbcMediaCodecInformation,
+    CodecType,
     VendorSpecificMediaCodecInformation,
 )
 from . import sdp, device, l2cap
@@ -598,22 +595,22 @@ class ServiceCapabilities:
 class MediaCodecCapabilities(ServiceCapabilities):
     media_codec_information: Union[bytes, SupportsBytes]
     media_type: int
-    media_codec_type: int
+    media_codec_type: CodecType
 
     def init_from_bytes(self) -> None:
         self.media_type = self.service_capabilities_bytes[0]
-        self.media_codec_type = self.service_capabilities_bytes[1]
+        self.media_codec_type = CodecType(self.service_capabilities_bytes[1])
         self.media_codec_information = self.service_capabilities_bytes[2:]
 
-        if self.media_codec_type == A2DP_SBC_CODEC_TYPE:
+        if self.media_codec_type == CodecType.SBC:
             self.media_codec_information = SbcMediaCodecInformation.from_bytes(
                 self.media_codec_information
             )
-        elif self.media_codec_type == A2DP_MPEG_2_4_AAC_CODEC_TYPE:
+        elif self.media_codec_type == CodecType.MPEG_2_4_AAC:
             self.media_codec_information = AacMediaCodecInformation.from_bytes(
                 self.media_codec_information
             )
-        elif self.media_codec_type == A2DP_NON_A2DP_CODEC_TYPE:
+        elif self.media_codec_type == CodecType.NON_A2DP:
             self.media_codec_information = (
                 VendorSpecificMediaCodecInformation.from_bytes(
                     self.media_codec_information
@@ -623,7 +620,7 @@ class MediaCodecCapabilities(ServiceCapabilities):
     def __init__(
         self,
         media_type: int,
-        media_codec_type: int,
+        media_codec_type: CodecType,
         media_codec_information: Union[bytes, SupportsBytes],
     ) -> None:
         super().__init__(
@@ -643,7 +640,7 @@ class MediaCodecCapabilities(ServiceCapabilities):
 
         details = [
             f'media_type={name_or_number(AVDTP_MEDIA_TYPE_NAMES, self.media_type)}',
-            f'codec={name_or_number(A2DP_CODEC_TYPE_NAMES, self.media_codec_type)}',
+            f'codec={self.media_codec_type.name}',
             f'codec_info={codec_info}',
         ]
         return self.to_string(details)

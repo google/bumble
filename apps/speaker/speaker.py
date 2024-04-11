@@ -48,16 +48,11 @@ from bumble.avdtp import (
     Protocol,
 )
 from bumble.a2dp import (
-    MPEG_2_AAC_LC_OBJECT_TYPE,
     make_audio_sink_service_sdp_records,
-    A2DP_SBC_CODEC_TYPE,
-    A2DP_MPEG_2_4_AAC_CODEC_TYPE,
-    SBC_MONO_CHANNEL_MODE,
-    SBC_DUAL_CHANNEL_MODE,
-    SBC_SNR_ALLOCATION_METHOD,
-    SBC_LOUDNESS_ALLOCATION_METHOD,
-    SBC_STEREO_CHANNEL_MODE,
-    SBC_JOINT_STEREO_CHANNEL_MODE,
+    CodecType,
+    AacObjectType,
+    SbcChannelMode,
+    SbcAllocationMethod,
     SbcMediaCodecInformation,
     AacMediaCodecInformation,
 )
@@ -450,9 +445,9 @@ class Speaker:
     def aac_codec_capabilities(self) -> MediaCodecCapabilities:
         return MediaCodecCapabilities(
             media_type=AVDTP_AUDIO_MEDIA_TYPE,
-            media_codec_type=A2DP_MPEG_2_4_AAC_CODEC_TYPE,
+            media_codec_type=CodecType.MPEG_2_4_AAC,
             media_codec_information=AacMediaCodecInformation.from_lists(
-                object_types=[MPEG_2_AAC_LC_OBJECT_TYPE],
+                object_types=[AacObjectType.MPEG_2_LC],
                 sampling_frequencies=[48000, 44100],
                 channels=[1, 2],
                 vbr=1,
@@ -463,20 +458,20 @@ class Speaker:
     def sbc_codec_capabilities(self) -> MediaCodecCapabilities:
         return MediaCodecCapabilities(
             media_type=AVDTP_AUDIO_MEDIA_TYPE,
-            media_codec_type=A2DP_SBC_CODEC_TYPE,
+            media_codec_type=CodecType.SBC,
             media_codec_information=SbcMediaCodecInformation.from_lists(
                 sampling_frequencies=[48000, 44100, 32000, 16000],
                 channel_modes=[
-                    SBC_MONO_CHANNEL_MODE,
-                    SBC_DUAL_CHANNEL_MODE,
-                    SBC_STEREO_CHANNEL_MODE,
-                    SBC_JOINT_STEREO_CHANNEL_MODE,
+                    SbcChannelMode.MONO,
+                    SbcChannelMode.DUAL,
+                    SbcChannelMode.STEREO,
+                    SbcChannelMode.JOINT_STEREO,
                 ],
                 block_lengths=[4, 8, 12, 16],
                 subbands=[4, 8],
                 allocation_methods=[
-                    SBC_LOUDNESS_ALLOCATION_METHOD,
-                    SBC_SNR_ALLOCATION_METHOD,
+                    SbcAllocationMethod.LOUDNESS,
+                    SbcAllocationMethod.SNR,
                 ],
                 minimum_bitpool_value=2,
                 maximum_bitpool_value=53,

@@ -31,13 +31,9 @@ from bumble.avdtp import (
 )
 from bumble.a2dp import (
     make_audio_sink_service_sdp_records,
-    A2DP_SBC_CODEC_TYPE,
-    SBC_MONO_CHANNEL_MODE,
-    SBC_DUAL_CHANNEL_MODE,
-    SBC_SNR_ALLOCATION_METHOD,
-    SBC_LOUDNESS_ALLOCATION_METHOD,
-    SBC_STEREO_CHANNEL_MODE,
-    SBC_JOINT_STEREO_CHANNEL_MODE,
+    CodecType,
+    SbcChannelMode,
+    SbcAllocationMethod,
     SbcMediaCodecInformation,
 )
 
@@ -59,20 +55,20 @@ def codec_capabilities():
     # NOTE: this shouldn't be hardcoded, but passed on the command line instead
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
-        media_codec_type=A2DP_SBC_CODEC_TYPE,
+        media_codec_type=CodecType.SBC,
         media_codec_information=SbcMediaCodecInformation.from_lists(
             sampling_frequencies=[48000, 44100, 32000, 16000],
             channel_modes=[
-                SBC_MONO_CHANNEL_MODE,
-                SBC_DUAL_CHANNEL_MODE,
-                SBC_STEREO_CHANNEL_MODE,
-                SBC_JOINT_STEREO_CHANNEL_MODE,
+                SbcChannelMode.MONO,
+                SbcChannelMode.DUAL,
+                SbcChannelMode.STEREO,
+                SbcChannelMode.JOINT_STEREO,
             ],
             block_lengths=[4, 8, 12, 16],
             subbands=[4, 8],
             allocation_methods=[
-                SBC_LOUDNESS_ALLOCATION_METHOD,
-                SBC_SNR_ALLOCATION_METHOD,
+                SbcAllocationMethod.LOUDNESS,
+                SbcAllocationMethod.SNR,
             ],
             minimum_bitpool_value=2,
             maximum_bitpool_value=53,

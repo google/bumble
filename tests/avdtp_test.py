@@ -15,7 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from bumble.a2dp import A2DP_SBC_CODEC_TYPE
+from bumble.a2dp import CodecType
 from bumble.avdtp import (
     AVDTP_AUDIO_MEDIA_TYPE,
     AVDTP_DELAY_REPORTING_SERVICE_CATEGORY,
@@ -26,7 +26,6 @@ from bumble.avdtp import (
     MediaPacket,
     Get_Capabilities_Response,
     Set_Configuration_Command,
-    Set_Configuration_Response,
     ServiceCapabilities,
     MediaCodecCapabilities,
 )
@@ -38,7 +37,7 @@ def test_messages():
         ServiceCapabilities(AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY),
         MediaCodecCapabilities(
             media_type=AVDTP_AUDIO_MEDIA_TYPE,
-            media_codec_type=A2DP_SBC_CODEC_TYPE,
+            media_codec_type=CodecType.SBC,
             media_codec_information=bytes.fromhex('211502fa'),
         ),
         ServiceCapabilities(AVDTP_DELAY_REPORTING_SERVICE_CATEGORY),

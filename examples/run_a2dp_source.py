@@ -33,10 +33,10 @@ from bumble.avdtp import (
     Listener,
 )
 from bumble.a2dp import (
-    SBC_JOINT_STEREO_CHANNEL_MODE,
-    SBC_LOUDNESS_ALLOCATION_METHOD,
     make_audio_source_service_sdp_records,
-    A2DP_SBC_CODEC_TYPE,
+    CodecType,
+    SbcChannelMode,
+    SbcAllocationMethod,
     SbcMediaCodecInformation,
     SbcPacketSource,
 )
@@ -58,13 +58,13 @@ def codec_capabilities():
     # instead
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
-        media_codec_type=A2DP_SBC_CODEC_TYPE,
+        media_codec_type=CodecType.SBC,
         media_codec_information=SbcMediaCodecInformation.from_discrete_values(
             sampling_frequency=44100,
-            channel_mode=SBC_JOINT_STEREO_CHANNEL_MODE,
+            channel_mode=SbcChannelMode.JOINT_STEREO,
             block_length=16,
             subbands=8,
-            allocation_method=SBC_LOUDNESS_ALLOCATION_METHOD,
+            allocation_method=SbcAllocationMethod.LOUDNESS,
             minimum_bitpool_value=2,
             maximum_bitpool_value=53,
         ),
@@ -88,9 +88,7 @@ async def stream_packets(read_function, protocol):
         print('@@@', endpoint)
 
     # Select a sink
-    sink = protocol.find_remote_sink_by_codec(
-        AVDTP_AUDIO_MEDIA_TYPE, A2DP_SBC_CODEC_TYPE
-    )
+    sink = protocol.find_remote_sink_by_codec(AVDTP_AUDIO_MEDIA_TYPE, CodecType.SBC)
     if sink is None:
         print(color('!!! no SBC sink found', 'red'))
         return

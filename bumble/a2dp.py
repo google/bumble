@@ -18,10 +18,11 @@
 from __future__ import annotations
 
 import dataclasses
+import enum
 import struct
 import logging
 from collections.abc import AsyncGenerator
-from typing import List, Callable, Awaitable
+from typing import List, Callable, Iterable, Awaitable
 
 from .company_ids import COMPANY_IDENTIFIERS
 from .sdp import (
@@ -55,19 +56,12 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # fmt: off
 
-A2DP_SBC_CODEC_TYPE            = 0x00
-A2DP_MPEG_1_2_AUDIO_CODEC_TYPE = 0x01
-A2DP_MPEG_2_4_AAC_CODEC_TYPE   = 0x02
-A2DP_ATRAC_FAMILY_CODEC_TYPE   = 0x03
-A2DP_NON_A2DP_CODEC_TYPE       = 0xFF
-
-A2DP_CODEC_TYPE_NAMES = {
-    A2DP_SBC_CODEC_TYPE:            'A2DP_SBC_CODEC_TYPE',
-    A2DP_MPEG_1_2_AUDIO_CODEC_TYPE: 'A2DP_MPEG_1_2_AUDIO_CODEC_TYPE',
-    A2DP_MPEG_2_4_AAC_CODEC_TYPE:   'A2DP_MPEG_2_4_AAC_CODEC_TYPE',
-    A2DP_ATRAC_FAMILY_CODEC_TYPE:   'A2DP_ATRAC_FAMILY_CODEC_TYPE',
-    A2DP_NON_A2DP_CODEC_TYPE:       'A2DP_NON_A2DP_CODEC_TYPE'
-}
+class CodecType(enum.IntEnum):
+    SBC            = 0x00
+    MPEG_1_2_AUDIO = 0x01
+    MPEG_2_4_AAC   = 0x02
+    ATRAC_FAMILY   = 0x03
+    NON_A2DP       = 0xFF
 
 
 SBC_SYNC_WORD = 0x9C
@@ -79,29 +73,20 @@ SBC_SAMPLING_FREQUENCIES = [
     48000
 ]
 
-SBC_MONO_CHANNEL_MODE         = 0x00
-SBC_DUAL_CHANNEL_MODE         = 0x01
-SBC_STEREO_CHANNEL_MODE       = 0x02
-SBC_JOINT_STEREO_CHANNEL_MODE = 0x03
 
-SBC_CHANNEL_MODE_NAMES = {
-    SBC_MONO_CHANNEL_MODE:         'SBC_MONO_CHANNEL_MODE',
-    SBC_DUAL_CHANNEL_MODE:         'SBC_DUAL_CHANNEL_MODE',
-    SBC_STEREO_CHANNEL_MODE:       'SBC_STEREO_CHANNEL_MODE',
-    SBC_JOINT_STEREO_CHANNEL_MODE: 'SBC_JOINT_STEREO_CHANNEL_MODE'
-}
+class SbcChannelMode(enum.IntEnum):
+    MONO         = 0x00
+    DUAL         = 0x01
+    STEREO       = 0x02
+    JOINT_STEREO = 0x03
 
 SBC_BLOCK_LENGTHS = [4, 8, 12, 16]
 
 SBC_SUBBANDS = [4, 8]
 
-SBC_SNR_ALLOCATION_METHOD      = 0x00
-SBC_LOUDNESS_ALLOCATION_METHOD = 0x01
-
-SBC_ALLOCATION_METHOD_NAMES = {
-    SBC_SNR_ALLOCATION_METHOD:      'SBC_SNR_ALLOCATION_METHOD',
-    SBC_LOUDNESS_ALLOCATION_METHOD: 'SBC_LOUDNESS_ALLOCATION_METHOD'
-}
+class SbcAllocationMethod(enum.IntEnum):
+    SNR      = 0x00
+    LOUDNESS = 0x01
 
 MPEG_2_4_AAC_SAMPLING_FREQUENCIES = [
     8000,
@@ -118,23 +103,17 @@ MPEG_2_4_AAC_SAMPLING_FREQUENCIES = [
     96000
 ]
 
-MPEG_2_AAC_LC_OBJECT_TYPE       = 0x00
-MPEG_4_AAC_LC_OBJECT_TYPE       = 0x01
-MPEG_4_AAC_LTP_OBJECT_TYPE      = 0x02
-MPEG_4_AAC_SCALABLE_OBJECT_TYPE = 0x03
-
-MPEG_2_4_OBJECT_TYPE_NAMES = {
-    MPEG_2_AAC_LC_OBJECT_TYPE:       'MPEG_2_AAC_LC_OBJECT_TYPE',
-    MPEG_4_AAC_LC_OBJECT_TYPE:       'MPEG_4_AAC_LC_OBJECT_TYPE',
-    MPEG_4_AAC_LTP_OBJECT_TYPE:      'MPEG_4_AAC_LTP_OBJECT_TYPE',
-    MPEG_4_AAC_SCALABLE_OBJECT_TYPE: 'MPEG_4_AAC_SCALABLE_OBJECT_TYPE'
-}
+class AacObjectType(enum.IntEnum):
+    MPEG_2_LC       = 0x00
+    MPEG_4_LC       = 0x01
+    MPEG_4_LTP      = 0x02
+    MPEG_4_SCALABLE = 0x03
 
 # fmt: on
 
 
 # -----------------------------------------------------------------------------
-def flags_to_list(flags, values):
+def flags_to_list(flags: int, values: List[int]) -> List[int]:
     result = []
     for i, value in enumerate(values):
         if flags & (1 << (len(values) - i - 1)):
@@ -267,16 +246,16 @@ class SbcMediaCodecInformation:
 
     SAMPLING_FREQUENCY_BITS = {16000: 1 << 3, 32000: 1 << 2, 44100: 1 << 1, 48000: 1}
     CHANNEL_MODE_BITS = {
-        SBC_MONO_CHANNEL_MODE: 1 << 3,
-        SBC_DUAL_CHANNEL_MODE: 1 << 2,
-        SBC_STEREO_CHANNEL_MODE: 1 << 1,
-        SBC_JOINT_STEREO_CHANNEL_MODE: 1,
+        SbcChannelMode.MONO: 1 << 3,
+        SbcChannelMode.DUAL: 1 << 2,
+        SbcChannelMode.STEREO: 1 << 1,
+        SbcChannelMode.JOINT_STEREO: 1,
     }
     BLOCK_LENGTH_BITS = {4: 1 << 3, 8: 1 << 2, 12: 1 << 1, 16: 1}
     SUBBANDS_BITS = {4: 1 << 1, 8: 1}
     ALLOCATION_METHOD_BITS = {
-        SBC_SNR_ALLOCATION_METHOD: 1 << 1,
-        SBC_LOUDNESS_ALLOCATION_METHOD: 1,
+        SbcAllocationMethod.SNR: 1 << 1,
+        SbcAllocationMethod.LOUDNESS: 1,
     }
 
     @staticmethod
@@ -302,10 +281,10 @@ class SbcMediaCodecInformation:
     def from_discrete_values(
         cls,
         sampling_frequency: int,
-        channel_mode: int,
+        channel_mode: SbcChannelMode,
         block_length: int,
         subbands: int,
-        allocation_method: int,
+        allocation_method: SbcAllocationMethod,
         minimum_bitpool_value: int,
         maximum_bitpool_value: int,
     ) -> SbcMediaCodecInformation:
@@ -322,11 +301,11 @@ class SbcMediaCodecInformation:
     @classmethod
     def from_lists(
         cls,
-        sampling_frequencies: List[int],
-        channel_modes: List[int],
-        block_lengths: List[int],
-        subbands: List[int],
-        allocation_methods: List[int],
+        sampling_frequencies: Iterable[int],
+        channel_modes: Iterable[SbcChannelMode],
+        block_lengths: Iterable[int],
+        subbands: Iterable[int],
+        allocation_methods: Iterable[SbcAllocationMethod],
         minimum_bitpool_value: int,
         maximum_bitpool_value: int,
     ) -> SbcMediaCodecInformation:
@@ -389,10 +368,10 @@ class AacMediaCodecInformation:
     bitrate: int
 
     OBJECT_TYPE_BITS = {
-        MPEG_2_AAC_LC_OBJECT_TYPE: 1 << 7,
-        MPEG_4_AAC_LC_OBJECT_TYPE: 1 << 6,
-        MPEG_4_AAC_LTP_OBJECT_TYPE: 1 << 5,
-        MPEG_4_AAC_SCALABLE_OBJECT_TYPE: 1 << 4,
+        AacObjectType.MPEG_2_LC: 1 << 7,
+        AacObjectType.MPEG_4_LC: 1 << 6,
+        AacObjectType.MPEG_4_LTP: 1 << 5,
+        AacObjectType.MPEG_4_SCALABLE: 1 << 4,
     }
     SAMPLING_FREQUENCY_BITS = {
         8000: 1 << 11,
@@ -425,7 +404,7 @@ class AacMediaCodecInformation:
     @classmethod
     def from_discrete_values(
         cls,
-        object_type: int,
+        object_type: AacObjectType,
         sampling_frequency: int,
         channels: int,
         vbr: int,
@@ -443,9 +422,9 @@ class AacMediaCodecInformation:
     @classmethod
     def from_lists(
         cls,
-        object_types: List[int],
-        sampling_frequencies: List[int],
-        channels: List[int],
+        object_types: Iterable[AacObjectType],
+        sampling_frequencies: Iterable[int],
+        channels: Iterable[int],
         vbr: int,
         bitrate: int,
     ) -> AacMediaCodecInformation:
@@ -582,17 +561,17 @@ class SbcParser:
                 sampling_frequency = SBC_SAMPLING_FREQUENCIES[(header[1] >> 6) & 3]
                 blocks = 4 * (1 + ((header[1] >> 4) & 3))
                 channel_mode = (header[1] >> 2) & 3
-                channels = 1 if channel_mode == SBC_MONO_CHANNEL_MODE else 2
+                channels = 1 if channel_mode == SbcChannelMode.MONO else 2
                 subbands = 8 if ((header[1]) & 1) else 4
                 bitpool = header[2]
 
                 # Compute the frame length
                 frame_length = 4 + (4 * subbands * channels) // 8
-                if channel_mode in (SBC_MONO_CHANNEL_MODE, SBC_DUAL_CHANNEL_MODE):
+                if channel_mode in (SbcChannelMode.MONO, SbcChannelMode.DUAL):
                     frame_length += (blocks * channels * bitpool) // 8
                 else:
                     frame_length += (
-                        (1 if channel_mode == SBC_JOINT_STEREO_CHANNEL_MODE else 0)
+                        (1 if channel_mode == SbcChannelMode.JOINT_STEREO else 0)
                         * subbands
                         + blocks * bitpool
                     ) // 8
