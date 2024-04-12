@@ -19,8 +19,9 @@ import asyncio
 import logging
 import os
 import pytest
+import pytest_asyncio
 
-from typing import Tuple
+from typing import Tuple, Optional
 
 from .test_utils import TwoDevices
 from bumble import core
@@ -36,9 +37,72 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
+def _default_hf_configuration() -> hfp.HfConfiguration:
+    return hfp.HfConfiguration(
+        supported_hf_features=[
+            hfp.HfFeature.CODEC_NEGOTIATION,
+            hfp.HfFeature.ESCO_S4_SETTINGS_SUPPORTED,
+            hfp.HfFeature.HF_INDICATORS,
+        ],
+        supported_hf_indicators=[
+            hfp.HfIndicator.ENHANCED_SAFETY,
+            hfp.HfIndicator.BATTERY_LEVEL,
+        ],
+        supported_audio_codecs=[
+            hfp.AudioCodec.CVSD,
+            hfp.AudioCodec.MSBC,
+        ],
+    )
+
+
+# -----------------------------------------------------------------------------
+def _default_hf_sdp_features() -> hfp.HfSdpFeature:
+    return hfp.HfSdpFeature.WIDE_BAND
+
+
+# -----------------------------------------------------------------------------
+def _default_ag_configuration() -> hfp.AgConfiguration:
+    return hfp.AgConfiguration(
+        supported_ag_features=[
+            hfp.AgFeature.HF_INDICATORS,
+            hfp.AgFeature.IN_BAND_RING_TONE_CAPABILITY,
+            hfp.AgFeature.REJECT_CALL,
+            hfp.AgFeature.CODEC_NEGOTIATION,
+            hfp.AgFeature.ESCO_S4_SETTINGS_SUPPORTED,
+        ],
+        supported_ag_indicators=[
+            hfp.AgIndicatorState.call(),
+            hfp.AgIndicatorState.service(),
+            hfp.AgIndicatorState.callsetup(),
+            hfp.AgIndicatorState.callsetup(),
+            hfp.AgIndicatorState.signal(),
+            hfp.AgIndicatorState.roam(),
+            hfp.AgIndicatorState.battchg(),
+        ],
+        supported_hf_indicators=[
+            hfp.HfIndicator.ENHANCED_SAFETY,
+            hfp.HfIndicator.BATTERY_LEVEL,
+        ],
+        supported_ag_call_hold_operations=[],
+        supported_audio_codecs=[hfp.AudioCodec.CVSD, hfp.AudioCodec.MSBC],
+    )
+
+
+# -----------------------------------------------------------------------------
+def _default_ag_sdp_features() -> hfp.AgSdpFeature:
+    return hfp.AgSdpFeature.WIDE_BAND | hfp.AgSdpFeature.IN_BAND_RING_TONE_CAPABILITY
+
+
+# -----------------------------------------------------------------------------
 async def make_hfp_connections(
-    hf_config: hfp.Configuration,
-) -> Tuple[hfp.HfProtocol, hfp.HfpProtocol]:
+    hf_config: Optional[hfp.HfConfiguration] = None,
+    ag_config: Optional[hfp.AgConfiguration] = None,
+):
+    if not hf_config:
+        hf_config = _default_hf_configuration()
+    if not ag_config:
+        ag_config = _default_ag_configuration()
+
     # Setup devices
     devices = TwoDevices()
     await devices.setup_connection()
@@ -55,38 +119,200 @@ async def make_hfp_connections(
 
     # Setup HFP connection
     hf = hfp.HfProtocol(client_dlc, hf_config)
-    ag = hfp.HfpProtocol(server_dlc)
-    return hf, ag
+    ag = hfp.AgProtocol(server_dlc, ag_config)
+
+    await hf.initiate_slc()
+    return (hf, ag)
 
 
 # -----------------------------------------------------------------------------
+@pytest_asyncio.fixture
+async def hfp_connections():
+    hf, ag = await make_hfp_connections()
+    hf_loop_task = asyncio.create_task(hf.run())
+
+    try:
+        yield (hf, ag)
+    finally:
+        # Close the coroutine.
+        hf.unsolicited_queue.put_nowait(None)
+        await hf_loop_task
 
 
+# -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_slc():
-    hf_config = hfp.Configuration(
-        supported_hf_features=[], supported_hf_indicators=[], supported_audio_codecs=[]
-    )
-    hf, ag = await make_hfp_connections(hf_config)
-
-    async def ag_loop():
-        while line := await ag.next_line():
-            if line.startswith('AT+BRSF'):
-                ag.send_response_line('+BRSF: 0')
-            elif line.startswith('AT+CIND=?'):
-                ag.send_response_line(
-                    '+CIND: ("call",(0,1)),("callsetup",(0-3)),("service",(0-1)),'
-                    '("signal",(0-5)),("roam",(0,1)),("battchg",(0-5)),'
-                    '("callheld",(0-2))'
+async def test_slc_with_minimal_features():
+    hf, ag = await make_hfp_connections(
+        hfp.HfConfiguration(
+            supported_audio_codecs=[],
+            supported_hf_features=[],
+            supported_hf_indicators=[],
+        ),
+        hfp.AgConfiguration(
+            supported_ag_call_hold_operations=[],
+            supported_ag_features=[],
+            supported_ag_indicators=[
+                hfp.AgIndicatorState(
+                    indicator=hfp.AgIndicator.CALL,
+                    supported_values={0, 1},
+                    current_status=0,
                 )
-            elif line.startswith('AT+CIND?'):
-                ag.send_response_line('+CIND: 0,0,1,4,1,5,0')
-            ag.send_response_line('OK')
+            ],
+            supported_hf_indicators=[],
+            supported_audio_codecs=[],
+        ),
+    )
 
-    ag_task = asyncio.create_task(ag_loop())
+    assert hf.supported_ag_features == ag.supported_ag_features
+    assert hf.supported_hf_features == ag.supported_hf_features
+    for a, b in zip(hf.ag_indicators, ag.ag_indicators):
+        assert a.indicator == b.indicator
+        assert a.current_status == b.current_status
 
-    await hf.initiate_slc()
-    ag_task.cancel()
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_slc(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+    hf, ag = hfp_connections
+
+    assert hf.supported_ag_features == ag.supported_ag_features
+    assert hf.supported_hf_features == ag.supported_hf_features
+    for a, b in zip(hf.ag_indicators, ag.ag_indicators):
+        assert a.indicator == b.indicator
+        assert a.current_status == b.current_status
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_ag_indicator(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+    hf, ag = hfp_connections
+
+    future = asyncio.get_running_loop().create_future()
+    hf.on('ag_indicator', future.set_result)
+
+    ag.update_ag_indicator(hfp.AgIndicator.CALL, 1)
+
+    indicator: hfp.AgIndicatorState = await future
+    assert indicator.current_status == 1
+    assert indicator.indicator == hfp.AgIndicator.CALL
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_hf_indicator(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+    hf, ag = hfp_connections
+
+    future = asyncio.get_running_loop().create_future()
+    ag.on('hf_indicator', future.set_result)
+
+    await hf.execute_command('AT+BIEV=2,100')
+
+    indicator: hfp.HfIndicatorState = await future
+    assert indicator.current_status == 100
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_codec_negotiation(
+    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+):
+    hf, ag = hfp_connections
+
+    futures = [
+        asyncio.get_running_loop().create_future(),
+        asyncio.get_running_loop().create_future(),
+    ]
+    hf.on('codec_negotiation', futures[0].set_result)
+    ag.on('codec_negotiation', futures[1].set_result)
+    await ag.negotiate_codec(hfp.AudioCodec.MSBC)
+
+    assert await futures[0] == await futures[1]
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_dial(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+    hf, ag = hfp_connections
+    NUMBER = 'ATD123456789'
+
+    future = asyncio.get_running_loop().create_future()
+    ag.on('dial', future.set_result)
+    await hf.execute_command(f'ATD{NUMBER}')
+
+    number: str = await future
+    assert number == NUMBER
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_answer(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+    hf, ag = hfp_connections
+
+    future = asyncio.get_running_loop().create_future()
+    ag.on('answer', lambda: future.set_result(None))
+    await hf.answer_incoming_call()
+
+    await future
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_reject_incoming_call(
+    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+):
+    hf, ag = hfp_connections
+
+    future = asyncio.get_running_loop().create_future()
+    ag.on('hang_up', lambda: future.set_result(None))
+    await hf.reject_incoming_call()
+
+    await future
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_terminate_call(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+    hf, ag = hfp_connections
+
+    future = asyncio.get_running_loop().create_future()
+    ag.on('hang_up', lambda: future.set_result(None))
+    await hf.terminate_call()
+
+    await future
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_hf_sdp_record():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    devices[0].sdp_service_records[1] = hfp.make_hf_sdp_records(
+        1, 2, _default_hf_configuration(), hfp.ProfileVersion.V1_8
+    )
+
+    assert await hfp.find_hf_sdp_record(devices.connections[1]) == (
+        2,
+        hfp.ProfileVersion.V1_8,
+        _default_hf_sdp_features(),
+    )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_ag_sdp_record():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    devices[0].sdp_service_records[1] = hfp.make_ag_sdp_records(
+        1, 2, _default_ag_configuration(), hfp.ProfileVersion.V1_8
+    )
+
+    assert await hfp.find_ag_sdp_record(devices.connections[1]) == (
+        2,
+        hfp.ProfileVersion.V1_8,
+        _default_ag_sdp_features(),
+    )
 
 
 # -----------------------------------------------------------------------------
