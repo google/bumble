@@ -43,6 +43,9 @@ def _default_hf_configuration() -> hfp.HfConfiguration:
             hfp.HfFeature.CODEC_NEGOTIATION,
             hfp.HfFeature.ESCO_S4_SETTINGS_SUPPORTED,
             hfp.HfFeature.HF_INDICATORS,
+            hfp.HfFeature.ENHANCED_CALL_STATUS,
+            hfp.HfFeature.THREE_WAY_CALLING,
+            hfp.HfFeature.CLI_PRESENTATION_CAPABILITY,
         ],
         supported_hf_indicators=[
             hfp.HfIndicator.ENHANCED_SAFETY,
@@ -57,7 +60,11 @@ def _default_hf_configuration() -> hfp.HfConfiguration:
 
 # -----------------------------------------------------------------------------
 def _default_hf_sdp_features() -> hfp.HfSdpFeature:
-    return hfp.HfSdpFeature.WIDE_BAND
+    return (
+        hfp.HfSdpFeature.WIDE_BAND
+        | hfp.HfSdpFeature.THREE_WAY_CALLING
+        | hfp.HfSdpFeature.CLI_PRESENTATION_CAPABILITY
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -69,6 +76,8 @@ def _default_ag_configuration() -> hfp.AgConfiguration:
             hfp.AgFeature.REJECT_CALL,
             hfp.AgFeature.CODEC_NEGOTIATION,
             hfp.AgFeature.ESCO_S4_SETTINGS_SUPPORTED,
+            hfp.AgFeature.ENHANCED_CALL_STATUS,
+            hfp.AgFeature.THREE_WAY_CALLING,
         ],
         supported_ag_indicators=[
             hfp.AgIndicatorState.call(),
@@ -83,14 +92,26 @@ def _default_ag_configuration() -> hfp.AgConfiguration:
             hfp.HfIndicator.ENHANCED_SAFETY,
             hfp.HfIndicator.BATTERY_LEVEL,
         ],
-        supported_ag_call_hold_operations=[],
+        supported_ag_call_hold_operations=[
+            hfp.CallHoldOperation.ADD_HELD_CALL,
+            hfp.CallHoldOperation.HOLD_ALL_ACTIVE_CALLS,
+            hfp.CallHoldOperation.HOLD_ALL_CALLS_EXCEPT,
+            hfp.CallHoldOperation.RELEASE_ALL_ACTIVE_CALLS,
+            hfp.CallHoldOperation.RELEASE_ALL_HELD_CALLS,
+            hfp.CallHoldOperation.RELEASE_SPECIFIC_CALL,
+            hfp.CallHoldOperation.CONNECT_TWO_CALLS,
+        ],
         supported_audio_codecs=[hfp.AudioCodec.CVSD, hfp.AudioCodec.MSBC],
     )
 
 
 # -----------------------------------------------------------------------------
 def _default_ag_sdp_features() -> hfp.AgSdpFeature:
-    return hfp.AgSdpFeature.WIDE_BAND | hfp.AgSdpFeature.IN_BAND_RING_TONE_CAPABILITY
+    return (
+        hfp.AgSdpFeature.WIDE_BAND
+        | hfp.AgSdpFeature.IN_BAND_RING_TONE_CAPABILITY
+        | hfp.AgSdpFeature.THREE_WAY_CALLING
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -165,6 +186,7 @@ async def test_slc_with_minimal_features():
 
     assert hf.supported_ag_features == ag.supported_ag_features
     assert hf.supported_hf_features == ag.supported_hf_features
+    assert hf.supported_ag_call_hold_operations == ag.supported_ag_call_hold_operations
     for a, b in zip(hf.ag_indicators, ag.ag_indicators):
         assert a.indicator == b.indicator
         assert a.current_status == b.current_status
@@ -177,6 +199,7 @@ async def test_slc(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
 
     assert hf.supported_ag_features == ag.supported_ag_features
     assert hf.supported_hf_features == ag.supported_hf_features
+    assert hf.supported_ag_call_hold_operations == ag.supported_ag_call_hold_operations
     for a, b in zip(hf.ag_indicators, ag.ag_indicators):
         assert a.indicator == b.indicator
         assert a.current_status == b.current_status
@@ -279,6 +302,175 @@ async def test_terminate_call(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProto
     await hf.terminate_call()
 
     await future
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_query_calls_without_calls(
+    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+):
+    hf, ag = hfp_connections
+
+    await hf.query_current_calls() == []
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_query_calls_with_calls(
+    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+):
+    hf, ag = hfp_connections
+    ag.calls.append(
+        hfp.CallInfo(
+            index=1,
+            direction=hfp.CallInfoDirection.MOBILE_ORIGINATED_CALL,
+            status=hfp.CallInfoStatus.ACTIVE,
+            mode=hfp.CallInfoMode.VOICE,
+            multi_party=hfp.CallInfoMultiParty.NOT_IN_CONFERENCE,
+            number='123456789',
+        )
+    )
+
+    await hf.query_current_calls() == ag.calls
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "operation,",
+    (
+        hfp.CallHoldOperation.RELEASE_ALL_HELD_CALLS,
+        hfp.CallHoldOperation.RELEASE_ALL_ACTIVE_CALLS,
+        hfp.CallHoldOperation.HOLD_ALL_ACTIVE_CALLS,
+        hfp.CallHoldOperation.ADD_HELD_CALL,
+        hfp.CallHoldOperation.CONNECT_TWO_CALLS,
+    ),
+)
+async def test_hold_call_without_call_index(
+    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol],
+    operation: hfp.CallHoldOperation,
+):
+    hf, ag = hfp_connections
+    call_hold_future = asyncio.get_running_loop().create_future()
+    ag.on("call_hold", lambda op, index: call_hold_future.set_result((op, index)))
+
+    await hf.execute_command(f"AT+CHLD={operation.value}")
+
+    assert (await call_hold_future) == (operation, None)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "operation,",
+    (
+        hfp.CallHoldOperation.RELEASE_SPECIFIC_CALL,
+        hfp.CallHoldOperation.HOLD_ALL_CALLS_EXCEPT,
+    ),
+)
+async def test_hold_call_with_call_index(
+    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol],
+    operation: hfp.CallHoldOperation,
+):
+    hf, ag = hfp_connections
+    call_hold_future = asyncio.get_running_loop().create_future()
+    ag.on("call_hold", lambda op, index: call_hold_future.set_result((op, index)))
+    ag.calls.append(
+        hfp.CallInfo(
+            index=1,
+            direction=hfp.CallInfoDirection.MOBILE_ORIGINATED_CALL,
+            status=hfp.CallInfoStatus.ACTIVE,
+            mode=hfp.CallInfoMode.VOICE,
+            multi_party=hfp.CallInfoMultiParty.NOT_IN_CONFERENCE,
+            number='123456789',
+        )
+    )
+
+    await hf.execute_command(f"AT+CHLD={operation.value.replace('x', '1')}")
+
+    assert (await call_hold_future) == (operation, 1)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_ring(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+    hf, ag = hfp_connections
+    ring_future = asyncio.get_running_loop().create_future()
+    hf.on("ring", lambda: ring_future.set_result(None))
+
+    ag.send_ring()
+
+    await ring_future
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_speaker_volume(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+    hf, ag = hfp_connections
+    speaker_volume_future = asyncio.get_running_loop().create_future()
+    hf.on("speaker_volume", speaker_volume_future.set_result)
+
+    ag.set_speaker_volume(10)
+
+    assert await speaker_volume_future == 10
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_microphone_volume(
+    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+):
+    hf, ag = hfp_connections
+    microphone_volume_future = asyncio.get_running_loop().create_future()
+    hf.on("microphone_volume", microphone_volume_future.set_result)
+
+    ag.set_microphone_volume(10)
+
+    assert await microphone_volume_future == 10
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_cli_notification(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+    hf, ag = hfp_connections
+    cli_notification_future = asyncio.get_running_loop().create_future()
+    hf.on("cli_notification", cli_notification_future.set_result)
+
+    ag.send_cli_notification(
+        hfp.CallLineIdentification(number="\"123456789\"", type=129, alpha="\"Bumble\"")
+    )
+
+    assert await cli_notification_future == hfp.CallLineIdentification(
+        number="123456789", type=129, alpha="Bumble", subaddr="", satype=None
+    )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_voice_recognition_from_hf(
+    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+):
+    hf, ag = hfp_connections
+    voice_recognition_future = asyncio.get_running_loop().create_future()
+    ag.on("voice_recognition", voice_recognition_future.set_result)
+
+    await hf.execute_command("AT+BVRA=1")
+
+    assert await voice_recognition_future == hfp.VoiceRecognitionState.ENABLE
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_voice_recognition_from_ag(
+    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+):
+    hf, ag = hfp_connections
+    voice_recognition_future = asyncio.get_running_loop().create_future()
+    hf.on("voice_recognition", voice_recognition_future.set_result)
+
+    ag.send_response("+BVRA: 1")
+
+    assert await voice_recognition_future == hfp.VoiceRecognitionState.ENABLE
 
 
 # -----------------------------------------------------------------------------
