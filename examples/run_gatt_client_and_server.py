@@ -19,21 +19,21 @@ import asyncio
 import os
 import logging
 from bumble.colors import color
-
 from bumble.core import ProtocolError
 from bumble.controller import Controller
 from bumble.device import Device, Peer
+from bumble.hci import Address
 from bumble.host import Host
 from bumble.link import LocalLink
 from bumble.gatt import (
     Service,
     Characteristic,
     Descriptor,
-    show_services,
     GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR,
     GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
     GATT_DEVICE_INFORMATION_SERVICE,
 )
+from bumble.gatt_client import show_services
 
 
 # -----------------------------------------------------------------------------
@@ -43,7 +43,7 @@ class ServerListener(Device.Listener):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     # Create a local link
     link = LocalLink()
 
@@ -51,14 +51,18 @@ async def main():
     client_controller = Controller("client controller", link=link)
     client_host = Host()
     client_host.controller = client_controller
-    client_device = Device("client", address='F0:F1:F2:F3:F4:F5', host=client_host)
+    client_device = Device(
+        "client", address=Address('F0:F1:F2:F3:F4:F5'), host=client_host
+    )
     await client_device.power_on()
 
     # Setup a stack for the server
     server_controller = Controller("server controller", link=link)
     server_host = Host()
     server_host.controller = server_controller
-    server_device = Device("server", address='F6:F7:F8:F9:FA:FB', host=server_host)
+    server_device = Device(
+        "server", address=Address('F6:F7:F8:F9:FA:FB'), host=server_host
+    )
     server_device.listener = ServerListener()
     await server_device.power_on()
 

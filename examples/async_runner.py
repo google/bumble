@@ -61,7 +61,7 @@ async def func4(x, y):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     print("MAIN: start, loop=", asyncio.get_running_loop())
     print("MAIN: invoke func1")
     func1(1, 2)

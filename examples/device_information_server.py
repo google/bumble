@@ -28,14 +28,16 @@ from bumble.profiles.device_information_service import DeviceInformationService
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) != 3:
         print('Usage: python device_info_server.py <device-config> <transport-spec>')
         print('example: python device_info_server.py device1.json usb:0')
         return
 
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
 
         # Add a Device Information Service to the GATT sever
         device_information_service = DeviceInformationService(
@@ -64,7 +66,7 @@ async def main():
         # Go!
         await device.power_on()
         await device.start_advertising(auto_restart=True)
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

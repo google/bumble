@@ -139,18 +139,20 @@ async def find_a2dp_service(connection):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 4:
         print('Usage: run_a2dp_info.py <device-config> <transport-spec> <bt-addr>')
         print('example: run_a2dp_info.py classic1.json usb:0 14:7D:DA:4E:53:A8')
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
         device.classic_enabled = True
 
         # Start the controller
@@ -187,7 +189,7 @@ async def main():
         client = await AVDTP_Protocol.connect(connection, avdtp_version)
 
         # Discover all endpoints on the remote device
-        endpoints = await client.discover_remote_endpoints()
+        endpoints = list(await client.discover_remote_endpoints())
         print(f'@@@ Found {len(endpoints)} endpoints')
         for endpoint in endpoints:
             print('@@@', endpoint)

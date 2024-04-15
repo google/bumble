@@ -19,6 +19,7 @@ import asyncio
 import sys
 import os
 import logging
+from typing import Any, Dict
 
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
@@ -41,7 +42,7 @@ from bumble.a2dp import (
     SbcMediaCodecInformation,
 )
 
-Context = {'output': None}
+Context: Dict[Any, Any] = {'output': None}
 
 
 # -----------------------------------------------------------------------------
@@ -104,7 +105,7 @@ def on_rtp_packet(packet):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 4:
         print(
             'Usage: run_a2dp_sink.py <device-config> <transport-spec> <sbc-file> '
@@ -114,14 +115,16 @@ async def main():
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         with open(sys.argv[3], 'wb') as sbc_file:
             Context['output'] = sbc_file
 
             # Create a device
-            device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+            device = Device.from_config_file_with_hci(
+                sys.argv[1], hci_transport.source, hci_transport.sink
+            )
             device.classic_enabled = True
 
             # Setup the SDP to expose the sink service
@@ -162,7 +165,7 @@ async def main():
                 await device.set_discoverable(True)
                 await device.set_connectable(True)
 
-            await hci_source.wait_for_termination()
+            await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

@@ -28,7 +28,7 @@ from bumble.transport import open_transport_or_link
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 3:
         print(
             'Usage: run_advertiser.py <config-file> <transport-spec> [type] [address]'
@@ -50,10 +50,12 @@ async def main():
         target = None
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
 
         if advertising_type.is_scannable:
             device.scan_response_data = bytes(
@@ -66,7 +68,7 @@ async def main():
 
         await device.power_on()
         await device.start_advertising(advertising_type=advertising_type, target=target)
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

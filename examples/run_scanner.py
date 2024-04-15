@@ -20,27 +20,31 @@ import sys
 import os
 import logging
 from bumble.colors import color
-
+from bumble.hci import Address
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 2:
         print('Usage: run_scanner.py <transport-spec> [filter]')
         print('example: run_scanner.py usb:0')
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[1]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[1]) as hci_transport:
         print('<<< connected')
         filter_duplicates = len(sys.argv) == 3 and sys.argv[2] == 'filter'
 
-        device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
+        device = Device.with_hci(
+            'Bumble',
+            Address('F0:F1:F2:F3:F4:F5'),
+            hci_transport.source,
+            hci_transport.sink,
+        )
 
-        @device.on('advertisement')
-        def _(advertisement):
+        def on_adv(advertisement):
             address_type_string = ('PUBLIC', 'RANDOM', 'PUBLIC_ID', 'RANDOM_ID')[
                 advertisement.address.address_type
             ]
@@ -67,10 +71,11 @@ async def main():
                 f'{advertisement.data.to_string(separator)}'
             )
 
+        device.on('advertisement', on_adv)
         await device.power_on()
         await device.start_scanning(filter_duplicates=filter_duplicates)
 
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

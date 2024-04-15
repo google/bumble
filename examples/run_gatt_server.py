@@ -71,7 +71,7 @@ def my_custom_write_with_error(connection, value):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 3:
         print(
             'Usage: run_gatt_server.py <device-config> <transport-spec> '
@@ -81,11 +81,13 @@ async def main():
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device to manage the host
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
         device.listener = Listener(device)
 
         # Add a few entries to the device's GATT server
@@ -146,7 +148,7 @@ async def main():
         else:
             await device.start_advertising(auto_restart=True)
 
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

@@ -57,18 +57,20 @@ def on_my_characteristic_subscription(peer, enabled):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 3:
         print('Usage: run_notifier.py <device-config> <transport-spec>')
         print('example: run_notifier.py device1.json usb:0')
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device to manage the host
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
         device.listener = Listener(device)
 
         # Add a few entries to the device's GATT server

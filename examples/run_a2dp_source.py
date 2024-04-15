@@ -114,7 +114,7 @@ async def stream_packets(read_function, protocol):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 4:
         print(
             'Usage: run_a2dp_source.py <device-config> <transport-spec> <sbc-file> '
@@ -126,11 +126,13 @@ async def main():
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
         device.classic_enabled = True
 
         # Setup the SDP to expose the SRC service
@@ -186,7 +188,7 @@ async def main():
                 await device.set_discoverable(True)
                 await device.set_connectable(True)
 
-            await hci_source.wait_for_termination()
+            await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------
