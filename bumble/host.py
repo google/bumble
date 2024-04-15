@@ -184,7 +184,7 @@ class Host(AbortableEventEmitter):
         self.long_term_key_provider = None
         self.link_key_provider = None
         self.pairing_io_capability_provider = None  # Classic only
-        self.snooper = None
+        self.snooper: Optional[Snooper] = None
 
         # Connect to the source and sink if specified
         if controller_source:

@@ -20,9 +20,9 @@ import asyncio
 import sys
 import os
 from bumble.colors import color
-
 from bumble.device import Device
 from bumble.controller import Controller
+from bumble.hci import Address
 from bumble.link import LocalLink
 from bumble.transport import open_transport_or_link
 
@@ -45,14 +45,14 @@ class ScannerListener(Device.Listener):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) != 2:
         print('Usage: run_controller.py <transport-spec>')
         print('example: run_controller_with_scanner.py serial:/dev/pts/14,1000000')
         return
 
     print('>>> connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[1]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[1]) as hci_transport:
         print('>>> connected')
 
         # Create a local link
@@ -60,22 +60,25 @@ async def main():
 
         # Create a first controller using the packet source/sink as its host interface
         controller1 = Controller(
-            'C1', host_source=hci_source, host_sink=hci_sink, link=link
+            'C1',
+            host_source=hci_transport.source,
+            host_sink=hci_transport.sink,
+            link=link,
+            public_address='E0:E1:E2:E3:E4:E5',
         )
-        controller1.address = 'E0:E1:E2:E3:E4:E5'
 
         # Create a second controller using the same link
         controller2 = Controller('C2', link=link)
 
         # Create a device with a scanner listener
         device = Device.with_hci(
-            'Bumble', 'F0:F1:F2:F3:F4:F5', controller2, controller2
+            'Bumble', Address('F0:F1:F2:F3:F4:F5'), controller2, controller2
         )
         device.listener = ScannerListener()
         await device.power_on()
         await device.start_scanning()
 
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

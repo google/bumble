@@ -275,7 +275,7 @@ async def get_stream_reader(pipe) -> asyncio.StreamReader:
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 4:
         print(
             'Usage: run_hid_host.py <device-config> <transport-spec> '
@@ -324,11 +324,13 @@ async def main():
         asyncio.create_task(handle_virtual_cable_unplug())
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< CONNECTED')
 
         # Create a device
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
         device.classic_enabled = True
 
         # Create HID host and start it
@@ -557,7 +559,7 @@ async def main():
             # Interrupt Channel
             await hid_host.connect_interrupt_channel()
 
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

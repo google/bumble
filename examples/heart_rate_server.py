@@ -33,14 +33,16 @@ from bumble.utils import AsyncRunner
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) != 3:
         print('Usage: python heart_rate_server.py <device-config> <transport-spec>')
         print('example: python heart_rate_server.py device1.json usb:0')
         return
 
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
 
         # Keep track of accumulated expended energy
         energy_start_time = time.time()

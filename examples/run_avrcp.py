@@ -331,7 +331,7 @@ class Delegate(avrcp.Delegate):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 3:
         print(
             'Usage: run_avrcp_controller.py <device-config> <transport-spec> '
@@ -341,11 +341,13 @@ async def main():
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
         device.classic_enabled = True
 
         # Setup the SDP to expose the sink service

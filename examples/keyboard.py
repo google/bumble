@@ -416,7 +416,7 @@ async def keyboard_device(device, command):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 4:
         print(
             'Usage: python keyboard.py <device-config> <transport-spec> <command>'
@@ -434,9 +434,11 @@ async def main():
         )
         return
 
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         # Create a device to manage the host
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
 
         command = sys.argv[3]
         if command == 'connect':

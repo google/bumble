@@ -25,7 +25,7 @@ from bumble.transport import open_transport_or_link
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 3:
         print(
             'Usage: run_connect_and_encrypt.py <device-config> <transport-spec> '
@@ -37,11 +37,13 @@ async def main():
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
         await device.power_on()
 
         # Connect to the peer
@@ -56,7 +58,7 @@ async def main():
             print(f'!!! Encryption failed: {error}')
             return
 
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

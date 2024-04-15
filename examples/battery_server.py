@@ -29,14 +29,16 @@ from bumble.profiles.battery_service import BatteryService
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) != 3:
         print('Usage: python battery_server.py <device-config> <transport-spec>')
         print('example: python battery_server.py device1.json usb:0')
         return
 
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
 
         # Add a Battery Service to the GATT sever
         battery_service = BatteryService(lambda _: random.randint(0, 100))

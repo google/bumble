@@ -20,8 +20,8 @@ import sys
 import os
 import logging
 from bumble.colors import color
-
 from bumble.device import Device
+from bumble.hci import Address
 from bumble.transport import open_transport_or_link
 from bumble.core import DeviceClass
 
@@ -53,22 +53,27 @@ class DiscoveryListener(Device.Listener):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) != 2:
         print('Usage: run_classic_discovery.py <transport-spec>')
         print('example: run_classic_discovery.py usb:04b4:f901')
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[1]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[1]) as hci_transport:
         print('<<< connected')
 
-        device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
+        device = Device.with_hci(
+            'Bumble',
+            Address('F0:F1:F2:F3:F4:F5'),
+            hci_transport.source,
+            hci_transport.sink,
+        )
         device.listener = DiscoveryListener()
         await device.power_on()
         await device.start_discovery()
 
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

@@ -84,14 +84,14 @@ def on_dlc(dlc: rfcomm.DLC, configuration: hfp.HfConfiguration):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 3:
         print('Usage: run_classic_hfp.py <device-config> <transport-spec>')
         print('example: run_classic_hfp.py classic2.json usb:04b4:f901')
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Hands-Free profile configuration.
@@ -116,7 +116,9 @@ async def main():
         )
 
         # Create a device
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
         device.classic_enabled = True
 
         # Create and register a server
@@ -128,7 +130,9 @@ async def main():
 
         # Advertise the HFP RFComm channel in the SDP
         device.sdp_service_records = {
-            0x00010001: hfp.sdp_records(0x00010001, channel_number, configuration)
+            0x00010001: hfp.make_hf_sdp_records(
+                0x00010001, channel_number, configuration
+            )
         }
 
         # Let's go!
@@ -164,7 +168,7 @@ async def main():
 
         await websockets.serve(serve, 'localhost', 8989)
 
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

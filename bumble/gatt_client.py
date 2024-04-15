@@ -91,6 +91,22 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
+# Utils
+# -----------------------------------------------------------------------------
+
+
+def show_services(services: Iterable[ServiceProxy]) -> None:
+    for service in services:
+        print(color(str(service), 'cyan'))
+
+        for characteristic in service.characteristics:
+            print(color('  ' + str(characteristic), 'magenta'))
+
+            for descriptor in characteristic.descriptors:
+                print(color('    ' + str(descriptor), 'green'))
+
+
+# -----------------------------------------------------------------------------
 # Proxies
 # -----------------------------------------------------------------------------
 class AttributeProxy(EventEmitter):

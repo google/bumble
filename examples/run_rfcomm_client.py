@@ -165,7 +165,7 @@ async def tcp_server(tcp_port, rfcomm_session):
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) < 5:
         print(
             'Usage: run_rfcomm_client.py <device-config> <transport-spec> '
@@ -178,11 +178,13 @@ async def main():
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device
-        device = Device.from_config_file_with_hci(sys.argv[1], hci_source, hci_sink)
+        device = Device.from_config_file_with_hci(
+            sys.argv[1], hci_transport.source, hci_transport.sink
+        )
         device.classic_enabled = True
         await device.power_on()
 
@@ -192,8 +194,8 @@ async def main():
         connection = await device.connect(target_address, transport=BT_BR_EDR_TRANSPORT)
         print(f'=== Connected to {connection.peer_address}!')
 
-        channel = sys.argv[4]
-        if channel == 'discover':
+        channel_str = sys.argv[4]
+        if channel_str == 'discover':
             await list_rfcomm_channels(connection)
             return
 
@@ -213,7 +215,7 @@ async def main():
         rfcomm_mux = await rfcomm_client.start()
         print('@@@ Started')
 
-        channel = int(channel)
+        channel = int(channel_str)
         print(f'### Opening session for channel {channel}...')
         try:
             session = await rfcomm_mux.open_dlc(channel)
@@ -229,7 +231,7 @@ async def main():
             tcp_port = int(sys.argv[5])
             asyncio.create_task(tcp_server(tcp_port, session))
 
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------

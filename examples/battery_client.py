@@ -21,23 +21,29 @@ import os
 import logging
 from bumble.colors import color
 from bumble.device import Device
+from bumble.hci import Address
 from bumble.transport import open_transport
 from bumble.profiles.battery_service import BatteryServiceProxy
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) != 3:
         print('Usage: battery_client.py <transport-spec> <bluetooth-address>')
         print('example: battery_client.py usb:0 E1:CA:72:48:C4:E8')
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport(sys.argv[1]) as (hci_source, hci_sink):
+    async with await open_transport(sys.argv[1]) as hci_transport:
         print('<<< connected')
 
         # Create and start a device
-        device = Device.with_hci('Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink)
+        device = Device.with_hci(
+            'Bumble',
+            Address('F0:F1:F2:F3:F4:F5'),
+            hci_transport.source,
+            hci_transport.sink,
+        )
         await device.power_on()
 
         # Connect to the peer

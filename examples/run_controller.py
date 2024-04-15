@@ -36,7 +36,7 @@ from bumble.transport import open_transport_or_link
 
 
 # -----------------------------------------------------------------------------
-async def main():
+async def main() -> None:
     if len(sys.argv) != 4:
         print(
             'Usage: run_controller.py <controller-address> <device-config> '
@@ -49,7 +49,7 @@ async def main():
         return
 
     print('>>> connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[3]) as (hci_source, hci_sink):
+    async with await open_transport_or_link(sys.argv[3]) as hci_transport:
         print('>>> connected')
 
         # Create a local link
@@ -57,7 +57,10 @@ async def main():
 
         # Create a first controller using the packet source/sink as its host interface
         controller1 = Controller(
-            'C1', host_source=hci_source, host_sink=hci_sink, link=link
+            'C1',
+            host_source=hci_transport.source,
+            host_sink=hci_transport.sink,
+            link=link,
         )
         controller1.random_address = sys.argv[1]
 
@@ -98,7 +101,7 @@ async def main():
         await device.start_advertising()
         await device.start_scanning()
 
-        await hci_source.wait_for_termination()
+        await hci_transport.source.wait_for_termination()
 
 
 # -----------------------------------------------------------------------------
