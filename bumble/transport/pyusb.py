@@ -227,6 +227,10 @@ async def open_pyusb_transport(spec: str) -> Transport:
         usb_find = libusb_package.find
 
     # Find the device according to the spec moniker
+    power_cycle = False
+    if spec.startswith('!'):
+        power_cycle = True
+        spec = spec[1:]
     if ':' in spec:
         vendor_id, product_id = spec.split(':')
         device = usb_find(idVendor=int(vendor_id, 16), idProduct=int(product_id, 16))
@@ -259,11 +263,12 @@ async def open_pyusb_transport(spec: str) -> Transport:
     logger.debug(f'USB Device: {device}')
 
     # Power Cycle the device
-    try:
-        device = await _power_cycle(device)  # type: ignore
-    except Exception as e:
-        logging.debug(e)
-        logging.info(f"Unable to power cycle {hex(device.idVendor)} {hex(device.idProduct)}")  # type: ignore
+    if power_cycle:
+        try:
+            device = await _power_cycle(device)  # type: ignore
+        except Exception as e:
+            logging.debug(e)
+            logging.info(f"Unable to power cycle {hex(device.idVendor)} {hex(device.idProduct)}")  # type: ignore
 
     # Collect the metadata
     device_metadata = {'vendor_id': device.idVendor, 'product_id': device.idProduct}
