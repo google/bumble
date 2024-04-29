@@ -25,7 +25,8 @@ import asyncio
 import logging
 import os
 import json
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Type
+from typing_extensions import Self
 
 from .colors import color
 from .hci import Address
@@ -253,8 +254,10 @@ class JsonKeyStore(KeyStore):
 
         logger.debug(f'JSON keystore: {self.filename}')
 
-    @staticmethod
-    def from_device(device: Device, filename=None) -> Optional[JsonKeyStore]:
+    @classmethod
+    def from_device(
+        cls: Type[Self], device: Device, filename: Optional[str] = None
+    ) -> Self:
         if not filename:
             # Extract the filename from the config if there is one
             if device.config.keystore is not None:
@@ -270,7 +273,7 @@ class JsonKeyStore(KeyStore):
         else:
             namespace = JsonKeyStore.DEFAULT_NAMESPACE
 
-        return JsonKeyStore(namespace, filename)
+        return cls(namespace, filename)
 
     async def load(self):
         # Try to open the file, without failing. If the file does not exist, it
