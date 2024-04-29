@@ -311,7 +311,7 @@ async def test_query_calls_without_calls(
 ):
     hf, ag = hfp_connections
 
-    await hf.query_current_calls() == []
+    assert await hf.query_current_calls() == []
 
 
 # -----------------------------------------------------------------------------
@@ -331,7 +331,7 @@ async def test_query_calls_with_calls(
         )
     )
 
-    await hf.query_current_calls() == ag.calls
+    assert await hf.query_current_calls() == ag.calls
 
 
 # -----------------------------------------------------------------------------
