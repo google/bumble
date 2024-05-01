@@ -951,7 +951,7 @@ class HfProtocol(pyee.EventEmitter):
 
             self.supported_ag_call_hold_operations = [
                 CallHoldOperation(operation.decode())
-                for operation in response.parameters
+                for operation in response.parameters[0]
             ]
 
         # 4.2.1.4 HF Indicators
@@ -1081,8 +1081,9 @@ class HfProtocol(pyee.EventEmitter):
                 mode=CallInfoMode(int(response.parameters[3])),
                 multi_party=CallInfoMultiParty(int(response.parameters[4])),
             )
+            if len(response.parameters) >= 6:
+                call_info.number = response.parameters[5].decode()
             if len(response.parameters) >= 7:
-                call_info.number = response.parameters[5]
                 call_info.type = int(response.parameters[6])
             calls.append(call_info)
         return calls
@@ -1422,9 +1423,11 @@ class AgProtocol(pyee.EventEmitter):
             return
 
         self.send_response(
-            '+CHLD:'
-            + ','.join(
-                operation.value for operation in self.supported_ag_call_hold_operations
+            '+CHLD: ({})'.format(
+                ','.join(
+                    operation.value
+                    for operation in self.supported_ag_call_hold_operations
+                )
             )
         )
         self.send_ok()
@@ -1557,15 +1560,16 @@ class AgProtocol(pyee.EventEmitter):
 
     def _on_clcc(self) -> None:
         for call in self.calls:
+            number_text = f',\"{call.number}\"' if call.number is not None else ''
+            type_text = f',{call.type}' if call.type is not None else ''
             response = (
                 f'+CLCC: {call.index}'
                 f',{call.direction.value}'
                 f',{call.status.value}'
                 f',{call.mode.value}'
                 f',{call.multi_party.value}'
-                f',\"{call.number}\"'
-                if call.number is not None
-                else '' f',{call.type}' if call.type is not None else ''
+                f'{number_text}'
+                f'{type_text}'
             )
             self.send_response(response)
         self.send_ok()
