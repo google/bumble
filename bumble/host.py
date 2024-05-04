@@ -530,7 +530,9 @@ class Host(AbortableEventEmitter):
 
                 # Check the return parameters if required
                 if check_result:
-                    if isinstance(response.return_parameters, int):
+                    if isinstance(response, hci.HCI_Command_Status_Event):
+                        status = response.status
+                    elif isinstance(response.return_parameters, int):
                         status = response.return_parameters
                     elif isinstance(response.return_parameters, bytes):
                         # return parameters first field is a one byte status code
