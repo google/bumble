@@ -24,6 +24,11 @@ class PacketSource {
 }
 
 class PacketSink {
+    constructor() {
+        this.queue = [];
+        this.isProcessing = false;
+    }
+
     on_packet(packet) {
         if (!this.writer) {
             return;
@@ -31,10 +36,23 @@ class PacketSink {
         const buffer = packet.toJs({create_proxies : false});
         packet.destroy();
         //console.log(`HCI[host->controller]: ${bufferToHex(buffer)}`);
-        // TODO: create an async queue here instead of blindly calling write without awaiting
-        this.writer(buffer);
+        this.queue.push(buffer);
+        this.processQueue();
+    }
+
+    async processQueue() {
+        if (this.isProcessing) {
+            return;
+        }
+        this.isProcessing = true;
+        while (this.queue.length > 0) {
+            const buffer = this.queue.shift();
+            await this.writer(buffer);
+        }
+        this.isProcessing = false;
     }
 }
+
 
 class LogEvent extends Event {
     constructor(message) {
