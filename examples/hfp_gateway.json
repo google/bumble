@@ -1,4 +1,5 @@
 {
     "name": "Bumble Phone",
-    "class_of_device": 6291980
+    "class_of_device": 6291980,
+    "keystore": "JsonKeyStore"
 }

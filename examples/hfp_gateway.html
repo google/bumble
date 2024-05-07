@@ -1,0 +1,350 @@
+<html data-bs-theme="dark">
+
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <script src="https://unpkg.com/pcm-player"></script>
+</head>
+
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1">Bumble HFP Audio Gateway</span>
+        </div>
+    </nav>
+    <br>
+
+    <div class="container">
+
+        <label class="form-label">Send AT Response</label>
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" placeholder="AT Response" aria-label="AT response" id="at_response">
+            <button class="btn btn-primary" type="button"
+                onclick="send_at_response(document.getElementById('at_response').value)">Send</button>
+        </div>
+
+        <div class="row">
+            <div class="col-3">
+                <label class="form-label">Speaker Volume</label>
+                <div class="input-group mb-3 col-auto">
+                    <input type="text" class="form-control" placeholder="0 - 15" aria-label="Speaker Volume"
+                        id="speaker_volume">
+                    <button class="btn btn-primary" type="button"
+                        onclick="send_at_response(`+VGS: ${document.getElementById('speaker_volume').value}`)">Set</button>
+                </div>
+            </div>
+            <div class="col-3">
+                <label class="form-label">Mic Volume</label>
+                <div class="input-group mb-3 col-auto">
+                    <input type="text" class="form-control" placeholder="0 - 15" aria-label="Mic Volume"
+                        id="mic_volume">
+                    <button class="btn btn-primary" type="button"
+                        onclick="send_at_response(`+VGM: ${document.getElementById('mic_volume').value}`)">Set</button>
+                </div>
+            </div>
+            <div class="col-3">
+                <label class="form-label">Browser Gain</label>
+                <input type="range" class="form-range" id="browser-gain" min="0" max="2" value="1" step="0.1" onchange="setGain()">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-auto">
+                <div class="input-group mb-3">
+                    <span class="input-group-text">Codec</span>
+
+                    <select class="form-select" id="codec">
+                        <option selected value="1">CVSD</option>
+                        <option value="2">MSBC</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="col-auto">
+                <button class="btn btn-primary" onclick="negotiate_codec()">Negotiate Codec</button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary" onclick="connect_sco()">Connect SCO</button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary" onclick="disconnect_sco()">Disconnect SCO</button>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-danger" onclick="connectAudio()">Connect Audio</button>
+            </div>
+        </div>
+
+        <hr>
+
+        <div class="row">
+            <h4>AG Indicators</h2>
+                <div class="col-3">
+                    <label class="form-label">call</label>
+                    <div class="input-group mb-3 col-auto">
+                        <select class="form-select" id="call">
+                            <option selected value="0">Inactive</option>
+                            <option value="1">Active</option>
+                        </select>
+                        <button class="btn btn-primary" type="button" onclick="update_ag_indicator('call')">Set</button>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <label class="form-label">callsetup</label>
+                    <div class="input-group mb-3 col-auto">
+                        <select class="form-select" id="callsetup">
+                            <option selected value="0">Idle</option>
+                            <option value="1">Incoming</option>
+                            <option value="2">Outgoing</option>
+                            <option value="3">Remote Alerted</option>
+                        </select>
+                        <button class="btn btn-primary" type="button"
+                            onclick="update_ag_indicator('callsetup')">Set</button>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <label class="form-label">callheld</label>
+                    <div class="input-group mb-3 col-auto">
+                        <select class="form-select" id="callsetup">
+                            <option selected value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                        </select>
+                        <button class="btn btn-primary" type="button"
+                            onclick="update_ag_indicator('callheld')">Set</button>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <label class="form-label">signal</label>
+                    <div class="input-group mb-3 col-auto">
+                        <select class="form-select" id="signal">
+                            <option selected value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                        <button class="btn btn-primary" type="button"
+                            onclick="update_ag_indicator('signal')">Set</button>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <label class="form-label">roam</label>
+                    <div class="input-group mb-3 col-auto">
+                        <select class="form-select" id="roam">
+                            <option selected value="0">0</option>
+                            <option value="1">1</option>
+                        </select>
+                        <button class="btn btn-primary" type="button" onclick="update_ag_indicator('roam')">Set</button>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <label class="form-label">battchg</label>
+                    <div class="input-group mb-3 col-auto">
+                        <select class="form-select" id="battchg">
+                            <option selected value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                        <button class="btn btn-primary" type="button"
+                            onclick="update_ag_indicator('battchg')">Set</button>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <label class="form-label">service</label>
+                    <div class="input-group mb-3 col-auto">
+                        <select class="form-select" id="service">
+                            <option selected value="0">0</option>
+                            <option value="1">1</option>
+                        </select>
+                        <button class="btn btn-primary" type="button"
+                            onclick="update_ag_indicator('service')">Set</button>
+                    </div>
+                </div>
+        </div>
+
+        <hr>
+
+        <button class="btn btn-primary" onclick="send_at_response('+BVRA: 1')">Start Voice Assistant</button>
+        <button class="btn btn-primary" onclick="send_at_response('+BVRA: 0')">Stop Voice Assistant</button>
+
+        <hr>
+
+
+        <h4>Calls</h4>
+        <div id="call-lists">
+            <template id="call-template">
+                <div class="row call-row">
+                    <div class="input-group mb-3">
+                        <label class="input-group-text">Index</label>
+                        <input class="form-control call-index" value="1">
+
+                        <label class="input-group-text">Number</label>
+                        <input class="form-control call-number">
+
+                        <label class="input-group-text">Direction</label>
+                        <select class="form-select call-direction">
+                            <option selected value="0">Originated</option>
+                            <option value="1">Terminated</option>
+                        </select>
+
+                        <label class="input-group-text">Status</label>
+                        <select class="form-select call-status">
+                            <option value="0">ACTIVE</option>
+                            <option value="1">HELD</option>
+                            <option value="2">DIALING</option>
+                            <option value="3">ALERTING</option>
+                            <option value="4">INCOMING</option>
+                            <option value="5">WAITING</option>
+                        </select>
+                        <button class="btn btn-primary call-remover">❌</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <button class="btn btn-primary" onclick="add_call()">➕ Add Call</button>
+        <button class="btn btn-primary" onclick="update_calls()">🗘 Update Calls</button>
+
+        <hr>
+
+        <div id="socketStateContainer" class="bg-body-tertiary p-3 rounded-2">
+            <h3>Log</h3>
+            <code id="log" style="white-space: pre-line;"></code>
+        </div>
+    </div>
+
+
+    <script>
+        let atResponseInput = document.getElementById("at_response")
+        let gainInput = document.getElementById('browser-gain')
+        let log = document.getElementById("log")
+        let socket = new WebSocket('ws://localhost:8888');
+        let sampleRate = 0;
+        let player;
+
+        socket.binaryType = "arraybuffer";
+        socket.onopen = _ => {
+            log.textContent += 'SOCKET OPEN\n'
+        }
+        socket.onclose = _ => {
+            log.textContent += 'SOCKET CLOSED\n'
+        }
+        socket.onerror = (error) => {
+            log.textContent += 'SOCKET ERROR\n'
+            console.log(`ERROR: ${error}`)
+        }
+        socket.onmessage = function (message) {
+            if (typeof message.data === 'string' || message.data instanceof String) {
+                log.textContent += `<-- ${event.data}\n`
+                const jsonMessage = JSON.parse(event.data)
+
+                if (jsonMessage.type == 'speaker_volume') {
+                    document.getElementById('speaker_volume').value = jsonMessage.level;
+                } else if (jsonMessage.type == 'microphone_volume') {
+                    document.getElementById('microphone_volume').value = jsonMessage.level;
+                } else if (jsonMessage.type == 'sco_state_change') {
+                    sampleRate = jsonMessage.sample_rate;
+                    console.log(sampleRate);
+                    if (player != null) {
+                        player = new PCMPlayer({
+                            inputCodec: 'Int16',
+                            channels: 1,
+                            sampleRate: sampleRate,
+                            flushTime: 7.5,
+                        });
+                        player.volume(gainInput.value);
+                    }
+                }
+            } else {
+                // BINARY audio data.
+                if (player == null) return;
+                player.feed(message.data);
+            }
+        };
+
+        function send(message) {
+            if (socket && socket.readyState == WebSocket.OPEN) {
+                let jsonMessage = JSON.stringify(message)
+                log.textContent += `--> ${jsonMessage}\n`
+                socket.send(jsonMessage)
+            } else {
+                log.textContent += 'NOT CONNECTED\n'
+            }
+        }
+
+        function send_at_response(response) {
+            send({ type: 'at_response', response: response })
+        }
+
+        function update_ag_indicator(indicator) {
+            const value = document.getElementById(indicator).value
+            send({ type: 'ag_indicator', indicator: indicator, value: value })
+        }
+
+        function connect_sco() {
+            send({ type: 'connect_sco' })
+        }
+
+        function negotiate_codec() {
+            const codec = document.getElementById('codec').value
+            send({ type: 'negotiate_codec', codec: codec })
+        }
+
+        function disconnect_sco() {
+            send({ type: 'disconnect_sco' })
+        }
+
+        function add_call() {
+            let callLists = document.getElementById('call-lists');
+            let template = document.getElementById('call-template');
+
+            let newNode = document.importNode(template.content, true);
+            newNode.querySelector('.call-remover').onclick = function (event) {
+                event.target.closest('.call-row').remove();
+            }
+            callLists.appendChild(newNode);
+        }
+
+        function update_calls() {
+            let callLists = document.getElementById('call-lists');
+            send({
+                type: 'update_calls',
+                calls: Array.from(
+                    callLists.querySelectorAll('.call-row')).map(
+                        function (element) {
+                            return {
+                                index: element.querySelector('.call-index').value,
+                                number: element.querySelector('.call-number').value,
+                                direction: element.querySelector('.call-direction').value,
+                                status: element.querySelector('.call-status').value,
+                            }
+                        }
+                    ),
+            }
+            )
+        }
+
+        function connectAudio() {
+            player = new PCMPlayer({
+                inputCodec: 'Int16',
+                channels: 1,
+                sampleRate: sampleRate,
+                flushTime: 7.5,
+            });
+            player.volume(gainInput.value);
+        }
+
+        function setGain() {
+            if (player != null) {
+                player.volume(gainInput.value);
+            }
+        }
+    </script>
+    </div>
+</body>
+
+</html>
