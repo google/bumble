@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
+import collections
 import dataclasses
 import enum
 from typing import Callable, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
@@ -54,6 +55,7 @@ logger = logging.getLogger(__name__)
 # fmt: off
 
 RFCOMM_PSM = 0x0003
+DEFAULT_RX_QUEUE_SIZE = 32
 
 class FrameType(enum.IntEnum):
     SABM = 0x2F  # Control field [1,1,1,1,_,1,0,0] LSB-first
@@ -445,7 +447,8 @@ class DLC(EventEmitter):
         RESET = 0x05
 
     connection_result: Optional[asyncio.Future]
-    sink: Optional[Callable[[bytes], None]]
+    _sink: Optional[Callable[[bytes], None]]
+    _enqueued_rx_packets: collections.deque[bytes]
 
     def __init__(
         self,
@@ -466,16 +469,31 @@ class DLC(EventEmitter):
         self.state = DLC.State.INIT
         self.role = multiplexer.role
         self.c_r = 1 if self.role == Multiplexer.Role.INITIATOR else 0
-        self.sink = None
         self.connection_result = None
         self.drained = asyncio.Event()
         self.drained.set()
+        # Queued packets when sink is not set.
+        self._enqueued_rx_packets = collections.deque(maxlen=DEFAULT_RX_QUEUE_SIZE)
+        self._sink = None
 
         # Compute the MTU
         max_overhead = 4 + 1  # header with 2-byte length + fcs
         self.mtu = min(
             max_frame_size, self.multiplexer.l2cap_channel.peer_mtu - max_overhead
         )
+
+    @property
+    def sink(self) -> Optional[Callable[[bytes], None]]:
+        return self._sink
+
+    @sink.setter
+    def sink(self, sink: Optional[Callable[[bytes], None]]) -> None:
+        self._sink = sink
+        # Dump queued packets to sink
+        if sink:
+            for packet in self._enqueued_rx_packets:
+                sink(packet)  # pylint: disable=not-callable
+            self._enqueued_rx_packets.clear()
 
     def change_state(self, new_state: State) -> None:
         logger.debug(f'{self} state change -> {color(new_state.name, "magenta")}')
@@ -549,8 +567,15 @@ class DLC(EventEmitter):
             f'rx_credits={self.rx_credits}: {data.hex()}'
         )
         if data:
-            if self.sink:
-                self.sink(data)  # pylint: disable=not-callable
+            if self._sink:
+                self._sink(data)  # pylint: disable=not-callable
+            else:
+                self._enqueued_rx_packets.append(data)
+            if (
+                self._enqueued_rx_packets.maxlen
+                and len(self._enqueued_rx_packets) >= self._enqueued_rx_packets.maxlen
+            ):
+                logger.warning(f'DLC [{self.dlci}] received packet queue is full')
 
             # Update the credits
             if self.rx_credits > 0:
