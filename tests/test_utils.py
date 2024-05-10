@@ -16,7 +16,8 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Type
+from typing_extensions import Self
 
 from bumble.controller import Controller
 from bumble.link import LocalLink
@@ -80,6 +81,12 @@ class TwoDevices:
 
     def __getitem__(self, index: int) -> Device:
         return self.devices[index]
+
+    @classmethod
+    async def create_with_connection(cls: Type[Self]) -> Self:
+        devices = cls()
+        await devices.setup_connection()
+        return devices
 
 
 # -----------------------------------------------------------------------------

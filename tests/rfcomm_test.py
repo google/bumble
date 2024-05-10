@@ -32,6 +32,8 @@ from bumble.rfcomm import (
     RFCOMM_PSM,
 )
 
+_TIMEOUT = 0.1
+
 
 # -----------------------------------------------------------------------------
 def basic_frame_check(x):
@@ -80,6 +82,29 @@ async def test_basic_connection() -> None:
 
     dlcs[1].write(b'Lorem ipsum dolor sit amet')
     assert await queues[0].get() == b'Lorem ipsum dolor sit amet'
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_receive_pdu_before_open_dlc_returns() -> None:
+    devices = await test_utils.TwoDevices.create_with_connection()
+    DATA = b'123'
+
+    accept_future: asyncio.Future[DLC] = asyncio.get_running_loop().create_future()
+    channel = Server(devices[0]).listen(acceptor=accept_future.set_result)
+
+    assert devices.connections[1]
+    multiplexer = await Client(devices.connections[1]).start()
+    open_dlc_task = asyncio.create_task(multiplexer.open_dlc(channel))
+
+    dlc_responder = await accept_future
+    dlc_responder.write(DATA)
+
+    dlc_initiator = await open_dlc_task
+    dlc_initiator_queue = asyncio.Queue()  # type: ignore[var-annotated]
+    dlc_initiator.sink = dlc_initiator_queue.put_nowait
+
+    assert await asyncio.wait_for(dlc_initiator_queue.get(), timeout=_TIMEOUT) == DATA
 
 
 # -----------------------------------------------------------------------------
