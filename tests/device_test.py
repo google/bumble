@@ -214,6 +214,12 @@ async def test_device_connect_parallel():
     d1.host.set_packet_sink(Sink(d1_flow()))
     d2.host.set_packet_sink(Sink(d2_flow()))
 
+    d1_accept_task = asyncio.create_task(d1.accept(peer_address=d0.public_address))
+    d2_accept_task = asyncio.create_task(d2.accept())
+
+    # Ensure that the accept tasks have started.
+    await async_barrier()
+
     [c01, c02, a10, a20] = await asyncio.gather(
         *[
             asyncio.create_task(
@@ -222,8 +228,8 @@ async def test_device_connect_parallel():
             asyncio.create_task(
                 d0.connect(d2.public_address, transport=BT_BR_EDR_TRANSPORT)
             ),
-            asyncio.create_task(d1.accept(peer_address=d0.public_address)),
-            asyncio.create_task(d2.accept()),
+            d1_accept_task,
+            d2_accept_task,
         ]
     )
 
