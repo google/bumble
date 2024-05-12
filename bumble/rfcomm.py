@@ -734,7 +734,13 @@ class DLC(EventEmitter):
         self.emit('close')
 
     def __str__(self) -> str:
-        return f'DLC(dlci={self.dlci},state={self.state.name})'
+        return (
+            f'DLC(dlci={self.dlci}, '
+            f'state={self.state.name}, '
+            f'max_frame_size={self.max_frame_size}, '
+            f'window_size={self.window_size}'
+            ')'
+        )
 
 
 # -----------------------------------------------------------------------------

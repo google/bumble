@@ -26,8 +26,8 @@ import struct
 from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Union, ClassVar
 
 from bumble import crypto
-from .colors import color
-from .core import (
+from bumble.colors import color
+from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     AdvertisingData,
     DeviceClass,
@@ -36,6 +36,7 @@ from .core import (
     name_or_number,
     padded_bytes,
 )
+from bumble.utils import OpenIntEnum
 
 
 # -----------------------------------------------------------------------------
@@ -1104,7 +1105,7 @@ HCI_SUPPORTED_COMMANDS_MASKS = {
 
 # LE Supported Features
 # See Bluetooth spec @ Vol 6, Part B, 4.6 FEATURE SUPPORT
-class LeFeature(enum.IntEnum):
+class LeFeature(OpenIntEnum):
     LE_ENCRYPTION                                  = 0
     CONNECTION_PARAMETERS_REQUEST_PROCEDURE        = 1
     EXTENDED_REJECT_INDICATION                     = 2
