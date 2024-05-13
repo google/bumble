@@ -25,6 +25,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import asyncio
+import functools
 import logging
 import struct
 from datetime import datetime
@@ -41,15 +42,15 @@ from typing import (
     Set,
     TYPE_CHECKING,
 )
+from typing_extensions import Self
 
 from pyee import EventEmitter
 
-from .colors import color
-from .hci import HCI_Constant
-from .att import (
+from bumble.colors import color
+from bumble.hci import HCI_Constant
+from bumble.att import (
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     ATT_ATTRIBUTE_NOT_LONG_ERROR,
-    ATT_CID,
     ATT_DEFAULT_MTU,
     ATT_ERROR_RESPONSE,
     ATT_INVALID_OFFSET_ERROR,
@@ -66,10 +67,14 @@ from .att import (
     ATT_Write_Command,
     ATT_Write_Request,
     ATT_Error,
+    EATT_PSM,
+    Bearer,
+    EnhancedBearer,
+    UnenhancedBearer,
 )
-from . import core
-from .core import UUID, InvalidStateError, ProtocolError
-from .gatt import (
+from bumble import core, l2cap
+from bumble.core import UUID, InvalidStateError, ProtocolError
+from bumble.gatt import (
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
     GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
@@ -272,8 +277,7 @@ class Client:
     pending_response: Optional[asyncio.futures.Future[ATT_PDU]]
     pending_request: Optional[ATT_PDU]
 
-    def __init__(self, connection: Connection) -> None:
-        self.connection = connection
+    def __init__(self, connection: Union[Bearer, Connection]) -> None:
         self.mtu_exchange_done = False
         self.request_semaphore = asyncio.Semaphore(1)
         self.pending_request = None
@@ -283,19 +287,34 @@ class Client:
         self.services = []
         self.cached_values = {}
 
+        if isinstance(connection, Bearer):
+            self.bearer = connection
+            if isinstance(connection, EnhancedBearer):
+                connection.eatt_channel.sink = lambda pdu: self.on_gatt_pdu(
+                    ATT_PDU.from_bytes(pdu)
+                )
+        else:
+            self.bearer = UnenhancedBearer(connection=connection)
+        self.connection = self.bearer.connection
+
+    @classmethod
+    async def connect_eatt(cls: Type[Self], connection: Connection) -> Self:
+        channel = await connection.create_l2cap_channel(
+            l2cap.LeCreditBasedChannelSpec(psm=EATT_PSM)
+        )
+        bearer = EnhancedBearer(connection=connection, eatt_channel=channel)
+        client = cls(bearer)
+        return client
+
     def send_gatt_pdu(self, pdu: bytes) -> None:
-        self.connection.send_l2cap_pdu(ATT_CID, pdu)
+        self.bearer.send_gatt_pdu(pdu)
 
     async def send_command(self, command: ATT_PDU) -> None:
-        logger.debug(
-            f'GATT Command from client: [0x{self.connection.handle:04X}] {command}'
-        )
+        logger.debug(f'GATT Command from client: {self.bearer.cookie} {command}')
         self.send_gatt_pdu(command.to_bytes())
 
     async def send_request(self, request: ATT_PDU):
-        logger.debug(
-            f'GATT Request from client: [0x{self.connection.handle:04X}] {request}'
-        )
+        logger.debug(f'GATT Request from client: {self.bearer.cookie} {request}')
 
         # Wait until we can send (only one pending command at a time for the connection)
         response = None
@@ -323,8 +342,7 @@ class Client:
 
     def send_confirmation(self, confirmation: ATT_Handle_Value_Confirmation) -> None:
         logger.debug(
-            f'GATT Confirmation from client: [0x{self.connection.handle:04X}] '
-            f'{confirmation}'
+            f'GATT Confirmation from client: {self.bearer.cookie} ' f'{confirmation}'
         )
         self.send_gatt_pdu(confirmation.to_bytes())
 
@@ -337,7 +355,7 @@ class Client:
 
         # We can only send one request per connection
         if self.mtu_exchange_done:
-            return self.connection.att_mtu
+            return self.bearer.mtu
 
         # Send the request
         self.mtu_exchange_done = True
@@ -351,9 +369,9 @@ class Client:
             )
 
         # Compute the final MTU
-        self.connection.att_mtu = min(mtu, response.server_rx_mtu)
+        self.bearer.mtu = min(mtu, response.server_rx_mtu)
 
-        return self.connection.att_mtu
+        return self.bearer.mtu
 
     def get_services_by_uuid(self, uuid: UUID) -> List[ServiceProxy]:
         return [service for service in self.services if service.uuid == uuid]
@@ -944,7 +962,7 @@ class Client:
         # If the value is the max size for the MTU, try to read more unless the caller
         # specifically asked not to do that
         attribute_value = response.attribute_value
-        if not no_long_read and len(attribute_value) == self.connection.att_mtu - 1:
+        if not no_long_read and len(attribute_value) == self.bearer.mtu - 1:
             logger.debug('using READ BLOB to get the rest of the value')
             offset = len(attribute_value)
             while True:
@@ -971,7 +989,7 @@ class Client:
                 part = response.part_attribute_value
                 attribute_value += part
 
-                if len(part) < self.connection.att_mtu - 1:
+                if len(part) < self.bearer.mtu - 1:
                     break
 
                 offset += len(part)
@@ -1073,9 +1091,7 @@ class Client:
             )
 
     def on_gatt_pdu(self, att_pdu: ATT_PDU) -> None:
-        logger.debug(
-            f'GATT Response to client: [0x{self.connection.handle:04X}] {att_pdu}'
-        )
+        logger.debug(f'GATT Response to client: {self.bearer.cookie} {att_pdu}')
         if att_pdu.op_code in ATT_RESPONSES:
             if self.pending_request is None:
                 # Not expected!
@@ -1105,8 +1121,7 @@ class Client:
             else:
                 logger.warning(
                     color(
-                        '--- Ignoring GATT Response from '
-                        f'[0x{self.connection.handle:04X}]: ',
+                        '--- Ignoring GATT Response from ' f'{self.bearer.cookie}: ',
                         'red',
                     )
                     + str(att_pdu)

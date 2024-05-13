@@ -23,6 +23,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+import abc
 import enum
 import functools
 import inspect
@@ -38,9 +39,11 @@ from typing import (
     Union,
     TYPE_CHECKING,
 )
+from typing_extensions import override
 
 from pyee import EventEmitter
 
+from bumble import l2cap
 from bumble.core import UUID, name_or_number, ProtocolError
 from bumble.hci import HCI_Object, key_with_value
 from bumble.colors import color
@@ -55,6 +58,7 @@ if TYPE_CHECKING:
 # pylint: disable=line-too-long
 
 ATT_CID = 0x04
+EATT_PSM = 0x0027
 
 ATT_ERROR_RESPONSE              = 0x01
 ATT_EXCHANGE_MTU_REQUEST        = 0x02
@@ -297,6 +301,94 @@ class ATT_PDU:
             if len(self.pdu) > 1:
                 result += f': {self.pdu.hex()}'
         return result
+
+
+# -----------------------------------------------------------------------------
+# Bearer
+# -----------------------------------------------------------------------------
+class Bearer:
+    connection: Connection
+
+    @property
+    @abc.abstractmethod
+    def mtu(self) -> int:
+        raise NotImplementedError
+
+    @mtu.setter
+    @abc.abstractmethod
+    def mtu(self, mtu: int) -> None:
+        raise NotImplementedError
+
+    @property
+    @abc.abstractmethod
+    def cookie(self) -> str:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def send_gatt_pdu(self, pdu: bytes) -> None:
+        raise NotImplementedError
+
+
+class UnenhancedBearer(Bearer):
+
+    def __init__(self, connection: Connection):
+        self.connection = connection
+
+    @property
+    @override
+    def mtu(self) -> int:
+        return self.connection.att_mtu
+
+    @mtu.setter
+    @override
+    def mtu(self, mtu: int) -> None:
+        self.connection.device.on_connection_att_mtu_update(self.connection, mtu)
+
+    @property
+    @override
+    def cookie(self) -> str:
+        return f'[0x{self.connection.handle:04X}]'
+
+    @override
+    def send_gatt_pdu(self, pdu: bytes) -> None:
+        self.connection.send_l2cap_pdu(cid=ATT_CID, pdu=pdu)
+
+    @override
+    def __hash__(self) -> int:
+        return hash(self.connection.handle)
+
+
+class EnhancedBearer(Bearer):
+
+    def __init__(
+        self, connection: Connection, eatt_channel: l2cap.LeCreditBasedChannel
+    ):
+        self.connection = connection
+        self.eatt_channel = eatt_channel
+        self._mtu = ATT_DEFAULT_MTU
+
+    @property
+    @override
+    def mtu(self) -> int:
+        return self._mtu
+
+    @mtu.setter
+    @override
+    def mtu(self, mtu: int) -> None:
+        self._mtu = mtu
+
+    @property
+    @override
+    def cookie(self) -> str:
+        return f'[0x{self.connection.handle:04X}|EATT_CID=0x{self.eatt_channel.source_cid:04X}]'
+
+    @override
+    def send_gatt_pdu(self, pdu: bytes) -> None:
+        self.eatt_channel.write(pdu)
+
+    @override
+    def __hash__(self) -> int:
+        return hash((self.connection.handle, self.eatt_channel.source_cid))
 
 
 # -----------------------------------------------------------------------------

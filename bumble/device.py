@@ -46,7 +46,7 @@ from typing_extensions import Self
 from pyee import EventEmitter
 
 from .colors import color
-from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
+from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU, EATT_PSM
 from .gatt import Characteristic, Descriptor, Service
 from .hci import (
     HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE,
@@ -1009,6 +1009,8 @@ class Connection(CompositeEventEmitter):
     sc: bool
     link_key_type: int
     gatt_client: gatt_client.Client
+    gatt_server: gatt_server.Server
+
     pairing_peer_io_capability: Optional[int]
     pairing_peer_authentication_requirements: Optional[int]
 
@@ -1282,6 +1284,7 @@ class DeviceConfiguration:
     keystore: Optional[str] = None
     address_resolution_offload: bool = False
     cis_enabled: bool = False
+    eatt_enabled: bool = False
 
     def __post_init__(self) -> None:
         self.gatt_services: List[Dict[str, Any]] = []
@@ -1624,6 +1627,11 @@ class Device(CompositeEventEmitter):
 
         self.add_default_services(generic_access_service)
         self.l2cap_channel_manager.register_fixed_channel(ATT_CID, self.on_gatt_pdu)
+        if self.config.eatt_enabled:
+            self.l2cap_channel_manager.create_le_credit_based_server(
+                spec=l2cap.LeCreditBasedChannelSpec(psm=EATT_PSM),
+                handler=self.gatt_server.on_eatt_channel,
+            )
 
         # Forward some events
         setup_event_forwarding(self.gatt_server, self, 'characteristic_subscription')
@@ -3789,9 +3797,6 @@ class Device(CompositeEventEmitter):
                 f'{connection.peer_address} as {connection.role_name}, reason={reason}'
             )
             connection.emit('disconnection', reason)
-
-            # Cleanup subsystems that maintain per-connection state
-            self.gatt_server.on_disconnection(connection)
         elif sco_link := self.sco_links.pop(connection_handle, None):
             sco_link.emit('disconnection', reason)
         elif cis_link := self.cis_links.pop(connection_handle, None):
@@ -4265,8 +4270,7 @@ class Device(CompositeEventEmitter):
         connection.emit('connection_phy_update_failure', error)
 
     @host_event_handler
-    @with_connection_from_handle
-    def on_connection_att_mtu_update(self, connection, att_mtu):
+    def on_connection_att_mtu_update(self, connection: Connection, att_mtu: int):
         logger.debug(
             f'*** Connection ATT MTU Update: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}, '
@@ -4340,7 +4344,7 @@ class Device(CompositeEventEmitter):
         connection.emit('pairing_failure', reason)
 
     @with_connection_from_handle
-    def on_gatt_pdu(self, connection, pdu):
+    def on_gatt_pdu(self, connection: Connection, pdu: bytes) -> None:
         # Parse the L2CAP payload into an ATT PDU object
         att_pdu = ATT_PDU.from_bytes(pdu)
 
@@ -4359,7 +4363,7 @@ class Device(CompositeEventEmitter):
                     color('no GATT server for connection 0x{connection_handle:04X}')
                 )
                 return
-            connection.gatt_server.on_gatt_pdu(connection, att_pdu)
+            connection.gatt_server.on_unenhanced_pdu(connection, att_pdu)
 
     @with_connection_from_handle
     def on_smp_pdu(self, connection, pdu):
