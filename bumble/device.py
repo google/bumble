@@ -2188,7 +2188,7 @@ class Device(CompositeEventEmitter):
             # controller.
             await self.send_command(
                 HCI_LE_Remove_Advertising_Set_Command(
-                    advertising_handle=advertising_data
+                    advertising_handle=advertising_handle
                 ),
                 check_result=False,
             )
