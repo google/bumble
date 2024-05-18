@@ -85,7 +85,7 @@ SDP implements the service discovery protocol for Bluetooth Classic.
 RFComm is a bi-directional serial-port-like protocol. It is used in several profiles.
 
 ## Device
-The Device component it a compound object that ties together a Host, GATT Client, GATT Server, L2CAP channel access, advertising and scanning, and more.
+The Device component is a compound object that ties together a Host, GATT Client, GATT Server, L2CAP channel access, advertising and scanning, and more.
 
 ## Profiles
 Profiles are ways of using the underlying protocols for certain well-defined used cases, like playing music, implementing a headset, and so on.
