@@ -28,6 +28,7 @@ from bumble.core import (
     BT_PERIPHERAL_ROLE,
     UUID,
     AdvertisingData,
+    Appearance,
     ConnectionError,
 )
 from bumble.device import (
@@ -988,8 +989,8 @@ class HostService(HostServicer):
             dt.random_target_addresses.extend(
                 [data[i * 6 :: i * 6 + 6] for i in range(int(len(data) / 6))]
             )
-        if i := cast(int, ad.get(AdvertisingData.APPEARANCE)):
-            dt.appearance = i
+        if appearance := cast(Appearance, ad.get(AdvertisingData.APPEARANCE)):
+            dt.appearance = int(appearance)
         if i := cast(int, ad.get(AdvertisingData.ADVERTISING_INTERVAL)):
             dt.advertising_interval = i
         if s := cast(str, ad.get(AdvertisingData.URI)):

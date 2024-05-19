@@ -15,7 +15,9 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from bumble.core import AdvertisingData, UUID, get_dict_key_by_value
+from enum import IntEnum
+
+from bumble.core import AdvertisingData, Appearance, UUID, get_dict_key_by_value
 
 
 # -----------------------------------------------------------------------------
@@ -67,7 +69,34 @@ def test_uuid_to_hex_str() -> None:
 
 
 # -----------------------------------------------------------------------------
+def test_appearance() -> None:
+    a = Appearance(Appearance.Category.COMPUTER, Appearance.ComputerSubcategory.LAPTOP)
+    assert str(a) == 'COMPUTER/LAPTOP'
+    assert int(a) == 0x0083
+
+    a = Appearance(Appearance.Category.HUMAN_INTERFACE_DEVICE, 0x77)
+    assert str(a) == 'HUMAN_INTERFACE_DEVICE/HumanInterfaceDeviceSubcategory[119]'
+    assert int(a) == 0x03C0 | 0x77
+
+    a = Appearance.from_int(0x0381)
+    assert a.category == Appearance.Category.BLOOD_PRESSURE
+    assert a.subcategory == Appearance.BloodPressureSubcategory.ARM_BLOOD_PRESSURE
+    assert int(a) == 0x381
+
+    a = Appearance.from_int(0x038A)
+    assert a.category == Appearance.Category.BLOOD_PRESSURE
+    assert a.subcategory == 0x0A
+    assert int(a) == 0x038A
+
+    a = Appearance.from_int(0x3333)
+    assert a.category == 0xCC
+    assert a.subcategory == 0x33
+    assert int(a) == 0x3333
+
+
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     test_ad_data()
     test_get_dict_key_by_value()
     test_uuid_to_hex_str()
+    test_appearance()

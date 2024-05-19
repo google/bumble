@@ -905,6 +905,27 @@ class Host(AbortableEventEmitter):
             event.num_completed_extended_advertising_events,
         )
 
+    def on_hci_le_periodic_advertising_sync_established_event(self, event):
+        self.emit(
+            'periodic_advertising_sync_establishment',
+            event.status,
+            event.sync_handle,
+            event.advertising_sid,
+            event.advertiser_address,
+            event.advertiser_phy,
+            event.periodic_advertising_interval,
+            event.advertiser_clock_accuracy,
+        )
+
+    def on_hci_le_periodic_advertising_sync_lost_event(self, event):
+        self.emit('periodic_advertising_sync_loss', event.sync_handle)
+
+    def on_hci_le_periodic_advertising_report_event(self, event):
+        self.emit('periodic_advertising_report', event.sync_handle, event)
+
+    def on_hci_le_biginfo_advertising_report_event(self, event):
+        self.emit('biginfo_advertising_report', event.sync_handle, event)
+
     def on_hci_le_cis_request_event(self, event):
         self.emit(
             'cis_request',

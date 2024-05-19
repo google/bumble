@@ -26,8 +26,8 @@ import struct
 from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Union, ClassVar
 
 from bumble import crypto
-from .colors import color
-from .core import (
+from bumble.colors import color
+from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     AdvertisingData,
     DeviceClass,
@@ -36,6 +36,7 @@ from .core import (
     name_or_number,
     padded_bytes,
 )
+from bumble.utils import OpenIntEnum
 
 
 # -----------------------------------------------------------------------------
@@ -1380,7 +1381,7 @@ class LmpFeatureMask(enum.IntFlag):
 STATUS_SPEC = {'size': 1, 'mapper': lambda x: HCI_Constant.status_name(x)}
 
 
-class CodecID(enum.IntEnum):
+class CodecID(OpenIntEnum):
     # fmt: off
     U_LOG           = 0x00
     A_LOG           = 0x01
@@ -1966,6 +1967,9 @@ class Address:
 
     def __str__(self):
         return self.to_string()
+
+    def __repr__(self):
+        return f'Address({self.to_string(False)}/{self.address_type_name(self.address_type)})'
 
 
 # Predefined address values
@@ -4455,6 +4459,80 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
     [
+        (
+            'options',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Periodic_Advertising_Create_Sync_Command.Options(
+                    x
+                ).name,
+            },
+        ),
+        ('advertising_sid', 1),
+        ('advertiser_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('advertiser_address', Address.parse_address_preceded_by_type),
+        ('skip', 2),
+        ('sync_timeout', 2),
+        (
+            'sync_cte_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Periodic_Advertising_Create_Sync_Command.CteType(
+                    x
+                ).name,
+            },
+        ),
+    ]
+)
+class HCI_LE_Periodic_Advertising_Create_Sync_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.67 LE Periodic Advertising Create Sync command
+    '''
+
+    class Options(enum.IntFlag):
+        USE_PERIODIC_ADVERTISER_LIST = 1 << 0
+        REPORTING_INITIALLY_DISABLED = 1 << 1
+        DUPLICATE_FILTERING_INITIALLY_ENABLED = 1 << 2
+
+    class CteType(enum.IntFlag):
+        DO_NOT_SYNC_TO_PACKETS_WITH_AN_AOA_CONSTANT_TONE_EXTENSION = 1 << 0
+        DO_NOT_SYNC_TO_PACKETS_WITH_AN_AOD_CONSTANT_TONE_EXTENSION_1US = 1 << 1
+        DO_NOT_SYNC_TO_PACKETS_WITH_AN_AOD_CONSTANT_TONE_EXTENSION_2US = 1 << 2
+        DO_NOT_SYNC_TO_PACKETS_WITH_A_TYPE_3_CONSTANT_TONE_EXTENSION = 1 << 3
+        DO_NOT_SYNC_TO_PACKETS_WITHOUT_A_CONSTANT_TONE_EXTENSION = 1 << 4
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command()
+class HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.68 LE Periodic Advertising Create Sync Cancel Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([('sync_handle', 2)])
+class HCI_LE_Periodic_Advertising_Terminate_Sync_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.69 LE Periodic Advertising Terminate Sync Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([('sync_handle', 2), ('enable', 1)])
+class HCI_LE_Set_Periodic_Advertising_Receive_Enable_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.88 LE Set Periodic Advertising Receive Enable Command
+    '''
+
+    class Enable(enum.IntFlag):
+        REPORTING_ENABLED = 1 << 0
+        DUPLICATE_FILTERING_ENABLED = 1 << 1
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
         ('peer_identity_address_type', Address.ADDRESS_TYPE_SPEC),
         ('peer_identity_address', Address.parse_address_preceded_by_type),
         (
@@ -4485,14 +4563,6 @@ class HCI_LE_Set_Privacy_Mode_Command(HCI_Command):
     @classmethod
     def privacy_mode_name(cls, privacy_mode):
         return name_or_number(cls.PRIVACY_MODE_NAMES, privacy_mode)
-
-
-# -----------------------------------------------------------------------------
-@HCI_Command.command([('bit_number', 1), ('bit_value', 1)])
-class HCI_LE_Set_Host_Feature_Command(HCI_Command):
-    '''
-    See Bluetooth spec @ 7.8.115 LE Set Host Feature Command
-    '''
 
 
 # -----------------------------------------------------------------------------
@@ -4653,6 +4723,14 @@ class HCI_LE_Remove_ISO_Data_Path_Command(HCI_Command):
 
     connection_handle: int
     data_path_direction: int
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([('bit_number', 1), ('bit_value', 1)])
+class HCI_LE_Set_Host_Feature_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.115 LE Set Host Feature Command
+    '''
 
 
 # -----------------------------------------------------------------------------
@@ -5274,6 +5352,142 @@ HCI_LE_Meta_Event.subevent_classes[HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT] = (
 # -----------------------------------------------------------------------------
 @HCI_LE_Meta_Event.event(
     [
+        ('status', STATUS_SPEC),
+        ('sync_handle', 2),
+        ('advertising_sid', 1),
+        ('advertiser_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('advertiser_address', Address.parse_address_preceded_by_type),
+        ('advertiser_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('periodic_advertising_interval', 2),
+        ('advertiser_clock_accuracy', 1),
+    ]
+)
+class HCI_LE_Periodic_Advertising_Sync_Established_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.14 LE Periodic Advertising Sync Established Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('sync_handle', 2),
+        ('advertising_sid', 1),
+        ('advertiser_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('advertiser_address', Address.parse_address_preceded_by_type),
+        ('advertiser_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('periodic_advertising_interval', 2),
+        ('advertiser_clock_accuracy', 1),
+        ('num_subevents', 1),
+        ('subevent_interval', 1),
+        ('response_slot_delay', 1),
+        ('response_slot_spacing', 1),
+    ]
+)
+class HCI_LE_Periodic_Advertising_Sync_Established_V2_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.14 LE Periodic Advertising Sync Established Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('sync_handle', 2),
+        ('tx_power', -1),
+        ('rssi', -1),
+        (
+            'cte_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Periodic_Advertising_Report_Event.CteType(
+                    x
+                ).name,
+            },
+        ),
+        (
+            'data_status',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Periodic_Advertising_Report_Event.DataStatus(
+                    x
+                ).name,
+            },
+        ),
+        ('data', 'v'),
+    ]
+)
+class HCI_LE_Periodic_Advertising_Report_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.15 LE Periodic Advertising Report Event
+    '''
+
+    TX_POWER_INFORMATION_NOT_AVAILABLE = 0x7F
+    RSSI_NOT_AVAILABLE = 0x7F
+
+    class CteType(OpenIntEnum):
+        AOA_CONSTANT_TONE_EXTENSION = 0x00
+        AOD_CONSTANT_TONE_EXTENSION_1US = 0x01
+        AOD_CONSTANT_TONE_EXTENSION_2US = 0x02
+        NO_CONSTANT_TONE_EXTENSION = 0xFF
+
+    class DataStatus(OpenIntEnum):
+        DATA_COMPLETE = 0x00
+        DATA_INCOMPLETE_MORE_TO_COME = 0x01
+        DATA_INCOMPLETE_TRUNCATED_NO_MORE_TO_COME = 0x02
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('sync_handle', 2),
+        ('tx_power', -1),
+        ('rssi', -1),
+        (
+            'cte_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Periodic_Advertising_Report_Event.CteType(
+                    x
+                ).name,
+            },
+        ),
+        ('periodic_event_counter', 2),
+        ('subevent', 1),
+        (
+            'data_status',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Periodic_Advertising_Report_Event.DataStatus(
+                    x
+                ).name,
+            },
+        ),
+        ('data', 'v'),
+    ]
+)
+class HCI_LE_Periodic_Advertising_Report_V2_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.15 LE Periodic Advertising Report Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('sync_handle', 2),
+    ]
+)
+class HCI_LE_Periodic_Advertising_Sync_Lost_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.16 LE Periodic Advertising Sync Lost Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
         ('status', 1),
         ('advertising_handle', 1),
         ('connection_handle', 2),
@@ -5333,6 +5547,30 @@ class HCI_LE_CIS_Established_Event(HCI_LE_Meta_Event):
 class HCI_LE_CIS_Request_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.26 LE CIS Request Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('sync_handle', 2),
+        ('num_bis', 1),
+        ('nse', 1),
+        ('iso_interval', 2),
+        ('bn', 1),
+        ('pto', 1),
+        ('irc', 1),
+        ('max_pdu', 2),
+        ('sdu_interval', 3),
+        ('max_sdu', 2),
+        ('phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('framing', 1),
+        ('encryption', 1),
+    ]
+)
+class HCI_LE_BIGInfo_Advertising_Report_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.34 LE BIGInfo Advertising Report Event
     '''
 
 
