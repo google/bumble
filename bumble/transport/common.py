@@ -425,6 +425,10 @@ class SnoopingTransport(Transport):
     class Source:
         sink: TransportSink
 
+        @property
+        def metadata(self) -> dict[str, Any]:
+            return getattr(self.source, 'metadata', {})
+
         def __init__(self, source: TransportSource, snooper: Snooper):
             self.source = source
             self.snooper = snooper
