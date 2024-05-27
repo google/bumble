@@ -25,8 +25,10 @@ import grpc.aio
 from .config import Config
 from .device import PandoraDevice
 from .host import HostService
+from .hid import HidService
 from .security import SecurityService, SecurityStorageService
 from pandora.host_grpc_aio import add_HostServicer_to_server
+from pandora.hid_grpc_aio import add_HidServicer_to_server
 from pandora.security_grpc_aio import (
     add_SecurityServicer_to_server,
     add_SecurityStorageServicer_to_server,
@@ -71,6 +73,7 @@ async def serve(
             add_HostServicer_to_server(
                 HostService(server, bumble.device, config), server
             )
+            add_HidServicer_to_server(HidService(server, bumble.device), server)
             add_SecurityServicer_to_server(
                 SecurityService(bumble.device, config), server
             )
