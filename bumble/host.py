@@ -152,6 +152,7 @@ class Host(AbortableEventEmitter):
     acl_packet_queue: Optional[AclPacketQueue] = None
     le_acl_packet_queue: Optional[AclPacketQueue] = None
     hci_sink: Optional[TransportSink] = None
+    hci_source: Optional[TransportSource] = None
     hci_metadata: Dict[str, Any]
     long_term_key_provider: Optional[
         Callable[[int, bytes, int], Awaitable[Optional[bytes]]]
@@ -506,6 +507,7 @@ class Host(AbortableEventEmitter):
     def set_packet_source(self, source: TransportSource) -> None:
         source.set_packet_sink(self)
         self.hci_metadata = getattr(source, 'metadata', self.hci_metadata)
+        self.hci_source = source
 
     def send_hci_packet(self, packet: hci.HCI_Packet) -> None:
         logger.debug(f'{color("### HOST -> CONTROLLER", "blue")}: {packet}')
@@ -514,7 +516,7 @@ class Host(AbortableEventEmitter):
         if self.hci_sink:
             self.hci_sink.on_packet(bytes(packet))
 
-    async def send_command(self, command, check_result=False):
+    async def send_command(self, command, check_result=False, timeout=None):
         # Wait until we can send (only one pending command at a time)
         async with self.command_semaphore:
             assert self.pending_command is None
@@ -526,7 +528,8 @@ class Host(AbortableEventEmitter):
 
             try:
                 self.send_hci_packet(command)
-                response = await self.pending_response
+                await asyncio.wait_for(self.pending_response, timeout=timeout)
+                response = self.pending_response.result()
 
                 # Check the return parameters if required
                 if check_result:
@@ -625,14 +628,19 @@ class Host(AbortableEventEmitter):
 
     # Packet Sink protocol (packets coming from the controller via HCI)
     def on_packet(self, packet: bytes) -> None:
-        hci_packet = hci.HCI_Packet.from_bytes(packet)
+        try:
+            hci_packet = hci.HCI_Packet.from_bytes(packet)
+        except Exception as error:
+            logger.warning(f'!!! error parsing packet from bytes: {error}')
+            return
+
         if self.ready or (
             isinstance(hci_packet, hci.HCI_Command_Complete_Event)
             and hci_packet.command_opcode == hci.HCI_RESET_COMMAND
         ):
             self.on_hci_packet(hci_packet)
         else:
-            logger.debug('reset not done, ignoring packet from controller')
+            logger.debug(f'reset not done, ignoring packet from controller: {hci_packet}')
 
     def on_transport_lost(self):
         # Called by the source when the transport has been lost.

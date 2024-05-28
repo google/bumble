@@ -126,6 +126,7 @@ async def open_usb_transport(spec: str) -> Transport:
         def on_packet(self, packet):
             # Ignore packets if we're closed
             if self.closed:
+                logger.warning('ignoring packet, closed')
                 return
 
             if len(packet) == 0:
@@ -280,7 +281,12 @@ async def open_usb_transport(spec: str) -> Transport:
                     packet = await self.queue.get()
                 except asyncio.CancelledError:
                     return
-                self.parser.feed_data(packet)
+                try:
+                    self.parser.feed_data(packet)
+                except Exception as error:
+                    logger.warning(
+                        color(f'!!! error feeding data: {error}', 'red')
+                    )
 
         def close(self):
             self.closed = True
