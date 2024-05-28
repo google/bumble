@@ -395,6 +395,9 @@ def sdp_records():
     }
 
 
+hid_device = None
+
+
 # This class implements the Hid Pandora interface.
 class HidService(HidServicer):
 
