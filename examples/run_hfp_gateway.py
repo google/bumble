@@ -26,7 +26,7 @@ import websockets
 from typing import Optional
 
 import bumble.core
-from bumble.device import Device
+from bumble.device import Device, ScoLink
 from bumble.transport import open_transport_or_link
 from bumble.core import (
     BT_BR_EDR_TRANSPORT,
@@ -217,11 +217,11 @@ async def main() -> None:
             1: hfp.make_ag_sdp_records(1, channel, configuration)
         }
 
-        def on_sco_connection(sco_link):
+        def on_sco_connection(sco_link: ScoLink):
             assert ag_protocol
             on_sco_state_change(ag_protocol.active_codec)
             sco_link.on('disconnection', lambda _: on_sco_state_change(0))
-            sco_link.on('pdu', on_sco_packet)
+            sco_link.sink = on_sco_packet
 
         device.on('sco_connection', on_sco_connection)
         if len(sys.argv) >= 4:

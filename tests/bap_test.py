@@ -72,7 +72,7 @@ def test_codec_specific_capabilities() -> None:
     cap = CodecSpecificCapabilities(
         supported_sampling_frequencies=SAMPLE_FREQUENCY,
         supported_frame_durations=FRAME_SURATION,
-        supported_audio_channel_counts=AUDIO_CHANNEL_COUNTS,
+        supported_audio_channel_count=AUDIO_CHANNEL_COUNTS,
         min_octets_per_codec_frame=40,
         max_octets_per_codec_frame=40,
         supported_max_codec_frames_per_sdu=1,
@@ -88,7 +88,7 @@ def test_pac_record() -> None:
     cap = CodecSpecificCapabilities(
         supported_sampling_frequencies=SAMPLE_FREQUENCY,
         supported_frame_durations=FRAME_SURATION,
-        supported_audio_channel_counts=AUDIO_CHANNEL_COUNTS,
+        supported_audio_channel_count=AUDIO_CHANNEL_COUNTS,
         min_octets_per_codec_frame=40,
         max_octets_per_codec_frame=40,
         supported_max_codec_frames_per_sdu=1,
@@ -216,7 +216,7 @@ async def test_pacs():
                         supported_frame_durations=(
                             SupportedFrameDuration.DURATION_10000_US_SUPPORTED
                         ),
-                        supported_audio_channel_counts=[1],
+                        supported_audio_channel_count=[1],
                         min_octets_per_codec_frame=40,
                         max_octets_per_codec_frame=40,
                         supported_max_codec_frames_per_sdu=1,
@@ -232,7 +232,7 @@ async def test_pacs():
                         supported_frame_durations=(
                             SupportedFrameDuration.DURATION_10000_US_SUPPORTED
                         ),
-                        supported_audio_channel_counts=[1],
+                        supported_audio_channel_count=[1],
                         min_octets_per_codec_frame=60,
                         max_octets_per_codec_frame=60,
                         supported_max_codec_frames_per_sdu=1,

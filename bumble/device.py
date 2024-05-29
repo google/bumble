@@ -23,7 +23,13 @@ import json
 import asyncio
 import logging
 import secrets
-from contextlib import asynccontextmanager, AsyncExitStack, closing
+import sys
+from contextlib import (
+    asynccontextmanager,
+    AsyncExitStack,
+    closing,
+    AbstractAsyncContextManager,
+)
 from dataclasses import dataclass, field
 from collections.abc import Iterable
 from typing import (
@@ -961,8 +967,9 @@ class ScoLink(CompositeEventEmitter):
     acl_connection: Connection
     handle: int
     link_type: int
+    sink: Optional[Callable[[HCI_SynchronousDataPacket], Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__init__()
 
     async def disconnect(
@@ -984,8 +991,9 @@ class CisLink(CompositeEventEmitter):
     cis_id: int  # CIS ID assigned by Central device
     cig_id: int  # CIG ID assigned by Central device
     state: State = State.PENDING
+    sink: Optional[Callable[[HCI_IsoDataPacket], Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__init__()
 
     async def disconnect(
@@ -1532,6 +1540,12 @@ class Device(CompositeEventEmitter):
         self.classic_pending_accepts = {
             Address.ANY: []
         }  # Futures, by BD address OR [Futures] for Address.ANY
+
+        # In Python <= 3.9 + Rust Runtime, asyncio.Lock cannot be properly initiated.
+        if sys.version_info >= (3, 10):
+            self._cis_lock = asyncio.Lock()
+        else:
+            self._cis_lock = AsyncExitStack()
 
         # Own address type cache
         self.connect_own_address_type = None
@@ -3406,49 +3420,71 @@ class Device(CompositeEventEmitter):
                 for cis_handle, _ in cis_acl_pairs
             }
 
-            @watcher.on(self, 'cis_establishment')
             def on_cis_establishment(cis_link: CisLink) -> None:
                 if pending_future := pending_cis_establishments.get(cis_link.handle):
                     pending_future.set_result(cis_link)
 
-            result = await self.send_command(
+            def on_cis_establishment_failure(cis_handle: int, status: int) -> None:
+                if pending_future := pending_cis_establishments.get(cis_handle):
+                    pending_future.set_exception(HCI_Error(status))
+
+            watcher.on(self, 'cis_establishment', on_cis_establishment)
+            watcher.on(self, 'cis_establishment_failure', on_cis_establishment_failure)
+            await self.send_command(
                 HCI_LE_Create_CIS_Command(
                     cis_connection_handle=[p[0] for p in cis_acl_pairs],
                     acl_connection_handle=[p[1] for p in cis_acl_pairs],
                 ),
+                check_result=True,
             )
-            if result.status != HCI_COMMAND_STATUS_PENDING:
-                logger.warning(
-                    'HCI_LE_Create_CIS_Command failed: '
-                    f'{HCI_Constant.error_name(result.status)}'
-                )
-                raise HCI_StatusError(result)
 
             return await asyncio.gather(*pending_cis_establishments.values())
 
     # [LE only]
     @experimental('Only for testing.')
     async def accept_cis_request(self, handle: int) -> CisLink:
-        result = await self.send_command(
-            HCI_LE_Accept_CIS_Request_Command(connection_handle=handle),
-        )
-        if result.status != HCI_COMMAND_STATUS_PENDING:
-            logger.warning(
-                'HCI_LE_Accept_CIS_Request_Command failed: '
-                f'{HCI_Constant.error_name(result.status)}'
-            )
-            raise HCI_StatusError(result)
+        """[LE Only] Accepts an incoming CIS request.
 
-        pending_cis_establishment = asyncio.get_running_loop().create_future()
+        When the specified CIS handle is already created, this method returns the
+        existed CIS link object immediately.
 
-        with closing(EventWatcher()) as watcher:
+        Args:
+            handle: CIS handle to accept.
 
-            @watcher.on(self, 'cis_establishment')
-            def on_cis_establishment(cis_link: CisLink) -> None:
-                if cis_link.handle == handle:
-                    pending_cis_establishment.set_result(cis_link)
+        Returns:
+            CIS link object on the given handle.
+        """
+        if not (cis_link := self.cis_links.get(handle)):
+            raise InvalidStateError(f'No pending CIS request of handle {handle}')
 
-            return await pending_cis_establishment
+        # There might be multiple ASE sharing a CIS channel.
+        # If one of them has accepted the request, the others should just leverage it.
+        async with self._cis_lock:
+            if cis_link.state == CisLink.State.ESTABLISHED:
+                return cis_link
+
+            with closing(EventWatcher()) as watcher:
+                pending_establishment = asyncio.get_running_loop().create_future()
+
+                def on_establishment() -> None:
+                    pending_establishment.set_result(None)
+
+                def on_establishment_failure(status: int) -> None:
+                    pending_establishment.set_exception(HCI_Error(status))
+
+                watcher.on(cis_link, 'establishment', on_establishment)
+                watcher.on(cis_link, 'establishment_failure', on_establishment_failure)
+
+                await self.send_command(
+                    HCI_LE_Accept_CIS_Request_Command(connection_handle=handle),
+                    check_result=True,
+                )
+
+                await pending_establishment
+                return cis_link
+
+        # Mypy believes this is reachable when context is an ExitStack.
+        raise InvalidStateError('Unreachable')
 
     # [LE only]
     @experimental('Only for testing.')
@@ -3457,15 +3493,10 @@ class Device(CompositeEventEmitter):
         handle: int,
         reason: int = HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     ) -> None:
-        result = await self.send_command(
+        await self.send_command(
             HCI_LE_Reject_CIS_Request_Command(connection_handle=handle, reason=reason),
+            check_result=True,
         )
-        if result.status != HCI_COMMAND_STATUS_PENDING:
-            logger.warning(
-                'HCI_LE_Reject_CIS_Request_Command failed: '
-                f'{HCI_Constant.error_name(result.status)}'
-            )
-            raise HCI_StatusError(result)
 
     async def get_remote_le_features(self, connection: Connection) -> LeFeatureMask:
         """[LE Only] Reads remote LE supported features.
@@ -3485,11 +3516,17 @@ class Device(CompositeEventEmitter):
                 if handle == connection.handle:
                     read_feature_future.set_result(LeFeatureMask(features))
 
+            def on_failure(handle: int, status: int):
+                if handle == connection.handle:
+                    read_feature_future.set_exception(HCI_Error(status))
+
             watcher.on(self.host, 'le_remote_features', on_le_remote_features)
+            watcher.on(self.host, 'le_remote_features_failure', on_failure)
             await self.send_command(
                 HCI_LE_Read_Remote_Features_Command(
                     connection_handle=connection.handle
                 ),
+                check_result=True,
             )
             return await read_feature_future
 
@@ -4111,8 +4148,8 @@ class Device(CompositeEventEmitter):
     @host_event_handler
     @experimental('Only for testing')
     def on_sco_packet(self, sco_handle: int, packet: HCI_SynchronousDataPacket) -> None:
-        if sco_link := self.sco_links.get(sco_handle):
-            sco_link.emit('pdu', packet)
+        if (sco_link := self.sco_links.get(sco_handle)) and sco_link.sink:
+            sco_link.sink(packet)
 
     # [LE only]
     @host_event_handler
@@ -4168,15 +4205,15 @@ class Device(CompositeEventEmitter):
     def on_cis_establishment_failure(self, cis_handle: int, status: int) -> None:
         logger.debug(f'*** CIS Establishment Failure: cis=[0x{cis_handle:04X}] ***')
         if cis_link := self.cis_links.pop(cis_handle):
-            cis_link.emit('establishment_failure')
+            cis_link.emit('establishment_failure', status)
         self.emit('cis_establishment_failure', cis_handle, status)
 
     # [LE only]
     @host_event_handler
     @experimental('Only for testing')
     def on_iso_packet(self, handle: int, packet: HCI_IsoDataPacket) -> None:
-        if cis_link := self.cis_links.get(handle):
-            cis_link.emit('pdu', packet)
+        if (cis_link := self.cis_links.get(handle)) and cis_link.sink:
+            cis_link.sink(packet)
 
     @host_event_handler
     @with_connection_from_handle

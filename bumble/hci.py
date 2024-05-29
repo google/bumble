@@ -23,7 +23,7 @@ import functools
 import logging
 import secrets
 import struct
-from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Union, ClassVar
 
 from bumble import crypto
 from .colors import color
@@ -2003,7 +2003,7 @@ class HCI_Packet:
     Abstract Base class for HCI packets
     '''
 
-    hci_packet_type: int
+    hci_packet_type: ClassVar[int]
 
     @staticmethod
     def from_bytes(packet: bytes) -> HCI_Packet:
@@ -6192,12 +6192,23 @@ class HCI_SynchronousDataPacket(HCI_Packet):
 
 
 # -----------------------------------------------------------------------------
+@dataclasses.dataclass
 class HCI_IsoDataPacket(HCI_Packet):
     '''
     See Bluetooth spec @ 5.4.5 HCI ISO Data Packets
     '''
 
-    hci_packet_type = HCI_ISO_DATA_PACKET
+    hci_packet_type: ClassVar[int] = HCI_ISO_DATA_PACKET
+
+    connection_handle: int
+    data_total_length: int
+    iso_sdu_fragment: bytes
+    pb_flag: int
+    ts_flag: int = 0
+    time_stamp: Optional[int] = None
+    packet_sequence_number: Optional[int] = None
+    iso_sdu_length: Optional[int] = None
+    packet_status_flag: Optional[int] = None
 
     @staticmethod
     def from_bytes(packet: bytes) -> HCI_IsoDataPacket:
@@ -6240,28 +6251,6 @@ class HCI_IsoDataPacket(HCI_Packet):
             packet_status_flag=packet_status_flag,
             iso_sdu_fragment=iso_sdu_fragment,
         )
-
-    def __init__(
-        self,
-        connection_handle: int,
-        pb_flag: int,
-        ts_flag: int,
-        data_total_length: int,
-        time_stamp: Optional[int],
-        packet_sequence_number: Optional[int],
-        iso_sdu_length: Optional[int],
-        packet_status_flag: Optional[int],
-        iso_sdu_fragment: bytes,
-    ) -> None:
-        self.connection_handle = connection_handle
-        self.pb_flag = pb_flag
-        self.ts_flag = ts_flag
-        self.data_total_length = data_total_length
-        self.time_stamp = time_stamp
-        self.packet_sequence_number = packet_sequence_number
-        self.iso_sdu_length = iso_sdu_length
-        self.packet_status_flag = packet_status_flag
-        self.iso_sdu_fragment = iso_sdu_fragment
 
     def __bytes__(self) -> bytes:
         return self.to_bytes()
