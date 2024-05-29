@@ -102,7 +102,7 @@ async def main() -> None:
                             supported_frame_durations=(
                                 SupportedFrameDuration.DURATION_10000_US_SUPPORTED
                             ),
-                            supported_audio_channel_counts=[1],
+                            supported_audio_channel_count=[1],
                             min_octets_per_codec_frame=120,
                             max_octets_per_codec_frame=120,
                             supported_max_codec_frames_per_sdu=1,

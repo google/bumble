@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "Abortable",
+        "aiohttp",
         "altsetting",
         "ansiblue",
         "ansicyan",
@@ -9,6 +10,7 @@
         "ansired",
         "ansiyellow",
         "appendleft",
+        "ascs",
         "ASHA",
         "asyncio",
         "ATRAC",
@@ -43,6 +45,7 @@
         "keyup",
         "levelname",
         "libc",
+        "liblc",
         "libusb",
         "MITM",
         "MSBC",
@@ -78,6 +81,7 @@
         "unmuted",
         "usbmodem",
         "vhci",
+        "wasmtime",
         "websockets",
         "xcursor",
         "ycursor"

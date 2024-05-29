@@ -721,14 +721,16 @@ class Host(AbortableEventEmitter):
         for connection_handle, num_completed_packets in zip(
             event.connection_handles, event.num_completed_packets
         ):
-            if not (connection := self.connections.get(connection_handle)):
+            if connection := self.connections.get(connection_handle):
+                connection.acl_packet_queue.on_packets_completed(num_completed_packets)
+            elif not (
+                self.cis_links.get(connection_handle)
+                or self.sco_links.get(connection_handle)
+            ):
                 logger.warning(
                     'received packet completion event for unknown handle '
                     f'0x{connection_handle:04X}'
                 )
-                continue
-
-            connection.acl_packet_queue.on_packets_completed(num_completed_packets)
 
     # Classic only
     def on_hci_connection_request_event(self, event):
