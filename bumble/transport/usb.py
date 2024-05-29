@@ -284,9 +284,7 @@ async def open_usb_transport(spec: str) -> Transport:
                 try:
                     self.parser.feed_data(packet)
                 except Exception as error:
-                    logger.warning(
-                        color(f'!!! error feeding data: {error}', 'red')
-                    )
+                    logger.warning(color(f'!!! error feeding data: {error}', 'red'))
 
         def close(self):
             self.closed = True

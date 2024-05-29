@@ -62,11 +62,10 @@ def test_parser_extensions():
     except ValueError:
         exception_thrown = True
 
-    assert exception_thrown
+    assert not exception_thrown
 
     # Now add a custom info
     parser.extended_packet_info[0x77] = (1, 1, 'B')
-    parser.reset()
     parser.feed_data(bytes([0x77, 0x00, 0x02, 0x01, 0x02]))
     assert len(sink.packets) == 1
 

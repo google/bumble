@@ -640,7 +640,9 @@ class Host(AbortableEventEmitter):
         ):
             self.on_hci_packet(hci_packet)
         else:
-            logger.debug(f'reset not done, ignoring packet from controller: {hci_packet}')
+            logger.debug(
+                f'reset not done, ignoring packet from controller: {hci_packet}'
+            )
 
     def on_transport_lost(self):
         # Called by the source when the transport has been lost.
