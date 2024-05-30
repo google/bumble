@@ -55,7 +55,8 @@ def test_parser_extensions():
     sink = Sink()
     parser = PacketParser(sink)
 
-    # Check that an exception is thrown for an unknown type
+    # Check that an exception is not thrown for an unknown type; instead the
+    # parser should be reset.
     try:
         parser.feed_data(bytes([0x77, 0x00, 0x02, 0x01, 0x02]))
         exception_thrown = False
@@ -63,6 +64,7 @@ def test_parser_extensions():
         exception_thrown = True
 
     assert not exception_thrown
+    assert len(sink.packets) == 0
 
     # Now add a custom info
     parser.extended_packet_info[0x77] = (1, 1, 'B')
