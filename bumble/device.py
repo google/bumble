@@ -3701,7 +3701,6 @@ class Device(CompositeEventEmitter):
                 # We were connected via a legacy advertisement.
                 if self.legacy_advertiser:
                     own_address_type = self.legacy_advertiser.own_address_type
-                    self.legacy_advertiser = None
                 else:
                     # This should not happen, but just in case, pick a default.
                     logger.warning("connection without an advertiser")
@@ -3732,15 +3731,14 @@ class Device(CompositeEventEmitter):
         )
         self.connections[connection_handle] = connection
 
-        if (
-            role == HCI_PERIPHERAL_ROLE
-            and self.legacy_advertiser
-            and self.legacy_advertiser.auto_restart
-        ):
-            connection.once(
-                'disconnection',
-                lambda _: self.abort_on('flush', self.legacy_advertiser.start()),
-            )
+        if role == HCI_PERIPHERAL_ROLE and self.legacy_advertiser:
+            if self.legacy_advertiser.auto_restart:
+                connection.once(
+                    'disconnection',
+                    lambda _: self.abort_on('flush', self.legacy_advertiser.start()),
+                )
+            else:
+                self.legacy_advertiser = None
 
         if role == HCI_CENTRAL_ROLE or not self.supports_le_extended_advertising:
             # We can emit now, we have all the info we need
