@@ -833,7 +833,9 @@ class ClassicChannel(EventEmitter):
 
         # Wait for the connection to succeed or fail
         try:
-            return await self.connection_result
+            return await self.connection.abort_on(
+                'disconnection', self.connection_result
+            )
         finally:
             self.connection_result = None
 
@@ -2226,7 +2228,7 @@ class ChannelManager:
         # Connect
         try:
             await channel.connect()
-        except Exception as e:
+        except BaseException as e:
             del connection_channels[source_cid]
             raise e
 

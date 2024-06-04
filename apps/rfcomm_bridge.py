@@ -24,7 +24,7 @@ from typing import Optional
 import click
 
 from bumble.colors import color
-from bumble.device import Device, Connection
+from bumble.device import Device, DeviceConfiguration, Connection
 from bumble import core
 from bumble import hci
 from bumble import rfcomm
@@ -37,7 +37,8 @@ from bumble import utils
 # -----------------------------------------------------------------------------
 DEFAULT_RFCOMM_UUID = "E6D55659-C8B4-4B85-96BB-B1143AF6D3AE"
 DEFAULT_MTU = 4096
-DEFAULT_TCP_PORT = 9544
+DEFAULT_CLIENT_TCP_PORT = 9544
+DEFAULT_SERVER_TCP_PORT = 9545
 
 TRACE_MAX_SIZE = 48
 
@@ -149,7 +150,7 @@ class ServerBridge:
 
     def on_disconnection(self, reason: int):
         print(
-            color("@@@ Bluetooth disconnection:", "blue"),
+            color("@@@ Bluetooth disconnection:", "red"),
             hci.HCI_Constant.error_name(reason),
         )
 
@@ -271,6 +272,7 @@ class ClientBridge:
             self.address, transport=core.BT_BR_EDR_TRANSPORT
         )
         print(color(f"@@@ Bluetooth connection: {self.connection}", "blue"))
+        self.connection.on("disconnection", self.on_disconnection)
 
         if self.encrypt:
             print(color("@@@ Encrypting Bluetooth connection", "blue"))
@@ -278,19 +280,16 @@ class ClientBridge:
             print(color("@@@ Bluetooth connection encrypted", "blue"))
 
         self.rfcomm_client = rfcomm.Client(self.connection)
-        self.rfcomm_mux = await self.rfcomm_client.start()
-
-        def on_disconnection(reason):
-            print(
-                color("@@@ Bluetooth disconnection:", "red"),
-                hci.HCI_Constant.error_name(reason),
-            )
-            self.connection = None
-
-        self.connection.on("disconnection", on_disconnection)
+        try:
+            self.rfcomm_mux = await self.rfcomm_client.start()
+        except BaseException as e:
+            print(color("!!! Failed to setup RFCOMM connection", "red"), e)
+            raise
 
     async def start(self, device: Device) -> None:
         self.device = device
+        await device.set_connectable(False)
+        await device.set_discoverable(False)
 
         # Called when a TCP connection is established
         async def on_tcp_connection(reader, writer):
@@ -303,9 +302,15 @@ class ClientBridge:
                 return
             self.tcp_connected = True
 
-            await self.pipe(reader, writer)
-            writer.close()
-            await writer.wait_closed()
+            try:
+                await self.pipe(reader, writer)
+            except BaseException as error:
+                print(color("!!! Exception while piping data:", "red"), error)
+                return
+            finally:
+                writer.close()
+                await writer.wait_closed()
+                self.tcp_connected = False
 
         await asyncio.start_server(
             on_tcp_connection,
@@ -339,12 +344,12 @@ class ClientBridge:
         # Connect a new RFCOMM channel
         await self.connect()
         assert self.rfcomm_mux
-        print(color(f'*** Opening RFCOMM channel {channel}', 'green'))
+        print(color(f"*** Opening RFCOMM channel {channel}", "green"))
         try:
             rfcomm_channel = await self.rfcomm_mux.open_dlc(channel)
-            print(color(f'*** RFCOMM channel open: {rfcomm_channel}', "green"))
+            print(color(f"*** RFCOMM channel open: {rfcomm_channel}", "green"))
         except Exception as error:
-            print(color(f'!!! RFCOMM open failed: {error}', 'red'))
+            print(color(f"!!! RFCOMM open failed: {error}", "red"))
             return
 
         # Pipe data from RFCOMM to TCP
@@ -383,6 +388,13 @@ class ClientBridge:
 
         print(color("~~~ Bye bye", "magenta"))
 
+    def on_disconnection(self, reason: int) -> None:
+        print(
+            color("@@@ Bluetooth disconnection:", "red"),
+            hci.HCI_Constant.error_name(reason),
+        )
+        self.connection = None
+
 
 # -----------------------------------------------------------------------------
 async def run(device_config, hci_transport, bridge):
@@ -393,7 +405,14 @@ async def run(device_config, hci_transport, bridge):
     ):
         print("<<< connected")
 
-        device = Device.from_config_file_with_hci(device_config, hci_source, hci_sink)
+        if device_config:
+            device = Device.from_config_file_with_hci(
+                device_config, hci_source, hci_sink
+            )
+        else:
+            device = Device.from_config_with_hci(
+                DeviceConfiguration(), hci_source, hci_sink
+            )
         device.classic_enabled = True
 
         # Let's go
@@ -412,11 +431,28 @@ async def run(device_config, hci_transport, bridge):
 # -----------------------------------------------------------------------------
 @click.group()
 @click.pass_context
-@click.option("--device-config", help="Device configuration file", required=True)
-@click.option("--hci-transport", help="HCI transport", required=True)
+@click.option(
+    "--device-config",
+    metavar="CONFIG_FILE",
+    help="Device configuration file",
+)
+@click.option(
+    "--hci-transport", metavar="TRANSPORT_NAME", help="HCI transport", required=True
+)
 @click.option("--trace", is_flag=True, help="Trace bridged data to stdout")
-@click.option("--channel", help="RFCOMM channel number", type=int, default=0)
-@click.option("--uuid", help="UUID for the RFCOMM channel", default=DEFAULT_RFCOMM_UUID)
+@click.option(
+    "--channel",
+    metavar="CHANNEL_NUMER",
+    help="RFCOMM channel number",
+    type=int,
+    default=0,
+)
+@click.option(
+    "--uuid",
+    metavar="UUID",
+    help="UUID for the RFCOMM channel",
+    default=DEFAULT_RFCOMM_UUID,
+)
 def cli(
     context,
     device_config,
@@ -437,7 +473,7 @@ def cli(
 @cli.command()
 @click.pass_context
 @click.option("--tcp-host", help="TCP host", default="localhost")
-@click.option("--tcp-port", help="TCP port", default=DEFAULT_TCP_PORT)
+@click.option("--tcp-port", help="TCP port", default=DEFAULT_SERVER_TCP_PORT)
 def server(context, tcp_host, tcp_port):
     bridge = ServerBridge(
         context.obj["channel"],
@@ -454,7 +490,7 @@ def server(context, tcp_host, tcp_port):
 @click.pass_context
 @click.argument("bluetooth-address")
 @click.option("--tcp-host", help="TCP host", default="_")
-@click.option("--tcp-port", help="TCP port", default=DEFAULT_TCP_PORT)
+@click.option("--tcp-port", help="TCP port", default=DEFAULT_CLIENT_TCP_PORT)
 @click.option("--encrypt", is_flag=True, help="Encrypt the connection")
 def client(context, bluetooth_address, tcp_host, tcp_port, encrypt):
     bridge = ClientBridge(
