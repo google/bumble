@@ -18,6 +18,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
+from bumble import core
+
 
 # -----------------------------------------------------------------------------
 class BitReader:
@@ -40,7 +42,7 @@ class BitReader:
         """ "Read up to 32 bits."""
 
         if bits > 32:
-            raise ValueError('maximum read size is 32')
+            raise core.InvalidArgumentError('maximum read size is 32')
 
         if self.bits_cached >= bits:
             # We have enough bits.
@@ -53,7 +55,7 @@ class BitReader:
         feed_size = len(feed_bytes)
         feed_int = int.from_bytes(feed_bytes, byteorder='big')
         if 8 * feed_size + self.bits_cached < bits:
-            raise ValueError('trying to read past the data')
+            raise core.InvalidArgumentError('trying to read past the data')
         self.byte_position += feed_size
 
         # Combine the new cache and the old cache
@@ -68,7 +70,7 @@ class BitReader:
 
     def read_bytes(self, count: int):
         if self.bit_position + 8 * count > 8 * len(self.data):
-            raise ValueError('not enough data')
+            raise core.InvalidArgumentError('not enough data')
 
         if self.bit_position % 8:
             # Not byte aligned
@@ -113,7 +115,7 @@ class AacAudioRtpPacket:
 
     @staticmethod
     def program_config_element(reader: BitReader):
-        raise ValueError('program_config_element not supported')
+        raise core.InvalidPacketError('program_config_element not supported')
 
     @dataclass
     class GASpecificConfig:
@@ -140,7 +142,7 @@ class AacAudioRtpPacket:
                     aac_spectral_data_resilience_flags = reader.read(1)
                 extension_flag_3 = reader.read(1)
                 if extension_flag_3 == 1:
-                    raise ValueError('extensionFlag3 == 1 not supported')
+                    raise core.InvalidPacketError('extensionFlag3 == 1 not supported')
 
     @staticmethod
     def audio_object_type(reader: BitReader):
@@ -216,7 +218,7 @@ class AacAudioRtpPacket:
                     reader, self.channel_configuration, self.audio_object_type
                 )
             else:
-                raise ValueError(
+                raise core.InvalidPacketError(
                     f'audioObjectType {self.audio_object_type} not supported'
                 )
 
@@ -260,7 +262,7 @@ class AacAudioRtpPacket:
             else:
                 audio_mux_version_a = 0
             if audio_mux_version_a != 0:
-                raise ValueError('audioMuxVersionA != 0 not supported')
+                raise core.InvalidPacketError('audioMuxVersionA != 0 not supported')
             if audio_mux_version == 1:
                 tara_buffer_fullness = AacAudioRtpPacket.latm_value(reader)
             stream_cnt = 0
@@ -268,10 +270,10 @@ class AacAudioRtpPacket:
             num_sub_frames = reader.read(6)
             num_program = reader.read(4)
             if num_program != 0:
-                raise ValueError('num_program != 0 not supported')
+                raise core.InvalidPacketError('num_program != 0 not supported')
             num_layer = reader.read(3)
             if num_layer != 0:
-                raise ValueError('num_layer != 0 not supported')
+                raise core.InvalidPacketError('num_layer != 0 not supported')
             if audio_mux_version == 0:
                 self.audio_specific_config = AacAudioRtpPacket.AudioSpecificConfig(
                     reader
@@ -284,7 +286,7 @@ class AacAudioRtpPacket:
                 )
                 audio_specific_config_len = reader.bit_position - marker
                 if asc_len < audio_specific_config_len:
-                    raise ValueError('audio_specific_config_len > asc_len')
+                    raise core.InvalidPacketError('audio_specific_config_len > asc_len')
                 asc_len -= audio_specific_config_len
                 reader.skip(asc_len)
             frame_length_type = reader.read(3)
@@ -293,7 +295,9 @@ class AacAudioRtpPacket:
             elif frame_length_type == 1:
                 frame_length = reader.read(9)
             else:
-                raise ValueError(f'frame_length_type {frame_length_type} not supported')
+                raise core.InvalidPacketError(
+                    f'frame_length_type {frame_length_type} not supported'
+                )
 
             self.other_data_present = reader.read(1)
             if self.other_data_present:
@@ -318,12 +322,12 @@ class AacAudioRtpPacket:
 
         def __init__(self, reader: BitReader, mux_config_present: int):
             if mux_config_present == 0:
-                raise ValueError('muxConfigPresent == 0 not supported')
+                raise core.InvalidPacketError('muxConfigPresent == 0 not supported')
 
             # AudioMuxElement - ISO/EIC 14496-3 Table 1.41
             use_same_stream_mux = reader.read(1)
             if use_same_stream_mux:
-                raise ValueError('useSameStreamMux == 1 not supported')
+                raise core.InvalidPacketError('useSameStreamMux == 1 not supported')
             self.stream_mux_config = AacAudioRtpPacket.StreamMuxConfig(reader)
 
             # We only support:

@@ -41,7 +41,14 @@ from typing import (
 
 from .utils import deprecated
 from .colors import color
-from .core import BT_CENTRAL_ROLE, InvalidStateError, ProtocolError
+from .core import (
+    BT_CENTRAL_ROLE,
+    InvalidStateError,
+    InvalidArgumentError,
+    InvalidPacketError,
+    OutOfResourcesError,
+    ProtocolError,
+)
 from .hci import (
     HCI_LE_Connection_Update_Command,
     HCI_Object,
@@ -188,17 +195,17 @@ class LeCreditBasedChannelSpec:
             self.max_credits < 1
             or self.max_credits > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_CREDITS
         ):
-            raise ValueError('max credits out of range')
+            raise InvalidArgumentError('max credits out of range')
         if (
             self.mtu < L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MTU
             or self.mtu > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MTU
         ):
-            raise ValueError('MTU out of range')
+            raise InvalidArgumentError('MTU out of range')
         if (
             self.mps < L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MPS
             or self.mps > L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_MPS
         ):
-            raise ValueError('MPS out of range')
+            raise InvalidArgumentError('MPS out of range')
 
 
 class L2CAP_PDU:
@@ -210,7 +217,7 @@ class L2CAP_PDU:
     def from_bytes(data: bytes) -> L2CAP_PDU:
         # Check parameters
         if len(data) < 4:
-            raise ValueError('not enough data for L2CAP header')
+            raise InvalidPacketError('not enough data for L2CAP header')
 
         _, l2cap_pdu_cid = struct.unpack_from('<HH', data, 0)
         l2cap_pdu_payload = data[4:]
@@ -815,7 +822,7 @@ class ClassicChannel(EventEmitter):
 
         # Check that we can start a new connection
         if self.connection_result:
-            raise RuntimeError('connection already pending')
+            raise InvalidStateError('connection already pending')
 
         self._change_state(self.State.WAIT_CONNECT_RSP)
         self.send_control_frame(
@@ -1126,7 +1133,7 @@ class LeCreditBasedChannel(EventEmitter):
         # Check that we can start a new connection
         identifier = self.manager.next_identifier(self.connection)
         if identifier in self.manager.le_coc_requests:
-            raise RuntimeError('too many concurrent connection requests')
+            raise InvalidStateError('too many concurrent connection requests')
 
         self._change_state(self.State.CONNECTING)
         request = L2CAP_LE_Credit_Based_Connection_Request(
@@ -1513,7 +1520,7 @@ class ChannelManager:
             if cid not in channels:
                 return cid
 
-        raise RuntimeError('no free CID available')
+        raise OutOfResourcesError('no free CID available')
 
     @staticmethod
     def find_free_le_cid(channels: Iterable[int]) -> int:
@@ -1526,7 +1533,7 @@ class ChannelManager:
             if cid not in channels:
                 return cid
 
-        raise RuntimeError('no free CID')
+        raise OutOfResourcesError('no free CID')
 
     def next_identifier(self, connection: Connection) -> int:
         identifier = (self.identifiers.setdefault(connection.handle, 0) + 1) % 256
@@ -1573,15 +1580,15 @@ class ChannelManager:
         else:
             # Check that the PSM isn't already in use
             if spec.psm in self.servers:
-                raise ValueError('PSM already in use')
+                raise InvalidArgumentError('PSM already in use')
 
             # Check that the PSM is valid
             if spec.psm % 2 == 0:
-                raise ValueError('invalid PSM (not odd)')
+                raise InvalidArgumentError('invalid PSM (not odd)')
             check = spec.psm >> 8
             while check:
                 if check % 2 != 0:
-                    raise ValueError('invalid PSM')
+                    raise InvalidArgumentError('invalid PSM')
                 check >>= 8
 
         self.servers[spec.psm] = ClassicChannelServer(self, spec.psm, handler, spec.mtu)
@@ -1623,7 +1630,7 @@ class ChannelManager:
         else:
             # Check that the PSM isn't already in use
             if spec.psm in self.le_coc_servers:
-                raise ValueError('PSM already in use')
+                raise InvalidArgumentError('PSM already in use')
 
         self.le_coc_servers[spec.psm] = LeCreditBasedChannelServer(
             self,
@@ -2151,10 +2158,10 @@ class ChannelManager:
         connection_channels = self.channels.setdefault(connection.handle, {})
         source_cid = self.find_free_le_cid(connection_channels)
         if source_cid is None:  # Should never happen!
-            raise RuntimeError('all CIDs already in use')
+            raise OutOfResourcesError('all CIDs already in use')
 
         if spec.psm is None:
-            raise ValueError('PSM cannot be None')
+            raise InvalidArgumentError('PSM cannot be None')
 
         # Create the channel
         logger.debug(f'creating coc channel with cid={source_cid} for psm {spec.psm}')
@@ -2203,10 +2210,10 @@ class ChannelManager:
         connection_channels = self.channels.setdefault(connection.handle, {})
         source_cid = self.find_free_br_edr_cid(connection_channels)
         if source_cid is None:  # Should never happen!
-            raise RuntimeError('all CIDs already in use')
+            raise OutOfResourcesError('all CIDs already in use')
 
         if spec.psm is None:
-            raise ValueError('PSM cannot be None')
+            raise InvalidArgumentError('PSM cannot be None')
 
         # Create the channel
         logger.debug(

@@ -33,6 +33,7 @@ from typing import Tuple
 import weakref
 
 
+from bumble import core
 from bumble.hci import (
     hci_vendor_command_op_code,
     STATUS_SPEC,
@@ -47,6 +48,10 @@ from bumble.drivers import common
 # Logging
 # -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
+
+
+class RtkFirmwareError(core.BaseBumbleError):
+    """Error raised when RTK firmware initialization fails."""
 
 
 # -----------------------------------------------------------------------------
@@ -208,15 +213,15 @@ class Firmware:
         extension_sig = bytes([0x51, 0x04, 0xFD, 0x77])
 
         if not firmware.startswith(RTK_EPATCH_SIGNATURE):
-            raise ValueError("Firmware does not start with epatch signature")
+            raise RtkFirmwareError("Firmware does not start with epatch signature")
 
         if not firmware.endswith(extension_sig):
-            raise ValueError("Firmware does not end with extension sig")
+            raise RtkFirmwareError("Firmware does not end with extension sig")
 
         # The firmware should start with a 14 byte header.
         epatch_header_size = 14
         if len(firmware) < epatch_header_size:
-            raise ValueError("Firmware too short")
+            raise RtkFirmwareError("Firmware too short")
 
         # Look for the "project ID", starting from the end.
         offset = len(firmware) - len(extension_sig)
@@ -230,7 +235,7 @@ class Firmware:
                 break
 
             if length == 0:
-                raise ValueError("Invalid 0-length instruction")
+                raise RtkFirmwareError("Invalid 0-length instruction")
 
             if opcode == 0 and length == 1:
                 project_id = firmware[offset - 1]
@@ -239,7 +244,7 @@ class Firmware:
             offset -= length
 
         if project_id < 0:
-            raise ValueError("Project ID not found")
+            raise RtkFirmwareError("Project ID not found")
 
         self.project_id = project_id
 
@@ -252,7 +257,7 @@ class Firmware:
         # <PatchLength_1><PatchLength_2>...<PatchLength_N> (16 bits each)
         # <PatchOffset_1><PatchOffset_2>...<PatchOffset_N> (32 bits each)
         if epatch_header_size + 8 * num_patches > len(firmware):
-            raise ValueError("Firmware too short")
+            raise RtkFirmwareError("Firmware too short")
         chip_id_table_offset = epatch_header_size
         patch_length_table_offset = chip_id_table_offset + 2 * num_patches
         patch_offset_table_offset = chip_id_table_offset + 4 * num_patches
@@ -266,7 +271,7 @@ class Firmware:
                 "<I", firmware, patch_offset_table_offset + 4 * patch_index
             )
             if patch_offset + patch_length > len(firmware):
-                raise ValueError("Firmware too short")
+                raise RtkFirmwareError("Firmware too short")
 
             # Get the SVN version for the patch
             (svn_version,) = struct.unpack_from(
@@ -645,7 +650,7 @@ class Driver(common.Driver):
         ):
             return await self.download_for_rtl8723b()
 
-        raise ValueError("ROM not supported")
+        raise RtkFirmwareError("ROM not supported")
 
     async def init_controller(self):
         await self.download_firmware()

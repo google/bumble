@@ -113,7 +113,7 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
         set_member_rank: Optional[int] = None,
     ) -> None:
         if len(set_identity_resolving_key) != SET_IDENTITY_RESOLVING_KEY_LENGTH:
-            raise ValueError(
+            raise core.InvalidArgumentError(
                 f'Invalid SIRK length {len(set_identity_resolving_key)}, expected {SET_IDENTITY_RESOLVING_KEY_LENGTH}'
             )
 
@@ -178,7 +178,7 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
                 key = await connection.device.get_link_key(connection.peer_address)
 
             if not key:
-                raise RuntimeError('LTK or LinkKey is not present')
+                raise core.InvalidOperationError('LTK or LinkKey is not present')
 
             sirk_bytes = sef(key, self.set_identity_resolving_key)
 
@@ -234,7 +234,7 @@ class CoordinatedSetIdentificationProxy(gatt_client.ProfileServiceProxy):
         '''Reads SIRK and decrypts if encrypted.'''
         response = await self.set_identity_resolving_key.read_value()
         if len(response) != SET_IDENTITY_RESOLVING_KEY_LENGTH + 1:
-            raise RuntimeError('Invalid SIRK value')
+            raise core.InvalidPacketError('Invalid SIRK value')
 
         sirk_type = SirkType(response[0])
         if sirk_type == SirkType.PLAINTEXT:
@@ -250,7 +250,7 @@ class CoordinatedSetIdentificationProxy(gatt_client.ProfileServiceProxy):
                 key = await device.get_link_key(connection.peer_address)
 
             if not key:
-                raise RuntimeError('LTK or LinkKey is not present')
+                raise core.InvalidOperationError('LTK or LinkKey is not present')
 
             sirk = sef(key, response[1:])
 
