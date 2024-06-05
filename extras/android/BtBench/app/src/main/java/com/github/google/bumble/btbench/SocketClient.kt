@@ -56,13 +56,19 @@ class SocketClient(private val viewModel: AppViewModel, private val socket: Blue
 
             thread {
                 socketDataSource.receive()
+                socket.close()
+                sender.abort()
             }
 
             Log.info("Startup delay: $DEFAULT_STARTUP_DELAY")
             Thread.sleep(DEFAULT_STARTUP_DELAY.toLong());
             Log.info("Starting to send")
 
-            sender.run()
+            try {
+                sender.run()
+            } catch (error: IOException) {
+                Log.info("run ended abruptly")
+            }
             cleanup()
         }
     }

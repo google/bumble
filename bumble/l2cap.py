@@ -70,6 +70,7 @@ L2CAP_LE_SIGNALING_CID = 0x05
 
 L2CAP_MIN_LE_MTU     = 23
 L2CAP_MIN_BR_EDR_MTU = 48
+L2CAP_MAX_BR_EDR_MTU = 65535
 
 L2CAP_DEFAULT_MTU = 2048  # Default value for the MTU we are willing to accept
 
@@ -832,7 +833,9 @@ class ClassicChannel(EventEmitter):
 
         # Wait for the connection to succeed or fail
         try:
-            return await self.connection_result
+            return await self.connection.abort_on(
+                'disconnection', self.connection_result
+            )
         finally:
             self.connection_result = None
 
@@ -2225,7 +2228,7 @@ class ChannelManager:
         # Connect
         try:
             await channel.connect()
-        except Exception as e:
+        except BaseException as e:
             del connection_channels[source_cid]
             raise e
 

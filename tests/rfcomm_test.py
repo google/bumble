@@ -62,7 +62,7 @@ def test_frames():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_basic_connection() -> None:
+async def test_connection_and_disconnection() -> None:
     devices = test_utils.TwoDevices()
     await devices.setup_connection()
 
@@ -82,6 +82,11 @@ async def test_basic_connection() -> None:
 
     dlcs[1].write(b'Lorem ipsum dolor sit amet')
     assert await queues[0].get() == b'Lorem ipsum dolor sit amet'
+
+    closed = asyncio.Event()
+    dlcs[1].on('close', closed.set)
+    await dlcs[1].disconnect()
+    await closed.wait()
 
 
 # -----------------------------------------------------------------------------
