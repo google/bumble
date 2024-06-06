@@ -24,7 +24,6 @@ import struct
 from abc import ABC, abstractmethod
 from pyee import EventEmitter
 from typing import Optional, Callable, TYPE_CHECKING
-from typing_extensions import override
 
 from bumble import l2cap, device
 from bumble.colors import color
@@ -346,7 +345,6 @@ class Device(HID):
         get_protocol_cb: Optional[Callable[[], None]] = None
         set_protocol_cb: Optional[Callable[[int], None]] = None
 
-    @override
     def on_ctrl_pdu(self, pdu: bytes) -> None:
         logger.debug(f'<<< HID CONTROL PDU: {pdu.hex()}')
         param = pdu[0] & 0x0F
@@ -534,7 +532,6 @@ class Host(HID):
         logger.debug(f'>>> HID CONTROL EXIT SUSPEND, PDU:{hid_message.hex()}')
         self.send_pdu_on_ctrl(hid_message)
 
-    @override
     def on_ctrl_pdu(self, pdu: bytes) -> None:
         logger.debug(f'<<< HID CONTROL PDU: {pdu.hex()}')
         param = pdu[0] & 0x0F
