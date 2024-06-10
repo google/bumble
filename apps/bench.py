@@ -1538,11 +1538,6 @@ def create_role_factory(ctx, default_role):
     help='RFComm credits threshold',
 )
 @click.option(
-    '--rfcomm-send-credits-threshold',
-    type=int,
-    help='RFComm send credits threshold',
-)
-@click.option(
     '--l2cap-psm',
     type=int,
     default=DEFAULT_L2CAP_PSM,

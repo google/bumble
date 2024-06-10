@@ -150,7 +150,8 @@ class AppViewModel : ViewModel() {
         } else if (senderPacketSizeSlider < 0.5F) {
             512
         } else if (senderPacketSizeSlider < 0.7F) {
-            1024
+            // 970 is a value that works well on Android.
+            970
         } else if (senderPacketSizeSlider < 0.9F) {
             2048
         } else {
