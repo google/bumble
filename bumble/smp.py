@@ -55,6 +55,7 @@ from .core import (
     BT_CENTRAL_ROLE,
     BT_LE_TRANSPORT,
     AdvertisingData,
+    InvalidArgumentError,
     ProtocolError,
     name_or_number,
 )
@@ -784,7 +785,7 @@ class Session:
             self.peer_oob_data = pairing_config.oob.peer_data
             if pairing_config.sc:
                 if pairing_config.oob.our_context is None:
-                    raise ValueError(
+                    raise InvalidArgumentError(
                         "oob pairing config requires a context when sc is True"
                     )
                 self.r = pairing_config.oob.our_context.r
@@ -793,7 +794,7 @@ class Session:
                     self.tk = pairing_config.oob.legacy_context.tk
             else:
                 if pairing_config.oob.legacy_context is None:
-                    raise ValueError(
+                    raise InvalidArgumentError(
                         "oob pairing config requires a legacy context when sc is False"
                     )
                 self.r = bytes(16)

@@ -24,10 +24,9 @@ import platform
 
 import usb1
 
-from bumble.transport.common import Transport, ParserSource
+from bumble.transport.common import Transport, ParserSource, TransportInitError
 from bumble import hci
 from bumble.colors import color
-from bumble.utils import AsyncRunner
 
 
 # -----------------------------------------------------------------------------
@@ -442,7 +441,7 @@ async def open_usb_transport(spec: str) -> Transport:
 
         if found is None:
             context.close()
-            raise ValueError('device not found')
+            raise TransportInitError('device not found')
 
         logger.debug(f'USB Device: {found}')
 
@@ -507,7 +506,7 @@ async def open_usb_transport(spec: str) -> Transport:
 
         endpoints = find_endpoints(found)
         if endpoints is None:
-            raise ValueError('no compatible interface found for device')
+            raise TransportInitError('no compatible interface found for device')
         (configuration, interface, setting, acl_in, acl_out, events_in) = endpoints
         logger.debug(
             f'selected endpoints: configuration={configuration}, '

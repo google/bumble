@@ -20,7 +20,13 @@ import grpc.aio
 
 from typing import Optional, Union
 
-from .common import PumpedTransport, PumpedPacketSource, PumpedPacketSink, Transport
+from .common import (
+    PumpedTransport,
+    PumpedPacketSource,
+    PumpedPacketSink,
+    Transport,
+    TransportSpecError,
+)
 
 # pylint: disable=no-name-in-module
 from .grpc_protobuf.emulated_bluetooth_pb2_grpc import EmulatedBluetoothServiceStub
@@ -77,7 +83,7 @@ async def open_android_emulator_transport(spec: Optional[str]) -> Transport:
             elif ':' in param:
                 server_host, server_port = param.split(':')
             else:
-                raise ValueError('invalid parameter')
+                raise TransportSpecError('invalid parameter')
 
     # Connect to the gRPC server
     server_address = f'{server_host}:{server_port}'
@@ -94,7 +100,7 @@ async def open_android_emulator_transport(spec: Optional[str]) -> Transport:
         service = VhciForwardingServiceStub(channel)
         hci_device = HciDevice(service.attachVhci())
     else:
-        raise ValueError('invalid mode')
+        raise TransportSpecError('invalid mode')
 
     # Create the transport object
     class EmulatorTransport(PumpedTransport):

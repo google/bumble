@@ -23,6 +23,7 @@ from typing import Callable, cast, Dict, Optional
 
 from bumble.colors import color
 from bumble import avc
+from bumble import core
 from bumble import l2cap
 
 # -----------------------------------------------------------------------------
@@ -275,7 +276,7 @@ class Protocol:
         self, pid: int, handler: Protocol.CommandHandler
     ) -> None:
         if pid not in self.command_handlers or self.command_handlers[pid] != handler:
-            raise ValueError("command handler not registered")
+            raise core.InvalidArgumentError("command handler not registered")
         del self.command_handlers[pid]
 
     def register_response_handler(
@@ -287,5 +288,5 @@ class Protocol:
         self, pid: int, handler: Protocol.ResponseHandler
     ) -> None:
         if pid not in self.response_handlers or self.response_handlers[pid] != handler:
-            raise ValueError("response handler not registered")
+            raise core.InvalidArgumentError("response handler not registered")
         del self.response_handlers[pid]

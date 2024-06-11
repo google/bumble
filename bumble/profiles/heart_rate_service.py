@@ -19,6 +19,7 @@
 from enum import IntEnum
 import struct
 
+from bumble import core
 from ..gatt_client import ProfileServiceProxy
 from ..att import ATT_Error
 from ..gatt import (
@@ -59,17 +60,17 @@ class HeartRateService(TemplateService):
             rr_intervals=None,
         ):
             if heart_rate < 0 or heart_rate > 0xFFFF:
-                raise ValueError('heart_rate out of range')
+                raise core.InvalidArgumentError('heart_rate out of range')
 
             if energy_expended is not None and (
                 energy_expended < 0 or energy_expended > 0xFFFF
             ):
-                raise ValueError('energy_expended out of range')
+                raise core.InvalidArgumentError('energy_expended out of range')
 
             if rr_intervals:
                 for rr_interval in rr_intervals:
                     if rr_interval < 0 or rr_interval * 1024 > 0xFFFF:
-                        raise ValueError('rr_intervals out of range')
+                        raise core.InvalidArgumentError('rr_intervals out of range')
 
             self.heart_rate = heart_rate
             self.sensor_contact_detected = sensor_contact_detected

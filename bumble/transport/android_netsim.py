@@ -31,6 +31,8 @@ from .common import (
     PumpedPacketSource,
     PumpedPacketSink,
     Transport,
+    TransportSpecError,
+    TransportInitError,
 )
 
 # pylint: disable=no-name-in-module
@@ -135,7 +137,7 @@ async def open_android_netsim_controller_transport(
     server_host: Optional[str], server_port: int, options: Dict[str, str]
 ) -> Transport:
     if not server_port:
-        raise ValueError('invalid port')
+        raise TransportSpecError('invalid port')
     if server_host == '_' or not server_host:
         server_host = 'localhost'
 
@@ -288,7 +290,7 @@ async def open_android_netsim_host_transport_with_address(
         instance_number = 0 if options is None else int(options.get('instance', '0'))
         server_port = find_grpc_port(instance_number)
         if not server_port:
-            raise RuntimeError('gRPC server port not found')
+            raise TransportInitError('gRPC server port not found')
 
     # Connect to the gRPC server
     server_address = f'{server_host}:{server_port}'
@@ -326,7 +328,7 @@ async def open_android_netsim_host_transport_with_channel(
 
             if response_type == 'error':
                 logger.warning(f'received error: {response.error}')
-                raise RuntimeError(response.error)
+                raise TransportInitError(response.error)
 
             if response_type == 'hci_packet':
                 return (
@@ -334,7 +336,7 @@ async def open_android_netsim_host_transport_with_channel(
                     + response.hci_packet.packet
                 )
 
-            raise ValueError('unsupported response type')
+            raise TransportSpecError('unsupported response type')
 
         async def write(self, packet):
             await self.hci_device.write(
@@ -429,7 +431,7 @@ async def open_android_netsim_transport(spec: Optional[str]) -> Transport:
     options: Dict[str, str] = {}
     for param in params[params_offset:]:
         if '=' not in param:
-            raise ValueError('invalid parameter, expected <name>=<value>')
+            raise TransportSpecError('invalid parameter, expected <name>=<value>')
         option_name, option_value = param.split('=')
         options[option_name] = option_value
 
@@ -440,7 +442,7 @@ async def open_android_netsim_transport(spec: Optional[str]) -> Transport:
         )
     if mode == 'controller':
         if host is None:
-            raise ValueError('<host>:<port> missing')
+            raise TransportSpecError('<host>:<port> missing')
         return await open_android_netsim_controller_transport(host, port, options)
 
-    raise ValueError('invalid mode option')
+    raise TransportSpecError('invalid mode option')

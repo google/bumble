@@ -23,6 +23,7 @@ import datetime
 from typing import BinaryIO, Generator
 import os
 
+from bumble import core
 from bumble.hci import HCI_COMMAND_PACKET, HCI_EVENT_PACKET
 
 
@@ -138,13 +139,13 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
 
     """
     if ':' not in spec:
-        raise ValueError('snooper type prefix missing')
+        raise core.InvalidArgumentError('snooper type prefix missing')
 
     snooper_type, snooper_args = spec.split(':', maxsplit=1)
 
     if snooper_type == 'btsnoop':
         if ':' not in snooper_args:
-            raise ValueError('I/O type for btsnoop snooper type missing')
+            raise core.InvalidArgumentError('I/O type for btsnoop snooper type missing')
 
         io_type, io_name = snooper_args.split(':', maxsplit=1)
         if io_type == 'file':
@@ -165,6 +166,6 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
                 _SNOOPER_INSTANCE_COUNT -= 1
                 return
 
-        raise ValueError(f'I/O type {io_type} not supported')
+        raise core.InvalidArgumentError(f'I/O type {io_type} not supported')
 
-    raise ValueError(f'snooper type {snooper_type} not found')
+    raise core.InvalidArgumentError(f'snooper type {snooper_type} not found')

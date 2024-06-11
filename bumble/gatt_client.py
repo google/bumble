@@ -331,9 +331,9 @@ class Client:
     async def request_mtu(self, mtu: int) -> int:
         # Check the range
         if mtu < ATT_DEFAULT_MTU:
-            raise ValueError(f'MTU must be >= {ATT_DEFAULT_MTU}')
+            raise core.InvalidArgumentError(f'MTU must be >= {ATT_DEFAULT_MTU}')
         if mtu > 0xFFFF:
-            raise ValueError('MTU must be <= 0xFFFF')
+            raise core.InvalidArgumentError('MTU must be <= 0xFFFF')
 
         # We can only send one request per connection
         if self.mtu_exchange_done:

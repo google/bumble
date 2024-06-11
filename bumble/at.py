@@ -14,13 +14,19 @@
 
 from typing import List, Union
 
+from bumble import core
+
+
+class AtParsingError(core.InvalidPacketError):
+    """Error raised when parsing AT commands fails."""
+
 
 def tokenize_parameters(buffer: bytes) -> List[bytes]:
     """Split input parameters into tokens.
     Removes space characters outside of double quote blocks:
     T-rec-V-25 - 5.2.1 Command line general format: "Space characters (IA5 2/0)
     are ignored [..], unless they are embedded in numeric or string constants"
-    Raises ValueError in case of invalid input string."""
+    Raises AtParsingError in case of invalid input string."""
 
     tokens = []
     in_quotes = False
@@ -43,11 +49,11 @@ def tokenize_parameters(buffer: bytes) -> List[bytes]:
                 token = bytearray()
             elif char == b'(':
                 if len(token) > 0:
-                    raise ValueError("open_paren following regular character")
+                    raise AtParsingError("open_paren following regular character")
                 tokens.append(char)
             elif char == b'"':
                 if len(token) > 0:
-                    raise ValueError("quote following regular character")
+                    raise AtParsingError("quote following regular character")
                 in_quotes = True
                 token.extend(char)
             else:
@@ -59,7 +65,7 @@ def tokenize_parameters(buffer: bytes) -> List[bytes]:
 
 def parse_parameters(buffer: bytes) -> List[Union[bytes, list]]:
     """Parse the parameters using the comma and parenthesis separators.
-    Raises ValueError in case of invalid input string."""
+    Raises AtParsingError in case of invalid input string."""
 
     tokens = tokenize_parameters(buffer)
     accumulator: List[list] = [[]]
@@ -73,7 +79,7 @@ def parse_parameters(buffer: bytes) -> List[Union[bytes, list]]:
             accumulator.append([])
         elif token == b')':
             if len(accumulator) < 2:
-                raise ValueError("close_paren without matching open_paren")
+                raise AtParsingError("close_paren without matching open_paren")
             accumulator[-1].append(current)
             current = accumulator.pop()
         else:
@@ -81,5 +87,5 @@ def parse_parameters(buffer: bytes) -> List[Union[bytes, list]]:
 
     accumulator[-1].append(current)
     if len(accumulator) > 1:
-        raise ValueError("missing close_paren")
+        raise AtParsingError("missing close_paren")
     return accumulator[0]

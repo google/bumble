@@ -19,7 +19,12 @@ import logging
 import asyncio
 from functools import partial
 
-from bumble.core import BT_PERIPHERAL_ROLE, BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT
+from bumble.core import (
+    BT_PERIPHERAL_ROLE,
+    BT_BR_EDR_TRANSPORT,
+    BT_LE_TRANSPORT,
+    InvalidStateError,
+)
 from bumble.colors import color
 from bumble.hci import (
     Address,
@@ -405,12 +410,12 @@ class RemoteLink:
 
     def add_controller(self, controller):
         if self.controller:
-            raise ValueError('controller already set')
+            raise InvalidStateError('controller already set')
         self.controller = controller
 
     def remove_controller(self, controller):
         if self.controller != controller:
-            raise ValueError('controller mismatch')
+            raise InvalidStateError('controller mismatch')
         self.controller = None
 
     def get_pending_connection(self):
