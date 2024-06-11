@@ -1008,8 +1008,6 @@ class RfcommServer(StreamedPacketIO):
         self.max_credits = max_credits
         self.credits_threshold = credits_threshold
         self.dlc = None
-        self.max_credits = max_credits
-        self.credits_threshold = credits_threshold
         self.ready = asyncio.Event()
 
         # Create and register a server
