@@ -20,12 +20,13 @@ import asyncio
 import dataclasses
 import logging
 import os
-from typing import Dict, Optional
+from typing import cast, Dict, Optional, Tuple
 
 import click
 import pyee
 
 from bumble.colors import color
+import bumble.company_ids
 import bumble.core
 import bumble.device
 import bumble.gatt
@@ -69,6 +70,7 @@ class BroadcastDiscoverer:
         ] = None
         appearance: Optional[bumble.core.Appearance] = None
         biginfo: Optional[bumble.device.BIGInfoAdvertisement] = None
+        manufacturer_data: Optional[Tuple[str, bytes]] = None
 
         def __post_init__(self) -> None:
             super().__init__()
@@ -124,6 +126,19 @@ class BroadcastDiscoverer:
                 bumble.core.AdvertisingData.APPEARANCE
             )
 
+            if manufacturer_data := advertisement.data.get(
+                bumble.core.AdvertisingData.MANUFACTURER_SPECIFIC_DATA
+            ):
+                assert isinstance(manufacturer_data, tuple)
+                company_id = cast(int, manufacturer_data[0])
+                data = cast(bytes, manufacturer_data[1])
+                self.manufacturer_data = (
+                    bumble.company_ids.COMPANY_IDENTIFIERS.get(
+                        company_id, f'0x{company_id:04X}'
+                    ),
+                    data,
+                )
+
         def print(self) -> None:
             print(
                 color('Broadcast:', 'yellow'),
@@ -135,6 +150,12 @@ class BroadcastDiscoverer:
                 print(f'  {color("Appearance", "cyan")}:   {str(self.appearance)}')
             print(f'  {color("RSSI", "cyan")}:         {self.rssi}')
             print(f'  {color("SID", "cyan")}:          {self.sync.sid}')
+
+            if self.manufacturer_data:
+                print(
+                    f'  {color("Manufacturer Data", "cyan")}: '
+                    f'{self.manufacturer_data[0]} -> {self.manufacturer_data[1].hex()}'
+                )
 
             if self.broadcast_audio_announcement:
                 print(
