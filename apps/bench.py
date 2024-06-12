@@ -40,6 +40,8 @@ from bumble.hci import (
     HCI_LE_1M_PHY,
     HCI_LE_2M_PHY,
     HCI_LE_CODED_PHY,
+    HCI_CENTRAL_ROLE,
+    HCI_PERIPHERAL_ROLE,
     HCI_Constant,
     HCI_Error,
     HCI_StatusError,
@@ -57,6 +59,7 @@ from bumble.transport import open_transport_or_link
 import bumble.rfcomm
 import bumble.core
 from bumble.utils import AsyncRunner
+from bumble.pairing import PairingConfig
 
 
 # -----------------------------------------------------------------------------
@@ -128,40 +131,34 @@ def le_phy_name(phy_id):
 
 
 def print_connection(connection):
+    params = []
     if connection.transport == BT_LE_TRANSPORT:
-        phy_state = (
+        params.append(
             'PHY='
             f'TX:{le_phy_name(connection.phy.tx_phy)}/'
             f'RX:{le_phy_name(connection.phy.rx_phy)}'
         )
 
-        data_length = (
+        params.append(
             'DL=('
             f'TX:{connection.data_length[0]}/{connection.data_length[1]},'
             f'RX:{connection.data_length[2]}/{connection.data_length[3]}'
             ')'
         )
-        connection_parameters = (
+
+        params.append(
             'Parameters='
             f'{connection.parameters.connection_interval * 1.25:.2f}/'
             f'{connection.parameters.peripheral_latency}/'
             f'{connection.parameters.supervision_timeout * 10} '
         )
 
+        params.append(f'MTU={connection.att_mtu}')
+
     else:
-        phy_state = ''
-        data_length = ''
-        connection_parameters = ''
+        params.append(f'Role={HCI_Constant.role_name(connection.role)}')
 
-    mtu = connection.att_mtu
-
-    logging.info(
-        f'{color("@@@ Connection:", "yellow")} '
-        f'{connection_parameters} '
-        f'{data_length} '
-        f'{phy_state} '
-        f'MTU={mtu}'
-    )
+    logging.info(color('@@@ Connection: ', 'yellow') + ' '.join(params))
 
 
 def make_sdp_records(channel):
@@ -212,6 +209,17 @@ def log_stats(title, stats):
             'cyan',
         )
     )
+
+
+async def switch_roles(connection, role):
+    target_role = HCI_CENTRAL_ROLE if role == "central" else HCI_PERIPHERAL_ROLE
+    if connection.role != target_role:
+        logging.info(f'{color("### Switching roles to:", "cyan")} {role}')
+        try:
+            await connection.switch_role(target_role)
+            logging.info(color('### Role switch complete', 'cyan'))
+        except HCI_Error as error:
+            logging.info(f'{color("### Role switch failed:", "red")} {error}')
 
 
 class PacketType(enum.IntEnum):
@@ -1034,6 +1042,10 @@ class RfcommServer(StreamedPacketIO):
 
     def on_dlc(self, dlc):
         logging.info(color(f'*** DLC connected: {dlc}', 'blue'))
+        if self.credits_threshold is not None:
+            dlc.rx_threshold = self.credits_threshold
+        if self.max_credits is not None:
+            dlc.rx_max_credits = self.max_credits
         dlc.sink = self.on_packet
         self.io_sink = dlc.write
         self.dlc = dlc
@@ -1063,6 +1075,7 @@ class Central(Connection.Listener):
         authenticate,
         encrypt,
         extended_data_length,
+        role_switch,
     ):
         super().__init__()
         self.transport = transport
@@ -1073,6 +1086,7 @@ class Central(Connection.Listener):
         self.authenticate = authenticate
         self.encrypt = encrypt or authenticate
         self.extended_data_length = extended_data_length
+        self.role_switch = role_switch
         self.device = None
         self.connection = None
 
@@ -1123,6 +1137,11 @@ class Central(Connection.Listener):
             role = self.role_factory(mode)
             self.device.classic_enabled = self.classic
 
+            # Set up a pairing config factory with minimal requirements.
+            self.device.pairing_config_factory = lambda _: PairingConfig(
+                sc=False, mitm=False, bonding=False
+            )
+
             await self.device.power_on()
 
             if self.classic:
@@ -1150,6 +1169,10 @@ class Central(Connection.Listener):
             logging.info(color('### Connected', 'cyan'))
             self.connection.listener = self
             print_connection(self.connection)
+
+            # Switch roles if needed.
+            if self.role_switch:
+                await switch_roles(self.connection, self.role_switch)
 
             # Wait a bit after the connection, some controllers aren't very good when
             # we start sending data right away while some connection parameters are
@@ -1212,20 +1235,30 @@ class Central(Connection.Listener):
     def on_connection_data_length_change(self):
         print_connection(self.connection)
 
+    def on_role_change(self):
+        print_connection(self.connection)
+
 
 # -----------------------------------------------------------------------------
 # Peripheral
 # -----------------------------------------------------------------------------
 class Peripheral(Device.Listener, Connection.Listener):
     def __init__(
-        self, transport, classic, extended_data_length, role_factory, mode_factory
+        self,
+        transport,
+        role_factory,
+        mode_factory,
+        classic,
+        extended_data_length,
+        role_switch,
     ):
         self.transport = transport
         self.classic = classic
-        self.extended_data_length = extended_data_length
         self.role_factory = role_factory
-        self.role = None
         self.mode_factory = mode_factory
+        self.extended_data_length = extended_data_length
+        self.role_switch = role_switch
+        self.role = None
         self.mode = None
         self.device = None
         self.connection = None
@@ -1247,6 +1280,11 @@ class Peripheral(Device.Listener, Connection.Listener):
             self.mode = self.mode_factory(self.device)
             self.role = self.role_factory(self.mode)
             self.device.classic_enabled = self.classic
+
+            # Set up a pairing config factory with minimal requirements.
+            self.device.pairing_config_factory = lambda _: PairingConfig(
+                sc=False, mitm=False, bonding=False
+            )
 
             await self.device.power_on()
 
@@ -1274,6 +1312,7 @@ class Peripheral(Device.Listener, Connection.Listener):
 
             await self.connected.wait()
             logging.info(color('### Connected', 'cyan'))
+            print_connection(self.connection)
 
             await self.mode.on_connection(self.connection)
             await self.role.run()
@@ -1290,13 +1329,17 @@ class Peripheral(Device.Listener, Connection.Listener):
             AsyncRunner.spawn(self.device.set_connectable(False))
 
         # Request a new data length if needed
-        if self.extended_data_length:
+        if not self.classic and self.extended_data_length:
             logging.info("+++ Requesting extended data length")
             AsyncRunner.spawn(
                 connection.set_data_length(
                     self.extended_data_length[0], self.extended_data_length[1]
                 )
             )
+
+        # Switch roles if needed.
+        if self.role_switch:
+            AsyncRunner.spawn(switch_roles(connection, self.role_switch))
 
     def on_disconnection(self, reason):
         logging.info(color(f'!!! Disconnection: reason={reason}', 'red'))
@@ -1317,6 +1360,9 @@ class Peripheral(Device.Listener, Connection.Listener):
         print_connection(self.connection)
 
     def on_connection_data_length_change(self):
+        print_connection(self.connection)
+
+    def on_role_change(self):
         print_connection(self.connection)
 
 
@@ -1449,6 +1495,11 @@ def create_role_factory(ctx, default_role):
     help='Request a data length upon connection, specified as tx_octets/tx_time',
 )
 @click.option(
+    '--role-switch',
+    type=click.Choice(['central', 'peripheral']),
+    help='Request role switch upon connection (central or peripheral)',
+)
+@click.option(
     '--rfcomm-channel',
     type=int,
     default=DEFAULT_RFCOMM_CHANNEL,
@@ -1512,7 +1563,7 @@ def create_role_factory(ctx, default_role):
     '--packet-size',
     '-s',
     metavar='SIZE',
-    type=click.IntRange(8, 4096),
+    type=click.IntRange(8, 8192),
     default=500,
     help='Packet size (client or ping role)',
 )
@@ -1572,6 +1623,7 @@ def bench(
     mode,
     att_mtu,
     extended_data_length,
+    role_switch,
     packet_size,
     packet_count,
     start_delay,
@@ -1614,12 +1666,12 @@ def bench(
     ctx.obj['repeat_delay'] = repeat_delay
     ctx.obj['pace'] = pace
     ctx.obj['linger'] = linger
-
     ctx.obj['extended_data_length'] = (
         [int(x) for x in extended_data_length.split('/')]
         if extended_data_length
         else None
     )
+    ctx.obj['role_switch'] = role_switch
     ctx.obj['classic'] = mode in ('rfcomm-client', 'rfcomm-server')
 
 
@@ -1663,6 +1715,7 @@ def central(
             authenticate,
             encrypt or authenticate,
             ctx.obj['extended_data_length'],
+            ctx.obj['role_switch'],
         ).run()
 
     asyncio.run(run_central())
@@ -1679,10 +1732,11 @@ def peripheral(ctx, transport):
     async def run_peripheral():
         await Peripheral(
             transport,
-            ctx.obj['classic'],
-            ctx.obj['extended_data_length'],
             role_factory,
             mode_factory,
+            ctx.obj['classic'],
+            ctx.obj['extended_data_length'],
+            ctx.obj['role_switch'],
         ).run()
 
     asyncio.run(run_peripheral())

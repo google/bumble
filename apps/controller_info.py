@@ -27,7 +27,7 @@ from bumble.colors import color
 from bumble.core import name_or_number
 from bumble.hci import (
     map_null_terminated_utf8_string,
-    LeFeatureMask,
+    LeFeature,
     HCI_SUCCESS,
     HCI_VERSION_NAMES,
     LMP_VERSION_NAMES,
@@ -140,7 +140,7 @@ async def get_le_info(host: Host) -> None:
 
     print(color('LE Features:', 'yellow'))
     for feature in host.supported_le_features:
-        print(LeFeatureMask(feature).name)
+        print(f'  {LeFeature(feature).name}')
 
 
 # -----------------------------------------------------------------------------
@@ -224,7 +224,7 @@ async def async_main(latency_probes, transport):
         print()
         print(color('Supported Commands:', 'yellow'))
         for command in host.supported_commands:
-            print('  ', HCI_Command.command_name(command))
+            print(f'  {HCI_Command.command_name(command)}')
 
 
 # -----------------------------------------------------------------------------
