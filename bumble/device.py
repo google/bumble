@@ -16,22 +16,21 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-from enum import IntEnum
-import copy
-import functools
-import json
 import asyncio
-import logging
-import secrets
-import sys
+from collections.abc import Iterable
 from contextlib import (
     asynccontextmanager,
     AsyncExitStack,
     closing,
-    AbstractAsyncContextManager,
 )
+import copy
 from dataclasses import dataclass, field
-from collections.abc import Iterable
+from enum import Enum, IntEnum
+import functools
+import json
+import logging
+import secrets
+import sys
 from typing import (
     Any,
     Callable,
@@ -81,6 +80,7 @@ from .hci import (
     HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
     HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
     HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
+    HCI_OPERATION_CANCELLED_BY_HOST_ERROR,
     HCI_R2_PAGE_SCAN_REPETITION_MODE,
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     HCI_SUCCESS,
@@ -102,11 +102,16 @@ from .hci import (
     HCI_LE_Accept_CIS_Request_Command,
     HCI_LE_Add_Device_To_Resolving_List_Command,
     HCI_LE_Advertising_Report_Event,
+    HCI_LE_BIGInfo_Advertising_Report_Event,
     HCI_LE_Clear_Resolving_List_Command,
     HCI_LE_Connection_Update_Command,
     HCI_LE_Create_Connection_Cancel_Command,
     HCI_LE_Create_Connection_Command,
     HCI_LE_Create_CIS_Command,
+    HCI_LE_Periodic_Advertising_Create_Sync_Command,
+    HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command,
+    HCI_LE_Periodic_Advertising_Report_Event,
+    HCI_LE_Periodic_Advertising_Terminate_Sync_Command,
     HCI_LE_Enable_Encryption_Command,
     HCI_LE_Extended_Advertising_Report_Event,
     HCI_LE_Extended_Create_Connection_Command,
@@ -248,6 +253,8 @@ DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS          = l2cap.L2CAP_LE_CREDIT_BASED_CONN
 DEVICE_DEFAULT_ADVERTISING_TX_POWER           = (
     HCI_LE_Set_Extended_Advertising_Parameters_Command.TX_POWER_NO_PREFERENCE
 )
+DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_SKIP    = 0
+DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_TIMEOUT = 5.0
 
 # fmt: on
 # pylint: enable=line-too-long
@@ -553,6 +560,70 @@ class AdvertisingEventProperties:
 
 
 # -----------------------------------------------------------------------------
+@dataclass
+class PeriodicAdvertisement:
+    address: Address
+    sid: int
+    tx_power: int = (
+        HCI_LE_Periodic_Advertising_Report_Event.TX_POWER_INFORMATION_NOT_AVAILABLE
+    )
+    rssi: int = HCI_LE_Periodic_Advertising_Report_Event.RSSI_NOT_AVAILABLE
+    is_truncated: bool = False
+    data_bytes: bytes = b''
+
+    # Constants
+    TX_POWER_NOT_AVAILABLE: ClassVar[int] = (
+        HCI_LE_Periodic_Advertising_Report_Event.TX_POWER_INFORMATION_NOT_AVAILABLE
+    )
+    RSSI_NOT_AVAILABLE: ClassVar[int] = (
+        HCI_LE_Periodic_Advertising_Report_Event.RSSI_NOT_AVAILABLE
+    )
+
+    def __post_init__(self) -> None:
+        self.data = (
+            None if self.is_truncated else AdvertisingData.from_bytes(self.data_bytes)
+        )
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class BIGInfoAdvertisement:
+    address: Address
+    sid: int
+    num_bis: int
+    nse: int
+    iso_interval: int
+    bn: int
+    pto: int
+    irc: int
+    max_pdu: int
+    sdu_interval: int
+    max_sdu: int
+    phy: Phy
+    framed: bool
+    encrypted: bool
+
+    @classmethod
+    def from_report(cls, address: Address, sid: int, report) -> Self:
+        return cls(
+            address,
+            sid,
+            report.num_bis,
+            report.nse,
+            report.iso_interval,
+            report.bn,
+            report.pto,
+            report.irc,
+            report.max_pdu,
+            report.sdu_interval,
+            report.max_sdu,
+            Phy(report.phy),
+            report.framing != 0,
+            report.encryption != 0,
+        )
+
+
+# -----------------------------------------------------------------------------
 # TODO: replace with typing.TypeAlias when the code base is all Python >= 3.10
 AdvertisingChannelMap = HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap
 
@@ -793,6 +864,201 @@ class AdvertisingSet(EventEmitter):
     def on_termination(self, status: int) -> None:
         self.enabled = False
         self.emit('termination', status)
+
+
+# -----------------------------------------------------------------------------
+class PeriodicAdvertisingSync(EventEmitter):
+    class State(Enum):
+        INIT = 0
+        PENDING = 1
+        ESTABLISHED = 2
+        CANCELLED = 3
+        ERROR = 4
+        LOST = 5
+        TERMINATED = 6
+
+    _state: State
+    sync_handle: Optional[int]
+    advertiser_address: Address
+    sid: int
+    skip: int
+    sync_timeout: float  # Sync timeout, in seconds
+    filter_duplicates: bool
+    status: int
+    advertiser_phy: int
+    periodic_advertising_interval: int
+    advertiser_clock_accuracy: int
+
+    def __init__(
+        self,
+        device: Device,
+        advertiser_address: Address,
+        sid: int,
+        skip: int,
+        sync_timeout: float,
+        filter_duplicates: bool,
+    ) -> None:
+        super().__init__()
+        self._state = self.State.INIT
+        self.sync_handle = None
+        self.device = device
+        self.advertiser_address = advertiser_address
+        self.sid = sid
+        self.skip = skip
+        self.sync_timeout = sync_timeout
+        self.filter_duplicates = filter_duplicates
+        self.status = HCI_SUCCESS
+        self.advertiser_phy = 0
+        self.periodic_advertising_interval = 0
+        self.advertiser_clock_accuracy = 0
+        self.data_accumulator = b''
+
+    @property
+    def state(self) -> State:
+        return self._state
+
+    @state.setter
+    def state(self, state: State) -> None:
+        logger.debug(f'{self} -> {state.name}')
+        self._state = state
+        self.emit('state_change')
+
+    async def establish(self) -> None:
+        if self.state != self.State.INIT:
+            raise InvalidStateError('sync not in init state')
+
+        options = HCI_LE_Periodic_Advertising_Create_Sync_Command.Options(0)
+        if self.filter_duplicates:
+            options |= (
+                HCI_LE_Periodic_Advertising_Create_Sync_Command.Options.DUPLICATE_FILTERING_INITIALLY_ENABLED
+            )
+
+        response = await self.device.send_command(
+            HCI_LE_Periodic_Advertising_Create_Sync_Command(
+                options=options,
+                advertising_sid=self.sid,
+                advertiser_address_type=self.advertiser_address.address_type,
+                advertiser_address=self.advertiser_address,
+                skip=self.skip,
+                sync_timeout=int(self.sync_timeout * 100),
+                sync_cte_type=0,
+            )
+        )
+        if response.status != HCI_Command_Status_Event.PENDING:
+            raise HCI_StatusError(response)
+
+        self.state = self.State.PENDING
+
+    async def terminate(self) -> None:
+        if self.state in (self.State.INIT, self.State.CANCELLED, self.State.TERMINATED):
+            return
+
+        if self.state == self.State.PENDING:
+            self.state = self.State.CANCELLED
+            response = await self.device.send_command(
+                HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command(),
+            )
+            if response.status == HCI_SUCCESS:
+                if self in self.device.periodic_advertising_syncs:
+                    self.device.periodic_advertising_syncs.remove(self)
+            return
+
+        if self.state in (self.State.ESTABLISHED, self.State.ERROR, self.State.LOST):
+            self.state = self.State.TERMINATED
+            await self.device.send_command(
+                HCI_LE_Periodic_Advertising_Terminate_Sync_Command(
+                    sync_handle=self.sync_handle
+                )
+            )
+            self.device.periodic_advertising_syncs.remove(self)
+
+    def on_establishment(
+        self,
+        status,
+        sync_handle,
+        advertiser_phy,
+        periodic_advertising_interval,
+        advertiser_clock_accuracy,
+    ) -> None:
+        self.status = status
+
+        if self.state == self.State.CANCELLED:
+            # Somehow, we receive an established event after trying to cancel, most
+            # likely because the cancel command was sent too late, when the sync was
+            # already established, but before the established event was sent.
+            # We need to automatically terminate.
+            logger.debug(
+                "received established event for cancelled sync, will terminate"
+            )
+            self.state = self.State.ESTABLISHED
+            AsyncRunner.spawn(self.terminate())
+            return
+
+        if status == HCI_SUCCESS:
+            self.sync_handle = sync_handle
+            self.advertiser_phy = advertiser_phy
+            self.periodic_advertising_interval = periodic_advertising_interval
+            self.advertiser_clock_accuracy = advertiser_clock_accuracy
+            self.state = self.State.ESTABLISHED
+            self.emit('establishment')
+            return
+
+        # We don't need to keep a reference anymore
+        if self in self.device.periodic_advertising_syncs:
+            self.device.periodic_advertising_syncs.remove(self)
+
+        if status == HCI_OPERATION_CANCELLED_BY_HOST_ERROR:
+            self.state = self.State.CANCELLED
+            self.emit('cancellation')
+            return
+
+        self.state = self.State.ERROR
+        self.emit('error')
+
+    def on_loss(self):
+        self.state = self.State.LOST
+        self.emit('loss')
+
+    def on_periodic_advertising_report(self, report) -> None:
+        self.data_accumulator += report.data
+        if (
+            report.data_status
+            == HCI_LE_Periodic_Advertising_Report_Event.DataStatus.DATA_INCOMPLETE_MORE_TO_COME
+        ):
+            return
+
+        self.emit(
+            'periodic_advertisement',
+            PeriodicAdvertisement(
+                self.advertiser_address,
+                self.sid,
+                report.tx_power,
+                report.rssi,
+                is_truncated=(
+                    report.data_status
+                    == HCI_LE_Periodic_Advertising_Report_Event.DataStatus.DATA_INCOMPLETE_TRUNCATED_NO_MORE_TO_COME
+                ),
+                data_bytes=self.data_accumulator,
+            ),
+        )
+        self.data_accumulator = b''
+
+    def on_biginfo_advertising_report(self, report) -> None:
+        self.emit(
+            'biginfo_advertisement',
+            BIGInfoAdvertisement.from_report(self.advertiser_address, self.sid, report),
+        )
+
+    def __str__(self) -> str:
+        return (
+            'PeriodicAdvertisingSync('
+            f'state={self.state.name}, '
+            f'sync_handle={self.sync_handle}, '
+            f'sid={self.sid}, '
+            f'skip={self.skip}, '
+            f'filter_duplicates={self.filter_duplicates}'
+            ')'
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -1409,6 +1675,20 @@ def try_with_connection_from_address(function):
     return wrapper
 
 
+# Decorator that converts the first argument from a sync handle to a periodic
+# advertising sync object
+def with_periodic_advertising_sync_from_handle(function):
+    @functools.wraps(function)
+    def wrapper(self, sync_handle, *args, **kwargs):
+        if (sync := self.lookup_periodic_advertising_sync(sync_handle)) is None:
+            raise ValueError(
+                f'no periodic advertising sync for handle: 0x{sync_handle:04x}'
+            )
+        return function(self, sync, *args, **kwargs)
+
+    return wrapper
+
+
 # Decorator that adds a method to the list of event handlers for host events.
 # This assumes that the method name starts with `on_`
 def host_event_handler(function):
@@ -1439,6 +1719,7 @@ class Device(CompositeEventEmitter):
         Address, List[asyncio.Future[Union[Connection, Tuple[Address, int, int]]]]
     ]
     advertisement_accumulators: Dict[Address, AdvertisementDataAccumulator]
+    periodic_advertising_syncs: List[PeriodicAdvertisingSync]
     config: DeviceConfiguration
     legacy_advertiser: Optional[LegacyAdvertiser]
     sco_links: Dict[int, ScoLink]
@@ -1524,6 +1805,7 @@ class Device(CompositeEventEmitter):
             [l2cap.L2CAP_Information_Request.EXTENDED_FEATURE_FIXED_CHANNELS]
         )
         self.advertisement_accumulators = {}  # Accumulators, by address
+        self.periodic_advertising_syncs = []
         self.scanning = False
         self.scanning_is_passive = False
         self.discovering = False
@@ -1705,6 +1987,18 @@ class Device(CompositeEventEmitter):
                     return connection
 
         return None
+
+    def lookup_periodic_advertising_sync(
+        self, sync_handle: int
+    ) -> Optional[PeriodicAdvertisingSync]:
+        return next(
+            (
+                sync
+                for sync in self.periodic_advertising_syncs
+                if sync.sync_handle == sync_handle
+            ),
+            None,
+        )
 
     @deprecated("Please use create_l2cap_server()")
     def register_l2cap_server(self, psm, server) -> int:
@@ -2367,6 +2661,116 @@ class Device(CompositeEventEmitter):
             self.advertisement_accumulators[report.address] = accumulator
         if advertisement := accumulator.update(report):
             self.emit('advertisement', advertisement)
+
+    async def create_periodic_advertising_sync(
+        self,
+        advertiser_address: Address,
+        sid: int,
+        skip: int = DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_SKIP,
+        sync_timeout: float = DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_TIMEOUT,
+        filter_duplicates: bool = False,
+    ) -> PeriodicAdvertisingSync:
+        # Check that there isn't already an equivalent entry
+        if any(
+            sync.advertiser_address == advertiser_address and sync.sid == sid
+            for sync in self.periodic_advertising_syncs
+        ):
+            raise ValueError("equivalent entry already created")
+
+        # Create a new entry
+        sync = PeriodicAdvertisingSync(
+            device=self,
+            advertiser_address=advertiser_address,
+            sid=sid,
+            skip=skip,
+            sync_timeout=sync_timeout,
+            filter_duplicates=filter_duplicates,
+        )
+
+        self.periodic_advertising_syncs.append(sync)
+
+        # Check if any sync should be started
+        await self._update_periodic_advertising_syncs()
+
+        return sync
+
+    async def _update_periodic_advertising_syncs(self) -> None:
+        # Check if there's already a pending sync
+        if any(
+            sync.state == PeriodicAdvertisingSync.State.PENDING
+            for sync in self.periodic_advertising_syncs
+        ):
+            logger.debug("at least one sync pending, nothing to update yet")
+            return
+
+        # Start the next sync that's waiting to be started
+        if ready := next(
+            (
+                sync
+                for sync in self.periodic_advertising_syncs
+                if sync.state == PeriodicAdvertisingSync.State.INIT
+            ),
+            None,
+        ):
+            await ready.establish()
+            return
+
+    @host_event_handler
+    def on_periodic_advertising_sync_establishment(
+        self,
+        status: int,
+        sync_handle: int,
+        advertising_sid: int,
+        advertiser_address: Address,
+        advertiser_phy: int,
+        periodic_advertising_interval: int,
+        advertiser_clock_accuracy: int,
+    ) -> None:
+        for periodic_advertising_sync in self.periodic_advertising_syncs:
+            if (
+                periodic_advertising_sync.advertiser_address == advertiser_address
+                and periodic_advertising_sync.sid == advertising_sid
+            ):
+                periodic_advertising_sync.on_establishment(
+                    status,
+                    sync_handle,
+                    advertiser_phy,
+                    periodic_advertising_interval,
+                    advertiser_clock_accuracy,
+                )
+
+                AsyncRunner.spawn(self._update_periodic_advertising_syncs())
+
+                return
+
+        logger.warning(
+            "periodic advertising sync establishment for unknown address/sid"
+        )
+
+    @host_event_handler
+    @with_periodic_advertising_sync_from_handle
+    def on_periodic_advertising_sync_loss(
+        self, periodic_advertising_sync: PeriodicAdvertisingSync
+    ):
+        periodic_advertising_sync.on_loss()
+
+    @host_event_handler
+    @with_periodic_advertising_sync_from_handle
+    def on_periodic_advertising_report(
+        self,
+        periodic_advertising_sync: PeriodicAdvertisingSync,
+        report: HCI_LE_Periodic_Advertising_Report_Event,
+    ):
+        periodic_advertising_sync.on_periodic_advertising_report(report)
+
+    @host_event_handler
+    @with_periodic_advertising_sync_from_handle
+    def on_biginfo_advertising_report(
+        self,
+        periodic_advertising_sync: PeriodicAdvertisingSync,
+        report: HCI_LE_BIGInfo_Advertising_Report_Event,
+    ):
+        periodic_advertising_sync.on_biginfo_advertising_report(report)
 
     async def start_discovery(self, auto_restart: bool = True) -> None:
         await self.send_command(

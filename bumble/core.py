@@ -16,11 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+import dataclasses
 import enum
 import struct
 from typing import List, Optional, Tuple, Union, cast, Dict
+from typing_extensions import Self
 
-from .company_ids import COMPANY_IDENTIFIERS
+from bumble.company_ids import COMPANY_IDENTIFIERS
+from bumble.utils import OpenIntEnum
 
 
 # -----------------------------------------------------------------------------
@@ -693,10 +696,568 @@ class DeviceClass:
 
 
 # -----------------------------------------------------------------------------
+# Appearance
+# -----------------------------------------------------------------------------
+class Appearance:
+    class Category(OpenIntEnum):
+        UNKNOWN = 0x0000
+        PHONE = 0x0001
+        COMPUTER = 0x0002
+        WATCH = 0x0003
+        CLOCK = 0x0004
+        DISPLAY = 0x0005
+        REMOTE_CONTROL = 0x0006
+        EYE_GLASSES = 0x0007
+        TAG = 0x0008
+        KEYRING = 0x0009
+        MEDIA_PLAYER = 0x000A
+        BARCODE_SCANNER = 0x000B
+        THERMOMETER = 0x000C
+        HEART_RATE_SENSOR = 0x000D
+        BLOOD_PRESSURE = 0x000E
+        HUMAN_INTERFACE_DEVICE = 0x000F
+        GLUCOSE_METER = 0x0010
+        RUNNING_WALKING_SENSOR = 0x0011
+        CYCLING = 0x0012
+        CONTROL_DEVICE = 0x0013
+        NETWORK_DEVICE = 0x0014
+        SENSOR = 0x0015
+        LIGHT_FIXTURES = 0x0016
+        FAN = 0x0017
+        HVAC = 0x0018
+        AIR_CONDITIONING = 0x0019
+        HUMIDIFIER = 0x001A
+        HEATING = 0x001B
+        ACCESS_CONTROL = 0x001C
+        MOTORIZED_DEVICE = 0x001D
+        POWER_DEVICE = 0x001E
+        LIGHT_SOURCE = 0x001F
+        WINDOW_COVERING = 0x0020
+        AUDIO_SINK = 0x0021
+        AUDIO_SOURCE = 0x0022
+        MOTORIZED_VEHICLE = 0x0023
+        DOMESTIC_APPLIANCE = 0x0024
+        WEARABLE_AUDIO_DEVICE = 0x0025
+        AIRCRAFT = 0x0026
+        AV_EQUIPMENT = 0x0027
+        DISPLAY_EQUIPMENT = 0x0028
+        HEARING_AID = 0x0029
+        GAMING = 0x002A
+        SIGNAGE = 0x002B
+        PULSE_OXIMETER = 0x0031
+        WEIGHT_SCALE = 0x0032
+        PERSONAL_MOBILITY_DEVICE = 0x0033
+        CONTINUOUS_GLUCOSE_MONITOR = 0x0034
+        INSULIN_PUMP = 0x0035
+        MEDICATION_DELIVERY = 0x0036
+        SPIROMETER = 0x0037
+        OUTDOOR_SPORTS_ACTIVITY = 0x0051
+
+    class UnknownSubcategory(OpenIntEnum):
+        GENERIC_UNKNOWN = 0x00
+
+    class PhoneSubcategory(OpenIntEnum):
+        GENERIC_PHONE = 0x00
+
+    class ComputerSubcategory(OpenIntEnum):
+        GENERIC_COMPUTER = 0x00
+        DESKTOP_WORKSTATION = 0x01
+        SERVER_CLASS_COMPUTER = 0x02
+        LAPTOP = 0x03
+        HANDHELD_PC_PDA = 0x04
+        PALM_SIZE_PC_PDA = 0x05
+        WEARABLE_COMPUTER = 0x06
+        TABLET = 0x07
+        DOCKING_STATION = 0x08
+        ALL_IN_ONE = 0x09
+        BLADE_SERVER = 0x0A
+        CONVERTIBLE = 0x0B
+        DETACHABLE = 0x0C
+        IOT_GATEWAY = 0x0D
+        MINI_PC = 0x0E
+        STICK_PC = 0x0F
+
+    class WatchSubcategory(OpenIntEnum):
+        GENENERIC_WATCH = 0x00
+        SPORTS_WATCH = 0x01
+        SMARTWATCH = 0x02
+
+    class ClockSubcategory(OpenIntEnum):
+        GENERIC_CLOCK = 0x00
+
+    class DisplaySubcategory(OpenIntEnum):
+        GENERIC_DISPLAY = 0x00
+
+    class RemoteControlSubcategory(OpenIntEnum):
+        GENERIC_REMOTE_CONTROL = 0x00
+
+    class EyeglassesSubcategory(OpenIntEnum):
+        GENERIC_EYEGLASSES = 0x00
+
+    class TagSubcategory(OpenIntEnum):
+        GENERIC_TAG = 0x00
+
+    class KeyringSubcategory(OpenIntEnum):
+        GENERIC_KEYRING = 0x00
+
+    class MediaPlayerSubcategory(OpenIntEnum):
+        GENERIC_MEDIA_PLAYER = 0x00
+
+    class BarcodeScannerSubcategory(OpenIntEnum):
+        GENERIC_BARCODE_SCANNER = 0x00
+
+    class ThermometerSubcategory(OpenIntEnum):
+        GENERIC_THERMOMETER = 0x00
+        EAR_THERMOMETER = 0x01
+
+    class HeartRateSensorSubcategory(OpenIntEnum):
+        GENERIC_HEART_RATE_SENSOR = 0x00
+        HEART_RATE_BELT = 0x01
+
+    class BloodPressureSubcategory(OpenIntEnum):
+        GENERIC_BLOOD_PRESSURE = 0x00
+        ARM_BLOOD_PRESSURE = 0x01
+        WRIST_BLOOD_PRESSURE = 0x02
+
+    class HumanInterfaceDeviceSubcategory(OpenIntEnum):
+        GENERIC_HUMAN_INTERFACE_DEVICE = 0x00
+        KEYBOARD = 0x01
+        MOUSE = 0x02
+        JOYSTICK = 0x03
+        GAMEPAD = 0x04
+        DIGITIZER_TABLET = 0x05
+        CARD_READER = 0x06
+        DIGITAL_PEN = 0x07
+        BARCODE_SCANNER = 0x08
+        TOUCHPAD = 0x09
+        PRESENTATION_REMOTE = 0x0A
+
+    class GlucoseMeterSubcategory(OpenIntEnum):
+        GENERIC_GLUCOSE_METER = 0x00
+
+    class RunningWalkingSensorSubcategory(OpenIntEnum):
+        GENERIC_RUNNING_WALKING_SENSOR = 0x00
+        IN_SHOE_RUNNING_WALKING_SENSOR = 0x01
+        ON_SHOW_RUNNING_WALKING_SENSOR = 0x02
+        ON_HIP_RUNNING_WALKING_SENSOR = 0x03
+
+    class CyclingSubcategory(OpenIntEnum):
+        GENERIC_CYCLING = 0x00
+        CYCLING_COMPUTER = 0x01
+        SPEED_SENSOR = 0x02
+        CADENCE_SENSOR = 0x03
+        POWER_SENSOR = 0x04
+        SPEED_AND_CADENCE_SENSOR = 0x05
+
+    class ControlDeviceSubcategory(OpenIntEnum):
+        GENERIC_CONTROL_DEVICE = 0x00
+        SWITCH = 0x01
+        MULTI_SWITCH = 0x02
+        BUTTON = 0x03
+        SLIDER = 0x04
+        ROTARY_SWITCH = 0x05
+        TOUCH_PANEL = 0x06
+        SINGLE_SWITCH = 0x07
+        DOUBLE_SWITCH = 0x08
+        TRIPLE_SWITCH = 0x09
+        BATTERY_SWITCH = 0x0A
+        ENERGY_HARVESTING_SWITCH = 0x0B
+        PUSH_BUTTON = 0x0C
+
+    class NetworkDeviceSubcategory(OpenIntEnum):
+        GENERIC_NETWORK_DEVICE = 0x00
+        ACCESS_POINT = 0x01
+        MESH_DEVICE = 0x02
+        MESH_NETWORK_PROXY = 0x03
+
+    class SensorSubcategory(OpenIntEnum):
+        GENERIC_SENSOR = 0x00
+        MOTION_SENSOR = 0x01
+        AIR_QUALITY_SENSOR = 0x02
+        TEMPERATURE_SENSOR = 0x03
+        HUMIDITY_SENSOR = 0x04
+        LEAK_SENSOR = 0x05
+        SMOKE_SENSOR = 0x06
+        OCCUPANCY_SENSOR = 0x07
+        CONTACT_SENSOR = 0x08
+        CARBON_MONOXIDE_SENSOR = 0x09
+        CARBON_DIOXIDE_SENSOR = 0x0A
+        AMBIENT_LIGHT_SENSOR = 0x0B
+        ENERGY_SENSOR = 0x0C
+        COLOR_LIGHT_SENSOR = 0x0D
+        RAIN_SENSOR = 0x0E
+        FIRE_SENSOR = 0x0F
+        WIND_SENSOR = 0x10
+        PROXIMITY_SENSOR = 0x11
+        MULTI_SENSOR = 0x12
+        FLUSH_MOUNTED_SENSOR = 0x13
+        CEILING_MOUNTED_SENSOR = 0x14
+        WALL_MOUNTED_SENSOR = 0x15
+        MULTISENSOR = 0x16
+        ENERGY_METER = 0x17
+        FLAME_DETECTOR = 0x18
+        VEHICLE_TIRE_PRESSURE_SENSOR = 0x19
+
+    class LightFixturesSubcategory(OpenIntEnum):
+        GENERIC_LIGHT_FIXTURES = 0x00
+        WALL_LIGHT = 0x01
+        CEILING_LIGHT = 0x02
+        FLOOR_LIGHT = 0x03
+        CABINET_LIGHT = 0x04
+        DESK_LIGHT = 0x05
+        TROFFER_LIGHT = 0x06
+        PENDANT_LIGHT = 0x07
+        IN_GROUND_LIGHT = 0x08
+        FLOOD_LIGHT = 0x09
+        UNDERWATER_LIGHT = 0x0A
+        BOLLARD_WITH_LIGHT = 0x0B
+        PATHWAY_LIGHT = 0x0C
+        GARDEN_LIGHT = 0x0D
+        POLE_TOP_LIGHT = 0x0E
+        SPOTLIGHT = 0x0F
+        LINEAR_LIGHT = 0x10
+        STREET_LIGHT = 0x11
+        SHELVES_LIGHT = 0x12
+        BAY_LIGHT = 0x013
+        EMERGENCY_EXIT_LIGHT = 0x14
+        LIGHT_CONTROLLER = 0x15
+        LIGHT_DRIVER = 0x16
+        BULB = 0x17
+        LOW_BAY_LIGHT = 0x18
+        HIGH_BAY_LIGHT = 0x19
+
+    class FanSubcategory(OpenIntEnum):
+        GENERIC_FAN = 0x00
+        CEILING_FAN = 0x01
+        AXIAL_FAN = 0x02
+        EXHAUST_FAN = 0x03
+        PEDESTAL_FAN = 0x04
+        DESK_FAN = 0x05
+        WALL_FAN = 0x06
+
+    class HvacSubcategory(OpenIntEnum):
+        GENERIC_HVAC = 0x00
+        THERMOSTAT = 0x01
+        HUMIDIFIER = 0x02
+        DEHUMIDIFIER = 0x03
+        HEATER = 0x04
+        RADIATOR = 0x05
+        BOILER = 0x06
+        HEAT_PUMP = 0x07
+        INFRARED_HEATER = 0x08
+        RADIANT_PANEL_HEATER = 0x09
+        FAN_HEATER = 0x0A
+        AIR_CURTAIN = 0x0B
+
+    class AirConditioningSubcategory(OpenIntEnum):
+        GENERIC_AIR_CONDITIONING = 0x00
+
+    class HumidifierSubcategory(OpenIntEnum):
+        GENERIC_HUMIDIFIER = 0x00
+
+    class HeatingSubcategory(OpenIntEnum):
+        GENERIC_HEATING = 0x00
+        RADIATOR = 0x01
+        BOILER = 0x02
+        HEAT_PUMP = 0x03
+        INFRARED_HEATER = 0x04
+        RADIANT_PANEL_HEATER = 0x05
+        FAN_HEATER = 0x06
+        AIR_CURTAIN = 0x07
+
+    class AccessControlSubcategory(OpenIntEnum):
+        GENERIC_ACCESS_CONTROL = 0x00
+        ACCESS_DOOR = 0x01
+        GARAGE_DOOR = 0x02
+        EMERGENCY_EXIT_DOOR = 0x03
+        ACCESS_LOCK = 0x04
+        ELEVATOR = 0x05
+        WINDOW = 0x06
+        ENTRANCE_GATE = 0x07
+        DOOR_LOCK = 0x08
+        LOCKER = 0x09
+
+    class MotorizedDeviceSubcategory(OpenIntEnum):
+        GENERIC_MOTORIZED_DEVICE = 0x00
+        MOTORIZED_GATE = 0x01
+        AWNING = 0x02
+        BLINDS_OR_SHADES = 0x03
+        CURTAINS = 0x04
+        SCREEN = 0x05
+
+    class PowerDeviceSubcategory(OpenIntEnum):
+        GENERIC_POWER_DEVICE = 0x00
+        POWER_OUTLET = 0x01
+        POWER_STRIP = 0x02
+        PLUG = 0x03
+        POWER_SUPPLY = 0x04
+        LED_DRIVER = 0x05
+        FLUORESCENT_LAMP_GEAR = 0x06
+        HID_LAMP_GEAR = 0x07
+        CHARGE_CASE = 0x08
+        POWER_BANK = 0x09
+
+    class LightSourceSubcategory(OpenIntEnum):
+        GENERIC_LIGHT_SOURCE = 0x00
+        INCANDESCENT_LIGHT_BULB = 0x01
+        LED_LAMP = 0x02
+        HID_LAMP = 0x03
+        FLUORESCENT_LAMP = 0x04
+        LED_ARRAY = 0x05
+        MULTI_COLOR_LED_ARRAY = 0x06
+        LOW_VOLTAGE_HALOGEN = 0x07
+        ORGANIC_LIGHT_EMITTING_DIODE = 0x08
+
+    class WindowCoveringSubcategory(OpenIntEnum):
+        GENERIC_WINDOW_COVERING = 0x00
+        WINDOW_SHADES = 0x01
+        WINDOW_BLINDS = 0x02
+        WINDOW_AWNING = 0x03
+        WINDOW_CURTAIN = 0x04
+        EXTERIOR_SHUTTER = 0x05
+        EXTERIOR_SCREEN = 0x06
+
+    class AudioSinkSubcategory(OpenIntEnum):
+        GENERIC_AUDIO_SINK = 0x00
+        STANDALONE_SPEAKER = 0x01
+        SOUNDBAR = 0x02
+        BOOKSHELF_SPEAKER = 0x03
+        STANDMOUNTED_SPEAKER = 0x04
+        SPEAKERPHONE = 0x05
+
+    class AudioSourceSubcategory(OpenIntEnum):
+        GENERIC_AUDIO_SOURCE = 0x00
+        MICROPHONE = 0x01
+        ALARM = 0x02
+        BELL = 0x03
+        HORN = 0x04
+        BROADCASTING_DEVICE = 0x05
+        SERVICE_DESK = 0x06
+        KIOSK = 0x07
+        BROADCASTING_ROOM = 0x08
+        AUDITORIUM = 0x09
+
+    class MotorizedVehicleSubcategory(OpenIntEnum):
+        GENERIC_MOTORIZED_VEHICLE = 0x00
+        CAR = 0x01
+        LARGE_GOODS_VEHICLE = 0x02
+        TWO_WHEELED_VEHICLE = 0x03
+        MOTORBIKE = 0x04
+        SCOOTER = 0x05
+        MOPED = 0x06
+        THREE_WHEELED_VEHICLE = 0x07
+        LIGHT_VEHICLE = 0x08
+        QUAD_BIKE = 0x09
+        MINIBUS = 0x0A
+        BUS = 0x0B
+        TROLLEY = 0x0C
+        AGRICULTURAL_VEHICLE = 0x0D
+        CAMPER_CARAVAN = 0x0E
+        RECREATIONAL_VEHICLE_MOTOR_HOME = 0x0F
+
+    class DomesticApplianceSubcategory(OpenIntEnum):
+        GENERIC_DOMESTIC_APPLIANCE = 0x00
+        REFRIGERATOR = 0x01
+        FREEZER = 0x02
+        OVEN = 0x03
+        MICROWAVE = 0x04
+        TOASTER = 0x05
+        WASHING_MACHINE = 0x06
+        DRYER = 0x07
+        COFFEE_MAKER = 0x08
+        CLOTHES_IRON = 0x09
+        CURLING_IRON = 0x0A
+        HAIR_DRYER = 0x0B
+        VACUUM_CLEANER = 0x0C
+        ROBOTIC_VACUUM_CLEANER = 0x0D
+        RICE_COOKER = 0x0E
+        CLOTHES_STEAMER = 0x0F
+
+    class WearableAudioDeviceSubcategory(OpenIntEnum):
+        GENERIC_WEARABLE_AUDIO_DEVICE = 0x00
+        EARBUD = 0x01
+        HEADSET = 0x02
+        HEADPHONES = 0x03
+        NECK_BAND = 0x04
+
+    class AircraftSubcategory(OpenIntEnum):
+        GENERIC_AIRCRAFT = 0x00
+        LIGHT_AIRCRAFT = 0x01
+        MICROLIGHT = 0x02
+        PARAGLIDER = 0x03
+        LARGE_PASSENGER_AIRCRAFT = 0x04
+
+    class AvEquipmentSubcategory(OpenIntEnum):
+        GENERIC_AV_EQUIPMENT = 0x00
+        AMPLIFIER = 0x01
+        RECEIVER = 0x02
+        RADIO = 0x03
+        TUNER = 0x04
+        TURNTABLE = 0x05
+        CD_PLAYER = 0x06
+        DVD_PLAYER = 0x07
+        BLUERAY_PLAYER = 0x08
+        OPTICAL_DISC_PLAYER = 0x09
+        SET_TOP_BOX = 0x0A
+
+    class DisplayEquipmentSubcategory(OpenIntEnum):
+        GENERIC_DISPLAY_EQUIPMENT = 0x00
+        TELEVISION = 0x01
+        MONITOR = 0x02
+        PROJECTOR = 0x03
+
+    class HearingAidSubcategory(OpenIntEnum):
+        GENERIC_HEARING_AID = 0x00
+        IN_EAR_HEARING_AID = 0x01
+        BEHIND_EAR_HEARING_AID = 0x02
+        COCHLEAR_IMPLANT = 0x03
+
+    class GamingSubcategory(OpenIntEnum):
+        GENERIC_GAMING = 0x00
+        HOME_VIDEO_GAME_CONSOLE = 0x01
+        PORTABLE_HANDHELD_CONSOLE = 0x02
+
+    class SignageSubcategory(OpenIntEnum):
+        GENERIC_SIGNAGE = 0x00
+        DIGITAL_SIGNAGE = 0x01
+        ELECTRONIC_LABEL = 0x02
+
+    class PulseOximeterSubcategory(OpenIntEnum):
+        GENERIC_PULSE_OXIMETER = 0x00
+        FINGERTIP_PULSE_OXIMETER = 0x01
+        WRIST_WORN_PULSE_OXIMETER = 0x02
+
+    class WeightScaleSubcategory(OpenIntEnum):
+        GENERIC_WEIGHT_SCALE = 0x00
+
+    class PersonalMobilityDeviceSubcategory(OpenIntEnum):
+        GENERIC_PERSONAL_MOBILITY_DEVICE = 0x00
+        POWERED_WHEELCHAIR = 0x01
+        MOBILITY_SCOOTER = 0x02
+
+    class ContinuousGlucoseMonitorSubcategory(OpenIntEnum):
+        GENERIC_CONTINUOUS_GLUCOSE_MONITOR = 0x00
+
+    class InsulinPumpSubcategory(OpenIntEnum):
+        GENERIC_INSULIN_PUMP = 0x00
+        INSULIN_PUMP_DURABLE_PUMP = 0x01
+        INSULIN_PUMP_PATCH_PUMP = 0x02
+        INSULIN_PEN = 0x03
+
+    class MedicationDeliverySubcategory(OpenIntEnum):
+        GENERIC_MEDICATION_DELIVERY = 0x00
+
+    class SpirometerSubcategory(OpenIntEnum):
+        GENERIC_SPIROMETER = 0x00
+        HANDHELD_SPIROMETER = 0x01
+
+    class OutdoorSportsActivitySubcategory(OpenIntEnum):
+        GENERIC_OUTDOOR_SPORTS_ACTIVITY = 0x00
+        LOCATION_DISPLAY = 0x01
+        LOCATION_AND_NAVIGATION_DISPLAY = 0x02
+        LOCATION_POD = 0x03
+        LOCATION_AND_NAVIGATION_POD = 0x04
+
+    class _OpenSubcategory(OpenIntEnum):
+        GENERIC = 0x00
+
+    SUBCATEGORY_CLASSES = {
+        Category.UNKNOWN: UnknownSubcategory,
+        Category.PHONE: PhoneSubcategory,
+        Category.COMPUTER: ComputerSubcategory,
+        Category.WATCH: WatchSubcategory,
+        Category.CLOCK: ClockSubcategory,
+        Category.DISPLAY: DisplaySubcategory,
+        Category.REMOTE_CONTROL: RemoteControlSubcategory,
+        Category.EYE_GLASSES: EyeglassesSubcategory,
+        Category.TAG: TagSubcategory,
+        Category.KEYRING: KeyringSubcategory,
+        Category.MEDIA_PLAYER: MediaPlayerSubcategory,
+        Category.BARCODE_SCANNER: BarcodeScannerSubcategory,
+        Category.THERMOMETER: ThermometerSubcategory,
+        Category.HEART_RATE_SENSOR: HeartRateSensorSubcategory,
+        Category.BLOOD_PRESSURE: BloodPressureSubcategory,
+        Category.HUMAN_INTERFACE_DEVICE: HumanInterfaceDeviceSubcategory,
+        Category.GLUCOSE_METER: GlucoseMeterSubcategory,
+        Category.RUNNING_WALKING_SENSOR: RunningWalkingSensorSubcategory,
+        Category.CYCLING: CyclingSubcategory,
+        Category.CONTROL_DEVICE: ControlDeviceSubcategory,
+        Category.NETWORK_DEVICE: NetworkDeviceSubcategory,
+        Category.SENSOR: SensorSubcategory,
+        Category.LIGHT_FIXTURES: LightFixturesSubcategory,
+        Category.FAN: FanSubcategory,
+        Category.HVAC: HvacSubcategory,
+        Category.AIR_CONDITIONING: AirConditioningSubcategory,
+        Category.HUMIDIFIER: HumidifierSubcategory,
+        Category.HEATING: HeatingSubcategory,
+        Category.ACCESS_CONTROL: AccessControlSubcategory,
+        Category.MOTORIZED_DEVICE: MotorizedDeviceSubcategory,
+        Category.POWER_DEVICE: PowerDeviceSubcategory,
+        Category.LIGHT_SOURCE: LightSourceSubcategory,
+        Category.WINDOW_COVERING: WindowCoveringSubcategory,
+        Category.AUDIO_SINK: AudioSinkSubcategory,
+        Category.AUDIO_SOURCE: AudioSourceSubcategory,
+        Category.MOTORIZED_VEHICLE: MotorizedVehicleSubcategory,
+        Category.DOMESTIC_APPLIANCE: DomesticApplianceSubcategory,
+        Category.WEARABLE_AUDIO_DEVICE: WearableAudioDeviceSubcategory,
+        Category.AIRCRAFT: AircraftSubcategory,
+        Category.AV_EQUIPMENT: AvEquipmentSubcategory,
+        Category.DISPLAY_EQUIPMENT: DisplayEquipmentSubcategory,
+        Category.HEARING_AID: HearingAidSubcategory,
+        Category.GAMING: GamingSubcategory,
+        Category.SIGNAGE: SignageSubcategory,
+        Category.PULSE_OXIMETER: PulseOximeterSubcategory,
+        Category.WEIGHT_SCALE: WeightScaleSubcategory,
+        Category.PERSONAL_MOBILITY_DEVICE: PersonalMobilityDeviceSubcategory,
+        Category.CONTINUOUS_GLUCOSE_MONITOR: ContinuousGlucoseMonitorSubcategory,
+        Category.INSULIN_PUMP: InsulinPumpSubcategory,
+        Category.MEDICATION_DELIVERY: MedicationDeliverySubcategory,
+        Category.SPIROMETER: SpirometerSubcategory,
+        Category.OUTDOOR_SPORTS_ACTIVITY: OutdoorSportsActivitySubcategory,
+    }
+
+    category: Category
+    subcategory: enum.IntEnum
+
+    @classmethod
+    def from_int(cls, appearance: int) -> Self:
+        category = cls.Category(appearance >> 6)
+        return cls(category, appearance & 0x3F)
+
+    def __init__(self, category: Category, subcategory: int) -> None:
+        self.category = category
+        if subcategory_class := self.SUBCATEGORY_CLASSES.get(category):
+            self.subcategory = subcategory_class(subcategory)
+        else:
+            self.subcategory = self._OpenSubcategory(subcategory)
+
+    def __int__(self) -> int:
+        return self.category << 6 | self.subcategory
+
+    def __repr__(self) -> str:
+        return (
+            'Appearance('
+            f'category={self.category.name}, '
+            f'subcategory={self.subcategory.name}'
+            ')'
+        )
+
+    def __str__(self) -> str:
+        return f'{self.category.name}/{self.subcategory.name}'
+
+
+# -----------------------------------------------------------------------------
 # Advertising Data
 # -----------------------------------------------------------------------------
-AdvertisingObject = Union[
-    List[UUID], Tuple[UUID, bytes], bytes, str, int, Tuple[int, int], Tuple[int, bytes]
+AdvertisingDataObject = Union[
+    List[UUID],
+    Tuple[UUID, bytes],
+    bytes,
+    str,
+    int,
+    Tuple[int, int],
+    Tuple[int, bytes],
+    Appearance,
 ]
 
 
@@ -704,109 +1265,115 @@ class AdvertisingData:
     # fmt: off
     # pylint: disable=line-too-long
 
-    # This list is only partial, it still needs to be filled in from the spec
-    FLAGS                                          = 0x01
-    INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS  = 0x02
-    COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS    = 0x03
-    INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS  = 0x04
-    COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS    = 0x05
-    INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS = 0x06
-    COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS   = 0x07
-    SHORTENED_LOCAL_NAME                           = 0x08
-    COMPLETE_LOCAL_NAME                            = 0x09
-    TX_POWER_LEVEL                                 = 0x0A
-    CLASS_OF_DEVICE                                = 0x0D
-    SIMPLE_PAIRING_HASH_C                          = 0x0E
-    SIMPLE_PAIRING_HASH_C_192                      = 0x0E
-    SIMPLE_PAIRING_RANDOMIZER_R                    = 0x0F
-    SIMPLE_PAIRING_RANDOMIZER_R_192                = 0x0F
-    DEVICE_ID                                      = 0x10
-    SECURITY_MANAGER_TK_VALUE                      = 0x10
-    SECURITY_MANAGER_OUT_OF_BAND_FLAGS             = 0x11
-    PERIPHERAL_CONNECTION_INTERVAL_RANGE           = 0x12
-    LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS      = 0x14
-    LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS     = 0x15
-    SERVICE_DATA                                   = 0x16
-    SERVICE_DATA_16_BIT_UUID                       = 0x16
-    PUBLIC_TARGET_ADDRESS                          = 0x17
-    RANDOM_TARGET_ADDRESS                          = 0x18
-    APPEARANCE                                     = 0x19
-    ADVERTISING_INTERVAL                           = 0x1A
-    LE_BLUETOOTH_DEVICE_ADDRESS                    = 0x1B
-    LE_ROLE                                        = 0x1C
-    SIMPLE_PAIRING_HASH_C_256                      = 0x1D
-    SIMPLE_PAIRING_RANDOMIZER_R_256                = 0x1E
-    LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS      = 0x1F
-    SERVICE_DATA_32_BIT_UUID                       = 0x20
-    SERVICE_DATA_128_BIT_UUID                      = 0x21
-    LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE       = 0x22
-    LE_SECURE_CONNECTIONS_RANDOM_VALUE             = 0x23
-    URI                                            = 0x24
-    INDOOR_POSITIONING                             = 0x25
-    TRANSPORT_DISCOVERY_DATA                       = 0x26
-    LE_SUPPORTED_FEATURES                          = 0x27
-    CHANNEL_MAP_UPDATE_INDICATION                  = 0x28
-    PB_ADV                                         = 0x29
-    MESH_MESSAGE                                   = 0x2A
-    MESH_BEACON                                    = 0x2B
-    BIGINFO                                        = 0x2C
-    BROADCAST_CODE                                 = 0x2D
-    RESOLVABLE_SET_IDENTIFIER                      = 0x2E
-    ADVERTISING_INTERVAL_LONG                      = 0x2F
-    THREE_D_INFORMATION_DATA                       = 0x3D
-    MANUFACTURER_SPECIFIC_DATA                     = 0xFF
+    FLAGS                                            = 0x01
+    INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS    = 0x02
+    COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS      = 0x03
+    INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS    = 0x04
+    COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS      = 0x05
+    INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS   = 0x06
+    COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS     = 0x07
+    SHORTENED_LOCAL_NAME                             = 0x08
+    COMPLETE_LOCAL_NAME                              = 0x09
+    TX_POWER_LEVEL                                   = 0x0A
+    CLASS_OF_DEVICE                                  = 0x0D
+    SIMPLE_PAIRING_HASH_C                            = 0x0E
+    SIMPLE_PAIRING_HASH_C_192                        = 0x0E
+    SIMPLE_PAIRING_RANDOMIZER_R                      = 0x0F
+    SIMPLE_PAIRING_RANDOMIZER_R_192                  = 0x0F
+    DEVICE_ID                                        = 0x10
+    SECURITY_MANAGER_TK_VALUE                        = 0x10
+    SECURITY_MANAGER_OUT_OF_BAND_FLAGS               = 0x11
+    PERIPHERAL_CONNECTION_INTERVAL_RANGE             = 0x12
+    LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS        = 0x14
+    LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS       = 0x15
+    SERVICE_DATA                                     = 0x16
+    SERVICE_DATA_16_BIT_UUID                         = 0x16
+    PUBLIC_TARGET_ADDRESS                            = 0x17
+    RANDOM_TARGET_ADDRESS                            = 0x18
+    APPEARANCE                                       = 0x19
+    ADVERTISING_INTERVAL                             = 0x1A
+    LE_BLUETOOTH_DEVICE_ADDRESS                      = 0x1B
+    LE_ROLE                                          = 0x1C
+    SIMPLE_PAIRING_HASH_C_256                        = 0x1D
+    SIMPLE_PAIRING_RANDOMIZER_R_256                  = 0x1E
+    LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS        = 0x1F
+    SERVICE_DATA_32_BIT_UUID                         = 0x20
+    SERVICE_DATA_128_BIT_UUID                        = 0x21
+    LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE         = 0x22
+    LE_SECURE_CONNECTIONS_RANDOM_VALUE               = 0x23
+    URI                                              = 0x24
+    INDOOR_POSITIONING                               = 0x25
+    TRANSPORT_DISCOVERY_DATA                         = 0x26
+    LE_SUPPORTED_FEATURES                            = 0x27
+    CHANNEL_MAP_UPDATE_INDICATION                    = 0x28
+    PB_ADV                                           = 0x29
+    MESH_MESSAGE                                     = 0x2A
+    MESH_BEACON                                      = 0x2B
+    BIGINFO                                          = 0x2C
+    BROADCAST_CODE                                   = 0x2D
+    RESOLVABLE_SET_IDENTIFIER                        = 0x2E
+    ADVERTISING_INTERVAL_LONG                        = 0x2F
+    BROADCAST_NAME                                   = 0x30
+    ENCRYPTED_ADVERTISING_DATA                       = 0X31
+    PERIODIC_ADVERTISING_RESPONSE_TIMING_INFORMATION = 0X32
+    ELECTRONIC_SHELF_LABEL                           = 0X34
+    THREE_D_INFORMATION_DATA                         = 0x3D
+    MANUFACTURER_SPECIFIC_DATA                       = 0xFF
 
     AD_TYPE_NAMES = {
-        FLAGS:                                          'FLAGS',
-        INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:  'INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS',
-        COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:    'COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS',
-        INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:  'INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS',
-        COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:    'COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS',
-        INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS: 'INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS',
-        COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS:   'COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS',
-        SHORTENED_LOCAL_NAME:                           'SHORTENED_LOCAL_NAME',
-        COMPLETE_LOCAL_NAME:                            'COMPLETE_LOCAL_NAME',
-        TX_POWER_LEVEL:                                 'TX_POWER_LEVEL',
-        CLASS_OF_DEVICE:                                'CLASS_OF_DEVICE',
-        SIMPLE_PAIRING_HASH_C:                          'SIMPLE_PAIRING_HASH_C',
-        SIMPLE_PAIRING_HASH_C_192:                      'SIMPLE_PAIRING_HASH_C_192',
-        SIMPLE_PAIRING_RANDOMIZER_R:                    'SIMPLE_PAIRING_RANDOMIZER_R',
-        SIMPLE_PAIRING_RANDOMIZER_R_192:                'SIMPLE_PAIRING_RANDOMIZER_R_192',
-        DEVICE_ID:                                      'DEVICE_ID',
-        SECURITY_MANAGER_TK_VALUE:                      'SECURITY_MANAGER_TK_VALUE',
-        SECURITY_MANAGER_OUT_OF_BAND_FLAGS:             'SECURITY_MANAGER_OUT_OF_BAND_FLAGS',
-        PERIPHERAL_CONNECTION_INTERVAL_RANGE:           'PERIPHERAL_CONNECTION_INTERVAL_RANGE',
-        LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS:      'LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS',
-        LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS:     'LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS',
-        SERVICE_DATA:                                   'SERVICE_DATA',
-        SERVICE_DATA_16_BIT_UUID:                       'SERVICE_DATA_16_BIT_UUID',
-        PUBLIC_TARGET_ADDRESS:                          'PUBLIC_TARGET_ADDRESS',
-        RANDOM_TARGET_ADDRESS:                          'RANDOM_TARGET_ADDRESS',
-        APPEARANCE:                                     'APPEARANCE',
-        ADVERTISING_INTERVAL:                           'ADVERTISING_INTERVAL',
-        LE_BLUETOOTH_DEVICE_ADDRESS:                    'LE_BLUETOOTH_DEVICE_ADDRESS',
-        LE_ROLE:                                        'LE_ROLE',
-        SIMPLE_PAIRING_HASH_C_256:                      'SIMPLE_PAIRING_HASH_C_256',
-        SIMPLE_PAIRING_RANDOMIZER_R_256:                'SIMPLE_PAIRING_RANDOMIZER_R_256',
-        LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS:      'LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS',
-        SERVICE_DATA_32_BIT_UUID:                       'SERVICE_DATA_32_BIT_UUID',
-        SERVICE_DATA_128_BIT_UUID:                      'SERVICE_DATA_128_BIT_UUID',
-        LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE:       'LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE',
-        LE_SECURE_CONNECTIONS_RANDOM_VALUE:             'LE_SECURE_CONNECTIONS_RANDOM_VALUE',
-        URI:                                            'URI',
-        INDOOR_POSITIONING:                             'INDOOR_POSITIONING',
-        TRANSPORT_DISCOVERY_DATA:                       'TRANSPORT_DISCOVERY_DATA',
-        LE_SUPPORTED_FEATURES:                          'LE_SUPPORTED_FEATURES',
-        CHANNEL_MAP_UPDATE_INDICATION:                  'CHANNEL_MAP_UPDATE_INDICATION',
-        PB_ADV:                                         'PB_ADV',
-        MESH_MESSAGE:                                   'MESH_MESSAGE',
-        MESH_BEACON:                                    'MESH_BEACON',
-        BIGINFO:                                        'BIGINFO',
-        BROADCAST_CODE:                                 'BROADCAST_CODE',
-        RESOLVABLE_SET_IDENTIFIER:                      'RESOLVABLE_SET_IDENTIFIER',
-        ADVERTISING_INTERVAL_LONG:                      'ADVERTISING_INTERVAL_LONG',
-        THREE_D_INFORMATION_DATA:                       'THREE_D_INFORMATION_DATA',
-        MANUFACTURER_SPECIFIC_DATA:                     'MANUFACTURER_SPECIFIC_DATA'
+        FLAGS:                                            'FLAGS',
+        INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:    'INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS',
+        COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:      'COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS',
+        INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:    'INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS',
+        COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:      'COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS',
+        INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS:   'INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS',
+        COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS:     'COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS',
+        SHORTENED_LOCAL_NAME:                             'SHORTENED_LOCAL_NAME',
+        COMPLETE_LOCAL_NAME:                              'COMPLETE_LOCAL_NAME',
+        TX_POWER_LEVEL:                                   'TX_POWER_LEVEL',
+        CLASS_OF_DEVICE:                                  'CLASS_OF_DEVICE',
+        SIMPLE_PAIRING_HASH_C:                            'SIMPLE_PAIRING_HASH_C',
+        SIMPLE_PAIRING_HASH_C_192:                        'SIMPLE_PAIRING_HASH_C_192',
+        SIMPLE_PAIRING_RANDOMIZER_R:                      'SIMPLE_PAIRING_RANDOMIZER_R',
+        SIMPLE_PAIRING_RANDOMIZER_R_192:                  'SIMPLE_PAIRING_RANDOMIZER_R_192',
+        DEVICE_ID:                                        'DEVICE_ID',
+        SECURITY_MANAGER_TK_VALUE:                        'SECURITY_MANAGER_TK_VALUE',
+        SECURITY_MANAGER_OUT_OF_BAND_FLAGS:               'SECURITY_MANAGER_OUT_OF_BAND_FLAGS',
+        PERIPHERAL_CONNECTION_INTERVAL_RANGE:             'PERIPHERAL_CONNECTION_INTERVAL_RANGE',
+        LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS:        'LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS',
+        LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS:       'LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS',
+        SERVICE_DATA_16_BIT_UUID:                         'SERVICE_DATA_16_BIT_UUID',
+        PUBLIC_TARGET_ADDRESS:                            'PUBLIC_TARGET_ADDRESS',
+        RANDOM_TARGET_ADDRESS:                            'RANDOM_TARGET_ADDRESS',
+        APPEARANCE:                                       'APPEARANCE',
+        ADVERTISING_INTERVAL:                             'ADVERTISING_INTERVAL',
+        LE_BLUETOOTH_DEVICE_ADDRESS:                      'LE_BLUETOOTH_DEVICE_ADDRESS',
+        LE_ROLE:                                          'LE_ROLE',
+        SIMPLE_PAIRING_HASH_C_256:                        'SIMPLE_PAIRING_HASH_C_256',
+        SIMPLE_PAIRING_RANDOMIZER_R_256:                  'SIMPLE_PAIRING_RANDOMIZER_R_256',
+        LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS:        'LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS',
+        SERVICE_DATA_32_BIT_UUID:                         'SERVICE_DATA_32_BIT_UUID',
+        SERVICE_DATA_128_BIT_UUID:                        'SERVICE_DATA_128_BIT_UUID',
+        LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE:         'LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE',
+        LE_SECURE_CONNECTIONS_RANDOM_VALUE:               'LE_SECURE_CONNECTIONS_RANDOM_VALUE',
+        URI:                                              'URI',
+        INDOOR_POSITIONING:                               'INDOOR_POSITIONING',
+        TRANSPORT_DISCOVERY_DATA:                         'TRANSPORT_DISCOVERY_DATA',
+        LE_SUPPORTED_FEATURES:                            'LE_SUPPORTED_FEATURES',
+        CHANNEL_MAP_UPDATE_INDICATION:                    'CHANNEL_MAP_UPDATE_INDICATION',
+        PB_ADV:                                           'PB_ADV',
+        MESH_MESSAGE:                                     'MESH_MESSAGE',
+        MESH_BEACON:                                      'MESH_BEACON',
+        BIGINFO:                                          'BIGINFO',
+        BROADCAST_CODE:                                   'BROADCAST_CODE',
+        RESOLVABLE_SET_IDENTIFIER:                        'RESOLVABLE_SET_IDENTIFIER',
+        ADVERTISING_INTERVAL_LONG:                        'ADVERTISING_INTERVAL_LONG',
+        BROADCAST_NAME:                                   'BROADCAST_NAME',
+        ENCRYPTED_ADVERTISING_DATA:                       'ENCRYPTED_ADVERTISING_DATA',
+        PERIODIC_ADVERTISING_RESPONSE_TIMING_INFORMATION: 'PERIODIC_ADVERTISING_RESPONSE_TIMING_INFORMATION',
+        ELECTRONIC_SHELF_LABEL:                           'ELECTRONIC_SHELF_LABEL',
+        THREE_D_INFORMATION_DATA:                         'THREE_D_INFORMATION_DATA',
+        MANUFACTURER_SPECIFIC_DATA:                       'MANUFACTURER_SPECIFIC_DATA'
     }
 
     LE_LIMITED_DISCOVERABLE_MODE_FLAG = 0x01
@@ -915,7 +1482,11 @@ class AdvertisingData:
             ad_data_str = f'company={company_name}, data={ad_data[2:].hex()}'
         elif ad_type == AdvertisingData.APPEARANCE:
             ad_type_str = 'Appearance'
-            ad_data_str = ad_data.hex()
+            appearance = Appearance.from_int(struct.unpack_from('<H', ad_data, 0)[0])
+            ad_data_str = str(appearance)
+        elif ad_type == AdvertisingData.BROADCAST_NAME:
+            ad_type_str = 'Broadcast Name'
+            ad_data_str = ad_data.decode('utf-8')
         else:
             ad_type_str = AdvertisingData.AD_TYPE_NAMES.get(ad_type, f'0x{ad_type:02X}')
             ad_data_str = ad_data.hex()
@@ -924,7 +1495,7 @@ class AdvertisingData:
 
     # pylint: disable=too-many-return-statements
     @staticmethod
-    def ad_data_to_object(ad_type: int, ad_data: bytes) -> AdvertisingObject:
+    def ad_data_to_object(ad_type: int, ad_data: bytes) -> AdvertisingDataObject:
         if ad_type in (
             AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
             AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
@@ -959,16 +1530,14 @@ class AdvertisingData:
             AdvertisingData.SHORTENED_LOCAL_NAME,
             AdvertisingData.COMPLETE_LOCAL_NAME,
             AdvertisingData.URI,
+            AdvertisingData.BROADCAST_NAME,
         ):
             return ad_data.decode("utf-8")
 
         if ad_type in (AdvertisingData.TX_POWER_LEVEL, AdvertisingData.FLAGS):
             return cast(int, struct.unpack('B', ad_data)[0])
 
-        if ad_type in (
-            AdvertisingData.APPEARANCE,
-            AdvertisingData.ADVERTISING_INTERVAL,
-        ):
+        if ad_type in (AdvertisingData.ADVERTISING_INTERVAL,):
             return cast(int, struct.unpack('<H', ad_data)[0])
 
         if ad_type == AdvertisingData.CLASS_OF_DEVICE:
@@ -979,6 +1548,11 @@ class AdvertisingData:
 
         if ad_type == AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
             return (cast(int, struct.unpack_from('<H', ad_data, 0)[0]), ad_data[2:])
+
+        if ad_type == AdvertisingData.APPEARANCE:
+            return Appearance.from_int(
+                cast(int, struct.unpack_from('<H', ad_data, 0)[0])
+            )
 
         return ad_data
 
@@ -993,27 +1567,27 @@ class AdvertisingData:
                 self.ad_structures.append((ad_type, ad_data))
             offset += length
 
-    def get_all(self, type_id: int, raw: bool = False) -> List[AdvertisingObject]:
+    def get_all(self, type_id: int, raw: bool = False) -> List[AdvertisingDataObject]:
         '''
         Get Advertising Data Structure(s) with a given type
 
         Returns a (possibly empty) list of matches.
         '''
 
-        def process_ad_data(ad_data: bytes) -> AdvertisingObject:
+        def process_ad_data(ad_data: bytes) -> AdvertisingDataObject:
             return ad_data if raw else self.ad_data_to_object(type_id, ad_data)
 
         return [process_ad_data(ad[1]) for ad in self.ad_structures if ad[0] == type_id]
 
-    def get(self, type_id: int, raw: bool = False) -> Optional[AdvertisingObject]:
+    def get(self, type_id: int, raw: bool = False) -> Optional[AdvertisingDataObject]:
         '''
         Get Advertising Data Structure(s) with a given type
 
         Returns the first entry, or None if no structure matches.
         '''
 
-        all = self.get_all(type_id, raw=raw)
-        return all[0] if all else None
+        all_objects = self.get_all(type_id, raw=raw)
+        return all_objects[0] if all_objects else None
 
     def __bytes__(self):
         return b''.join(
