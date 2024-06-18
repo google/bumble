@@ -787,6 +787,10 @@ class Host(AbortableEventEmitter):
         # Just use the same implementation as for the non-enhanced event for now
         self.on_hci_le_connection_complete_event(event)
 
+    def on_hci_le_enhanced_connection_complete_v2_event(self, event):
+        # Just use the same implementation as for the v1 event for now
+        self.on_hci_le_enhanced_connection_complete_event(event)
+
     def on_hci_connection_complete_event(self, event):
         if event.status == hci.HCI_SUCCESS:
             # Create/update the connection

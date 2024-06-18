@@ -1856,6 +1856,7 @@ class Device(CompositeEventEmitter):
 
         # Extended advertising.
         self.extended_advertising_sets: Dict[int, AdvertisingSet] = {}
+        self.connecting_extended_advertising_sets: Dict[int, AdvertisingSet] = {}
 
         # Legacy advertising.
         # The advertising and scan response data, as well as the advertising interval
@@ -4009,14 +4010,28 @@ class Device(CompositeEventEmitter):
             )
             return
 
-        if not (connection := self.lookup_connection(connection_handle)):
-            logger.warning(f'no connection for handle 0x{connection_handle:04x}')
+        if connection := self.lookup_connection(connection_handle):
+            # We have already received the connection complete event.
+            self._complete_le_extended_advertising_connection(
+                connection, advertising_set
+            )
             return
 
+        # Associate the connection handle with the advertising set, the connection
+        # will complete later.
+        logger.debug(
+            f'the connection with handle {connection_handle:04X} will complete later'
+        )
+        self.connecting_extended_advertising_sets[connection_handle] = advertising_set
+
+    def _complete_le_extended_advertising_connection(
+        self, connection: Connection, advertising_set: AdvertisingSet
+    ) -> None:
         # Update the connection address.
         connection.self_address = (
             advertising_set.random_address
-            if advertising_set.advertising_parameters.own_address_type
+            if advertising_set.random_address is not None
+            and advertising_set.advertising_parameters.own_address_type
             in (OwnAddressType.RANDOM, OwnAddressType.RESOLVABLE_OR_RANDOM)
             else self.public_address
         )
@@ -4147,6 +4162,16 @@ class Device(CompositeEventEmitter):
         if role == HCI_CENTRAL_ROLE or not self.supports_le_extended_advertising:
             # We can emit now, we have all the info we need
             self._emit_le_connection(connection)
+            return
+
+        if role == HCI_PERIPHERAL_ROLE and self.supports_le_extended_advertising:
+            if advertising_set := self.connecting_extended_advertising_sets.pop(
+                connection_handle, None
+            ):
+                # We have already received the advertising set termination event.
+                self._complete_le_extended_advertising_connection(
+                    connection, advertising_set
+                )
 
     @host_event_handler
     def on_connection_failure(self, transport, peer_address, error_code):

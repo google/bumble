@@ -301,9 +301,7 @@ async def test_legacy_advertising_connection(own_address_type):
     else:
         assert device.lookup_connection(0x0001).self_address == device.random_address
 
-    # For unknown reason, read_phy() in on_connection() would be killed at the end of
-    # test, so we force scheduling here to avoid an warning.
-    await asyncio.sleep(0.0001)
+    await async_barrier()
 
 
 # -----------------------------------------------------------------------------
@@ -384,9 +382,41 @@ async def test_extended_advertising_connection(own_address_type):
     else:
         assert device.lookup_connection(0x0001).self_address == device.random_address
 
-    # For unknown reason, read_phy() in on_connection() would be killed at the end of
-    # test, so we force scheduling here to avoid an warning.
-    await asyncio.sleep(0.0001)
+    await async_barrier()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    'own_address_type,',
+    (OwnAddressType.PUBLIC, OwnAddressType.RANDOM),
+)
+@pytest.mark.asyncio
+async def test_extended_advertising_connection_out_of_order(own_address_type):
+    device = Device(host=mock.AsyncMock(spec=Host))
+    peer_address = Address('F0:F1:F2:F3:F4:F5')
+    advertising_set = await device.create_advertising_set(
+        advertising_parameters=AdvertisingParameters(own_address_type=own_address_type)
+    )
+    device.on_advertising_set_termination(
+        HCI_SUCCESS,
+        advertising_set.advertising_handle,
+        0x0001,
+        0,
+    )
+    device.on_connection(
+        0x0001,
+        BT_LE_TRANSPORT,
+        peer_address,
+        BT_PERIPHERAL_ROLE,
+        ConnectionParameters(0, 0, 0),
+    )
+
+    if own_address_type == OwnAddressType.PUBLIC:
+        assert device.lookup_connection(0x0001).self_address == device.public_address
+    else:
+        assert device.lookup_connection(0x0001).self_address == device.random_address
+
+    await async_barrier()
 
 
 # -----------------------------------------------------------------------------
