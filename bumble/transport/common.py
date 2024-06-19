@@ -132,7 +132,9 @@ class PacketParser:
                         packet_type
                     ) or self.extended_packet_info.get(packet_type)
                     if self.packet_info is None:
-                        raise ValueError(f'invalid packet type {packet_type}')
+                        logger.warning(f'ignoring invalid packet type: {packet_type}')
+                        self.reset()
+                        break
                     self.state = PacketParser.NEED_LENGTH
                     self.bytes_needed = self.packet_info[0] + self.packet_info[1]
                 elif self.state == PacketParser.NEED_LENGTH:
