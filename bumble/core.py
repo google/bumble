@@ -130,6 +130,10 @@ class InvalidStateError(Exception):
     """Invalid State Error"""
 
 
+class UnsupportedOperationError(Exception):
+    """Unsupported Operation Error"""
+
+
 class ConnectionError(BaseError):  # pylint: disable=redefined-builtin
     """Connection Error"""
 
