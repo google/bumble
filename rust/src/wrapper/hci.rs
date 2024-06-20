@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,13 +17,11 @@
 // re-export here, and internal usages of these imports should refer to this mod, not the internal
 // mod
 pub(crate) use crate::internal::hci::WithPacketType;
-pub use crate::internal::hci::{packets, Error, Packet};
+pub use crate::internal::hci::{packets, Address, Error, InvalidAddressHex, Packet};
 
-use crate::wrapper::{
-    hci::packets::{AddressType, Command, ErrorCode},
-    ConversionError,
-};
-use itertools::Itertools as _;
+use crate::wrapper::core::{TryFromPy, TryToPy};
+use crate::wrapper::hci::packets::{AddressType, Command, ErrorCode};
+use pyo3::types::PyBytes;
 use pyo3::{
     exceptions::PyException, intern, types::PyModule, FromPyObject, IntoPy, PyAny, PyErr, PyObject,
     PyResult, Python, ToPyObject,
@@ -72,101 +70,50 @@ impl IntoPy<PyObject> for HciCommand {
     }
 }
 
-/// A Bluetooth address
-#[derive(Clone)]
-pub struct Address(pub(crate) PyObject);
-
-impl Address {
-    /// Creates a new [Address] object.
-    pub fn new(address: &str, address_type: AddressType) -> PyResult<Self> {
-        Python::with_gil(|py| {
-            PyModule::import(py, intern!(py, "bumble.device"))?
-                .getattr(intern!(py, "Address"))?
-                .call1((address, address_type))
-                .map(|any| Self(any.into()))
-        })
-    }
-
-    /// The type of address
-    pub fn address_type(&self) -> PyResult<AddressType> {
-        Python::with_gil(|py| {
-            self.0
-                .getattr(py, intern!(py, "address_type"))?
-                .extract::<u8>(py)?
-                .try_into()
-                .map_err(|addr_type| {
-                    PyErr::new::<PyException, _>(format!(
-                        "Failed to convert {addr_type} to AddressType"
-                    ))
-                })
-        })
-    }
-
-    /// True if the address is static
-    pub fn is_static(&self) -> PyResult<bool> {
-        Python::with_gil(|py| {
-            self.0
-                .getattr(py, intern!(py, "is_static"))?
-                .extract::<bool>(py)
-        })
-    }
-
-    /// True if the address is resolvable
-    pub fn is_resolvable(&self) -> PyResult<bool> {
-        Python::with_gil(|py| {
-            self.0
-                .getattr(py, intern!(py, "is_resolvable"))?
-                .extract::<bool>(py)
-        })
-    }
-
-    /// Address bytes in _little-endian_ format
-    pub fn as_le_bytes(&self) -> PyResult<Vec<u8>> {
-        Python::with_gil(|py| {
-            self.0
-                .call_method0(py, intern!(py, "to_bytes"))?
-                .extract::<Vec<u8>>(py)
-        })
-    }
-
-    /// Address bytes as big-endian colon-separated hex
-    pub fn as_hex(&self) -> PyResult<String> {
-        self.as_le_bytes().map(|bytes| {
-            bytes
-                .into_iter()
-                .rev()
-                .map(|byte| hex::encode_upper([byte]))
-                .join(":")
-        })
+impl TryToPy for Address {
+    fn try_to_py<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        PyModule::import(py, intern!(py, "bumble.device"))?
+            .getattr(intern!(py, "Address"))?
+            .call1((PyBytes::new(py, &self.as_le_bytes()), self.address_type()))
     }
 }
 
-impl ToPyObject for Address {
-    fn to_object(&self, _py: Python<'_>) -> PyObject {
-        self.0.clone()
+impl TryFromPy for Address {
+    fn try_from_py<'py>(py: Python<'py>, obj: &'py PyAny) -> PyResult<Self> {
+        let address_type = obj
+            .getattr(intern!(py, "address_type"))?
+            .extract::<u8>()?
+            .try_into()
+            .map_err(|addr_type| {
+                PyErr::new::<PyException, _>(format!(
+                    "Failed to convert {addr_type} to AddressType"
+                ))
+            })?;
+
+        let address = obj.call_method0(intern!(py, "to_bytes"))?.extract()?;
+
+        Ok(Self::from_le_bytes(address, address_type))
     }
 }
 
-/// An error meaning that the u64 value did not represent a valid BT address.
-#[derive(Debug)]
-pub struct InvalidAddress(#[allow(unused)] u64);
+/// An error meaning that the internal u64 value used to convert to [packets::Address] did not
+/// represent a valid BT address.
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid address u64: {0}")]
+pub struct AddressConversionError(#[allow(unused)] u64);
 
 impl TryInto<packets::Address> for Address {
-    type Error = ConversionError<InvalidAddress>;
+    type Error = AddressConversionError;
 
     fn try_into(self) -> Result<packets::Address, Self::Error> {
-        let addr_le_bytes = self.as_le_bytes().map_err(ConversionError::Python)?;
-
         // packets::Address only supports converting from a u64 (TODO: update if/when it supports converting from [u8; 6] -- https://github.com/google/pdl/issues/75)
         // So first we take the python `Address` little-endian bytes (6 bytes), copy them into a
         // [u8; 8] in little-endian format, and finally convert it into a u64.
         let mut buf = [0_u8; 8];
-        buf[0..6].copy_from_slice(&addr_le_bytes);
+        buf[0..6].copy_from_slice(&self.as_le_bytes());
         let address_u64 = u64::from_le_bytes(buf);
 
-        packets::Address::try_from(address_u64)
-            .map_err(InvalidAddress)
-            .map_err(ConversionError::Native)
+        packets::Address::try_from(address_u64).map_err(AddressConversionError)
     }
 }
 
