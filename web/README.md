@@ -24,9 +24,14 @@ controller using some other transport (ex: `python apps/hci_bridge.py ws-server:
 For HTTP, start an HTTP server with the `web` directory as its
 root. You can use the invoke task `inv web.serve` for convenience.
 
+`inv web.build` will build the local copy of bumble and automatically copy the `.whl` file
+to the web directory. To use this build, include the param `?packageFile=true` to the URL.
+
 In a browser, open either `scanner/scanner.html` or `speaker/speaker.html`.
 You can pass optional query parameters:
 
+  * `packageFile=true` will automatically use the bumble package built via the
+    `inv web.build` command.
   * `package` may be set to point to a local build of Bumble (`.whl` files).
      The filename must be URL-encoded of course, and must be located under
      the `web` directory (the HTTP server won't serve files not under its
