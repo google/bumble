@@ -46,3 +46,5 @@ Example:
 
 NOTE: to get a local build of the Bumble package, use `inv build`, the built `.whl` file can be found in the `dist` directory. 
 Make a copy of the built `.whl` file in the `web` directory.
+
+Tip: During web developement, disable caching. [Chrome](https://stackoverflow.com/a/7000899]) / [Firefiox](https://stackoverflow.com/a/289771)
