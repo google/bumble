@@ -503,21 +503,9 @@ class ConsoleApp:
             self.show_error('not connected')
             return
 
-        # Discover all services, characteristics and descriptors
-        self.append_to_output('discovering services...')
-        await self.connected_peer.discover_services()
-        self.append_to_output(
-            f'found {len(self.connected_peer.services)} services,'
-            ' discovering characteristics...'
-        )
-        await self.connected_peer.discover_characteristics()
-        self.append_to_output('found characteristics, discovering descriptors...')
-        for service in self.connected_peer.services:
-            for characteristic in service.characteristics:
-                await self.connected_peer.discover_descriptors(characteristic)
-        self.append_to_output('discovery completed')
-
-        self.show_remote_services(self.connected_peer.services)
+        self.append_to_output('Service Discovery starting...')
+        await self.connected_peer.discover_all()
+        self.append_to_output('Service Discovery done!')
 
     async def discover_attributes(self):
         if not self.connected_peer:
