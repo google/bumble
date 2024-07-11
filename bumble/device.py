@@ -27,6 +27,7 @@ import copy
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
 import functools
+import itertools
 import json
 import logging
 import secrets
@@ -1172,8 +1173,20 @@ class Peer:
         return self.gatt_client.get_services_by_uuid(uuid)
 
     def get_characteristics_by_uuid(
-        self, uuid: core.UUID, service: Optional[gatt_client.ServiceProxy] = None
+        self,
+        uuid: core.UUID,
+        service: Optional[Union[gatt_client.ServiceProxy, core.UUID]] = None,
     ) -> List[gatt_client.CharacteristicProxy]:
+        if isinstance(service, core.UUID):
+            return list(
+                itertools.chain(
+                    *[
+                        self.get_characteristics_by_uuid(uuid, s)
+                        for s in self.get_services_by_uuid(service)
+                    ]
+                )
+            )
+
         return self.gatt_client.get_characteristics_by_uuid(uuid, service)
 
     def create_service_proxy(self, proxy_class: Type[_PROXY_CLASS]) -> _PROXY_CLASS:
