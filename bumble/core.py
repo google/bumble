@@ -79,7 +79,13 @@ def get_dict_key_by_value(dictionary, value):
 # -----------------------------------------------------------------------------
 # Exceptions
 # -----------------------------------------------------------------------------
-class BaseError(Exception):
+
+
+class BaseBumbleError(Exception):
+    """Base Error raised by Bumble."""
+
+
+class BaseError(BaseBumbleError):
     """Base class for errors with an error code, error name and namespace"""
 
     def __init__(
@@ -118,16 +124,36 @@ class ProtocolError(BaseError):
     """Protocol Error"""
 
 
-class TimeoutError(Exception):  # pylint: disable=redefined-builtin
+class TimeoutError(BaseBumbleError):  # pylint: disable=redefined-builtin
     """Timeout Error"""
 
 
-class CommandTimeoutError(Exception):
+class CommandTimeoutError(BaseBumbleError):
     """Command Timeout Error"""
 
 
-class InvalidStateError(Exception):
+class InvalidStateError(BaseBumbleError):
     """Invalid State Error"""
+
+
+class InvalidArgumentError(BaseBumbleError, ValueError):
+    """Invalid Argument Error"""
+
+
+class InvalidPacketError(BaseBumbleError, ValueError):
+    """Invalid Packet Error"""
+
+
+class InvalidOperationError(BaseBumbleError, RuntimeError):
+    """Invalid Operation Error"""
+
+
+class OutOfResourcesError(BaseBumbleError, RuntimeError):
+    """Out of Resources Error"""
+
+
+class UnreachableError(BaseBumbleError):
+    """The code path raising this error should be unreachable."""
 
 
 class ConnectionError(BaseError):  # pylint: disable=redefined-builtin
@@ -188,12 +214,12 @@ class UUID:
                     or uuid_str_or_int[18] != '-'
                     or uuid_str_or_int[23] != '-'
                 ):
-                    raise ValueError('invalid UUID format')
+                    raise InvalidArgumentError('invalid UUID format')
                 uuid_str = uuid_str_or_int.replace('-', '')
             else:
                 uuid_str = uuid_str_or_int
             if len(uuid_str) != 32 and len(uuid_str) != 8 and len(uuid_str) != 4:
-                raise ValueError(f"invalid UUID format: {uuid_str}")
+                raise InvalidArgumentError(f"invalid UUID format: {uuid_str}")
             self.uuid_bytes = bytes(reversed(bytes.fromhex(uuid_str)))
         self.name = name
 
@@ -218,7 +244,7 @@ class UUID:
 
             return self.register()
 
-        raise ValueError('only 2, 4 and 16 bytes are allowed')
+        raise InvalidArgumentError('only 2, 4 and 16 bytes are allowed')
 
     @classmethod
     def from_16_bits(cls, uuid_16: int, name: Optional[str] = None) -> UUID:

@@ -55,6 +55,7 @@ from bumble.sdp import (
 )
 from bumble.utils import AsyncRunner, OpenIntEnum
 from bumble.core import (
+    InvalidArgumentError,
     ProtocolError,
     BT_L2CAP_PROTOCOL_ID,
     BT_AVCTP_PROTOCOL_ID,
@@ -1411,7 +1412,7 @@ class Protocol(pyee.EventEmitter):
     def notify_track_changed(self, identifier: bytes) -> None:
         """Notify the connected peer of a Track change."""
         if len(identifier) != 8:
-            raise ValueError("identifier must be 8 bytes")
+            raise InvalidArgumentError("identifier must be 8 bytes")
         self.notify_event(TrackChangedEvent(identifier))
 
     def notify_playback_position_changed(self, position: int) -> None:

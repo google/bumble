@@ -20,7 +20,7 @@ import logging
 import os
 from typing import Optional
 
-from .common import Transport, AsyncPipeSink, SnoopingTransport
+from .common import Transport, AsyncPipeSink, SnoopingTransport, TransportSpecError
 from ..snoop import create_snooper
 
 # -----------------------------------------------------------------------------
@@ -180,7 +180,7 @@ async def _open_transport(scheme: str, spec: Optional[str]) -> Transport:
 
         return await open_android_netsim_transport(spec)
 
-    raise ValueError('unknown transport scheme')
+    raise TransportSpecError('unknown transport scheme')
 
 
 # -----------------------------------------------------------------------------

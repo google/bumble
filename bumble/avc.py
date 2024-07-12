@@ -20,6 +20,7 @@ import enum
 import struct
 from typing import Dict, Type, Union, Tuple
 
+from bumble import core
 from bumble.utils import OpenIntEnum
 
 
@@ -88,7 +89,9 @@ class Frame:
             short_name = subclass.__name__.replace("ResponseFrame", "")
             category_class = ResponseFrame
         else:
-            raise ValueError(f"invalid subclass name {subclass.__name__}")
+            raise core.InvalidArgumentError(
+                f"invalid subclass name {subclass.__name__}"
+            )
 
         uppercase_indexes = [
             i for i in range(len(short_name)) if short_name[i].isupper()
@@ -106,7 +109,7 @@ class Frame:
     @staticmethod
     def from_bytes(data: bytes) -> Frame:
         if data[0] >> 4 != 0:
-            raise ValueError("first 4 bits must be 0s")
+            raise core.InvalidPacketError("first 4 bits must be 0s")
 
         ctype_or_response = data[0] & 0xF
         subunit_type = Frame.SubunitType(data[1] >> 3)
@@ -122,7 +125,7 @@ class Frame:
             # Extended to the next byte
             extension = data[2]
             if extension == 0:
-                raise ValueError("extended subunit ID value reserved")
+                raise core.InvalidPacketError("extended subunit ID value reserved")
             if extension == 0xFF:
                 subunit_id = 5 + 254 + data[3]
                 opcode_offset = 4
@@ -131,7 +134,7 @@ class Frame:
                 opcode_offset = 3
 
         elif subunit_id == 6:
-            raise ValueError("reserved subunit ID")
+            raise core.InvalidPacketError("reserved subunit ID")
 
         opcode = Frame.OperationCode(data[opcode_offset])
         operands = data[opcode_offset + 1 :]
@@ -448,7 +451,7 @@ class PassThroughFrame:
         operation_data: bytes,
     ) -> None:
         if len(operation_data) > 255:
-            raise ValueError("operation data must be <= 255 bytes")
+            raise core.InvalidArgumentError("operation data must be <= 255 bytes")
         self.state_flag = state_flag
         self.operation_id = operation_id
         self.operation_data = operation_data

@@ -16,6 +16,10 @@ from functools import partial
 from typing import List, Optional, Union
 
 
+class ColorError(ValueError):
+    """Error raised when a color spec is invalid."""
+
+
 # ANSI color names. There is also a "default"
 COLORS = ('black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white')
 
@@ -52,7 +56,7 @@ def _color_code(spec: ColorSpec, base: int) -> str:
     elif isinstance(spec, int) and 0 <= spec <= 255:
         return _join(base + 8, 5, spec)
     else:
-        raise ValueError('Invalid color spec "%s"' % spec)
+        raise ColorError('Invalid color spec "%s"' % spec)
 
 
 def color(
@@ -72,7 +76,7 @@ def color(
             if style_part in STYLES:
                 codes.append(STYLES.index(style_part))
             else:
-                raise ValueError('Invalid style "%s"' % style_part)
+                raise ColorError('Invalid style "%s"' % style_part)
 
     if codes:
         return '\x1b[{0}m{1}\x1b[0m'.format(_join(*codes), s)

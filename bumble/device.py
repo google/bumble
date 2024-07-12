@@ -179,10 +179,15 @@ from .core import (
     BT_LE_TRANSPORT,
     BT_PERIPHERAL_ROLE,
     AdvertisingData,
+    BaseBumbleError,
     ConnectionParameterUpdateError,
     CommandTimeoutError,
     ConnectionPHY,
+    InvalidArgumentError,
+    InvalidOperationError,
     InvalidStateError,
+    OutOfResourcesError,
+    UnreachableError,
 )
 from .utils import (
     AsyncRunner,
@@ -267,6 +272,8 @@ DEVICE_MAX_HIGH_DUTY_CYCLE_CONNECTABLE_DIRECTED_ADVERTISING_DURATION = 1.28
 # -----------------------------------------------------------------------------
 # Classes
 # -----------------------------------------------------------------------------
+class ObjectLookupError(BaseBumbleError):
+    """Error raised when failed to lookup an object."""
 
 
 # -----------------------------------------------------------------------------
@@ -1662,7 +1669,9 @@ def with_connection_from_handle(function):
     @functools.wraps(function)
     def wrapper(self, connection_handle, *args, **kwargs):
         if (connection := self.lookup_connection(connection_handle)) is None:
-            raise ValueError(f'no connection for handle: 0x{connection_handle:04x}')
+            raise ObjectLookupError(
+                f'no connection for handle: 0x{connection_handle:04x}'
+            )
         return function(self, connection, *args, **kwargs)
 
     return wrapper
@@ -1677,7 +1686,7 @@ def with_connection_from_address(function):
         for connection in self.connections.values():
             if connection.peer_address == address:
                 return function(self, connection, *args, **kwargs)
-        raise ValueError('no connection for address')
+        raise ObjectLookupError('no connection for address')
 
     return wrapper
 
@@ -2115,7 +2124,7 @@ class Device(CompositeEventEmitter):
                 spec=spec,
             )
         else:
-            raise ValueError(f'Unexpected mode {spec}')
+            raise InvalidArgumentError(f'Unexpected mode {spec}')
 
     def send_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes) -> None:
         self.host.send_l2cap_pdu(connection_handle, cid, pdu)
@@ -2276,7 +2285,7 @@ class Device(CompositeEventEmitter):
     def supports_le_features(self, feature: LeFeatureMask) -> bool:
         return self.host.supports_le_features(feature)
 
-    def supports_le_phy(self, phy):
+    def supports_le_phy(self, phy: int) -> bool:
         if phy == HCI_LE_1M_PHY:
             return True
 
@@ -2285,7 +2294,7 @@ class Device(CompositeEventEmitter):
             HCI_LE_CODED_PHY: LeFeatureMask.LE_CODED_PHY,
         }
         if phy not in feature_map:
-            raise ValueError('invalid PHY')
+            raise InvalidArgumentError('invalid PHY')
 
         return self.supports_le_features(feature_map[phy])
 
@@ -2345,7 +2354,7 @@ class Device(CompositeEventEmitter):
         # Decide what peer address to use
         if advertising_type.is_directed:
             if target is None:
-                raise ValueError('directed advertising requires a target')
+                raise InvalidArgumentError('directed advertising requires a target')
             peer_address = target
         else:
             peer_address = Address.ANY
@@ -2452,7 +2461,7 @@ class Device(CompositeEventEmitter):
             and advertising_data
             and scan_response_data
         ):
-            raise ValueError(
+            raise InvalidArgumentError(
                 "Extended advertisements can't have both data and scan \
                               response data"
             )
@@ -2468,7 +2477,9 @@ class Device(CompositeEventEmitter):
                 if handle not in self.extended_advertising_sets
             )
         except StopIteration as exc:
-            raise RuntimeError("all valid advertising handles already in use") from exc
+            raise OutOfResourcesError(
+                "all valid advertising handles already in use"
+            ) from exc
 
         # Use the device's random address if a random address is needed but none was
         # provided.
@@ -2567,14 +2578,14 @@ class Device(CompositeEventEmitter):
     ) -> None:
         # Check that the arguments are legal
         if scan_interval < scan_window:
-            raise ValueError('scan_interval must be >= scan_window')
+            raise InvalidArgumentError('scan_interval must be >= scan_window')
         if (
             scan_interval < DEVICE_MIN_SCAN_INTERVAL
             or scan_interval > DEVICE_MAX_SCAN_INTERVAL
         ):
-            raise ValueError('scan_interval out of range')
+            raise InvalidArgumentError('scan_interval out of range')
         if scan_window < DEVICE_MIN_SCAN_WINDOW or scan_window > DEVICE_MAX_SCAN_WINDOW:
-            raise ValueError('scan_interval out of range')
+            raise InvalidArgumentError('scan_interval out of range')
 
         # Reset the accumulators
         self.advertisement_accumulators = {}
@@ -2602,7 +2613,7 @@ class Device(CompositeEventEmitter):
                     scanning_phy_count += 1
 
             if scanning_phy_count == 0:
-                raise ValueError('at least one scanning PHY must be enabled')
+                raise InvalidArgumentError('at least one scanning PHY must be enabled')
 
             await self.send_command(
                 HCI_LE_Set_Extended_Scan_Parameters_Command(
@@ -2906,7 +2917,7 @@ class Device(CompositeEventEmitter):
 
         # Check parameters
         if transport not in (BT_LE_TRANSPORT, BT_BR_EDR_TRANSPORT):
-            raise ValueError('invalid transport')
+            raise InvalidArgumentError('invalid transport')
 
         # Adjust the transport automatically if we need to
         if transport == BT_LE_TRANSPORT and not self.le_enabled:
@@ -2923,7 +2934,7 @@ class Device(CompositeEventEmitter):
                 peer_address = Address.from_string_for_transport(
                     peer_address, transport
                 )
-            except ValueError:
+            except InvalidArgumentError:
                 # If the address is not parsable, assume it is a name instead
                 logger.debug('looking for peer by name')
                 peer_address = await self.find_peer_by_name(
@@ -2935,7 +2946,7 @@ class Device(CompositeEventEmitter):
                 transport == BT_BR_EDR_TRANSPORT
                 and peer_address.address_type != Address.PUBLIC_DEVICE_ADDRESS
             ):
-                raise ValueError('BR/EDR addresses must be PUBLIC')
+                raise InvalidArgumentError('BR/EDR addresses must be PUBLIC')
 
         assert isinstance(peer_address, Address)
 
@@ -2986,7 +2997,7 @@ class Device(CompositeEventEmitter):
                         )
                     )
                     if not phys:
-                        raise ValueError('at least one supported PHY needed')
+                        raise InvalidArgumentError('at least one supported PHY needed')
 
                     phy_count = len(phys)
                     initiating_phys = phy_list_to_bits(phys)
@@ -3058,7 +3069,7 @@ class Device(CompositeEventEmitter):
                     )
                 else:
                     if HCI_LE_1M_PHY not in connection_parameters_preferences:
-                        raise ValueError('1M PHY preferences required')
+                        raise InvalidArgumentError('1M PHY preferences required')
 
                     prefs = connection_parameters_preferences[HCI_LE_1M_PHY]
                     result = await self.send_command(
@@ -3158,7 +3169,7 @@ class Device(CompositeEventEmitter):
         if isinstance(peer_address, str):
             try:
                 peer_address = Address(peer_address)
-            except ValueError:
+            except InvalidArgumentError:
                 # If the address is not parsable, assume it is a name instead
                 logger.debug('looking for peer by name')
                 peer_address = await self.find_peer_by_name(
@@ -3168,7 +3179,7 @@ class Device(CompositeEventEmitter):
         assert isinstance(peer_address, Address)
 
         if peer_address == Address.NIL:
-            raise ValueError('accept on nil address')
+            raise InvalidArgumentError('accept on nil address')
 
         # Create a future so that we can wait for the request
         pending_request_fut = asyncio.get_running_loop().create_future()
@@ -3281,7 +3292,7 @@ class Device(CompositeEventEmitter):
             if isinstance(peer_address, str):
                 try:
                     peer_address = Address(peer_address)
-                except ValueError:
+                except InvalidArgumentError:
                     # If the address is not parsable, assume it is a name instead
                     logger.debug('looking for peer by name')
                     peer_address = await self.find_peer_by_name(
@@ -3324,10 +3335,10 @@ class Device(CompositeEventEmitter):
 
     async def set_data_length(self, connection, tx_octets, tx_time) -> None:
         if tx_octets < 0x001B or tx_octets > 0x00FB:
-            raise ValueError('tx_octets must be between 0x001B and 0x00FB')
+            raise InvalidArgumentError('tx_octets must be between 0x001B and 0x00FB')
 
         if tx_time < 0x0148 or tx_time > 0x4290:
-            raise ValueError('tx_time must be between 0x0148 and 0x4290')
+            raise InvalidArgumentError('tx_time must be between 0x0148 and 0x4290')
 
         return await self.send_command(
             HCI_LE_Set_Data_Length_Command(
@@ -3602,7 +3613,7 @@ class Device(CompositeEventEmitter):
 
     async def encrypt(self, connection, enable=True):
         if not enable and connection.transport == BT_LE_TRANSPORT:
-            raise ValueError('`enable` parameter is classic only.')
+            raise InvalidArgumentError('`enable` parameter is classic only.')
 
         # Set up event handlers
         pending_encryption = asyncio.get_running_loop().create_future()
@@ -3621,11 +3632,11 @@ class Device(CompositeEventEmitter):
             if connection.transport == BT_LE_TRANSPORT:
                 # Look for a key in the key store
                 if self.keystore is None:
-                    raise RuntimeError('no key store')
+                    raise InvalidOperationError('no key store')
 
                 keys = await self.keystore.get(str(connection.peer_address))
                 if keys is None:
-                    raise RuntimeError('keys not found in key store')
+                    raise InvalidOperationError('keys not found in key store')
 
                 if keys.ltk is not None:
                     ltk = keys.ltk.value
@@ -3636,7 +3647,7 @@ class Device(CompositeEventEmitter):
                     rand = keys.ltk_central.rand
                     ediv = keys.ltk_central.ediv
                 else:
-                    raise RuntimeError('no LTK found for peer')
+                    raise InvalidOperationError('no LTK found for peer')
 
                 if connection.role != HCI_CENTRAL_ROLE:
                     raise InvalidStateError('only centrals can start encryption')
@@ -3911,7 +3922,7 @@ class Device(CompositeEventEmitter):
                 return cis_link
 
         # Mypy believes this is reachable when context is an ExitStack.
-        raise InvalidStateError('Unreachable')
+        raise UnreachableError()
 
     # [LE only]
     @experimental('Only for testing.')
@@ -4399,7 +4410,7 @@ class Device(CompositeEventEmitter):
             return await pairing_config.delegate.confirm(auto=True)
 
         async def na() -> bool:
-            assert False, "N/A: unreachable"
+            raise UnreachableError()
 
         # See Bluetooth spec @ Vol 3, Part C 5.2.2.6
         methods = {

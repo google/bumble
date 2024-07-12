@@ -29,7 +29,7 @@ from usb.core import USBError
 from usb.util import CTRL_TYPE_CLASS, CTRL_RECIPIENT_OTHER
 from usb.legacy import REQ_SET_FEATURE, REQ_CLEAR_FEATURE, CLASS_HUB
 
-from .common import Transport, ParserSource
+from .common import Transport, ParserSource, TransportInitError
 from .. import hci
 from ..colors import color
 
@@ -259,7 +259,7 @@ async def open_pyusb_transport(spec: str) -> Transport:
             device = None
 
     if device is None:
-        raise ValueError('device not found')
+        raise TransportInitError('device not found')
     logger.debug(f'USB Device: {device}')
 
     # Power Cycle the device

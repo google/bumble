@@ -23,7 +23,7 @@ from typing_extensions import Self
 
 from . import core, l2cap
 from .colors import color
-from .core import InvalidStateError
+from .core import InvalidStateError, InvalidArgumentError, InvalidPacketError
 from .hci import HCI_Object, name_or_number, key_with_value
 
 if TYPE_CHECKING:
@@ -189,7 +189,9 @@ class DataElement:
         self.bytes = None
         if element_type in (DataElement.UNSIGNED_INTEGER, DataElement.SIGNED_INTEGER):
             if value_size is None:
-                raise ValueError('integer types must have a value size specified')
+                raise InvalidArgumentError(
+                    'integer types must have a value size specified'
+                )
 
     @staticmethod
     def nil() -> DataElement:
@@ -265,7 +267,7 @@ class DataElement:
         if len(data) == 8:
             return struct.unpack('>Q', data)[0]
 
-        raise ValueError(f'invalid integer length {len(data)}')
+        raise InvalidPacketError(f'invalid integer length {len(data)}')
 
     @staticmethod
     def signed_integer_from_bytes(data):
@@ -281,7 +283,7 @@ class DataElement:
         if len(data) == 8:
             return struct.unpack('>q', data)[0]
 
-        raise ValueError(f'invalid integer length {len(data)}')
+        raise InvalidPacketError(f'invalid integer length {len(data)}')
 
     @staticmethod
     def list_from_bytes(data):
@@ -354,7 +356,7 @@ class DataElement:
             data = b''
         elif self.type == DataElement.UNSIGNED_INTEGER:
             if self.value < 0:
-                raise ValueError('UNSIGNED_INTEGER cannot be negative')
+                raise InvalidArgumentError('UNSIGNED_INTEGER cannot be negative')
 
             if self.value_size == 1:
                 data = struct.pack('B', self.value)
@@ -365,7 +367,7 @@ class DataElement:
             elif self.value_size == 8:
                 data = struct.pack('>Q', self.value)
             else:
-                raise ValueError('invalid value_size')
+                raise InvalidArgumentError('invalid value_size')
         elif self.type == DataElement.SIGNED_INTEGER:
             if self.value_size == 1:
                 data = struct.pack('b', self.value)
@@ -376,7 +378,7 @@ class DataElement:
             elif self.value_size == 8:
                 data = struct.pack('>q', self.value)
             else:
-                raise ValueError('invalid value_size')
+                raise InvalidArgumentError('invalid value_size')
         elif self.type == DataElement.UUID:
             data = bytes(reversed(bytes(self.value)))
         elif self.type == DataElement.URL:
@@ -392,7 +394,7 @@ class DataElement:
         size_bytes = b''
         if self.type == DataElement.NIL:
             if size != 0:
-                raise ValueError('NIL must be empty')
+                raise InvalidArgumentError('NIL must be empty')
             size_index = 0
         elif self.type in (
             DataElement.UNSIGNED_INTEGER,
@@ -410,7 +412,7 @@ class DataElement:
             elif size == 16:
                 size_index = 4
             else:
-                raise ValueError('invalid data size')
+                raise InvalidArgumentError('invalid data size')
         elif self.type in (
             DataElement.TEXT_STRING,
             DataElement.SEQUENCE,
@@ -427,10 +429,10 @@ class DataElement:
                 size_index = 7
                 size_bytes = struct.pack('>I', size)
             else:
-                raise ValueError('invalid data size')
+                raise InvalidArgumentError('invalid data size')
         elif self.type == DataElement.BOOLEAN:
             if size != 1:
-                raise ValueError('boolean must be 1 byte')
+                raise InvalidArgumentError('boolean must be 1 byte')
             size_index = 0
 
         self.bytes = bytes([self.type << 3 | size_index]) + size_bytes + data
