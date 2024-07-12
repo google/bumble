@@ -2162,7 +2162,7 @@ class LocalStreamEndPoint(StreamEndPoint, EventEmitter):
     def on_abort_command(self):
         self.emit('abort')
 
-    def on_delayreport_command(self, delay):
+    def on_delayreport_command(self, delay: int):
         self.emit('delay_report', delay)
 
     def on_rtp_channel_open(self):
