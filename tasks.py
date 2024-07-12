@@ -20,7 +20,10 @@ Invoke tasks
 # Imports
 # -----------------------------------------------------------------------------
 import os
-
+import glob
+import shutil
+import urllib
+from pathlib import Path
 from invoke import task, call, Collection
 from invoke.exceptions import Exit, UnexpectedExit
 
@@ -206,4 +209,20 @@ def serve(ctx, port=8000):
 
 
 # -----------------------------------------------------------------------------
+@task
+def web_build(ctx):
+    # Step 1: build the wheel
+    build(ctx)
+    # Step 2: Copy the wheel to the web folder, so the http server can access it
+    newest_wheel = Path(max(glob.glob('dist/*.whl'), key=lambda f: os.path.getmtime(f)))
+    shutil.copy(newest_wheel, Path('web/'))
+    # Step 3: Write wheel's name to web/packageFile
+    with open(Path('web', 'packageFile'), mode='w') as package_file:
+        package_file.write(str(Path('/') / newest_wheel.name))
+    # Step 4: Success!
+    print('Include ?packageFile=true in your URL!')
+
+
+# -----------------------------------------------------------------------------
 web_tasks.add_task(serve)
+web_tasks.add_task(web_build, name="build")
