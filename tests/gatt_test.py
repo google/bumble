@@ -1147,6 +1147,56 @@ def test_get_attribute_group():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_get_characteristics_by_uuid():
+    [client, server] = LinkedDevices().devices[:2]
+
+    characteristic1 = Characteristic(
+        '1234',
+        Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
+        Characteristic.READABLE,
+        bytes([1, 2, 3]),
+    )
+    characteristic2 = Characteristic(
+        '5678',
+        Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
+        Characteristic.READABLE,
+        bytes([1, 2, 3]),
+    )
+    service1 = Service(
+        'ABCD',
+        [characteristic1, characteristic2],
+    )
+    service2 = Service(
+        'FFFF',
+        [characteristic1],
+    )
+
+    server.add_services([service1, service2])
+
+    await client.power_on()
+    await server.power_on()
+    connection = await client.connect(server.random_address)
+    peer = Peer(connection)
+
+    await peer.discover_services()
+    await peer.discover_characteristics()
+    c = peer.get_characteristics_by_uuid(uuid=UUID('1234'))
+    assert len(c) == 2
+    assert isinstance(c[0], CharacteristicProxy)
+    c = peer.get_characteristics_by_uuid(uuid=UUID('1234'), service=UUID('ABCD'))
+    assert len(c) == 1
+    assert isinstance(c[0], CharacteristicProxy)
+    c = peer.get_characteristics_by_uuid(uuid=UUID('1234'), service=UUID('AAAA'))
+    assert len(c) == 0
+
+    s = peer.get_services_by_uuid(uuid=UUID('ABCD'))
+    assert len(s) == 1
+    c = peer.get_characteristics_by_uuid(uuid=UUID('1234'), service=s[0])
+    assert len(s) == 1
+
+
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(async_main())
