@@ -881,6 +881,57 @@ async def test_unsubscribe():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_discover_all():
+    [client, server] = LinkedDevices().devices[:2]
+
+    characteristic1 = Characteristic(
+        'FDB159DB-036C-49E3-B3DB-6325AC750806',
+        Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
+        Characteristic.READABLE,
+        bytes([1, 2, 3]),
+    )
+
+    descriptor1 = Descriptor('2902', 'READABLE,WRITEABLE')
+    descriptor2 = Descriptor('AAAA', 'READABLE,WRITEABLE')
+    characteristic2 = Characteristic(
+        '3234C4F4-3F34-4616-8935-45A50EE05DEB',
+        Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
+        Characteristic.READABLE,
+        bytes([1, 2, 3]),
+        descriptors=[descriptor1, descriptor2],
+    )
+
+    service1 = Service(
+        '3A657F47-D34F-46B3-B1EC-698E29B6B829',
+        [characteristic1, characteristic2],
+    )
+    service2 = Service('1111', [])
+    server.add_services([service1, service2])
+
+    await client.power_on()
+    await server.power_on()
+    connection = await client.connect(server.random_address)
+    peer = Peer(connection)
+
+    await peer.discover_all()
+    assert len(peer.gatt_client.services) == 3
+    # service 1800 gets added automatically
+    assert peer.gatt_client.services[0].uuid == UUID('1800')
+    assert peer.gatt_client.services[1].uuid == service1.uuid
+    assert peer.gatt_client.services[2].uuid == service2.uuid
+    s = peer.get_services_by_uuid(service1.uuid)
+    assert len(s) == 1
+    assert len(s[0].characteristics) == 2
+    c = peer.get_characteristics_by_uuid(uuid=characteristic2.uuid, service=s[0])
+    assert len(c) == 1
+    assert len(c[0].descriptors) == 2
+    s = peer.get_services_by_uuid(service2.uuid)
+    assert len(s) == 1
+    assert len(s[0].characteristics) == 0
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_mtu_exchange():
     [d1, d2, d3] = LinkedDevices().devices[:3]
 

@@ -1134,6 +1134,15 @@ class Peer:
     async def discover_attributes(self) -> List[gatt_client.AttributeProxy]:
         return await self.gatt_client.discover_attributes()
 
+    async def discover_all(self):
+        await self.discover_services()
+        for service in self.services:
+            await self.discover_characteristics(service=service)
+
+        for service in self.services:
+            for characteristic in service.characteristics:
+                await self.discover_descriptors(characteristic=characteristic)
+
     async def subscribe(
         self,
         characteristic: gatt_client.CharacteristicProxy,
