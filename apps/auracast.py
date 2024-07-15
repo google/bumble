@@ -363,6 +363,11 @@ async def run_discover_broadcasts(
             hci_sink,
         )
         await device.power_on()
+
+        if not device.supports_le_periodic_advertising:
+            print(color('Periodic advertising not supported', 'red'))
+            return
+
         discoverer = BroadcastDiscoverer(device, filter_duplicates, sync_timeout)
         await discoverer.run()
         await hci_source.terminated

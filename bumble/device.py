@@ -174,7 +174,7 @@ from .hci import (
     phy_list_to_bits,
 )
 from .host import Host
-from .gap import GenericAccessService
+from .profiles.gap import GenericAccessService
 from .core import (
     BT_BR_EDR_TRANSPORT,
     BT_CENTRAL_ROLE,
@@ -189,6 +189,7 @@ from .core import (
     InvalidArgumentError,
     InvalidOperationError,
     InvalidStateError,
+    NotSupportedError,
     OutOfResourcesError,
     UnreachableError,
 )
@@ -1209,8 +1210,13 @@ class Peer:
 
         return self.gatt_client.get_characteristics_by_uuid(uuid, service)
 
-    def create_service_proxy(self, proxy_class: Type[_PROXY_CLASS]) -> _PROXY_CLASS:
-        return cast(_PROXY_CLASS, proxy_class.from_client(self.gatt_client))
+    def create_service_proxy(
+        self, proxy_class: Type[_PROXY_CLASS]
+    ) -> Optional[_PROXY_CLASS]:
+        if proxy := proxy_class.from_client(self.gatt_client):
+            return cast(_PROXY_CLASS, proxy)
+
+        return None
 
     async def discover_service_and_create_proxy(
         self, proxy_class: Type[_PROXY_CLASS]
@@ -2384,6 +2390,10 @@ class Device(CompositeEventEmitter):
     def supports_le_extended_advertising(self):
         return self.supports_le_features(LeFeatureMask.LE_EXTENDED_ADVERTISING)
 
+    @property
+    def supports_le_periodic_advertising(self):
+        return self.supports_le_features(LeFeatureMask.LE_PERIODIC_ADVERTISING)
+
     async def start_advertising(
         self,
         advertising_type: AdvertisingType = AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
@@ -2786,6 +2796,10 @@ class Device(CompositeEventEmitter):
         sync_timeout: float = DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_TIMEOUT,
         filter_duplicates: bool = False,
     ) -> PeriodicAdvertisingSync:
+        # Check that the controller supports the feature.
+        if not self.supports_le_periodic_advertising:
+            raise NotSupportedError()
+
         # Check that there isn't already an equivalent entry
         if any(
             sync.advertiser_address == advertiser_address and sync.sid == sid
@@ -3016,7 +3030,7 @@ class Device(CompositeEventEmitter):
                 peer_address = Address.from_string_for_transport(
                     peer_address, transport
                 )
-            except InvalidArgumentError:
+            except (InvalidArgumentError, ValueError):
                 # If the address is not parsable, assume it is a name instead
                 logger.debug('looking for peer by name')
                 peer_address = await self.find_peer_by_name(
