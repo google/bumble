@@ -253,7 +253,7 @@ class ProfileServiceProxy:
     SERVICE_CLASS: Type[TemplateService]
 
     @classmethod
-    def from_client(cls, client: Client) -> ProfileServiceProxy:
+    def from_client(cls, client: Client) -> Optional[ProfileServiceProxy]:
         return ServiceProxy.from_client(cls, client, cls.SERVICE_CLASS.UUID)
 
 
@@ -405,7 +405,7 @@ class Client:
         if not already_known:
             self.services.append(service)
 
-    async def discover_services(self, uuids: Iterable[UUID] = []) -> List[ServiceProxy]:
+    async def discover_services(self, uuids: Iterable[UUID] = ()) -> List[ServiceProxy]:
         '''
         See Vol 3, Part G - 4.4.1 Discover All Primary Services
         '''

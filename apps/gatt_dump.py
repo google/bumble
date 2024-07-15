@@ -75,11 +75,15 @@ async def async_main(device_config, encrypt, transport, address_or_name):
 
         if address_or_name:
             # Connect to the target peer
+            print(color('>>> Connecting...', 'green'))
             connection = await device.connect(address_or_name)
+            print(color('>>> Connected', 'green'))
 
             # Encrypt the connection if required
             if encrypt:
+                print(color('+++ Encrypting connection...', 'blue'))
                 await connection.encrypt()
+                print(color('+++ Encryption established', 'blue'))
 
             await dump_gatt_db(Peer(connection), None)
         else:
