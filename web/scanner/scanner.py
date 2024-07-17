@@ -15,12 +15,21 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+import pyee
+
 from bumble.device import Device
 from bumble.hci import HCI_Reset_Command
 
 
 # -----------------------------------------------------------------------------
-class Scanner:
+class Scanner(pyee.EventEmitter):
+    """
+    Scanner web app
+
+    Emitted events:
+        update: Emit when new `ScanEntry` are available.
+    """
+
     class ScanEntry:
         def __init__(self, advertisement):
             self.address = advertisement.address.to_string(False)
@@ -39,13 +48,12 @@ class Scanner:
             'Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink
         )
         self.scan_entries = {}
-        self.listeners = {}
         self.device.on('advertisement', self.on_advertisement)
 
     async def start(self):
         print('### Starting Scanner')
         self.scan_entries = {}
-        self.emit_update()
+        self.emit('update', self.scan_entries)
         await self.device.power_on()
         await self.device.start_scanning()
         print('### Scanner started')
@@ -56,16 +64,9 @@ class Scanner:
         await self.device.power_off()
         print('### Scanner stopped')
 
-    def emit_update(self):
-        if listener := self.listeners.get('update'):
-            listener(list(self.scan_entries.values()))
-
-    def on(self, event_name, listener):
-        self.listeners[event_name] = listener
-
     def on_advertisement(self, advertisement):
         self.scan_entries[advertisement.address] = self.ScanEntry(advertisement)
-        self.emit_update()
+        self.emit('update', self.scan_entries)
 
 
 # -----------------------------------------------------------------------------
