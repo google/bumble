@@ -106,7 +106,7 @@ async def show_battery_level(
 
     if battery_service.battery_level:
         print(
-            color('  Battery Level:    ', 'green'),
+            color('  Battery Level:', 'green'),
             await battery_service.battery_level.read_value(),
         )
 
@@ -130,32 +130,35 @@ async def show_tmas(
 
 # -----------------------------------------------------------------------------
 async def show_device_info(peer, done: Optional[asyncio.Future]) -> None:
-    # Discover all services
-    print(color('### Discovering Services and Characteristics', 'magenta'))
-    await peer.discover_services()
-    for service in peer.services:
-        await service.discover_characteristics()
+    try:
+        # Discover all services
+        print(color('### Discovering Services and Characteristics', 'magenta'))
+        await peer.discover_services()
+        for service in peer.services:
+            await service.discover_characteristics()
 
-    print(color('=== Services ===', 'yellow'))
-    show_services(peer.services)
-    print()
+        print(color('=== Services ===', 'yellow'))
+        show_services(peer.services)
+        print()
 
-    if gap_service := peer.create_service_proxy(GenericAccessServiceProxy):
-        await try_show(show_gap_information, gap_service)
+        if gap_service := peer.create_service_proxy(GenericAccessServiceProxy):
+            await try_show(show_gap_information, gap_service)
 
-    if device_information_service := peer.create_service_proxy(
-        DeviceInformationServiceProxy
-    ):
-        await try_show(show_device_information, device_information_service)
+        if device_information_service := peer.create_service_proxy(
+            DeviceInformationServiceProxy
+        ):
+            await try_show(show_device_information, device_information_service)
 
-    if battery_service := peer.create_service_proxy(BatteryServiceProxy):
-        await try_show(show_battery_level, battery_service)
+        if battery_service := peer.create_service_proxy(BatteryServiceProxy):
+            await try_show(show_battery_level, battery_service)
 
-    if tmas := peer.create_service_proxy(TelephonyAndMediaAudioServiceProxy):
-        await try_show(show_tmas, tmas)
+        if tmas := peer.create_service_proxy(TelephonyAndMediaAudioServiceProxy):
+            await try_show(show_tmas, tmas)
 
-    if done is not None:
-        done.set_result(None)
+        if done is not None:
+            done.set_result(None)
+    except asyncio.CancelledError:
+        print(color('!!! Operation canceled', 'red'))
 
 
 # -----------------------------------------------------------------------------

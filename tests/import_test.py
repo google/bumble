@@ -41,6 +41,7 @@ def test_import():
     )
 
     from bumble.profiles import (
+        ascs,
         bap,
         bass,
         battery_service,
@@ -50,6 +51,7 @@ def test_import():
         gap,
         heart_rate_service,
         le_audio,
+        pacs,
         pbp,
         vcp,
     )
@@ -73,6 +75,7 @@ def test_import():
     assert transport
     assert utils
 
+    assert ascs
     assert bap
     assert bass
     assert battery_service
@@ -82,6 +85,7 @@ def test_import():
     assert gap
     assert heart_rate_service
     assert le_audio
+    assert pacs
     assert pbp
     assert vcp
 
