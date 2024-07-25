@@ -39,7 +39,7 @@ from typing import (
 )
 
 from bumble.colors import color
-from bumble.core import UUID
+from bumble.core import BaseBumbleError, UUID
 from bumble.att import Attribute, AttributeValue
 
 if TYPE_CHECKING:
@@ -318,6 +318,11 @@ def show_services(services: Iterable[Service]) -> None:
 
             for descriptor in characteristic.descriptors:
                 print(color('    ' + str(descriptor), 'green'))
+
+
+# -----------------------------------------------------------------------------
+class InvalidServiceError(BaseBumbleError):
+    """The service is not compliant with the spec/profile"""
 
 
 # -----------------------------------------------------------------------------

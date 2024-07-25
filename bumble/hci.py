@@ -1965,7 +1965,8 @@ class Address:
 
     def __eq__(self, other):
         return (
-            self.address_bytes == other.address_bytes
+            isinstance(other, Address)
+            and self.address_bytes == other.address_bytes
             and self.is_public == other.is_public
         )
 
@@ -4523,18 +4524,6 @@ class HCI_LE_Periodic_Advertising_Terminate_Sync_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([('sync_handle', 2), ('enable', 1)])
-class HCI_LE_Set_Periodic_Advertising_Receive_Enable_Command(HCI_Command):
-    '''
-    See Bluetooth spec @ 7.8.88 LE Set Periodic Advertising Receive Enable Command
-    '''
-
-    class Enable(enum.IntFlag):
-        REPORTING_ENABLED = 1 << 0
-        DUPLICATE_FILTERING_ENABLED = 1 << 1
-
-
-# -----------------------------------------------------------------------------
 @HCI_Command.command(
     [
         ('peer_identity_address_type', Address.ADDRESS_TYPE_SPEC),
@@ -4567,6 +4556,32 @@ class HCI_LE_Set_Privacy_Mode_Command(HCI_Command):
     @classmethod
     def privacy_mode_name(cls, privacy_mode):
         return name_or_number(cls.PRIVACY_MODE_NAMES, privacy_mode)
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([('sync_handle', 2), ('enable', 1)])
+class HCI_LE_Set_Periodic_Advertising_Receive_Enable_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.88 LE Set Periodic Advertising Receive Enable Command
+    '''
+
+    class Enable(enum.IntFlag):
+        REPORTING_ENABLED = 1 << 0
+        DUPLICATE_FILTERING_ENABLED = 1 << 1
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[('connection_handle', 2), ('service_data', 2), ('sync_handle', 2)],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+    ],
+)
+class HCI_LE_Periodic_Advertising_Sync_Transfer_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.89 LE Periodic Advertising Sync Transfer Command
+    '''
 
 
 # -----------------------------------------------------------------------------

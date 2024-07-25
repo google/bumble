@@ -47,3 +47,8 @@ class Metadata:
             offset += entry_length
 
         return cls(entries)
+
+    def __bytes__(self) -> bytes:
+        return b''.join(
+            (bytes([len(entry.data), entry.tag]) + entry.data for entry in self.entries)
+        )

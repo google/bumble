@@ -264,7 +264,8 @@ class ParserSource:
         self.parser.set_packet_sink(sink)
 
     def on_transport_lost(self) -> None:
-        self.terminated.set_result(None)
+        if not self.terminated.done():
+            self.terminated.set_result(None)
         if self.parser.sink:
             if hasattr(self.parser.sink, 'on_transport_lost'):
                 self.parser.sink.on_transport_lost()
