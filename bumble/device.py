@@ -2366,8 +2366,10 @@ class Device(CompositeEventEmitter):
         assert self.legacy_advertising_set is None
 
         # Generate RPA
-        if own_address_type == OwnAddressType.RESOLVABLE_OR_RANDOM:
-            random_address = Address.generate_private_address(self.irk)
+        if self.address_resolution_offload == False:
+            if own_address_type == OwnAddressType.RESOLVABLE_OR_RANDOM:
+                own_address_type = OwnAddressType.RANDOM
+                random_address = Address.generate_private_address(self.irk)
         else:
             random_address=self.random_address
 
