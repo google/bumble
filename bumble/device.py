@@ -2365,12 +2365,18 @@ class Device(CompositeEventEmitter):
         assert self.legacy_advertiser is None
         assert self.legacy_advertising_set is None
 
+        # Generate RPA
+        if own_address_type == OwnAddressType.RESOLVABLE_OR_RANDOM:
+            random_address = Address.generate_private_address(self.irk)
+        else:
+            random_address=self.random_address
+
         if self.supports_le_extended_advertising:
             # Use extended advertising commands with legacy PDUs.
             self.legacy_advertising_set = await self.create_advertising_set(
                 auto_start=True,
                 auto_restart=auto_restart,
-                random_address=self.random_address,
+                random_address=random_address,
                 advertising_parameters=AdvertisingParameters(
                     advertising_event_properties=(
                         AdvertisingEventProperties.from_advertising_type(
