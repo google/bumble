@@ -95,6 +95,12 @@ async def show_device_information(
             await device_information_service.serial_number.read_value(),
         )
 
+    if device_information_service.firmware_revision:
+        print(
+            color('  Firmware Revision:', 'green'),
+            await device_information_service.firmware_revision.read_value(),
+        )
+
     print()
 
 
