@@ -685,10 +685,11 @@ class CodecSpecificConfiguration:
 
 @dataclasses.dataclass
 class PacRecord:
+    '''Published Audio Capabilities Service, Table 3.2/3.4.'''
+
     coding_format: hci.CodingFormat
     codec_specific_capabilities: Union[CodecSpecificCapabilities, bytes]
-    # TODO: Parse Metadata
-    metadata: bytes = b''
+    metadata: le_audio.Metadata = dataclasses.field(default_factory=le_audio.Metadata)
 
     @classmethod
     def from_bytes(cls, data: bytes) -> PacRecord:
@@ -701,7 +702,8 @@ class PacRecord:
         ]
         offset += codec_specific_capabilities_size
         metadata_size = data[offset]
-        metadata = data[offset : offset + metadata_size]
+        offset += 1
+        metadata = le_audio.Metadata.from_bytes(data[offset : offset + metadata_size])
 
         codec_specific_capabilities: Union[CodecSpecificCapabilities, bytes]
         if coding_format.codec_id == hci.CodecID.VENDOR_SPECIFIC:
@@ -719,12 +721,13 @@ class PacRecord:
 
     def __bytes__(self) -> bytes:
         capabilities_bytes = bytes(self.codec_specific_capabilities)
+        metadata_bytes = bytes(self.metadata)
         return (
             bytes(self.coding_format)
             + bytes([len(capabilities_bytes)])
             + capabilities_bytes
-            + bytes([len(self.metadata)])
-            + self.metadata
+            + bytes([len(metadata_bytes)])
+            + metadata_bytes
         )
 
 
@@ -940,8 +943,7 @@ class AseStateMachine(gatt.Characteristic):
     presentation_delay = 0
 
     # Additional parameters in ENABLING, STREAMING, DISABLING State
-    # TODO: Parse this
-    metadata = b''
+    metadata = le_audio.Metadata()
 
     def __init__(
         self,
@@ -1088,7 +1090,7 @@ class AseStateMachine(gatt.Characteristic):
                 AseReasonCode.NONE,
             )
 
-        self.metadata = metadata
+        self.metadata = le_audio.Metadata.from_bytes(metadata)
         self.state = self.State.ENABLING
 
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
@@ -1140,7 +1142,7 @@ class AseStateMachine(gatt.Characteristic):
                 AseResponseCode.INVALID_ASE_STATE_MACHINE_TRANSITION,
                 AseReasonCode.NONE,
             )
-        self.metadata = metadata
+        self.metadata = le_audio.Metadata.from_bytes(metadata)
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
 
     def on_release(self) -> Tuple[AseResponseCode, AseReasonCode]:
@@ -1217,8 +1219,9 @@ class AseStateMachine(gatt.Characteristic):
             self.State.STREAMING,
             self.State.DISABLING,
         ):
+            metadata_bytes = bytes(self.metadata)
             additional_parameters = (
-                bytes([self.cig_id, self.cis_id, len(self.metadata)]) + self.metadata
+                bytes([self.cig_id, self.cis_id, len(metadata_bytes)]) + metadata_bytes
             )
         else:
             additional_parameters = b''
