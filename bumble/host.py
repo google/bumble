@@ -772,6 +772,8 @@ class Host(AbortableEventEmitter):
                 event.connection_handle,
                 BT_LE_TRANSPORT,
                 event.peer_address,
+                getattr(event, 'local_resolvable_private_address', None),
+                getattr(event, 'peer_resolvable_private_address', None),
                 event.role,
                 connection_parameters,
             )
@@ -815,6 +817,8 @@ class Host(AbortableEventEmitter):
                 event.connection_handle,
                 BT_BR_EDR_TRANSPORT,
                 event.bd_addr,
+                None,
+                None,
                 None,
                 None,
             )

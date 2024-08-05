@@ -182,6 +182,7 @@ from .core import (
     BaseBumbleError,
     ConnectionParameterUpdateError,
     CommandTimeoutError,
+    ConnectionParameters,
     ConnectionPHY,
     InvalidArgumentError,
     InvalidOperationError,
@@ -1304,6 +1305,7 @@ class Connection(CompositeEventEmitter):
     handle: int
     transport: int
     self_address: Address
+    self_resolvable_address: Optional[Address]
     peer_address: Address
     peer_resolvable_address: Optional[Address]
     peer_le_features: Optional[LeFeatureMask]
@@ -1351,6 +1353,7 @@ class Connection(CompositeEventEmitter):
         handle,
         transport,
         self_address,
+        self_resolvable_address,
         peer_address,
         peer_resolvable_address,
         role,
@@ -1362,6 +1365,7 @@ class Connection(CompositeEventEmitter):
         self.handle = handle
         self.transport = transport
         self.self_address = self_address
+        self.self_resolvable_address = self_resolvable_address
         self.peer_address = peer_address
         self.peer_resolvable_address = peer_resolvable_address
         self.peer_name = None  # Classic only
@@ -1395,6 +1399,7 @@ class Connection(CompositeEventEmitter):
             None,
             BT_BR_EDR_TRANSPORT,
             device.public_address,
+            None,
             peer_address,
             None,
             role,
@@ -1553,7 +1558,9 @@ class Connection(CompositeEventEmitter):
             f'Connection(handle=0x{self.handle:04X}, '
             f'role={self.role_name}, '
             f'self_address={self.self_address}, '
-            f'peer_address={self.peer_address})'
+            f'self_resolvable_address={self.self_resolvable_address}, '
+            f'peer_address={self.peer_address}, '
+            f'peer_resolvable_address={self.peer_resolvable_address})'
         )
 
 
@@ -1586,6 +1593,7 @@ class DeviceConfiguration:
     irk: bytes = bytes(16)  # This really must be changed for any level of security
     keystore: Optional[str] = None
     address_resolution_offload: bool = False
+    address_generation_offload: bool = False
     cis_enabled: bool = False
 
     def __post_init__(self) -> None:
@@ -1891,6 +1899,7 @@ class Device(CompositeEventEmitter):
         self.connectable = config.connectable
         self.classic_accept_any = config.classic_accept_any
         self.address_resolution_offload = config.address_resolution_offload
+        self.address_generation_offload = config.address_generation_offload
 
         # Extended advertising.
         self.extended_advertising_sets: Dict[int, AdvertisingSet] = {}
@@ -2313,7 +2322,7 @@ class Device(CompositeEventEmitter):
         # Create a host-side address resolver
         self.address_resolver = smp.AddressResolver(resolving_keys)
 
-        if self.address_resolution_offload:
+        if self.address_resolution_offload or self.address_generation_offload:
             await self.send_command(HCI_LE_Clear_Resolving_List_Command())
 
             # Add an empty entry for non-directed address generation.
@@ -4158,12 +4167,14 @@ class Device(CompositeEventEmitter):
     @host_event_handler
     def on_connection(
         self,
-        connection_handle,
-        transport,
-        peer_address,
-        role,
-        connection_parameters,
-    ):
+        connection_handle: int,
+        transport: int,
+        peer_address: Address,
+        self_resolvable_address: Optional[Address],
+        peer_resolvable_address: Optional[Address],
+        role: int,
+        connection_parameters: ConnectionParameters,
+    ) -> None:
         logger.debug(
             f'*** Connection: [0x{connection_handle:04X}] '
             f'{peer_address} {"" if role is None else HCI_Constant.role_name(role)}'
@@ -4184,15 +4195,15 @@ class Device(CompositeEventEmitter):
 
             return
 
-        # Resolve the peer address if we can
-        peer_resolvable_address = None
-        if self.address_resolver:
-            if peer_address.is_resolvable:
-                resolved_address = self.address_resolver.resolve(peer_address)
-                if resolved_address is not None:
-                    logger.debug(f'*** Address resolved as {resolved_address}')
-                    peer_resolvable_address = peer_address
-                    peer_address = resolved_address
+        if peer_resolvable_address is None:
+            # Resolve the peer address if we can
+            if self.address_resolver:
+                if peer_address.is_resolvable:
+                    resolved_address = self.address_resolver.resolve(peer_address)
+                    if resolved_address is not None:
+                        logger.debug(f'*** Address resolved as {resolved_address}')
+                        peer_resolvable_address = peer_address
+                        peer_address = resolved_address
 
         self_address = None
         if role == HCI_CENTRAL_ROLE:
@@ -4223,12 +4234,19 @@ class Device(CompositeEventEmitter):
                 else self.random_address
             )
 
+        # Convert all-zeros addresses into None.
+        if self_resolvable_address == Address.ANY_RANDOM:
+            self_resolvable_address = None
+        if peer_resolvable_address == Address.ANY_RANDOM:
+            peer_resolvable_address = None
+
         # Create a connection.
         connection = Connection(
             self,
             connection_handle,
             transport,
             self_address,
+            self_resolvable_address,
             peer_address,
             peer_resolvable_address,
             role,
@@ -4239,9 +4257,10 @@ class Device(CompositeEventEmitter):
 
         if role == HCI_PERIPHERAL_ROLE and self.legacy_advertiser:
             if self.legacy_advertiser.auto_restart:
+                advertiser = self.legacy_advertiser
                 connection.once(
                     'disconnection',
-                    lambda _: self.abort_on('flush', self.legacy_advertiser.start()),
+                    lambda _: self.abort_on('flush', advertiser.start()),
                 )
             else:
                 self.legacy_advertiser = None

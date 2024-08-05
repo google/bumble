@@ -290,6 +290,8 @@ async def test_legacy_advertising_disconnection(auto_restart):
         0x0001,
         BT_LE_TRANSPORT,
         peer_address,
+        None,
+        None,
         BT_PERIPHERAL_ROLE,
         ConnectionParameters(0, 0, 0),
     )
@@ -339,6 +341,8 @@ async def test_extended_advertising_connection(own_address_type):
         0x0001,
         BT_LE_TRANSPORT,
         peer_address,
+        None,
+        None,
         BT_PERIPHERAL_ROLE,
         ConnectionParameters(0, 0, 0),
     )
@@ -379,6 +383,8 @@ async def test_extended_advertising_connection_out_of_order(own_address_type):
         0x0001,
         BT_LE_TRANSPORT,
         peer_address,
+        None,
+        None,
         BT_PERIPHERAL_ROLE,
         ConnectionParameters(0, 0, 0),
     )

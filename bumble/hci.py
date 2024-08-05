@@ -1840,6 +1840,12 @@ class Address:
         )
 
     @staticmethod
+    def parse_random_address(data, offset):
+        return Address.parse_address_with_type(
+            data, offset, Address.RANDOM_DEVICE_ADDRESS
+        )
+
+    @staticmethod
     def parse_address_with_type(data, offset, address_type):
         return offset + 6, Address(data[offset : offset + 6], address_type)
 
@@ -1965,7 +1971,8 @@ class Address:
 
     def __eq__(self, other):
         return (
-            self.address_bytes == other.address_bytes
+            isinstance(other, Address)
+            and self.address_bytes == other.address_bytes
             and self.is_public == other.is_public
         )
 
@@ -5178,8 +5185,8 @@ class HCI_LE_Data_Length_Change_Event(HCI_LE_Meta_Event):
         ),
         ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
         ('peer_address', Address.parse_address_preceded_by_type),
-        ('local_resolvable_private_address', Address.parse_address),
-        ('peer_resolvable_private_address', Address.parse_address),
+        ('local_resolvable_private_address', Address.parse_random_address),
+        ('peer_resolvable_private_address', Address.parse_random_address),
         ('connection_interval', 2),
         ('peripheral_latency', 2),
         ('supervision_timeout', 2),
