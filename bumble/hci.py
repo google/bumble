@@ -50,11 +50,11 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Utils
 # -----------------------------------------------------------------------------
-def hci_command_op_code(ogf, ocf):
+def hci_command_op_code(ogf: int, ocf: int) -> int:
     return ogf << 10 | ocf
 
 
-def hci_vendor_command_op_code(ocf):
+def hci_vendor_command_op_code(ocf: int) -> int:
     return hci_command_op_code(HCI_VENDOR_OGF, ocf)
 
 
@@ -65,7 +65,7 @@ def key_with_value(dictionary, target_value):
     return None
 
 
-def indent_lines(string):
+def indent_lines(string: str) -> str:
     return '\n'.join(['  ' + line for line in string.split('\n')])
 
 
@@ -79,7 +79,7 @@ def map_null_terminated_utf8_string(utf8_bytes):
         return utf8_bytes
 
 
-def map_class_of_device(class_of_device):
+def map_class_of_device(class_of_device: int) -> str:
     (
         service_classes,
         major_device_class,
@@ -709,7 +709,6 @@ class PhyBit(enum.IntFlag):
     LE_1M    = 1 << HCI_LE_1M_PHY_BIT
     LE_2M    = 1 << HCI_LE_2M_PHY_BIT
     LE_CODED = 1 << HCI_LE_CODED_PHY_BIT
-
 
 # Connection Parameters
 HCI_CONNECTION_INTERVAL_MS_PER_UNIT = 1.25
