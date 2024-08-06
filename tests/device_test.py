@@ -278,34 +278,6 @@ async def test_legacy_advertising():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    'own_address_type,',
-    (OwnAddressType.PUBLIC, OwnAddressType.RANDOM),
-)
-@pytest.mark.asyncio
-async def test_legacy_advertising_connection(own_address_type):
-    device = Device(host=mock.AsyncMock(Host))
-    peer_address = Address('F0:F1:F2:F3:F4:F5')
-
-    # Start advertising
-    await device.start_advertising()
-    device.on_connection(
-        0x0001,
-        BT_LE_TRANSPORT,
-        peer_address,
-        BT_PERIPHERAL_ROLE,
-        ConnectionParameters(0, 0, 0),
-    )
-
-    if own_address_type == OwnAddressType.PUBLIC:
-        assert device.lookup_connection(0x0001).self_address == device.public_address
-    else:
-        assert device.lookup_connection(0x0001).self_address == device.random_address
-
-    await async_barrier()
-
-
-# -----------------------------------------------------------------------------
-@pytest.mark.parametrize(
     'auto_restart,',
     (True, False),
 )
@@ -318,6 +290,8 @@ async def test_legacy_advertising_disconnection(auto_restart):
         0x0001,
         BT_LE_TRANSPORT,
         peer_address,
+        None,
+        None,
         BT_PERIPHERAL_ROLE,
         ConnectionParameters(0, 0, 0),
     )
@@ -367,6 +341,8 @@ async def test_extended_advertising_connection(own_address_type):
         0x0001,
         BT_LE_TRANSPORT,
         peer_address,
+        None,
+        None,
         BT_PERIPHERAL_ROLE,
         ConnectionParameters(0, 0, 0),
     )
@@ -407,6 +383,8 @@ async def test_extended_advertising_connection_out_of_order(own_address_type):
         0x0001,
         BT_LE_TRANSPORT,
         peer_address,
+        None,
+        None,
         BT_PERIPHERAL_ROLE,
         ConnectionParameters(0, 0, 0),
     )

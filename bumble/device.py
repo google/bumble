@@ -182,6 +182,7 @@ from .core import (
     BaseBumbleError,
     ConnectionParameterUpdateError,
     CommandTimeoutError,
+    ConnectionParameters,
     ConnectionPHY,
     InvalidArgumentError,
     InvalidOperationError,
@@ -259,8 +260,9 @@ DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS          = l2cap.L2CAP_LE_CREDIT_BASED_CONN
 DEVICE_DEFAULT_ADVERTISING_TX_POWER           = (
     HCI_LE_Set_Extended_Advertising_Parameters_Command.TX_POWER_NO_PREFERENCE
 )
-DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_SKIP    = 0
+DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_SKIP = 0
 DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_TIMEOUT = 5.0
+DEVICE_DEFAULT_LE_RPA_TIMEOUT                 = 15 * 60 # 15 minutes (in seconds)
 
 # fmt: on
 # pylint: enable=line-too-long
@@ -1303,6 +1305,7 @@ class Connection(CompositeEventEmitter):
     handle: int
     transport: int
     self_address: Address
+    self_resolvable_address: Optional[Address]
     peer_address: Address
     peer_resolvable_address: Optional[Address]
     peer_le_features: Optional[LeFeatureMask]
@@ -1350,6 +1353,7 @@ class Connection(CompositeEventEmitter):
         handle,
         transport,
         self_address,
+        self_resolvable_address,
         peer_address,
         peer_resolvable_address,
         role,
@@ -1361,6 +1365,7 @@ class Connection(CompositeEventEmitter):
         self.handle = handle
         self.transport = transport
         self.self_address = self_address
+        self.self_resolvable_address = self_resolvable_address
         self.peer_address = peer_address
         self.peer_resolvable_address = peer_resolvable_address
         self.peer_name = None  # Classic only
@@ -1394,6 +1399,7 @@ class Connection(CompositeEventEmitter):
             None,
             BT_BR_EDR_TRANSPORT,
             device.public_address,
+            None,
             peer_address,
             None,
             role,
@@ -1552,7 +1558,9 @@ class Connection(CompositeEventEmitter):
             f'Connection(handle=0x{self.handle:04X}, '
             f'role={self.role_name}, '
             f'self_address={self.self_address}, '
-            f'peer_address={self.peer_address})'
+            f'self_resolvable_address={self.self_resolvable_address}, '
+            f'peer_address={self.peer_address}, '
+            f'peer_resolvable_address={self.peer_resolvable_address})'
         )
 
 
@@ -1567,8 +1575,9 @@ class DeviceConfiguration:
     advertising_interval_min: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
     advertising_interval_max: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
     le_enabled: bool = True
-    # LE host enable 2nd parameter
     le_simultaneous_enabled: bool = False
+    le_privacy_enabled: bool = False
+    le_rpa_timeout: int = DEVICE_DEFAULT_LE_RPA_TIMEOUT
     classic_enabled: bool = False
     classic_sc_enabled: bool = True
     classic_ssp_enabled: bool = True
@@ -1584,6 +1593,7 @@ class DeviceConfiguration:
     irk: bytes = bytes(16)  # This really must be changed for any level of security
     keystore: Optional[str] = None
     address_resolution_offload: bool = False
+    address_generation_offload: bool = False
     cis_enabled: bool = False
 
     def __post_init__(self) -> None:
@@ -1736,8 +1746,9 @@ device_host_event_handlers: List[str] = []
 # -----------------------------------------------------------------------------
 class Device(CompositeEventEmitter):
     # Incomplete list of fields.
-    random_address: Address
-    public_address: Address
+    random_address: Address  # Random address that may change with RPA
+    public_address: Address  # Public address (obtained from the controller)
+    static_address: Address  # Random address that can be set but does not change
     classic_enabled: bool
     name: str
     class_of_device: int
@@ -1867,15 +1878,19 @@ class Device(CompositeEventEmitter):
         config = config or DeviceConfiguration()
         self.config = config
 
-        self.public_address = Address('00:00:00:00:00:00')
         self.name = config.name
+        self.public_address = Address.ANY
         self.random_address = config.address
+        self.static_address = config.address
         self.class_of_device = config.class_of_device
         self.keystore = None
         self.irk = config.irk
         self.le_enabled = config.le_enabled
-        self.classic_enabled = config.classic_enabled
         self.le_simultaneous_enabled = config.le_simultaneous_enabled
+        self.le_privacy_enabled = config.le_privacy_enabled
+        self.le_rpa_timeout = config.le_rpa_timeout
+        self.le_rpa_periodic_update_task: Optional[asyncio.Task] = None
+        self.classic_enabled = config.classic_enabled
         self.cis_enabled = config.cis_enabled
         self.classic_sc_enabled = config.classic_sc_enabled
         self.classic_ssp_enabled = config.classic_ssp_enabled
@@ -1884,6 +1899,7 @@ class Device(CompositeEventEmitter):
         self.connectable = config.connectable
         self.classic_accept_any = config.classic_accept_any
         self.address_resolution_offload = config.address_resolution_offload
+        self.address_generation_offload = config.address_generation_offload
 
         # Extended advertising.
         self.extended_advertising_sets: Dict[int, AdvertisingSet] = {}
@@ -1939,6 +1955,7 @@ class Device(CompositeEventEmitter):
             if isinstance(address, str):
                 address = Address(address)
             self.random_address = address
+            self.static_address = address
 
         # Setup SMP
         self.smp_manager = smp.Manager(
@@ -2170,6 +2187,16 @@ class Device(CompositeEventEmitter):
             )
 
         if self.le_enabled:
+            # If LE Privacy is enabled, generate an RPA
+            if self.le_privacy_enabled:
+                self.random_address = Address.generate_private_address(self.irk)
+                logger.info(f'Initial RPA: {self.random_address}')
+                if self.le_rpa_timeout > 0:
+                    # Start a task to periodically generate a new RPA
+                    self.le_rpa_periodic_update_task = asyncio.create_task(
+                        self._run_rpa_periodic_update()
+                    )
+
             # Set the controller address
             if self.random_address == Address.ANY_RANDOM:
                 # Try to use an address generated at random by the controller
@@ -2249,8 +2276,44 @@ class Device(CompositeEventEmitter):
 
     async def power_off(self) -> None:
         if self.powered_on:
+            if self.le_rpa_periodic_update_task:
+                self.le_rpa_periodic_update_task.cancel()
+
             await self.host.flush()
+
             self.powered_on = False
+
+    async def update_rpa(self) -> bool:
+        """
+        Try to update the RPA.
+
+        Returns:
+          True if the RPA was updated, False if it could not be updated.
+        """
+
+        # Check if this is a good time to rotate the address
+        if self.is_advertising or self.is_scanning or self.is_le_connecting:
+            logger.debug('skipping RPA update')
+            return False
+
+        random_address = Address.generate_private_address(self.irk)
+        response = await self.send_command(
+            HCI_LE_Set_Random_Address_Command(random_address=self.random_address)
+        )
+        if response.return_parameters == HCI_SUCCESS:
+            logger.info(f'new RPA: {random_address}')
+            self.random_address = random_address
+            return True
+        else:
+            logger.warning(f'failed to set RPA: {response.return_parameters}')
+            return False
+
+    async def _run_rpa_periodic_update(self) -> None:
+        """Update the RPA periodically"""
+        while self.le_rpa_timeout != 0:
+            await asyncio.sleep(self.le_rpa_timeout)
+            if not self.update_rpa():
+                logger.debug("periodic RPA update failed")
 
     async def refresh_resolving_list(self) -> None:
         assert self.keystore is not None
@@ -2259,7 +2322,7 @@ class Device(CompositeEventEmitter):
         # Create a host-side address resolver
         self.address_resolver = smp.AddressResolver(resolving_keys)
 
-        if self.address_resolution_offload:
+        if self.address_resolution_offload or self.address_generation_offload:
             await self.send_command(HCI_LE_Clear_Resolving_List_Command())
 
             # Add an empty entry for non-directed address generation.
@@ -4104,12 +4167,14 @@ class Device(CompositeEventEmitter):
     @host_event_handler
     def on_connection(
         self,
-        connection_handle,
-        transport,
-        peer_address,
-        role,
-        connection_parameters,
-    ):
+        connection_handle: int,
+        transport: int,
+        peer_address: Address,
+        self_resolvable_address: Optional[Address],
+        peer_resolvable_address: Optional[Address],
+        role: int,
+        connection_parameters: ConnectionParameters,
+    ) -> None:
         logger.debug(
             f'*** Connection: [0x{connection_handle:04X}] '
             f'{peer_address} {"" if role is None else HCI_Constant.role_name(role)}'
@@ -4130,15 +4195,15 @@ class Device(CompositeEventEmitter):
 
             return
 
-        # Resolve the peer address if we can
-        peer_resolvable_address = None
-        if self.address_resolver:
-            if peer_address.is_resolvable:
-                resolved_address = self.address_resolver.resolve(peer_address)
-                if resolved_address is not None:
-                    logger.debug(f'*** Address resolved as {resolved_address}')
-                    peer_resolvable_address = peer_address
-                    peer_address = resolved_address
+        if peer_resolvable_address is None:
+            # Resolve the peer address if we can
+            if self.address_resolver:
+                if peer_address.is_resolvable:
+                    resolved_address = self.address_resolver.resolve(peer_address)
+                    if resolved_address is not None:
+                        logger.debug(f'*** Address resolved as {resolved_address}')
+                        peer_resolvable_address = peer_address
+                        peer_address = resolved_address
 
         self_address = None
         if role == HCI_CENTRAL_ROLE:
@@ -4169,12 +4234,19 @@ class Device(CompositeEventEmitter):
                 else self.random_address
             )
 
+        # Convert all-zeros addresses into None.
+        if self_resolvable_address == Address.ANY_RANDOM:
+            self_resolvable_address = None
+        if peer_resolvable_address == Address.ANY_RANDOM:
+            peer_resolvable_address = None
+
         # Create a connection.
         connection = Connection(
             self,
             connection_handle,
             transport,
             self_address,
+            self_resolvable_address,
             peer_address,
             peer_resolvable_address,
             role,
@@ -4185,9 +4257,10 @@ class Device(CompositeEventEmitter):
 
         if role == HCI_PERIPHERAL_ROLE and self.legacy_advertiser:
             if self.legacy_advertiser.auto_restart:
+                advertiser = self.legacy_advertiser
                 connection.once(
                     'disconnection',
-                    lambda _: self.abort_on('flush', self.legacy_advertiser.start()),
+                    lambda _: self.abort_on('flush', advertiser.start()),
                 )
             else:
                 self.legacy_advertiser = None
@@ -4871,5 +4944,6 @@ class Device(CompositeEventEmitter):
         return (
             f'Device(name="{self.name}", '
             f'random_address="{self.random_address}", '
-            f'public_address="{self.public_address}")'
+            f'public_address="{self.public_address}", '
+            f'static_address="{self.static_address}")'
         )

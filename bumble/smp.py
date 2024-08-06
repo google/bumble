@@ -767,8 +767,11 @@ class Session:
         self.oob_data_flag = 0 if pairing_config.oob is None else 1
 
         # Set up addresses
-        self_address = connection.self_address
+        self_address = connection.self_resolvable_address or connection.self_address
         peer_address = connection.peer_resolvable_address or connection.peer_address
+        logger.debug(
+            f"pairing with self_address={self_address}, peer_address={peer_address}"
+        )
         if self.is_initiator:
             self.ia = bytes(self_address)
             self.iat = 1 if self_address.is_random else 0
@@ -1076,9 +1079,9 @@ class Session:
 
     def send_identity_address_command(self) -> None:
         identity_address = {
-            None: self.connection.self_address,
+            None: self.manager.device.static_address,
             Address.PUBLIC_DEVICE_ADDRESS: self.manager.device.public_address,
-            Address.RANDOM_DEVICE_ADDRESS: self.manager.device.random_address,
+            Address.RANDOM_DEVICE_ADDRESS: self.manager.device.static_address,
         }[self.pairing_config.identity_address_type]
         self.send_command(
             SMP_Identity_Address_Information_Command(
