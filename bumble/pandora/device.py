@@ -16,22 +16,8 @@
 
 from __future__ import annotations
 from bumble import transport
-from bumble.core import (
-    BT_GENERIC_AUDIO_SERVICE,
-    BT_HANDSFREE_SERVICE,
-    BT_L2CAP_PROTOCOL_ID,
-    BT_RFCOMM_PROTOCOL_ID,
-)
 from bumble.device import Device, DeviceConfiguration
 from bumble.host import Host
-from bumble.sdp import (
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    DataElement,
-    ServiceAttribute,
-)
 from typing import Any, Dict, List, Optional
 
 
@@ -110,55 +96,4 @@ def _make_device(config: Dict[str, Any]) -> Device:
     device_config.load_from_dict(config)
     device = Device(config=device_config, host=None)
 
-    # Add fake a2dp service to avoid Android disconnect
-    device.sdp_service_records = _make_sdp_records(1)
-
     return device
-
-
-# TODO(b/267540823): remove when Pandora A2dp is supported
-def _make_sdp_records(rfcomm_channel: int) -> Dict[int, List[ServiceAttribute]]:
-    return {
-        0x00010001: [
-            ServiceAttribute(
-                SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_32(0x00010001),
-            ),
-            ServiceAttribute(
-                SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.uuid(BT_HANDSFREE_SERVICE),
-                        DataElement.uuid(BT_GENERIC_AUDIO_SERVICE),
-                    ]
-                ),
-            ),
-            ServiceAttribute(
-                SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.sequence([DataElement.uuid(BT_L2CAP_PROTOCOL_ID)]),
-                        DataElement.sequence(
-                            [
-                                DataElement.uuid(BT_RFCOMM_PROTOCOL_ID),
-                                DataElement.unsigned_integer_8(rfcomm_channel),
-                            ]
-                        ),
-                    ]
-                ),
-            ),
-            ServiceAttribute(
-                SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.sequence(
-                            [
-                                DataElement.uuid(BT_HANDSFREE_SERVICE),
-                                DataElement.unsigned_integer_16(0x0105),
-                            ]
-                        )
-                    ]
-                ),
-            ),
-        ]
-    }
