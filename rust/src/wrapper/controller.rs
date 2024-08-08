@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 //! Controller components
 use crate::wrapper::{
     common::{TransportSink, TransportSource},
+    core::TryToPy,
     hci::Address,
     link::Link,
     wrap_python_async, PyDictExt,
@@ -52,7 +53,10 @@ impl Controller {
             kwargs.set_opt_item("host_source", host_source)?;
             kwargs.set_opt_item("host_sink", host_sink)?;
             kwargs.set_opt_item("link", link)?;
-            kwargs.set_opt_item("public_address", public_address)?;
+            kwargs.set_opt_item(
+                "public_address",
+                public_address.map(|a| a.try_to_py(py)).transpose()?,
+            )?;
 
             // Controller constructor (`__init__`) is not (and can't be) marked async, but calls
             // `get_running_loop`, and thus needs wrapped in an async function.
