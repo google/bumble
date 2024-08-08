@@ -791,7 +791,7 @@ class Session:
                     raise InvalidArgumentError(
                         "oob pairing config requires a context when sc is True"
                     )
-                self.local_oob_r = pairing_config.oob.our_context.r
+                self.r = pairing_config.oob.our_context.r
                 self.ecc_key = pairing_config.oob.our_context.ecc_key
                 if pairing_config.oob.legacy_context is not None:
                     self.tk = pairing_config.oob.legacy_context.tk
@@ -800,12 +800,12 @@ class Session:
                     raise InvalidArgumentError(
                         "oob pairing config requires a legacy context when sc is False"
                     )
-                self.local_oob_r = bytes(16)
+                self.r = bytes(16)
                 self.ecc_key = manager.ecc_key
                 self.tk = pairing_config.oob.legacy_context.tk
         else:
             self.peer_oob_data = None
-            self.local_oob_r = bytes(16)
+            self.r = bytes(16)
             self.ecc_key = manager.ecc_key
             self.tk = bytes(16)
 
@@ -1014,8 +1014,10 @@ class Session:
         self.send_command(response)
 
     def send_pairing_confirm_command(self) -> None:
-        self.r = crypto.r()
-        logger.debug(f'generated random: {self.r.hex()}')
+
+        if self.pairing_method != PairingMethod.OOB:
+            self.r = crypto.r()
+            logger.debug(f'generated random: {self.r.hex()}')
 
         if self.sc:
 
@@ -1457,7 +1459,7 @@ class Session:
                 return
             if command.oob_data_flag == 0:
                 # The peer doesn't have OOB data, use r=0
-                self.local_oob_r = bytes(16)
+                self.r = bytes(16)
         else:
             # Decide which pairing method to use from the IO capability
             self.decide_pairing_method(
@@ -1527,7 +1529,7 @@ class Session:
                 return
             if command.oob_data_flag == 0:
                 # The peer doesn't have OOB data, use r=0
-                self.local_oob_r = bytes(16)
+                self.r = bytes(16)
         else:
             # Decide which pairing method to use from the IO capability
             self.decide_pairing_method(
@@ -1739,7 +1741,7 @@ class Session:
                 ra = self.peer_oob_data.r
             else:
                 ra = bytes(16)
-            rb = self.local_oob_r
+            rb = self.r
         else:
             return
 
