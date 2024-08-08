@@ -764,7 +764,7 @@ class Session:
         self.peer_io_capability = SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
 
         # OOB
-        self.oob_data_flag = 1 if pairing.oob and pairing_config.oob.peer_data else 0
+        self.oob_data_flag = 1 if pairing_config.oob and pairing_config.oob.peer_data else 0
 
         # Set up addresses
         self_address = connection.self_resolvable_address or connection.self_address
