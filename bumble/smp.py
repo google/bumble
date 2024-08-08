@@ -1739,11 +1739,21 @@ class Session:
             ra = self.passkey.to_bytes(16, byteorder='little')
             rb = ra
         elif self.pairing_method == PairingMethod.OOB:
-            if self.peer_oob_data:
-                ra = self.peer_oob_data.r
+            if self.is_initiator:
+                if self.peer_oob_data:
+                    rb = self.peer_oob_data.r
+                    ra = self.r
+                else:
+                    rb = bytes(16)
+                    ra = self.r
             else:
-                ra = bytes(16)
-            rb = self.r
+                if self.peer_oob_data:
+                    ra = self.peer_oob_data.r
+                    rb = self.r
+                else:
+                    ra = bytes(16)
+                    rb = self.r
+
         else:
             return
 
