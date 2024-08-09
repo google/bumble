@@ -2183,10 +2183,15 @@ class Device(CompositeEventEmitter):
                 HCI_Write_LE_Host_Support_Command(
                     le_supported_host=int(self.le_enabled),
                     simultaneous_le_host=int(self.le_simultaneous_enabled),
-                )
+                ),
+                check_result=True,
             )
 
         if self.le_enabled:
+            # Generate a random address if not set.
+            if self.static_address == Address.ANY_RANDOM:
+                self.static_address = Address.generate_static_address()
+
             # If LE Privacy is enabled, generate an RPA
             if self.le_privacy_enabled:
                 self.random_address = Address.generate_private_address(self.irk)
@@ -2196,23 +2201,8 @@ class Device(CompositeEventEmitter):
                     self.le_rpa_periodic_update_task = asyncio.create_task(
                         self._run_rpa_periodic_update()
                     )
-
-            # Set the controller address
-            if self.random_address == Address.ANY_RANDOM:
-                # Try to use an address generated at random by the controller
-                if self.host.supports_command(HCI_LE_RAND_COMMAND):
-                    # Get 8 random bytes
-                    response = await self.send_command(
-                        HCI_LE_Rand_Command(), check_result=True
-                    )
-
-                    # Ensure the address bytes can be a static random address
-                    address_bytes = response.return_parameters.random_number[
-                        :5
-                    ] + bytes([response.return_parameters.random_number[5] | 0xC0])
-
-                    # Create a static random address from the random bytes
-                    self.random_address = Address(address_bytes)
+            else:
+                self.random_address = self.static_address
 
             if self.random_address != Address.ANY_RANDOM:
                 logger.debug(
@@ -2237,7 +2227,8 @@ class Device(CompositeEventEmitter):
                 await self.send_command(
                     HCI_LE_Set_Address_Resolution_Enable_Command(
                         address_resolution_enable=1
-                    )
+                    ),
+                    check_result=True,
                 )
 
             if self.cis_enabled:
@@ -2245,7 +2236,8 @@ class Device(CompositeEventEmitter):
                     HCI_LE_Set_Host_Feature_Command(
                         bit_number=LeFeature.CONNECTED_ISOCHRONOUS_STREAM,
                         bit_value=1,
-                    )
+                    ),
+                    check_result=True,
                 )
 
         if self.classic_enabled:
