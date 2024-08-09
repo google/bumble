@@ -537,6 +537,16 @@ async def test_cis_setup_failure():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_power_on_default_static_address_should_not_be_any():
+    devices = TwoDevices()
+    devices[0].static_address = devices[0].random_address = Address.ANY_RANDOM
+    await devices[0].power_on()
+
+    assert devices[0].static_address != Address.ANY_RANDOM
+
+
+# -----------------------------------------------------------------------------
 def test_gatt_services_with_gas():
     device = Device(host=Host(None, None))
 

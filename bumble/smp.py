@@ -1079,7 +1079,7 @@ class Session:
 
     def send_identity_address_command(self) -> None:
         identity_address = {
-            None: self.manager.device.static_address,
+            None: self.connection.self_address,
             Address.PUBLIC_DEVICE_ADDRESS: self.manager.device.public_address,
             Address.RANDOM_DEVICE_ADDRESS: self.manager.device.static_address,
         }[self.pairing_config.identity_address_type]
