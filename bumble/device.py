@@ -51,6 +51,7 @@ from typing_extensions import Self
 
 from pyee import EventEmitter
 
+from bumble import hci
 from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
 from .gatt import Characteristic, Descriptor, Service
@@ -168,6 +169,7 @@ from .hci import (
     OwnAddressType,
     LeFeature,
     LeFeatureMask,
+    LmpFeatureMask,
     Phy,
     phy_list_to_bits,
 )
@@ -1583,6 +1585,7 @@ class DeviceConfiguration:
     classic_ssp_enabled: bool = True
     classic_smp_enabled: bool = True
     classic_accept_any: bool = True
+    classic_interlaced_scan_enabled: bool = True
     connectable: bool = True
     discoverable: bool = True
     advertising_data: bytes = bytes(
@@ -1895,6 +1898,7 @@ class Device(CompositeEventEmitter):
         self.classic_sc_enabled = config.classic_sc_enabled
         self.classic_ssp_enabled = config.classic_ssp_enabled
         self.classic_smp_enabled = config.classic_smp_enabled
+        self.classic_interlaced_scan_enabled = config.classic_interlaced_scan_enabled
         self.discoverable = config.discoverable
         self.connectable = config.connectable
         self.classic_accept_any = config.classic_accept_any
@@ -2267,6 +2271,21 @@ class Device(CompositeEventEmitter):
             )
             await self.set_connectable(self.connectable)
             await self.set_discoverable(self.discoverable)
+
+            if self.classic_interlaced_scan_enabled:
+                if self.host.supports_lmp_features(LmpFeatureMask.INTERLACED_PAGE_SCAN):
+                    await self.send_command(
+                        hci.HCI_Write_Page_Scan_Type_Command(page_scan_type=1),
+                        check_result=True,
+                    )
+
+                if self.host.supports_lmp_features(
+                    LmpFeatureMask.INTERLACED_INQUIRY_SCAN
+                ):
+                    await self.send_command(
+                        hci.HCI_Write_Inquiry_Scan_Type_Command(scan_type=1),
+                        check_result=True,
+                    )
 
         # Done
         self.powered_on = True
