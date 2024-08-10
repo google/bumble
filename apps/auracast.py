@@ -495,6 +495,10 @@ async def run_assist(
                 print(color('Scanning for any broadcast', 'cyan'))
             broadcast = await find_broadcast_by_name(device, broadcast_name)
 
+            if broadcast.broadcast_audio_announcement is None:
+                print(color('No broadcast audio announcement found', 'red'))
+                return
+
             if (
                 broadcast.basic_audio_announcement is None
                 or not broadcast.basic_audio_announcement.subgroups

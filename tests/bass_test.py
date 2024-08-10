@@ -99,6 +99,7 @@ def test_operations() -> None:
 def basic_broadcast_receive_state_check(brs: bass.BroadcastReceiveState) -> None:
     serialized = bytes(brs)
     parsed = bass.BroadcastReceiveState.from_bytes(serialized)
+    assert parsed is not None
     assert bytes(parsed) == serialized
 
 

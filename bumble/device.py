@@ -988,7 +988,8 @@ class PeriodicAdvertisingSync(EventEmitter):
             self.device.periodic_advertising_syncs.remove(self)
 
     async def transfer(self, connection: Connection, service_data: int = 0) -> None:
-        await connection.transfer_periodic_sync(self.sync_handle, service_data)
+        if self.sync_handle is not None:
+            await connection.transfer_periodic_sync(self.sync_handle, service_data)
 
     def on_establishment(
         self,
@@ -3606,7 +3607,8 @@ class Device(CompositeEventEmitter):
                 connection_handle=connection.handle,
                 service_data=service_data,
                 sync_handle=sync_handle,
-            ), check_result=True
+            ),
+            check_result=True,
         )
 
     async def find_peer_by_name(self, name, transport=BT_LE_TRANSPORT):
@@ -3837,6 +3839,7 @@ class Device(CompositeEventEmitter):
                 if self.keystore is None:
                     raise InvalidOperationError('no key store')
 
+                logger.debug(f'Looking up key for {connection.peer_address}')
                 keys = await self.keystore.get(str(connection.peer_address))
                 if keys is None:
                     raise InvalidOperationError('keys not found in key store')
@@ -4315,6 +4318,12 @@ class Device(CompositeEventEmitter):
         role: int,
         connection_parameters: ConnectionParameters,
     ) -> None:
+        # Convert all-zeros addresses into None.
+        if self_resolvable_address == Address.ANY_RANDOM:
+            self_resolvable_address = None
+        if peer_resolvable_address == Address.ANY_RANDOM:
+            peer_resolvable_address = None
+
         logger.debug(
             f'*** Connection: [0x{connection_handle:04X}] '
             f'{peer_address} {"" if role is None else HCI_Constant.role_name(role)}'
@@ -4373,12 +4382,6 @@ class Device(CompositeEventEmitter):
                 )
                 else self.random_address
             )
-
-        # Convert all-zeros addresses into None.
-        if self_resolvable_address == Address.ANY_RANDOM:
-            self_resolvable_address = None
-        if peer_resolvable_address == Address.ANY_RANDOM:
-            peer_resolvable_address = None
 
         # Create a connection.
         connection = Connection(

@@ -23,6 +23,7 @@ import struct
 from typing import Optional, Sequence, Union
 
 from bumble.profiles.bap import AudioLocation, CodecSpecificCapabilities, ContextType
+from bumble.profiles import le_audio
 from bumble import gatt
 from bumble import gatt_client
 from bumble import hci
@@ -37,10 +38,11 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 @dataclasses.dataclass
 class PacRecord:
+    '''Published Audio Capabilities Service, Table 3.2/3.4.'''
+
     coding_format: hci.CodingFormat
     codec_specific_capabilities: Union[CodecSpecificCapabilities, bytes]
-    # TODO: Parse Metadata
-    metadata: bytes = b''
+    metadata: le_audio.Metadata = dataclasses.field(default_factory=le_audio.Metadata)
 
     @classmethod
     def from_bytes(cls, data: bytes) -> PacRecord:
@@ -53,7 +55,8 @@ class PacRecord:
         ]
         offset += codec_specific_capabilities_size
         metadata_size = data[offset]
-        metadata = data[offset : offset + metadata_size]
+        offset += 1
+        metadata = le_audio.Metadata.from_bytes(data[offset : offset + metadata_size])
 
         codec_specific_capabilities: Union[CodecSpecificCapabilities, bytes]
         if coding_format.codec_id == hci.CodecID.VENDOR_SPECIFIC:
@@ -71,12 +74,13 @@ class PacRecord:
 
     def __bytes__(self) -> bytes:
         capabilities_bytes = bytes(self.codec_specific_capabilities)
+        metadata_bytes = bytes(self.metadata)
         return (
             bytes(self.coding_format)
             + bytes([len(capabilities_bytes)])
             + capabilities_bytes
-            + bytes([len(self.metadata)])
-            + self.metadata
+            + bytes([len(metadata_bytes)])
+            + metadata_bytes
         )
 
 

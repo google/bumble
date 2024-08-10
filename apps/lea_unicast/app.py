@@ -484,7 +484,7 @@ class Speaker:
                 )
             ) + bytes(bap.UnicastServerAdvertisingData())
 
-            def on_pdu(pdu: HCI_IsoDataPacket, ase: bap.AseStateMachine):
+            def on_pdu(pdu: HCI_IsoDataPacket, ase: ascs.AseStateMachine):
                 codec_config = ase.codec_specific_configuration
                 assert isinstance(codec_config, bap.CodecSpecificConfiguration)
                 pcm = decode(
@@ -494,7 +494,7 @@ class Speaker:
                 )
                 self.device.abort_on('disconnection', self.ui_server.send_audio(pcm))
 
-            def on_ase_state_change(ase: bap.AseStateMachine) -> None:
+            def on_ase_state_change(ase: ascs.AseStateMachine) -> None:
                 if ase.state == ascs.AseStateMachine.State.STREAMING:
                     codec_config = ase.codec_specific_configuration
                     assert isinstance(codec_config, bap.CodecSpecificConfiguration)

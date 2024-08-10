@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
 from bumble import colors
 from bumble.profiles.bap import CodecSpecificConfiguration
+from bumble.profiles import le_audio
 from bumble import device
 from bumble import gatt
 from bumble import gatt_client
@@ -299,8 +300,7 @@ class AseStateMachine(gatt.Characteristic):
     presentation_delay = 0
 
     # Additional parameters in ENABLING, STREAMING, DISABLING State
-    # TODO: Parse this
-    metadata = b''
+    metadata = le_audio.Metadata()
 
     def __init__(
         self,
@@ -447,7 +447,7 @@ class AseStateMachine(gatt.Characteristic):
                 AseReasonCode.NONE,
             )
 
-        self.metadata = metadata
+        self.metadata = le_audio.Metadata.from_bytes(metadata)
         self.state = self.State.ENABLING
 
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
@@ -499,7 +499,7 @@ class AseStateMachine(gatt.Characteristic):
                 AseResponseCode.INVALID_ASE_STATE_MACHINE_TRANSITION,
                 AseReasonCode.NONE,
             )
-        self.metadata = metadata
+        self.metadata = le_audio.Metadata.from_bytes(metadata)
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
 
     def on_release(self) -> Tuple[AseResponseCode, AseReasonCode]:
@@ -576,8 +576,9 @@ class AseStateMachine(gatt.Characteristic):
             self.State.STREAMING,
             self.State.DISABLING,
         ):
+            metadata_bytes = bytes(self.metadata)
             additional_parameters = (
-                bytes([self.cig_id, self.cis_id, len(self.metadata)]) + self.metadata
+                bytes([self.cig_id, self.cis_id, len(metadata_bytes)]) + metadata_bytes
             )
         else:
             additional_parameters = b''
