@@ -516,7 +516,7 @@ async def run_assist(
                 0xFFFF,
                 [
                     bumble.profiles.bass.SubgroupInfo(
-                        0xFFFFFFFF,  # bumble.profiles.bass.SubgroupInfo.ANY_BIS,
+                        bumble.profiles.bass.SubgroupInfo.ANY_BIS,
                         bytes(broadcast.basic_audio_announcement.subgroups[0].metadata),
                     )
                 ],
@@ -536,6 +536,25 @@ async def run_assist(
                 print(color('!!! modify-source requires --source-id'))
                 return
 
+            # Find the requested broadcast
+            await bass.remote_scan_started()
+            if broadcast_name:
+                print(color('Scanning for broadcast:', 'cyan'), broadcast_name)
+            else:
+                print(color('Scanning for any broadcast', 'cyan'))
+            broadcast = await find_broadcast_by_name(device, broadcast_name)
+
+            if broadcast.broadcast_audio_announcement is None:
+                print(color('No broadcast audio announcement found', 'red'))
+                return
+
+            if (
+                broadcast.basic_audio_announcement is None
+                or not broadcast.basic_audio_announcement.subgroups
+            ):
+                print(color('No subgroups found', 'red'))
+                return
+
             # Modify the source
             print(
                 color('Modifying source:', 'blue'),
@@ -546,12 +565,10 @@ async def run_assist(
                 bumble.profiles.bass.PeriodicAdvertisingSyncParams.SYNCHRONIZE_TO_PA_PAST_NOT_AVAILABLE,
                 0xFFFF,
                 [
-                    # bumble.profiles.bass.SubgroupInfo(
-                    #     1,  # bumble.profiles.bass.SubgroupInfo.ANY_BIS,
-                    #     bytes(
-                    #         broadcast.basic_audio_announcement.subgroups[0].metadata
-                    #     ),
-                    # )
+                    bumble.profiles.bass.SubgroupInfo(
+                        bumble.profiles.bass.SubgroupInfo.ANY_BIS,
+                        bytes(broadcast.basic_audio_announcement.subgroups[0].metadata),
+                    )
                 ],
             )
             await peer.sustain()
@@ -584,6 +601,22 @@ async def run_pair(transport: str, address: str) -> None:
             print("+++ Paired")
 
 
+def run_async(async_command: asyncio.Coroutine) -> None:
+    try:
+        asyncio.run(async_command)
+    except bumble.core.ProtocolError as error:
+        if error.error_namespace == 'att' and error.error_code in list(
+            bumble.profiles.bass.ApplicationError
+        ):
+            message = bumble.profiles.bass.ApplicationError(error.error_code).name
+        else:
+            message = str(error)
+
+        print(
+            color('!!! An error occurred while executing the command:', 'red'), message
+        )
+
+
 # -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
@@ -610,7 +643,7 @@ def auracast(
 @click.pass_context
 def scan(ctx, filter_duplicates, sync_timeout, transport):
     """Scan for public broadcasts"""
-    asyncio.run(run_scan(filter_duplicates, sync_timeout, transport))
+    run_async(run_scan(filter_duplicates, sync_timeout, transport))
 
 
 @auracast.command('assist')
@@ -637,7 +670,7 @@ def scan(ctx, filter_duplicates, sync_timeout, transport):
 @click.pass_context
 def assist(ctx, broadcast_name, source_id, command, transport, address):
     """Scan for broadcasts on behalf of a audio server"""
-    asyncio.run(run_assist(broadcast_name, source_id, command, transport, address))
+    run_async(run_assist(broadcast_name, source_id, command, transport, address))
 
 
 @auracast.command('pair')
@@ -646,7 +679,7 @@ def assist(ctx, broadcast_name, source_id, command, transport, address):
 @click.pass_context
 def pair(ctx, transport, address):
     """Pair with an audio server"""
-    asyncio.run(run_pair(transport, address))
+    run_async(run_pair(transport, address))
 
 
 def main():
