@@ -21,7 +21,7 @@ import contextlib
 import dataclasses
 import logging
 import os
-from typing import cast, Any, AsyncGenerator, Dict, Optional, Tuple
+from typing import cast, Any, AsyncGenerator, Coroutine, Dict, Optional, Tuple
 
 import click
 import pyee
@@ -601,7 +601,7 @@ async def run_pair(transport: str, address: str) -> None:
             print("+++ Paired")
 
 
-def run_async(async_command: asyncio.Coroutine) -> None:
+def run_async(async_command: Coroutine) -> None:
     try:
         asyncio.run(async_command)
     except bumble.core.ProtocolError as error:
