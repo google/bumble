@@ -977,6 +977,7 @@ class Client:
                 offset += len(part)
 
         self.cache_value(attribute_handle, attribute_value)
+
         # Return the value as bytes
         return attribute_value
 

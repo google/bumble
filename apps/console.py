@@ -168,6 +168,7 @@ class ConsoleApp:
                         'remote-services': None,
                         'local-values': None,
                         'remote-values': None,
+                        'remote-attributes': None,
                     },
                     'filter': {
                         'address': None,
@@ -216,6 +217,7 @@ class ConsoleApp:
         )
         self.local_values_text = FormattedTextControl()
         self.remote_values_text = FormattedTextControl()
+        self.remote_attributes_text = FormattedTextControl()
         self.log_height = Dimension(min=7, weight=4)
         self.log_max_lines = 100
         self.log_lines = []
@@ -241,6 +243,12 @@ class ConsoleApp:
                 ConditionalContainer(
                     Frame(Window(self.remote_values_text), title='Remote Values'),
                     filter=Condition(lambda: self.top_tab == 'remote-values'),
+                ),
+                ConditionalContainer(
+                    Frame(
+                        Window(self.remote_attributes_text), title='Remote Attributes'
+                    ),
+                    filter=Condition(lambda: self.top_tab == 'remote-attributes'),
                 ),
                 ConditionalContainer(
                     Frame(Window(self.log_text, height=self.log_height), title='Log'),
@@ -504,6 +512,8 @@ class ConsoleApp:
         await self.connected_peer.discover_all()
         self.append_to_output('Service Discovery done!')
 
+        self.show_remote_services(self.connected_peer.services)
+
     async def discover_attributes(self):
         if not self.connected_peer:
             self.show_error('not connected')
@@ -514,7 +524,7 @@ class ConsoleApp:
         attributes = await self.connected_peer.discover_attributes()
         self.append_to_output(f'discovered {len(attributes)} attributes...')
 
-        self.show_attributes(attributes)
+        await self.show_remote_attributes(attributes)
 
     def find_remote_characteristic(self, param) -> Optional[CharacteristicProxy]:
         if not self.connected_peer:
@@ -659,7 +669,6 @@ class ConsoleApp:
                 connection_parameters_preferences=connection_parameters_preferences,
                 timeout=DEFAULT_CONNECTION_TIMEOUT,
             )
-            self.top_tab = 'services'
         except bumble.core.TimeoutError:
             self.show_error('connection timed out')
 
@@ -730,19 +739,20 @@ class ConsoleApp:
                 'remote-services',
                 'local-values',
                 'remote-values',
+                'remote-attributes',
             }:
                 self.top_tab = params[0]
                 self.ui.invalidate()
 
         while self.top_tab == 'local-values':
-            await self.do_show_local_values()
+            await self.show_local_values()
             await asyncio.sleep(1)
 
         while self.top_tab == 'remote-values':
-            await self.do_show_remote_values()
+            await self.show_remote_values()
             await asyncio.sleep(1)
 
-    async def do_show_local_values(self):
+    async def show_local_values(self):
         prettytable = PrettyTable()
         field_names = ["Service", "Characteristic", "Descriptor"]
 
@@ -797,7 +807,7 @@ class ConsoleApp:
         self.local_values_text.text = prettytable.get_string()
         self.ui.invalidate()
 
-    async def do_show_remote_values(self):
+    async def show_remote_values(self):
         prettytable = PrettyTable(
             field_names=[
                 "Connection",
@@ -829,6 +839,23 @@ class ConsoleApp:
                 prettytable.add_row(row)
 
         self.remote_values_text.text = prettytable.get_string()
+        self.ui.invalidate()
+
+    async def show_remote_attributes(self, attributes):
+        lines = []
+        for attribute in attributes:
+            lines.append(('ansimagenta', str(attribute) + "\n"))
+            try:
+                value = await attribute.read_value()
+                lines.append(('ansicyan', value.hex() + "\n"))
+            except bumble.core.ProtocolError as error:
+                lines.append(("ansired", f"!!! Protocol Error ({error})\n"))
+            except bumble.core.TimeoutError:
+                lines.append(("ansired", "!!! Timeout\n"))
+            except Exception as error:
+                lines.append(("ansired", f"!!! Error ({error})\n"))
+
+        self.remote_attributes_text.text = lines
         self.ui.invalidate()
 
     async def do_get_phy(self, _):
