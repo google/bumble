@@ -17,13 +17,17 @@
 # -----------------------------------------------------------------------------
 
 import pytest
+from unittest import mock
 
 from bumble import smp
+from bumble import pairing
 from bumble.crypto import EccKey, aes_cmac, ah, c1, f4, f5, f6, g2, h6, h7, s1
 from bumble.pairing import OobData, OobSharedData, LeRole
 from bumble.hci import Address
 from bumble.core import AdvertisingData
+from bumble.device import Device
 
+from typing import Optional
 
 # -----------------------------------------------------------------------------
 # pylint: disable=invalid-name
@@ -249,6 +253,57 @@ def test_ltk_to_link_key(ct2: bool, expected: str):
 def test_link_key_to_ltk(ct2: bool, expected: str):
     LINK_KEY = reversed_hex('05040302 01000908 07060504 03020100')
     assert smp.Session.derive_ltk(LINK_KEY, ct2) == reversed_hex(expected)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    'identity_address_type, public_address, random_address, expected_identity_address',
+    [
+        (
+            None,
+            Address("00:11:22:33:44:55", Address.PUBLIC_DEVICE_ADDRESS),
+            Address("EE:EE:EE:EE:EE:EE", Address.RANDOM_DEVICE_ADDRESS),
+            Address("00:11:22:33:44:55", Address.PUBLIC_DEVICE_ADDRESS),
+        ),
+        (
+            None,
+            Address.ANY,
+            Address("EE:EE:EE:EE:EE:EE", Address.RANDOM_DEVICE_ADDRESS),
+            Address("EE:EE:EE:EE:EE:EE", Address.RANDOM_DEVICE_ADDRESS),
+        ),
+        (
+            pairing.PairingConfig.AddressType.PUBLIC,
+            Address("00:11:22:33:44:55", Address.PUBLIC_DEVICE_ADDRESS),
+            Address("EE:EE:EE:EE:EE:EE", Address.RANDOM_DEVICE_ADDRESS),
+            Address("00:11:22:33:44:55", Address.PUBLIC_DEVICE_ADDRESS),
+        ),
+        (
+            pairing.PairingConfig.AddressType.RANDOM,
+            Address("00:11:22:33:44:55", Address.PUBLIC_DEVICE_ADDRESS),
+            Address("EE:EE:EE:EE:EE:EE", Address.RANDOM_DEVICE_ADDRESS),
+            Address("EE:EE:EE:EE:EE:EE", Address.RANDOM_DEVICE_ADDRESS),
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_send_identity_address_command(
+    identity_address_type: Optional[pairing.PairingConfig.AddressType],
+    public_address: Address,
+    random_address: Address,
+    expected_identity_address: Address,
+):
+    device = Device()
+    device.public_address = public_address
+    device.static_address = random_address
+    pairing_config = pairing.PairingConfig(identity_address_type=identity_address_type)
+    session = smp.Session(device.smp_manager, mock.MagicMock(), pairing_config, True)
+
+    with mock.patch.object(session, 'send_command') as mock_method:
+        session.send_identity_address_command()
+
+    actual_command = mock_method.call_args.args[0]
+    assert actual_command.addr_type == expected_identity_address.address_type
+    assert actual_command.bd_addr == expected_identity_address
 
 
 # -----------------------------------------------------------------------------
