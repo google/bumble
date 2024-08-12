@@ -20,12 +20,12 @@
 import enum
 import logging
 import struct
-from typing import Optional
 
 from bumble.gatt import (
     TemplateService,
     Characteristic,
     DelegatedCharacteristicAdapter,
+    InvalidServiceError,
     GATT_TELEPHONY_AND_MEDIA_AUDIO_SERVICE,
     GATT_TMAP_ROLE_CHARACTERISTIC,
 )
@@ -69,19 +69,21 @@ class TelephonyAndMediaAudioService(TemplateService):
 class TelephonyAndMediaAudioServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = TelephonyAndMediaAudioService
 
-    role: Optional[DelegatedCharacteristicAdapter]
+    role: DelegatedCharacteristicAdapter
 
     def __init__(self, service_proxy: ServiceProxy):
         self.service_proxy = service_proxy
 
-        if characteristics := service_proxy.get_characteristics_by_uuid(
-            GATT_TMAP_ROLE_CHARACTERISTIC
-        ):
-            self.role = DelegatedCharacteristicAdapter(
-                characteristics[0],
-                decode=lambda value: Role(
-                    struct.unpack_from('<H', value, 0)[0],
-                ),
+        if not (
+            characteristics := service_proxy.get_characteristics_by_uuid(
+                GATT_TMAP_ROLE_CHARACTERISTIC
             )
-        else:
-            self.role = None
+        ):
+            raise InvalidServiceError('TMAP Role characteristic not found')
+
+        self.role = DelegatedCharacteristicAdapter(
+            characteristics[0],
+            decode=lambda value: Role(
+                struct.unpack_from('<H', value, 0)[0],
+            ),
+        )
