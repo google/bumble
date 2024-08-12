@@ -17,10 +17,11 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import asyncio
+import contextlib
 import dataclasses
 import logging
 import os
-from typing import cast, Dict, Optional, Tuple
+from typing import cast, Any, AsyncGenerator, Coroutine, Dict, Optional, Tuple
 
 import click
 import pyee
@@ -32,6 +33,7 @@ import bumble.device
 import bumble.gatt
 import bumble.hci
 import bumble.profiles.bap
+import bumble.profiles.bass
 import bumble.profiles.pbp
 import bumble.transport
 import bumble.utils
@@ -46,14 +48,16 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
-AURACAST_DEFAULT_DEVICE_NAME = "Bumble Auracast"
-AURACAST_DEFAULT_DEVICE_ADDRESS = bumble.hci.Address("F0:F1:F2:F3:F4:F5")
+AURACAST_DEFAULT_DEVICE_NAME = 'Bumble Auracast'
+AURACAST_DEFAULT_DEVICE_ADDRESS = bumble.hci.Address('F0:F1:F2:F3:F4:F5')
+AURACAST_DEFAULT_SYNC_TIMEOUT = 5.0
+AURACAST_DEFAULT_ATT_MTU = 256
 
 
 # -----------------------------------------------------------------------------
-# Discover Broadcasts
+# Scan For Broadcasts
 # -----------------------------------------------------------------------------
-class BroadcastDiscoverer:
+class BroadcastScanner(pyee.EventEmitter):
     @dataclasses.dataclass
     class Broadcast(pyee.EventEmitter):
         name: str
@@ -78,22 +82,6 @@ class BroadcastDiscoverer:
             self.sync.on('loss', self.on_sync_loss)
             self.sync.on('periodic_advertisement', self.on_periodic_advertisement)
             self.sync.on('biginfo_advertisement', self.on_biginfo_advertisement)
-
-            self.establishment_timeout_task = asyncio.create_task(
-                self.wait_for_establishment()
-            )
-
-        async def wait_for_establishment(self) -> None:
-            await asyncio.sleep(5.0)
-            if self.sync.state == bumble.device.PeriodicAdvertisingSync.State.PENDING:
-                print(
-                    color(
-                        '!!! Periodic advertisement sync not established in time, '
-                        'canceling',
-                        'red',
-                    )
-                )
-                await self.sync.terminate()
 
         def update(self, advertisement: bumble.device.Advertisement) -> None:
             self.rssi = advertisement.rssi
@@ -138,6 +126,8 @@ class BroadcastDiscoverer:
                     ),
                     data,
                 )
+
+            self.emit('update')
 
         def print(self) -> None:
             print(
@@ -227,13 +217,12 @@ class BroadcastDiscoverer:
                 )
 
         def on_sync_establishment(self) -> None:
-            self.establishment_timeout_task.cancel()
-            self.emit('change')
+            self.emit('sync_establishment')
 
         def on_sync_loss(self) -> None:
             self.basic_audio_announcement = None
             self.biginfo = None
-            self.emit('change')
+            self.emit('sync_loss')
 
         def on_periodic_advertisement(
             self, advertisement: bumble.device.PeriodicAdvertisement
@@ -268,37 +257,21 @@ class BroadcastDiscoverer:
         filter_duplicates: bool,
         sync_timeout: float,
     ):
+        super().__init__()
         self.device = device
         self.filter_duplicates = filter_duplicates
         self.sync_timeout = sync_timeout
-        self.broadcasts: Dict[bumble.hci.Address, BroadcastDiscoverer.Broadcast] = {}
-        self.status_message = ''
+        self.broadcasts: Dict[bumble.hci.Address, BroadcastScanner.Broadcast] = {}
         device.on('advertisement', self.on_advertisement)
 
-    async def run(self) -> None:
-        self.status_message = color('Scanning...', 'green')
+    async def start(self) -> None:
         await self.device.start_scanning(
             active=False,
             filter_duplicates=False,
         )
 
-    def refresh(self) -> None:
-        # Clear the screen from the top
-        print('\033[H')
-        print('\033[0J')
-        print('\033[H')
-
-        # Print the status message
-        print(self.status_message)
-        print("==========================================")
-
-        # Print all broadcasts
-        for broadcast in self.broadcasts.values():
-            broadcast.print()
-            print('------------------------------------------')
-
-        # Clear the screen to the bottom
-        print('\033[0J')
+    async def stop(self) -> None:
+        await self.device.stop_scanning()
 
     def on_advertisement(self, advertisement: bumble.device.Advertisement) -> None:
         if (
@@ -311,7 +284,6 @@ class BroadcastDiscoverer:
 
         if broadcast := self.broadcasts.get(advertisement.address):
             broadcast.update(advertisement)
-            self.refresh()
             return
 
         bumble.utils.AsyncRunner.spawn(
@@ -331,41 +303,318 @@ class BroadcastDiscoverer:
             name,
             periodic_advertising_sync,
         )
-        broadcast.on('change', self.refresh)
         broadcast.update(advertisement)
         self.broadcasts[advertisement.address] = broadcast
         periodic_advertising_sync.on('loss', lambda: self.on_broadcast_loss(broadcast))
-        self.status_message = color(
-            f'+Found {len(self.broadcasts)} broadcasts', 'green'
-        )
-        self.refresh()
+        self.emit('new_broadcast', broadcast)
 
     def on_broadcast_loss(self, broadcast: Broadcast) -> None:
         del self.broadcasts[broadcast.sync.advertiser_address]
         bumble.utils.AsyncRunner.spawn(broadcast.sync.terminate())
+        self.emit('broadcast_loss', broadcast)
+
+
+class PrintingBroadcastScanner:
+    def __init__(
+        self, device: bumble.device.Device, filter_duplicates: bool, sync_timeout: float
+    ) -> None:
+        self.scanner = BroadcastScanner(device, filter_duplicates, sync_timeout)
+        self.scanner.on('new_broadcast', self.on_new_broadcast)
+        self.scanner.on('broadcast_loss', self.on_broadcast_loss)
+        self.scanner.on('update', self.refresh)
+        self.status_message = ''
+
+    async def start(self) -> None:
+        self.status_message = color('Scanning...', 'green')
+        await self.scanner.start()
+
+    def on_new_broadcast(self, broadcast: BroadcastScanner.Broadcast) -> None:
         self.status_message = color(
-            f'-Found {len(self.broadcasts)} broadcasts', 'green'
+            f'+Found {len(self.scanner.broadcasts)} broadcasts', 'green'
+        )
+        broadcast.on('change', self.refresh)
+        broadcast.on('update', self.refresh)
+        self.refresh()
+
+    def on_broadcast_loss(self, broadcast: BroadcastScanner.Broadcast) -> None:
+        self.status_message = color(
+            f'-Found {len(self.scanner.broadcasts)} broadcasts', 'green'
         )
         self.refresh()
 
+    def refresh(self) -> None:
+        # Clear the screen from the top
+        print('\033[H')
+        print('\033[0J')
+        print('\033[H')
 
-async def run_discover_broadcasts(
-    filter_duplicates: bool, sync_timeout: float, transport: str
-) -> None:
+        # Print the status message
+        print(self.status_message)
+        print("==========================================")
+
+        # Print all broadcasts
+        for broadcast in self.scanner.broadcasts.values():
+            broadcast.print()
+            print('------------------------------------------')
+
+        # Clear the screen to the bottom
+        print('\033[0J')
+
+
+@contextlib.asynccontextmanager
+async def create_device(transport: str) -> AsyncGenerator[bumble.device.Device, Any]:
     async with await bumble.transport.open_transport(transport) as (
         hci_source,
         hci_sink,
     ):
-        device = bumble.device.Device.with_hci(
-            AURACAST_DEFAULT_DEVICE_NAME,
-            AURACAST_DEFAULT_DEVICE_ADDRESS,
+        device_config = bumble.device.DeviceConfiguration(
+            name=AURACAST_DEFAULT_DEVICE_NAME,
+            address=AURACAST_DEFAULT_DEVICE_ADDRESS,
+            keystore='JsonKeyStore',
+        )
+
+        device = bumble.device.Device.from_config_with_hci(
+            device_config,
             hci_source,
             hci_sink,
         )
         await device.power_on()
-        discoverer = BroadcastDiscoverer(device, filter_duplicates, sync_timeout)
-        await discoverer.run()
-        await hci_source.terminated
+
+        yield device
+
+
+async def find_broadcast_by_name(
+    device: bumble.device.Device, name: Optional[str]
+) -> BroadcastScanner.Broadcast:
+    result = asyncio.get_running_loop().create_future()
+
+    def on_broadcast_change(broadcast: BroadcastScanner.Broadcast) -> None:
+        if broadcast.basic_audio_announcement and not result.done():
+            print(color('Broadcast basic audio announcement received', 'green'))
+            result.set_result(broadcast)
+
+    def on_new_broadcast(broadcast: BroadcastScanner.Broadcast) -> None:
+        if name is None or broadcast.name == name:
+            print(color('Broadcast found:', 'green'), broadcast.name)
+            broadcast.on('change', lambda: on_broadcast_change(broadcast))
+            return
+
+        print(color(f'Skipping broadcast {broadcast.name}'))
+
+    scanner = BroadcastScanner(device, False, AURACAST_DEFAULT_SYNC_TIMEOUT)
+    scanner.on('new_broadcast', on_new_broadcast)
+    await scanner.start()
+
+    broadcast = await result
+    await scanner.stop()
+
+    return broadcast
+
+
+async def run_scan(
+    filter_duplicates: bool, sync_timeout: float, transport: str
+) -> None:
+    async with create_device(transport) as device:
+        if not device.supports_le_periodic_advertising:
+            print(color('Periodic advertising not supported', 'red'))
+            return
+
+        scanner = PrintingBroadcastScanner(device, filter_duplicates, sync_timeout)
+        await scanner.start()
+        await asyncio.get_running_loop().create_future()
+
+
+async def run_assist(
+    broadcast_name: Optional[str],
+    source_id: Optional[int],
+    command: str,
+    transport: str,
+    address: str,
+) -> None:
+    async with create_device(transport) as device:
+        if not device.supports_le_periodic_advertising:
+            print(color('Periodic advertising not supported', 'red'))
+            return
+
+        # Connect to the server
+        print(f'=== Connecting to {address}...')
+        connection = await device.connect(address)
+        peer = bumble.device.Peer(connection)
+        print(f'=== Connected to {peer}')
+
+        print("+++ Encrypting connection...")
+        await peer.connection.encrypt()
+        print("+++ Connection encrypted")
+
+        # Request a larger MTU
+        mtu = AURACAST_DEFAULT_ATT_MTU
+        print(color(f'$$$ Requesting MTU={mtu}', 'yellow'))
+        await peer.request_mtu(mtu)
+
+        # Get the BASS service
+        bass = await peer.discover_service_and_create_proxy(
+            bumble.profiles.bass.BroadcastAudioScanServiceProxy
+        )
+
+        # Check that the service was found
+        if not bass:
+            print(color('!!! Broadcast Audio Scan Service not found', 'red'))
+            return
+
+        # Subscribe to and read the broadcast receive state characteristics
+        for i, broadcast_receive_state in enumerate(bass.broadcast_receive_states):
+            try:
+                await broadcast_receive_state.subscribe(
+                    lambda value, i=i: print(
+                        f"{color(f'Broadcast Receive State Update [{i}]:', 'green')} {value}"
+                    )
+                )
+            except bumble.core.ProtocolError as error:
+                print(
+                    color(
+                        f'!!! Failed to subscribe to Broadcast Receive State characteristic:',
+                        'red',
+                    ),
+                    error,
+                )
+            value = await broadcast_receive_state.read_value()
+            print(
+                f'{color(f"Initial Broadcast Receive State [{i}]:", "green")} {value}'
+            )
+
+        if command == 'monitor-state':
+            await peer.sustain()
+            return
+
+        if command == 'add-source':
+            # Find the requested broadcast
+            await bass.remote_scan_started()
+            if broadcast_name:
+                print(color('Scanning for broadcast:', 'cyan'), broadcast_name)
+            else:
+                print(color('Scanning for any broadcast', 'cyan'))
+            broadcast = await find_broadcast_by_name(device, broadcast_name)
+
+            if broadcast.broadcast_audio_announcement is None:
+                print(color('No broadcast audio announcement found', 'red'))
+                return
+
+            if (
+                broadcast.basic_audio_announcement is None
+                or not broadcast.basic_audio_announcement.subgroups
+            ):
+                print(color('No subgroups found', 'red'))
+                return
+
+            # Add the source
+            print(color('Adding source:', 'blue'), broadcast.sync.advertiser_address)
+            await bass.add_source(
+                broadcast.sync.advertiser_address,
+                broadcast.sync.sid,
+                broadcast.broadcast_audio_announcement.broadcast_id,
+                bumble.profiles.bass.PeriodicAdvertisingSyncParams.SYNCHRONIZE_TO_PA_PAST_AVAILABLE,
+                0xFFFF,
+                [
+                    bumble.profiles.bass.SubgroupInfo(
+                        bumble.profiles.bass.SubgroupInfo.ANY_BIS,
+                        bytes(broadcast.basic_audio_announcement.subgroups[0].metadata),
+                    )
+                ],
+            )
+
+            # Initiate a PA Sync Transfer
+            await broadcast.sync.transfer(peer.connection)
+
+            # Notify the sink that we're done scanning.
+            await bass.remote_scan_stopped()
+
+            await peer.sustain()
+            return
+
+        if command == 'modify-source':
+            if source_id is None:
+                print(color('!!! modify-source requires --source-id'))
+                return
+
+            # Find the requested broadcast
+            await bass.remote_scan_started()
+            if broadcast_name:
+                print(color('Scanning for broadcast:', 'cyan'), broadcast_name)
+            else:
+                print(color('Scanning for any broadcast', 'cyan'))
+            broadcast = await find_broadcast_by_name(device, broadcast_name)
+
+            if broadcast.broadcast_audio_announcement is None:
+                print(color('No broadcast audio announcement found', 'red'))
+                return
+
+            if (
+                broadcast.basic_audio_announcement is None
+                or not broadcast.basic_audio_announcement.subgroups
+            ):
+                print(color('No subgroups found', 'red'))
+                return
+
+            # Modify the source
+            print(
+                color('Modifying source:', 'blue'),
+                source_id,
+            )
+            await bass.modify_source(
+                source_id,
+                bumble.profiles.bass.PeriodicAdvertisingSyncParams.SYNCHRONIZE_TO_PA_PAST_NOT_AVAILABLE,
+                0xFFFF,
+                [
+                    bumble.profiles.bass.SubgroupInfo(
+                        bumble.profiles.bass.SubgroupInfo.ANY_BIS,
+                        bytes(broadcast.basic_audio_announcement.subgroups[0].metadata),
+                    )
+                ],
+            )
+            await peer.sustain()
+            return
+
+        if command == 'remove-source':
+            if source_id is None:
+                print(color('!!! remove-source requires --source-id'))
+                return
+
+            # Remove the source
+            print(color('Removing source:', 'blue'), source_id)
+            await bass.remove_source(source_id)
+            await peer.sustain()
+            return
+
+        print(color(f'!!! invalid command {command}'))
+
+
+async def run_pair(transport: str, address: str) -> None:
+    async with create_device(transport) as device:
+
+        # Connect to the server
+        print(f'=== Connecting to {address}...')
+        async with device.connect_as_gatt(address) as peer:
+            print(f'=== Connected to {peer}')
+
+            print("+++ Initiating pairing...")
+            await peer.connection.pair()
+            print("+++ Paired")
+
+
+def run_async(async_command: Coroutine) -> None:
+    try:
+        asyncio.run(async_command)
+    except bumble.core.ProtocolError as error:
+        if error.error_namespace == 'att' and error.error_code in list(
+            bumble.profiles.bass.ApplicationError
+        ):
+            message = bumble.profiles.bass.ApplicationError(error.error_code).name
+        else:
+            message = str(error)
+
+        print(
+            color('!!! An error occurred while executing the command:', 'red'), message
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -379,7 +628,7 @@ def auracast(
     ctx.ensure_object(dict)
 
 
-@auracast.command('discover-broadcasts')
+@auracast.command('scan')
 @click.option(
     '--filter-duplicates', is_flag=True, default=False, help='Filter duplicates'
 )
@@ -387,14 +636,50 @@ def auracast(
     '--sync-timeout',
     metavar='SYNC_TIMEOUT',
     type=float,
-    default=5.0,
+    default=AURACAST_DEFAULT_SYNC_TIMEOUT,
     help='Sync timeout (in seconds)',
 )
 @click.argument('transport')
 @click.pass_context
-def discover_broadcasts(ctx, filter_duplicates, sync_timeout, transport):
-    """Discover public broadcasts"""
-    asyncio.run(run_discover_broadcasts(filter_duplicates, sync_timeout, transport))
+def scan(ctx, filter_duplicates, sync_timeout, transport):
+    """Scan for public broadcasts"""
+    run_async(run_scan(filter_duplicates, sync_timeout, transport))
+
+
+@auracast.command('assist')
+@click.option(
+    '--broadcast-name',
+    metavar='BROADCAST_NAME',
+    help='Broadcast Name to tune to',
+)
+@click.option(
+    '--source-id',
+    metavar='SOURCE_ID',
+    type=int,
+    help='Source ID (for remove-source command)',
+)
+@click.option(
+    '--command',
+    type=click.Choice(
+        ['monitor-state', 'add-source', 'modify-source', 'remove-source']
+    ),
+    required=True,
+)
+@click.argument('transport')
+@click.argument('address')
+@click.pass_context
+def assist(ctx, broadcast_name, source_id, command, transport, address):
+    """Scan for broadcasts on behalf of a audio server"""
+    run_async(run_assist(broadcast_name, source_id, command, transport, address))
+
+
+@auracast.command('pair')
+@click.argument('transport')
+@click.argument('address')
+@click.pass_context
+def pair(ctx, transport, address):
+    """Pair with an audio server"""
+    run_async(run_pair(transport, address))
 
 
 def main():

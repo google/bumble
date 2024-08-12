@@ -33,7 +33,6 @@ import ctypes
 import wasmtime
 import wasmtime.loader
 import liblc3  # type: ignore
-import logging
 
 import click
 import aiohttp.web
@@ -43,7 +42,7 @@ from bumble.core import AdvertisingData
 from bumble.colors import color
 from bumble.device import Device, DeviceConfiguration, AdvertisingParameters
 from bumble.transport import open_transport
-from bumble.profiles import bap
+from bumble.profiles import ascs, bap, pacs
 from bumble.hci import Address, CodecID, CodingFormat, HCI_IsoDataPacket
 
 # -----------------------------------------------------------------------------
@@ -57,8 +56,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_UI_PORT = 7654
 
 
-def _sink_pac_record() -> bap.PacRecord:
-    return bap.PacRecord(
+def _sink_pac_record() -> pacs.PacRecord:
+    return pacs.PacRecord(
         coding_format=CodingFormat(CodecID.LC3),
         codec_specific_capabilities=bap.CodecSpecificCapabilities(
             supported_sampling_frequencies=(
@@ -79,8 +78,8 @@ def _sink_pac_record() -> bap.PacRecord:
     )
 
 
-def _source_pac_record() -> bap.PacRecord:
-    return bap.PacRecord(
+def _source_pac_record() -> pacs.PacRecord:
+    return pacs.PacRecord(
         coding_format=CodingFormat(CodecID.LC3),
         codec_specific_capabilities=bap.CodecSpecificCapabilities(
             supported_sampling_frequencies=(
@@ -447,7 +446,7 @@ class Speaker:
             )
 
             self.device.add_service(
-                bap.PublishedAudioCapabilitiesService(
+                pacs.PublishedAudioCapabilitiesService(
                     supported_source_context=bap.ContextType(0xFFFF),
                     available_source_context=bap.ContextType(0xFFFF),
                     supported_sink_context=bap.ContextType(0xFFFF),  # All context types
@@ -461,10 +460,10 @@ class Speaker:
                 )
             )
 
-            ascs = bap.AudioStreamControlService(
+            ascs_service = ascs.AudioStreamControlService(
                 self.device, sink_ase_id=[1], source_ase_id=[2]
             )
-            self.device.add_service(ascs)
+            self.device.add_service(ascs_service)
 
             advertising_data = bytes(
                 AdvertisingData(
@@ -479,13 +478,13 @@ class Speaker:
                         ),
                         (
                             AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                            bytes(bap.PublishedAudioCapabilitiesService.UUID),
+                            bytes(pacs.PublishedAudioCapabilitiesService.UUID),
                         ),
                     ]
                 )
             ) + bytes(bap.UnicastServerAdvertisingData())
 
-            def on_pdu(pdu: HCI_IsoDataPacket, ase: bap.AseStateMachine):
+            def on_pdu(pdu: HCI_IsoDataPacket, ase: ascs.AseStateMachine):
                 codec_config = ase.codec_specific_configuration
                 assert isinstance(codec_config, bap.CodecSpecificConfiguration)
                 pcm = decode(
@@ -495,12 +494,12 @@ class Speaker:
                 )
                 self.device.abort_on('disconnection', self.ui_server.send_audio(pcm))
 
-            def on_ase_state_change(ase: bap.AseStateMachine) -> None:
-                if ase.state == bap.AseStateMachine.State.STREAMING:
+            def on_ase_state_change(ase: ascs.AseStateMachine) -> None:
+                if ase.state == ascs.AseStateMachine.State.STREAMING:
                     codec_config = ase.codec_specific_configuration
                     assert isinstance(codec_config, bap.CodecSpecificConfiguration)
                     assert ase.cis_link
-                    if ase.role == bap.AudioRole.SOURCE:
+                    if ase.role == ascs.AudioRole.SOURCE:
                         ase.cis_link.abort_on(
                             'disconnection',
                             lc3_source_task(
@@ -516,10 +515,10 @@ class Speaker:
                         )
                     else:
                         ase.cis_link.sink = functools.partial(on_pdu, ase=ase)
-                elif ase.state == bap.AseStateMachine.State.CODEC_CONFIGURED:
+                elif ase.state == ascs.AseStateMachine.State.CODEC_CONFIGURED:
                     codec_config = ase.codec_specific_configuration
                     assert isinstance(codec_config, bap.CodecSpecificConfiguration)
-                    if ase.role == bap.AudioRole.SOURCE:
+                    if ase.role == ascs.AudioRole.SOURCE:
                         setup_encoders(
                             codec_config.sampling_frequency.hz,
                             codec_config.frame_duration.us,
@@ -532,7 +531,7 @@ class Speaker:
                             codec_config.audio_channel_allocation.channel_count,
                         )
 
-            for ase in ascs.ase_state_machines.values():
+            for ase in ascs_service.ase_state_machines.values():
                 ase.on('state_change', functools.partial(on_ase_state_change, ase=ase))
 
             await self.device.power_on()

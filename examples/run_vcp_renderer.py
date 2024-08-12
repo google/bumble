@@ -30,6 +30,7 @@ from bumble.hci import (
     CodingFormat,
     OwnAddressType,
 )
+from bumble.profiles.ascs import AudioStreamControlService
 from bumble.profiles.bap import (
     UnicastServerAdvertisingData,
     CodecSpecificCapabilities,
@@ -37,10 +38,8 @@ from bumble.profiles.bap import (
     AudioLocation,
     SupportedSamplingFrequency,
     SupportedFrameDuration,
-    PacRecord,
-    PublishedAudioCapabilitiesService,
-    AudioStreamControlService,
 )
+from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
 from bumble.profiles.vcp import VolumeControlService

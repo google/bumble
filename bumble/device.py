@@ -113,6 +113,7 @@ from .hci import (
     HCI_LE_Periodic_Advertising_Create_Sync_Command,
     HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command,
     HCI_LE_Periodic_Advertising_Report_Event,
+    HCI_LE_Periodic_Advertising_Sync_Transfer_Command,
     HCI_LE_Periodic_Advertising_Terminate_Sync_Command,
     HCI_LE_Enable_Encryption_Command,
     HCI_LE_Extended_Advertising_Report_Event,
@@ -174,7 +175,7 @@ from .hci import (
     phy_list_to_bits,
 )
 from .host import Host
-from .gap import GenericAccessService
+from .profiles.gap import GenericAccessService
 from .core import (
     BT_BR_EDR_TRANSPORT,
     BT_CENTRAL_ROLE,
@@ -189,6 +190,7 @@ from .core import (
     InvalidArgumentError,
     InvalidOperationError,
     InvalidStateError,
+    NotSupportedError,
     OutOfResourcesError,
     UnreachableError,
 )
@@ -970,19 +972,24 @@ class PeriodicAdvertisingSync(EventEmitter):
             response = await self.device.send_command(
                 HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command(),
             )
-            if response.status == HCI_SUCCESS:
+            if response.return_parameters == HCI_SUCCESS:
                 if self in self.device.periodic_advertising_syncs:
                     self.device.periodic_advertising_syncs.remove(self)
             return
 
         if self.state in (self.State.ESTABLISHED, self.State.ERROR, self.State.LOST):
             self.state = self.State.TERMINATED
-            await self.device.send_command(
-                HCI_LE_Periodic_Advertising_Terminate_Sync_Command(
-                    sync_handle=self.sync_handle
+            if self.sync_handle is not None:
+                await self.device.send_command(
+                    HCI_LE_Periodic_Advertising_Terminate_Sync_Command(
+                        sync_handle=self.sync_handle
+                    )
                 )
-            )
             self.device.periodic_advertising_syncs.remove(self)
+
+    async def transfer(self, connection: Connection, service_data: int = 0) -> None:
+        if self.sync_handle is not None:
+            await connection.transfer_periodic_sync(self.sync_handle, service_data)
 
     def on_establishment(
         self,
@@ -1209,8 +1216,13 @@ class Peer:
 
         return self.gatt_client.get_characteristics_by_uuid(uuid, service)
 
-    def create_service_proxy(self, proxy_class: Type[_PROXY_CLASS]) -> _PROXY_CLASS:
-        return cast(_PROXY_CLASS, proxy_class.from_client(self.gatt_client))
+    def create_service_proxy(
+        self, proxy_class: Type[_PROXY_CLASS]
+    ) -> Optional[_PROXY_CLASS]:
+        if proxy := proxy_class.from_client(self.gatt_client):
+            return cast(_PROXY_CLASS, proxy)
+
+        return None
 
     async def discover_service_and_create_proxy(
         self, proxy_class: Type[_PROXY_CLASS]
@@ -1495,11 +1507,9 @@ class Connection(CompositeEventEmitter):
 
         try:
             await asyncio.wait_for(self.device.abort_on('flush', abort), timeout)
-        except asyncio.TimeoutError:
-            pass
-
-        self.remove_listener('disconnection', abort.set_result)
-        self.remove_listener('disconnection_failure', abort.set_exception)
+        finally:
+            self.remove_listener('disconnection', abort.set_result)
+            self.remove_listener('disconnection_failure', abort.set_exception)
 
     async def set_data_length(self, tx_octets, tx_time) -> None:
         return await self.device.set_data_length(self, tx_octets, tx_time)
@@ -1529,6 +1539,11 @@ class Connection(CompositeEventEmitter):
 
     async def get_phy(self):
         return await self.device.get_connection_phy(self)
+
+    async def transfer_periodic_sync(
+        self, sync_handle: int, service_data: int = 0
+    ) -> None:
+        await self.device.transfer_periodic_sync(self, sync_handle, service_data)
 
     # [Classic only]
     async def request_remote_name(self):
@@ -2390,6 +2405,10 @@ class Device(CompositeEventEmitter):
     def supports_le_extended_advertising(self):
         return self.supports_le_features(LeFeatureMask.LE_EXTENDED_ADVERTISING)
 
+    @property
+    def supports_le_periodic_advertising(self):
+        return self.supports_le_features(LeFeatureMask.LE_PERIODIC_ADVERTISING)
+
     async def start_advertising(
         self,
         advertising_type: AdvertisingType = AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
@@ -2792,6 +2811,10 @@ class Device(CompositeEventEmitter):
         sync_timeout: float = DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_TIMEOUT,
         filter_duplicates: bool = False,
     ) -> PeriodicAdvertisingSync:
+        # Check that the controller supports the feature.
+        if not self.supports_le_periodic_advertising:
+            raise NotSupportedError()
+
         # Check that there isn't already an equivalent entry
         if any(
             sync.advertiser_address == advertiser_address and sync.sid == sid
@@ -2989,18 +3012,47 @@ class Device(CompositeEventEmitter):
         ] = None,
         own_address_type: int = OwnAddressType.RANDOM,
         timeout: Optional[float] = DEVICE_DEFAULT_CONNECT_TIMEOUT,
+        always_resolve: bool = False,
     ) -> Connection:
         '''
         Request a connection to a peer.
-        When transport is BLE, this method cannot be called if there is already a
+
+        When the transport is BLE, this method cannot be called if there is already a
         pending connection.
 
-        connection_parameters_preferences: (BLE only, ignored for BR/EDR)
-          * None: use the 1M PHY with default parameters
-          * map: each entry has a PHY as key and a ConnectionParametersPreferences
-            object as value
+        Args:
+          peer_address:
+            Address or name of the device to connect to.
+            If a string is passed:
+              If the string is an address followed by a `@` suffix, the `always_resolve`
+              argument is implicitly set to True, so the connection is made to the
+              address after resolution.
+              If the string is any other address, the connection is made to that
+              address (with or without address resolution, depending on the
+              `always_resolve` argument).
+              For any other string, a scan for devices using that string as their name
+              is initiated, and a connection to the first matching device's address
+              is made. In that case, `always_resolve` is ignored.
 
-        own_address_type: (BLE only)
+          connection_parameters_preferences:
+            (BLE only, ignored for BR/EDR)
+            * None: use the 1M PHY with default parameters
+            * map: each entry has a PHY as key and a ConnectionParametersPreferences
+              object as value
+
+          own_address_type:
+            (BLE only, ignored for BR/EDR)
+            OwnAddressType.RANDOM to use this device's random address, or
+            OwnAddressType.PUBLIC to use this device's public address.
+
+          timeout:
+            Maximum time to wait for a connection to be established, in seconds.
+            Pass None for an unlimited time.
+
+          always_resolve:
+            (BLE only, ignored for BR/EDR)
+            If True, always initiate a scan, resolving addresses, and connect to the
+            address that resolves to `peer_address`.
         '''
 
         # Check parameters
@@ -3019,11 +3071,19 @@ class Device(CompositeEventEmitter):
 
         if isinstance(peer_address, str):
             try:
-                peer_address = Address.from_string_for_transport(
-                    peer_address, transport
-                )
-            except InvalidArgumentError:
+                if transport == BT_LE_TRANSPORT and peer_address.endswith('@'):
+                    peer_address = Address.from_string_for_transport(
+                        peer_address[:-1], transport
+                    )
+                    always_resolve = True
+                    logger.debug('forcing address resolution')
+                else:
+                    peer_address = Address.from_string_for_transport(
+                        peer_address, transport
+                    )
+            except (InvalidArgumentError, ValueError):
                 # If the address is not parsable, assume it is a name instead
+                always_resolve = False
                 logger.debug('looking for peer by name')
                 peer_address = await self.find_peer_by_name(
                     peer_address, transport
@@ -3037,6 +3097,12 @@ class Device(CompositeEventEmitter):
                 raise InvalidArgumentError('BR/EDR addresses must be PUBLIC')
 
         assert isinstance(peer_address, Address)
+
+        if transport == BT_LE_TRANSPORT and always_resolve:
+            logger.debug('resolving address')
+            peer_address = await self.find_peer_by_identity_address(
+                peer_address
+            )  # TODO: timeout
 
         def on_connection(connection):
             if transport == BT_LE_TRANSPORT or (
@@ -3539,15 +3605,26 @@ class Device(CompositeEventEmitter):
             check_result=True,
         )
 
+    async def transfer_periodic_sync(
+        self, connection: Connection, sync_handle: int, service_data: int = 0
+    ) -> None:
+        return await self.send_command(
+            HCI_LE_Periodic_Advertising_Sync_Transfer_Command(
+                connection_handle=connection.handle,
+                service_data=service_data,
+                sync_handle=sync_handle,
+            ),
+            check_result=True,
+        )
+
     async def find_peer_by_name(self, name, transport=BT_LE_TRANSPORT):
         """
-        Scan for a peer with a give name and return its address and transport
+        Scan for a peer with a given name and return its address.
         """
 
         # Create a future to wait for an address to be found
         peer_address = asyncio.get_running_loop().create_future()
 
-        # Scan/inquire with event handlers to handle scan/inquiry results
         def on_peer_found(address, ad_data):
             local_name = ad_data.get(AdvertisingData.COMPLETE_LOCAL_NAME, raw=True)
             if local_name is None:
@@ -3556,13 +3633,13 @@ class Device(CompositeEventEmitter):
                 if local_name.decode('utf-8') == name:
                     peer_address.set_result(address)
 
-        handler = None
+        listener = None
         was_scanning = self.scanning
         was_discovering = self.discovering
         try:
             if transport == BT_LE_TRANSPORT:
                 event_name = 'advertisement'
-                handler = self.on(
+                listener = self.on(
                     event_name,
                     lambda advertisement: on_peer_found(
                         advertisement.address, advertisement.data
@@ -3574,7 +3651,7 @@ class Device(CompositeEventEmitter):
 
             elif transport == BT_BR_EDR_TRANSPORT:
                 event_name = 'inquiry_result'
-                handler = self.on(
+                listener = self.on(
                     event_name,
                     lambda address, class_of_device, eir_data, rssi: on_peer_found(
                         address, eir_data
@@ -3588,13 +3665,59 @@ class Device(CompositeEventEmitter):
 
             return await self.abort_on('flush', peer_address)
         finally:
-            if handler is not None:
-                self.remove_listener(event_name, handler)
+            if listener is not None:
+                self.remove_listener(event_name, listener)
 
             if transport == BT_LE_TRANSPORT and not was_scanning:
                 await self.stop_scanning()
             elif transport == BT_BR_EDR_TRANSPORT and not was_discovering:
                 await self.stop_discovery()
+
+    async def find_peer_by_identity_address(self, identity_address: Address) -> Address:
+        """
+        Scan for a peer with a resolvable address that can be resolved to a given
+        identity address.
+        """
+
+        # Create a future to wait for an address to be found
+        peer_address = asyncio.get_running_loop().create_future()
+
+        def on_peer_found(address, _):
+            if address == identity_address:
+                if not peer_address.done():
+                    logger.debug(f'*** Matching public address found for {address}')
+                    peer_address.set_result(address)
+                return
+
+            if address.is_resolvable:
+                resolved_address = self.address_resolver.resolve(address)
+                if resolved_address == identity_address:
+                    if not peer_address.done():
+                        logger.debug(f'*** Matching identity found for {address}')
+                        peer_address.set_result(address)
+                return
+
+        was_scanning = self.scanning
+        event_name = 'advertisement'
+        listener = None
+        try:
+            listener = self.on(
+                event_name,
+                lambda advertisement: on_peer_found(
+                    advertisement.address, advertisement.data
+                ),
+            )
+
+            if not self.scanning:
+                await self.start_scanning(filter_duplicates=True)
+
+            return await self.abort_on('flush', peer_address)
+        finally:
+            if listener is not None:
+                self.remove_listener(event_name, listener)
+
+            if not was_scanning:
+                await self.stop_scanning()
 
     @property
     def pairing_config_factory(self) -> Callable[[Connection], pairing.PairingConfig]:
@@ -3722,6 +3845,7 @@ class Device(CompositeEventEmitter):
                 if self.keystore is None:
                     raise InvalidOperationError('no key store')
 
+                logger.debug(f'Looking up key for {connection.peer_address}')
                 keys = await self.keystore.get(str(connection.peer_address))
                 if keys is None:
                     raise InvalidOperationError('keys not found in key store')
@@ -4200,6 +4324,12 @@ class Device(CompositeEventEmitter):
         role: int,
         connection_parameters: ConnectionParameters,
     ) -> None:
+        # Convert all-zeros addresses into None.
+        if self_resolvable_address == Address.ANY_RANDOM:
+            self_resolvable_address = None
+        if peer_resolvable_address == Address.ANY_RANDOM:
+            peer_resolvable_address = None
+
         logger.debug(
             f'*** Connection: [0x{connection_handle:04X}] '
             f'{peer_address} {"" if role is None else HCI_Constant.role_name(role)}'
@@ -4258,12 +4388,6 @@ class Device(CompositeEventEmitter):
                 )
                 else self.random_address
             )
-
-        # Convert all-zeros addresses into None.
-        if self_resolvable_address == Address.ANY_RANDOM:
-            self_resolvable_address = None
-        if peer_resolvable_address == Address.ANY_RANDOM:
-            peer_resolvable_address = None
 
         # Create a connection.
         connection = Connection(

@@ -253,7 +253,7 @@ class ProfileServiceProxy:
     SERVICE_CLASS: Type[TemplateService]
 
     @classmethod
-    def from_client(cls, client: Client) -> ProfileServiceProxy:
+    def from_client(cls, client: Client) -> Optional[ProfileServiceProxy]:
         return ServiceProxy.from_client(cls, client, cls.SERVICE_CLASS.UUID)
 
 
@@ -282,6 +282,8 @@ class Client:
         self.indication_subscribers = {}  # Subscriber set, by attribute handle
         self.services = []
         self.cached_values = {}
+
+        connection.on('disconnection', self.on_disconnection)
 
     def send_gatt_pdu(self, pdu: bytes) -> None:
         self.connection.send_l2cap_pdu(ATT_CID, pdu)
@@ -405,7 +407,7 @@ class Client:
         if not already_known:
             self.services.append(service)
 
-    async def discover_services(self, uuids: Iterable[UUID] = []) -> List[ServiceProxy]:
+    async def discover_services(self, uuids: Iterable[UUID] = ()) -> List[ServiceProxy]:
         '''
         See Vol 3, Part G - 4.4.1 Discover All Primary Services
         '''
@@ -1071,6 +1073,10 @@ class Client:
                     attribute_handle=attribute_handle, attribute_value=value
                 )
             )
+
+    def on_disconnection(self, _) -> None:
+        if self.pending_response and not self.pending_response.done():
+            self.pending_response.cancel()
 
     def on_gatt_pdu(self, att_pdu: ATT_PDU) -> None:
         logger.debug(

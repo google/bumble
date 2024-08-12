@@ -148,6 +148,10 @@ class InvalidOperationError(BaseBumbleError, RuntimeError):
     """Invalid Operation Error"""
 
 
+class NotSupportedError(BaseBumbleError, RuntimeError):
+    """Not Supported"""
+
+
 class OutOfResourcesError(BaseBumbleError, RuntimeError):
     """Out of Resources Error"""
 

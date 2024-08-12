@@ -264,7 +264,9 @@ class BaseSource:
         self.sink = sink
 
     def on_transport_lost(self) -> None:
-        self.terminated.set_result(None)
+        if not self.terminated.done():
+            self.terminated.set_result(None)
+
         if self.sink:
             if hasattr(self.sink, 'on_transport_lost'):
                 self.sink.on_transport_lost()

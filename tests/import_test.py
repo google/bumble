@@ -27,7 +27,6 @@ def test_import():
         core,
         crypto,
         device,
-        gap,
         hci,
         hfp,
         host,
@@ -41,6 +40,22 @@ def test_import():
         utils,
     )
 
+    from bumble.profiles import (
+        ascs,
+        bap,
+        bass,
+        battery_service,
+        cap,
+        csip,
+        device_information_service,
+        gap,
+        heart_rate_service,
+        le_audio,
+        pacs,
+        pbp,
+        vcp,
+    )
+
     assert att
     assert bridge
     assert company_ids
@@ -48,7 +63,6 @@ def test_import():
     assert core
     assert crypto
     assert device
-    assert gap
     assert hci
     assert hfp
     assert host
@@ -60,6 +74,20 @@ def test_import():
     assert smp
     assert transport
     assert utils
+
+    assert ascs
+    assert bap
+    assert bass
+    assert battery_service
+    assert cap
+    assert csip
+    assert device_information_service
+    assert gap
+    assert heart_rate_service
+    assert le_audio
+    assert pacs
+    assert pbp
+    assert vcp
 
 
 # -----------------------------------------------------------------------------

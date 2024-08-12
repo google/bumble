@@ -23,8 +23,9 @@ import logging
 
 from bumble import device
 from bumble.hci import CodecID, CodingFormat
-from bumble.profiles.bap import (
-    AudioLocation,
+from bumble.profiles.ascs import (
+    AudioStreamControlService,
+    AudioStreamControlServiceProxy,
     AseStateMachine,
     ASE_Operation,
     ASE_Config_Codec,
@@ -35,6 +36,9 @@ from bumble.profiles.bap import (
     ASE_Receiver_Stop_Ready,
     ASE_Release,
     ASE_Update_Metadata,
+)
+from bumble.profiles.bap import (
+    AudioLocation,
     SupportedFrameDuration,
     SupportedSamplingFrequency,
     SamplingFrequency,
@@ -42,9 +46,9 @@ from bumble.profiles.bap import (
     CodecSpecificCapabilities,
     CodecSpecificConfiguration,
     ContextType,
+)
+from bumble.profiles.pacs import (
     PacRecord,
-    AudioStreamControlService,
-    AudioStreamControlServiceProxy,
     PublishedAudioCapabilitiesService,
     PublishedAudioCapabilitiesServiceProxy,
 )
