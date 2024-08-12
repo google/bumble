@@ -24,7 +24,7 @@ import platform
 
 import usb1
 
-from bumble.transport.common import Transport, ParserSource, TransportInitError
+from bumble.transport.common import Transport, BaseSource, TransportInitError
 from bumble import hci
 from bumble.colors import color
 
@@ -208,7 +208,7 @@ async def open_usb_transport(spec: str) -> Transport:
                 except usb1.USBError:
                     logger.debug('OUT transfer likely already completed')
 
-    class UsbPacketSource(asyncio.Protocol, ParserSource):
+    class UsbPacketSource(asyncio.Protocol, BaseSource):
         def __init__(self, device, metadata, acl_in, events_in):
             super().__init__()
             self.device = device
@@ -285,7 +285,13 @@ async def open_usb_transport(spec: str) -> Transport:
                     packet = await self.queue.get()
                 except asyncio.CancelledError:
                     return
-                self.parser.feed_data(packet)
+                if self.sink:
+                    try:
+                        self.sink.on_packet(packet)
+                    except Exception as error:
+                        logger.exception(
+                            color(f'!!! Exception in sink.on_packet: {error}', 'red')
+                        )
 
         def close(self):
             self.closed = True
