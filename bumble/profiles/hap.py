@@ -16,13 +16,13 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-from bumble.utils import OpenIntEnum
-
 from att import CommonErrorCode
 from bumble import att
 from bumble import device
 from bumble import gatt, gatt_client
-from typing import Dict, List, Optional
+from bumble.utils import OpenIntEnum
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Union
 
 
 # -----------------------------------------------------------------------------
@@ -90,6 +90,7 @@ class HearingAidPresetControlPointOpcode(OpenIntEnum):
     SET_PREVIOUS_PRESET_SYNCHRONIZED_LOCALLY = 0x0A
 
 
+@dataclass
 class PresetChangedOperation:
     '''See Hearing Access Service 3.2.2.2. Preset Changed operation.'''
 
@@ -100,41 +101,26 @@ class PresetChangedOperation:
         PRESET_RECORD_AVAILABLE   = 0x02
         PRESET_RECORD_UNAVAILABLE = 0x03
 
+    @dataclass
     class Generic:
         prev_index: int
         preset_record: PresetRecord
 
-        def __init__(self, idx, preset):
-            self.prev_index = idx
-            self.preset_record = preset
-
-        def to_bytes(self) -> bytes:
-            return bytes([self.prev_index]) + self.preset_record.to_bytes()
-
-    def __init__(self, id: ChangeId, params: Generic):
-        self.change_id = id
-        self.additional_parameters = params
+        def __bytes__(self) -> bytes:
+            return bytes([self.prev_index]) + bytes(self.preset_record)
 
     change_id: ChangeId
-    additional_parameters: Generic | int
+    additional_parameters: Union[Generic, int]
 
-    def additional_parameters_to_bytes(self) -> bytes:
-        if isinstance(self.additional_parameters, PresetChangedOperation.Generic):
-            return self.additional_parameters.to_bytes()
-        return bytes([self.additional_parameters])
-
-    def to_bytes(self, is_last: bool) -> bytes:
+    def __bytes__(self, is_last: bool) -> bytes:
         # TODO does the bytes concatenate correctly ?
-        return (
-            bytes(
-                [
-                    HearingAidPresetControlPointOpcode.PRESET_CHANGED,
-                    self.change_id,
-                    is_last,
-                ]
-            )
-            + self.additional_parameters_to_bytes()
-        )
+        return bytes(
+            [
+                HearingAidPresetControlPointOpcode.PRESET_CHANGED,
+                self.change_id,
+                is_last,
+            ]
+        ) + bytes(self.additional_parameters)
 
     @staticmethod
     def get_index(op: PresetChangedOperation) -> int:
@@ -176,18 +162,16 @@ class PresetRecord:
         writable: Writable
         is_available: IsAvailable
 
-        def to_bytes(self) -> bytes:
+        def __bytes__(self) -> bytes:
             return bytes([self.writable | (self.is_available << 1)])
 
     index: int
     properties: Property
     name: str
 
-    def to_bytes(self) -> bytes:
+    def __bytes__(self) -> bytes:
         # TODO validate string encoding + concatenation of bytes
-        return (
-            bytes([self.index]) + self.properties.to_bytes() + self.name.encode('utf-8')
-        )
+        return bytes([self.index]) + bytes(self.properties) + self.name.encode('utf-8')
 
     def is_available(self) -> bool:
         return (
@@ -217,7 +201,7 @@ class HearingAccessService(gatt.TemplateService):
         dynamic_presets: DynamicPresets
         writable_presets_support: WritablePresetsSupport
 
-        def to_bytes(self) -> bytes:
+        def __bytes__(self) -> bytes:
             # TODO: Is thit the proper way to concatenate to bits ? and is this in correct endianness
             return bytes(
                 [
@@ -277,7 +261,7 @@ class HearingAccessService(gatt.TemplateService):
     def _on_read_hearing_aid_features(
         self, connection: Optional[device.Connection]
     ) -> bytes:
-        return self.hearing_aid_features.to_bytes()
+        return bytes(self.hearing_aid_features)
 
     def _on_write_hearing_aid_preset_control_point(
         self, connection: Optional[device.Connection], value: bytes
@@ -328,7 +312,7 @@ class HearingAccessService(gatt.TemplateService):
                         is_last,
                     ]
                 )
-                + preset.to_bytes(),
+                + bytes(preset),
             )
 
         self.read_presets_request_in_progress = True
@@ -378,7 +362,7 @@ class HearingAccessService(gatt.TemplateService):
             await connection.device.notify_subscriber(
                 connection,
                 self.hearing_aid_preset_control_point,
-                value=op.to_bytes(is_last),
+                value=op.__bytes__(is_last),
             )
             self.preset_changed_operations_per_device[connection] = idx
             idx += 1
@@ -472,8 +456,8 @@ class HearingAccessService(gatt.TemplateService):
 
     async def set_next_preset(
         self, connection: Optional[device.Connection], is_reverse
-        ):
-        ''' Set the next preset as active or previous if is_reverse is true'''
+    ):
+        '''Set the next preset as active or previous if is_reverse is true'''
         assert connection
 
         if self.active_preset_index == 0x00:
@@ -509,30 +493,33 @@ class HearingAccessService(gatt.TemplateService):
     async def _on_set_active_preset_synchronized_locally(
         self, connection: Optional[device.Connection], value: bytes
     ):
-        assert (
+        if (
             self.hearing_aid_features.preset_synchronization_support
             == PresetSynchronizationSupport.PRESET_SYNCHRONIZATION_IS_SUPPORTED
-        )
+        ):
+            raise att.ATT_Error(ErrorCode.PRESET_SYNCHRONIZATION_NOT_SUPPORTED)
         await self.set_active_preset(connection, value)
         # TODO (low priority) inform other server of the change
 
     async def _on_set_next_preset_synchronized_locally(
         self, connection: Optional[device.Connection]
     ):
-        assert (
+        if (
             self.hearing_aid_features.preset_synchronization_support
             == PresetSynchronizationSupport.PRESET_SYNCHRONIZATION_IS_SUPPORTED
-        )
+        ):
+            raise att.ATT_Error(ErrorCode.PRESET_SYNCHRONIZATION_NOT_SUPPORTED)
         await self.set_next_preset(connection, False)
         # TODO (low priority) inform other server of the change
 
     async def _on_set_previous_preset_synchronized_locally(
         self, connection: Optional[device.Connection]
     ):
-        assert (
+        if (
             self.hearing_aid_features.preset_synchronization_support
             == PresetSynchronizationSupport.PRESET_SYNCHRONIZATION_IS_SUPPORTED
-        )
+        ):
+            raise att.ATT_Error(ErrorCode.PRESET_SYNCHRONIZATION_NOT_SUPPORTED)
         await self.set_next_preset(connection, True)
         # TODO (low priority) inform other server of the change
 
