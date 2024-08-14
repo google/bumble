@@ -142,7 +142,7 @@ class MainActivity : ComponentActivity() {
                 ::runRfcommClient,
                 ::runRfcommServer,
                 ::runL2capClient,
-                ::runL2capServer
+                ::runL2capServer,
             )
         }
 
@@ -166,6 +166,8 @@ class MainActivity : ComponentActivity() {
                 "rfcomm-server" -> runRfcommServer()
                 "l2cap-client" -> runL2capClient()
                 "l2cap-server" -> runL2capServer()
+                "scan-start" -> runScan(true)
+                "stop-start" -> runScan(false)
             }
         }
     }
@@ -190,6 +192,11 @@ class MainActivity : ComponentActivity() {
         l2capServer?.run()
     }
 
+    private fun runScan(startScan: Boolean) {
+        val scan = bluetoothAdapter?.let { Scan(it) }
+        scan?.run(startScan)
+    }
+
     @SuppressLint("MissingPermission")
     fun becomeDiscoverable() {
         val discoverableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
@@ -206,7 +213,7 @@ fun MainView(
     runRfcommClient: () -> Unit,
     runRfcommServer: () -> Unit,
     runL2capClient: () -> Unit,
-    runL2capServer: () -> Unit
+    runL2capServer: () -> Unit,
 ) {
     BTBenchTheme {
         val scrollState = rememberScrollState()
