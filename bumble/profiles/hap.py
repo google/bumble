@@ -356,6 +356,7 @@ class HearingAccessService(gatt.TemplateService):
                     )
                     + bytes(presets[0]),
                 )
+                presets.pop(0)
 
         finally:
             self.read_presets_request_in_progress = False
