@@ -209,9 +209,8 @@ class HearingAccessService(gatt.TemplateService):
     hearing_aid_preset_control_point: gatt.Characteristic
     active_preset_index_characteristic: gatt.Characteristic
     active_preset_index: int = 0x00
-    active_preset_index_per_device: Dict[
-        Address, int
-    ]  # TODO validate address type → public_address ?
+    # TODO validate address type → public_address ?
+    active_preset_index_per_device: Dict[Address, int] = {}
 
     device: Device
 
@@ -219,14 +218,12 @@ class HearingAccessService(gatt.TemplateService):
     preset_records: Dict[int, PresetRecord] = {}  # key is the preset index
     read_presets_request_in_progress: bool = False
 
-    preset_changed_operations_history: List[PresetChangedOperation]
-    preset_changed_operations_per_device: Dict[Address, int]
     preset_changed_operations_history_per_device: Dict[
         Address, List[PresetChangedOperation]
     ] = {}
 
     # Keep an updated list of connected client to send notification to
-    currently_connected_clients: Set[Connection]
+    currently_connected_clients: Set[Connection] = set()
 
     def __init__(
         self, device: Device, features: HearingAidFeatures, presets: List[PresetRecord]
