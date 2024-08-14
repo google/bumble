@@ -148,12 +148,6 @@ class PresetChangedOperation:
             ]
         ) + bytes(self.additional_parameters)
 
-    @staticmethod
-    def get_index(op: PresetChangedOperation) -> int:
-        if isinstance(op.additional_parameters, PresetChangedOperation.Generic):
-            return op.additional_parameters.prev_index
-        return op.additional_parameters
-
 
 class PresetChangedOperationDeleted(PresetChangedOperation):
     def __init__(self, index):
@@ -402,7 +396,12 @@ class HearingAccessService(gatt.TemplateService):
             connection.device.public_address, []
         )
         # Notification will be sent in index order
-        op_list.sort(key=PresetChangedOperation.get_index)
+        def get_op_index(op: PresetChangedOperation) -> int:
+            if isinstance(op.additional_parameters, PresetChangedOperation.Generic):
+                return op.additional_parameters.prev_index
+            return op.additional_parameters
+
+        op_list.sort(key=get_op_index)
         while len(op_list) > 0:
             try:
                 await connection.device.indicate_subscriber(
