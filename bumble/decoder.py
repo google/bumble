@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Union
+
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
@@ -149,7 +151,7 @@ QMF_COEFFS = [3, -11, 12, 32, -210, 951, 3876, -805, 362, -156, 53, -11]
 # -----------------------------------------------------------------------------
 # Classes
 # -----------------------------------------------------------------------------
-class G722Decoder(object):
+class G722Decoder:
     """G.722 decoder with bitrate 64kbit/s.
 
     For the Blocks in the sub-band decoders, please refer to the G.722
@@ -157,7 +159,7 @@ class G722Decoder(object):
     https://www.itu.int/rec/T-REC-G.722-201209-I
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._x = [0] * 24
         self._band = [Band(), Band()]
         # The initial value in BLOCK 3L
@@ -165,12 +167,12 @@ class G722Decoder(object):
         # The initial value in BLOCK 3H
         self._band[1].det = 8
 
-    def decode_frame(self, encoded_data) -> bytearray:
+    def decode_frame(self, encoded_data: Union[bytes, bytearray]) -> bytearray:
         result_array = bytearray(len(encoded_data) * 4)
         self.g722_decode(result_array, encoded_data)
         return result_array
 
-    def g722_decode(self, result_array, encoded_data) -> int:
+    def g722_decode(self, result_array, encoded_data: Union[bytes, bytearray]) -> int:
         """Decode the data frame using g722 decoder."""
         result_length = 0
 
@@ -198,14 +200,16 @@ class G722Decoder(object):
 
         return result_length
 
-    def update_decoded_result(self, xout, byte_length, byte_array) -> int:
+    def update_decoded_result(
+        self, xout: int, byte_length: int, byte_array: bytearray
+    ) -> int:
         result = (int)(xout >> 11)
         bytes_result = result.to_bytes(2, 'little', signed=True)
         byte_array[byte_length] = bytes_result[0]
         byte_array[byte_length + 1] = bytes_result[1]
         return byte_length + 2
 
-    def lower_sub_band_decoder(self, lower_bits) -> int:
+    def lower_sub_band_decoder(self, lower_bits: int) -> int:
         """Lower sub-band decoder for last six bits."""
 
         # Block 5L
@@ -258,7 +262,7 @@ class G722Decoder(object):
 
         return rlow
 
-    def higher_sub_band_decoder(self, higher_bits) -> int:
+    def higher_sub_band_decoder(self, higher_bits: int) -> int:
         """Higher sub-band decoder for first two bits."""
 
         # Block 2H
@@ -306,14 +310,14 @@ class G722Decoder(object):
 
 
 # -----------------------------------------------------------------------------
-class Band(object):
-    """Structure for G722 decode proccessing."""
+class Band:
+    """Structure for G722 decode processing."""
 
     s: int = 0
     nb: int = 0
     det: int = 0
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._sp = 0
         self._sz = 0
         self._r = [0] * 3

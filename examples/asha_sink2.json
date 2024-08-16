@@ -1,5 +1,6 @@
 {
     "name": "Bumble Aid Right",
     "address": "F7:F8:F9:FA:FB:FC",
+    "identity_address_type": 1,
     "keystore": "JsonKeyStore"
 }
