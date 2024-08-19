@@ -241,34 +241,26 @@ class HearingAccessService(gatt.TemplateService):
         for p in presets:
             self.preset_records[p.index] = p
 
-        with contextlib.closing(EventWatcher()) as watcher:
+        @device.on('connection')
+        def on_connection(connection: Connection) -> None:
+            @connection.on('disconnection')
+            def on_disconnection(_reason):
+                self.currently_connected_clients.remove(connection)
+            # TODO Should we filter on device bonded && device is HAP ?
+            self.currently_connected_clients.add(connection)
+            if connection.device.public_address not in self.preset_changed_operations_history_per_device:
+                self.preset_changed_operations_history_per_device[
+                    connection.device.public_address
+                ] = []
+                return
 
-            @watcher.on(
-                device, 'connection'
-            )  # should it be on_characteristic_subscription ?
-            async def on_connection(connection: Connection) -> None:
-                # TODO if device is bonded && device is HAP ?
-                with contextlib.closing(EventWatcher()) as watcher:
-
-                    @watcher.on(connection, 'disconnection')
-                    def on_disconnection() -> None:
-                        self.currently_connected_clients.remove(connection)
-
-                self.currently_connected_clients.add(connection)
-                if (
-                    self.preset_changed_operations_history_per_device.get(
-                        connection.device.public_address
-                    )
-                    == None
-                ):
-                    self.preset_changed_operations_history_per_device[
-                        connection.device.public_address
-                    ] = []
-                    return
+            async def on_connection_async():
                 # Send all the PresetChangedOperation that occur when not connected
                 await self._preset_changed_operation(connection)
                 # Update the active preset index if needed
                 await self.notify_active_preset_for_connection(connection)
+
+            connection.abort_on('disconnection', on_connection_async())
 
         self.hearing_aid_features_characteristic = gatt.Characteristic(
             uuid=gatt.GATT_HEARING_AID_FEATURES_CHARACTERISTIC,
@@ -312,9 +304,11 @@ class HearingAccessService(gatt.TemplateService):
     def _on_write_hearing_aid_preset_control_point(
         self, connection: Optional[Connection], value: bytes
     ):
+        assert connection
+
         opcode = HearingAidPresetControlPointOpcode(value[0])
         handler = getattr(self, '_on_' + opcode.name.lower())
-        handler(connection, value)
+        connection.abort_on('disconnection', handler(connection, value))
 
     async def _on_read_presets_request(
         self, connection: Optional[Connection], value: bytes
