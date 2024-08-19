@@ -16,17 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-from att import CommonErrorCode
-from bumble import att
-from bumble import device
-from bumble import gatt, gatt_client
-from bumble.utils import EventWatcher, OpenIntEnum
-from dataclasses import dataclass
+from bumble import att, gatt, gatt_client
+from bumble.att import CommonErrorCode
+from bumble.device import Device, Connection
+from bumble.utils import AsyncRunner, EventWatcher, OpenIntEnum
+from bumble.hci import Address
+from dataclasses import dataclass, field
 import contextlib
 from typing import Dict, List, Optional, Set, Union
-from utils import AsyncRunner
-from device import Device, Connection
-from hci import Address
 
 
 # -----------------------------------------------------------------------------
@@ -108,13 +105,22 @@ class HearingAidFeatures:
         return bytes(
             [
                 (self.hearing_aid_type << 0)
-                | (self.hearing_aid_type << 2)
-                | (self.preset_synchronization_support << 3)
-                | (self.independent_presets << 4)
-                | (self.dynamic_presets << 5)
-                | (self.writable_presets_support << 6)
+                | (self.preset_synchronization_support << 2)
+                | (self.independent_presets << 3)
+                | (self.dynamic_presets << 4)
+                | (self.writable_presets_support << 5)
             ]
         )
+
+
+def HearingAidFeatures_from_bytes(data: int) -> HearingAidFeatures:
+    return HearingAidFeatures(
+        HearingAidType(data & 0b11),
+        PresetSynchronizationSupport(data >> 2 & 0b1),
+        IndependentPresets(data >> 3 & 0b1),
+        DynamicPresets(data >> 4 & 0b1),
+        WritablePresetsSupport(data >> 5 & 0b1),
+    )
 
 
 @dataclass
@@ -167,9 +173,11 @@ class PresetChangedOperationUnavailable(PresetChangedOperation):
         self.additional_parameters = index
 
 
+@dataclass
 class PresetRecord:
     '''See Hearing Access Service 2.8. Preset record.'''
 
+    @dataclass
     class Property:
         class Writable(OpenIntEnum):
             CANNOT_BE_WRITTEN = 0b0
@@ -179,15 +187,15 @@ class PresetRecord:
             IS_UNAVAILABLE = 0b0
             IS_AVAILABLE = 0b1
 
-        writable: Writable
-        is_available: IsAvailable
+        writable: Writable = Writable.CAN_BE_WRITTEN
+        is_available: IsAvailable = IsAvailable.IS_AVAILABLE
 
         def __bytes__(self) -> bytes:
             return bytes([self.writable | (self.is_available << 1)])
 
     index: int
-    properties: Property
     name: str
+    properties: Property = field(default_factory=Property)
 
     def __bytes__(self) -> bytes:
         return bytes([self.index]) + bytes(self.properties) + self.name.encode('utf-8')
@@ -393,6 +401,7 @@ class HearingAccessService(gatt.TemplateService):
         op_list = self.preset_changed_operations_history_per_device.get(
             connection.device.public_address, []
         )
+
         # Notification will be sent in index order
         def get_op_index(op: PresetChangedOperation) -> int:
             if isinstance(op.additional_parameters, PresetChangedOperation.Generic):
