@@ -4281,6 +4281,12 @@ class Device(CompositeEventEmitter):
             else self.public_address
         )
 
+        if advertising_set.advertising_parameters.own_address_type in (
+            OwnAddressType.RANDOM,
+            OwnAddressType.PUBLIC,
+        ):
+            connection.self_resolvable_address = None
+
         # Setup auto-restart of the advertising set if needed.
         if advertising_set.auto_restart:
             connection.once(
@@ -4327,7 +4333,10 @@ class Device(CompositeEventEmitter):
         # Convert all-zeros addresses into None.
         if self_resolvable_address == Address.ANY_RANDOM:
             self_resolvable_address = None
-        if peer_resolvable_address == Address.ANY_RANDOM:
+        if (
+            peer_resolvable_address == Address.ANY_RANDOM
+            or not peer_address.is_resolved
+        ):
             peer_resolvable_address = None
 
         logger.debug(
@@ -4361,6 +4370,7 @@ class Device(CompositeEventEmitter):
                         peer_address = resolved_address
 
         self_address = None
+        own_address_type: Optional[int] = None
         if role == HCI_CENTRAL_ROLE:
             own_address_type = self.connect_own_address_type
             assert own_address_type is not None
@@ -4388,6 +4398,11 @@ class Device(CompositeEventEmitter):
                 )
                 else self.random_address
             )
+
+        # Some controllers may return local resolvable address even not using address
+        # generation offloading. Ignore the value to prevent SMP failure.
+        if own_address_type in (OwnAddressType.RANDOM, OwnAddressType.PUBLIC):
+            self_resolvable_address = None
 
         # Create a connection.
         connection = Connection(
