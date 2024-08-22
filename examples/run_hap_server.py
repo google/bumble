@@ -22,6 +22,7 @@ import os
 
 from bumble.core import AdvertisingData
 from bumble.device import Device
+from bumble import att
 from bumble.profiles.hap import (
     HearingAccessService,
     HearingAidFeatures,
@@ -64,6 +65,8 @@ async def main() -> None:
         )
 
         await device.power_on()
+
+        att.ATT_DEFAULT_MTU = 49
 
         hap = HearingAccessService(
             device, server_features, [foo_preset, bar_preset, foobar_preset]
