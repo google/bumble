@@ -19,10 +19,9 @@ from __future__ import annotations
 from bumble import att, gatt, gatt_client
 from bumble.att import CommonErrorCode
 from bumble.device import Device, Connection
-from bumble.utils import AsyncRunner, EventWatcher, OpenIntEnum
+from bumble.utils import AsyncRunner, OpenIntEnum
 from bumble.hci import Address
 from dataclasses import dataclass, field
-import contextlib
 from typing import Dict, List, Optional, Set, Union
 
 
@@ -244,6 +243,8 @@ class HearingAccessService(gatt.TemplateService):
         self.device = device
         self.hearing_aid_features = features
         for p in presets:
+            assert len(p.name.encode()) >= 1
+            assert len(p.name.encode()) <= 40
             self.preset_records[p.index] = p
 
         @device.on('connection')
