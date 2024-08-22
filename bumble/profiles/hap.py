@@ -146,13 +146,18 @@ class PresetChangedOperation:
     additional_parameters: Union[Generic, int]
 
     def to_bytes(self, is_last: bool) -> bytes:
+        if isinstance(self.additional_parameters, PresetChangedOperation.Generic):
+            additional_parameters_bytes = bytes(self.additional_parameters)
+        else:
+            additional_parameters_bytes = bytes([self.additional_parameters])
+
         return bytes(
             [
                 HearingAidPresetControlPointOpcode.PRESET_CHANGED,
                 self.change_id,
                 is_last,
             ]
-        ) + bytes(self.additional_parameters)
+        ) + additional_parameters_bytes
 
 
 class PresetChangedOperationDeleted(PresetChangedOperation):
