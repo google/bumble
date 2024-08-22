@@ -226,7 +226,7 @@ class HearingAccessService(gatt.TemplateService):
 
     device: Device
 
-    hearing_aid_features: HearingAidFeatures
+    server_features: HearingAidFeatures
     preset_records: Dict[int, PresetRecord] = {}  # key is the preset index
     read_presets_request_in_progress: bool = False
 
@@ -244,7 +244,7 @@ class HearingAccessService(gatt.TemplateService):
         assert att.ATT_DEFAULT_MTU >= 49
 
         self.device = device
-        self.hearing_aid_features = features
+        self.server_features = features
         for p in presets:
             assert len(p.name.encode()) >= 1
             assert len(p.name.encode()) <= 40
@@ -275,7 +275,7 @@ class HearingAccessService(gatt.TemplateService):
             uuid=gatt.GATT_HEARING_AID_FEATURES_CHARACTERISTIC,
             properties=gatt.Characteristic.Properties.READ,
             permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            value=bytes(self.hearing_aid_features),
+            value=bytes(self.server_features),
         )
         self.hearing_aid_preset_control_point = gatt.Characteristic(
             uuid=gatt.GATT_HEARING_AID_PRESET_CONTROL_POINT_CHARACTERISTIC,
@@ -550,7 +550,7 @@ class HearingAccessService(gatt.TemplateService):
         self, connection: Optional[Connection], value: bytes
     ):
         if (
-            self.hearing_aid_features.preset_synchronization_support
+            self.server_features.preset_synchronization_support
             == PresetSynchronizationSupport.PRESET_SYNCHRONIZATION_IS_SUPPORTED
         ):
             raise att.ATT_Error(ErrorCode.PRESET_SYNCHRONIZATION_NOT_SUPPORTED)
@@ -561,7 +561,7 @@ class HearingAccessService(gatt.TemplateService):
         self, connection: Optional[Connection]
     ):
         if (
-            self.hearing_aid_features.preset_synchronization_support
+            self.server_features.preset_synchronization_support
             == PresetSynchronizationSupport.PRESET_SYNCHRONIZATION_IS_SUPPORTED
         ):
             raise att.ATT_Error(ErrorCode.PRESET_SYNCHRONIZATION_NOT_SUPPORTED)
@@ -572,7 +572,7 @@ class HearingAccessService(gatt.TemplateService):
         self, connection: Optional[Connection]
     ):
         if (
-            self.hearing_aid_features.preset_synchronization_support
+            self.server_features.preset_synchronization_support
             == PresetSynchronizationSupport.PRESET_SYNCHRONIZATION_IS_SUPPORTED
         ):
             raise att.ATT_Error(ErrorCode.PRESET_SYNCHRONIZATION_NOT_SUPPORTED)
