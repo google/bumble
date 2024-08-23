@@ -139,7 +139,7 @@ async def open_usb_transport(spec: str) -> Transport:
             self.packets.put_nowait(packet)
 
         def transfer_callback(self, transfer):
-            self.acl_out_transfer_ready.release()
+            self.loop.call_soon_threadsafe(self.acl_out_transfer_ready.release)
             status = transfer.getStatus()
 
             # pylint: disable=no-member
