@@ -424,6 +424,7 @@ class HearingAccessService(gatt.TemplateService):
             return op.additional_parameters
 
         op_list.sort(key=get_op_index)
+        # If the ATT bearer is terminated before all notifications or indications are sent, then the server shall consider the Preset Changed operation aborted and shall continue the operation when the client reconnects.
         while len(op_list) > 0:
             try:
                 await connection.device.indicate_subscriber(
@@ -431,8 +432,9 @@ class HearingAccessService(gatt.TemplateService):
                     self.hearing_aid_preset_control_point,
                     value=op_list[0].to_bytes(len(op_list) == 1),
                 )
+                # Remove item once sent, and keep the non sent item in the list
                 op_list.pop(0)
-            finally:
+            except TimeoutError:
                 break
 
     async def _notifyPresetOperations(self, op: PresetChangedOperation) -> None:
