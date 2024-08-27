@@ -225,7 +225,6 @@ class HearingAccessService(gatt.TemplateService):
     hearing_aid_preset_control_point: gatt.Characteristic
     active_preset_index_characteristic: gatt.Characteristic
     active_preset_index: int = 0x00
-    # TODO validate address type → public_address ?
     active_preset_index_per_device: Dict[Address, int] = {}
 
     device: Device
@@ -489,13 +488,12 @@ class HearingAccessService(gatt.TemplateService):
             self.active_preset_index_characteristic,
             value=bytes([self.active_preset_index]),
         )
-        self.active_preset_index_per_device[
-            connection.device.public_address
-        ] = self.active_preset_index
+        self.active_preset_index_per_device[connection.device.public_address] = (
+            self.active_preset_index
+        )
 
     async def notify_active_preset(self) -> None:
         for connection in self.currently_connected_clients:
-            # TODO can a client be disconnected while iterating on all the current ?
             await self.notify_active_preset_for_connection(connection)
 
     async def set_active_preset(
