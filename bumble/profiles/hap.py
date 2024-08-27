@@ -18,7 +18,7 @@
 from __future__ import annotations
 from bumble import att, gatt, gatt_client
 from bumble.att import CommonErrorCode
-from bumble.core import InvalidArgumentError
+from bumble.core import InvalidArgumentError, InvalidStateError
 from bumble.device import Device, Connection
 from bumble.utils import AsyncRunner, OpenIntEnum
 from bumble.hci import Address
@@ -151,13 +151,16 @@ class PresetChangedOperation:
         else:
             additional_parameters_bytes = bytes([self.additional_parameters])
 
-        return bytes(
-            [
-                HearingAidPresetControlPointOpcode.PRESET_CHANGED,
-                self.change_id,
-                is_last,
-            ]
-        ) + additional_parameters_bytes
+        return (
+            bytes(
+                [
+                    HearingAidPresetControlPointOpcode.PRESET_CHANGED,
+                    self.change_id,
+                    is_last,
+                ]
+            )
+            + additional_parameters_bytes
+        )
 
 
 class PresetChangedOperationDeleted(PresetChangedOperation):
@@ -257,9 +260,13 @@ class HearingAccessService(gatt.TemplateService):
             @connection.on('disconnection')
             def on_disconnection(_reason) -> None:
                 self.currently_connected_clients.remove(connection)
+
             # TODO Should we filter on device bonded && device is HAP ?
             self.currently_connected_clients.add(connection)
-            if connection.device.public_address not in self.preset_changed_operations_history_per_device:
+            if (
+                connection.device.public_address
+                not in self.preset_changed_operations_history_per_device
+            ):
                 self.preset_changed_operations_history_per_device[
                     connection.device.public_address
                 ] = []
@@ -378,7 +385,8 @@ class HearingAccessService(gatt.TemplateService):
     async def delete_preset(self, index: int) -> None:
         '''Server API to delete a preset. It should not be the current active preset'''
 
-        assert index != self.active_preset_index
+        if index == self.active_preset_index:
+            raise InvalidStateError('Cannot delete active preset')
 
         del self.preset_records[index]
         await self._notifyPresetOperations(PresetChangedOperationDeleted(index))
@@ -393,7 +401,8 @@ class HearingAccessService(gatt.TemplateService):
     async def unavailable_preset(self, index: int) -> None:
         '''Server API to make a preset unavailable. It should not be the current active preset'''
 
-        assert index != self.active_preset_index
+        if index == self.active_preset_index:
+            raise InvalidStateError('Cannot set active preset as unavailable')
 
         preset = self.preset_records[index]
         preset.properties.is_available = (
@@ -477,16 +486,18 @@ class HearingAccessService(gatt.TemplateService):
             self.active_preset_index_characteristic,
             value=bytes([self.active_preset_index]),
         )
-        self.active_preset_index_per_device[
-            connection.device.public_address
-        ] = self.active_preset_index
+        self.active_preset_index_per_device[connection.device.public_address] = (
+            self.active_preset_index
+        )
 
     async def notify_active_preset(self) -> None:
         for connection in self.currently_connected_clients:
             # TODO can a client be disconnected while iterating on all the current ?
             await self.notify_active_preset_for_connection(connection)
 
-    async def set_active_preset(self, connection: Optional[Connection], value: bytes) -> None:
+    async def set_active_preset(
+        self, connection: Optional[Connection], value: bytes
+    ) -> None:
         assert connection
         index = value[1]
         preset = self.preset_records.get(index, None)
