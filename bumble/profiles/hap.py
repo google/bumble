@@ -160,19 +160,19 @@ class PresetChangedOperation:
 
 
 class PresetChangedOperationDeleted(PresetChangedOperation):
-    def __init__(self, index):
+    def __init__(self, index) -> None:
         self.change_id = PresetChangedOperation.ChangeId.PRESET_RECORD_DELETED
         self.additional_parameters = index
 
 
 class PresetChangedOperationAvailable(PresetChangedOperation):
-    def __init__(self, index):
+    def __init__(self, index) -> None:
         self.change_id = PresetChangedOperation.ChangeId.PRESET_RECORD_AVAILABLE
         self.additional_parameters = index
 
 
 class PresetChangedOperationUnavailable(PresetChangedOperation):
-    def __init__(self, index):
+    def __init__(self, index) -> None:
         self.change_id = PresetChangedOperation.ChangeId.PRESET_RECORD_UNAVAILABLE
         self.additional_parameters = index
 
@@ -253,7 +253,7 @@ class HearingAccessService(gatt.TemplateService):
         @device.on('connection')
         def on_connection(connection: Connection) -> None:
             @connection.on('disconnection')
-            def on_disconnection(_reason):
+            def on_disconnection(_reason) -> None:
                 self.currently_connected_clients.remove(connection)
             # TODO Should we filter on device bonded && device is HAP ?
             self.currently_connected_clients.add(connection)
@@ -263,7 +263,7 @@ class HearingAccessService(gatt.TemplateService):
                 ] = []
                 return
 
-            async def on_connection_async():
+            async def on_connection_async() -> None:
                 # Send all the PresetChangedOperation that occur when not connected
                 await self._preset_changed_operation(connection)
                 # Update the active preset index if needed
@@ -307,7 +307,7 @@ class HearingAccessService(gatt.TemplateService):
         )
 
     # TODO this need to be triggered when device is unbonded
-    def on_forget(self, addr: Address):
+    def on_forget(self, addr: Address) -> None:
         self.preset_changed_operations_history_per_device.pop(addr)
 
     def _on_write_hearing_aid_preset_control_point(
@@ -369,11 +369,11 @@ class HearingAccessService(gatt.TemplateService):
         finally:
             self.read_presets_request_in_progress = False
 
-    async def generic_update(self, op: PresetChangedOperation):
+    async def generic_update(self, op: PresetChangedOperation) -> None:
         '''Server API to perform a generic update. It is the responsibility of the caller to modify the preset_records to match the PresetChangedOperation being sent'''
         await self._notifyPresetOperations(op)
 
-    async def delete_preset(self, index: int):
+    async def delete_preset(self, index: int) -> None:
         '''Server API to delete a preset. It should not be the current active preset'''
 
         assert index != self.active_preset_index
@@ -381,14 +381,14 @@ class HearingAccessService(gatt.TemplateService):
         del self.preset_records[index]
         await self._notifyPresetOperations(PresetChangedOperationDeleted(index))
 
-    async def available_preset(self, index: int):
+    async def available_preset(self, index: int) -> None:
         '''Server API to make a preset available'''
 
         preset = self.preset_records[index]
         preset.properties.is_available = PresetRecord.Property.IsAvailable.IS_AVAILABLE
         await self._notifyPresetOperations(PresetChangedOperationAvailable(index))
 
-    async def unavailable_preset(self, index: int):
+    async def unavailable_preset(self, index: int) -> None:
         '''Server API to make a preset unavailable. It should not be the current active preset'''
 
         assert index != self.active_preset_index
@@ -399,7 +399,7 @@ class HearingAccessService(gatt.TemplateService):
         )
         await self._notifyPresetOperations(PresetChangedOperationUnavailable(index))
 
-    async def _preset_changed_operation(self, connection: Connection):
+    async def _preset_changed_operation(self, connection: Connection) -> None:
         '''Send all PresetChangedOperation saved for a given connection'''
         op_list = self.preset_changed_operations_history_per_device.get(
             connection.device.public_address, []
@@ -423,7 +423,7 @@ class HearingAccessService(gatt.TemplateService):
             finally:
                 break
 
-    async def _notifyPresetOperations(self, op: PresetChangedOperation):
+    async def _notifyPresetOperations(self, op: PresetChangedOperation) -> None:
         for historyList in self.preset_changed_operations_history_per_device.values():
             historyList.append(op)
 
@@ -460,7 +460,7 @@ class HearingAccessService(gatt.TemplateService):
             )
         )
 
-    async def notify_active_preset_for_connection(self, connection: Connection):
+    async def notify_active_preset_for_connection(self, connection: Connection) -> None:
         if (
             self.active_preset_index_per_device.get(
                 connection.device.public_address, 0x00
@@ -479,12 +479,12 @@ class HearingAccessService(gatt.TemplateService):
             connection.device.public_address
         ] = self.active_preset_index
 
-    async def notify_active_preset(self):
+    async def notify_active_preset(self) -> None:
         for connection in self.currently_connected_clients:
             # TODO can a client be disconnected while iterating on all the current ?
             await self.notify_active_preset_for_connection(connection)
 
-    async def set_active_preset(self, connection: Optional[Connection], value: bytes):
+    async def set_active_preset(self, connection: Optional[Connection], value: bytes) -> None:
         assert connection
         index = value[1]
         preset = self.preset_records.get(index, None)
@@ -540,10 +540,10 @@ class HearingAccessService(gatt.TemplateService):
             self.active_preset_index = first_preset.index
         await self.notify_active_preset()
 
-    async def _on_set_next_preset(self, connection: Optional[Connection]):
+    async def _on_set_next_preset(self, connection: Optional[Connection]) -> None:
         await self.set_next_or_previous_preset(connection, False)
 
-    async def _on_set_previous_preset(self, connection: Optional[Connection]):
+    async def _on_set_previous_preset(self, connection: Optional[Connection]) -> None:
         await self.set_next_or_previous_preset(connection, True)
 
     async def _on_set_active_preset_synchronized_locally(
