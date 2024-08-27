@@ -18,6 +18,7 @@
 from __future__ import annotations
 from bumble import att, gatt, gatt_client
 from bumble.att import CommonErrorCode
+from bumble.core import InvalidArgumentError
 from bumble.device import Device, Connection
 from bumble.utils import AsyncRunner, OpenIntEnum
 from bumble.hci import Address
@@ -246,8 +247,9 @@ class HearingAccessService(gatt.TemplateService):
         self.device = device
         self.server_features = features
         for p in presets:
-            assert len(p.name.encode()) >= 1
-            assert len(p.name.encode()) <= 40
+            if len(p.name.encode()) >= 1 or len(p.name.encode()) <= 40:
+                raise InvalidArgumentError(f'Invalid name: {p.name}')
+
             self.preset_records[p.index] = p
 
         @device.on('connection')
