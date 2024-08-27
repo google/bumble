@@ -360,22 +360,23 @@ class HearingAccessService(gatt.TemplateService):
     async def _read_preset_response(
         self, connection: Connection, presets: List[PresetRecord]
     ):
+        # If the ATT bearer is terminated before all notifications or indications are sent, then the server shall consider the Read Presets Request operation aborted and shall not either continue or restart the operation when the client reconnects.
         try:
-            while len(presets) > 0:
+            for i, preset in enumerate(presets):
                 await connection.device.indicate_subscriber(
                     connection,
                     self.hearing_aid_preset_control_point,
                     value=bytes(
                         [
                             HearingAidPresetControlPointOpcode.READ_PRESET_RESPONSE,
-                            len(presets) == 1,
+                            i == len(presets) - 1,
                         ]
                     )
-                    + bytes(presets[0]),
+                    + bytes(preset),
                 )
-                presets.pop(0)
 
         finally:
+            # indicate_subscriber can raise a TimeoutError, we need to gracefully terminate the operation
             self.read_presets_request_in_progress = False
 
     async def generic_update(self, op: PresetChangedOperation) -> None:
