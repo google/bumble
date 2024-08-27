@@ -487,9 +487,9 @@ class HearingAccessService(gatt.TemplateService):
             self.active_preset_index_characteristic,
             value=bytes([self.active_preset_index]),
         )
-        self.active_preset_index_per_device[connection.device.public_address] = (
-            self.active_preset_index
-        )
+        self.active_preset_index_per_device[
+            connection.device.public_address
+        ] = self.active_preset_index
 
     async def notify_active_preset(self) -> None:
         for connection in self.currently_connected_clients:
