@@ -23,10 +23,10 @@ import struct
 
 from abc import ABC, abstractmethod
 from pyee import EventEmitter
-from typing import Optional, Callable
+from typing import Optional, Callable, List, Dict, Any
 from typing_extensions import override
 
-from bumble import l2cap, device
+from bumble import l2cap, device, sdp, core
 from bumble.core import InvalidStateError, ProtocolError
 from bumble.hci import Address
 
@@ -40,9 +40,31 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
-# fmt: on
 HID_CONTROL_PSM = 0x0011
 HID_INTERRUPT_PSM = 0x0013
+
+
+class AttributeId(enum.IntEnum):
+    SERVICE_NAME = 0x0100
+    SERVICE_DESCRIPTION = 0x0101
+    PROVIDER_NAME = 0x0102
+    DEVICE_RELEASE_NUMBER = 0x0200  # [DEPRECATED]
+    PARSER_VERSION = 0x0201
+    DEVICE_SUBCLASS = 0x0202
+    COUNTRY_CODE = 0x0203
+    VIRTUAL_CABLE = 0x0204
+    RECONNECT_INITIATE = 0x0205
+    DESCRIPTOR_LIST = 0x0206
+    LANGID_BASE_LIST = 0x0207
+    SDP_DISABLE = 0x0208  # [DEPRECATED]
+    BATTERY_POWER = 0x0209
+    REMOTE_WAKE = 0x020A
+    PROFILE_VERSION = 0x020B  # DEPRECATED]
+    SUPERVISION_TIMEOUT = 0x020C
+    NORMALLY_CONNECTABLE = 0x020D
+    BOOT_DEVICE = 0x020E
+    SSR_HOST_MAX_LATENCY = 0x020F
+    SSR_HOST_MIN_TIMEOUT = 0x0210
 
 
 class Message:
@@ -195,6 +217,329 @@ class SendHandshakeMessage(Message):
 
 
 # -----------------------------------------------------------------------------
+# SDP
+# -----------------------------------------------------------------------------
+@dataclass
+class SdpInformation:
+    service_record_handle: int
+    version_number: int
+    hid_parser_version: int
+    hid_device_subclass: int
+    hid_country_code: int
+    hid_virtual_cable: bool
+    hid_reconnect_initiate: bool
+    report_descriptor_type: int
+    hid_report_map: bytes
+    hid_langid_base_language: int
+    hid_langid_base_bluetooth_string_offset: int
+    hid_boot_device: bool
+    hid_battery_power: Optional[bool] = None
+    hid_remote_wake: Optional[bool] = None
+    hid_supervision_timeout: Optional[int] = None
+    hid_normally_connectable: Optional[bool] = None
+    service_name: Optional[bytes] = None
+    service_description: Optional[bytes] = None
+    provider_name: Optional[bytes] = None
+    hid_ssr_host_max_latency: Optional[int] = None
+    hid_ssr_host_min_timeout: Optional[int] = None
+
+
+def make_device_sdp_record(
+    service_record_handle: int,
+    hid_report_map: bytes,
+    version_number=0x0101,  # 0x0101 uint16 version number (v1.1)
+    service_name: bytes = b'Bumble HID',
+    service_description: bytes = b'Bumble',
+    provider_name: bytes = b'Bumble',
+    hid_parser_version: int = 0x0111,  # uint16 0x0111 (v1.1.1)
+    hid_device_subclass: int = 0xC0,  # Combo keyboard/pointing device
+    hid_country_code: int = 0x21,  # 0x21 Uint8, USA
+    hid_virtual_cable: bool = True,  # Virtual cable enabled
+    hid_reconnect_initiate: bool = True,  #  Reconnect initiate enabled
+    report_descriptor_type: int = 0x22,  # 0x22 Type = Report Descriptor
+    hid_langid_base_language: int = 0x0409,  # 0x0409 Language = English (United States)
+    hid_langid_base_bluetooth_string_offset: int = 0x100,  # 0x0100 Default
+    hid_battery_power: Optional[bool] = True,  #  Battery power enabled
+    hid_remote_wake: Optional[bool] = True,  #  Remote wake enabled
+    hid_supervision_timeout: Optional[int] = 0xC80,  # uint16 0xC80 (2s)
+    hid_normally_connectable: Optional[bool] = True,  #  Normally connectable enabled
+    hid_boot_device: bool = True,  #  Boot device support enabled
+    hid_ssr_host_max_latency: Optional[int] = 0x640,  # uint16 0x640 (1s)
+    hid_ssr_host_min_timeout: Optional[int] = 0xC80,  # uint16 0xC80 (2s)
+) -> List[sdp.ServiceAttribute]:
+    attributes = [
+        sdp.ServiceAttribute(
+            sdp.SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+            sdp.DataElement.unsigned_integer_32(service_record_handle),
+        ),
+        sdp.ServiceAttribute(
+            sdp.SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+            sdp.DataElement.sequence(
+                [sdp.DataElement.uuid(sdp.SDP_PUBLIC_BROWSE_ROOT)]
+            ),
+        ),
+        sdp.ServiceAttribute(
+            sdp.SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+            sdp.DataElement.sequence(
+                [
+                    sdp.DataElement.uuid(core.BT_HUMAN_INTERFACE_DEVICE_SERVICE),
+                ]
+            ),
+        ),
+        sdp.ServiceAttribute(
+            sdp.SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+            sdp.DataElement.sequence(
+                [
+                    sdp.DataElement.sequence(
+                        [
+                            sdp.DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
+                            sdp.DataElement.unsigned_integer_16(HID_CONTROL_PSM),
+                        ]
+                    ),
+                    sdp.DataElement.sequence(
+                        [sdp.DataElement.uuid(core.BT_HIDP_PROTOCOL_ID)]
+                    ),
+                ]
+            ),
+        ),
+        sdp.ServiceAttribute(
+            sdp.SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID,
+            sdp.DataElement.sequence(
+                [
+                    sdp.DataElement.unsigned_integer_16(0x656E),  # "en"
+                    sdp.DataElement.unsigned_integer_16(0x6A),
+                    sdp.DataElement.unsigned_integer_16(0x0100),
+                ]
+            ),
+        ),
+        sdp.ServiceAttribute(
+            sdp.SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+            sdp.DataElement.sequence(
+                [
+                    sdp.DataElement.sequence(
+                        [
+                            sdp.DataElement.uuid(
+                                core.BT_HUMAN_INTERFACE_DEVICE_SERVICE
+                            ),
+                            sdp.DataElement.unsigned_integer_16(version_number),
+                        ]
+                    ),
+                ]
+            ),
+        ),
+        sdp.ServiceAttribute(
+            sdp.SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+            sdp.DataElement.sequence(
+                [
+                    sdp.DataElement.sequence(
+                        [
+                            sdp.DataElement.sequence(
+                                [
+                                    sdp.DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
+                                    sdp.DataElement.unsigned_integer_16(
+                                        HID_INTERRUPT_PSM
+                                    ),
+                                ]
+                            ),
+                            sdp.DataElement.sequence(
+                                [
+                                    sdp.DataElement.uuid(core.BT_HIDP_PROTOCOL_ID),
+                                ]
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.SERVICE_NAME,
+            sdp.DataElement(sdp.DataElement.TEXT_STRING, service_name),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.SERVICE_DESCRIPTION,
+            sdp.DataElement(sdp.DataElement.TEXT_STRING, service_description),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.PROVIDER_NAME,
+            sdp.DataElement(sdp.DataElement.TEXT_STRING, provider_name),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.PARSER_VERSION,
+            sdp.DataElement.unsigned_integer_32(hid_parser_version),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.DEVICE_SUBCLASS,
+            sdp.DataElement.unsigned_integer_32(hid_device_subclass),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.COUNTRY_CODE,
+            sdp.DataElement.unsigned_integer_32(hid_country_code),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.VIRTUAL_CABLE,
+            sdp.DataElement.boolean(hid_virtual_cable),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.RECONNECT_INITIATE,
+            sdp.DataElement.boolean(hid_reconnect_initiate),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.DESCRIPTOR_LIST,
+            sdp.DataElement.sequence(
+                [
+                    sdp.DataElement.sequence(
+                        [
+                            sdp.DataElement.unsigned_integer_16(report_descriptor_type),
+                            sdp.DataElement(
+                                sdp.DataElement.TEXT_STRING, hid_report_map
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.LANGID_BASE_LIST,
+            sdp.DataElement.sequence(
+                [
+                    sdp.DataElement.sequence(
+                        [
+                            sdp.DataElement.unsigned_integer_16(
+                                hid_langid_base_language
+                            ),
+                            sdp.DataElement.unsigned_integer_16(
+                                hid_langid_base_bluetooth_string_offset
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+        ),
+        sdp.ServiceAttribute(
+            AttributeId.BOOT_DEVICE,
+            sdp.DataElement.boolean(hid_boot_device),
+        ),
+    ]
+    if hid_battery_power is not None:
+        attributes.append(
+            sdp.ServiceAttribute(
+                AttributeId.BATTERY_POWER,
+                sdp.DataElement.boolean(hid_battery_power),
+            )
+        )
+    if hid_remote_wake is not None:
+        attributes.append(
+            sdp.ServiceAttribute(
+                AttributeId.REMOTE_WAKE,
+                sdp.DataElement.boolean(hid_remote_wake),
+            )
+        )
+    if hid_supervision_timeout is not None:
+        attributes.append(
+            sdp.ServiceAttribute(
+                AttributeId.SUPERVISION_TIMEOUT,
+                sdp.DataElement.unsigned_integer_16(hid_supervision_timeout),
+            )
+        )
+    if hid_normally_connectable is not None:
+        attributes.append(
+            sdp.ServiceAttribute(
+                AttributeId.NORMALLY_CONNECTABLE,
+                sdp.DataElement.boolean(hid_normally_connectable),
+            )
+        )
+    if hid_ssr_host_max_latency is not None:
+        attributes.append(
+            sdp.ServiceAttribute(
+                AttributeId.SSR_HOST_MAX_LATENCY,
+                sdp.DataElement.unsigned_integer_16(hid_ssr_host_max_latency),
+            )
+        )
+    if hid_ssr_host_min_timeout is not None:
+        attributes.append(
+            sdp.ServiceAttribute(
+                AttributeId.SSR_HOST_MIN_TIMEOUT,
+                sdp.DataElement.unsigned_integer_16(hid_ssr_host_min_timeout),
+            )
+        )
+    return attributes
+
+
+async def find_device_sdp_record(
+    connection: device.Connection,
+) -> Optional[SdpInformation]:
+
+    async with sdp.Client(connection) as sdp_client:
+        service_record_handles = await sdp_client.search_services(
+            [core.BT_HUMAN_INTERFACE_DEVICE_SERVICE]
+        )
+        if not service_record_handles:
+            return None
+        if len(service_record_handles) > 1:
+            logger.info(
+                "Remote has more than one HID SDP records, only return the first one."
+            )
+
+        service_record_handle = service_record_handles[0]
+        attr: Dict[str, Any] = {"service_record_handle": service_record_handle}
+
+        attributes = await sdp_client.get_attributes(
+            service_record_handle, [sdp.SDP_ALL_ATTRIBUTES_RANGE]
+        )
+        for attribute in attributes:
+            if attribute.id == sdp.SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID:
+                attr["version_number"] = attribute.value.value[0].value[1].value
+            elif attribute.id == AttributeId.SERVICE_NAME:
+                attr["service_name"] = attribute.value.value
+            elif attribute.id == AttributeId.SERVICE_DESCRIPTION:
+                attr["service_description"] = attribute.value.value
+            elif attribute.id == AttributeId.PROVIDER_NAME:
+                attr["provider_name"] = attribute.value.value
+            elif attribute.id == AttributeId.PARSER_VERSION:
+                attr["hid_parser_version"] = attribute.value.value
+            elif attribute.id == AttributeId.DEVICE_SUBCLASS:
+                attr["hid_device_subclass"] = attribute.value.value
+            elif attribute.id == AttributeId.COUNTRY_CODE:
+                attr["hid_country_code"] = attribute.value.value
+            elif attribute.id == AttributeId.VIRTUAL_CABLE:
+                attr["hid_virtual_cable"] = attribute.value.value
+            elif attribute.id == AttributeId.RECONNECT_INITIATE:
+                attr["hid_reconnect_initiate"] = attribute.value.value
+            elif attribute.id == AttributeId.DESCRIPTOR_LIST:
+                attr["report_descriptor_type"] = attribute.value.value[0].value[0].value
+                attr["hid_report_map"] = attribute.value.value[0].value[1].value
+            elif attribute.id == AttributeId.BATTERY_POWER:
+                attr["hid_battery_power"] = attribute.value.value
+            elif attribute.id == AttributeId.REMOTE_WAKE:
+                attr["hid_remote_wake"] = attribute.value.value
+            elif attribute.id == AttributeId.SUPERVISION_TIMEOUT:
+                attr["hid_supervision_timeout"] = attribute.value.value
+            elif attribute.id == AttributeId.NORMALLY_CONNECTABLE:
+                attr["hid_normally_connectable"] = attribute.value.value
+            elif attribute.id == AttributeId.LANGID_BASE_LIST:
+                attr["hid_langid_base_language"] = (
+                    attribute.value.value[0].value[0].value
+                )
+                attr["hid_langid_base_bluetooth_string_offset"] = (
+                    attribute.value.value[0].value[1].value
+                )
+            elif attribute.id == AttributeId.BOOT_DEVICE:
+                attr["hid_boot_device"] = attribute.value.value
+            elif attribute.id == AttributeId.SSR_HOST_MAX_LATENCY:
+                attr["hid_ssr_host_max_latency"] = attribute.value.value
+            elif attribute.id == AttributeId.SSR_HOST_MIN_TIMEOUT:
+                attr["hid_ssr_host_min_timeout"] = attribute.value.value
+
+        try:
+            return SdpInformation(**attr)
+        except:
+            logger.exception("Cannot build SDP information")
+            return None
+
+
+# -----------------------------------------------------------------------------
+
+
 class HID(ABC, EventEmitter):
     l2cap_ctrl_channel: Optional[l2cap.ClassicChannel] = None
     l2cap_intr_channel: Optional[l2cap.ClassicChannel] = None
