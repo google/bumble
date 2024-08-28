@@ -263,11 +263,11 @@ class HearingAccessService(gatt.TemplateService):
             # TODO Should we filter on device bonded && device is HAP ?
             self.currently_connected_clients.add(connection)
             if (
-                connection.device.public_address
+                connection.peer_address
                 not in self.preset_changed_operations_history_per_device
             ):
                 self.preset_changed_operations_history_per_device[
-                    connection.device.public_address
+                    connection.peer_address
                 ] = []
                 return
 
@@ -413,7 +413,7 @@ class HearingAccessService(gatt.TemplateService):
     async def _preset_changed_operation(self, connection: Connection) -> None:
         '''Send all PresetChangedOperation saved for a given connection'''
         op_list = self.preset_changed_operations_history_per_device.get(
-            connection.device.public_address, []
+            connection.peer_address, []
         )
 
         # Notification will be sent in index order
@@ -476,7 +476,7 @@ class HearingAccessService(gatt.TemplateService):
     async def notify_active_preset_for_connection(self, connection: Connection) -> None:
         if (
             self.active_preset_index_per_device.get(
-                connection.device.public_address, 0x00
+                connection.peer_address, 0x00
             )
             == self.active_preset_index
         ):
@@ -488,7 +488,7 @@ class HearingAccessService(gatt.TemplateService):
             self.active_preset_index_characteristic,
             value=bytes([self.active_preset_index]),
         )
-        self.active_preset_index_per_device[connection.device.public_address] = (
+        self.active_preset_index_per_device[connection.peer_address] = (
             self.active_preset_index
         )
 
