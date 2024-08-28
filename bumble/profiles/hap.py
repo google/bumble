@@ -23,6 +23,7 @@ from bumble.device import Device, Connection
 from bumble.utils import AsyncRunner, OpenIntEnum
 from bumble.hci import Address
 from dataclasses import dataclass, field
+import logging
 from typing import Dict, List, Optional, Set, Union
 
 
@@ -328,6 +329,8 @@ class HearingAccessService(gatt.TemplateService):
         self, connection: Optional[Connection], value: bytes
     ):
         assert connection
+        if connection.att_mtu < 49: # 2.5. GATT sub-procedure requirements 
+            logging.warning(f'HAS require MTU >= 49: {connection}')
 
         if self.read_presets_request_in_progress:
             raise att.ATT_Error(CommonErrorCode.PROCEDURE_ALREADY_IN_PROGRESS)
