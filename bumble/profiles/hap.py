@@ -243,9 +243,6 @@ class HearingAccessService(gatt.TemplateService):
     def __init__(
         self, device: Device, features: HearingAidFeatures, presets: List[PresetRecord]
     ) -> None:
-        # 2.5. GATT sub-procedure requirements
-        assert att.ATT_DEFAULT_MTU >= 49
-
         self.device = device
         self.server_features = features
         for p in presets:

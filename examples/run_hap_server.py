@@ -66,8 +66,6 @@ async def main() -> None:
 
         await device.power_on()
 
-        att.ATT_DEFAULT_MTU = 49
-
         hap = HearingAccessService(
             device, server_features, [foo_preset, bar_preset, foobar_preset]
         )
