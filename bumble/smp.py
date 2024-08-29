@@ -764,7 +764,9 @@ class Session:
         self.peer_io_capability = SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
 
         # OOB
-        self.oob_data_flag = 0 if pairing_config.oob is None else 1
+        self.oob_data_flag = (
+            1 if pairing_config.oob and pairing_config.oob.peer_data else 0
+        )
 
         # Set up addresses
         self_address = connection.self_resolvable_address or connection.self_address
@@ -1014,8 +1016,10 @@ class Session:
         self.send_command(response)
 
     def send_pairing_confirm_command(self) -> None:
-        self.r = crypto.r()
-        logger.debug(f'generated random: {self.r.hex()}')
+
+        if self.pairing_method != PairingMethod.OOB:
+            self.r = crypto.r()
+            logger.debug(f'generated random: {self.r.hex()}')
 
         if self.sc:
 
@@ -1735,7 +1739,6 @@ class Session:
         if self.pairing_method in (
             PairingMethod.JUST_WORKS,
             PairingMethod.NUMERIC_COMPARISON,
-            PairingMethod.OOB,
         ):
             ra = bytes(16)
             rb = ra
@@ -1743,6 +1746,22 @@ class Session:
             assert self.passkey
             ra = self.passkey.to_bytes(16, byteorder='little')
             rb = ra
+        elif self.pairing_method == PairingMethod.OOB:
+            if self.is_initiator:
+                if self.peer_oob_data:
+                    rb = self.peer_oob_data.r
+                    ra = self.r
+                else:
+                    rb = bytes(16)
+                    ra = self.r
+            else:
+                if self.peer_oob_data:
+                    ra = self.peer_oob_data.r
+                    rb = self.r
+                else:
+                    ra = bytes(16)
+                    rb = self.r
+
         else:
             return
 
