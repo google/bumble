@@ -268,7 +268,6 @@ class HearingAccessService(gatt.TemplateService):
 
         @device.on('connection')
         def on_connection(connection: Connection) -> None:
-            logging.warning(f'on_connection for {connection}')
             @connection.on('disconnection')
             def on_disconnection(_reason) -> None:
                 self.currently_connected_clients.remove(connection)
@@ -489,27 +488,23 @@ class HearingAccessService(gatt.TemplateService):
         )
 
     async def notify_active_preset_for_connection(self, connection: Connection) -> None:
-        logging.warning('will notify ? ')
         if (
             self.active_preset_index_per_device.get(connection.peer_address, 0x00)
             == self.active_preset_index
         ):
-            logging.warning('skip notify')
             # Nothing to do, peer is already updated
             return
 
-        logging.warning('notify subscriber')
         await connection.device.notify_subscriber(
             connection,
             self.active_preset_index_characteristic,
             value=bytes([self.active_preset_index]),
         )
-        self.active_preset_index_per_device[
-            connection.peer_address
-        ] = self.active_preset_index
+        self.active_preset_index_per_device[connection.peer_address] = (
+            self.active_preset_index
+        )
 
     async def notify_active_preset(self) -> None:
-        logging.warning(f'notify_active_preset for {self.currently_connected_clients}')
         for connection in self.currently_connected_clients:
             await self.notify_active_preset_for_connection(connection)
 
@@ -565,18 +560,20 @@ class HearingAccessService(gatt.TemplateService):
         if not first_preset:  # If no other preset are available
             raise att.ATT_Error(ErrorCode.PRESET_OPERATION_NOT_POSSIBLE)
 
-        logging.error(f'index was {self.active_preset_index}')
         if next_preset:
             self.active_preset_index = next_preset.index
         else:
             self.active_preset_index = first_preset.index
-        logging.error(f'index now is {self.active_preset_index}')
         await self.notify_active_preset()
 
-    async def _on_set_next_preset(self, connection: Optional[Connection], __value__: bytes) -> None:
+    async def _on_set_next_preset(
+        self, connection: Optional[Connection], __value__: bytes
+    ) -> None:
         await self.set_next_or_previous_preset(connection, False)
 
-    async def _on_set_previous_preset(self, connection: Optional[Connection], __value__: bytes) -> None:
+    async def _on_set_previous_preset(
+        self, connection: Optional[Connection], __value__: bytes
+    ) -> None:
         await self.set_next_or_previous_preset(connection, True)
 
     async def _on_set_active_preset_synchronized_locally(
@@ -649,7 +646,6 @@ class HearingAccessServiceProxy(gatt_client.ProfileServiceProxy):
         self.preset_control_point_indications = asyncio.Queue()
 
         def on_preset_control_point_indication(data: bytes):
-            logging.warning(f'got indication: {data}')
             self.preset_control_point_indications.put_nowait(data)
 
         await self.hearing_aid_preset_control_point.subscribe(

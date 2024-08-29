@@ -197,6 +197,7 @@ UUID_2_FIELD_SPEC    = lambda x, y: UUID.parse_uuid_2(x, y)  # noqa: E731
 # pylint: enable=line-too-long
 # pylint: disable=invalid-name
 
+
 class CommonErrorCode(OpenIntEnum):
     '''See Supplement to the Bluetooth Code Specification 1.2 List of Error Codes.'''
 

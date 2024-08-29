@@ -41,22 +41,26 @@ server_features = hap.HearingAidFeatures(
     hap.DynamicPresets.PRESET_RECORDS_DOES_NOT_CHANGE,
     hap.WritablePresetsSupport.WRITABLE_PRESET_RECORDS_SUPPORTED,
 )
+
+
 # -----------------------------------------------------------------------------
 @pytest_asyncio.fixture
 async def hap_client():
     devices = TwoDevices()
     devices[0].add_service(
-        hap.HearingAccessService(devices[1], server_features,[foo_preset, bar_preset, foobar_preset])
+        hap.HearingAccessService(
+            devices[1], server_features, [foo_preset, bar_preset, foobar_preset]
+        )
     )
 
     await devices.setup_connection()
     # TODO negotiate MTU > 49 to not truncate preset names
 
     # Mock encryption.
-    devices.connections[0].encryption = 1 # type: ignore
-    devices.connections[1].encryption = 1 # type: ignore
+    devices.connections[0].encryption = 1  # type: ignore
+    devices.connections[1].encryption = 1  # type: ignore
 
-    peer = device.Peer(devices.connections[1]) # type: ignore
+    peer = device.Peer(devices.connections[1])  # type: ignore
     hap_client = await peer.discover_service_and_create_proxy(
         hap.HearingAccessServiceProxy
     )
@@ -65,21 +69,32 @@ async def hap_client():
 
     yield hap_client
 
+
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_init_service(hap_client: hap.HearingAccessServiceProxy):
-    assert hap.HearingAidFeatures_from_bytes(await hap_client.server_features.read_value()) == server_features
+    assert (
+        hap.HearingAidFeatures_from_bytes(await hap_client.server_features.read_value())
+        == server_features
+    )
     assert (await hap_client.active_preset_index.read_value()) == (foo_preset.index)
+
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_read_all_presets(hap_client: hap.HearingAccessServiceProxy):
     await hap_client.hearing_aid_preset_control_point.write_value(
-        bytes([hap.HearingAidPresetControlPointOpcode.READ_PRESETS_REQUEST, 1, 0xff])
+        bytes([hap.HearingAidPresetControlPointOpcode.READ_PRESETS_REQUEST, 1, 0xFF])
     )
-    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(foo_preset)
-    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(foobar_preset)
-    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(bar_preset)
+    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(
+        foo_preset
+    )
+    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(
+        foobar_preset
+    )
+    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(
+        bar_preset
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -88,8 +103,13 @@ async def test_read_partial_presets(hap_client: hap.HearingAccessServiceProxy):
     await hap_client.hearing_aid_preset_control_point.write_value(
         bytes([hap.HearingAidPresetControlPointOpcode.READ_PRESETS_REQUEST, 3, 2])
     )
-    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(foobar_preset)
-    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(bar_preset)
+    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(
+        foobar_preset
+    )
+    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(
+        bar_preset
+    )
+
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
