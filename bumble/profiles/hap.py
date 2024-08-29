@@ -16,6 +16,8 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+import asyncio
+import functools
 from bumble import att, gatt, gatt_client
 from bumble.att import CommonErrorCode
 from bumble.core import InvalidArgumentError, InvalidStateError
@@ -225,35 +227,48 @@ class HearingAccessService(gatt.TemplateService):
     hearing_aid_features_characteristic: gatt.Characteristic
     hearing_aid_preset_control_point: gatt.Characteristic
     active_preset_index_characteristic: gatt.Characteristic
-    active_preset_index: int = 0x00
-    active_preset_index_per_device: Dict[Address, int] = {}
+    active_preset_index: int
+    active_preset_index_per_device: Dict[Address, int]
 
     device: Device
 
     server_features: HearingAidFeatures
-    preset_records: Dict[int, PresetRecord] = {}  # key is the preset index
-    read_presets_request_in_progress: bool = False
+    preset_records: Dict[int, PresetRecord]  # key is the preset index
+    read_presets_request_in_progress: bool
 
     preset_changed_operations_history_per_device: Dict[
         Address, List[PresetChangedOperation]
-    ] = {}
+    ]
 
     # Keep an updated list of connected client to send notification to
-    currently_connected_clients: Set[Connection] = set()
+    currently_connected_clients: Set[Connection]
 
     def __init__(
         self, device: Device, features: HearingAidFeatures, presets: List[PresetRecord]
     ) -> None:
+        self.active_preset_index_per_device = {}
+        self.read_presets_request_in_progress = False
+        self.preset_changed_operations_history_per_device = {}
+        self.currently_connected_clients = set()
+
         self.device = device
         self.server_features = features
+        if len(presets) < 1:
+            raise InvalidArgumentError(f'Invalid presets: {presets}')
+
+        self.preset_records = {}
         for p in presets:
-            if len(p.name.encode()) >= 1 or len(p.name.encode()) <= 40:
+            if len(p.name.encode()) < 1 or len(p.name.encode()) > 40:
                 raise InvalidArgumentError(f'Invalid name: {p.name}')
 
             self.preset_records[p.index] = p
 
+        # associate the lowest index as the current active preset at startup
+        self.active_preset_index = sorted(self.preset_records.keys())[0]
+
         @device.on('connection')
         def on_connection(connection: Connection) -> None:
+            logging.warning(f'on_connection for {connection}')
             @connection.on('disconnection')
             def on_disconnection(_reason) -> None:
                 self.currently_connected_clients.remove(connection)
@@ -329,7 +344,7 @@ class HearingAccessService(gatt.TemplateService):
         self, connection: Optional[Connection], value: bytes
     ):
         assert connection
-        if connection.att_mtu < 49: # 2.5. GATT sub-procedure requirements 
+        if connection.att_mtu < 49:  # 2.5. GATT sub-procedure requirements
             logging.warning(f'HAS require MTU >= 49: {connection}')
 
         if self.read_presets_request_in_progress:
@@ -474,25 +489,27 @@ class HearingAccessService(gatt.TemplateService):
         )
 
     async def notify_active_preset_for_connection(self, connection: Connection) -> None:
+        logging.warning('will notify ? ')
         if (
-            self.active_preset_index_per_device.get(
-                connection.peer_address, 0x00
-            )
+            self.active_preset_index_per_device.get(connection.peer_address, 0x00)
             == self.active_preset_index
         ):
+            logging.warning('skip notify')
             # Nothing to do, peer is already updated
             return
 
+        logging.warning('notify subscriber')
         await connection.device.notify_subscriber(
             connection,
             self.active_preset_index_characteristic,
             value=bytes([self.active_preset_index]),
         )
-        self.active_preset_index_per_device[connection.peer_address] = (
-            self.active_preset_index
-        )
+        self.active_preset_index_per_device[
+            connection.peer_address
+        ] = self.active_preset_index
 
     async def notify_active_preset(self) -> None:
+        logging.warning(f'notify_active_preset for {self.currently_connected_clients}')
         for connection in self.currently_connected_clients:
             await self.notify_active_preset_for_connection(connection)
 
@@ -548,16 +565,18 @@ class HearingAccessService(gatt.TemplateService):
         if not first_preset:  # If no other preset are available
             raise att.ATT_Error(ErrorCode.PRESET_OPERATION_NOT_POSSIBLE)
 
+        logging.error(f'index was {self.active_preset_index}')
         if next_preset:
             self.active_preset_index = next_preset.index
         else:
             self.active_preset_index = first_preset.index
+        logging.error(f'index now is {self.active_preset_index}')
         await self.notify_active_preset()
 
-    async def _on_set_next_preset(self, connection: Optional[Connection]) -> None:
+    async def _on_set_next_preset(self, connection: Optional[Connection], __value__: bytes) -> None:
         await self.set_next_or_previous_preset(connection, False)
 
-    async def _on_set_previous_preset(self, connection: Optional[Connection]) -> None:
+    async def _on_set_previous_preset(self, connection: Optional[Connection], __value__: bytes) -> None:
         await self.set_next_or_previous_preset(connection, True)
 
     async def _on_set_active_preset_synchronized_locally(
@@ -572,7 +591,7 @@ class HearingAccessService(gatt.TemplateService):
         # TODO (low priority) inform other server of the change
 
     async def _on_set_next_preset_synchronized_locally(
-        self, connection: Optional[Connection]
+        self, connection: Optional[Connection], __value__: bytes
     ):
         if (
             self.server_features.preset_synchronization_support
@@ -583,7 +602,7 @@ class HearingAccessService(gatt.TemplateService):
         # TODO (low priority) inform other server of the change
 
     async def _on_set_previous_preset_synchronized_locally(
-        self, connection: Optional[Connection]
+        self, connection: Optional[Connection], __value__: bytes
     ):
         if (
             self.server_features.preset_synchronization_support
@@ -601,13 +620,38 @@ class HearingAccessServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = HearingAccessService
 
     hearing_aid_preset_control_point: gatt_client.CharacteristicProxy
+    preset_control_point_indications: asyncio.Queue
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        # TODO use a InvalidServiceError instead of throwing a IndexError
+        self.server_features = gatt.PackedCharacteristicAdapter(
+            service_proxy.get_characteristics_by_uuid(
+                gatt.GATT_HEARING_AID_FEATURES_CHARACTERISTIC
+            )[0],
+            'B',
+        )
+
         self.hearing_aid_preset_control_point = (
             service_proxy.get_characteristics_by_uuid(
                 gatt.GATT_HEARING_AID_PRESET_CONTROL_POINT_CHARACTERISTIC
             )[0]
+        )
+
+        self.active_preset_index = gatt.PackedCharacteristicAdapter(
+            service_proxy.get_characteristics_by_uuid(
+                gatt.GATT_ACTIVE_PRESET_INDEX_CHARACTERISTIC
+            )[0],
+            'B',
+        )
+
+    async def setup_subscription(self):
+        self.preset_control_point_indications = asyncio.Queue()
+
+        def on_preset_control_point_indication(data: bytes):
+            logging.warning(f'got indication: {data}')
+            self.preset_control_point_indications.put_nowait(data)
+
+        await self.hearing_aid_preset_control_point.subscribe(
+            functools.partial(on_preset_control_point_indication), prefer_notify=False
         )
