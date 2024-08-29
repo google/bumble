@@ -514,7 +514,9 @@ class Host(AbortableEventEmitter):
         if self.hci_sink:
             self.hci_sink.on_packet(bytes(packet))
 
-    async def send_command(self, command, check_result=False, response_timeout: Optional[int] = None):
+    async def send_command(
+        self, command, check_result=False, response_timeout: Optional[int] = None
+    ):
         # Wait until we can send (only one pending command at a time)
         async with self.command_semaphore:
             assert self.pending_command is None

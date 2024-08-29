@@ -499,7 +499,9 @@ class Driver(common.Driver):
     async def driver_info_for_host(cls, host):
         try:
             await host.send_command(
-                HCI_Reset_Command(), check_result=True, response_timeout=cls.POST_RESET_DELAY
+                HCI_Reset_Command(),
+                check_result=True,
+                response_timeout=cls.POST_RESET_DELAY,
             )
             host.ready = True  # Needed to let the host know the controller is ready.
         except asyncio.exceptions.TimeoutError:
