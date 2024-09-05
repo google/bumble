@@ -26,6 +26,10 @@ from bumble.core import UUID
 
 from bumble.device import Connection
 
+from bumble.profiles.vcp import MIN_VOLUME, MAX_VOLUME
+
+from bumble.att import ATT_Error
+
 from bumble.gatt import (
     Characteristic,
     TemplateService,
@@ -54,6 +58,23 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
+CHANGE_COUNTER_MAX_VALUE = 0xFF
+GAIN_SETTINGS_MIN_VALUE = 0
+GAIN_SETTINGS_MAX_VALUE = 255
+
+
+class ErrorCode(enum.IntEnum):
+    '''
+    Cf. 1.6 Application error codes
+    '''
+
+    INVALID_CHANGE_COUNTER = 0x80
+    OPCODE_NOT_SUPPORTED = 0x81
+    MUTE_DISABLED = 0x82
+    VALUE_OUT_OF_RANGE = 0x83
+    GAIN_MODE_CHANGE_NOT_ALLOWED = 0x84
+
+
 class Mute(enum.IntEnum):
     '''
     Cf. 2.2.1.2 Mute Field
@@ -84,6 +105,18 @@ class AudioInputStatus(enum.IntEnum):
     ACTIVE = 0x01
 
 
+class AudioInputControlPointOpCode(enum.IntEnum):
+    '''
+    Cf. 3.5.1 Audio Input Control Point procedure requirements
+    '''
+
+    SET_GAIN_SETTING = 0x00
+    UNMUTE = 0x02
+    MUTE = 0x03
+    SET_MANUAL_GAIN_MODE = 0x04
+    SET_AUTOMATIC_GAIN_MODE = 0x05
+
+
 # -----------------------------------------------------------------------------
 class AudioInputState(Characteristic):
     '''
@@ -102,7 +135,7 @@ class AudioInputState(Characteristic):
         self.gain_settings_unit = gain_settings_unit
         self.mute: Mute = Mute.NOT_MUTED
         self.gain_mode: GainMode = GainMode.AUTOMATIC_ONLY
-        self.change_counter: int = 0x00
+        self.change_counter = 0
 
         value = CharacteristicValue(read=self._on_read)
 
@@ -116,18 +149,18 @@ class AudioInputState(Characteristic):
     def update_gain_settings_unit(self, gain_settings_unit: int) -> None:
         self.gain_settings_unit = gain_settings_unit
 
-    def increment_gain(self) -> None:
+    def increment_gain_settings(self) -> None:
         self.gain_settings += self.gain_settings_unit
-        self._increment_change_counter()
+        self.increment_change_counter()
 
-    def decrement_gain(self) -> None:
+    def decrement_gain_settings(self) -> None:
         self.gain_settings -= self.gain_settings_unit
-        self._increment_change_counter()
+        self.increment_change_counter()
 
-    def _increment_change_counter(self):
-        self.change_counter += 1
-        if self.change_counter > 255:
-            self.change_counter = 0
+    def increment_change_counter(self):
+        self.change_counter += 0x01
+        if self.change_counter > CHANGE_COUNTER_MAX_VALUE:
+            self.change_counter = 0x00
 
     def _on_read(self, _connection: Optional[Connection]) -> bytes:
         return self.__bytes__()
@@ -146,9 +179,9 @@ class GainSettingsProperties(Characteristic):
         gain_settings_unit: int,
         descriptors: Sequence[Descriptor] = (),
     ):
-        self.gain_settings_unit = gain_settings_unit
-        self.gain_settings_minimum: int = 0
-        self.gain_settings_maximum: int = 255
+        self.gain_settings_unit: int = gain_settings_unit
+        self.gain_settings_minimum: int = GAIN_SETTINGS_MIN_VALUE
+        self.gain_settings_maximum: int = GAIN_SETTINGS_MAX_VALUE
 
         value = CharacteristicValue(read=self._on_read)
         super().__init__(uuid, properties, permissions, value, descriptors)
@@ -164,6 +197,140 @@ class GainSettingsProperties(Characteristic):
 
     def _on_read(self, _connection: Optional[Connection]) -> bytes:
         return self.__bytes__()
+
+
+class AudioInputControlPoint(Characteristic):
+    '''
+    Cf. 3.52 Audio Input Control Point
+    '''
+
+    def __init__(
+        self,
+        uuid: Union[str, bytes, UUID],
+        properties: Characteristic.Properties,
+        permissions: Union[str, Attribute.Permissions],
+        audio_input_state: AudioInputState,
+        gain_settings_properties: GainSettingsProperties,
+        descriptors: Sequence[Descriptor] = (),
+    ):
+
+        self.audio_input_state = audio_input_state
+        self.gain_settings_properties = gain_settings_properties
+
+        value = CharacteristicValue(write=self._on_write)
+
+        super().__init__(uuid, properties, permissions, value, descriptors)
+
+    def _on_write(self, connection: Optional[Connection], value: bytes) -> None:
+        assert connection
+
+        def _set_gain_settings(gain_settings_operand: int) -> None:
+            '''Cf. 3.5.2.1 Set Gain Settings Procedure'''
+
+            gain_mode = self.audio_input_state.gain_mode
+            gain_settings = self.audio_input_state.gain_settings
+
+            if not (gain_mode == GainMode.MANUAL or gain_mode == GainMode.MANUAL_ONLY):
+                logger.warning(
+                    "GainMode should be either MANUAL or MANUAL_ONLY Cf Spec Audio Input Control Service 3.5.2.1"
+                )
+                return
+
+            if (
+                gain_settings_operand
+                < self.gain_settings_properties.gain_settings_minimum
+                or gain_settings_operand
+                > self.gain_settings_properties.gain_settings_maximum
+            ):
+                logger.error("gain_seetings value out of range")
+                raise ATT_Error(ErrorCode.VALUE_OUT_OF_RANGE)
+
+            if gain_settings != gain_settings_operand:
+                pass  # TODO: NOTIFY CLIENT
+
+        def _unmute() -> None:
+            '''Cf. 3.5.2.2 Unmute procedure'''
+
+            mute = self.audio_input_state.mute
+            if mute == Mute.DISABLED:
+                logger.error("unmute: Cannot change Mute value, Mute state is DISABLED")
+                raise ATT_Error(ErrorCode.MUTE_DISABLED)
+
+            if mute == Mute.MUTED:
+                return
+
+            mute = Mute.NOT_MUTED
+            self.audio_input_state.increment_change_counter()
+            # TODO: NOTIFY CLIENT
+
+        def _mute() -> None:
+            '''Cf. 3.5.5.2 Mute procedure'''
+
+            change_counter = self.audio_input_state.change_counter
+            mute = self.audio_input_state.mute
+            if mute == Mute.DISABLED:
+                logger.error("mute: Cannot change Mute value, Mute state is DISABLED")
+                raise ATT_Error(ErrorCode.MUTE_DISABLED)
+
+            change_counter_operand = value[1]
+            if change_counter != change_counter_operand:
+                raise ATT_Error(ErrorCode.INVALID_CHANGE_COUNTER)
+
+            if mute == Mute.NOT_MUTED:
+                return
+
+            mute = Mute.MUTED
+            self.audio_input_state.increment_change_counter()
+            # TODO: NOTIFY CLIENT
+
+        def _set_manual_gain_mode() -> None:
+            '''Cf. 3.5.2.4 Set Manual Gain Mode procedure'''
+
+            gain_mode = self.audio_input_state.gain_mode
+            if gain_mode == GainMode.AUTOMATIC_ONLY or GainMode.MANUAL_ONLY:
+                logger.error(f"Cannot change gain_mode, bad state: {gain_mode}")
+                raise ATT_Error(ErrorCode.GAIN_MODE_CHANGE_NOT_ALLOWED)
+
+            if gain_mode == GainMode.MANUAL:
+                return
+
+            gain_mode = GainMode.MANUAL
+            self.audio_input_state.increment_change_counter()
+            # TODO: Notify client
+
+        def _set_automatic_gain_mode() -> None:
+            '''Cf. 3.5.2.5 Set Automatic Gain Mode'''
+
+            gain_mode = self.audio_input_state.gain_mode
+            if gain_mode == GainMode.AUTOMATIC_ONLY or GainMode.MANUAL_ONLY:
+                logger.error(f"Cannot change gain_mode, bad state: {gain_mode}")
+                raise ATT_Error(ErrorCode.GAIN_MODE_CHANGE_NOT_ALLOWED)
+
+            if gain_mode == GainMode.AUTOMATIC:
+                return
+
+            gain_mode = GainMode.AUTOMATIC
+            self.audio_input_state.increment_change_counter()
+            # TODO: NOTIFY CLIENT
+
+        try:
+            opcode = AudioInputControlPointOpCode(value[0])
+
+            match opcode:
+                case AudioInputControlPointOpCode.SET_GAIN_SETTING:
+                    _set_gain_settings(value[2])
+                case AudioInputControlPointOpCode.UNMUTE:
+                    _unmute()
+                case AudioInputControlPointOpCode.MUTE:
+                    _mute()
+                case AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE:
+                    _set_manual_gain_mode()
+                case AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE:
+                    _set_automatic_gain_mode()
+
+        except ValueError as e:
+            logger.error(f"OpCode value is incorrect: {e}")
+            raise ATT_Error(ErrorCode.OPCODE_NOT_SUPPORTED)
 
 
 class AICSService(TemplateService):
@@ -201,11 +368,12 @@ class AICSService(TemplateService):
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
             value=bytes([self.audio_input_status]),
         )
-        self.audio_input_control_point = Characteristic(
+        self.audio_input_control_point = AudioInputControlPoint(
             uuid=GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
             properties=Characteristic.Properties.WRITE,
             permissions=Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
-            value=b'',
+            audio_input_state=self.audio_input_state,
+            gain_settings_properties=self.gain_settings_properties,
         )
         self.audio_input_description = Characteristic(
             uuid=GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
@@ -254,3 +422,7 @@ class AICSServiceProxy(ProfileServiceProxy):
             )[0],
             'B',
         )
+
+        self.audio_input_control_point = service_proxy.get_characteristics_by_uuid(
+            GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC
+        )[0]

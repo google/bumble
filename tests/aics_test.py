@@ -26,6 +26,7 @@ from bumble.profiles.aics import (
     AICSServiceProxy,
     GainMode,
     AudioInputStatus,
+    AudioInputControlPointOpCode,
 )
 
 from .test_utils import TwoDevices
@@ -64,4 +65,28 @@ async def test_init_service(aics_client: AICSServiceProxy):
     assert await aics_client.gain_settings_properties.read_value() == (1, 0, 255)
     assert await aics_client.audio_input_status.read_value() == (
         AudioInputStatus.ACTIVE
+    )
+
+
+@pytest.mark.asyncio
+async def test_set_gain_setting_when_gain_mode_automatic_only(
+    aics_client: AICSServiceProxy,
+):
+    change_counter = 0
+    gain_settings = 120
+    await aics_client.audio_input_control_point.write_value(
+        bytes(
+            [
+                AudioInputControlPointOpCode.SET_GAIN_SETTING,
+                change_counter,
+                gain_settings,
+            ]
+        )
+    )
+
+    assert await aics_client.audio_input_state.read_value() == (
+        0,
+        Mute.NOT_MUTED,
+        GainMode.AUTOMATIC_ONLY,
+        0,
     )
