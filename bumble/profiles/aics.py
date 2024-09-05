@@ -75,7 +75,11 @@ class GainMode(enum.IntEnum):
     AUTOMATIC = 0x03
 
 
-class AudioInputType(enum.IntEnum):
+class AudioInputStatus(enum.IntEnum):
+    '''
+    Cf. 3.4 Audio Input Status
+    '''
+
     INATIVE = 0x00
     ACTIVE = 0x01
 
@@ -91,10 +95,11 @@ class AudioInputState(Characteristic):
         uuid: Union[str, bytes, UUID],
         properties: Characteristic.Properties,
         permissions: Union[str, Attribute.Permissions],
+        gain_settings_unit: int,
         descriptors: Sequence[Descriptor] = (),
     ):
         self.gain_settings: int = 0
-        self.gain_settings_unit: int = 1
+        self.gain_settings_unit = gain_settings_unit
         self.mute: Mute = Mute.NOT_MUTED
         self.gain_mode: GainMode = GainMode.AUTOMATIC_ONLY
         self.change_counter: int = 0x00
@@ -138,9 +143,10 @@ class GainSettingsProperties(Characteristic):
         uuid: Union[str, bytes, UUID],
         properties: Characteristic.Properties,
         permissions: Union[str, Attribute.Permissions],
+        gain_settings_unit: int,
         descriptors: Sequence[Descriptor] = (),
     ):
-        self.gain_settings_unit: int = 1
+        self.gain_settings_unit = gain_settings_unit
         self.gain_settings_minimum: int = 0
         self.gain_settings_maximum: int = 255
 
@@ -163,17 +169,25 @@ class GainSettingsProperties(Characteristic):
 class AICSService(TemplateService):
     UUID = GATT_AUDIO_INPUT_CONTROL_SERVICE
 
-    def __init__(self):
+    def __init__(
+        self,
+        gain_settings_unit: int = 1,
+        audio_input_status: AudioInputStatus = AudioInputStatus.ACTIVE,
+    ):
+        self.audio_input_status = audio_input_status
+
         self.audio_input_state = AudioInputState(
             uuid=GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
             properties=Characteristic.Properties.READ
             | Characteristic.Properties.NOTIFY,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
+            gain_settings_unit=gain_settings_unit,
         )
         self.gain_settings_properties = GainSettingsProperties(
             uuid=GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
             properties=Characteristic.Properties.READ,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
+            gain_settings_unit=gain_settings_unit,
         )
         self.audio_input_type = Characteristic(
             uuid=GATT_AUDIO_INPUT_TYPE_CHARACTERISTIC,
@@ -185,7 +199,7 @@ class AICSService(TemplateService):
             uuid=GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC,
             properties=Characteristic.Properties.READ,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            value=b'',
+            value=bytes([self.audio_input_status]),
         )
         self.audio_input_control_point = Characteristic(
             uuid=GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
@@ -232,4 +246,11 @@ class AICSServiceProxy(ProfileServiceProxy):
                 GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC
             )[0],
             'BBB',
+        )
+
+        self.audio_input_status = PackedCharacteristicAdapter(
+            service_proxy.get_characteristics_by_uuid(
+                GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC
+            )[0],
+            'B',
         )

@@ -20,7 +20,13 @@ import pytest_asyncio
 
 from bumble import device
 
-from bumble.profiles.aics import Mute, AICSService, AICSServiceProxy, GainMode
+from bumble.profiles.aics import (
+    Mute,
+    AICSService,
+    AICSServiceProxy,
+    GainMode,
+    AudioInputStatus,
+)
 
 from .test_utils import TwoDevices
 
@@ -56,3 +62,6 @@ async def test_init_service(aics_client: AICSServiceProxy):
         0,
     )
     assert await aics_client.gain_settings_properties.read_value() == (1, 0, 255)
+    assert await aics_client.audio_input_status.read_value() == (
+        AudioInputStatus.ACTIVE
+    )
