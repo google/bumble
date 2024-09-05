@@ -128,14 +128,36 @@ class AudioInputState(Characteristic):
         return self.__bytes__()
 
 
-class GainSettingsProperties:
+class GainSettingsProperties(Characteristic):
     '''
     Cf. 3.2 Gain Settings Properties
     '''
 
-    unit: int
-    minimum: int
-    maximum: int
+    def __init__(
+        self,
+        uuid: Union[str, bytes, UUID],
+        properties: Characteristic.Properties,
+        permissions: Union[str, Attribute.Permissions],
+        descriptors: Sequence[Descriptor] = (),
+    ):
+        self.gain_settings_unit: int = 1
+        self.gain_settings_minimum: int = 0
+        self.gain_settings_maximum: int = 255
+
+        value = CharacteristicValue(read=self._on_read)
+        super().__init__(uuid, properties, permissions, value, descriptors)
+
+    def __bytes__(self) -> bytes:
+        return bytes(
+            [
+                self.gain_settings_unit,
+                self.gain_settings_minimum,
+                self.gain_settings_maximum,
+            ]
+        )
+
+    def _on_read(self, _connection: Optional[Connection]) -> bytes:
+        return self.__bytes__()
 
 
 class AICSService(TemplateService):
@@ -148,11 +170,10 @@ class AICSService(TemplateService):
             | Characteristic.Properties.NOTIFY,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
         )
-        self.gain_settings_properties = Characteristic(
+        self.gain_settings_properties = GainSettingsProperties(
             uuid=GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
             properties=Characteristic.Properties.READ,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            value=b'',
         )
         self.audio_input_type = Characteristic(
             uuid=GATT_AUDIO_INPUT_TYPE_CHARACTERISTIC,
@@ -204,4 +225,11 @@ class AICSServiceProxy(ProfileServiceProxy):
                 GATT_AUDIO_INPUT_STATE_CHARACTERISTIC
             )[0],
             'BBBB',
+        )
+
+        self.gain_settings_properties = PackedCharacteristicAdapter(
+            service_proxy.get_characteristics_by_uuid(
+                GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC
+            )[0],
+            'BBB',
         )

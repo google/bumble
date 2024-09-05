@@ -46,6 +46,7 @@ async def aics_client():
 
     yield aics_client
 
+
 @pytest.mark.asyncio
 async def test_init_service(aics_client: AICSServiceProxy):
     assert await aics_client.audio_input_state.read_value() == (
@@ -54,3 +55,4 @@ async def test_init_service(aics_client: AICSServiceProxy):
         GainMode.AUTOMATIC_ONLY,
         0,
     )
+    assert await aics_client.gain_settings_properties.read_value() == (1, 0, 255)
