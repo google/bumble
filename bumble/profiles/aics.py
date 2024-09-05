@@ -20,9 +20,20 @@
 import enum
 import logging
 
+from typing import Union, Optional
+
+from bumble.core import UUID
+
+from bumble.device import Connection
+
 from bumble.gatt import (
     Characteristic,
     TemplateService,
+    Attribute,
+    CharacteristicValue,
+    Sequence,
+    Descriptor,
+    PackedCharacteristicAdapter,
     GATT_AUDIO_INPUT_CONTROL_SERVICE,
     GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
     GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
@@ -31,6 +42,8 @@ from bumble.gatt import (
     GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
     GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
 )
+
+from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -46,9 +59,9 @@ class Mute(enum.IntEnum):
     Cf. 2.2.1.2 Mute Field
     '''
 
-    NOT_MUTED = 0
-    MUTED = 1
-    DISABLED = 2
+    NOT_MUTED = 0x00
+    MUTED = 0x01
+    DISABLED = 0x02
 
 
 class GainMode(enum.IntEnum):
@@ -56,34 +69,84 @@ class GainMode(enum.IntEnum):
     Cf. 2.2.1.3 Gain Mode
     '''
 
-    MANUAL_ONLY = 0
-    AUTOMATIC_ONLY = 1
-    MANUAL = 2
-    AUTOMATIC = 3
+    MANUAL_ONLY = 0x00
+    AUTOMATIC_ONLY = 0x01
+    MANUAL = 0x02
+    AUTOMATIC = 0x03
+
+
+class AudioInputType(enum.IntEnum):
+    INATIVE = 0x00
+    ACTIVE = 0x01
 
 
 # -----------------------------------------------------------------------------
 class AudioInputState(Characteristic):
     '''
-    Cf. 2.2.1 AudioInputState
+    Cf. 2.2.1 Audio Input State
     '''
 
-    gain_settings: int
-    mute: Mute
-    gain_mode: int
-    change_counter: int
+    def __init__(
+        self,
+        uuid: Union[str, bytes, UUID],
+        properties: Characteristic.Properties,
+        permissions: Union[str, Attribute.Permissions],
+        descriptors: Sequence[Descriptor] = (),
+    ):
+        self.gain_settings: int = 0
+        self.gain_settings_unit: int = 1
+        self.mute: Mute = Mute.NOT_MUTED
+        self.gain_mode: GainMode = GainMode.AUTOMATIC_ONLY
+        self.change_counter: int = 0x00
+
+        value = CharacteristicValue(read=self._on_read)
+
+        super().__init__(uuid, properties, permissions, value, descriptors)
+
+    def __bytes__(self) -> bytes:
+        return bytes(
+            [self.gain_settings, self.mute, self.gain_mode, self.change_counter]
+        )
+
+    def update_gain_settings_unit(self, gain_settings_unit: int) -> None:
+        self.gain_settings_unit = gain_settings_unit
+
+    def increment_gain(self) -> None:
+        self.gain_settings += self.gain_settings_unit
+        self._increment_change_counter()
+
+    def decrement_gain(self) -> None:
+        self.gain_settings -= self.gain_settings_unit
+        self._increment_change_counter()
+
+    def _increment_change_counter(self):
+        self.change_counter += 1
+        if self.change_counter > 255:
+            self.change_counter = 0
+
+    def _on_read(self, _connection: Optional[Connection]) -> bytes:
+        return self.__bytes__()
 
 
-class AicsService(TemplateService):
+class GainSettingsProperties:
+    '''
+    Cf. 3.2 Gain Settings Properties
+    '''
+
+    unit: int
+    minimum: int
+    maximum: int
+
+
+class AICSService(TemplateService):
     UUID = GATT_AUDIO_INPUT_CONTROL_SERVICE
 
     def __init__(self):
-        self.audio_input_state = Characteristic(
+        self.audio_input_state = AudioInputState(
             uuid=GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
             properties=Characteristic.Properties.READ
             | Characteristic.Properties.NOTIFY,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            value=b'',
         )
         self.gain_settings_properties = Characteristic(
             uuid=GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
@@ -91,28 +154,54 @@ class AicsService(TemplateService):
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
             value=b'',
         )
-        self.gain_settings_properties = Characteristic(
+        self.audio_input_type = Characteristic(
             uuid=GATT_AUDIO_INPUT_TYPE_CHARACTERISTIC,
             properties=Characteristic.Properties.READ,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
             value=b'',
         )
-        self.gain_settings_properties = Characteristic(
+        self.audio_input_status = Characteristic(
             uuid=GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC,
             properties=Characteristic.Properties.READ,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
             value=b'',
         )
-        self.gain_settings_properties = Characteristic(
+        self.audio_input_control_point = Characteristic(
             uuid=GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
             properties=Characteristic.Properties.WRITE,
             permissions=Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
             value=b'',
         )
-        self.gain_settings_properties = Characteristic(
+        self.audio_input_description = Characteristic(
             uuid=GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
             properties=Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
             permissions=Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
             value=b'',
         )
-        super().__init__([self.audio_input_state])
+        super().__init__(
+            [
+                self.audio_input_state,
+                self.gain_settings_properties,
+                self.audio_input_type,
+                self.audio_input_status,
+                self.audio_input_control_point,
+                self.audio_input_description,
+            ]
+        )
+
+
+# -----------------------------------------------------------------------------
+# Client
+# -----------------------------------------------------------------------------
+class AICSServiceProxy(ProfileServiceProxy):
+    SERVICE_CLASS = AICSService
+
+    def __init__(self, service_proxy: ServiceProxy) -> None:
+        self.service_proxy = service_proxy
+
+        self.audio_input_state = PackedCharacteristicAdapter(
+            service_proxy.get_characteristics_by_uuid(
+                GATT_AUDIO_INPUT_STATE_CHARACTERISTIC
+            )[0],
+            'BBBB',
+        )
