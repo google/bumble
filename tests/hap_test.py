@@ -29,6 +29,7 @@ from .test_utils import TwoDevices
 # Logging
 # -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 foo_preset = hap.PresetRecord(1, "foo preset")
 bar_preset = hap.PresetRecord(50, "bar preset")
@@ -49,7 +50,7 @@ async def hap_client():
     devices = TwoDevices()
     devices[0].add_service(
         hap.HearingAccessService(
-            devices[1], server_features, [foo_preset, bar_preset, foobar_preset]
+            devices[0], server_features, [foo_preset, bar_preset, foobar_preset]
         )
     )
 
@@ -117,5 +118,8 @@ async def test_active_preset_change(hap_client: hap.HearingAccessServiceProxy):
     await hap_client.hearing_aid_preset_control_point.write_value(
         bytes([hap.HearingAidPresetControlPointOpcode.SET_NEXT_PRESET])
     )
-    # TODO: this does not work and the preset index is not updated receive update
-    # assert (await hap_client.active_preset_index.read_value()) == (foobar_preset.index)
+    assert (
+        await hap_client.active_preset_index_notification.get()
+    ) == foobar_preset.index
+
+    assert (await hap_client.active_preset_index.read_value()) == (foobar_preset.index)

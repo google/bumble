@@ -315,7 +315,7 @@ class HearingAccessService(gatt.TemplateService):
                 | gatt.Characteristic.Properties.NOTIFY
             ),
             permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            value=bytes([self.active_preset_index]),
+            value=gatt.CharacteristicValue(read=self._on_read_active_preset_index),
         )
 
         super().__init__(
@@ -325,6 +325,11 @@ class HearingAccessService(gatt.TemplateService):
                 self.active_preset_index_characteristic,
             ]
         )
+
+    def _on_read_active_preset_index(
+        self, __connection__: Optional[Connection]
+    ) -> bytes:
+        return bytes([self.active_preset_index])
 
     # TODO this need to be triggered when device is unbonded
     def on_forget(self, addr: Address) -> None:
@@ -497,7 +502,7 @@ class HearingAccessService(gatt.TemplateService):
 
         await connection.device.notify_subscriber(
             connection,
-            self.active_preset_index_characteristic,
+            attribute=self.active_preset_index_characteristic,
             value=bytes([self.active_preset_index]),
         )
         self.active_preset_index_per_device[connection.peer_address] = (
@@ -644,10 +649,18 @@ class HearingAccessServiceProxy(gatt_client.ProfileServiceProxy):
 
     async def setup_subscription(self):
         self.preset_control_point_indications = asyncio.Queue()
+        self.active_preset_index_notification = asyncio.Queue()
+
+        def on_active_preset_index_notification(data: bytes):
+            self.active_preset_index_notification.put_nowait(data)
 
         def on_preset_control_point_indication(data: bytes):
             self.preset_control_point_indications.put_nowait(data)
 
         await self.hearing_aid_preset_control_point.subscribe(
             functools.partial(on_preset_control_point_indication), prefer_notify=False
+        )
+
+        await self.active_preset_index.subscribe(
+            functools.partial(on_active_preset_index_notification)
         )
