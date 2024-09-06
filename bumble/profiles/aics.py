@@ -163,6 +163,11 @@ class AudioInputState(Characteristic):
         if self.change_counter > CHANGE_COUNTER_MAX_VALUE:
             self.change_counter = 0x00
 
+    async def notify_subscribers(self, connection: Connection) -> None:
+        await connection.device.notify_subscribers(
+            attribute=self.value, value=self.__bytes__()
+        )
+
     def _on_read(self, _connection: Optional[Connection]) -> bytes:
         return self.__bytes__()
 
@@ -216,15 +221,19 @@ class AudioInputDescription(Characteristic):
 
         self.audio_input_status_value = audio_input_description_value
 
-        value = CharacteristicValue(read=self._on_read, write=self._on_write)
+        self.value = CharacteristicValue(read=self._on_read, write=self._on_write)
 
-        super().__init__(uuid, properties, permissions, value, descriptors)
+        super().__init__(uuid, properties, permissions, self.value, descriptors)
 
     def _on_read(self, _connection: Optional[Connection]) -> bytes:
         return self.audio_input_status_value.encode('utf-8')
 
-    def _on_write(self, _connection: Optional[Connection], value: bytes) -> None:
+    async def _on_write(self, connection: Optional[Connection], value: bytes) -> None:
         self.audio_input_status_value = value.decode('utf-8')
+        if connection is not None:
+            await connection.device.notify_subscribers(
+                attribute=self.value, value=value
+            )
 
 
 class AudioInputControlPoint(Characteristic):
@@ -245,14 +254,14 @@ class AudioInputControlPoint(Characteristic):
         self.audio_input_state = audio_input_state
         self.gain_settings_properties = gain_settings_properties
 
-        value = CharacteristicValue(write=self._on_write)
+        self.value = CharacteristicValue(write=self._on_write)
 
-        super().__init__(uuid, properties, permissions, value, descriptors)
+        super().__init__(uuid, properties, permissions, self.value, descriptors)
 
-    def _on_write(self, connection: Optional[Connection], value: bytes) -> None:
+    async def _on_write(self, connection: Optional[Connection], value: bytes) -> None:
         assert connection
 
-        def _set_gain_settings(gain_settings_operand: int) -> None:
+        async def _set_gain_settings(gain_settings_operand: int) -> None:
             '''Cf. 3.5.2.1 Set Gain Settings Procedure'''
 
             gain_mode = self.audio_input_state.gain_mode
@@ -274,9 +283,9 @@ class AudioInputControlPoint(Characteristic):
 
             if self.audio_input_state.gain_settings != gain_settings_operand:
                 self.audio_input_state.gain_settings = gain_settings_operand
-                pass  # TODO: NOTIFY CLIENT
+                await self.audio_input_state.notify_subscribers(connection)
 
-        def _unmute():
+        async def _unmute():
             '''Cf. 3.5.2.2 Unmute procedure'''
 
             logger.error(f'unmute: {self.audio_input_state.mute}')
@@ -290,9 +299,9 @@ class AudioInputControlPoint(Characteristic):
 
             self.audio_input_state.mute = Mute.NOT_MUTED
             self.audio_input_state.increment_change_counter()
-            # TODO: NOTIFY CLIENT
+            await self.audio_input_state.notify_subscribers(connection)
 
-        def _mute() -> None:
+        async def _mute() -> None:
             '''Cf. 3.5.5.2 Mute procedure'''
 
             change_counter = self.audio_input_state.change_counter
@@ -310,9 +319,9 @@ class AudioInputControlPoint(Characteristic):
 
             self.audio_input_state.mute = Mute.MUTED
             self.audio_input_state.increment_change_counter()
-            # TODO: NOTIFY CLIENT
+            await self.audio_input_state.notify_subscribers(connection)
 
-        def _set_manual_gain_mode() -> None:
+        async def _set_manual_gain_mode() -> None:
             '''Cf. 3.5.2.4 Set Manual Gain Mode procedure'''
 
             gain_mode = self.audio_input_state.gain_mode
@@ -325,9 +334,9 @@ class AudioInputControlPoint(Characteristic):
 
             self.audio_input_state.gain_mode = GainMode.MANUAL
             self.audio_input_state.increment_change_counter()
-            # TODO: Notify client
+            await self.audio_input_state.notify_subscribers(connection)
 
-        def _set_automatic_gain_mode() -> None:
+        async def _set_automatic_gain_mode() -> None:
             '''Cf. 3.5.2.5 Set Automatic Gain Mode'''
 
             gain_mode = self.audio_input_state.gain_mode
@@ -340,7 +349,7 @@ class AudioInputControlPoint(Characteristic):
 
             self.audio_input_state.gain_mode = GainMode.AUTOMATIC
             self.audio_input_state.increment_change_counter()
-            # TODO: NOTIFY CLIENT
+            await self.audio_input_state.notify_subscribers(connection)
 
         try:
             opcode = AudioInputControlPointOpCode(value[0])
@@ -348,15 +357,15 @@ class AudioInputControlPoint(Characteristic):
             opcode = AudioInputControlPointOpCode(value[0])
 
             if opcode == AudioInputControlPointOpCode.SET_GAIN_SETTING:
-                _set_gain_settings(value[2])
+                await _set_gain_settings(value[2])
             elif opcode == AudioInputControlPointOpCode.UNMUTE:
-                _unmute()
+                await _unmute()
             elif opcode == AudioInputControlPointOpCode.MUTE:
-                _mute()
+                await _mute()
             elif opcode == AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE:
-                _set_manual_gain_mode()
+                await _set_manual_gain_mode()
             elif opcode == AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE:
-                _set_automatic_gain_mode()
+                await _set_automatic_gain_mode()
 
         except ValueError as e:
             logger.error(f"OpCode value is incorrect: {e}")
