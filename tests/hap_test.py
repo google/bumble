@@ -21,7 +21,7 @@ import functools
 import pytest_asyncio
 import logging
 
-from bumble import device
+from bumble import att, device
 from bumble.profiles import hap
 from .test_utils import TwoDevices
 
@@ -34,6 +34,14 @@ logger.setLevel(logging.DEBUG)
 foo_preset = hap.PresetRecord(1, "foo preset")
 bar_preset = hap.PresetRecord(50, "bar preset")
 foobar_preset = hap.PresetRecord(5, "foobar preset")
+unavailable_preset = hap.PresetRecord(
+    78,
+    "foobar preset",
+    hap.PresetRecord.Property(
+        hap.PresetRecord.Property.Writable.CANNOT_BE_WRITTEN,
+        hap.PresetRecord.Property.IsAvailable.IS_UNAVAILABLE,
+    ),
+)
 
 server_features = hap.HearingAidFeatures(
     hap.HearingAidType.MONAURAL_HEARING_AID,
@@ -43,6 +51,8 @@ server_features = hap.HearingAidFeatures(
     hap.WritablePresetsSupport.WRITABLE_PRESET_RECORDS_SUPPORTED,
 )
 
+TIMEOUT = 0.1
+
 
 # -----------------------------------------------------------------------------
 @pytest_asyncio.fixture
@@ -50,7 +60,9 @@ async def hap_client():
     devices = TwoDevices()
     devices[0].add_service(
         hap.HearingAccessService(
-            devices[0], server_features, [foo_preset, bar_preset, foobar_preset]
+            devices[0],
+            server_features,
+            [foo_preset, bar_preset, foobar_preset, unavailable_preset],
         )
     )
 
@@ -87,15 +99,22 @@ async def test_read_all_presets(hap_client: hap.HearingAccessServiceProxy):
     await hap_client.hearing_aid_preset_control_point.write_value(
         bytes([hap.HearingAidPresetControlPointOpcode.READ_PRESETS_REQUEST, 1, 0xFF])
     )
-    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(
-        foo_preset
-    )
-    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(
-        foobar_preset
-    )
-    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(
-        bar_preset
-    )
+    assert (await hap_client.preset_control_point_indications.get()) == bytes(
+        [hap.HearingAidPresetControlPointOpcode.READ_PRESET_RESPONSE, 0]
+    ) + bytes(foo_preset)
+    assert (await hap_client.preset_control_point_indications.get()) == bytes(
+        [hap.HearingAidPresetControlPointOpcode.READ_PRESET_RESPONSE, 0]
+    ) + bytes(foobar_preset)
+    assert (await hap_client.preset_control_point_indications.get()) == bytes(
+        [hap.HearingAidPresetControlPointOpcode.READ_PRESET_RESPONSE, 0]
+    ) + bytes(bar_preset)
+    assert (await hap_client.preset_control_point_indications.get()) == bytes(
+        [hap.HearingAidPresetControlPointOpcode.READ_PRESET_RESPONSE, 1]
+    ) + bytes(unavailable_preset)
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(
+            hap_client.preset_control_point_indications.get(), TIMEOUT
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -114,7 +133,43 @@ async def test_read_partial_presets(hap_client: hap.HearingAccessServiceProxy):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_active_preset_change(hap_client: hap.HearingAccessServiceProxy):
+async def test_set_active_preset_valid(hap_client: hap.HearingAccessServiceProxy):
+    await hap_client.hearing_aid_preset_control_point.write_value(
+        bytes(
+            [hap.HearingAidPresetControlPointOpcode.SET_ACTIVE_PRESET, bar_preset.index]
+        )
+    )
+    assert (await hap_client.active_preset_index_notification.get()) == bar_preset.index
+
+    assert (await hap_client.active_preset_index.read_value()) == (bar_preset.index)
+
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(
+            hap_client.active_preset_index_notification.get(), TIMEOUT
+        )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_set_active_preset_invalid(hap_client: hap.HearingAccessServiceProxy):
+    await hap_client.hearing_aid_preset_control_point.write_value(
+        bytes(
+            [
+                hap.HearingAidPresetControlPointOpcode.SET_ACTIVE_PRESET,
+                unavailable_preset.index,
+            ]
+        )
+    )
+    # TODO: we should check the remote has sent an att err rsp
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(
+            hap_client.active_preset_index_notification.get(), TIMEOUT
+        )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_set_next_preset(hap_client: hap.HearingAccessServiceProxy):
     await hap_client.hearing_aid_preset_control_point.write_value(
         bytes([hap.HearingAidPresetControlPointOpcode.SET_NEXT_PRESET])
     )
@@ -123,3 +178,51 @@ async def test_active_preset_change(hap_client: hap.HearingAccessServiceProxy):
     ) == foobar_preset.index
 
     assert (await hap_client.active_preset_index.read_value()) == (foobar_preset.index)
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(
+            hap_client.active_preset_index_notification.get(), TIMEOUT
+        )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_set_next_preset_will_loop_to_first(
+    hap_client: hap.HearingAccessServiceProxy,
+):
+    async def go_next(new_preset: hap.PresetRecord):
+        await hap_client.hearing_aid_preset_control_point.write_value(
+            bytes([hap.HearingAidPresetControlPointOpcode.SET_NEXT_PRESET])
+        )
+        assert (
+            await hap_client.active_preset_index_notification.get()
+        ) == new_preset.index
+
+        assert (await hap_client.active_preset_index.read_value()) == (new_preset.index)
+
+    await go_next(foobar_preset)
+    await go_next(bar_preset)
+    await go_next(foo_preset)
+
+    # Note that there is a invalid preset in the preset record of the server
+
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(
+            hap_client.active_preset_index_notification.get(), TIMEOUT
+        )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_set_previous_preset_will_loop_to_last(
+    hap_client: hap.HearingAccessServiceProxy,
+):
+    await hap_client.hearing_aid_preset_control_point.write_value(
+        bytes([hap.HearingAidPresetControlPointOpcode.SET_PREVIOUS_PRESET])
+    )
+    assert (await hap_client.active_preset_index_notification.get()) == bar_preset.index
+
+    assert (await hap_client.active_preset_index.read_value()) == (bar_preset.index)
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(
+            hap_client.active_preset_index_notification.get(), TIMEOUT
+        )

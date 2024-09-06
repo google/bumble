@@ -522,7 +522,7 @@ class HearingAccessService(gatt.TemplateService):
         if (
             not preset
             or preset.properties.is_available
-            == PresetRecord.Property.IsAvailable.IS_AVAILABLE
+            != PresetRecord.Property.IsAvailable.IS_AVAILABLE
         ):
             raise att.ATT_Error(ErrorCode.PRESET_OPERATION_NOT_POSSIBLE)
 
