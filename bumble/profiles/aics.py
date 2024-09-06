@@ -26,8 +26,6 @@ from bumble.core import UUID
 
 from bumble.device import Connection
 
-from bumble.profiles.vcp import MIN_VOLUME, MAX_VOLUME
-
 from bumble.att import ATT_Error
 
 from bumble.gatt import (
@@ -128,13 +126,16 @@ class AudioInputState(Characteristic):
         uuid: Union[str, bytes, UUID],
         properties: Characteristic.Properties,
         permissions: Union[str, Attribute.Permissions],
+        gain_settings: int,
         gain_settings_unit: int,
+        mute: Mute,
+        gain_mode: GainMode,
         descriptors: Sequence[Descriptor] = (),
     ):
-        self.gain_settings: int = 0
+        self.gain_settings = gain_settings
         self.gain_settings_unit = gain_settings_unit
-        self.mute: Mute = Mute.NOT_MUTED
-        self.gain_mode: GainMode = GainMode.AUTOMATIC_ONLY
+        self.mute: Mute = mute
+        self.gain_mode: GainMode = gain_mode
         self.change_counter = 0
 
         value = CharacteristicValue(read=self._on_read)
@@ -228,7 +229,6 @@ class AudioInputControlPoint(Characteristic):
             '''Cf. 3.5.2.1 Set Gain Settings Procedure'''
 
             gain_mode = self.audio_input_state.gain_mode
-            gain_settings = self.audio_input_state.gain_settings
 
             if not (gain_mode == GainMode.MANUAL or gain_mode == GainMode.MANUAL_ONLY):
                 logger.warning(
@@ -245,21 +245,23 @@ class AudioInputControlPoint(Characteristic):
                 logger.error("gain_seetings value out of range")
                 raise ATT_Error(ErrorCode.VALUE_OUT_OF_RANGE)
 
-            if gain_settings != gain_settings_operand:
+            if self.audio_input_state.gain_settings != gain_settings_operand:
+                self.audio_input_state.gain_settings = gain_settings_operand
                 pass  # TODO: NOTIFY CLIENT
 
-        def _unmute() -> None:
+        def _unmute():
             '''Cf. 3.5.2.2 Unmute procedure'''
 
+            logger.error(f'unmute: {self.audio_input_state.mute}')
             mute = self.audio_input_state.mute
             if mute == Mute.DISABLED:
                 logger.error("unmute: Cannot change Mute value, Mute state is DISABLED")
                 raise ATT_Error(ErrorCode.MUTE_DISABLED)
 
-            if mute == Mute.MUTED:
+            if mute == Mute.NOT_MUTED:
                 return
 
-            mute = Mute.NOT_MUTED
+            self.audio_input_state.mute = Mute.NOT_MUTED
             self.audio_input_state.increment_change_counter()
             # TODO: NOTIFY CLIENT
 
@@ -276,10 +278,10 @@ class AudioInputControlPoint(Characteristic):
             if change_counter != change_counter_operand:
                 raise ATT_Error(ErrorCode.INVALID_CHANGE_COUNTER)
 
-            if mute == Mute.NOT_MUTED:
+            if mute == Mute.MUTED:
                 return
 
-            mute = Mute.MUTED
+            self.audio_input_state.mute = Mute.MUTED
             self.audio_input_state.increment_change_counter()
             # TODO: NOTIFY CLIENT
 
@@ -287,14 +289,14 @@ class AudioInputControlPoint(Characteristic):
             '''Cf. 3.5.2.4 Set Manual Gain Mode procedure'''
 
             gain_mode = self.audio_input_state.gain_mode
-            if gain_mode == GainMode.AUTOMATIC_ONLY or GainMode.MANUAL_ONLY:
+            if gain_mode in (GainMode.AUTOMATIC_ONLY, GainMode.MANUAL_ONLY):
                 logger.error(f"Cannot change gain_mode, bad state: {gain_mode}")
                 raise ATT_Error(ErrorCode.GAIN_MODE_CHANGE_NOT_ALLOWED)
 
             if gain_mode == GainMode.MANUAL:
                 return
 
-            gain_mode = GainMode.MANUAL
+            self.audio_input_state.gain_mode = GainMode.MANUAL
             self.audio_input_state.increment_change_counter()
             # TODO: Notify client
 
@@ -302,31 +304,32 @@ class AudioInputControlPoint(Characteristic):
             '''Cf. 3.5.2.5 Set Automatic Gain Mode'''
 
             gain_mode = self.audio_input_state.gain_mode
-            if gain_mode == GainMode.AUTOMATIC_ONLY or GainMode.MANUAL_ONLY:
+            if gain_mode in (GainMode.AUTOMATIC_ONLY, GainMode.MANUAL_ONLY):
                 logger.error(f"Cannot change gain_mode, bad state: {gain_mode}")
                 raise ATT_Error(ErrorCode.GAIN_MODE_CHANGE_NOT_ALLOWED)
 
             if gain_mode == GainMode.AUTOMATIC:
                 return
 
-            gain_mode = GainMode.AUTOMATIC
+            self.audio_input_state.gain_mode = GainMode.AUTOMATIC
             self.audio_input_state.increment_change_counter()
             # TODO: NOTIFY CLIENT
 
         try:
             opcode = AudioInputControlPointOpCode(value[0])
 
-            match opcode:
-                case AudioInputControlPointOpCode.SET_GAIN_SETTING:
-                    _set_gain_settings(value[2])
-                case AudioInputControlPointOpCode.UNMUTE:
-                    _unmute()
-                case AudioInputControlPointOpCode.MUTE:
-                    _mute()
-                case AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE:
-                    _set_manual_gain_mode()
-                case AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE:
-                    _set_automatic_gain_mode()
+            opcode = AudioInputControlPointOpCode(value[0])
+
+            if opcode == AudioInputControlPointOpCode.SET_GAIN_SETTING:
+                _set_gain_settings(value[2])
+            elif opcode == AudioInputControlPointOpCode.UNMUTE:
+                _unmute()
+            elif opcode == AudioInputControlPointOpCode.MUTE:
+                _mute()
+            elif opcode == AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE:
+                _set_manual_gain_mode()
+            elif opcode == AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE:
+                _set_automatic_gain_mode()
 
         except ValueError as e:
             logger.error(f"OpCode value is incorrect: {e}")
@@ -338,17 +341,23 @@ class AICSService(TemplateService):
 
     def __init__(
         self,
-        gain_settings_unit: int = 1,
         audio_input_status: AudioInputStatus = AudioInputStatus.ACTIVE,
+        gain_settings: int = 0,
+        gain_settings_unit: int = 1,
+        mute: Mute = Mute.NOT_MUTED,
+        gain_mode: GainMode = GainMode.AUTOMATIC_ONLY,
     ):
-        self.audio_input_status = audio_input_status
+        self.audio_input_status_value = audio_input_status
 
         self.audio_input_state = AudioInputState(
             uuid=GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
             properties=Characteristic.Properties.READ
             | Characteristic.Properties.NOTIFY,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
+            gain_settings=gain_settings,
             gain_settings_unit=gain_settings_unit,
+            mute=mute,
+            gain_mode=gain_mode,
         )
         self.gain_settings_properties = GainSettingsProperties(
             uuid=GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
@@ -366,7 +375,7 @@ class AICSService(TemplateService):
             uuid=GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC,
             properties=Characteristic.Properties.READ,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            value=bytes([self.audio_input_status]),
+            value=bytes([self.audio_input_status_value]),
         )
         self.audio_input_control_point = AudioInputControlPoint(
             uuid=GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
@@ -381,6 +390,7 @@ class AICSService(TemplateService):
             permissions=Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
             value=b'',
         )
+
         super().__init__(
             [
                 self.audio_input_state,
