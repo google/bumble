@@ -200,9 +200,36 @@ class GainSettingsProperties(Characteristic):
         return self.__bytes__()
 
 
+class AudioInputDescription(Characteristic):
+    '''
+    Cf. 3.6 Audio Input Description
+    '''
+
+    def __init__(
+        self,
+        uuid: Union[str, bytes, UUID],
+        properties: Characteristic.Properties,
+        permissions: Union[str, Attribute.Permissions],
+        audio_input_description_value: str,
+        descriptors: Sequence[Descriptor] = (),
+    ):
+
+        self.audio_input_status_value = audio_input_description_value
+
+        value = CharacteristicValue(read=self._on_read, write=self._on_write)
+
+        super().__init__(uuid, properties, permissions, value, descriptors)
+
+    def _on_read(self, _connection: Optional[Connection]) -> bytes:
+        return self.audio_input_status_value.encode('utf-8')
+
+    def _on_write(self, _connection: Optional[Connection], value: bytes) -> None:
+        self.audio_input_status_value = value.decode('utf-8')
+
+
 class AudioInputControlPoint(Characteristic):
     '''
-    Cf. 3.52 Audio Input Control Point
+    Cf. 3.5.2 Audio Input Control Point
     '''
 
     def __init__(
@@ -346,6 +373,7 @@ class AICSService(TemplateService):
         gain_settings_unit: int = 1,
         mute: Mute = Mute.NOT_MUTED,
         gain_mode: GainMode = GainMode.AUTOMATIC_ONLY,
+        audio_input_description_value: str = 'Bluetooth',
     ):
         self.audio_input_status_value = audio_input_status
 
@@ -384,11 +412,14 @@ class AICSService(TemplateService):
             audio_input_state=self.audio_input_state,
             gain_settings_properties=self.gain_settings_properties,
         )
-        self.audio_input_description = Characteristic(
+        self.audio_input_description = AudioInputDescription(
             uuid=GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
-            properties=Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
-            permissions=Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
-            value=b'',
+            properties=Characteristic.Properties.READ
+            | Characteristic.Properties.NOTIFY
+            | Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
+            permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
+            | Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
+            audio_input_description_value=audio_input_description_value,
         )
 
         super().__init__(
@@ -435,4 +466,8 @@ class AICSServiceProxy(ProfileServiceProxy):
 
         self.audio_input_control_point = service_proxy.get_characteristics_by_uuid(
             GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC
+        )[0]
+
+        self.audio_input_description = service_proxy.get_characteristics_by_uuid(
+            GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC
         )[0]

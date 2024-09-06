@@ -424,3 +424,19 @@ async def test_set_automatic_gain_mode_when_automatic_only(
     state = await aics_client.audio_input_state.read_value()
     assert state[2] == GainMode.AUTOMATIC_ONLY
     assert state[3] == change_counter
+
+
+@pytest.mark.asyncio
+async def test_audio_input_description_initial_value(aics_client: AICSServiceProxy):
+    description = await aics_client.audio_input_description.read_value()
+    assert description.decode('utf-8') == "Bluetooth"
+
+
+@pytest.mark.asyncio
+async def test_audio_input_description_write_and_read(aics_client: AICSServiceProxy):
+    new_description = "Line Input".encode('utf-8')
+
+    await aics_client.audio_input_description.write_value(new_description)
+
+    description = await aics_client.audio_input_description.read_value()
+    assert description == new_description
