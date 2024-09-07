@@ -68,7 +68,7 @@ from .att import (
     ATT_Error,
 )
 from . import core
-from .core import UUID, InvalidStateError, ProtocolError
+from .core import UUID, InvalidStateError
 from .gatt import (
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
@@ -345,12 +345,7 @@ class Client:
         self.mtu_exchange_done = True
         response = await self.send_request(ATT_Exchange_MTU_Request(client_rx_mtu=mtu))
         if response.op_code == ATT_ERROR_RESPONSE:
-            raise ProtocolError(
-                response.error_code,
-                'att',
-                ATT_PDU.error_name(response.error_code),
-                response,
-            )
+            raise ATT_Error(error_code=response.error_code, message=response)
 
         # Compute the final MTU
         self.connection.att_mtu = min(mtu, response.server_rx_mtu)
@@ -936,12 +931,7 @@ class Client:
         if response is None:
             raise TimeoutError('read timeout')
         if response.op_code == ATT_ERROR_RESPONSE:
-            raise ProtocolError(
-                response.error_code,
-                'att',
-                ATT_PDU.error_name(response.error_code),
-                response,
-            )
+            raise ATT_Error(error_code=response.error_code, message=response)
 
         # If the value is the max size for the MTU, try to read more unless the caller
         # specifically asked not to do that
@@ -963,12 +953,7 @@ class Client:
                         ATT_INVALID_OFFSET_ERROR,
                     ):
                         break
-                    raise ProtocolError(
-                        response.error_code,
-                        'att',
-                        ATT_PDU.error_name(response.error_code),
-                        response,
-                    )
+                    raise ATT_Error(error_code=response.error_code, message=response)
 
                 part = response.part_attribute_value
                 attribute_value += part
@@ -1061,12 +1046,7 @@ class Client:
                 )
             )
             if response.op_code == ATT_ERROR_RESPONSE:
-                raise ProtocolError(
-                    response.error_code,
-                    'att',
-                    ATT_PDU.error_name(response.error_code),
-                    response,
-                )
+                raise ATT_Error(error_code=response.error_code, message=response)
         else:
             await self.send_command(
                 ATT_Write_Command(
