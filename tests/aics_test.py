@@ -203,14 +203,18 @@ async def test_unmute_when_mute_disabled(aics_client: AICSServiceProxy):
     aics_service.audio_input_state.change_counter = 0
     change_counter = 0
 
-    await aics_client.audio_input_control_point.write_value(
-        bytes(
-            [
-                AudioInputControlPointOpCode.UNMUTE,
-                change_counter,
-            ]
+    with pytest.raises(ATT_Error) as e:
+        await aics_client.audio_input_control_point.write_value(
+            bytes(
+                [
+                    AudioInputControlPointOpCode.UNMUTE,
+                    change_counter,
+                ]
+            ),
+            with_response=True,
         )
-    )
+
+    assert e.value.error_code == ErrorCode.MUTE_DISABLED
 
     state: AudioInputState = await aics_client.audio_input_state.read_value()
     assert state.mute == Mute.DISABLED
@@ -244,14 +248,18 @@ async def test_mute_when_mute_disabled(aics_client: AICSServiceProxy):
     aics_service.audio_input_state.change_counter = 0
     change_counter = 0
 
-    await aics_client.audio_input_control_point.write_value(
-        bytes(
-            [
-                AudioInputControlPointOpCode.MUTE,
-                change_counter,
-            ]
+    with pytest.raises(ATT_Error) as e:
+        await aics_client.audio_input_control_point.write_value(
+            bytes(
+                [
+                    AudioInputControlPointOpCode.MUTE,
+                    change_counter,
+                ]
+            ),
+            with_response=True,
         )
-    )
+
+    assert e.value.error_code == ErrorCode.MUTE_DISABLED
 
     state: AudioInputState = await aics_client.audio_input_state.read_value()
     assert state.mute == Mute.DISABLED
@@ -306,14 +314,18 @@ async def test_set_manual_gain_mode_when_manual_only(aics_client: AICSServicePro
     aics_service.audio_input_state.change_counter = 0
     change_counter = 0
 
-    await aics_client.audio_input_control_point.write_value(
-        bytes(
-            [
-                AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE,
-                change_counter,
-            ]
+    with pytest.raises(ATT_Error) as e:
+        await aics_client.audio_input_control_point.write_value(
+            bytes(
+                [
+                    AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE,
+                    change_counter,
+                ]
+            ),
+            with_response=True,
         )
-    )
+
+    assert e.value.error_code == ErrorCode.GAIN_MODE_CHANGE_NOT_ALLOWED
 
     state: AudioInputState = await aics_client.audio_input_state.read_value()
     assert state.gain_mode == GainMode.MANUAL_ONLY
@@ -326,14 +338,18 @@ async def test_set_manual_gain_mode_when_automatic_only(aics_client: AICSService
     aics_service.audio_input_state.change_counter = 0
     change_counter = 0
 
-    await aics_client.audio_input_control_point.write_value(
-        bytes(
-            [
-                AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE,
-                change_counter,
-            ]
+    with pytest.raises(ATT_Error) as e:
+        await aics_client.audio_input_control_point.write_value(
+            bytes(
+                [
+                    AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE,
+                    change_counter,
+                ]
+            ),
+            with_response=True,
         )
-    )
+
+    assert e.value.error_code == ErrorCode.GAIN_MODE_CHANGE_NOT_ALLOWED
 
     # No change expected
     state: AudioInputState = await aics_client.audio_input_state.read_value()
@@ -391,14 +407,18 @@ async def test_set_automatic_gain_mode_when_manual_only(aics_client: AICSService
     aics_service.audio_input_state.change_counter = 0
     change_counter = 0
 
-    await aics_client.audio_input_control_point.write_value(
-        bytes(
-            [
-                AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE,
-                change_counter,
-            ]
+    with pytest.raises(ATT_Error) as e:
+        await aics_client.audio_input_control_point.write_value(
+            bytes(
+                [
+                    AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE,
+                    change_counter,
+                ]
+            ),
+            with_response=True,
         )
-    )
+
+    assert e.value.error_code == ErrorCode.GAIN_MODE_CHANGE_NOT_ALLOWED
 
     # No change expected
     state: AudioInputState = await aics_client.audio_input_state.read_value()
@@ -414,14 +434,18 @@ async def test_set_automatic_gain_mode_when_automatic_only(
     aics_service.audio_input_state.change_counter = 0
     change_counter = 0
 
-    await aics_client.audio_input_control_point.write_value(
-        bytes(
-            [
-                AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE,
-                change_counter,
-            ]
+    with pytest.raises(ATT_Error) as e:
+        await aics_client.audio_input_control_point.write_value(
+            bytes(
+                [
+                    AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE,
+                    change_counter,
+                ]
+            ),
+            with_response=True,
         )
-    )
+
+    assert e.value.error_code == ErrorCode.GAIN_MODE_CHANGE_NOT_ALLOWED
 
     # No change expected
     state: AudioInputState = await aics_client.audio_input_state.read_value()
