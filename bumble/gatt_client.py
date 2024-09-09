@@ -68,7 +68,7 @@ from .att import (
     ATT_Error,
 )
 from . import core
-from .core import UUID, InvalidStateError, ProtocolError
+from .core import UUID, InvalidStateError
 from .gatt import (
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
@@ -253,7 +253,7 @@ class ProfileServiceProxy:
     SERVICE_CLASS: Type[TemplateService]
 
     @classmethod
-    def from_client(cls, client: Client) -> ProfileServiceProxy:
+    def from_client(cls, client: Client) -> Optional[ProfileServiceProxy]:
         return ServiceProxy.from_client(cls, client, cls.SERVICE_CLASS.UUID)
 
 
@@ -282,6 +282,8 @@ class Client:
         self.indication_subscribers = {}  # Subscriber set, by attribute handle
         self.services = []
         self.cached_values = {}
+
+        connection.on('disconnection', self.on_disconnection)
 
     def send_gatt_pdu(self, pdu: bytes) -> None:
         self.connection.send_l2cap_pdu(ATT_CID, pdu)
@@ -343,12 +345,7 @@ class Client:
         self.mtu_exchange_done = True
         response = await self.send_request(ATT_Exchange_MTU_Request(client_rx_mtu=mtu))
         if response.op_code == ATT_ERROR_RESPONSE:
-            raise ProtocolError(
-                response.error_code,
-                'att',
-                ATT_PDU.error_name(response.error_code),
-                response,
-            )
+            raise ATT_Error(error_code=response.error_code, message=response)
 
         # Compute the final MTU
         self.connection.att_mtu = min(mtu, response.server_rx_mtu)
@@ -405,7 +402,7 @@ class Client:
         if not already_known:
             self.services.append(service)
 
-    async def discover_services(self, uuids: Iterable[UUID] = []) -> List[ServiceProxy]:
+    async def discover_services(self, uuids: Iterable[UUID] = ()) -> List[ServiceProxy]:
         '''
         See Vol 3, Part G - 4.4.1 Discover All Primary Services
         '''
@@ -934,12 +931,7 @@ class Client:
         if response is None:
             raise TimeoutError('read timeout')
         if response.op_code == ATT_ERROR_RESPONSE:
-            raise ProtocolError(
-                response.error_code,
-                'att',
-                ATT_PDU.error_name(response.error_code),
-                response,
-            )
+            raise ATT_Error(error_code=response.error_code, message=response)
 
         # If the value is the max size for the MTU, try to read more unless the caller
         # specifically asked not to do that
@@ -961,12 +953,7 @@ class Client:
                         ATT_INVALID_OFFSET_ERROR,
                     ):
                         break
-                    raise ProtocolError(
-                        response.error_code,
-                        'att',
-                        ATT_PDU.error_name(response.error_code),
-                        response,
-                    )
+                    raise ATT_Error(error_code=response.error_code, message=response)
 
                 part = response.part_attribute_value
                 attribute_value += part
@@ -1059,18 +1046,17 @@ class Client:
                 )
             )
             if response.op_code == ATT_ERROR_RESPONSE:
-                raise ProtocolError(
-                    response.error_code,
-                    'att',
-                    ATT_PDU.error_name(response.error_code),
-                    response,
-                )
+                raise ATT_Error(error_code=response.error_code, message=response)
         else:
             await self.send_command(
                 ATT_Write_Command(
                     attribute_handle=attribute_handle, attribute_value=value
                 )
             )
+
+    def on_disconnection(self, _) -> None:
+        if self.pending_response and not self.pending_response.done():
+            self.pending_response.cancel()
 
     def on_gatt_pdu(self, att_pdu: ATT_PDU) -> None:
         logger.debug(

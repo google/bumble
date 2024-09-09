@@ -21,7 +21,7 @@ import os
 import logging
 import json
 import websockets
-from bumble.colors import color
+import struct
 
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
@@ -30,9 +30,7 @@ from bumble.core import (
     BT_L2CAP_PROTOCOL_ID,
     BT_HUMAN_INTERFACE_DEVICE_SERVICE,
     BT_HIDP_PROTOCOL_ID,
-    UUID,
 )
-from bumble.hci import Address
 from bumble.hid import (
     Device as HID_Device,
     HID_CONTROL_PSM,
@@ -40,20 +38,17 @@ from bumble.hid import (
     Message,
 )
 from bumble.sdp import (
-    Client as SDP_Client,
     DataElement,
     ServiceAttribute,
     SDP_PUBLIC_BROWSE_ROOT,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_ALL_ATTRIBUTES_RANGE,
     SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID,
     SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
     SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
 )
-from bumble.utils import AsyncRunner
 
 # -----------------------------------------------------------------------------
 # SDP attributes for Bluetooth HID devices
@@ -430,7 +425,7 @@ deviceData = DeviceData()
 
 
 # -----------------------------------------------------------------------------
-async def keyboard_device(hid_device):
+async def keyboard_device(hid_device: HID_Device):
 
     # Start a Websocket server to receive events from a web page
     async def serve(websocket, _path):
@@ -476,9 +471,9 @@ async def keyboard_device(hid_device):
                     # limiting x and y values within logical max and min range
                     x = max(log_min, min(log_max, x))
                     y = max(log_min, min(log_max, y))
-                    x_cord = x.to_bytes(signed=True)
-                    y_cord = y.to_bytes(signed=True)
-                    deviceData.mouseData = bytearray([0x02, 0x00]) + x_cord + y_cord
+                    deviceData.mouseData = bytearray([0x02, 0x00]) + struct.pack(
+                        ">bb", x, y
+                    )
                     hid_device.send_data(deviceData.mouseData)
             except websockets.exceptions.ConnectionClosedOK:
                 pass
@@ -515,7 +510,9 @@ async def main() -> None:
     def on_hid_data_cb(pdu: bytes):
         print(f'Received Data, PDU: {pdu.hex()}')
 
-    def on_get_report_cb(report_id: int, report_type: int, buffer_size: int):
+    def on_get_report_cb(
+        report_id: int, report_type: int, buffer_size: int
+    ) -> HID_Device.GetSetStatus:
         retValue = hid_device.GetSetStatus()
         print(
             "GET_REPORT report_id: "
@@ -555,8 +552,7 @@ async def main() -> None:
 
     def on_set_report_cb(
         report_id: int, report_type: int, report_size: int, data: bytes
-    ):
-        retValue = hid_device.GetSetStatus()
+    ) -> HID_Device.GetSetStatus:
         print(
             "SET_REPORT report_id: "
             + str(report_id)
@@ -568,33 +564,33 @@ async def main() -> None:
             + str(data)
         )
         if report_type == Message.ReportType.FEATURE_REPORT:
-            retValue.status = hid_device.GetSetReturn.ERR_INVALID_PARAMETER
+            status = HID_Device.GetSetReturn.ERR_INVALID_PARAMETER
         elif report_type == Message.ReportType.INPUT_REPORT:
             if report_id == 1 and report_size != len(deviceData.keyboardData):
-                retValue.status = hid_device.GetSetReturn.ERR_INVALID_PARAMETER
+                status = HID_Device.GetSetReturn.ERR_INVALID_PARAMETER
             elif report_id == 2 and report_size != len(deviceData.mouseData):
-                retValue.status = hid_device.GetSetReturn.ERR_INVALID_PARAMETER
+                status = HID_Device.GetSetReturn.ERR_INVALID_PARAMETER
             elif report_id == 3:
-                retValue.status = hid_device.GetSetReturn.REPORT_ID_NOT_FOUND
+                status = HID_Device.GetSetReturn.REPORT_ID_NOT_FOUND
             else:
-                retValue.status = hid_device.GetSetReturn.SUCCESS
+                status = HID_Device.GetSetReturn.SUCCESS
         else:
-            retValue.status = hid_device.GetSetReturn.SUCCESS
+            status = HID_Device.GetSetReturn.SUCCESS
 
-        return retValue
+        return HID_Device.GetSetStatus(status=status)
 
-    def on_get_protocol_cb():
-        retValue = hid_device.GetSetStatus()
-        retValue.data = protocol_mode.to_bytes()
-        retValue.status = hid_device.GetSetReturn.SUCCESS
-        return retValue
+    def on_get_protocol_cb() -> HID_Device.GetSetStatus:
+        return HID_Device.GetSetStatus(
+            data=bytes([protocol_mode]),
+            status=hid_device.GetSetReturn.SUCCESS,
+        )
 
-    def on_set_protocol_cb(protocol: int):
-        retValue = hid_device.GetSetStatus()
+    def on_set_protocol_cb(protocol: int) -> HID_Device.GetSetStatus:
         # We do not support SET_PROTOCOL.
         print(f"SET_PROTOCOL report_id: {protocol}")
-        retValue.status = hid_device.GetSetReturn.ERR_UNSUPPORTED_REQUEST
-        return retValue
+        return HID_Device.GetSetStatus(
+            status=hid_device.GetSetReturn.ERR_UNSUPPORTED_REQUEST
+        )
 
     def on_virtual_cable_unplug_cb():
         print('Received Virtual Cable Unplug')

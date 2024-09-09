@@ -942,11 +942,19 @@ class Server(EventEmitter):
             )
             return
 
-        # Accept the value
-        await attribute.write_value(connection, request.attribute_value)
-
-        # Done
-        self.send_response(connection, ATT_Write_Response())
+        try:
+            # Accept the value
+            await attribute.write_value(connection, request.attribute_value)
+        except ATT_Error as error:
+            response = ATT_Error_Response(
+                request_opcode_in_error=request.op_code,
+                attribute_handle_in_error=request.attribute_handle,
+                error_code=error.error_code,
+            )
+        else:
+            # Done
+            response = ATT_Write_Response()
+        self.send_response(connection, response)
 
     @AsyncRunner.run_in_task()
     async def on_att_write_command(self, connection, request):

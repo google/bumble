@@ -47,8 +47,10 @@ from bumble.att import (
     ATT_EXCHANGE_MTU_REQUEST,
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     ATT_PDU,
+    ATT_Error,
     ATT_Error_Response,
     ATT_Read_By_Group_Type_Request,
+    ErrorCode,
 )
 from .test_utils import async_barrier
 
@@ -1245,6 +1247,32 @@ async def test_get_characteristics_by_uuid():
     assert len(s) == 1
     c = peer.get_characteristics_by_uuid(uuid=UUID('1234'), service=s[0])
     assert len(s) == 1
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_write_return_error():
+    [client, server] = LinkedDevices().devices[:2]
+
+    on_write = Mock(side_effect=ATT_Error(error_code=ErrorCode.VALUE_NOT_ALLOWED))
+    characteristic = Characteristic(
+        '1234',
+        Characteristic.Properties.WRITE,
+        Characteristic.Permissions.WRITEABLE,
+        CharacteristicValue(write=on_write),
+    )
+    service = Service('ABCD', [characteristic])
+    server.add_service(service)
+
+    await client.power_on()
+    await server.power_on()
+    connection = await client.connect(server.random_address)
+
+    async with Peer(connection) as peer:
+        c = peer.get_characteristics_by_uuid(uuid=UUID('1234'))[0]
+        with pytest.raises(ATT_Error) as e:
+            await c.write_value(b'', with_response=True)
+        assert e.value.error_code == ErrorCode.VALUE_NOT_ALLOWED
 
 
 # -----------------------------------------------------------------------------

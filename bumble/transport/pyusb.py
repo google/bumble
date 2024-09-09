@@ -23,7 +23,7 @@ import time
 import usb.core
 import usb.util
 
-from typing import Optional
+from typing import Optional, Set
 from usb.core import Device as UsbDevice
 from usb.core import USBError
 from usb.util import CTRL_TYPE_CLASS, CTRL_RECIPIENT_OTHER
@@ -45,6 +45,11 @@ RESET_DELAY = 3
 # Logging
 # -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
+
+# -----------------------------------------------------------------------------
+# Global
+# -----------------------------------------------------------------------------
+devices_in_use: Set[int] = set()
 
 
 # -----------------------------------------------------------------------------
@@ -216,6 +221,7 @@ async def open_pyusb_transport(spec: str) -> Transport:
         async def close(self):
             await self.source.stop()
             await self.sink.stop()
+            devices_in_use.remove(device.address)
             usb.util.release_interface(self.device, 0)
 
     usb_find = usb.core.find
@@ -233,7 +239,18 @@ async def open_pyusb_transport(spec: str) -> Transport:
         spec = spec[1:]
     if ':' in spec:
         vendor_id, product_id = spec.split(':')
-        device = usb_find(idVendor=int(vendor_id, 16), idProduct=int(product_id, 16))
+        device = None
+        devices = usb_find(
+            find_all=True, idVendor=int(vendor_id, 16), idProduct=int(product_id, 16)
+        )
+        for d in devices:
+            if d.address in devices_in_use:
+                continue
+            device = d
+            devices_in_use.add(d.address)
+            break
+        if device is None:
+            raise ValueError('device already in use')
     elif '-' in spec:
 
         def device_path(device):

@@ -248,26 +248,28 @@ class AsyncPipeSink:
 
 
 # -----------------------------------------------------------------------------
-class ParserSource:
+class BaseSource:
     """
     Base class designed to be subclassed by transport-specific source classes
     """
 
     terminated: asyncio.Future[None]
-    parser: PacketParser
+    sink: Optional[TransportSink]
 
     def __init__(self) -> None:
-        self.parser = PacketParser()
         self.terminated = asyncio.get_running_loop().create_future()
+        self.sink = None
 
     def set_packet_sink(self, sink: TransportSink) -> None:
-        self.parser.set_packet_sink(sink)
+        self.sink = sink
 
     def on_transport_lost(self) -> None:
-        self.terminated.set_result(None)
-        if self.parser.sink:
-            if hasattr(self.parser.sink, 'on_transport_lost'):
-                self.parser.sink.on_transport_lost()
+        if not self.terminated.done():
+            self.terminated.set_result(None)
+
+        if self.sink:
+            if hasattr(self.sink, 'on_transport_lost'):
+                self.sink.on_transport_lost()
 
     async def wait_for_termination(self) -> None:
         """
@@ -278,6 +280,23 @@ class ParserSource:
 
     def close(self) -> None:
         pass
+
+
+# -----------------------------------------------------------------------------
+class ParserSource(BaseSource):
+    """
+    Base class for sources that use an HCI parser.
+    """
+
+    parser: PacketParser
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.parser = PacketParser()
+
+    def set_packet_sink(self, sink: TransportSink) -> None:
+        super().set_packet_sink(sink)
+        self.parser.set_packet_sink(sink)
 
 
 # -----------------------------------------------------------------------------

@@ -764,7 +764,9 @@ class Session:
         self.peer_io_capability = SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
 
         # OOB
-        self.oob_data_flag = 0 if pairing_config.oob is None else 1
+        self.oob_data_flag = (
+            1 if pairing_config.oob and pairing_config.oob.peer_data else 0
+        )
 
         # Set up addresses
         self_address = connection.self_resolvable_address or connection.self_address
@@ -1014,8 +1016,10 @@ class Session:
         self.send_command(response)
 
     def send_pairing_confirm_command(self) -> None:
-        self.r = crypto.r()
-        logger.debug(f'generated random: {self.r.hex()}')
+
+        if self.pairing_method != PairingMethod.OOB:
+            self.r = crypto.r()
+            logger.debug(f'generated random: {self.r.hex()}')
 
         if self.sc:
 
@@ -1078,11 +1082,19 @@ class Session:
         )
 
     def send_identity_address_command(self) -> None:
-        identity_address = {
-            None: self.manager.device.static_address,
-            Address.PUBLIC_DEVICE_ADDRESS: self.manager.device.public_address,
-            Address.RANDOM_DEVICE_ADDRESS: self.manager.device.static_address,
-        }[self.pairing_config.identity_address_type]
+        if self.pairing_config.identity_address_type == Address.PUBLIC_DEVICE_ADDRESS:
+            identity_address = self.manager.device.public_address
+        elif self.pairing_config.identity_address_type == Address.RANDOM_DEVICE_ADDRESS:
+            identity_address = self.manager.device.static_address
+        else:
+            # No identity address type set. If the controller has a public address, it
+            # will be more responsible to be the identity address.
+            if self.manager.device.public_address != Address.ANY:
+                logger.debug("No identity address type set, using PUBLIC")
+                identity_address = self.manager.device.public_address
+            else:
+                logger.debug("No identity address type set, using RANDOM")
+                identity_address = self.manager.device.static_address
         self.send_command(
             SMP_Identity_Address_Information_Command(
                 addr_type=identity_address.address_type,
@@ -1727,7 +1739,6 @@ class Session:
         if self.pairing_method in (
             PairingMethod.JUST_WORKS,
             PairingMethod.NUMERIC_COMPARISON,
-            PairingMethod.OOB,
         ):
             ra = bytes(16)
             rb = ra
@@ -1735,6 +1746,22 @@ class Session:
             assert self.passkey
             ra = self.passkey.to_bytes(16, byteorder='little')
             rb = ra
+        elif self.pairing_method == PairingMethod.OOB:
+            if self.is_initiator:
+                if self.peer_oob_data:
+                    rb = self.peer_oob_data.r
+                    ra = self.r
+                else:
+                    rb = bytes(16)
+                    ra = self.r
+            else:
+                if self.peer_oob_data:
+                    ra = self.peer_oob_data.r
+                    rb = self.r
+                else:
+                    ra = bytes(16)
+                    rb = self.r
+
         else:
             return
 

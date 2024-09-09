@@ -35,15 +35,13 @@ from bumble.hci import (
     CodingFormat,
     OwnAddressType,
 )
+from bumble.profiles.ascs import AudioStreamControlService
 from bumble.profiles.bap import (
     CodecSpecificCapabilities,
     ContextType,
     AudioLocation,
     SupportedSamplingFrequency,
     SupportedFrameDuration,
-    PacRecord,
-    PublishedAudioCapabilitiesService,
-    AudioStreamControlService,
     UnicastServerAdvertisingData,
 )
 from bumble.profiles.mcp import (
@@ -52,7 +50,7 @@ from bumble.profiles.mcp import (
     MediaState,
     MediaControlPointOpcode,
 )
-
+from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.transport import open_transport_or_link
 
 from typing import Optional
