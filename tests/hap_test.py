@@ -20,6 +20,7 @@ import pytest
 import functools
 import pytest_asyncio
 import logging
+import sys
 
 from bumble import att, device
 from bumble.profiles import hap
@@ -52,6 +53,17 @@ server_features = hap.HearingAidFeatures(
 )
 
 TIMEOUT = 0.1
+
+async def assert_queue_is_empty(queue: asyncio.Queue):
+    assert queue.empty()
+
+    # Check that nothing is being added during TIMEOUT secondes
+    if sys.version_info >= (3, 11):
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(queue.get(), TIMEOUT)
+    else:
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(queue.get(), TIMEOUT)
 
 
 # -----------------------------------------------------------------------------
@@ -111,10 +123,8 @@ async def test_read_all_presets(hap_client: hap.HearingAccessServiceProxy):
     assert (await hap_client.preset_control_point_indications.get()) == bytes(
         [hap.HearingAidPresetControlPointOpcode.READ_PRESET_RESPONSE, 1]
     ) + bytes(unavailable_preset)
-    with pytest.raises(TimeoutError):
-        await asyncio.wait_for(
-            hap_client.preset_control_point_indications.get(), TIMEOUT
-        )
+
+    await assert_queue_is_empty(hap_client.preset_control_point_indications)
 
 
 # -----------------------------------------------------------------------------
@@ -143,10 +153,7 @@ async def test_set_active_preset_valid(hap_client: hap.HearingAccessServiceProxy
 
     assert (await hap_client.active_preset_index.read_value()) == (bar_preset.index)
 
-    with pytest.raises(TimeoutError):
-        await asyncio.wait_for(
-            hap_client.active_preset_index_notification.get(), TIMEOUT
-        )
+    await assert_queue_is_empty(hap_client.active_preset_index_notification)
 
 
 # -----------------------------------------------------------------------------
@@ -176,10 +183,8 @@ async def test_set_next_preset(hap_client: hap.HearingAccessServiceProxy):
     ) == foobar_preset.index
 
     assert (await hap_client.active_preset_index.read_value()) == (foobar_preset.index)
-    with pytest.raises(TimeoutError):
-        await asyncio.wait_for(
-            hap_client.active_preset_index_notification.get(), TIMEOUT
-        )
+
+    await assert_queue_is_empty(hap_client.active_preset_index_notification)
 
 
 # -----------------------------------------------------------------------------
@@ -203,10 +208,7 @@ async def test_set_next_preset_will_loop_to_first(
 
     # Note that there is a invalid preset in the preset record of the server
 
-    with pytest.raises(TimeoutError):
-        await asyncio.wait_for(
-            hap_client.active_preset_index_notification.get(), TIMEOUT
-        )
+    await assert_queue_is_empty(hap_client.active_preset_index_notification)
 
 
 # -----------------------------------------------------------------------------
@@ -220,7 +222,5 @@ async def test_set_previous_preset_will_loop_to_last(
     assert (await hap_client.active_preset_index_notification.get()) == bar_preset.index
 
     assert (await hap_client.active_preset_index.read_value()) == (bar_preset.index)
-    with pytest.raises(TimeoutError):
-        await asyncio.wait_for(
-            hap_client.active_preset_index_notification.get(), TIMEOUT
-        )
+
+    await assert_queue_is_empty(hap_client.active_preset_index_notification)
