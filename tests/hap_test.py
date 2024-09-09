@@ -159,7 +159,8 @@ async def test_set_active_preset_invalid(hap_client: hap.HearingAccessServicePro
                     hap.HearingAidPresetControlPointOpcode.SET_ACTIVE_PRESET,
                     unavailable_preset.index,
                 ]
-            ),  with_response=True
+            ),
+            with_response=True,
         )
     assert e.value.error_code == hap.ErrorCode.PRESET_OPERATION_NOT_POSSIBLE
 
