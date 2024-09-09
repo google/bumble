@@ -21,6 +21,8 @@ import logging
 
 from typing import Union, Optional
 
+from bumble import gatt
+
 from bumble.core import UUID
 
 from bumble.device import Connection
@@ -451,31 +453,59 @@ class AICSServiceProxy(ProfileServiceProxy):
     def __init__(self, service_proxy: ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        self.audio_input_state = PackedCharacteristicAdapter(
-            service_proxy.get_characteristics_by_uuid(
+        if not (
+            characteristics := service_proxy.get_characteristics_by_uuid(
                 GATT_AUDIO_INPUT_STATE_CHARACTERISTIC
-            )[0],
+            )
+        ):
+            raise gatt.InvalidServiceError("Audio Input State Characteristic not found")
+        self.audio_input_state = PackedCharacteristicAdapter(
+            characteristics[0],
             'BBBB',
         )
 
-        self.gain_settings_properties = PackedCharacteristicAdapter(
-            service_proxy.get_characteristics_by_uuid(
+        if not (
+            characteristics := service_proxy.get_characteristics_by_uuid(
                 GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC
-            )[0],
+            )
+        ):
+            raise gatt.InvalidServiceError(
+                "Gain Settings Attribute Characteristic not found"
+            )
+        self.gain_settings_properties = PackedCharacteristicAdapter(
+            characteristics[0],
             'BBB',
         )
 
-        self.audio_input_status = PackedCharacteristicAdapter(
-            service_proxy.get_characteristics_by_uuid(
+        if not (
+            characteristics := service_proxy.get_characteristics_by_uuid(
                 GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC
-            )[0],
+            )
+        ):
+            raise gatt.InvalidServiceError(
+                "Audio Input Status Characteristic not found"
+            )
+        self.audio_input_status = PackedCharacteristicAdapter(
+            characteristics[0],
             'B',
         )
 
-        self.audio_input_control_point = service_proxy.get_characteristics_by_uuid(
-            GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC
-        )[0]
+        if not (
+            characteristics := service_proxy.get_characteristics_by_uuid(
+                GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC
+            )
+        ):
+            raise gatt.InvalidServiceError(
+                "Audio Input Control Point Characteristic not found"
+            )
+        self.audio_input_control_point = characteristics[0]
 
-        self.audio_input_description = service_proxy.get_characteristics_by_uuid(
-            GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC
-        )[0]
+        if not (
+            characteristics := service_proxy.get_characteristics_by_uuid(
+                GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC
+            )
+        ):
+            raise gatt.InvalidServiceError(
+                "Audio Input Description Characteristic not found"
+            )
+        self.audio_input_description = characteristics[0]
