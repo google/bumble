@@ -275,6 +275,11 @@ GATT_SOURCE_AUDIO_LOCATION_CHARACTERISTIC       = UUID.from_16_bits(0x2BCC, 'Sou
 GATT_AVAILABLE_AUDIO_CONTEXTS_CHARACTERISTIC    = UUID.from_16_bits(0x2BCD, 'Available Audio Contexts')
 GATT_SUPPORTED_AUDIO_CONTEXTS_CHARACTERISTIC    = UUID.from_16_bits(0x2BCE, 'Supported Audio Contexts')
 
+# Hearing Access Service
+GATT_HEARING_AID_FEATURES_CHARACTERISTIC             = UUID.from_16_bits(0x2BDA, 'Hearing Aid Features')
+GATT_HEARING_AID_PRESET_CONTROL_POINT_CHARACTERISTIC = UUID.from_16_bits(0x2BDB, 'Hearing Aid Preset Control Point')
+GATT_ACTIVE_PRESET_INDEX_CHARACTERISTIC              = UUID.from_16_bits(0x2BDC, 'Active Preset Index')
+
 # ASHA Service
 GATT_ASHA_SERVICE                             = UUID.from_16_bits(0xFDF0, 'Audio Streaming for Hearing Aid')
 GATT_ASHA_READ_ONLY_PROPERTIES_CHARACTERISTIC = UUID('6333651e-c481-4a3e-9169-7c902aad37bb', 'ReadOnlyProperties')

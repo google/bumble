@@ -915,7 +915,7 @@ class Server(EventEmitter):
         See Bluetooth spec Vol 3, Part F - 3.4.5.1 Write Request
         '''
 
-        # Check  that the attribute exists
+        # Check that the attribute exists
         attribute = self.get_attribute(request.attribute_handle)
         if attribute is None:
             self.send_response(
