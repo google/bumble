@@ -54,6 +54,7 @@ server_features = hap.HearingAidFeatures(
 
 TIMEOUT = 0.1
 
+
 async def assert_queue_is_empty(queue: asyncio.Queue):
     assert queue.empty()
 
