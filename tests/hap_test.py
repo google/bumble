@@ -152,19 +152,16 @@ async def test_set_active_preset_valid(hap_client: hap.HearingAccessServiceProxy
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_set_active_preset_invalid(hap_client: hap.HearingAccessServiceProxy):
-    await hap_client.hearing_aid_preset_control_point.write_value(
-        bytes(
-            [
-                hap.HearingAidPresetControlPointOpcode.SET_ACTIVE_PRESET,
-                unavailable_preset.index,
-            ]
+    with pytest.raises(att.ATT_Error) as e:
+        await hap_client.hearing_aid_preset_control_point.write_value(
+            bytes(
+                [
+                    hap.HearingAidPresetControlPointOpcode.SET_ACTIVE_PRESET,
+                    unavailable_preset.index,
+                ]
+            ),  with_response=True
         )
-    )
-    # TODO: we should check the remote has sent an att err rsp
-    with pytest.raises(TimeoutError):
-        await asyncio.wait_for(
-            hap_client.active_preset_index_notification.get(), TIMEOUT
-        )
+    assert e.value.error_code == hap.ErrorCode.PRESET_OPERATION_NOT_POSSIBLE
 
 
 # -----------------------------------------------------------------------------

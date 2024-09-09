@@ -335,14 +335,14 @@ class HearingAccessService(gatt.TemplateService):
     def on_forget(self, addr: Address) -> None:
         self.preset_changed_operations_history_per_device.pop(addr)
 
-    def _on_write_hearing_aid_preset_control_point(
+    async def _on_write_hearing_aid_preset_control_point(
         self, connection: Optional[Connection], value: bytes
     ):
         assert connection
 
         opcode = HearingAidPresetControlPointOpcode(value[0])
         handler = getattr(self, '_on_' + opcode.name.lower())
-        connection.abort_on('disconnection', handler(connection, value))
+        await handler(connection, value)
 
     async def _on_read_presets_request(
         self, connection: Optional[Connection], value: bytes
