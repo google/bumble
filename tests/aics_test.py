@@ -25,6 +25,7 @@ from bumble.att import ATT_Error
 from bumble.profiles.aics import (
     Mute,
     AICSService,
+    AudioInputState,
     AICSServiceProxy,
     GainMode,
     AudioInputStatus,
@@ -65,11 +66,11 @@ async def aics_client():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_init_service(aics_client: AICSServiceProxy):
-    assert await aics_client.audio_input_state.read_value() == (
-        0,
-        Mute.NOT_MUTED,
-        GainMode.AUTOMATIC_ONLY,
-        0,
+    assert await aics_client.audio_input_state.read_value() == AudioInputState(
+        gain_settings=0,
+        mute=Mute.NOT_MUTED,
+        gain_mode=GainMode.MANUAL,
+        change_counter=0,
     )
     assert await aics_client.gain_settings_properties.read_value() == (1, 0, 255)
     assert await aics_client.audio_input_status.read_value() == (
@@ -81,6 +82,8 @@ async def test_init_service(aics_client: AICSServiceProxy):
 async def test_set_gain_setting_when_gain_mode_automatic_only(
     aics_client: AICSServiceProxy,
 ):
+    aics_service.audio_input_state.gain_mode = GainMode.AUTOMATIC_ONLY
+
     change_counter = 0
     gain_settings = 120
     await aics_client.audio_input_control_point.write_value(
@@ -94,11 +97,11 @@ async def test_set_gain_setting_when_gain_mode_automatic_only(
     )
 
     # Unchanged
-    assert await aics_client.audio_input_state.read_value() == (
-        0,
-        Mute.NOT_MUTED,
-        GainMode.AUTOMATIC_ONLY,
-        0,
+    assert await aics_client.audio_input_state.read_value() == AudioInputState(
+        gain_settings=0,
+        mute=Mute.NOT_MUTED,
+        gain_mode=GainMode.AUTOMATIC_ONLY,
+        change_counter=0,
     )
 
 
@@ -118,11 +121,11 @@ async def test_set_gain_setting_when_gain_mode_automatic(aics_client: AICSServic
     )
 
     # Unchanged
-    assert await aics_client.audio_input_state.read_value() == (
-        0,
-        Mute.NOT_MUTED,
-        GainMode.AUTOMATIC,
-        0,
+    assert await aics_client.audio_input_state.read_value() == AudioInputState(
+        gain_settings=0,
+        mute=Mute.NOT_MUTED,
+        gain_mode=GainMode.AUTOMATIC,
+        change_counter=0,
     )
 
 
@@ -141,11 +144,11 @@ async def test_set_gain_setting_when_gain_mode_MANUAL(aics_client: AICSServicePr
         )
     )
 
-    assert await aics_client.audio_input_state.read_value() == (
-        gain_settings,
-        Mute.NOT_MUTED,
-        GainMode.MANUAL,
-        change_counter,
+    assert await aics_client.audio_input_state.read_value() == AudioInputState(
+        gain_settings=gain_settings,
+        mute=Mute.NOT_MUTED,
+        gain_mode=GainMode.MANUAL,
+        change_counter=change_counter,
     )
 
 
@@ -166,11 +169,11 @@ async def test_set_gain_setting_when_gain_mode_MANUAL_ONLY(
         )
     )
 
-    assert await aics_client.audio_input_state.read_value() == (
-        gain_settings,
-        Mute.NOT_MUTED,
-        GainMode.MANUAL_ONLY,
-        change_counter,
+    assert await aics_client.audio_input_state.read_value() == AudioInputState(
+        gain_settings=gain_settings,
+        mute=Mute.NOT_MUTED,
+        gain_mode=GainMode.MANUAL_ONLY,
+        change_counter=change_counter,
     )
 
 
@@ -189,9 +192,9 @@ async def test_unmute_when_muted(aics_client: AICSServiceProxy):
 
     change_counter += 1
 
-    state = await aics_client.audio_input_state.read_value()
-    assert state[1] == Mute.NOT_MUTED
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.mute == Mute.NOT_MUTED
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -209,9 +212,9 @@ async def test_unmute_when_mute_disabled(aics_client: AICSServiceProxy):
         )
     )
 
-    state = await aics_client.audio_input_state.read_value()
-    assert state[1] == Mute.DISABLED
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.mute == Mute.DISABLED
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -230,9 +233,9 @@ async def test_mute_when_not_muted(aics_client: AICSServiceProxy):
     )
 
     change_counter += 1
-    state = await aics_client.audio_input_state.read_value()
-    assert state[1] == Mute.MUTED
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.mute == Mute.MUTED
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -250,9 +253,9 @@ async def test_mute_when_mute_disabled(aics_client: AICSServiceProxy):
         )
     )
 
-    state = await aics_client.audio_input_state.read_value()
-    assert state[1] == Mute.DISABLED
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.mute == Mute.DISABLED
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -271,9 +274,9 @@ async def test_set_manual_gain_mode_when_automatic(aics_client: AICSServiceProxy
     )
 
     change_counter += 1
-    state = await aics_client.audio_input_state.read_value()
-    assert state[2] == GainMode.MANUAL
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.gain_mode == GainMode.MANUAL
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -292,9 +295,9 @@ async def test_set_manual_gain_mode_when_already_manual(aics_client: AICSService
     )
 
     # No change expected
-    state = await aics_client.audio_input_state.read_value()
-    assert state[2] == GainMode.MANUAL
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.gain_mode == GainMode.MANUAL
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -312,9 +315,9 @@ async def test_set_manual_gain_mode_when_manual_only(aics_client: AICSServicePro
         )
     )
 
-    state = await aics_client.audio_input_state.read_value()
-    assert state[2] == GainMode.MANUAL_ONLY
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.gain_mode == GainMode.MANUAL_ONLY
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -333,9 +336,9 @@ async def test_set_manual_gain_mode_when_automatic_only(aics_client: AICSService
     )
 
     # No change expected
-    state = await aics_client.audio_input_state.read_value()
-    assert state[2] == GainMode.AUTOMATIC_ONLY
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.gain_mode == GainMode.AUTOMATIC_ONLY
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -354,9 +357,9 @@ async def test_set_automatic_gain_mode_when_manual(aics_client: AICSServiceProxy
     )
 
     change_counter += 1
-    state = await aics_client.audio_input_state.read_value()
-    assert state[2] == GainMode.AUTOMATIC
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.gain_mode == GainMode.AUTOMATIC
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -377,9 +380,9 @@ async def test_set_automatic_gain_mode_when_already_automatic(
     )
 
     # No change expected
-    state = await aics_client.audio_input_state.read_value()
-    assert state[2] == GainMode.AUTOMATIC
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.gain_mode == GainMode.AUTOMATIC
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -398,9 +401,9 @@ async def test_set_automatic_gain_mode_when_manual_only(aics_client: AICSService
     )
 
     # No change expected
-    state = await aics_client.audio_input_state.read_value()
-    assert state[2] == GainMode.MANUAL_ONLY
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.gain_mode == GainMode.MANUAL_ONLY
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio
@@ -421,9 +424,9 @@ async def test_set_automatic_gain_mode_when_automatic_only(
     )
 
     # No change expected
-    state = await aics_client.audio_input_state.read_value()
-    assert state[2] == GainMode.AUTOMATIC_ONLY
-    assert state[3] == change_counter
+    state: AudioInputState = await aics_client.audio_input_state.read_value()
+    assert state.gain_mode == GainMode.AUTOMATIC_ONLY
+    assert state.change_counter == change_counter
 
 
 @pytest.mark.asyncio

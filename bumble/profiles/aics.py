@@ -19,6 +19,10 @@
 # -----------------------------------------------------------------------------
 import logging
 
+import struct
+
+from dataclasses import dataclass
+
 from typing import Union, Optional
 
 from bumble import gatt
@@ -31,6 +35,7 @@ from bumble.att import ATT_Error
 
 from bumble.gatt import (
     Characteristic,
+    DelegatedCharacteristicAdapter,
     TemplateService,
     Attribute,
     CharacteristicValue,
@@ -119,42 +124,41 @@ class AudioInputControlPointOpCode(OpenIntEnum):
 
 
 # -----------------------------------------------------------------------------
-class AudioInputState(Characteristic):
+@dataclass
+class AudioInputState:
     '''
     Cf. 2.2.1 Audio Input State
     '''
 
-    def __init__(
-        self,
-        uuid: Union[str, bytes, UUID],
-        properties: Characteristic.Properties,
-        permissions: Union[str, Attribute.Permissions],
-        gain_settings: int,
-        gain_settings_unit: int,
-        mute: Mute,
-        gain_mode: GainMode,
-        descriptors: Sequence[Descriptor] = (),
-    ):
-        self.gain_settings = gain_settings
-        self.gain_settings_unit = gain_settings_unit
-        self.mute: Mute = mute
-        self.gain_mode: GainMode = gain_mode
-        self.change_counter = 0
+    gain_settings: int = 0
+    mute: Mute = Mute.NOT_MUTED
+    gain_mode: GainMode = GainMode.MANUAL
+    change_counter: int = 0
+    attribute_value: Optional[CharacteristicValue] = None
 
-        value = CharacteristicValue(read=self._on_read)
-
-        super().__init__(uuid, properties, permissions, value, descriptors)
+    def __str__(self) -> str:
+        return (
+            f"AudioInputState(gain_settings={self.gain_settings},"
+            f" mute={self.mute},"
+            f" gain_mode={self.gain_mode},"
+            f" change_counter={self.change_counter})"
+        )
 
     def __bytes__(self) -> bytes:
         return bytes(
             [self.gain_settings, self.mute, self.gain_mode, self.change_counter]
         )
 
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        gain_settings, mute, gain_mode, change_counter = struct.unpack("BBBB", data)
+        return cls(gain_settings, mute, gain_mode, change_counter)
+
     def update_gain_settings_unit(self, gain_settings_unit: int) -> None:
         self.gain_settings_unit = gain_settings_unit
 
-    def increment_gain_settings(self) -> None:
-        self.gain_settings += self.gain_settings_unit
+    def increment_gain_settings(self, gain_settings_unit: int) -> None:
+        self.gain_settings += gain_settings_unit
         self.increment_change_counter()
 
     def decrement_gain_settings(self) -> None:
@@ -165,33 +169,40 @@ class AudioInputState(Characteristic):
         self.change_counter = (self.change_counter + 1) % (CHANGE_COUNTER_MAX_VALUE + 1)
 
     async def notify_subscribers(self, connection: Connection) -> None:
+        assert self.attribute_value is not None
         await connection.device.notify_subscribers(
-            attribute=self.value, value=bytes(self)
+            attribute=self.attribute_value, value=bytes(self)
         )
 
-    def _on_read(self, _connection: Optional[Connection]) -> bytes:
+    def on_read(self, _connection: Optional[Connection]) -> bytes:
         return bytes(self)
 
 
-class GainSettingsProperties(Characteristic):
+@dataclass
+class GainSettingsProperties:
     '''
     Cf. 3.2 Gain Settings Properties
     '''
 
-    def __init__(
-        self,
-        uuid: Union[str, bytes, UUID],
-        properties: Characteristic.Properties,
-        permissions: Union[str, Attribute.Permissions],
-        gain_settings_unit: int,
-        descriptors: Sequence[Descriptor] = (),
-    ):
-        self.gain_settings_unit: int = gain_settings_unit
-        self.gain_settings_minimum: int = GAIN_SETTINGS_MIN_VALUE
-        self.gain_settings_maximum: int = GAIN_SETTINGS_MAX_VALUE
+    gain_settings_unit: int = 1
+    gain_settings_minimum: int = GAIN_SETTINGS_MIN_VALUE
+    gain_settings_maximum: int = GAIN_SETTINGS_MAX_VALUE
 
-        value = CharacteristicValue(read=self._on_read)
-        super().__init__(uuid, properties, permissions, value, descriptors)
+    def __str__(self) -> str:
+        return (
+            f"GainSettingsProperties(gain_settings_unit={self.gain_settings_unit},"
+            f" gain_settings_minimum={self.gain_settings_minimum},"
+            f" gain_settings_maximum={self.gain_settings_maximum},"
+        )
+
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        (gain_settings_unit, gain_settings_minimum, gain_settings_maximum) = (
+            struct.unpack('BBB', data)
+        )
+        GainSettingsProperties(
+            gain_settings_unit, gain_settings_minimum, gain_settings_maximum
+        )
 
     def __bytes__(self) -> bytes:
         return bytes(
@@ -202,64 +213,20 @@ class GainSettingsProperties(Characteristic):
             ]
         )
 
-    def _on_read(self, _connection: Optional[Connection]) -> bytes:
+    def on_read(self, _connection: Optional[Connection]) -> bytes:
         return bytes(self)
 
 
-class AudioInputDescription(Characteristic):
-    '''
-    Cf. 3.6 Audio Input Description
-    '''
-
-    def __init__(
-        self,
-        uuid: Union[str, bytes, UUID],
-        properties: Characteristic.Properties,
-        permissions: Union[str, Attribute.Permissions],
-        audio_input_description_value: str,
-        descriptors: Sequence[Descriptor] = (),
-    ):
-
-        self.audio_input_status_value = audio_input_description_value
-
-        self.value = CharacteristicValue(read=self._on_read, write=self._on_write)
-
-        super().__init__(uuid, properties, permissions, self.value, descriptors)
-
-    def _on_read(self, _connection: Optional[Connection]) -> bytes:
-        return self.audio_input_status_value.encode('utf-8')
-
-    async def _on_write(self, connection: Optional[Connection], value: bytes) -> None:
-        self.audio_input_status_value = value.decode('utf-8')
-        if connection is not None:
-            await connection.device.notify_subscribers(
-                attribute=self.value, value=value
-            )
-
-
-class AudioInputControlPoint(Characteristic):
+@dataclass
+class AudioInputControlPoint:
     '''
     Cf. 3.5.2 Audio Input Control Point
     '''
 
-    def __init__(
-        self,
-        uuid: Union[str, bytes, UUID],
-        properties: Characteristic.Properties,
-        permissions: Union[str, Attribute.Permissions],
-        audio_input_state: AudioInputState,
-        gain_settings_properties: GainSettingsProperties,
-        descriptors: Sequence[Descriptor] = (),
-    ):
+    audio_input_state: AudioInputState
+    gain_settings_properties: GainSettingsProperties
 
-        self.audio_input_state = audio_input_state
-        self.gain_settings_properties = gain_settings_properties
-
-        self.value = CharacteristicValue(write=self._on_write)
-
-        super().__init__(uuid, properties, permissions, self.value, descriptors)
-
-    async def _on_write(self, connection: Optional[Connection], value: bytes) -> None:
+    async def on_write(self, connection: Optional[Connection], value: bytes) -> None:
         assert connection
 
         try:
@@ -289,6 +256,7 @@ class AudioInputControlPoint(Characteristic):
 
         gain_mode = self.audio_input_state.gain_mode
 
+        logger.error(f"set_gain_setting: gain_mode: {gain_mode}")
         if not (gain_mode == GainMode.MANUAL or gain_mode == GainMode.MANUAL_ONLY):
             logger.warning(
                 "GainMode should be either MANUAL or MANUAL_ONLY Cf Spec Audio Input Control Service 3.5.2.1"
@@ -373,73 +341,131 @@ class AudioInputControlPoint(Characteristic):
         await self.audio_input_state.notify_subscribers(connection)
 
 
+@dataclass
+class AudioInputDescription:
+    '''
+    Cf. 3.6 Audio Input Description
+    '''
+
+    audio_input_description: str = "Bluetooth"
+    attribute_value: Optional[CharacteristicValue] = None
+
+    def __str__(self) -> str:
+        return f"AudioInputDescription({self.audio_input_description})"
+
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        return cls(audio_input_description=data.decode('utf-8'))
+
+    def __bytes__(self) -> bytes:
+        return self.audio_input_description.encode('utf-8')
+
+    def on_read(self, _connection: Optional[Connection]) -> bytes:
+        return self.audio_input_description.encode('utf-8')
+
+    async def on_write(self, connection: Optional[Connection], value: bytes) -> None:
+        assert connection
+        assert self.attribute_value
+
+        self.audio_input_description = value.decode('utf-8')
+        await connection.device.notify_subscribers(
+            attribute=self.attribute_value, value=value
+        )
+
+
 class AICSService(TemplateService):
     UUID = GATT_AUDIO_INPUT_CONTROL_SERVICE
 
     def __init__(
         self,
+        audio_input_state: AudioInputState = AudioInputState(),
+        gain_settings_properties: GainSettingsProperties = GainSettingsProperties(),
+        audio_input_type: str = "local",
         audio_input_status: AudioInputStatus = AudioInputStatus.ACTIVE,
-        gain_settings: int = 0,
-        gain_settings_unit: int = 1,
-        mute: Mute = Mute.NOT_MUTED,
-        gain_mode: GainMode = GainMode.AUTOMATIC_ONLY,
-        audio_input_description_value: str = 'Bluetooth',
+        audio_input_description: AudioInputDescription = AudioInputDescription(),
     ):
-        self.audio_input_status_value = audio_input_status
+        self.audio_input_state = audio_input_state
+        self.audio_input_status = audio_input_status
+        self.gain_settings_properties = gain_settings_properties
+        self.audio_input_control_point: AudioInputControlPoint = AudioInputControlPoint(
+            self.audio_input_state, self.gain_settings_properties
+        )
+        self.audio_input_description = audio_input_description
 
-        self.audio_input_state = AudioInputState(
-            uuid=GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
-            properties=Characteristic.Properties.READ
-            | Characteristic.Properties.NOTIFY,
-            permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            gain_settings=gain_settings,
-            gain_settings_unit=gain_settings_unit,
-            mute=mute,
-            gain_mode=gain_mode,
+        self.audio_input_state_characteristic = DelegatedCharacteristicAdapter(
+            Characteristic(
+                uuid=GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
+                properties=Characteristic.Properties.READ
+                | Characteristic.Properties.NOTIFY,
+                permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
+                value=CharacteristicValue(read=self.audio_input_state.on_read),
+            ),
+            encode=lambda value: bytes(value),
         )
-        self.gain_settings_properties = GainSettingsProperties(
-            uuid=GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
-            properties=Characteristic.Properties.READ,
-            permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            gain_settings_unit=gain_settings_unit,
+        self.audio_input_state.attribute_value = (
+            self.audio_input_state_characteristic.value
         )
-        self.audio_input_type = Characteristic(
+
+        self.gain_settings_properties_characteristic = DelegatedCharacteristicAdapter(
+            Characteristic(
+                uuid=GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
+                properties=Characteristic.Properties.READ,
+                permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
+                value=CharacteristicValue(read=self.gain_settings_properties.on_read),
+            )
+        )
+
+        self.audio_input_type_characteristic = Characteristic(
             uuid=GATT_AUDIO_INPUT_TYPE_CHARACTERISTIC,
             properties=Characteristic.Properties.READ,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            value=b'',
+            value=audio_input_type,
         )
-        self.audio_input_status = Characteristic(
+
+        self.audio_input_status_characteristic = Characteristic(
             uuid=GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC,
             properties=Characteristic.Properties.READ,
             permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            value=bytes([self.audio_input_status_value]),
+            value=bytes([self.audio_input_status]),
         )
-        self.audio_input_control_point = AudioInputControlPoint(
-            uuid=GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
-            properties=Characteristic.Properties.WRITE,
-            permissions=Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
-            audio_input_state=self.audio_input_state,
-            gain_settings_properties=self.gain_settings_properties,
+
+        self.audio_input_control_point_characteristic = DelegatedCharacteristicAdapter(
+            Characteristic(
+                uuid=GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
+                properties=Characteristic.Properties.WRITE,
+                permissions=Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
+                value=CharacteristicValue(
+                    write=self.audio_input_control_point.on_write
+                ),
+            )
         )
-        self.audio_input_description = AudioInputDescription(
-            uuid=GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
-            properties=Characteristic.Properties.READ
-            | Characteristic.Properties.NOTIFY
-            | Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
-            permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
-            | Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
-            audio_input_description_value=audio_input_description_value,
+
+        self.audio_input_description_characteristic = DelegatedCharacteristicAdapter(
+            Characteristic(
+                uuid=GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
+                properties=Characteristic.Properties.READ
+                | Characteristic.Properties.NOTIFY
+                | Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
+                permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
+                | Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
+                value=CharacteristicValue(
+                    write=self.audio_input_description.on_write,
+                    read=self.audio_input_description.on_read,
+                ),
+            )
+        )
+        self.audio_input_description.attribute_value = (
+            self.audio_input_control_point_characteristic.value
         )
 
         super().__init__(
             [
-                self.audio_input_state,
-                self.gain_settings_properties,
-                self.audio_input_type,
-                self.audio_input_status,
-                self.audio_input_control_point,
-                self.audio_input_description,
+                self.audio_input_state_characteristic,  # type: ignore
+                self.gain_settings_properties_characteristic,  # type: ignore
+                self.audio_input_type_characteristic,  # type: ignore
+                self.audio_input_status_characteristic,  # type: ignore
+                self.audio_input_control_point_characteristic,  # type: ignore
+                self.audio_input_description_characteristic,  # type: ignore
             ]
         )
 
@@ -459,9 +485,8 @@ class AICSServiceProxy(ProfileServiceProxy):
             )
         ):
             raise gatt.InvalidServiceError("Audio Input State Characteristic not found")
-        self.audio_input_state = PackedCharacteristicAdapter(
-            characteristics[0],
-            'BBBB',
+        self.audio_input_state = DelegatedCharacteristicAdapter(
+            characteristic=characteristics[0], decode=AudioInputState.from_bytes
         )
 
         if not (
