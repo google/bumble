@@ -171,7 +171,7 @@ class Host(AbortableEventEmitter):
         self.cis_links = {}  # CIS links, by connection handle
         self.sco_links = {}  # SCO links, by connection handle
         self.pending_command = None
-        self.pending_response = None
+        self.pending_response: Optional[asyncio.Future[Any]] = None
         self.number_of_supported_advertising_sets = 0
         self.maximum_advertising_data_length = 31
         self.local_version = None
@@ -534,7 +534,7 @@ class Host(AbortableEventEmitter):
                 # Check the return parameters if required
                 if check_result:
                     if isinstance(response, hci.HCI_Command_Status_Event):
-                        status = response.status
+                        status = response.status  # type: ignore[attr-defined]
                     elif isinstance(response.return_parameters, int):
                         status = response.return_parameters
                     elif isinstance(response.return_parameters, bytes):
