@@ -18,29 +18,19 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-
 import struct
 
 from dataclasses import dataclass
-
-from typing import Union, Optional
+from typing import Optional
 
 from bumble import gatt
-
-from bumble.core import UUID
-
 from bumble.device import Connection
-
 from bumble.att import ATT_Error
-
 from bumble.gatt import (
     Characteristic,
     DelegatedCharacteristicAdapter,
     TemplateService,
-    Attribute,
     CharacteristicValue,
-    Sequence,
-    Descriptor,
     PackedCharacteristicAdapter,
     GATT_AUDIO_INPUT_CONTROL_SERVICE,
     GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
@@ -50,9 +40,7 @@ from bumble.gatt import (
     GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
     GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
 )
-
 from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
-
 from bumble.utils import OpenIntEnum
 
 # -----------------------------------------------------------------------------
@@ -136,14 +124,6 @@ class AudioInputState:
     change_counter: int = 0
     attribute_value: Optional[CharacteristicValue] = None
 
-    def __str__(self) -> str:
-        return (
-            f"AudioInputState(gain_settings={self.gain_settings},"
-            f" mute={self.mute},"
-            f" gain_mode={self.gain_mode},"
-            f" change_counter={self.change_counter})"
-        )
-
     def __bytes__(self) -> bytes:
         return bytes(
             [self.gain_settings, self.mute, self.gain_mode, self.change_counter]
@@ -188,13 +168,6 @@ class GainSettingsProperties:
     gain_settings_minimum: int = GAIN_SETTINGS_MIN_VALUE
     gain_settings_maximum: int = GAIN_SETTINGS_MAX_VALUE
 
-    def __str__(self) -> str:
-        return (
-            f"GainSettingsProperties(gain_settings_unit={self.gain_settings_unit},"
-            f" gain_settings_minimum={self.gain_settings_minimum},"
-            f" gain_settings_maximum={self.gain_settings_maximum},"
-        )
-
     @classmethod
     def from_bytes(cls, data: bytes):
         (gain_settings_unit, gain_settings_minimum, gain_settings_maximum) = (
@@ -229,24 +202,22 @@ class AudioInputControlPoint:
     async def on_write(self, connection: Optional[Connection], value: bytes) -> None:
         assert connection
 
-        try:
-            opcode = AudioInputControlPointOpCode(value[0])
+        opcode = AudioInputControlPointOpCode(value[0])
 
-            if opcode == AudioInputControlPointOpCode.SET_GAIN_SETTING:
-                gain_settings_operand = value[2]
-                await self._set_gain_settings(connection, gain_settings_operand)
-            elif opcode == AudioInputControlPointOpCode.UNMUTE:
-                await self._unmute(connection)
-            elif opcode == AudioInputControlPointOpCode.MUTE:
-                change_counter_operand = value[1]
-                await self._mute(connection, change_counter_operand)
-            elif opcode == AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE:
-                await self._set_manual_gain_mode(connection)
-            elif opcode == AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE:
-                await self._set_automatic_gain_mode(connection)
-
-        except ValueError as e:
-            logger.error(f"OpCode value is incorrect: {e}")
+        if opcode == AudioInputControlPointOpCode.SET_GAIN_SETTING:
+            gain_settings_operand = value[2]
+            await self._set_gain_settings(connection, gain_settings_operand)
+        elif opcode == AudioInputControlPointOpCode.UNMUTE:
+            await self._unmute(connection)
+        elif opcode == AudioInputControlPointOpCode.MUTE:
+            change_counter_operand = value[1]
+            await self._mute(connection, change_counter_operand)
+        elif opcode == AudioInputControlPointOpCode.SET_MANUAL_GAIN_MODE:
+            await self._set_manual_gain_mode(connection)
+        elif opcode == AudioInputControlPointOpCode.SET_AUTOMATIC_GAIN_MODE:
+            await self._set_automatic_gain_mode(connection)
+        else:
+            logger.error(f"OpCode value is incorrect: {opcode}")
             raise ATT_Error(ErrorCode.OPCODE_NOT_SUPPORTED)
 
     async def _set_gain_settings(
@@ -349,9 +320,6 @@ class AudioInputDescription:
 
     audio_input_description: str = "Bluetooth"
     attribute_value: Optional[CharacteristicValue] = None
-
-    def __str__(self) -> str:
-        return f"AudioInputDescription({self.audio_input_description})"
 
     @classmethod
     def from_bytes(cls, data: bytes):

@@ -79,6 +79,21 @@ async def test_init_service(aics_client: AICSServiceProxy):
 
 
 @pytest.mark.asyncio
+async def test_wrong_opcode_raise_error(aics_client: AICSServiceProxy):
+    with pytest.raises(ATT_Error) as e:
+        await aics_client.audio_input_control_point.write_value(
+            bytes(
+                [
+                    0xFF,
+                ]
+            ),
+            with_response=True,
+        )
+
+    assert e.value.error_code == ErrorCode.OPCODE_NOT_SUPPORTED
+
+
+@pytest.mark.asyncio
 async def test_set_gain_setting_when_gain_mode_automatic_only(
     aics_client: AICSServiceProxy,
 ):
