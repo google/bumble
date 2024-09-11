@@ -25,6 +25,7 @@ import sys
 from bumble import att, device
 from bumble.profiles import hap
 from .test_utils import TwoDevices
+from bumble.keys import PairingKeys
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -85,6 +86,10 @@ async def hap_client():
     # Mock encryption.
     devices.connections[0].encryption = 1  # type: ignore
     devices.connections[1].encryption = 1  # type: ignore
+
+    devices[0].on_pairing(
+        devices.connections[0], devices.connections[0].peer_address, PairingKeys(), True
+    )
 
     peer = device.Peer(devices.connections[1])  # type: ignore
     hap_client = await peer.discover_service_and_create_proxy(
