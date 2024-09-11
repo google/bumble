@@ -148,7 +148,7 @@ class AudioInputState:
     def increment_change_counter(self):
         self.change_counter = (self.change_counter + 1) % (CHANGE_COUNTER_MAX_VALUE + 1)
 
-    async def notify_subscribers(self, connection: Connection) -> None:
+    async def notify_subscribers_via_connection(self, connection: Connection) -> None:
         assert self.attribute_value is not None
         await connection.device.notify_subscribers(
             attribute=self.attribute_value, value=bytes(self)
@@ -244,7 +244,7 @@ class AudioInputControlPoint:
 
         if self.audio_input_state.gain_settings != gain_settings_operand:
             self.audio_input_state.gain_settings = gain_settings_operand
-            await self.audio_input_state.notify_subscribers(connection)
+            await self.audio_input_state.notify_subscribers_via_connection(connection)
 
     async def _unmute(self, connection: Connection):
         '''Cf. 3.5.2.2 Unmute procedure'''
@@ -260,7 +260,7 @@ class AudioInputControlPoint:
 
         self.audio_input_state.mute = Mute.NOT_MUTED
         self.audio_input_state.increment_change_counter()
-        await self.audio_input_state.notify_subscribers(connection)
+        await self.audio_input_state.notify_subscribers_via_connection(connection)
 
     async def _mute(self, connection: Connection, change_counter_operand: int) -> None:
         '''Cf. 3.5.5.2 Mute procedure'''
@@ -279,7 +279,7 @@ class AudioInputControlPoint:
 
         self.audio_input_state.mute = Mute.MUTED
         self.audio_input_state.increment_change_counter()
-        await self.audio_input_state.notify_subscribers(connection)
+        await self.audio_input_state.notify_subscribers_via_connection(connection)
 
     async def _set_manual_gain_mode(self, connection: Connection) -> None:
         '''Cf. 3.5.2.4 Set Manual Gain Mode procedure'''
@@ -294,7 +294,7 @@ class AudioInputControlPoint:
 
         self.audio_input_state.gain_mode = GainMode.MANUAL
         self.audio_input_state.increment_change_counter()
-        await self.audio_input_state.notify_subscribers(connection)
+        await self.audio_input_state.notify_subscribers_via_connection(connection)
 
     async def _set_automatic_gain_mode(self, connection: Connection) -> None:
         '''Cf. 3.5.2.5 Set Automatic Gain Mode'''
@@ -309,7 +309,7 @@ class AudioInputControlPoint:
 
         self.audio_input_state.gain_mode = GainMode.AUTOMATIC
         self.audio_input_state.increment_change_counter()
-        await self.audio_input_state.notify_subscribers(connection)
+        await self.audio_input_state.notify_subscribers_via_connection(connection)
 
 
 @dataclass
