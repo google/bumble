@@ -301,6 +301,8 @@ class Driver(common.Driver):
         fw_name: str = ""
         config_name: str = ""
 
+    POST_RESET_DELAY: float = 0.2
+
     DRIVER_INFOS = [
         # 8723A
         DriverInfo(
@@ -495,12 +497,24 @@ class Driver(common.Driver):
 
     @classmethod
     async def driver_info_for_host(cls, host):
-        await host.send_command(HCI_Reset_Command(), check_result=True)
-        host.ready = True  # Needed to let the host know the controller is ready.
+        try:
+            await host.send_command(
+                HCI_Reset_Command(),
+                check_result=True,
+                response_timeout=cls.POST_RESET_DELAY,
+            )
+            host.ready = True  # Needed to let the host know the controller is ready.
+        except asyncio.exceptions.TimeoutError:
+            logger.warning("timeout waiting for hci reset, retrying")
+            await host.send_command(HCI_Reset_Command(), check_result=True)
+            host.ready = True
 
-        response = await host.send_command(
-            HCI_Read_Local_Version_Information_Command(), check_result=True
-        )
+        command = HCI_Read_Local_Version_Information_Command()
+        response = await host.send_command(command, check_result=True)
+        if response.command_opcode != command.op_code:
+            logger.error("failed to probe local version information")
+            return None
+
         local_version = response.return_parameters
 
         logger.debug(
