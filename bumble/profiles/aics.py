@@ -346,19 +346,34 @@ class AICSService(TemplateService):
 
     def __init__(
         self,
-        audio_input_state: AudioInputState = AudioInputState(),
-        gain_settings_properties: GainSettingsProperties = GainSettingsProperties(),
+        audio_input_state: Optional[AudioInputState] = None,
+        gain_settings_properties: Optional[GainSettingsProperties] = None,
         audio_input_type: str = "local",
-        audio_input_status: AudioInputStatus = AudioInputStatus.ACTIVE,
-        audio_input_description: AudioInputDescription = AudioInputDescription(),
+        audio_input_status: Optional[AudioInputStatus] = None,
+        audio_input_description: Optional[AudioInputDescription] = None,
     ):
-        self.audio_input_state = audio_input_state
-        self.audio_input_status = audio_input_status
-        self.gain_settings_properties = gain_settings_properties
+        self.audio_input_state = (
+            AudioInputState() if audio_input_state is None else audio_input_state
+        )
+        self.gain_settings_properties = (
+            GainSettingsProperties()
+            if gain_settings_properties is None
+            else gain_settings_properties
+        )
+        self.audio_input_status = (
+            AudioInputStatus.ACTIVE
+            if audio_input_status is None
+            else audio_input_status
+        )
+        self.audio_input_description = (
+            AudioInputDescription()
+            if audio_input_description is None
+            else audio_input_description
+        )
+
         self.audio_input_control_point: AudioInputControlPoint = AudioInputControlPoint(
             self.audio_input_state, self.gain_settings_properties
         )
-        self.audio_input_description = audio_input_description
 
         self.audio_input_state_characteristic = DelegatedCharacteristicAdapter(
             Characteristic(
