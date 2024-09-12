@@ -60,6 +60,8 @@ from bumble.hci import (
     HCI_Number_Of_Completed_Packets_Event,
     HCI_Packet,
     HCI_PIN_Code_Request_Reply_Command,
+    HCI_Read_Local_Supported_Codecs_Command,
+    HCI_Read_Local_Supported_Codecs_V2_Command,
     HCI_Read_Local_Supported_Commands_Command,
     HCI_Read_Local_Supported_Features_Command,
     HCI_Read_Local_Version_Information_Command,
@@ -474,6 +476,51 @@ def test_HCI_LE_Setup_ISO_Data_Path_Command():
         codec_configuration=b'',
     )
     basic_check(command)
+
+
+# -----------------------------------------------------------------------------
+def test_HCI_Read_Local_Supported_Codecs_Command_Complete():
+    returned_parameters = (
+        HCI_Read_Local_Supported_Codecs_Command.parse_return_parameters(
+            bytes([HCI_SUCCESS, 3, CodecID.A_LOG, CodecID.CVSD, CodecID.LINEAR_PCM, 0])
+        )
+    )
+    assert returned_parameters.standard_codec_ids == [
+        CodecID.A_LOG,
+        CodecID.CVSD,
+        CodecID.LINEAR_PCM,
+    ]
+
+
+# -----------------------------------------------------------------------------
+def test_HCI_Read_Local_Supported_Codecs_V2_Command_Complete():
+    returned_parameters = (
+        HCI_Read_Local_Supported_Codecs_V2_Command.parse_return_parameters(
+            bytes(
+                [
+                    HCI_SUCCESS,
+                    3,
+                    CodecID.A_LOG,
+                    HCI_Read_Local_Supported_Codecs_V2_Command.Transport.BR_EDR_ACL,
+                    CodecID.CVSD,
+                    HCI_Read_Local_Supported_Codecs_V2_Command.Transport.BR_EDR_SCO,
+                    CodecID.LINEAR_PCM,
+                    HCI_Read_Local_Supported_Codecs_V2_Command.Transport.LE_CIS,
+                    0,
+                ]
+            )
+        )
+    )
+    assert returned_parameters.standard_codec_ids == [
+        CodecID.A_LOG,
+        CodecID.CVSD,
+        CodecID.LINEAR_PCM,
+    ]
+    assert returned_parameters.standard_codec_transports == [
+        HCI_Read_Local_Supported_Codecs_V2_Command.Transport.BR_EDR_ACL,
+        HCI_Read_Local_Supported_Codecs_V2_Command.Transport.BR_EDR_SCO,
+        HCI_Read_Local_Supported_Codecs_V2_Command.Transport.LE_CIS,
+    ]
 
 
 # -----------------------------------------------------------------------------
