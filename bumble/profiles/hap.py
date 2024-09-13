@@ -19,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import functools
 from bumble import att, gatt, gatt_client
-from bumble.att import CommonErrorCode
 from bumble.core import InvalidArgumentError, InvalidStateError
 from bumble.device import Device, Connection
 from bumble.utils import AsyncRunner, OpenIntEnum
@@ -352,16 +351,16 @@ class HearingAccessService(gatt.TemplateService):
             logging.warning(f'HAS require MTU >= 49: {connection}')
 
         if self.read_presets_request_in_progress:
-            raise att.ATT_Error(CommonErrorCode.PROCEDURE_ALREADY_IN_PROGRESS)
+            raise att.ATT_Error(att.ErrorCode.PROCEDURE_ALREADY_IN_PROGRESS)
         self.read_presets_request_in_progress = True
 
         start_index = value[1]
         if start_index == 0x00:
-            raise att.ATT_Error(CommonErrorCode.OUT_OF_RANGE)
+            raise att.ATT_Error(att.ErrorCode.OUT_OF_RANGE)
 
         num_presets = value[2]
         if num_presets == 0x00:
-            raise att.ATT_Error(CommonErrorCode.OUT_OF_RANGE)
+            raise att.ATT_Error(att.ErrorCode.OUT_OF_RANGE)
 
         # Sending `num_presets` presets ordered by increasing index field, starting from start_index
         presets = [
@@ -371,7 +370,7 @@ class HearingAccessService(gatt.TemplateService):
         ]
         del presets[num_presets:]
         if len(presets) == 0:
-            raise att.ATT_Error(CommonErrorCode.OUT_OF_RANGE)
+            raise att.ATT_Error(att.ErrorCode.OUT_OF_RANGE)
 
         AsyncRunner.spawn(self._read_preset_response(connection, presets))
 
@@ -468,7 +467,7 @@ class HearingAccessService(gatt.TemplateService):
         assert connection
 
         if self.read_presets_request_in_progress:
-            raise att.ATT_Error(CommonErrorCode.PROCEDURE_ALREADY_IN_PROGRESS)
+            raise att.ATT_Error(att.ErrorCode.PROCEDURE_ALREADY_IN_PROGRESS)
 
         index = value[1]
         preset = self.preset_records.get(index, None)
