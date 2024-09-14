@@ -23,7 +23,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-from bumble.utils import OpenIntEnum
 
 import enum
 import functools
@@ -211,15 +210,6 @@ UUID_2_FIELD_SPEC    = lambda x, y: UUID.parse_uuid_2(x, y)  # noqa: E731
 # fmt: on
 # pylint: enable=line-too-long
 # pylint: disable=invalid-name
-
-
-class CommonErrorCode(OpenIntEnum):
-    '''See Supplement to the Bluetooth Code Specification 1.2 List of Error Codes.'''
-
-    WRITE_REQUEST_REJECTED = 0xFC
-    CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR_IMPROPERLY_CONFIGURED = 0xFD
-    PROCEDURE_ALREADY_IN_PROGRESS = 0xFE
-    OUT_OF_RANGE = 0xFF
 
 
 # -----------------------------------------------------------------------------
