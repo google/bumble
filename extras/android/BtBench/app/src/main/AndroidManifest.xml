@@ -23,6 +23,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.BTBench"
         >
+        <meta-data
+            android:name="mobly-snippets"
+            android:value="com.github.google.bumble.btbench.AutomationSnippet"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -35,5 +38,7 @@
         </activity>
 <!--        <profileable android:shell="true"/>-->
     </application>
-
+    <instrumentation
+        android:name="com.google.android.mobly.snippet.SnippetRunner"
+        android:targetPackage="com.github.google.bumble.btbench" />
 </manifest>
