@@ -46,6 +46,12 @@ from bumble.att import (
     ATT_INSUFFICIENT_AUTHENTICATION_ERROR,
     ATT_INSUFFICIENT_ENCRYPTION_ERROR,
 )
+from bumble.utils import AsyncRunner
+
+# -----------------------------------------------------------------------------
+# Constants
+# -----------------------------------------------------------------------------
+POST_PAIRING_DELAY = 1
 
 
 # -----------------------------------------------------------------------------
@@ -235,8 +241,10 @@ def on_connection(connection, request):
 
     # Listen for pairing events
     connection.on('pairing_start', on_pairing_start)
-    connection.on('pairing', lambda keys: on_pairing(connection.peer_address, keys))
-    connection.on('pairing_failure', on_pairing_failure)
+    connection.on('pairing', lambda keys: on_pairing(connection, keys))
+    connection.on(
+        'pairing_failure', lambda reason: on_pairing_failure(connection, reason)
+    )
 
     # Listen for encryption changes
     connection.on(
@@ -270,19 +278,24 @@ def on_pairing_start():
 
 
 # -----------------------------------------------------------------------------
-def on_pairing(address, keys):
+@AsyncRunner.run_in_task()
+async def on_pairing(connection, keys):
     print(color('***-----------------------------------', 'cyan'))
-    print(color(f'*** Paired! (peer identity={address})', 'cyan'))
+    print(color(f'*** Paired! (peer identity={connection.peer_address})', 'cyan'))
     keys.print(prefix=color('*** ', 'cyan'))
     print(color('***-----------------------------------', 'cyan'))
+    await asyncio.sleep(POST_PAIRING_DELAY)
+    await connection.disconnect()
     Waiter.instance.terminate()
 
 
 # -----------------------------------------------------------------------------
-def on_pairing_failure(reason):
+@AsyncRunner.run_in_task()
+async def on_pairing_failure(connection, reason):
     print(color('***-----------------------------------', 'red'))
     print(color(f'*** Pairing failed: {smp_error_name(reason)}', 'red'))
     print(color('***-----------------------------------', 'red'))
+    await connection.disconnect()
     Waiter.instance.terminate()
 
 
@@ -293,6 +306,7 @@ async def pair(
     mitm,
     bond,
     ctkd,
+    identity_address,
     linger,
     io,
     oob,
@@ -382,11 +396,18 @@ async def pair(
             oob_contexts = None
 
         # Set up a pairing config factory
+        if identity_address == 'public':
+            identity_address_type = PairingConfig.AddressType.PUBLIC
+        elif identity_address == 'random':
+            identity_address_type = PairingConfig.AddressType.RANDOM
+        else:
+            identity_address_type = None
         device.pairing_config_factory = lambda connection: PairingConfig(
             sc=sc,
             mitm=mitm,
             bonding=bond,
             oob=oob_contexts,
+            identity_address_type=identity_address_type,
             delegate=Delegate(mode, connection, io, prompt),
         )
 
@@ -457,6 +478,10 @@ class LogHandler(logging.Handler):
     help='Enable CTKD',
     show_default=True,
 )
+@click.option(
+    '--identity-address',
+    type=click.Choice(['random', 'public']),
+)
 @click.option('--linger', default=False, is_flag=True, help='Linger after pairing')
 @click.option(
     '--io',
@@ -493,6 +518,7 @@ def main(
     mitm,
     bond,
     ctkd,
+    identity_address,
     linger,
     io,
     oob,
@@ -518,6 +544,7 @@ def main(
             mitm,
             bond,
             ctkd,
+            identity_address,
             linger,
             io,
             oob,
