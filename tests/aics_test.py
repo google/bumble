@@ -15,8 +15,6 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-import os
-import logging
 import pytest
 import pytest_asyncio
 
@@ -38,8 +36,6 @@ from bumble.profiles.vcp import VolumeControlService, VolumeControlServiceProxy
 
 from .test_utils import TwoDevices
 
-
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'VERBOSE').upper())
 
 # -----------------------------------------------------------------------------
 # Tests
