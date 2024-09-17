@@ -88,7 +88,7 @@ class VolumeControlService(gatt.TemplateService):
         muted: int = 0,
         change_counter: int = 0,
         volume_flags: int = 0,
-        included_services: List[gatt.Service] = [],
+        included_services: Sequence[gatt.Service] = (),
     ) -> None:
         self.step_size = step_size
         self.volume_setting = volume_setting
