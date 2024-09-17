@@ -123,7 +123,7 @@ class VolumeControlService(gatt.TemplateService):
                 self.volume_control_point,
                 self.volume_flags,
             ],
-            included_services=included_services,
+            included_services=list(included_services),
         )
 
     @property
