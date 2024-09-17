@@ -39,6 +39,9 @@ async def vcp_client():
 
     await devices.setup_connection()
 
+    assert devices.connections[0]
+    assert devices.connections[1]
+
     # Mock encryption.
     devices.connections[0].encryption = 1
     devices.connections[1].encryption = 1

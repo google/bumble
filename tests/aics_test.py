@@ -30,10 +30,9 @@ from bumble.profiles.aics import (
     GainMode,
     AudioInputStatus,
     AudioInputControlPointOpCode,
-    GAIN_SETTINGS_MAX_VALUE,
-    GAIN_SETTINGS_MIN_VALUE,
     ErrorCode,
 )
+from bumble.profiles.vcp import VolumeControlService, VolumeControlServiceProxy
 
 from .test_utils import TwoDevices
 
@@ -42,23 +41,34 @@ from .test_utils import TwoDevices
 # Tests
 # -----------------------------------------------------------------------------
 aics_service = AICSService()
+vcp_service = VolumeControlService(
+    volume_setting=32, muted=1, volume_flags=1, included_services=[aics_service]
+)
 
 
 @pytest_asyncio.fixture
 async def aics_client():
     devices = TwoDevices()
-    devices[0].add_service(aics_service)
+    devices[0].add_service(vcp_service)
 
     await devices.setup_connection()
 
-    assert devices.connections[0] is not None
-    assert devices.connections[1] is not None
+    assert devices.connections[0]
+    assert devices.connections[1]
 
     devices.connections[0].encryption = 1
     devices.connections[1].encryption = 1
 
     peer = device.Peer(devices.connections[1])
-    aics_client = await peer.discover_service_and_create_proxy(AICSServiceProxy)
+
+    vcp_client = await peer.discover_service_and_create_proxy(VolumeControlServiceProxy)
+
+    assert vcp_client
+    included_services = await peer.discover_included_services(vcp_client.service_proxy)
+    assert included_services
+    aics_service_discovered = included_services[0]
+    await peer.discover_characteristics(service=aics_service_discovered)
+    aics_client = AICSServiceProxy(aics_service_discovered)
 
     yield aics_client
 

@@ -442,14 +442,15 @@ class AICSService(TemplateService):
         )
 
         super().__init__(
-            [
+            characteristics=[
                 self.audio_input_state_characteristic,  # type: ignore
                 self.gain_settings_properties_characteristic,  # type: ignore
                 self.audio_input_type_characteristic,  # type: ignore
                 self.audio_input_status_characteristic,  # type: ignore
                 self.audio_input_control_point_characteristic,  # type: ignore
                 self.audio_input_description_characteristic,  # type: ignore
-            ]
+            ],
+            primary=False,
         )
 
 

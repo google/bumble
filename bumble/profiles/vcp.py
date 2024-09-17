@@ -24,7 +24,7 @@ from bumble import device
 from bumble import gatt
 from bumble import gatt_client
 
-from typing import Optional
+from typing import Optional, Sequence
 
 # -----------------------------------------------------------------------------
 # Constants
@@ -88,6 +88,7 @@ class VolumeControlService(gatt.TemplateService):
         muted: int = 0,
         change_counter: int = 0,
         volume_flags: int = 0,
+        included_services: Sequence[gatt.Service] = (),
     ) -> None:
         self.step_size = step_size
         self.volume_setting = volume_setting
@@ -117,11 +118,12 @@ class VolumeControlService(gatt.TemplateService):
         )
 
         super().__init__(
-            [
+            characteristics=[
                 self.volume_state,
                 self.volume_control_point,
                 self.volume_flags,
-            ]
+            ],
+            included_services=list(included_services),
         )
 
     @property
