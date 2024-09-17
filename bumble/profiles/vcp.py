@@ -24,7 +24,7 @@ from bumble import device
 from bumble import gatt
 from bumble import gatt_client
 
-from typing import Optional, List
+from typing import Optional, Sequence
 
 # -----------------------------------------------------------------------------
 # Constants
