@@ -580,10 +580,10 @@ class ServiceCapabilities:
         self.service_category = service_category
         self.service_capabilities_bytes = service_capabilities_bytes
 
-    def to_string(self, details: List[str] = []) -> str:
+    def to_string(self, details: Optional[List[str]] = None) -> str:
         attributes = ','.join(
             [name_or_number(AVDTP_SERVICE_CATEGORY_NAMES, self.service_category)]
-            + details
+            + (details or [])
         )
         return f'ServiceCapabilities({attributes})'
 
