@@ -22,16 +22,18 @@ import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.socket-client")
 
-private const val DEFAULT_STARTUP_DELAY = 3000
-
-class SocketClient(private val viewModel: AppViewModel, private val socket: BluetoothSocket) {
+class SocketClient(
+    private val viewModel: AppViewModel,
+    private val socket: BluetoothSocket,
+    private val createIoClient: (packetIo: PacketIO) -> IoClient
+) {
     @SuppressLint("MissingPermission")
-    fun run() {
+    fun run(blocking: Boolean = false) {
         viewModel.running = true
         val socketDataSink = SocketDataSink(socket)
         val streamIO = StreamedPacketIO(socketDataSink)
         val socketDataSource = SocketDataSource(socket, streamIO::onData)
-        val sender = Sender(viewModel, streamIO)
+        val ioClient = createIoClient(streamIO)
 
         fun cleanup() {
             socket.close()
@@ -39,9 +41,9 @@ class SocketClient(private val viewModel: AppViewModel, private val socket: Blue
             viewModel.running = false
         }
 
-        thread(name = "SocketClient") {
+        val clientThread = thread(name = "SocketClient") {
             viewModel.aborter = {
-                sender.abort()
+                ioClient.abort()
                 socket.close()
             }
             Log.info("connecting to remote")
@@ -54,22 +56,26 @@ class SocketClient(private val viewModel: AppViewModel, private val socket: Blue
             }
             Log.info("connected")
 
-            thread {
+            val sourceThread = thread {
                 socketDataSource.receive()
                 socket.close()
-                sender.abort()
+                ioClient.abort()
             }
 
-            Log.info("Startup delay: $DEFAULT_STARTUP_DELAY")
-            Thread.sleep(DEFAULT_STARTUP_DELAY.toLong());
-            Log.info("Starting to send")
-
             try {
-                sender.run()
+                ioClient.run()
             } catch (error: IOException) {
                 Log.info("run ended abruptly")
             }
+
+            Log.info("waiting for source thread to finish")
+            sourceThread.join()
+
             cleanup()
+        }
+
+        if (blocking) {
+            clientThread.join()
         }
     }
 }

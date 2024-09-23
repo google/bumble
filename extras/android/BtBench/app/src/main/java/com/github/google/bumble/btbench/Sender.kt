@@ -19,9 +19,12 @@ import java.util.logging.Logger
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 
+private const val DEFAULT_STARTUP_DELAY = 3000
+
 private val Log = Logger.getLogger("btbench.sender")
 
-class Sender(private val viewModel: AppViewModel, private val packetIO: PacketIO) : PacketSink() {
+class Sender(private val viewModel: AppViewModel, private val packetIO: PacketIO) : IoClient,
+    PacketSink() {
     private var startTime: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
     private var bytesSent = 0
     private val done = Semaphore(0)
@@ -30,10 +33,15 @@ class Sender(private val viewModel: AppViewModel, private val packetIO: PacketIO
         packetIO.packetSink = this
     }
 
-    fun run() {
+    override fun run() {
         viewModel.packetsSent = 0
         viewModel.packetsReceived = 0
         viewModel.throughput = 0
+        viewModel.stats = ""
+
+        Log.info("startup delay: $DEFAULT_STARTUP_DELAY")
+        Thread.sleep(DEFAULT_STARTUP_DELAY.toLong());
+        Log.info("running")
 
         Log.info("sending reset")
         packetIO.sendPacket(ResetPacket())
@@ -63,14 +71,14 @@ class Sender(private val viewModel: AppViewModel, private val packetIO: PacketIO
         Log.info("got ACK")
     }
 
-    fun abort() {
+    override fun abort() {
         done.release()
     }
 
     override fun onResetPacket() {
     }
 
-    override fun onAckPacket() {
+    override fun onAckPacket(packet: AckPacket) {
         Log.info("received ACK")
         val elapsed = TimeSource.Monotonic.markNow() - startTime
         val throughput = (bytesSent / elapsed.toDouble(DurationUnit.SECONDS)).toInt()

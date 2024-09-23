@@ -29,10 +29,11 @@ private val Log = Logger.getLogger("btbench.l2cap-client")
 class L2capClient(
     private val viewModel: AppViewModel,
     private val bluetoothAdapter: BluetoothAdapter,
-    private val context: Context
-) {
+    private val context: Context,
+    private val createIoClient: (packetIo: PacketIO) -> IoClient
+) : Mode {
     @SuppressLint("MissingPermission")
-    fun run() {
+    override fun run(blocking: Boolean) {
         viewModel.running = true
         val addressIsPublic = viewModel.peerBluetoothAddress.endsWith("/P")
         val address = viewModel.peerBluetoothAddress.take(17)
@@ -75,6 +76,7 @@ class L2capClient(
                 ) {
                     if (gatt != null && newState == BluetoothProfile.STATE_CONNECTED) {
                         if (viewModel.use2mPhy) {
+                            Log.info("requesting 2M PHY")
                             gatt.setPreferredPhy(
                                 BluetoothDevice.PHY_LE_2M_MASK,
                                 BluetoothDevice.PHY_LE_2M_MASK,
@@ -95,7 +97,7 @@ class L2capClient(
 
         val socket = remoteDevice.createInsecureL2capChannel(viewModel.l2capPsm)
 
-        val client = SocketClient(viewModel, socket)
-        client.run()
+        val client = SocketClient(viewModel, socket, createIoClient)
+        client.run(blocking)
     }
 }

@@ -22,14 +22,18 @@ import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.rfcomm-server")
 
-class RfcommServer(private val viewModel: AppViewModel, val bluetoothAdapter: BluetoothAdapter) {
+class RfcommServer(
+    private val viewModel: AppViewModel,
+    private val bluetoothAdapter: BluetoothAdapter,
+    private val createIoClient: (packetIo: PacketIO) -> IoClient
+) : Mode {
     @SuppressLint("MissingPermission")
-    fun run() {
+    override fun run(blocking: Boolean) {
         val serverSocket = bluetoothAdapter.listenUsingInsecureRfcommWithServiceRecord(
             "BumbleBench", DEFAULT_RFCOMM_UUID
         )
 
-        val server = SocketServer(viewModel, serverSocket)
-        server.run({}, {})
+        val server = SocketServer(viewModel, serverSocket, createIoClient)
+        server.run({}, {}, blocking)
     }
 }

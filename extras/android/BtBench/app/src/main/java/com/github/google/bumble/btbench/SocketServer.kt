@@ -21,8 +21,12 @@ import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.socket-server")
 
-class SocketServer(private val viewModel: AppViewModel, private val serverSocket: BluetoothServerSocket) {
-    fun run(onConnected: () -> Unit, onDisconnected: () -> Unit) {
+class SocketServer(
+    private val viewModel: AppViewModel,
+    private val serverSocket: BluetoothServerSocket,
+    private val createIoClient: (packetIo: PacketIO) -> IoClient
+) {
+    fun run(onConnected: () -> Unit, onDisconnected: () -> Unit, blocking: Boolean = false) {
         var aborted = false
         viewModel.running = true
 
@@ -31,7 +35,7 @@ class SocketServer(private val viewModel: AppViewModel, private val serverSocket
             viewModel.running = false
         }
 
-        thread(name = "SocketServer") {
+        val serverThread = thread(name = "SocketServer") {
             while (!aborted) {
                 viewModel.aborter = {
                     serverSocket.close()
@@ -46,6 +50,8 @@ class SocketServer(private val viewModel: AppViewModel, private val serverSocket
                     return@thread
                 }
                 Log.info("got connection from ${socket.remoteDevice.address}")
+                Log.info("maxReceivePacketSize=${socket.maxReceivePacketSize}")
+                Log.info("maxTransmitPacketSize=${socket.maxTransmitPacketSize}")
                 onConnected()
 
                 viewModel.aborter = {
@@ -57,11 +63,15 @@ class SocketServer(private val viewModel: AppViewModel, private val serverSocket
                 val socketDataSink = SocketDataSink(socket)
                 val streamIO = StreamedPacketIO(socketDataSink)
                 val socketDataSource = SocketDataSource(socket, streamIO::onData)
-                val receiver = Receiver(viewModel, streamIO)
+                val ioClient = createIoClient(streamIO)
                 socketDataSource.receive()
                 socket.close()
             }
             cleanup()
+        }
+
+        if (blocking) {
+            serverThread.join()
         }
     }
 }

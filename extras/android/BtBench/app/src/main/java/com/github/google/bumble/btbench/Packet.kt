@@ -74,13 +74,13 @@ abstract class PacketSink {
     fun onPacket(packet: Packet) {
         when (packet) {
             is ResetPacket -> onResetPacket()
-            is AckPacket -> onAckPacket()
+            is AckPacket -> onAckPacket(packet)
             is SequencePacket -> onSequencePacket(packet)
         }
     }
 
     abstract fun onResetPacket()
-    abstract fun onAckPacket()
+    abstract fun onAckPacket(packet: AckPacket)
     abstract fun onSequencePacket(packet: SequencePacket)
 }
 

@@ -19,6 +19,7 @@ import asyncio
 import enum
 import logging
 import os
+import statistics
 import struct
 import time
 
@@ -194,17 +195,19 @@ def make_sdp_records(channel):
     }
 
 
-def log_stats(title, stats):
+def log_stats(title, stats, precision=2):
     stats_min = min(stats)
     stats_max = max(stats)
-    stats_avg = sum(stats) / len(stats)
+    stats_avg = statistics.mean(stats)
+    stats_stdev = statistics.stdev(stats)
     logging.info(
         color(
             (
                 f'### {title} stats: '
-                f'min={stats_min:.2f}, '
-                f'max={stats_max:.2f}, '
-                f'average={stats_avg:.2f}'
+                f'min={stats_min:.{precision}f}, '
+                f'max={stats_max:.{precision}f}, '
+                f'average={stats_avg:.{precision}f}, '
+                f'stdev={stats_stdev:.{precision}f}'
             ),
             'cyan',
         )
@@ -448,9 +451,9 @@ class Ping:
         self.repeat_delay = repeat_delay
         self.pace = pace
         self.done = asyncio.Event()
-        self.current_packet_index = 0
-        self.ping_sent_time = 0.0
-        self.latencies = []
+        self.ping_times = []
+        self.rtts = []
+        self.next_expected_packet_index = 0
         self.min_stats = []
         self.max_stats = []
         self.avg_stats = []
@@ -477,60 +480,57 @@ class Ping:
             logging.info(color('=== Sending RESET', 'magenta'))
             await self.packet_io.send_packet(bytes([PacketType.RESET]))
 
-            self.current_packet_index = 0
-            self.latencies = []
-            await self.send_next_ping()
+            packet_interval = self.pace / 1000
+            start_time = time.time()
+            self.next_expected_packet_index = 0
+            for i in range(self.tx_packet_count):
+                target_time = start_time + (i * packet_interval)
+                now = time.time()
+                if now < target_time:
+                    await asyncio.sleep(target_time - now)
+
+                packet = struct.pack(
+                    '>bbI',
+                    PacketType.SEQUENCE,
+                    (PACKET_FLAG_LAST if i == self.tx_packet_count - 1 else 0),
+                    i,
+                ) + bytes(self.tx_packet_size - 6)
+                logging.info(color(f'Sending packet {i}', 'yellow'))
+                self.ping_times.append(time.time())
+                await self.packet_io.send_packet(packet)
 
             await self.done.wait()
 
-            min_latency = min(self.latencies)
-            max_latency = max(self.latencies)
-            avg_latency = sum(self.latencies) / len(self.latencies)
+            min_rtt = min(self.rtts)
+            max_rtt = max(self.rtts)
+            avg_rtt = statistics.mean(self.rtts)
+            stdev_rtt = statistics.stdev(self.rtts)
             logging.info(
                 color(
-                    '@@@ Latencies: '
-                    f'min={min_latency:.2f}, '
-                    f'max={max_latency:.2f}, '
-                    f'average={avg_latency:.2f}'
+                    '@@@ RTTs: '
+                    f'min={min_rtt:.2f}, '
+                    f'max={max_rtt:.2f}, '
+                    f'average={avg_rtt:.2f}, '
+                    f'stdev={stdev_rtt:.2f}'
                 )
             )
 
-            self.min_stats.append(min_latency)
-            self.max_stats.append(max_latency)
-            self.avg_stats.append(avg_latency)
+            self.min_stats.append(min_rtt)
+            self.max_stats.append(max_rtt)
+            self.avg_stats.append(avg_rtt)
 
             run_counter = f'[{run + 1} of {self.repeat + 1}]' if self.repeat else ''
             logging.info(color(f'=== {run_counter} Done!', 'magenta'))
 
             if self.repeat:
-                log_stats('Min Latency', self.min_stats)
-                log_stats('Max Latency', self.max_stats)
-                log_stats('Average Latency', self.avg_stats)
+                log_stats('Min RTT', self.min_stats)
+                log_stats('Max RTT', self.max_stats)
+                log_stats('Average RTT', self.avg_stats)
 
         if self.repeat:
             logging.info(color('--- End of runs', 'blue'))
 
-    async def send_next_ping(self):
-        if self.pace:
-            await asyncio.sleep(self.pace / 1000)
-
-        packet = struct.pack(
-            '>bbI',
-            PacketType.SEQUENCE,
-            (
-                PACKET_FLAG_LAST
-                if self.current_packet_index == self.tx_packet_count - 1
-                else 0
-            ),
-            self.current_packet_index,
-        ) + bytes(self.tx_packet_size - 6)
-        logging.info(color(f'Sending packet {self.current_packet_index}', 'yellow'))
-        self.ping_sent_time = time.time()
-        await self.packet_io.send_packet(packet)
-
     def on_packet_received(self, packet):
-        elapsed = time.time() - self.ping_sent_time
-
         try:
             packet_type, packet_data = parse_packet(packet)
         except ValueError:
@@ -542,21 +542,23 @@ class Ping:
             return
 
         if packet_type == PacketType.ACK:
-            latency = elapsed * 1000
-            self.latencies.append(latency)
+            elapsed = time.time() - self.ping_times[packet_index]
+            rtt = elapsed * 1000
+            self.rtts.append(rtt)
             logging.info(
                 color(
-                    f'<<< Received ACK [{packet_index}], latency={latency:.2f}ms',
+                    f'<<< Received ACK [{packet_index}], RTT={rtt:.2f}ms',
                     'green',
                 )
             )
 
-            if packet_index == self.current_packet_index:
-                self.current_packet_index += 1
+            if packet_index == self.next_expected_packet_index:
+                self.next_expected_packet_index += 1
             else:
                 logging.info(
                     color(
-                        f'!!! Unexpected packet, expected {self.current_packet_index} '
+                        f'!!! Unexpected packet, '
+                        f'expected {self.next_expected_packet_index} '
                         f'but received {packet_index}'
                     )
                 )
@@ -564,8 +566,6 @@ class Ping:
         if packet_flags & PACKET_FLAG_LAST:
             self.done.set()
             return
-
-        AsyncRunner.spawn(self.send_next_ping())
 
 
 # -----------------------------------------------------------------------------
@@ -583,8 +583,11 @@ class Pong:
 
     def reset(self):
         self.expected_packet_index = 0
+        self.receive_times = []
 
     def on_packet_received(self, packet):
+        self.receive_times.append(time.time())
+
         try:
             packet_type, packet_data = parse_packet(packet)
         except ValueError:
@@ -599,10 +602,16 @@ class Pong:
             packet_flags, packet_index = parse_packet_sequence(packet_data)
         except ValueError:
             return
+        interval = (
+            self.receive_times[-1] - self.receive_times[-2]
+            if len(self.receive_times) >= 2
+            else 0
+        )
         logging.info(
             color(
                 f'<<< Received packet {packet_index}: '
-                f'flags=0x{packet_flags:02X}, {len(packet)} bytes',
+                f'flags=0x{packet_flags:02X}, {len(packet)} bytes, '
+                f'interval={interval:.4f}',
                 'green',
             )
         )
@@ -623,8 +632,35 @@ class Pong:
             )
         )
 
-        if packet_flags & PACKET_FLAG_LAST and not self.linger:
-            self.done.set()
+        if packet_flags & PACKET_FLAG_LAST:
+            if len(self.receive_times) >= 3:
+                # Show basic stats
+                intervals = [
+                    self.receive_times[i + 1] - self.receive_times[i]
+                    for i in range(len(self.receive_times) - 1)
+                ]
+                log_stats('Packet intervals', intervals, 3)
+
+                # Show a histogram
+                bin_count = 20
+                bins = [0] * bin_count
+                interval_min = min(intervals)
+                interval_max = max(intervals)
+                interval_range = interval_max - interval_min
+                bin_thresholds = [
+                    interval_min + i * (interval_range / bin_count)
+                    for i in range(bin_count)
+                ]
+                for interval in intervals:
+                    for i in reversed(range(bin_count)):
+                        if interval >= bin_thresholds[i]:
+                            bins[i] += 1
+                            break
+                for i in range(bin_count):
+                    logging.info(f'@@@ >= {bin_thresholds[i]:.4f}: {bins[i]}')
+
+            if not self.linger:
+                self.done.set()
 
     async def run(self):
         await self.done.wait()
@@ -942,9 +978,12 @@ class RfcommClient(StreamedPacketIO):
             channel = await bumble.rfcomm.find_rfcomm_channel_with_uuid(
                 connection, self.uuid
             )
-            logging.info(color(f'@@@ Channel number = {channel}', 'cyan'))
-            if channel == 0:
-                logging.info(color('!!! No RFComm service with this UUID found', 'red'))
+            if channel:
+                logging.info(color(f'@@@ Channel number = {channel}', 'cyan'))
+            else:
+                logging.warning(
+                    color('!!! No RFComm service with this UUID found', 'red')
+                )
                 await connection.disconnect()
                 return
 
@@ -1053,6 +1092,8 @@ class RfcommServer(StreamedPacketIO):
             dlc.rx_max_credits = self.max_credits
         if self.credits_threshold is not None:
             dlc.rx_credits_threshold = self.credits_threshold
+
+        self.ready.set()
 
     async def drain(self):
         assert self.dlc
@@ -1503,7 +1544,7 @@ def create_role_factory(ctx, default_role):
     '--rfcomm-channel',
     type=int,
     default=DEFAULT_RFCOMM_CHANNEL,
-    help='RFComm channel to use',
+    help='RFComm channel to use (specify 0 for channel discovery via SDP)',
 )
 @click.option(
     '--rfcomm-uuid',
@@ -1743,7 +1784,11 @@ def peripheral(ctx, transport):
 
 
 def main():
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    logging.basicConfig(
+        level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper(),
+        format="[%(asctime)s.%(msecs)03d] %(levelname)s:%(name)s:%(message)s",
+        datefmt="%H:%M:%S",
+    )
     bench()
 
 
