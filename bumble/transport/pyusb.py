@@ -221,8 +221,9 @@ async def open_pyusb_transport(spec: str) -> Transport:
         async def close(self):
             await self.source.stop()
             await self.sink.stop()
-            devices_in_use.remove(device.address)
             usb.util.release_interface(self.device, 0)
+            if devices_in_use and device.address in devices_in_use:
+                devices_in_use.remove(device.address)
 
     usb_find = usb.core.find
     try:
