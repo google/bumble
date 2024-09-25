@@ -168,12 +168,25 @@ class MainActivity : ComponentActivity() {
             appViewModel.senderPacketInterval = packetInterval
         }
         appViewModel.updateSenderPacketSizeSlider()
+        intent.getStringExtra("scenario")?.let {
+            when (it) {
+                "send" -> appViewModel.scenario = SEND_SCENARIO
+                "receive" -> appViewModel.scenario = RECEIVE_SCENARIO
+                "ping" -> appViewModel.scenario = PING_SCENARIO
+                "pong" -> appViewModel.scenario = PONG_SCENARIO
+            }
+        }
+        intent.getStringExtra("mode")?.let {
+            when (it) {
+                "rfcomm-client" -> appViewModel.mode = RFCOMM_CLIENT_MODE
+                "rfcomm-server" -> appViewModel.mode = RFCOMM_SERVER_MODE
+                "l2cap-client" -> appViewModel.mode = L2CAP_CLIENT_MODE
+                "l2cap-server" -> appViewModel.mode = L2CAP_SERVER_MODE
+            }
+        }
         intent.getStringExtra("autostart")?.let {
             when (it) {
-                "rfcomm-client" -> runRfcommClient()
-                "rfcomm-server" -> runRfcommServer()
-                "l2cap-client" -> runL2capClient()
-                "l2cap-server" -> runL2capServer()
+                "run-scenario" -> runScenario()
                 "scan-start" -> runScan(true)
                 "stop-start" -> runScan(false)
             }
@@ -200,6 +213,11 @@ class MainActivity : ComponentActivity() {
         runner.run(false)
     }
 
+    private fun runScan(startScan: Boolean) {
+        val scan = bluetoothAdapter?.let { Scan(it) }
+        scan?.run(startScan)
+    }
+
     private fun createIoClient(packetIo: PacketIO): IoClient {
         return when (appViewModel.scenario) {
             SEND_SCENARIO -> Sender(appViewModel, packetIo)
@@ -210,30 +228,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun runRfcommClient() {
-//        val rfcommClient = bluetoothAdapter?.let { RfcommClient(appViewModel, it) }
-//        rfcommClient?.run()
-    }
-
-    private fun runRfcommServer() {
-//        val rfcommServer = bluetoothAdapter?.let { RfcommServer(appViewModel, it) }
-//        rfcommServer?.run()
-    }
-
-    private fun runL2capClient() {
-//        val l2capClient = bluetoothAdapter?.let { L2capClient(appViewModel, it, baseContext) }
-//        l2capClient?.run()
-    }
-
-    private fun runL2capServer() {
-//        val l2capServer = bluetoothAdapter?.let { L2capServer(appViewModel, it) }
-//        l2capServer?.run()
-    }
-
-    private fun runScan(startScan: Boolean) {
-        val scan = bluetoothAdapter?.let { Scan(it) }
-        scan?.run(startScan)
-    }
 
     @SuppressLint("MissingPermission")
     fun becomeDiscoverable() {

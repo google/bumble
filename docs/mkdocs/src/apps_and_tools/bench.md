@@ -11,32 +11,44 @@ Usage: bumble-bench [OPTIONS] COMMAND [ARGS]...
 
 Options:
   --device-config FILENAME        Device configuration file
-  --role [sender|receiver|ping|pong]
+  --scenario [send|receive|ping|pong]
   --mode [gatt-client|gatt-server|l2cap-client|l2cap-server|rfcomm-client|rfcomm-server]
   --att-mtu MTU                   GATT MTU (gatt-client mode)  [23<=x<=517]
   --extended-data-length TEXT     Request a data length upon connection,
                                   specified as tx_octets/tx_time
-  --rfcomm-channel INTEGER        RFComm channel to use
+  --role-switch [central|peripheral]
+                                  Request role switch upon connection (central
+                                  or peripheral)
+  --rfcomm-channel INTEGER        RFComm channel to use (specify 0 for channel
+                                  discovery via SDP)
   --rfcomm-uuid TEXT              RFComm service UUID to use (ignored if
                                   --rfcomm-channel is not 0)
+  --rfcomm-l2cap-mtu INTEGER      RFComm L2CAP MTU
+  --rfcomm-max-frame-size INTEGER
+                                  RFComm maximum frame size
+  --rfcomm-initial-credits INTEGER
+                                  RFComm initial credits
+  --rfcomm-max-credits INTEGER    RFComm max credits
+  --rfcomm-credits-threshold INTEGER
+                                  RFComm credits threshold
   --l2cap-psm INTEGER             L2CAP PSM to use
   --l2cap-mtu INTEGER             L2CAP MTU to use
   --l2cap-mps INTEGER             L2CAP MPS to use
   --l2cap-max-credits INTEGER     L2CAP maximum number of credits allowed for
                                   the peer
-  -s, --packet-size SIZE          Packet size (client or ping role)
-                                  [8<=x<=4096]
-  -c, --packet-count COUNT        Packet count (client or ping role)
-  -sd, --start-delay SECONDS      Start delay (client or ping role)
-  --repeat N                      Repeat the run N times (client and ping
-                                  roles)(0, which is the fault, to run just
+  -s, --packet-size SIZE          Packet size (send or ping scenario)
+                                  [8<=x<=8192]
+  -c, --packet-count COUNT        Packet count (send or ping scenario)
+  -sd, --start-delay SECONDS      Start delay (send or ping scenario)
+  --repeat N                      Repeat the run N times (send and ping
+                                  scenario)(0, which is the fault, to run just
                                   once)
   --repeat-delay SECONDS          Delay, in seconds, between repeats
   --pace MILLISECONDS             Wait N milliseconds between packets (0,
                                   which is the fault, to send as fast as
                                   possible)
-  --linger                        Don't exit at the end of a run (server and
-                                  pong roles)
+  --linger                        Don't exit at the end of a run (receive and
+                                  pong scenarios)
   --help                          Show this message and exit.
 
 Commands:
@@ -82,7 +94,7 @@ Device 1 mode     | Device 2 mode
 
 Device 1 role | Device 2 role
 --------------|--------------
-``sender``    | ``receiver``
+``send``      | ``receive``
 ``ping``      | ``pong``
 
 
@@ -137,12 +149,12 @@ the other on `usb:1`, and two consoles/terminals. We will run a command in each.
 !!! example "Ping/Pong Latency"
     In the first console/terminal:
     ```
-    $ bumble-bench --role pong peripheral usb:0
+    $ bumble-bench --scenario pong peripheral usb:0
     ```
 
     In the second console/terminal:
     ```
-    $ bumble-bench --role ping central usb:1
+    $ bumble-bench --scenario ping central usb:1
     ```
 
 !!! example "Reversed modes with GATT and custom connection interval"
@@ -170,10 +182,10 @@ the other on `usb:1`, and two consoles/terminals. We will run a command in each.
 !!! example "Reversed roles with L2CAP"
     In the first console/terminal:
     ```
-    $ bumble-bench --mode l2cap-client --role sender peripheral usb:0
+    $ bumble-bench --mode l2cap-client --scenario send peripheral usb:0
     ```
 
     In the second console/terminal:
     ```
-    $ bumble-bench --mode l2cap-server --role receiver central usb:1
+    $ bumble-bench --mode l2cap-server --scenario receive central usb:1
     ```

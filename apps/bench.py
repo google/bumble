@@ -1109,7 +1109,7 @@ class Central(Connection.Listener):
         transport,
         peripheral_address,
         classic,
-        role_factory,
+        scenario_factory,
         mode_factory,
         connection_interval,
         phy,
@@ -1122,7 +1122,7 @@ class Central(Connection.Listener):
         self.transport = transport
         self.peripheral_address = peripheral_address
         self.classic = classic
-        self.role_factory = role_factory
+        self.scenario_factory = scenario_factory
         self.mode_factory = mode_factory
         self.authenticate = authenticate
         self.encrypt = encrypt or authenticate
@@ -1175,7 +1175,7 @@ class Central(Connection.Listener):
                 DEFAULT_CENTRAL_NAME, central_address, hci_source, hci_sink
             )
             mode = self.mode_factory(self.device)
-            role = self.role_factory(mode)
+            scenario = self.scenario_factory(mode)
             self.device.classic_enabled = self.classic
 
             # Set up a pairing config factory with minimal requirements.
@@ -1256,7 +1256,7 @@ class Central(Connection.Listener):
 
             await mode.on_connection(self.connection)
 
-            await role.run()
+            await scenario.run()
             await asyncio.sleep(DEFAULT_LINGER_TIME)
             await self.connection.disconnect()
 
@@ -1287,7 +1287,7 @@ class Peripheral(Device.Listener, Connection.Listener):
     def __init__(
         self,
         transport,
-        role_factory,
+        scenario_factory,
         mode_factory,
         classic,
         extended_data_length,
@@ -1295,11 +1295,11 @@ class Peripheral(Device.Listener, Connection.Listener):
     ):
         self.transport = transport
         self.classic = classic
-        self.role_factory = role_factory
+        self.scenario_factory = scenario_factory
         self.mode_factory = mode_factory
         self.extended_data_length = extended_data_length
         self.role_switch = role_switch
-        self.role = None
+        self.scenario = None
         self.mode = None
         self.device = None
         self.connection = None
@@ -1319,7 +1319,7 @@ class Peripheral(Device.Listener, Connection.Listener):
             )
             self.device.listener = self
             self.mode = self.mode_factory(self.device)
-            self.role = self.role_factory(self.mode)
+            self.scenario = self.scenario_factory(self.mode)
             self.device.classic_enabled = self.classic
 
             # Set up a pairing config factory with minimal requirements.
@@ -1356,7 +1356,7 @@ class Peripheral(Device.Listener, Connection.Listener):
             print_connection(self.connection)
 
             await self.mode.on_connection(self.connection)
-            await self.role.run()
+            await self.scenario.run()
             await asyncio.sleep(DEFAULT_LINGER_TIME)
 
     def on_connection(self, connection):
@@ -1385,7 +1385,7 @@ class Peripheral(Device.Listener, Connection.Listener):
     def on_disconnection(self, reason):
         logging.info(color(f'!!! Disconnection: reason={reason}', 'red'))
         self.connection = None
-        self.role.reset()
+        self.scenario.reset()
 
         if self.classic:
             AsyncRunner.spawn(self.device.set_discoverable(True))
@@ -1467,13 +1467,13 @@ def create_mode_factory(ctx, default_mode):
 
 
 # -----------------------------------------------------------------------------
-def create_role_factory(ctx, default_role):
-    role = ctx.obj['role']
-    if role is None:
-        role = default_role
+def create_scenario_factory(ctx, default_scenario):
+    scenario = ctx.obj['scenario']
+    if scenario is None:
+        scenarion = default_scenario
 
-    def create_role(packet_io):
-        if role == 'sender':
+    def create_scenario(packet_io):
+        if scenario == 'send':
             return Sender(
                 packet_io,
                 start_delay=ctx.obj['start_delay'],
@@ -1484,10 +1484,10 @@ def create_role_factory(ctx, default_role):
                 packet_count=ctx.obj['packet_count'],
             )
 
-        if role == 'receiver':
+        if scenario == 'receive':
             return Receiver(packet_io, ctx.obj['linger'])
 
-        if role == 'ping':
+        if scenario == 'ping':
             return Ping(
                 packet_io,
                 start_delay=ctx.obj['start_delay'],
@@ -1498,12 +1498,12 @@ def create_role_factory(ctx, default_role):
                 packet_count=ctx.obj['packet_count'],
             )
 
-        if role == 'pong':
+        if scenario == 'pong':
             return Pong(packet_io, ctx.obj['linger'])
 
-        raise ValueError('invalid role')
+        raise ValueError('invalid scenario')
 
-    return create_role
+    return create_scenario
 
 
 # -----------------------------------------------------------------------------
@@ -1511,7 +1511,7 @@ def create_role_factory(ctx, default_role):
 # -----------------------------------------------------------------------------
 @click.group()
 @click.option('--device-config', metavar='FILENAME', help='Device configuration file')
-@click.option('--role', type=click.Choice(['sender', 'receiver', 'ping', 'pong']))
+@click.option('--scenario', type=click.Choice(['send', 'receive', 'ping', 'pong']))
 @click.option(
     '--mode',
     type=click.Choice(
@@ -1606,7 +1606,7 @@ def create_role_factory(ctx, default_role):
     metavar='SIZE',
     type=click.IntRange(8, 8192),
     default=500,
-    help='Packet size (client or ping role)',
+    help='Packet size (send or ping scenario)',
 )
 @click.option(
     '--packet-count',
@@ -1614,7 +1614,7 @@ def create_role_factory(ctx, default_role):
     metavar='COUNT',
     type=int,
     default=10,
-    help='Packet count (client or ping role)',
+    help='Packet count (send or ping scenario)',
 )
 @click.option(
     '--start-delay',
@@ -1622,7 +1622,7 @@ def create_role_factory(ctx, default_role):
     metavar='SECONDS',
     type=int,
     default=1,
-    help='Start delay (client or ping role)',
+    help='Start delay (send or ping scenario)',
 )
 @click.option(
     '--repeat',
@@ -1630,7 +1630,7 @@ def create_role_factory(ctx, default_role):
     type=int,
     default=0,
     help=(
-        'Repeat the run N times (client and ping roles)'
+        'Repeat the run N times (send and ping scenario)'
         '(0, which is the fault, to run just once) '
     ),
 )
@@ -1654,13 +1654,13 @@ def create_role_factory(ctx, default_role):
 @click.option(
     '--linger',
     is_flag=True,
-    help="Don't exit at the end of a run (server and pong roles)",
+    help="Don't exit at the end of a run (receive and pong scenarios)",
 )
 @click.pass_context
 def bench(
     ctx,
     device_config,
-    role,
+    scenario,
     mode,
     att_mtu,
     extended_data_length,
@@ -1686,7 +1686,7 @@ def bench(
 ):
     ctx.ensure_object(dict)
     ctx.obj['device_config'] = device_config
-    ctx.obj['role'] = role
+    ctx.obj['scenario'] = scenario
     ctx.obj['mode'] = mode
     ctx.obj['att_mtu'] = att_mtu
     ctx.obj['rfcomm_channel'] = rfcomm_channel
@@ -1740,7 +1740,7 @@ def central(
     ctx, transport, peripheral_address, connection_interval, phy, authenticate, encrypt
 ):
     """Run as a central (initiates the connection)"""
-    role_factory = create_role_factory(ctx, 'sender')
+    scenario_factory = create_scenario_factory(ctx, 'send')
     mode_factory = create_mode_factory(ctx, 'gatt-client')
     classic = ctx.obj['classic']
 
@@ -1749,7 +1749,7 @@ def central(
             transport,
             peripheral_address,
             classic,
-            role_factory,
+            scenario_factory,
             mode_factory,
             connection_interval,
             phy,
@@ -1767,13 +1767,13 @@ def central(
 @click.pass_context
 def peripheral(ctx, transport):
     """Run as a peripheral (waits for a connection)"""
-    role_factory = create_role_factory(ctx, 'receiver')
+    scenario_factory = create_scenario_factory(ctx, 'receive')
     mode_factory = create_mode_factory(ctx, 'gatt-server')
 
     async def run_peripheral():
         await Peripheral(
             transport,
-            role_factory,
+            scenario_factory,
             mode_factory,
             ctx.obj['classic'],
             ctx.obj['extended_data_length'],

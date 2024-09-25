@@ -64,6 +64,7 @@ class SocketClient(
 
             try {
                 ioClient.run()
+                socket.close()
             } catch (error: IOException) {
                 Log.info("run ended abruptly")
             }
