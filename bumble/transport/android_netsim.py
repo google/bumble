@@ -70,6 +70,9 @@ def get_ini_dir() -> Optional[pathlib.Path]:
     elif sys.platform == 'linux':
         if xdg_runtime_dir := os.environ.get('XDG_RUNTIME_DIR', None):
             return pathlib.Path(xdg_runtime_dir)
+        tmpdir = os.environ.get('TMPDIR', '/tmp')
+        if pathlib.Path(tmpdir).is_dir():
+            return pathlib.Path(tmpdir)
     elif sys.platform == 'win32':
         if local_app_data_dir := os.environ.get('LOCALAPPDATA', None):
             return pathlib.Path(local_app_data_dir) / 'Temp'
