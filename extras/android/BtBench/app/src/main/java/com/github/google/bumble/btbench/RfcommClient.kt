@@ -25,15 +25,21 @@ class RfcommClient(
     private val bluetoothAdapter: BluetoothAdapter,
     private val createIoClient: (packetIo: PacketIO) -> IoClient
 ) : Mode {
+    private var socketClient: SocketClient? = null
+
     @SuppressLint("MissingPermission")
-    override fun run(blocking: Boolean) {
+    override fun run() {
         val address = viewModel.peerBluetoothAddress.take(17)
         val remoteDevice = bluetoothAdapter.getRemoteDevice(address)
         val socket = remoteDevice.createInsecureRfcommSocketToServiceRecord(
             DEFAULT_RFCOMM_UUID
         )
 
-        val client = SocketClient(viewModel, socket, createIoClient)
-        client.run(blocking)
+        socketClient = SocketClient(viewModel, socket, createIoClient)
+        socketClient!!.run()
+    }
+
+    override fun waitForCompletion() {
+        socketClient?.waitForCompletion()
     }
 }

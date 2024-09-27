@@ -15,5 +15,6 @@
 package com.github.google.bumble.btbench
 
 interface Mode {
-    fun run(blocking: Boolean)
+    fun run()
+    fun waitForCompletion()
 }

@@ -42,6 +42,8 @@ const val PONG_SCENARIO = "Pong"
 
 class AppViewModel : ViewModel() {
     private var preferences: SharedPreferences? = null
+    var status by mutableStateOf("")
+    var lastError by mutableStateOf("")
     var mode by mutableStateOf(RFCOMM_SERVER_MODE)
     var scenario by mutableStateOf(RECEIVE_SCENARIO)
     var peerBluetoothAddress by mutableStateOf(DEFAULT_PEER_BLUETOOTH_ADDRESS)
@@ -216,6 +218,18 @@ class AppViewModel : ViewModel() {
             putString(MODE_PREF_KEY, mode)
             apply()
         }
+    }
+
+    fun clear() {
+        status = ""
+        lastError = ""
+        mtu = 0
+        rxPhy = 0
+        txPhy = 0
+        packetsSent = 0
+        packetsReceived = 0
+        throughput = 0
+        stats = ""
     }
 
     fun abort() {

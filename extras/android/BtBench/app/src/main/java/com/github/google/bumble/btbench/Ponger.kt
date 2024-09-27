@@ -28,7 +28,9 @@ class Ponger(private val viewModel: AppViewModel, private val packetIO: PacketIO
         packetIO.packetSink = this
     }
 
-    override fun run() {}
+    override fun run() {
+        viewModel.clear()
+    }
 
     override fun abort() {}
 

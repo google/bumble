@@ -26,7 +26,9 @@ class SocketServer(
     private val serverSocket: BluetoothServerSocket,
     private val createIoClient: (packetIo: PacketIO) -> IoClient
 ) {
-    fun run(onConnected: () -> Unit, onDisconnected: () -> Unit, blocking: Boolean = false) {
+    private var serverThread: Thread? = null
+
+    fun run(onConnected: () -> Unit, onDisconnected: () -> Unit) {
         var aborted = false
         viewModel.running = true
 
@@ -35,7 +37,7 @@ class SocketServer(
             viewModel.running = false
         }
 
-        val serverThread = thread(name = "SocketServer") {
+        serverThread = thread(name = "SocketServer") {
             while (!aborted) {
                 viewModel.aborter = {
                     serverSocket.close()
@@ -63,15 +65,22 @@ class SocketServer(
                 val socketDataSink = SocketDataSink(socket)
                 val streamIO = StreamedPacketIO(socketDataSink)
                 val socketDataSource = SocketDataSource(socket, streamIO::onData)
-                val ioClient = createIoClient(streamIO)
+
+                val ioThread = thread(name = "IoClient") {
+                    val ioClient = createIoClient(streamIO)
+                    ioClient.run()
+                }
+
                 socketDataSource.receive()
                 socket.close()
+                ioThread.join()
             }
             cleanup()
         }
 
-        if (blocking) {
-            serverThread.join()
-        }
+    }
+
+    fun waitForCompletion() {
+        serverThread?.join()
     }
 }

@@ -27,8 +27,10 @@ class SocketClient(
     private val socket: BluetoothSocket,
     private val createIoClient: (packetIo: PacketIO) -> IoClient
 ) {
+    private var clientThread: Thread? = null
+
     @SuppressLint("MissingPermission")
-    fun run(blocking: Boolean = false) {
+    fun run() {
         viewModel.running = true
         val socketDataSink = SocketDataSink(socket)
         val streamIO = StreamedPacketIO(socketDataSink)
@@ -41,7 +43,7 @@ class SocketClient(
             viewModel.running = false
         }
 
-        val clientThread = thread(name = "SocketClient") {
+        clientThread = thread(name = "SocketClient") {
             viewModel.aborter = {
                 ioClient.abort()
                 socket.close()
@@ -51,6 +53,8 @@ class SocketClient(
                 socket.connect()
             } catch (error: IOException) {
                 Log.warning("connection failed")
+                viewModel.status = "ABORTED"
+                viewModel.lastError = "CONNECTION_FAILED"
                 cleanup()
                 return@thread
             }
@@ -65,8 +69,11 @@ class SocketClient(
             try {
                 ioClient.run()
                 socket.close()
+                viewModel.status = "OK"
             } catch (error: IOException) {
                 Log.info("run ended abruptly")
+                viewModel.status = "ABORTED"
+                viewModel.lastError = "IO_ERROR"
             }
 
             Log.info("waiting for source thread to finish")
@@ -74,9 +81,9 @@ class SocketClient(
 
             cleanup()
         }
+    }
 
-        if (blocking) {
-            clientThread.join()
-        }
+    fun waitForCompletion() {
+        clientThread?.join()
     }
 }

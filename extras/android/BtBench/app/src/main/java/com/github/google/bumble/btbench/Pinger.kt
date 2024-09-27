@@ -34,9 +34,7 @@ class Pinger(private val viewModel: AppViewModel, private val packetIO: PacketIO
     }
 
     override fun run() {
-        viewModel.packetsSent = 0
-        viewModel.packetsReceived = 0
-        viewModel.stats = ""
+        viewModel.clear()
 
         Log.info("startup delay: $DEFAULT_STARTUP_DELAY")
         Thread.sleep(DEFAULT_STARTUP_DELAY.toLong());

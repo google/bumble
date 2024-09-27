@@ -32,8 +32,10 @@ class L2capClient(
     private val context: Context,
     private val createIoClient: (packetIo: PacketIO) -> IoClient
 ) : Mode {
+    private var socketClient: SocketClient? = null
+
     @SuppressLint("MissingPermission")
-    override fun run(blocking: Boolean) {
+    override fun run() {
         viewModel.running = true
         val addressIsPublic = viewModel.peerBluetoothAddress.endsWith("/P")
         val address = viewModel.peerBluetoothAddress.take(17)
@@ -97,7 +99,11 @@ class L2capClient(
 
         val socket = remoteDevice.createInsecureL2capChannel(viewModel.l2capPsm)
 
-        val client = SocketClient(viewModel, socket, createIoClient)
-        client.run(blocking)
+        socketClient = SocketClient(viewModel, socket, createIoClient)
+        socketClient!!.run()
+    }
+
+    override fun waitForCompletion() {
+        socketClient?.waitForCompletion()
     }
 }

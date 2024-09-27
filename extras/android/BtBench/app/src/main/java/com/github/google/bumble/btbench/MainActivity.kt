@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
             L2CAP_SERVER_MODE -> L2capServer(appViewModel, bluetoothAdapter!!, ::createIoClient)
             else -> throw IllegalStateException()
         }
-        runner.run(false)
+        runner.run()
     }
 
     private fun runScan(startScan: Boolean) {
@@ -442,6 +442,12 @@ fun MainView(
                 )
                 Text(
                     text = if (appViewModel.rxPhy != 0 || appViewModel.txPhy != 0) "PHY: tx=${appViewModel.txPhy}, rx=${appViewModel.rxPhy}" else ""
+                )
+                Text(
+                    text = "Status: ${appViewModel.status}"
+                )
+                Text(
+                    text = "Last Error: ${appViewModel.lastError}"
                 )
                 Text(
                     text = "Packets Sent: ${appViewModel.packetsSent}"
