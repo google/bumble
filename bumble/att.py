@@ -811,7 +811,7 @@ class Attribute(EventEmitter):
                 enum_list: List[str] = [p.name for p in cls if p.name is not None]
                 enum_list_str = ",".join(enum_list)
                 raise TypeError(
-                    f"Attribute::permissions error:\nExpected a string containing any of the keys, separated by commas: {enum_list_str  }\nGot: {permissions_str}"
+                    f"Attribute::permissions error:\nExpected a string containing any of the keys, separated by commas: {enum_list_str}\nGot: {permissions_str}"
                 ) from exc
 
     # Permission flags(legacy-use only)
