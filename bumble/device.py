@@ -53,7 +53,7 @@ from pyee import EventEmitter
 
 from bumble import hci
 from .colors import color
-from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
+from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU, Attribute
 from .gatt import Characteristic, Descriptor, Service
 from .hci import (
     HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE,
@@ -4222,7 +4222,12 @@ class Device(CompositeEventEmitter):
     async def notify_subscriber(self, connection, attribute, value=None, force=False):
         await self.gatt_server.notify_subscriber(connection, attribute, value, force)
 
-    async def notify_subscribers(self, attribute, value=None, force=False):
+    async def notify_subscribers(
+        self,
+        attribute: Attribute,
+        value: Optional[bytes] = None,
+        force: bool = False,
+    ) -> None:
         await self.gatt_server.notify_subscribers(attribute, value, force)
 
     async def indicate_subscriber(self, connection, attribute, value=None, force=False):

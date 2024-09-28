@@ -14,7 +14,7 @@ Set up a virtualenv for Bumble, or otherwise have an isolated Python environment
 for Bumble and its dependencies.
 
 Due to Python being
-[picky about how its sys path is set up](https://github.com/PyO3/pyo3/issues/1741,
+[picky about how its sys path is set up](https://github.com/PyO3/pyo3/issues/1741),
 it's necessary to explicitly point to the virtualenv's `site-packages`. Use
 suitable virtualenv paths as appropriate for your OS, as seen here running
 the `battery_client` example:
