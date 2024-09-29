@@ -3440,11 +3440,11 @@ class HCI_Read_Local_Supported_Codecs_V2_Command(HCI_Command):
     See Bluetooth spec @ 7.4.8 Read Local Supported Codecs Command
     '''
 
-    class Transport(OpenIntEnum):
-        BR_EDR_ACL = 0x00
-        BR_EDR_SCO = 0x01
-        LE_CIS = 0x02
-        LE_BIS = 0x03
+    class Transport(enum.IntFlag):
+        BR_EDR_ACL = 1 << 0
+        BR_EDR_SCO = 1 << 1
+        LE_CIS = 1 << 2
+        LE_BIS = 1 << 3
 
 
 # -----------------------------------------------------------------------------

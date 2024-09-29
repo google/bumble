@@ -27,6 +27,7 @@ from bumble.colors import color
 from bumble.core import name_or_number
 from bumble.hci import (
     map_null_terminated_utf8_string,
+    CodecID,
     LeFeature,
     HCI_SUCCESS,
     HCI_VERSION_NAMES,
@@ -50,6 +51,8 @@ from bumble.hci import (
     HCI_LE_Read_Maximum_Advertising_Data_Length_Command,
     HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
     HCI_LE_Read_Suggested_Default_Data_Length_Command,
+    HCI_Read_Local_Supported_Codecs_Command,
+    HCI_Read_Local_Supported_Codecs_V2_Command,
     HCI_Read_Local_Version_Information_Command,
 )
 from bumble.host import Host
@@ -169,6 +172,60 @@ async def get_acl_flow_control_info(host: Host) -> None:
 
 
 # -----------------------------------------------------------------------------
+async def get_codecs_info(host: Host) -> None:
+    print()
+
+    if host.supports_command(HCI_Read_Local_Supported_Codecs_V2_Command.op_code):
+        response = await host.send_command(
+            HCI_Read_Local_Supported_Codecs_V2_Command(), check_result=True
+        )
+        print(color('Codecs:', 'yellow'))
+
+        for codec_id, transport in zip(
+            response.return_parameters.standard_codec_ids,
+            response.return_parameters.standard_codec_transports,
+        ):
+            transport_name = HCI_Read_Local_Supported_Codecs_V2_Command.Transport(
+                transport
+            ).name
+            codec_name = CodecID(codec_id).name
+            print(f'  {codec_name} - {transport_name}')
+
+        for codec_id, transport in zip(
+            response.return_parameters.vendor_specific_codec_ids,
+            response.return_parameters.vendor_specific_codec_transports,
+        ):
+            transport_name = HCI_Read_Local_Supported_Codecs_V2_Command.Transport(
+                transport
+            ).name
+            company = name_or_number(COMPANY_IDENTIFIERS, codec_id >> 16)
+            print(f'  {company} / {codec_id & 0xFFFF} - {transport_name}')
+
+        if not response.return_parameters.standard_codec_ids:
+            print('  No standard codecs')
+        if not response.return_parameters.vendor_specific_codec_ids:
+            print('  No Vendor-specific codecs')
+
+    if host.supports_command(HCI_Read_Local_Supported_Codecs_Command.op_code):
+        response = await host.send_command(
+            HCI_Read_Local_Supported_Codecs_Command(), check_result=True
+        )
+        print(color('Codecs (BR/EDR):', 'yellow'))
+        for codec_id in response.return_parameters.standard_codec_ids:
+            codec_name = CodecID(codec_id).name
+            print(f'  {codec_name}')
+
+        for codec_id in response.return_parameters.vendor_specific_codec_ids:
+            company = name_or_number(COMPANY_IDENTIFIERS, codec_id >> 16)
+            print(f'  {company} / {codec_id & 0xFFFF}')
+
+        if not response.return_parameters.standard_codec_ids:
+            print('  No standard codecs')
+        if not response.return_parameters.vendor_specific_codec_ids:
+            print('  No Vendor-specific codecs')
+
+
+# -----------------------------------------------------------------------------
 async def async_main(latency_probes, transport):
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(transport) as (hci_source, hci_sink):
@@ -219,6 +276,9 @@ async def async_main(latency_probes, transport):
 
         # Print the ACL flow control info
         await get_acl_flow_control_info(host)
+
+        # Get codec info
+        await get_codecs_info(host)
 
         # Print the list of commands supported by the controller
         print()
