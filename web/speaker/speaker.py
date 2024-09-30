@@ -72,7 +72,7 @@ class AudioExtractor:
 # -----------------------------------------------------------------------------
 class AacAudioExtractor:
     def extract_audio(self, packet: MediaPacket) -> bytes:
-        return AacAudioRtpPacket(packet.payload).to_adts()
+        return AacAudioRtpPacket.from_bytes(packet.payload).to_adts()
 
 
 # -----------------------------------------------------------------------------
@@ -282,9 +282,6 @@ class Speaker:
             mitm=False
         )
 
-        # Start the controller
-        await self.device.power_on()
-
         # Listen for Bluetooth connections
         self.device.on('connection', self.on_bluetooth_connection)
 
@@ -294,6 +291,9 @@ class Speaker:
         # Create a listener to wait for AVDTP connections
         self.avdtp_listener = Listener.for_device(self.device)
         self.avdtp_listener.on('connection', self.on_avdtp_connection)
+
+        # Start the controller
+        await self.device.power_on()
 
         print(f'Speaker ready to play, codec={self.codec}')
 

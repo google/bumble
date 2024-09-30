@@ -1491,10 +1491,14 @@ class Protocol(pyee.EventEmitter):
             f"<<< AVCTP Command, transaction_label={transaction_label}: " f"{command}"
         )
 
-        # Only the PANEL subunit type with subunit ID 0 is supported in this profile.
-        if (
-            command.subunit_type != avc.Frame.SubunitType.PANEL
-            or command.subunit_id != 0
+        # Only addressing the unit, or the PANEL subunit with subunit ID 0 is supported
+        # in this profile.
+        if not (
+            command.subunit_type == avc.Frame.SubunitType.UNIT
+            and command.subunit_id == 7
+        ) and not (
+            command.subunit_type == avc.Frame.SubunitType.PANEL
+            and command.subunit_id == 0
         ):
             logger.debug("subunit not supported")
             self.send_not_implemented_response(transaction_label, command)
@@ -1528,8 +1532,8 @@ class Protocol(pyee.EventEmitter):
             # TODO: delegate
             response = avc.PassThroughResponseFrame(
                 avc.ResponseFrame.ResponseCode.ACCEPTED,
-                avc.Frame.SubunitType.PANEL,
-                0,
+                command.subunit_type,
+                command.subunit_id,
                 command.state_flag,
                 command.operation_id,
                 command.operation_data,
@@ -1846,6 +1850,15 @@ class Protocol(pyee.EventEmitter):
             RejectedResponse(pdu_id, status_code),
         )
 
+    def send_not_implemented_avrcp_response(
+        self, transaction_label: int, pdu_id: Protocol.PduId
+    ) -> None:
+        self.send_avrcp_response(
+            transaction_label,
+            avc.ResponseFrame.ResponseCode.NOT_IMPLEMENTED,
+            NotImplementedResponse(pdu_id, b''),
+        )
+
     def _on_get_capabilities_command(
         self, transaction_label: int, command: GetCapabilitiesCommand
     ) -> None:
@@ -1891,29 +1904,35 @@ class Protocol(pyee.EventEmitter):
         async def register_notification():
             # Check if the event is supported.
             supported_events = await self.delegate.get_supported_events()
-            if command.event_id in supported_events:
-                if command.event_id == EventId.VOLUME_CHANGED:
-                    volume = await self.delegate.get_absolute_volume()
-                    response = RegisterNotificationResponse(VolumeChangedEvent(volume))
-                    self.send_avrcp_response(
-                        transaction_label,
-                        avc.ResponseFrame.ResponseCode.INTERIM,
-                        response,
-                    )
-                    self._register_notification_listener(transaction_label, command)
-                    return
+            if command.event_id not in supported_events:
+                logger.debug("event not supported")
+                self.send_not_implemented_avrcp_response(
+                    transaction_label, self.PduId.REGISTER_NOTIFICATION
+                )
+                return
 
-                if command.event_id == EventId.PLAYBACK_STATUS_CHANGED:
-                    # TODO: testing only, use delegate
-                    response = RegisterNotificationResponse(
-                        PlaybackStatusChangedEvent(play_status=PlayStatus.PLAYING)
-                    )
-                    self.send_avrcp_response(
-                        transaction_label,
-                        avc.ResponseFrame.ResponseCode.INTERIM,
-                        response,
-                    )
-                    self._register_notification_listener(transaction_label, command)
-                    return
+            if command.event_id == EventId.VOLUME_CHANGED:
+                volume = await self.delegate.get_absolute_volume()
+                response = RegisterNotificationResponse(VolumeChangedEvent(volume))
+                self.send_avrcp_response(
+                    transaction_label,
+                    avc.ResponseFrame.ResponseCode.INTERIM,
+                    response,
+                )
+                self._register_notification_listener(transaction_label, command)
+                return
+
+            if command.event_id == EventId.PLAYBACK_STATUS_CHANGED:
+                # TODO: testing only, use delegate
+                response = RegisterNotificationResponse(
+                    PlaybackStatusChangedEvent(play_status=PlayStatus.PLAYING)
+                )
+                self.send_avrcp_response(
+                    transaction_label,
+                    avc.ResponseFrame.ResponseCode.INTERIM,
+                    response,
+                )
+                self._register_notification_listener(transaction_label, command)
+                return
 
         self._delegate_command(transaction_label, command, register_notification())

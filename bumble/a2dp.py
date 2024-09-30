@@ -17,12 +17,14 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-import dataclasses
-import struct
-import logging
 from collections.abc import AsyncGenerator
+import dataclasses
+import enum
+import logging
+import struct
 from typing import List, Callable, Awaitable
 
+from .codecs import AacAudioRtpPacket
 from .company_ids import COMPANY_IDENTIFIERS
 from .sdp import (
     DataElement,
@@ -535,6 +537,7 @@ class SbcFrame:
     block_count: int
     channel_mode: int
     subband_count: int
+    bitpool: int
     payload: bytes
 
     @property
@@ -555,6 +558,7 @@ class SbcFrame:
             f'cm={self.channel_mode},'
             f'br={self.bitrate},'
             f'sc={self.sample_count},'
+            f'bp={self.bitpool},'
             f'size={len(self.payload)})'
         )
 
@@ -602,7 +606,7 @@ class SbcParser:
 
                 # Emit the next frame
                 yield SbcFrame(
-                    sampling_frequency, blocks, channel_mode, subbands, payload
+                    sampling_frequency, blocks, channel_mode, subbands, bitpool, payload
                 )
 
         return generate_frames()
@@ -632,13 +636,12 @@ class SbcPacketSource:
             # NOTE: this doesn't support frame fragments
             sbc_parser = SbcParser(self.read)
             async for frame in sbc_parser.frames:
-                print(frame)
-
                 if (
                     frames_size + len(frame.payload) > max_rtp_payload
                     or len(frames) == 16
                 ):
                     # Need to flush what has been accumulated so far
+                    logger.debug(f"yielding {len(frames)} frames")
 
                     # Emit a packet
                     sbc_payload = bytes([len(frames)]) + b''.join(
@@ -661,5 +664,142 @@ class SbcPacketSource:
                     # Accumulate
                     frames.append(frame)
                     frames_size += len(frame.payload)
+
+        return generate_packets()
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class AacFrame:
+    class Profile(enum.IntEnum):
+        MAIN = 0
+        LC = 1
+        SSR = 2
+        LTP = 3
+
+    profile: Profile
+    sampling_frequency: int
+    channel_configuration: int
+    payload: bytes
+
+    @property
+    def sample_count(self) -> int:
+        return 1024
+
+    @property
+    def duration(self) -> float:
+        return self.sample_count / self.sampling_frequency
+
+    def __str__(self) -> str:
+        return (
+            f'AAC(sf={self.sampling_frequency},'
+            f'ch={self.channel_configuration},'
+            f'size={len(self.payload)})'
+        )
+
+
+# -----------------------------------------------------------------------------
+ADTS_AAC_SAMPLING_FREQUENCIES = [
+    96000,
+    88200,
+    64000,
+    48000,
+    44100,
+    32000,
+    24000,
+    22050,
+    16000,
+    12000,
+    11025,
+    8000,
+    7350,
+    0,
+    0,
+    0,
+]
+
+
+# -----------------------------------------------------------------------------
+class AacParser:
+    """Parser for AAC frames in an ADTS stream"""
+
+    def __init__(self, read: Callable[[int], Awaitable[bytes]]) -> None:
+        self.read = read
+
+    @property
+    def frames(self) -> AsyncGenerator[AacFrame, None]:
+        async def generate_frames() -> AsyncGenerator[AacFrame, None]:
+            while True:
+                header = await self.read(7)
+                if not header:
+                    return
+
+                sync_word = (header[0] << 4) | (header[1] >> 4)
+                if sync_word != 0b111111111111:
+                    raise ValueError(f"invalid sync word ({sync_word:06x})")
+                layer = (header[1] >> 1) & 0b11
+                profile = AacFrame.Profile((header[2] >> 6) & 0b11)
+                sampling_frequency = ADTS_AAC_SAMPLING_FREQUENCIES[
+                    (header[2] >> 2) & 0b1111
+                ]
+                channel_configuration = ((header[2] & 0b1) << 2) | (header[3] >> 6)
+                frame_length = (
+                    ((header[3] & 0b11) << 11) | (header[4] << 3) | (header[5] >> 5)
+                )
+
+                if layer != 0:
+                    raise ValueError("layer must be 0")
+
+                payload = await self.read(frame_length - 7)
+                if payload:
+                    yield AacFrame(
+                        profile, sampling_frequency, channel_configuration, payload
+                    )
+
+        return generate_frames()
+
+
+# -----------------------------------------------------------------------------
+class AacPacketSource:
+    def __init__(
+        self, read: Callable[[int], Awaitable[bytes]], mtu: int, codec_capabilities
+    ) -> None:
+        self.read = read
+        self.mtu = mtu
+        self.codec_capabilities = codec_capabilities
+
+    @property
+    def packets(self):
+        async def generate_packets():
+            # pylint: disable=import-outside-toplevel
+            from .avdtp import MediaPacket  # Import here to avoid a circular reference
+
+            sequence_number = 0
+            timestamp = 0
+
+            aac_parser = AacParser(self.read)
+            async for frame in aac_parser.frames:
+                logger.debug("yielding one AAC frame")
+
+                # Emit a packet
+                aac_payload = bytes(
+                    AacAudioRtpPacket.for_simple_aac(
+                        frame.sampling_frequency,
+                        frame.channel_configuration,
+                        frame.payload,
+                    )
+                )
+                packet = MediaPacket(
+                    2, 0, 0, 0, sequence_number, timestamp, 0, [], 96, aac_payload
+                )
+                packet.timestamp_seconds = timestamp / frame.sampling_frequency
+                yield packet
+
+                # Prepare for next packets
+                sequence_number += 1
+                sequence_number &= 0xFFFF
+                timestamp += frame.sample_count
+                timestamp &= 0xFFFFFFFF
+                frames = [frame]
 
         return generate_packets()

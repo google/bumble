@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 from dataclasses import dataclass
+from typing_extensions import Self
 
 from bumble import core
 
@@ -102,11 +103,39 @@ class BitReader:
 
 
 # -----------------------------------------------------------------------------
+class BitWriter:
+    """Simple but not optimized bit stream writer."""
+
+    data: int
+    bit_count: int
+
+    def __init__(self) -> None:
+        self.data = 0
+        self.bit_count = 0
+
+    def write(self, value: int, bit_count: int) -> None:
+        self.data = (self.data << bit_count) | value
+        self.bit_count += bit_count
+
+    def write_bytes(self, data: bytes) -> None:
+        bit_count = 8 * len(data)
+        self.data = (self.data << bit_count) | int.from_bytes(data, 'big')
+        self.bit_count += bit_count
+
+    def __bytes__(self) -> bytes:
+        return (self.data << ((8 - (self.bit_count % 8)) % 8)).to_bytes(
+            (self.bit_count + 7) // 8, 'big'
+        )
+
+
+# -----------------------------------------------------------------------------
 class AacAudioRtpPacket:
     """AAC payload encapsulated in an RTP packet payload"""
 
+    audio_mux_element: AudioMuxElement
+
     @staticmethod
-    def latm_value(reader: BitReader) -> int:
+    def read_latm_value(reader: BitReader) -> int:
         bytes_for_value = reader.read(2)
         value = 0
         for _ in range(bytes_for_value + 1):
@@ -114,24 +143,33 @@ class AacAudioRtpPacket:
         return value
 
     @staticmethod
-    def program_config_element(reader: BitReader):
-        raise core.InvalidPacketError('program_config_element not supported')
+    def read_audio_object_type(reader: BitReader):
+        # GetAudioObjectType - ISO/EIC 14496-3 Table 1.16
+        audio_object_type = reader.read(5)
+        if audio_object_type == 31:
+            audio_object_type = 32 + reader.read(6)
+
+        return audio_object_type
 
     @dataclass
     class GASpecificConfig:
-        def __init__(
-            self, reader: BitReader, channel_configuration: int, audio_object_type: int
-        ) -> None:
+        audio_object_type: int
+        # NOTE: other fields not supported
+
+        @classmethod
+        def from_bits(
+            cls, reader: BitReader, channel_configuration: int, audio_object_type: int
+        ) -> Self:
             # GASpecificConfig - ISO/EIC 14496-3 Table 4.1
             frame_length_flag = reader.read(1)
             depends_on_core_coder = reader.read(1)
             if depends_on_core_coder:
-                self.core_coder_delay = reader.read(14)
+                core_coder_delay = reader.read(14)
             extension_flag = reader.read(1)
             if not channel_configuration:
-                AacAudioRtpPacket.program_config_element(reader)
+                raise core.InvalidPacketError('program_config_element not supported')
             if audio_object_type in (6, 20):
-                self.layer_nr = reader.read(3)
+                layer_nr = reader.read(3)
             if extension_flag:
                 if audio_object_type == 22:
                     num_of_sub_frame = reader.read(5)
@@ -144,14 +182,13 @@ class AacAudioRtpPacket:
                 if extension_flag_3 == 1:
                     raise core.InvalidPacketError('extensionFlag3 == 1 not supported')
 
-    @staticmethod
-    def audio_object_type(reader: BitReader):
-        # GetAudioObjectType - ISO/EIC 14496-3 Table 1.16
-        audio_object_type = reader.read(5)
-        if audio_object_type == 31:
-            audio_object_type = 32 + reader.read(6)
+            return cls(audio_object_type)
 
-        return audio_object_type
+        def to_bits(self, writer: BitWriter) -> None:
+            assert self.audio_object_type in (1, 2)
+            writer.write(0, 1)  # frame_length_flag = 0
+            writer.write(0, 1)  # depends_on_core_coder = 0
+            writer.write(0, 1)  # extension_flag = 0
 
     @dataclass
     class AudioSpecificConfig:
@@ -159,6 +196,7 @@ class AacAudioRtpPacket:
         sampling_frequency_index: int
         sampling_frequency: int
         channel_configuration: int
+        ga_specific_config: AacAudioRtpPacket.GASpecificConfig
         sbr_present_flag: int
         ps_present_flag: int
         extension_audio_object_type: int
@@ -182,44 +220,73 @@ class AacAudioRtpPacket:
             7350,
         ]
 
-        def __init__(self, reader: BitReader) -> None:
-            # AudioSpecificConfig - ISO/EIC 14496-3 Table 1.15
-            self.audio_object_type = AacAudioRtpPacket.audio_object_type(reader)
-            self.sampling_frequency_index = reader.read(4)
-            if self.sampling_frequency_index == 0xF:
-                self.sampling_frequency = reader.read(24)
-            else:
-                self.sampling_frequency = self.SAMPLING_FREQUENCIES[
-                    self.sampling_frequency_index
-                ]
-            self.channel_configuration = reader.read(4)
-            self.sbr_present_flag = -1
-            self.ps_present_flag = -1
-            if self.audio_object_type in (5, 29):
-                self.extension_audio_object_type = 5
-                self.sbc_present_flag = 1
-                if self.audio_object_type == 29:
-                    self.ps_present_flag = 1
-                self.extension_sampling_frequency_index = reader.read(4)
-                if self.extension_sampling_frequency_index == 0xF:
-                    self.extension_sampling_frequency = reader.read(24)
-                else:
-                    self.extension_sampling_frequency = self.SAMPLING_FREQUENCIES[
-                        self.extension_sampling_frequency_index
-                    ]
-                self.audio_object_type = AacAudioRtpPacket.audio_object_type(reader)
-                if self.audio_object_type == 22:
-                    self.extension_channel_configuration = reader.read(4)
-            else:
-                self.extension_audio_object_type = 0
+        @classmethod
+        def for_simple_aac(
+            cls,
+            audio_object_type: int,
+            sampling_frequency: int,
+            channel_configuration: int,
+        ) -> Self:
+            if sampling_frequency not in cls.SAMPLING_FREQUENCIES:
+                raise ValueError(f'invalid sampling frequency {sampling_frequency}')
 
-            if self.audio_object_type in (1, 2, 3, 4, 6, 7, 17, 19, 20, 21, 22, 23):
-                ga_specific_config = AacAudioRtpPacket.GASpecificConfig(
-                    reader, self.channel_configuration, self.audio_object_type
+            ga_specific_config = AacAudioRtpPacket.GASpecificConfig(audio_object_type)
+
+            return cls(
+                audio_object_type=audio_object_type,
+                sampling_frequency_index=cls.SAMPLING_FREQUENCIES.index(
+                    sampling_frequency
+                ),
+                sampling_frequency=sampling_frequency,
+                channel_configuration=channel_configuration,
+                ga_specific_config=ga_specific_config,
+                sbr_present_flag=0,
+                ps_present_flag=0,
+                extension_audio_object_type=0,
+                extension_sampling_frequency_index=0,
+                extension_sampling_frequency=0,
+                extension_channel_configuration=0,
+            )
+
+        @classmethod
+        def from_bits(cls, reader: BitReader) -> Self:
+            # AudioSpecificConfig - ISO/EIC 14496-3 Table 1.15
+            audio_object_type = AacAudioRtpPacket.read_audio_object_type(reader)
+            sampling_frequency_index = reader.read(4)
+            if sampling_frequency_index == 0xF:
+                sampling_frequency = reader.read(24)
+            else:
+                sampling_frequency = cls.SAMPLING_FREQUENCIES[sampling_frequency_index]
+            channel_configuration = reader.read(4)
+            sbr_present_flag = 0
+            ps_present_flag = 0
+            extension_sampling_frequency_index = 0
+            extension_sampling_frequency = 0
+            extension_channel_configuration = 0
+            extension_audio_object_type = 0
+            if audio_object_type in (5, 29):
+                extension_audio_object_type = 5
+                sbr_present_flag = 1
+                if audio_object_type == 29:
+                    ps_present_flag = 1
+                extension_sampling_frequency_index = reader.read(4)
+                if extension_sampling_frequency_index == 0xF:
+                    extension_sampling_frequency = reader.read(24)
+                else:
+                    extension_sampling_frequency = cls.SAMPLING_FREQUENCIES[
+                        extension_sampling_frequency_index
+                    ]
+                audio_object_type = AacAudioRtpPacket.read_audio_object_type(reader)
+                if audio_object_type == 22:
+                    extension_channel_configuration = reader.read(4)
+
+            if audio_object_type in (1, 2, 3, 4, 6, 7, 17, 19, 20, 21, 22, 23):
+                ga_specific_config = AacAudioRtpPacket.GASpecificConfig.from_bits(
+                    reader, channel_configuration, audio_object_type
                 )
             else:
                 raise core.InvalidPacketError(
-                    f'audioObjectType {self.audio_object_type} not supported'
+                    f'audioObjectType {audio_object_type} not supported'
                 )
 
             # if self.extension_audio_object_type != 5 and bits_to_decode >= 16:
@@ -248,13 +315,44 @@ class AacAudioRtpPacket:
             #                     self.extension_sampling_frequency = self.SAMPLING_FREQUENCIES[self.extension_sampling_frequency_index]
             #             self.extension_channel_configuration = reader.read(4)
 
+            return cls(
+                audio_object_type,
+                sampling_frequency_index,
+                sampling_frequency,
+                channel_configuration,
+                ga_specific_config,
+                sbr_present_flag,
+                ps_present_flag,
+                extension_audio_object_type,
+                extension_sampling_frequency_index,
+                extension_sampling_frequency,
+                extension_channel_configuration,
+            )
+
+        def to_bits(self, writer: BitWriter) -> None:
+            if self.sampling_frequency_index >= 15:
+                raise ValueError(
+                    f"unsupported sampling frequency index {self.sampling_frequency_index}"
+                )
+
+            if self.audio_object_type not in (1, 2):
+                raise ValueError(
+                    f"unsupported audio object type {self.audio_object_type} "
+                )
+
+            writer.write(self.audio_object_type, 5)
+            writer.write(self.sampling_frequency_index, 4)
+            writer.write(self.channel_configuration, 4)
+            self.ga_specific_config.to_bits(writer)
+
     @dataclass
     class StreamMuxConfig:
         other_data_present: int
         other_data_len_bits: int
         audio_specific_config: AacAudioRtpPacket.AudioSpecificConfig
 
-        def __init__(self, reader: BitReader) -> None:
+        @classmethod
+        def from_bits(cls, reader: BitReader) -> Self:
             # StreamMuxConfig - ISO/EIC 14496-3 Table 1.42
             audio_mux_version = reader.read(1)
             if audio_mux_version == 1:
@@ -264,7 +362,7 @@ class AacAudioRtpPacket:
             if audio_mux_version_a != 0:
                 raise core.InvalidPacketError('audioMuxVersionA != 0 not supported')
             if audio_mux_version == 1:
-                tara_buffer_fullness = AacAudioRtpPacket.latm_value(reader)
+                tara_buffer_fullness = AacAudioRtpPacket.read_latm_value(reader)
             stream_cnt = 0
             all_streams_same_time_framing = reader.read(1)
             num_sub_frames = reader.read(6)
@@ -275,13 +373,13 @@ class AacAudioRtpPacket:
             if num_layer != 0:
                 raise core.InvalidPacketError('num_layer != 0 not supported')
             if audio_mux_version == 0:
-                self.audio_specific_config = AacAudioRtpPacket.AudioSpecificConfig(
+                audio_specific_config = AacAudioRtpPacket.AudioSpecificConfig.from_bits(
                     reader
                 )
             else:
-                asc_len = AacAudioRtpPacket.latm_value(reader)
+                asc_len = AacAudioRtpPacket.read_latm_value(reader)
                 marker = reader.bit_position
-                self.audio_specific_config = AacAudioRtpPacket.AudioSpecificConfig(
+                audio_specific_config = AacAudioRtpPacket.AudioSpecificConfig.from_bits(
                     reader
                 )
                 audio_specific_config_len = reader.bit_position - marker
@@ -299,36 +397,49 @@ class AacAudioRtpPacket:
                     f'frame_length_type {frame_length_type} not supported'
                 )
 
-            self.other_data_present = reader.read(1)
-            if self.other_data_present:
+            other_data_present = reader.read(1)
+            other_data_len_bits = 0
+            if other_data_present:
                 if audio_mux_version == 1:
-                    self.other_data_len_bits = AacAudioRtpPacket.latm_value(reader)
+                    other_data_len_bits = AacAudioRtpPacket.read_latm_value(reader)
                 else:
-                    self.other_data_len_bits = 0
                     while True:
-                        self.other_data_len_bits *= 256
+                        other_data_len_bits *= 256
                         other_data_len_esc = reader.read(1)
-                        self.other_data_len_bits += reader.read(8)
+                        other_data_len_bits += reader.read(8)
                         if other_data_len_esc == 0:
                             break
             crc_check_present = reader.read(1)
             if crc_check_present:
                 crc_checksum = reader.read(8)
 
+            return cls(other_data_present, other_data_len_bits, audio_specific_config)
+
+        def to_bits(self, writer: BitWriter) -> None:
+            writer.write(0, 1)  # audioMuxVersion = 0
+            writer.write(1, 1)  # allStreamsSameTimeFraming = 1
+            writer.write(0, 6)  # numSubFrames = 0
+            writer.write(0, 4)  # numProgram = 0
+            writer.write(0, 3)  # numLayer = 0
+            self.audio_specific_config.to_bits(writer)
+            writer.write(0, 3)  # frameLengthType = 0
+            writer.write(0, 8)  # latmBufferFullness = 0
+            writer.write(0, 1)  # otherDataPresent = 0
+            writer.write(0, 1)  # crcCheckPresent = 0
+
     @dataclass
     class AudioMuxElement:
-        payload: bytes
         stream_mux_config: AacAudioRtpPacket.StreamMuxConfig
+        payload: bytes
 
-        def __init__(self, reader: BitReader, mux_config_present: int):
-            if mux_config_present == 0:
-                raise core.InvalidPacketError('muxConfigPresent == 0 not supported')
-
+        @classmethod
+        def from_bits(cls, reader: BitReader) -> Self:
             # AudioMuxElement - ISO/EIC 14496-3 Table 1.41
+            # (only supports mux_config_present=1)
             use_same_stream_mux = reader.read(1)
             if use_same_stream_mux:
                 raise core.InvalidPacketError('useSameStreamMux == 1 not supported')
-            self.stream_mux_config = AacAudioRtpPacket.StreamMuxConfig(reader)
+            stream_mux_config = AacAudioRtpPacket.StreamMuxConfig.from_bits(reader)
 
             # We only support:
             # allStreamsSameTimeFraming == 1
@@ -344,19 +455,46 @@ class AacAudioRtpPacket:
                 if tmp != 255:
                     break
 
-            self.payload = reader.read_bytes(mux_slot_length_bytes)
+            payload = reader.read_bytes(mux_slot_length_bytes)
 
-            if self.stream_mux_config.other_data_present:
-                reader.skip(self.stream_mux_config.other_data_len_bits)
+            if stream_mux_config.other_data_present:
+                reader.skip(stream_mux_config.other_data_len_bits)
 
             # ByteAlign
             while reader.bit_position % 8:
                 reader.read(1)
 
-    def __init__(self, data: bytes) -> None:
+            return cls(stream_mux_config, payload)
+
+        def to_bits(self, writer: BitWriter) -> None:
+            writer.write(0, 1)  # useSameStreamMux = 0
+            self.stream_mux_config.to_bits(writer)
+            mux_slot_length_bytes = len(self.payload)
+            while mux_slot_length_bytes > 255:
+                writer.write(255, 8)
+                mux_slot_length_bytes -= 255
+            writer.write(mux_slot_length_bytes, 8)
+            if mux_slot_length_bytes == 255:
+                writer.write(0, 8)
+            writer.write_bytes(self.payload)
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
         # Parse the bit stream
         reader = BitReader(data)
-        self.audio_mux_element = self.AudioMuxElement(reader, mux_config_present=1)
+        return cls(cls.AudioMuxElement.from_bits(reader))
+
+    @classmethod
+    def for_simple_aac(
+        cls, sampling_frequency: int, channel_configuration: int, payload: bytes
+    ) -> Self:
+        audio_specific_config = cls.AudioSpecificConfig.for_simple_aac(
+            2, sampling_frequency, channel_configuration
+        )
+        stream_mux_config = cls.StreamMuxConfig(0, 0, audio_specific_config)
+        audio_mux_element = cls.AudioMuxElement(stream_mux_config, payload)
+
+        return cls(audio_mux_element)
 
     def to_adts(self):
         # pylint: disable=line-too-long
@@ -383,3 +521,11 @@ class AacAudioRtpPacket:
             )
             + self.audio_mux_element.payload
         )
+
+    def __init__(self, audio_mux_element: AudioMuxElement) -> None:
+        self.audio_mux_element = audio_mux_element
+
+    def __bytes__(self) -> bytes:
+        writer = BitWriter()
+        self.audio_mux_element.to_bits(writer)
+        return bytes(writer)

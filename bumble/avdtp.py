@@ -377,6 +377,7 @@ class MediaPacketPump:
         self.packets = packets
         self.clock = clock
         self.pump_task = None
+        self.completed = asyncio.Event()
 
     async def start(self, rtp_channel: l2cap.ClassicChannel) -> None:
         async def pump_packets():
@@ -406,6 +407,8 @@ class MediaPacketPump:
                     )
             except asyncio.exceptions.CancelledError:
                 logger.debug('pump canceled')
+            finally:
+                self.completed.set()
 
         # Pump packets
         self.pump_task = asyncio.create_task(pump_packets())
@@ -416,6 +419,9 @@ class MediaPacketPump:
             self.pump_task.cancel()
             await self.pump_task
             self.pump_task = None
+
+    async def wait_for_completion(self) -> None:
+        await self.completed.wait()
 
 
 # -----------------------------------------------------------------------------
@@ -1316,10 +1322,20 @@ class Protocol(EventEmitter):
         return None
 
     def add_source(
-        self, codec_capabilities: MediaCodecCapabilities, packet_pump: MediaPacketPump
+        self,
+        codec_capabilities: MediaCodecCapabilities,
+        packet_pump: MediaPacketPump,
+        delay_reporting: bool = False,
     ) -> LocalSource:
         seid = len(self.local_endpoints) + 1
-        source = LocalSource(self, seid, codec_capabilities, packet_pump)
+        service_capabilities = (
+            [ServiceCapabilities(AVDTP_DELAY_REPORTING_SERVICE_CATEGORY)]
+            if delay_reporting
+            else []
+        )
+        source = LocalSource(
+            self, seid, codec_capabilities, service_capabilities, packet_pump
+        )
         self.local_endpoints.append(source)
 
         return source
@@ -2180,12 +2196,13 @@ class LocalSource(LocalStreamEndPoint):
         protocol: Protocol,
         seid: int,
         codec_capabilities: MediaCodecCapabilities,
+        other_capabilitiles: Iterable[ServiceCapabilities],
         packet_pump: MediaPacketPump,
     ) -> None:
         capabilities = [
             ServiceCapabilities(AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY),
             codec_capabilities,
-        ]
+        ] + list(other_capabilitiles)
         super().__init__(
             protocol,
             seid,
