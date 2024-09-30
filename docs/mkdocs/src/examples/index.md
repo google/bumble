@@ -1,7 +1,7 @@
 EXAMPLES
 ========
 
-The project includes a few simple example applications the illustrate some of the ways the library APIs can be used.
+The project includes a few simple example applications to illustrate some of the ways the library APIs can be used.
 These examples include:
 
 ## `battery_service.py`
