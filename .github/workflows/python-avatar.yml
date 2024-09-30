@@ -40,4 +40,11 @@ jobs:
           avatar --list | grep -Ev '^=' > test-names.txt
           timeout 5m avatar --test-beds bumble.bumbles --tests $(split test-names.txt -n l/${{ matrix.shard }})
       - name: Rootcanal Logs
+        if: always()
         run: cat rootcanal.log
+      - name: Upload Mobly logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: mobly-logs
+          path: /tmp/logs/mobly/bumble.bumbles/
