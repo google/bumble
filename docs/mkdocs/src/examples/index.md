@@ -1,7 +1,7 @@
 EXAMPLES
 ========
 
-The project includes a few simple example applications the illustrate some of the ways the library APIs can be used.
+The project includes a few simple example applications to illustrate some of the ways the library APIs can be used.
 These examples include:
 
 ## `battery_service.py`
@@ -41,6 +41,9 @@ An app that connected to a device (BLE) and encrypts the connection.
 
 ## `run_controller.py`
 Creates two linked controllers, attaches one to a transport, and the other to a local host with a GATT server application. This can be used, for example, to attach a virtual controller to a native stack, like BlueZ on Linux, and use the native tools, like `bluetoothctl`, to scan and connect to the GATT server included in the example.
+
+## `run_csis_servers.py`
+Runs CSIS servers on two devices to form a Coordinated Set. **Note**: If using the example config file (e.g. `device1.json`), the `address` needs to be removed, so that the devices are given different random addresses.   
 
 ## `run_gatt_client_and_server.py`
 Runs a local GATT server and GATT client, connected to each other. The GATT client discovers and logs all the services and characteristics exposed by the GATT server

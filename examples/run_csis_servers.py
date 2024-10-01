@@ -38,13 +38,10 @@ from bumble.transport import open_transport_or_link
 async def main() -> None:
     if len(sys.argv) < 3:
         print(
-            'Usage: run_cig_setup.py <config-file>'
+            'Usage: run_csis_servers.py <config-file> '
             '<transport-spec-for-device-1> <transport-spec-for-device-2>'
         )
-        print(
-            'example: run_cig_setup.py device1.json'
-            'tcp-client:127.0.0.1:6402 tcp-client:127.0.0.1:6402'
-        )
+        print('example: run_csis_servers.py device1.json ' 'hci-socket:0 hci-socket:1')
         return
 
     print('<<< connecting to HCI...')
