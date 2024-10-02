@@ -36,13 +36,10 @@ from bumble.transport import open_transport_or_link
 async def main() -> None:
     if len(sys.argv) < 3:
         print(
-            'Usage: run_cig_setup.py <config-file>'
+            'Usage: run_cig_setup.py <config-file> '
             '<transport-spec-for-device-1> <transport-spec-for-device-2>'
         )
-        print(
-            'example: run_cig_setup.py device1.json'
-            'tcp-client:127.0.0.1:6402 tcp-client:127.0.0.1:6402'
-        )
+        print('example: run_cig_setup.py device1.json hci-socket:0 hci-socket:1')
         return
 
     print('<<< connecting to HCI...')
@@ -65,18 +62,18 @@ async def main() -> None:
     advertising_set = await devices[0].create_advertising_set()
 
     connection = await devices[1].connect(
-        devices[0].public_address, own_address_type=OwnAddressType.PUBLIC
+        devices[0].random_address, own_address_type=OwnAddressType.RANDOM
     )
 
     cid_ids = [2, 3]
     cis_handles = await devices[1].setup_cig(
         cig_id=1,
         cis_id=cid_ids,
-        sdu_interval=(10000, 0),
+        sdu_interval=(10000, 255),
         framing=0,
         max_sdu=(120, 0),
         retransmission_number=13,
-        max_transport_latency=(100, 0),
+        max_transport_latency=(100, 5),
     )
 
     def on_cis_request(
