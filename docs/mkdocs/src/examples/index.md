@@ -25,6 +25,9 @@ An app that implements a virtual Bluetooth speaker that can receive audio.
 ## `run_advertiser.py`
 An app that runs a simple device that just advertises (BLE).
 
+## `run_cig_setup.py`
+An app that creates a simple CIG containing two CISes. **Note**: If using the example config file (e.g. `device1.json`), the `address` needs to be removed, so that the devices are given different random addresses.
+
 ## `run_classic_connect.py`
 An app that connects to a Bluetooth Classic device and prints its services.
 
