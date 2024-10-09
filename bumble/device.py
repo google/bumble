@@ -1766,9 +1766,9 @@ device_host_event_handlers: List[str] = []
 # -----------------------------------------------------------------------------
 class Device(CompositeEventEmitter):
     # Incomplete list of fields.
-    random_address: Address  # Random address that may change with RPA
-    public_address: Address  # Public address (obtained from the controller)
-    static_address: Address  # Random address that can be set but does not change
+    random_address: Address  # Random private address that may change periodically
+    public_address: Address  # Public address that is globally unique (from controller)
+    static_address: Address  # Random static address that does not change once set
     classic_enabled: bool
     name: str
     class_of_device: int
