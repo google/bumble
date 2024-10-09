@@ -51,6 +51,7 @@ from .a2dp import (
     A2DP_MPEG_2_4_AAC_CODEC_TYPE,
     A2DP_NON_A2DP_CODEC_TYPE,
     A2DP_SBC_CODEC_TYPE,
+    A2DP_VENDOR_MEDIA_CODEC_INFORMATION_CLASSES,
     AacMediaCodecInformation,
     SbcMediaCodecInformation,
     VendorSpecificMediaCodecInformation,
@@ -328,6 +329,7 @@ class MediaPacket:
         self.marker = marker
         self.sequence_number = sequence_number & 0xFFFF
         self.timestamp = timestamp & 0xFFFFFFFF
+        self.timestamp_seconds = 0.0
         self.ssrc = ssrc
         self.csrc_list = csrc_list
         self.payload_type = payload_type
@@ -621,11 +623,25 @@ class MediaCodecCapabilities(ServiceCapabilities):
                 self.media_codec_information
             )
         elif self.media_codec_type == A2DP_NON_A2DP_CODEC_TYPE:
-            self.media_codec_information = (
+            vendor_media_codec_information = (
                 VendorSpecificMediaCodecInformation.from_bytes(
                     self.media_codec_information
                 )
             )
+            if (
+                vendor_class_map := A2DP_VENDOR_MEDIA_CODEC_INFORMATION_CLASSES.get(
+                    vendor_media_codec_information.vendor_id
+                )
+            ) and (
+                media_codec_information_class := vendor_class_map.get(
+                    vendor_media_codec_information.codec_id
+                )
+            ):
+                self.media_codec_information = media_codec_information_class.from_bytes(
+                    vendor_media_codec_information.value
+                )
+            else:
+                self.media_codec_information = vendor_media_codec_information
 
     def __init__(
         self,
@@ -1388,7 +1404,7 @@ class Protocol(EventEmitter):
         return self.remote_endpoints.values()
 
     def find_remote_sink_by_codec(
-        self, media_type: int, codec_type: int
+        self, media_type: int, codec_type: int, vendor_id: int = 0, codec_id: int = 0
     ) -> Optional[DiscoveredStreamEndPoint]:
         for endpoint in self.remote_endpoints.values():
             if (
@@ -1413,7 +1429,19 @@ class Protocol(EventEmitter):
                             codec_capabilities.media_type == AVDTP_AUDIO_MEDIA_TYPE
                             and codec_capabilities.media_codec_type == codec_type
                         ):
-                            has_codec = True
+                            if isinstance(
+                                codec_capabilities.media_codec_information,
+                                VendorSpecificMediaCodecInformation,
+                            ):
+                                if (
+                                    codec_capabilities.media_codec_information.vendor_id
+                                    == vendor_id
+                                    and codec_capabilities.media_codec_information.codec_id
+                                    == codec_id
+                                ):
+                                    has_codec = True
+                            else:
+                                has_codec = True
                 if has_media_transport and has_codec:
                     return endpoint
 

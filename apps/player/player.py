@@ -31,6 +31,9 @@ from bumble.a2dp import (
     A2DP_SBC_CODEC_TYPE,
     A2DP_MPEG_2_4_AAC_CODEC_TYPE,
     MPEG_2_AAC_LC_OBJECT_TYPE,
+    A2DP_NON_A2DP_CODEC_TYPE,
+    OPUS_VENDOR_ID,
+    OPUS_CODEC_ID,
     AacFrame,
     AacParser,
     AacPacketSource,
@@ -39,6 +42,10 @@ from bumble.a2dp import (
     SbcParser,
     SbcPacketSource,
     SbcMediaCodecInformation,
+    OpusPacket,
+    OpusParser,
+    OpusPacketSource,
+    OpusMediaCodecInformation,
 )
 from bumble.avrcp import Protocol as AvrcpProtocol
 from bumble.avdtp import (
@@ -57,7 +64,7 @@ from bumble.core import (
     BT_BR_EDR_TRANSPORT,
 )
 from bumble.device import Connection, Device, DeviceConfiguration
-from bumble.hci import Address
+from bumble.hci import Address, HCI_CONNECTION_ALREADY_EXISTS_ERROR, HCI_Constant
 from bumble.pairing import PairingConfig
 from bumble.transport import open_transport
 from bumble.utils import AsyncRunner
@@ -131,6 +138,36 @@ async def aac_codec_capabilities(read_function) -> MediaCodecCapabilities:
 
 
 # -----------------------------------------------------------------------------
+async def opus_codec_capabilities(read_function) -> MediaCodecCapabilities:
+    opus_parser = OpusParser(read_function)
+    opus_packet: OpusPacket
+    async for opus_packet in opus_parser.packets:
+        # We only need the first packet
+        print(color(f"Opus format: {opus_packet}", "cyan"))
+        break
+
+    if opus_packet.channel_mode == OpusPacket.ChannelMode.MONO:
+        channel_mode = OpusMediaCodecInformation.ChannelMode.MONO
+    elif opus_packet.channel_mode == OpusPacket.ChannelMode.STEREO:
+        channel_mode = OpusMediaCodecInformation.ChannelMode.STEREO
+    else:
+        channel_mode = OpusMediaCodecInformation.ChannelMode.DUAL_MONO
+
+    if opus_packet.duration == 10:
+        frame_size = OpusMediaCodecInformation.FrameSize.F_10MS
+    else:
+        frame_size = OpusMediaCodecInformation.FrameSize.F_20MS
+
+    return MediaCodecCapabilities(
+        media_type=AVDTP_AUDIO_MEDIA_TYPE,
+        media_codec_type=A2DP_NON_A2DP_CODEC_TYPE,
+        media_codec_information=OpusMediaCodecInformation.from_discrete_values(
+            channel_mode=channel_mode, sampling_frequency=48000, frame_size=frame_size
+        ),
+    )
+
+
+# -----------------------------------------------------------------------------
 class Player:
     def __init__(
         self,
@@ -144,14 +181,12 @@ class Player:
         self.authenticate = authenticate
         self.encrypt = encrypt
         self.avrcp_protocol: Optional[AvrcpProtocol] = None
-        self.done: Optional[asyncio.Future]
+        self.done: Optional[asyncio.Event]
 
     async def run(self, workload) -> None:
-        self.done = asyncio.get_running_loop().create_future()
+        self.done = asyncio.Event()
         try:
             await self._run(workload)
-        except BumbleConnectionError as error:
-            print(color(f"Failed to connect: {error}", "red"))
         except Exception as error:
             print(color(f"!!! ERROR: {error}", "red"))
 
@@ -172,9 +207,12 @@ class Player:
 
             device_config.classic_enabled = True
             device_config.le_enabled = False
+            device_config.le_simultaneous_enabled = False
+            device_config.classic_sc_enabled = False
+            device_config.classic_smp_enabled = False
             device = Device.from_config_with_hci(device_config, hci_source, hci_sink)
 
-            # Setup the SDP to expose the SRC service
+            # Setup the SDP records to expose the SRC service
             device.sdp_service_records = a2dp_source_sdp_records()
 
             # Setup AVRCP
@@ -200,15 +238,28 @@ class Player:
             device.on("connection", self.on_bluetooth_connection)
 
             # Run the workload
-            await workload(device)
+            try:
+                await workload(device)
+            except BumbleConnectionError as error:
+                if error.error_code == HCI_CONNECTION_ALREADY_EXISTS_ERROR:
+                    print(color("Connection already established", "blue"))
+                else:
+                    print(color(f"Failed to connect: {error}", "red"))
 
             # Wait until it is time to exit
+            assert self.done is not None
             await asyncio.wait(
-                [hci_source.terminated, self.done], return_when=asyncio.FIRST_COMPLETED
+                [hci_source.terminated, asyncio.ensure_future(self.done.wait())],
+                return_when=asyncio.FIRST_COMPLETED,
             )
 
     def on_bluetooth_connection(self, connection: Connection) -> None:
         print(color(f"--- Connected: {connection}", "cyan"))
+        connection.on("disconnection", self.on_bluetooth_disconnection)
+
+    def on_bluetooth_disconnection(self, reason) -> None:
+        print(color(f"--- Disconnected: {HCI_Constant.error_name(reason)}", "cyan"))
+        self.set_done()
 
     async def connect(self, device: Device, address: str) -> Connection:
         print(color(f"Connecting to {address}...", "green"))
@@ -243,7 +294,9 @@ class Player:
         self,
         protocol: AvdtpProtocol,
         codec_type: int,
-        packet_source: Union[SbcPacketSource, AacPacketSource],
+        vendor_id: int,
+        codec_id: int,
+        packet_source: Union[SbcPacketSource, AacPacketSource, OpusPacketSource],
     ):
         # Discover all endpoints on the remote device
         endpoints = await protocol.discover_remote_endpoints()
@@ -251,7 +304,9 @@ class Player:
             print('@@@', endpoint)
 
         # Select a sink
-        sink = protocol.find_remote_sink_by_codec(AVDTP_AUDIO_MEDIA_TYPE, codec_type)
+        sink = protocol.find_remote_sink_by_codec(
+            AVDTP_AUDIO_MEDIA_TYPE, codec_type, vendor_id, codec_id
+        )
         if sink is None:
             print(color('!!! no compatible sink found', 'red'))
             return
@@ -313,8 +368,7 @@ class Player:
         print(color("Pairing...", "magenta"))
         await connection.authenticate()
         print(color("Pairing completed", "magenta"))
-        if self.done is not None:
-            self.done.set_result(None)
+        self.set_done()
 
     async def inquire(self, device: Device, address: str) -> None:
         connection = await self.connect(device, address)
@@ -326,8 +380,7 @@ class Player:
         for endpoint in endpoints:
             print('@@@', endpoint)
 
-        if self.done is not None:
-            self.done.set_result(None)
+        self.set_done()
 
     async def play(
         self,
@@ -341,6 +394,8 @@ class Player:
                 audio_format = "sbc"
             elif audio_file.endswith(".aac") or audio_file.endswith(".adts"):
                 audio_format = "aac"
+            elif audio_file.endswith(".ogg"):
+                audio_format = "opus"
             else:
                 raise ValueError("Unable to determine audio format from file extension")
 
@@ -359,7 +414,9 @@ class Player:
                     return input_file.read(byte_count)
 
                 # Obtain the codec capabilities from the stream
-                packet_source: Union[SbcPacketSource, AacPacketSource]
+                packet_source: Union[SbcPacketSource, AacPacketSource, OpusPacketSource]
+                vendor_id = 0
+                codec_id = 0
                 if audio_format == "sbc":
                     codec_type = A2DP_SBC_CODEC_TYPE
                     codec_capabilities = await sbc_codec_capabilities(read_audio_data)
@@ -368,10 +425,20 @@ class Player:
                         avdtp_protocol.l2cap_channel.peer_mtu,
                         codec_capabilities,
                     )
-                else:
+                elif audio_format == "aac":
                     codec_type = A2DP_MPEG_2_4_AAC_CODEC_TYPE
                     codec_capabilities = await aac_codec_capabilities(read_audio_data)
                     packet_source = AacPacketSource(
+                        read_audio_data,
+                        avdtp_protocol.l2cap_channel.peer_mtu,
+                        codec_capabilities,
+                    )
+                else:
+                    codec_type = A2DP_NON_A2DP_CODEC_TYPE
+                    vendor_id = OPUS_VENDOR_ID
+                    codec_id = OPUS_CODEC_ID
+                    codec_capabilities = await opus_codec_capabilities(read_audio_data)
+                    packet_source = OpusPacketSource(
                         read_audio_data,
                         avdtp_protocol.l2cap_channel.peer_mtu,
                         codec_capabilities,
@@ -381,17 +448,22 @@ class Player:
                 input_file.seek(0)
 
                 try:
-                    await self.stream_packets(avdtp_protocol, codec_type, packet_source)
+                    await self.stream_packets(
+                        avdtp_protocol, codec_type, vendor_id, codec_id, packet_source
+                    )
                 except Exception as error:
                     print(color(f"!!! Error while streaming: {error}", "red"))
 
-            if self.done:
-                self.done.set_result(None)
+            self.set_done()
 
         if address:
             await self.connect(device, address)
         else:
             print(color("Waiting for an incoming connection...", "magenta"))
+
+    def set_done(self) -> None:
+        if self.done:
+            self.done.set()
 
 
 # -----------------------------------------------------------------------------
@@ -469,7 +541,7 @@ def pair(context, address):
 @click.option(
     "-f",
     "--audio-format",
-    type=click.Choice(["auto", "sbc", "aac"]),
+    type=click.Choice(["auto", "sbc", "aac", "opus"]),
     help="Audio file format (use 'auto' to infer the format from the file extension)",
     default="auto",
 )
