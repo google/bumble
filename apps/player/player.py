@@ -334,10 +334,10 @@ class Player:
         await packet_pump.wait_for_completion()
 
     async def discover(self, device: Device) -> None:
-        @device.on("inquiry_result")
+        @device.listens_to("inquiry_result")
         def on_inquiry_result(
             address: Address, class_of_device: int, data: AdvertisingData, rssi: int
-        ):
+        ) -> None:
             (
                 service_classes,
                 major_device_class,
@@ -501,7 +501,7 @@ def player_cli(ctx, hci_transport, device_config, authenticate, encrypt):
 @player_cli.command("discover")
 @click.pass_context
 def discover(context):
-    """Discover for speakers or headphones"""
+    """Discover speakers or headphones"""
     player = create_player(context)
     asyncio.run(player.run(player.discover))
 
