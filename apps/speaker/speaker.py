@@ -93,7 +93,7 @@ class AudioExtractor:
 # -----------------------------------------------------------------------------
 class AacAudioExtractor:
     def extract_audio(self, packet: MediaPacket) -> bytes:
-        return AacAudioRtpPacket(packet.payload).to_adts()
+        return AacAudioRtpPacket.from_bytes(packet.payload).to_adts()
 
 
 # -----------------------------------------------------------------------------

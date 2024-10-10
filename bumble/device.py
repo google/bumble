@@ -1571,14 +1571,22 @@ class Connection(CompositeEventEmitter):
                     raise
 
     def __str__(self):
-        return (
-            f'Connection(handle=0x{self.handle:04X}, '
-            f'role={self.role_name}, '
-            f'self_address={self.self_address}, '
-            f'self_resolvable_address={self.self_resolvable_address}, '
-            f'peer_address={self.peer_address}, '
-            f'peer_resolvable_address={self.peer_resolvable_address})'
-        )
+        if self.transport == BT_LE_TRANSPORT:
+            return (
+                f'Connection(transport=LE, handle=0x{self.handle:04X}, '
+                f'role={self.role_name}, '
+                f'self_address={self.self_address}, '
+                f'self_resolvable_address={self.self_resolvable_address}, '
+                f'peer_address={self.peer_address}, '
+                f'peer_resolvable_address={self.peer_resolvable_address})'
+            )
+        else:
+            return (
+                f'Connection(transport=BR/EDR, handle=0x{self.handle:04X}, '
+                f'role={self.role_name}, '
+                f'self_address={self.self_address}, '
+                f'peer_address={self.peer_address})'
+            )
 
 
 # -----------------------------------------------------------------------------
