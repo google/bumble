@@ -119,7 +119,7 @@ class Frame:
             # Not supported
             raise NotImplementedError("extended subunit types not supported")
 
-        if subunit_id < 5:
+        if subunit_id < 5 or subunit_id == 7:
             opcode_offset = 2
         elif subunit_id == 5:
             # Extended to the next byte
@@ -132,7 +132,6 @@ class Frame:
             else:
                 subunit_id = 5 + extension
                 opcode_offset = 3
-
         elif subunit_id == 6:
             raise core.InvalidPacketError("reserved subunit ID")
 

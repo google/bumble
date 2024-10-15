@@ -1106,6 +1106,18 @@ class Host(AbortableEventEmitter):
                 event.status,
             )
 
+    def on_hci_qos_setup_complete_event(self, event):
+        if event.status == hci.HCI_SUCCESS:
+            self.emit(
+                'connection_qos_setup', event.connection_handle, event.service_type
+            )
+        else:
+            self.emit(
+                'connection_qos_setup_failure',
+                event.connection_handle,
+                event.status,
+            )
+
     def on_hci_link_supervision_timeout_changed_event(self, event):
         pass
 

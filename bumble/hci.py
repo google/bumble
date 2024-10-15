@@ -6068,6 +6068,32 @@ class HCI_Read_Remote_Version_Information_Complete_Event(HCI_Event):
 # -----------------------------------------------------------------------------
 @HCI_Event.event(
     [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('unused', 1),
+        (
+            'service_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_QOS_Setup_Complete_Event.ServiceType(x).name,
+            },
+        ),
+    ]
+)
+class HCI_QOS_Setup_Complete_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 7.7.13 QoS Setup Complete Event
+    '''
+
+    class ServiceType(OpenIntEnum):
+        NO_TRAFFIC_AVAILABLE = 0x00
+        BEST_EFFORT_AVAILABLE = 0x01
+        GUARANTEED_AVAILABLE = 0x02
+
+
+# -----------------------------------------------------------------------------
+@HCI_Event.event(
+    [
         ('num_hci_command_packets', 1),
         ('command_opcode', {'size': 2, 'mapper': HCI_Command.command_name}),
         ('return_parameters', '*'),

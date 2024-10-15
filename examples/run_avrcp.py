@@ -60,20 +60,23 @@ def codec_capabilities():
     return avdtp.MediaCodecCapabilities(
         media_type=avdtp.AVDTP_AUDIO_MEDIA_TYPE,
         media_codec_type=a2dp.A2DP_SBC_CODEC_TYPE,
-        media_codec_information=a2dp.SbcMediaCodecInformation.from_lists(
-            sampling_frequencies=[48000, 44100, 32000, 16000],
-            channel_modes=[
-                a2dp.SBC_MONO_CHANNEL_MODE,
-                a2dp.SBC_DUAL_CHANNEL_MODE,
-                a2dp.SBC_STEREO_CHANNEL_MODE,
-                a2dp.SBC_JOINT_STEREO_CHANNEL_MODE,
-            ],
-            block_lengths=[4, 8, 12, 16],
-            subbands=[4, 8],
-            allocation_methods=[
-                a2dp.SBC_LOUDNESS_ALLOCATION_METHOD,
-                a2dp.SBC_SNR_ALLOCATION_METHOD,
-            ],
+        media_codec_information=a2dp.SbcMediaCodecInformation(
+            sampling_frequency=a2dp.SbcMediaCodecInformation.SamplingFrequency.SF_48000
+            | a2dp.SbcMediaCodecInformation.SamplingFrequency.SF_44100
+            | a2dp.SbcMediaCodecInformation.SamplingFrequency.SF_32000
+            | a2dp.SbcMediaCodecInformation.SamplingFrequency.SF_16000,
+            channel_mode=a2dp.SbcMediaCodecInformation.ChannelMode.MONO
+            | a2dp.SbcMediaCodecInformation.ChannelMode.DUAL_CHANNEL
+            | a2dp.SbcMediaCodecInformation.ChannelMode.STEREO
+            | a2dp.SbcMediaCodecInformation.ChannelMode.JOINT_STEREO,
+            block_length=a2dp.SbcMediaCodecInformation.BlockLength.BL_4
+            | a2dp.SbcMediaCodecInformation.BlockLength.BL_8
+            | a2dp.SbcMediaCodecInformation.BlockLength.BL_12
+            | a2dp.SbcMediaCodecInformation.BlockLength.BL_16,
+            subbands=a2dp.SbcMediaCodecInformation.Subbands.S_4
+            | a2dp.SbcMediaCodecInformation.Subbands.S_8,
+            allocation_method=a2dp.SbcMediaCodecInformation.AllocationMethod.LOUDNESS
+            | a2dp.SbcMediaCodecInformation.AllocationMethod.SNR,
             minimum_bitpool_value=2,
             maximum_bitpool_value=53,
         ),

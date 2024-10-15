@@ -33,20 +33,16 @@ from bumble.avdtp import (
     Protocol,
     Listener,
     MediaCodecCapabilities,
-    MediaPacket,
     AVDTP_AUDIO_MEDIA_TYPE,
     AVDTP_TSEP_SNK,
     A2DP_SBC_CODEC_TYPE,
 )
 from bumble.a2dp import (
+    AacMediaCodecInformation,
+    OpusMediaCodecInformation,
     SbcMediaCodecInformation,
-    SBC_MONO_CHANNEL_MODE,
-    SBC_DUAL_CHANNEL_MODE,
-    SBC_STEREO_CHANNEL_MODE,
-    SBC_JOINT_STEREO_CHANNEL_MODE,
-    SBC_LOUDNESS_ALLOCATION_METHOD,
-    SBC_SNR_ALLOCATION_METHOD,
 )
+from bumble.rtp import MediaPacket
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -125,12 +121,12 @@ def source_codec_capabilities():
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
         media_codec_type=A2DP_SBC_CODEC_TYPE,
-        media_codec_information=SbcMediaCodecInformation.from_discrete_values(
-            sampling_frequency=44100,
-            channel_mode=SBC_JOINT_STEREO_CHANNEL_MODE,
-            block_length=16,
-            subbands=8,
-            allocation_method=SBC_LOUDNESS_ALLOCATION_METHOD,
+        media_codec_information=SbcMediaCodecInformation(
+            sampling_frequency=SbcMediaCodecInformation.SamplingFrequency.SF_44100,
+            channel_mode=SbcMediaCodecInformation.ChannelMode.JOINT_STEREO,
+            block_length=SbcMediaCodecInformation.BlockLength.BL_16,
+            subbands=SbcMediaCodecInformation.Subbands.S_8,
+            allocation_method=SbcMediaCodecInformation.AllocationMethod.LOUDNESS,
             minimum_bitpool_value=2,
             maximum_bitpool_value=53,
         ),
@@ -142,20 +138,23 @@ def sink_codec_capabilities():
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
         media_codec_type=A2DP_SBC_CODEC_TYPE,
-        media_codec_information=SbcMediaCodecInformation.from_lists(
-            sampling_frequencies=[48000, 44100, 32000, 16000],
-            channel_modes=[
-                SBC_MONO_CHANNEL_MODE,
-                SBC_DUAL_CHANNEL_MODE,
-                SBC_STEREO_CHANNEL_MODE,
-                SBC_JOINT_STEREO_CHANNEL_MODE,
-            ],
-            block_lengths=[4, 8, 12, 16],
-            subbands=[4, 8],
-            allocation_methods=[
-                SBC_LOUDNESS_ALLOCATION_METHOD,
-                SBC_SNR_ALLOCATION_METHOD,
-            ],
+        media_codec_information=SbcMediaCodecInformation(
+            sampling_frequency=SbcMediaCodecInformation.SamplingFrequency.SF_48000
+            | SbcMediaCodecInformation.SamplingFrequency.SF_44100
+            | SbcMediaCodecInformation.SamplingFrequency.SF_32000
+            | SbcMediaCodecInformation.SamplingFrequency.SF_16000,
+            channel_mode=SbcMediaCodecInformation.ChannelMode.MONO
+            | SbcMediaCodecInformation.ChannelMode.DUAL_CHANNEL
+            | SbcMediaCodecInformation.ChannelMode.STEREO
+            | SbcMediaCodecInformation.ChannelMode.JOINT_STEREO,
+            block_length=SbcMediaCodecInformation.BlockLength.BL_4
+            | SbcMediaCodecInformation.BlockLength.BL_8
+            | SbcMediaCodecInformation.BlockLength.BL_12
+            | SbcMediaCodecInformation.BlockLength.BL_16,
+            subbands=SbcMediaCodecInformation.Subbands.S_4
+            | SbcMediaCodecInformation.Subbands.S_8,
+            allocation_method=SbcMediaCodecInformation.AllocationMethod.LOUDNESS
+            | SbcMediaCodecInformation.AllocationMethod.SNR,
             minimum_bitpool_value=2,
             maximum_bitpool_value=53,
         ),
@@ -273,7 +272,125 @@ async def test_source_sink_1():
 
 
 # -----------------------------------------------------------------------------
-async def run_test_self():
+def test_sbc_codec_specific_information():
+    sbc_info = SbcMediaCodecInformation.from_bytes(bytes.fromhex("3fff0235"))
+    assert (
+        sbc_info.sampling_frequency
+        == SbcMediaCodecInformation.SamplingFrequency.SF_44100
+        | SbcMediaCodecInformation.SamplingFrequency.SF_48000
+    )
+    assert (
+        sbc_info.channel_mode
+        == SbcMediaCodecInformation.ChannelMode.MONO
+        | SbcMediaCodecInformation.ChannelMode.DUAL_CHANNEL
+        | SbcMediaCodecInformation.ChannelMode.STEREO
+        | SbcMediaCodecInformation.ChannelMode.JOINT_STEREO
+    )
+    assert (
+        sbc_info.block_length
+        == SbcMediaCodecInformation.BlockLength.BL_4
+        | SbcMediaCodecInformation.BlockLength.BL_8
+        | SbcMediaCodecInformation.BlockLength.BL_12
+        | SbcMediaCodecInformation.BlockLength.BL_16
+    )
+    assert (
+        sbc_info.subbands
+        == SbcMediaCodecInformation.Subbands.S_4 | SbcMediaCodecInformation.Subbands.S_8
+    )
+    assert (
+        sbc_info.allocation_method
+        == SbcMediaCodecInformation.AllocationMethod.SNR
+        | SbcMediaCodecInformation.AllocationMethod.LOUDNESS
+    )
+    assert sbc_info.minimum_bitpool_value == 2
+    assert sbc_info.maximum_bitpool_value == 53
+
+    sbc_info2 = SbcMediaCodecInformation(
+        SbcMediaCodecInformation.SamplingFrequency.SF_44100
+        | SbcMediaCodecInformation.SamplingFrequency.SF_48000,
+        SbcMediaCodecInformation.ChannelMode.MONO
+        | SbcMediaCodecInformation.ChannelMode.DUAL_CHANNEL
+        | SbcMediaCodecInformation.ChannelMode.STEREO
+        | SbcMediaCodecInformation.ChannelMode.JOINT_STEREO,
+        SbcMediaCodecInformation.BlockLength.BL_4
+        | SbcMediaCodecInformation.BlockLength.BL_8
+        | SbcMediaCodecInformation.BlockLength.BL_12
+        | SbcMediaCodecInformation.BlockLength.BL_16,
+        SbcMediaCodecInformation.Subbands.S_4 | SbcMediaCodecInformation.Subbands.S_8,
+        SbcMediaCodecInformation.AllocationMethod.SNR
+        | SbcMediaCodecInformation.AllocationMethod.LOUDNESS,
+        2,
+        53,
+    )
+    assert sbc_info == sbc_info2
+    assert bytes(sbc_info2) == bytes.fromhex("3fff0235")
+
+
+# -----------------------------------------------------------------------------
+def test_aac_codec_specific_information():
+    aac_info = AacMediaCodecInformation.from_bytes(bytes.fromhex("f0018c83e800"))
+    assert (
+        aac_info.object_type
+        == AacMediaCodecInformation.ObjectType.MPEG_2_AAC_LC
+        | AacMediaCodecInformation.ObjectType.MPEG_4_AAC_LC
+        | AacMediaCodecInformation.ObjectType.MPEG_4_AAC_LTP
+        | AacMediaCodecInformation.ObjectType.MPEG_4_AAC_SCALABLE
+    )
+    assert (
+        aac_info.sampling_frequency
+        == AacMediaCodecInformation.SamplingFrequency.SF_44100
+        | AacMediaCodecInformation.SamplingFrequency.SF_48000
+    )
+    assert (
+        aac_info.channels
+        == AacMediaCodecInformation.Channels.MONO
+        | AacMediaCodecInformation.Channels.STEREO
+    )
+    assert aac_info.vbr == 1
+    assert aac_info.bitrate == 256000
+
+    aac_info2 = AacMediaCodecInformation(
+        AacMediaCodecInformation.ObjectType.MPEG_2_AAC_LC
+        | AacMediaCodecInformation.ObjectType.MPEG_4_AAC_LC
+        | AacMediaCodecInformation.ObjectType.MPEG_4_AAC_LTP
+        | AacMediaCodecInformation.ObjectType.MPEG_4_AAC_SCALABLE,
+        AacMediaCodecInformation.SamplingFrequency.SF_44100
+        | AacMediaCodecInformation.SamplingFrequency.SF_48000,
+        AacMediaCodecInformation.Channels.MONO
+        | AacMediaCodecInformation.Channels.STEREO,
+        1,
+        256000,
+    )
+    assert aac_info == aac_info2
+    assert bytes(aac_info2) == bytes.fromhex("f0018c83e800")
+
+
+# -----------------------------------------------------------------------------
+def test_opus_codec_specific_information():
+    opus_info = OpusMediaCodecInformation.from_bytes(bytes([0x92]))
+    assert opus_info.vendor_id == OpusMediaCodecInformation.VENDOR_ID
+    assert opus_info.codec_id == OpusMediaCodecInformation.CODEC_ID
+    assert opus_info.frame_size == OpusMediaCodecInformation.FrameSize.FS_20MS
+    assert opus_info.channel_mode == OpusMediaCodecInformation.ChannelMode.STEREO
+    assert (
+        opus_info.sampling_frequency
+        == OpusMediaCodecInformation.SamplingFrequency.SF_48000
+    )
+
+    opus_info2 = OpusMediaCodecInformation(
+        OpusMediaCodecInformation.ChannelMode.STEREO,
+        OpusMediaCodecInformation.FrameSize.FS_20MS,
+        OpusMediaCodecInformation.SamplingFrequency.SF_48000,
+    )
+    assert opus_info2 == opus_info
+    assert opus_info2.value == bytes([0x92])
+
+
+# -----------------------------------------------------------------------------
+async def async_main():
+    test_sbc_codec_specific_information()
+    test_aac_codec_specific_information()
+    test_opus_codec_specific_information()
     await test_self_connection()
     await test_source_sink_1()
 
@@ -281,4 +398,4 @@ async def run_test_self():
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
-    asyncio.run(run_test_self())
+    asyncio.run(async_main())
