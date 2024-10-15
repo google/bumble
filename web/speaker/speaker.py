@@ -28,26 +28,18 @@ from bumble.avdtp import (
     AVDTP_AUDIO_MEDIA_TYPE,
     Listener,
     MediaCodecCapabilities,
-    MediaPacket,
     Protocol,
 )
 from bumble.a2dp import (
     make_audio_sink_service_sdp_records,
-    MPEG_2_AAC_LC_OBJECT_TYPE,
     A2DP_SBC_CODEC_TYPE,
     A2DP_MPEG_2_4_AAC_CODEC_TYPE,
-    SBC_MONO_CHANNEL_MODE,
-    SBC_DUAL_CHANNEL_MODE,
-    SBC_SNR_ALLOCATION_METHOD,
-    SBC_LOUDNESS_ALLOCATION_METHOD,
-    SBC_STEREO_CHANNEL_MODE,
-    SBC_JOINT_STEREO_CHANNEL_MODE,
     SbcMediaCodecInformation,
     AacMediaCodecInformation,
 )
-from bumble.utils import AsyncRunner
 from bumble.codecs import AacAudioRtpPacket
 from bumble.hci import HCI_Reset_Command
+from bumble.rtp import MediaPacket
 
 
 # -----------------------------------------------------------------------------
@@ -130,10 +122,12 @@ class Speaker:
         return MediaCodecCapabilities(
             media_type=AVDTP_AUDIO_MEDIA_TYPE,
             media_codec_type=A2DP_MPEG_2_4_AAC_CODEC_TYPE,
-            media_codec_information=AacMediaCodecInformation.from_lists(
-                object_types=[MPEG_2_AAC_LC_OBJECT_TYPE],
-                sampling_frequencies=[48000, 44100],
-                channels=[1, 2],
+            media_codec_information=AacMediaCodecInformation(
+                object_type=AacMediaCodecInformation.ObjectType.MPEG_2_AAC_LC,
+                sampling_frequency=AacMediaCodecInformation.SamplingFrequency.SF_48000
+                | AacMediaCodecInformation.SamplingFrequency.SF_44100,
+                channels=AacMediaCodecInformation.Channels.MONO
+                | AacMediaCodecInformation.Channels.STEREO,
                 vbr=1,
                 bitrate=256000,
             ),
@@ -143,20 +137,23 @@ class Speaker:
         return MediaCodecCapabilities(
             media_type=AVDTP_AUDIO_MEDIA_TYPE,
             media_codec_type=A2DP_SBC_CODEC_TYPE,
-            media_codec_information=SbcMediaCodecInformation.from_lists(
-                sampling_frequencies=[48000, 44100, 32000, 16000],
-                channel_modes=[
-                    SBC_MONO_CHANNEL_MODE,
-                    SBC_DUAL_CHANNEL_MODE,
-                    SBC_STEREO_CHANNEL_MODE,
-                    SBC_JOINT_STEREO_CHANNEL_MODE,
-                ],
-                block_lengths=[4, 8, 12, 16],
-                subbands=[4, 8],
-                allocation_methods=[
-                    SBC_LOUDNESS_ALLOCATION_METHOD,
-                    SBC_SNR_ALLOCATION_METHOD,
-                ],
+            media_codec_information=SbcMediaCodecInformation(
+                sampling_frequency=SbcMediaCodecInformation.SamplingFrequency.SF_48000
+                | SbcMediaCodecInformation.SamplingFrequency.SF_44100
+                | SbcMediaCodecInformation.SamplingFrequency.SF_32000
+                | SbcMediaCodecInformation.SamplingFrequency.SF_16000,
+                channel_mode=SbcMediaCodecInformation.ChannelMode.MONO
+                | SbcMediaCodecInformation.ChannelMode.DUAL_CHANNEL
+                | SbcMediaCodecInformation.ChannelMode.STEREO
+                | SbcMediaCodecInformation.ChannelMode.JOINT_STEREO,
+                block_length=SbcMediaCodecInformation.BlockLength.BL_4
+                | SbcMediaCodecInformation.BlockLength.BL_8
+                | SbcMediaCodecInformation.BlockLength.BL_12
+                | SbcMediaCodecInformation.BlockLength.BL_16,
+                subbands=SbcMediaCodecInformation.Subbands.S_4
+                | SbcMediaCodecInformation.Subbands.S_8,
+                allocation_method=SbcMediaCodecInformation.AllocationMethod.LOUDNESS
+                | SbcMediaCodecInformation.AllocationMethod.SNR,
                 minimum_bitpool_value=2,
                 maximum_bitpool_value=53,
             ),

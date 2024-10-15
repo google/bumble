@@ -33,8 +33,6 @@ from bumble.avdtp import (
     Listener,
 )
 from bumble.a2dp import (
-    SBC_JOINT_STEREO_CHANNEL_MODE,
-    SBC_LOUDNESS_ALLOCATION_METHOD,
     make_audio_source_service_sdp_records,
     A2DP_SBC_CODEC_TYPE,
     SbcMediaCodecInformation,
@@ -59,12 +57,12 @@ def codec_capabilities():
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
         media_codec_type=A2DP_SBC_CODEC_TYPE,
-        media_codec_information=SbcMediaCodecInformation.from_discrete_values(
-            sampling_frequency=44100,
-            channel_mode=SBC_JOINT_STEREO_CHANNEL_MODE,
-            block_length=16,
-            subbands=8,
-            allocation_method=SBC_LOUDNESS_ALLOCATION_METHOD,
+        media_codec_information=SbcMediaCodecInformation(
+            sampling_frequency=SbcMediaCodecInformation.SamplingFrequency.SF_44100,
+            channel_mode=SbcMediaCodecInformation.ChannelMode.JOINT_STEREO,
+            block_length=SbcMediaCodecInformation.BlockLength.BL_16,
+            subbands=SbcMediaCodecInformation.Subbands.S_8,
+            allocation_method=SbcMediaCodecInformation.AllocationMethod.LOUDNESS,
             minimum_bitpool_value=2,
             maximum_bitpool_value=53,
         ),
@@ -73,11 +71,9 @@ def codec_capabilities():
 
 # -----------------------------------------------------------------------------
 def on_avdtp_connection(read_function, protocol):
-    packet_source = SbcPacketSource(
-        read_function, protocol.l2cap_channel.peer_mtu, codec_capabilities()
-    )
+    packet_source = SbcPacketSource(read_function, protocol.l2cap_channel.peer_mtu)
     packet_pump = MediaPacketPump(packet_source.packets)
-    protocol.add_source(packet_source.codec_capabilities, packet_pump)
+    protocol.add_source(codec_capabilities(), packet_pump)
 
 
 # -----------------------------------------------------------------------------
@@ -97,11 +93,9 @@ async def stream_packets(read_function, protocol):
     print(f'### Selected sink: {sink.seid}')
 
     # Stream the packets
-    packet_source = SbcPacketSource(
-        read_function, protocol.l2cap_channel.peer_mtu, codec_capabilities()
-    )
+    packet_source = SbcPacketSource(read_function, protocol.l2cap_channel.peer_mtu)
     packet_pump = MediaPacketPump(packet_source.packets)
-    source = protocol.add_source(packet_source.codec_capabilities, packet_pump)
+    source = protocol.add_source(codec_capabilities(), packet_pump)
     stream = await protocol.create_stream(source, sink)
     await stream.start()
     await asyncio.sleep(5)

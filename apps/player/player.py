@@ -25,15 +25,10 @@ from typing import Optional, Union
 import click
 
 from bumble.a2dp import (
-    SBC_JOINT_STEREO_CHANNEL_MODE,
-    SBC_LOUDNESS_ALLOCATION_METHOD,
     make_audio_source_service_sdp_records,
     A2DP_SBC_CODEC_TYPE,
     A2DP_MPEG_2_4_AAC_CODEC_TYPE,
-    MPEG_2_AAC_LC_OBJECT_TYPE,
     A2DP_NON_A2DP_CODEC_TYPE,
-    OPUS_VENDOR_ID,
-    OPUS_CODEC_ID,
     AacFrame,
     AacParser,
     AacPacketSource,
@@ -95,15 +90,37 @@ async def sbc_codec_capabilities(read_function) -> MediaCodecCapabilities:
         print(color(f"SBC format: {sbc_frame}", "cyan"))
         break
 
+    channel_mode = [
+        SbcMediaCodecInformation.ChannelMode.MONO,
+        SbcMediaCodecInformation.ChannelMode.DUAL_CHANNEL,
+        SbcMediaCodecInformation.ChannelMode.STEREO,
+        SbcMediaCodecInformation.ChannelMode.JOINT_STEREO,
+    ][sbc_frame.channel_mode]
+    block_length = {
+        4: SbcMediaCodecInformation.BlockLength.BL_4,
+        8: SbcMediaCodecInformation.BlockLength.BL_8,
+        12: SbcMediaCodecInformation.BlockLength.BL_12,
+        16: SbcMediaCodecInformation.BlockLength.BL_16,
+    }[sbc_frame.block_count]
+    subbands = {
+        4: SbcMediaCodecInformation.Subbands.S_4,
+        8: SbcMediaCodecInformation.Subbands.S_8,
+    }[sbc_frame.subband_count]
+    allocation_method = [
+        SbcMediaCodecInformation.AllocationMethod.LOUDNESS,
+        SbcMediaCodecInformation.AllocationMethod.SNR,
+    ][sbc_frame.allocation_method]
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
         media_codec_type=A2DP_SBC_CODEC_TYPE,
-        media_codec_information=SbcMediaCodecInformation.from_discrete_values(
-            sampling_frequency=sbc_frame.sampling_frequency,
-            channel_mode=SBC_JOINT_STEREO_CHANNEL_MODE,
-            block_length=16,
-            subbands=8,
-            allocation_method=SBC_LOUDNESS_ALLOCATION_METHOD,
+        media_codec_information=SbcMediaCodecInformation(
+            sampling_frequency=SbcMediaCodecInformation.SamplingFrequency.from_int(
+                sbc_frame.sampling_frequency
+            ),
+            channel_mode=channel_mode,
+            block_length=block_length,
+            subbands=subbands,
+            allocation_method=allocation_method,
             minimum_bitpool_value=2,
             maximum_bitpool_value=40,
         ),
@@ -119,13 +136,22 @@ async def aac_codec_capabilities(read_function) -> MediaCodecCapabilities:
         print(color(f"AAC format: {aac_frame}", "cyan"))
         break
 
+    sampling_frequency = AacMediaCodecInformation.SamplingFrequency.from_int(
+        aac_frame.sampling_frequency
+    )
+    channels = (
+        AacMediaCodecInformation.Channels.MONO
+        if aac_frame.channel_configuration == 1
+        else AacMediaCodecInformation.Channels.STEREO
+    )
+
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
         media_codec_type=A2DP_MPEG_2_4_AAC_CODEC_TYPE,
-        media_codec_information=AacMediaCodecInformation.from_discrete_values(
-            object_type=MPEG_2_AAC_LC_OBJECT_TYPE,
-            sampling_frequency=aac_frame.sampling_frequency,
-            channels=aac_frame.channel_configuration,
+        media_codec_information=AacMediaCodecInformation(
+            object_type=AacMediaCodecInformation.ObjectType.MPEG_2_AAC_LC,
+            sampling_frequency=sampling_frequency,
+            channels=channels,
             vbr=1,
             bitrate=128000,
         ),
@@ -149,15 +175,17 @@ async def opus_codec_capabilities(read_function) -> MediaCodecCapabilities:
         channel_mode = OpusMediaCodecInformation.ChannelMode.DUAL_MONO
 
     if opus_packet.duration == 10:
-        frame_size = OpusMediaCodecInformation.FrameSize.F_10MS
+        frame_size = OpusMediaCodecInformation.FrameSize.FS_10MS
     else:
-        frame_size = OpusMediaCodecInformation.FrameSize.F_20MS
+        frame_size = OpusMediaCodecInformation.FrameSize.FS_20MS
 
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
         media_codec_type=A2DP_NON_A2DP_CODEC_TYPE,
-        media_codec_information=OpusMediaCodecInformation.from_discrete_values(
-            channel_mode=channel_mode, sampling_frequency=48000, frame_size=frame_size
+        media_codec_information=OpusMediaCodecInformation(
+            channel_mode=channel_mode,
+            sampling_frequency=OpusMediaCodecInformation.SamplingFrequency.SF_48000,
+            frame_size=frame_size,
         ),
     )
 
@@ -292,6 +320,7 @@ class Player:
         vendor_id: int,
         codec_id: int,
         packet_source: Union[SbcPacketSource, AacPacketSource, OpusPacketSource],
+        codec_capabilities: MediaCodecCapabilities,
     ):
         # Discover all endpoints on the remote device
         endpoints = await protocol.discover_remote_endpoints()
@@ -317,11 +346,25 @@ class Player:
         def on_delay_report(delay: int):
             print(color(f"*** DELAY REPORT: {delay}", "blue"))
 
+        # Adjust the codec capabilities for certain codecs
+        for capability in sink.capabilities:
+            if isinstance(capability, MediaCodecCapabilities):
+                if isinstance(
+                    codec_capabilities.media_codec_information, SbcMediaCodecInformation
+                ) and isinstance(
+                    capability.media_codec_information, SbcMediaCodecInformation
+                ):
+                    codec_capabilities.media_codec_information.minimum_bitpool_value = (
+                        capability.media_codec_information.minimum_bitpool_value
+                    )
+                    codec_capabilities.media_codec_information.maximum_bitpool_value = (
+                        capability.media_codec_information.maximum_bitpool_value
+                    )
+                    print(color("Source media codec:", "green"), codec_capabilities)
+
         # Stream the packets
         packet_pump = MediaPacketPump(packet_source.packets)
-        source = protocol.add_source(
-            packet_source.codec_capabilities, packet_pump, delay_reporting
-        )
+        source = protocol.add_source(codec_capabilities, packet_pump, delay_reporting)
         source.on("delay_report", on_delay_report)
         stream = await protocol.create_stream(source, sink)
         await stream.start()
@@ -358,7 +401,8 @@ class Player:
         await device.start_discovery()
 
     async def pair(self, device: Device, address: str) -> None:
-        connection = await self.connect(device, address)
+        print(color(f"Connecting to {address}...", "green"))
+        connection = await device.connect(address, transport=BT_BR_EDR_TRANSPORT)
 
         print(color("Pairing...", "magenta"))
         await connection.authenticate()
@@ -418,7 +462,6 @@ class Player:
                     packet_source = SbcPacketSource(
                         read_audio_data,
                         avdtp_protocol.l2cap_channel.peer_mtu,
-                        codec_capabilities,
                     )
                 elif audio_format == "aac":
                     codec_type = A2DP_MPEG_2_4_AAC_CODEC_TYPE
@@ -426,17 +469,15 @@ class Player:
                     packet_source = AacPacketSource(
                         read_audio_data,
                         avdtp_protocol.l2cap_channel.peer_mtu,
-                        codec_capabilities,
                     )
                 else:
                     codec_type = A2DP_NON_A2DP_CODEC_TYPE
-                    vendor_id = OPUS_VENDOR_ID
-                    codec_id = OPUS_CODEC_ID
+                    vendor_id = OpusMediaCodecInformation.VENDOR_ID
+                    codec_id = OpusMediaCodecInformation.CODEC_ID
                     codec_capabilities = await opus_codec_capabilities(read_audio_data)
                     packet_source = OpusPacketSource(
                         read_audio_data,
                         avdtp_protocol.l2cap_channel.peer_mtu,
-                        codec_capabilities,
                     )
 
                 # Rewind to the start
@@ -444,7 +485,12 @@ class Player:
 
                 try:
                     await self.stream_packets(
-                        avdtp_protocol, codec_type, vendor_id, codec_id, packet_source
+                        avdtp_protocol,
+                        codec_type,
+                        vendor_id,
+                        codec_id,
+                        packet_source,
+                        codec_capabilities,
                     )
                 except Exception as error:
                     print(color(f"!!! Error while streaming: {error}", "red"))
@@ -483,7 +529,7 @@ def create_player(context) -> Player:
     default=False,
 )
 @click.option(
-    "--encrypt", is_flag=True, help="Request encryption when connecting", default=False
+    "--encrypt", is_flag=True, help="Request encryption when connecting", default=True
 )
 def player_cli(ctx, hci_transport, device_config, authenticate, encrypt):
     ctx.ensure_object(dict)
