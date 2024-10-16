@@ -55,7 +55,7 @@ extend-exclude = '''
 '''
 
 [tool.mypy]
-exclude = ['bumble/transport/grpc_protobuf']
+exclude = ['bumble/transport/grpc_protobuf', 'examples/mobly/bench']
 
 [[tool.mypy.overrides]]
 module = "bumble.transport.grpc_protobuf.*"
