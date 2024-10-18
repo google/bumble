@@ -795,29 +795,30 @@ class HfProtocol(pyee.EventEmitter):
         # Append to the read buffer.
         self.read_buffer.extend(data)
 
-        # Locate header and trailer.
-        header = self.read_buffer.find(b'\r\n')
-        trailer = self.read_buffer.find(b'\r\n', header + 2)
-        if header == -1 or trailer == -1:
-            return
+        while self.read_buffer:
+            # Locate header and trailer.
+            header = self.read_buffer.find(b'\r\n')
+            trailer = self.read_buffer.find(b'\r\n', header + 2)
+            if header == -1 or trailer == -1:
+                return
 
-        # Isolate the AT response code and parameters.
-        raw_response = self.read_buffer[header + 2 : trailer]
-        response = AtResponse.parse_from(raw_response)
-        logger.debug(f"<<< {raw_response.decode()}")
+            # Isolate the AT response code and parameters.
+            raw_response = self.read_buffer[header + 2 : trailer]
+            response = AtResponse.parse_from(raw_response)
+            logger.debug(f"<<< {raw_response.decode()}")
 
-        # Consume the response bytes.
-        self.read_buffer = self.read_buffer[trailer + 2 :]
+            # Consume the response bytes.
+            self.read_buffer = self.read_buffer[trailer + 2 :]
 
-        # Forward the received code to the correct queue.
-        if self.command_lock.locked() and (
-            response.code in STATUS_CODES or response.code in RESPONSE_CODES
-        ):
-            self.response_queue.put_nowait(response)
-        elif response.code in UNSOLICITED_CODES:
-            self.unsolicited_queue.put_nowait(response)
-        else:
-            logger.warning(f"dropping unexpected response with code '{response.code}'")
+            # Forward the received code to the correct queue.
+            if self.command_lock.locked() and (
+                response.code in STATUS_CODES or response.code in RESPONSE_CODES
+            ):
+                self.response_queue.put_nowait(response)
+            elif response.code in UNSOLICITED_CODES:
+                self.unsolicited_queue.put_nowait(response)
+            else:
+                logger.warning(f"dropping unexpected response with code '{response.code}'")
 
     async def execute_command(
         self,
