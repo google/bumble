@@ -1,7 +1,7 @@
 PLATFORMS
 =========
 
-Most of the code included in the project should run on any platform that supports Python >= 3.8. Not all features are supported on all platforms (for example, USB dongle support is only available on platforms where the python USB library is functional).
+Most of the code included in the project should run on any platform that supports Python >= 3.9. Not all features are supported on all platforms (for example, USB dongle support is only available on platforms where the python USB library is functional).
 
 For platform-specific information, see the following pages:
 
