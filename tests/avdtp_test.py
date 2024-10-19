@@ -23,13 +23,12 @@ from bumble.avdtp import (
     AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY,
     AVDTP_SET_CONFIGURATION,
     Message,
-    MediaPacket,
     Get_Capabilities_Response,
     Set_Configuration_Command,
-    Set_Configuration_Response,
     ServiceCapabilities,
     MediaCodecCapabilities,
 )
+from bumble.rtp import MediaPacket
 
 
 # -----------------------------------------------------------------------------

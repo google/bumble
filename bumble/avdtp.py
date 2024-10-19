@@ -17,12 +17,10 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import asyncio
-import struct
 import time
 import logging
 import enum
 import warnings
-from pyee import EventEmitter
 from typing import (
     Any,
     Awaitable,
@@ -39,6 +37,8 @@ from typing import (
     cast,
 )
 
+from pyee import EventEmitter
+
 from .core import (
     BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
     InvalidStateError,
@@ -51,12 +51,15 @@ from .a2dp import (
     A2DP_MPEG_2_4_AAC_CODEC_TYPE,
     A2DP_NON_A2DP_CODEC_TYPE,
     A2DP_SBC_CODEC_TYPE,
+    A2DP_VENDOR_MEDIA_CODEC_INFORMATION_CLASSES,
     AacMediaCodecInformation,
     SbcMediaCodecInformation,
     VendorSpecificMediaCodecInformation,
 )
+from .rtp import MediaPacket
 from . import sdp, device, l2cap
 from .colors import color
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -279,95 +282,6 @@ class RealtimeClock:
 
 
 # -----------------------------------------------------------------------------
-class MediaPacket:
-    @staticmethod
-    def from_bytes(data: bytes) -> MediaPacket:
-        version = (data[0] >> 6) & 0x03
-        padding = (data[0] >> 5) & 0x01
-        extension = (data[0] >> 4) & 0x01
-        csrc_count = data[0] & 0x0F
-        marker = (data[1] >> 7) & 0x01
-        payload_type = data[1] & 0x7F
-        sequence_number = struct.unpack_from('>H', data, 2)[0]
-        timestamp = struct.unpack_from('>I', data, 4)[0]
-        ssrc = struct.unpack_from('>I', data, 8)[0]
-        csrc_list = [
-            struct.unpack_from('>I', data, 12 + i)[0] for i in range(csrc_count)
-        ]
-        payload = data[12 + csrc_count * 4 :]
-
-        return MediaPacket(
-            version,
-            padding,
-            extension,
-            marker,
-            sequence_number,
-            timestamp,
-            ssrc,
-            csrc_list,
-            payload_type,
-            payload,
-        )
-
-    def __init__(
-        self,
-        version: int,
-        padding: int,
-        extension: int,
-        marker: int,
-        sequence_number: int,
-        timestamp: int,
-        ssrc: int,
-        csrc_list: List[int],
-        payload_type: int,
-        payload: bytes,
-    ) -> None:
-        self.version = version
-        self.padding = padding
-        self.extension = extension
-        self.marker = marker
-        self.sequence_number = sequence_number & 0xFFFF
-        self.timestamp = timestamp & 0xFFFFFFFF
-        self.ssrc = ssrc
-        self.csrc_list = csrc_list
-        self.payload_type = payload_type
-        self.payload = payload
-
-    def __bytes__(self) -> bytes:
-        header = bytes(
-            [
-                self.version << 6
-                | self.padding << 5
-                | self.extension << 4
-                | len(self.csrc_list),
-                self.marker << 7 | self.payload_type,
-            ]
-        ) + struct.pack(
-            '>HII',
-            self.sequence_number,
-            self.timestamp,
-            self.ssrc,
-        )
-        for csrc in self.csrc_list:
-            header += struct.pack('>I', csrc)
-        return header + self.payload
-
-    def __str__(self) -> str:
-        return (
-            f'RTP(v={self.version},'
-            f'p={self.padding},'
-            f'x={self.extension},'
-            f'm={self.marker},'
-            f'pt={self.payload_type},'
-            f'sn={self.sequence_number},'
-            f'ts={self.timestamp},'
-            f'ssrc={self.ssrc},'
-            f'csrcs={self.csrc_list},'
-            f'payload_size={len(self.payload)})'
-        )
-
-
-# -----------------------------------------------------------------------------
 class MediaPacketPump:
     pump_task: Optional[asyncio.Task]
 
@@ -377,6 +291,7 @@ class MediaPacketPump:
         self.packets = packets
         self.clock = clock
         self.pump_task = None
+        self.completed = asyncio.Event()
 
     async def start(self, rtp_channel: l2cap.ClassicChannel) -> None:
         async def pump_packets():
@@ -406,6 +321,8 @@ class MediaPacketPump:
                     )
             except asyncio.exceptions.CancelledError:
                 logger.debug('pump canceled')
+            finally:
+                self.completed.set()
 
         # Pump packets
         self.pump_task = asyncio.create_task(pump_packets())
@@ -416,6 +333,9 @@ class MediaPacketPump:
             self.pump_task.cancel()
             await self.pump_task
             self.pump_task = None
+
+    async def wait_for_completion(self) -> None:
+        await self.completed.wait()
 
 
 # -----------------------------------------------------------------------------
@@ -615,11 +535,25 @@ class MediaCodecCapabilities(ServiceCapabilities):
                 self.media_codec_information
             )
         elif self.media_codec_type == A2DP_NON_A2DP_CODEC_TYPE:
-            self.media_codec_information = (
+            vendor_media_codec_information = (
                 VendorSpecificMediaCodecInformation.from_bytes(
                     self.media_codec_information
                 )
             )
+            if (
+                vendor_class_map := A2DP_VENDOR_MEDIA_CODEC_INFORMATION_CLASSES.get(
+                    vendor_media_codec_information.vendor_id
+                )
+            ) and (
+                media_codec_information_class := vendor_class_map.get(
+                    vendor_media_codec_information.codec_id
+                )
+            ):
+                self.media_codec_information = media_codec_information_class.from_bytes(
+                    vendor_media_codec_information.value
+                )
+            else:
+                self.media_codec_information = vendor_media_codec_information
 
     def __init__(
         self,
@@ -1316,10 +1250,20 @@ class Protocol(EventEmitter):
         return None
 
     def add_source(
-        self, codec_capabilities: MediaCodecCapabilities, packet_pump: MediaPacketPump
+        self,
+        codec_capabilities: MediaCodecCapabilities,
+        packet_pump: MediaPacketPump,
+        delay_reporting: bool = False,
     ) -> LocalSource:
         seid = len(self.local_endpoints) + 1
-        source = LocalSource(self, seid, codec_capabilities, packet_pump)
+        service_capabilities = (
+            [ServiceCapabilities(AVDTP_DELAY_REPORTING_SERVICE_CATEGORY)]
+            if delay_reporting
+            else []
+        )
+        source = LocalSource(
+            self, seid, codec_capabilities, service_capabilities, packet_pump
+        )
         self.local_endpoints.append(source)
 
         return source
@@ -1372,7 +1316,7 @@ class Protocol(EventEmitter):
         return self.remote_endpoints.values()
 
     def find_remote_sink_by_codec(
-        self, media_type: int, codec_type: int
+        self, media_type: int, codec_type: int, vendor_id: int = 0, codec_id: int = 0
     ) -> Optional[DiscoveredStreamEndPoint]:
         for endpoint in self.remote_endpoints.values():
             if (
@@ -1397,7 +1341,19 @@ class Protocol(EventEmitter):
                             codec_capabilities.media_type == AVDTP_AUDIO_MEDIA_TYPE
                             and codec_capabilities.media_codec_type == codec_type
                         ):
-                            has_codec = True
+                            if isinstance(
+                                codec_capabilities.media_codec_information,
+                                VendorSpecificMediaCodecInformation,
+                            ):
+                                if (
+                                    codec_capabilities.media_codec_information.vendor_id
+                                    == vendor_id
+                                    and codec_capabilities.media_codec_information.codec_id
+                                    == codec_id
+                                ):
+                                    has_codec = True
+                            else:
+                                has_codec = True
                 if has_media_transport and has_codec:
                     return endpoint
 
@@ -2180,12 +2136,13 @@ class LocalSource(LocalStreamEndPoint):
         protocol: Protocol,
         seid: int,
         codec_capabilities: MediaCodecCapabilities,
+        other_capabilitiles: Iterable[ServiceCapabilities],
         packet_pump: MediaPacketPump,
     ) -> None:
         capabilities = [
             ServiceCapabilities(AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY),
             codec_capabilities,
-        ]
+        ] + list(other_capabilitiles)
         super().__init__(
             protocol,
             seid,
