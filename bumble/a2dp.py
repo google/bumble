@@ -930,9 +930,6 @@ class OpusPacketSource:
     @property
     def packets(self):
         async def generate_packets():
-            # pylint: disable=import-outside-toplevel
-            from .avdtp import MediaPacket  # Import here to avoid a circular reference
-
             sequence_number = 0
             elapsed_ms = 0
 
