@@ -4,6 +4,6 @@ channels:
   - conda-forge
 dependencies:
   - pip=23
-  - python=3.8
+  - python=3.9
   - pip:
     - --editable .[development,documentation,test]

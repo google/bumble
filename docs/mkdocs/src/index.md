@@ -31,7 +31,7 @@ Some of the configurations that may be useful:
 
 See the [use cases page](use_cases/index.md) for more use cases.
 
-The project is implemented in Python (Python >= 3.8 is required). A number of APIs for functionality that is inherently I/O bound is implemented in terms of python coroutines with async IO. This means that all of the concurrent tasks run in the same thread, which makes everything much simpler and more predictable.
+The project is implemented in Python (Python >= 3.9 is required). A number of APIs for functionality that is inherently I/O bound is implemented in terms of python coroutines with async IO. This means that all of the concurrent tasks run in the same thread, which makes everything much simpler and more predictable.
 
 ![layers](images/bumble_layers.svg)
 
