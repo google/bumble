@@ -22,16 +22,20 @@ import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.socket-client")
 
-private const val DEFAULT_STARTUP_DELAY = 3000
+class SocketClient(
+    private val viewModel: AppViewModel,
+    private val socket: BluetoothSocket,
+    private val createIoClient: (packetIo: PacketIO) -> IoClient
+) {
+    private var clientThread: Thread? = null
 
-class SocketClient(private val viewModel: AppViewModel, private val socket: BluetoothSocket) {
     @SuppressLint("MissingPermission")
     fun run() {
         viewModel.running = true
         val socketDataSink = SocketDataSink(socket)
         val streamIO = StreamedPacketIO(socketDataSink)
         val socketDataSource = SocketDataSource(socket, streamIO::onData)
-        val sender = Sender(viewModel, streamIO)
+        val ioClient = createIoClient(streamIO)
 
         fun cleanup() {
             socket.close()
@@ -39,9 +43,9 @@ class SocketClient(private val viewModel: AppViewModel, private val socket: Blue
             viewModel.running = false
         }
 
-        thread(name = "SocketClient") {
+        clientThread = thread(name = "SocketClient") {
             viewModel.aborter = {
-                sender.abort()
+                ioClient.abort()
                 socket.close()
             }
             Log.info("connecting to remote")
@@ -49,27 +53,37 @@ class SocketClient(private val viewModel: AppViewModel, private val socket: Blue
                 socket.connect()
             } catch (error: IOException) {
                 Log.warning("connection failed")
+                viewModel.status = "ABORTED"
+                viewModel.lastError = "CONNECTION_FAILED"
                 cleanup()
                 return@thread
             }
             Log.info("connected")
 
-            thread {
+            val sourceThread = thread {
                 socketDataSource.receive()
                 socket.close()
-                sender.abort()
+                ioClient.abort()
             }
-
-            Log.info("Startup delay: $DEFAULT_STARTUP_DELAY")
-            Thread.sleep(DEFAULT_STARTUP_DELAY.toLong());
-            Log.info("Starting to send")
 
             try {
-                sender.run()
+                ioClient.run()
+                socket.close()
+                viewModel.status = "OK"
             } catch (error: IOException) {
                 Log.info("run ended abruptly")
+                viewModel.status = "ABORTED"
+                viewModel.lastError = "IO_ERROR"
             }
+
+            Log.info("waiting for source thread to finish")
+            sourceThread.join()
+
             cleanup()
         }
+    }
+
+    fun waitForCompletion() {
+        clientThread?.join()
     }
 }
