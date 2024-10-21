@@ -818,7 +818,9 @@ class HfProtocol(pyee.EventEmitter):
             elif response.code in UNSOLICITED_CODES:
                 self.unsolicited_queue.put_nowait(response)
             else:
-                logger.warning(f"dropping unexpected response with code '{response.code}'")
+                logger.warning(
+                    f"dropping unexpected response with code '{response.code}'"
+                )
 
     async def execute_command(
         self,
@@ -1245,31 +1247,32 @@ class AgProtocol(pyee.EventEmitter):
         # Append to the read buffer.
         self.read_buffer.extend(data)
 
-        # Locate the trailer.
-        trailer = self.read_buffer.find(b'\r')
-        if trailer == -1:
-            return
+        while self.read_buffer:
+            # Locate the trailer.
+            trailer = self.read_buffer.find(b'\r')
+            if trailer == -1:
+                return
 
-        # Isolate the AT response code and parameters.
-        raw_command = self.read_buffer[:trailer]
-        command = AtCommand.parse_from(raw_command)
-        logger.debug(f"<<< {raw_command.decode()}")
+            # Isolate the AT response code and parameters.
+            raw_command = self.read_buffer[:trailer]
+            command = AtCommand.parse_from(raw_command)
+            logger.debug(f"<<< {raw_command.decode()}")
 
-        # Consume the response bytes.
-        self.read_buffer = self.read_buffer[trailer + 1 :]
+            # Consume the response bytes.
+            self.read_buffer = self.read_buffer[trailer + 1 :]
 
-        if command.sub_code == AtCommand.SubCode.TEST:
-            handler_name = f'_on_{command.code.lower()}_test'
-        elif command.sub_code == AtCommand.SubCode.READ:
-            handler_name = f'_on_{command.code.lower()}_read'
-        else:
-            handler_name = f'_on_{command.code.lower()}'
+            if command.sub_code == AtCommand.SubCode.TEST:
+                handler_name = f'_on_{command.code.lower()}_test'
+            elif command.sub_code == AtCommand.SubCode.READ:
+                handler_name = f'_on_{command.code.lower()}_read'
+            else:
+                handler_name = f'_on_{command.code.lower()}'
 
-        if handler := getattr(self, handler_name, None):
-            handler(*command.parameters)
-        else:
-            logger.warning('Handler %s not found', handler_name)
-            self.send_response('ERROR')
+            if handler := getattr(self, handler_name, None):
+                handler(*command.parameters)
+            else:
+                logger.warning('Handler %s not found', handler_name)
+                self.send_response('ERROR')
 
     def send_response(self, response: str) -> None:
         """Sends an AT response."""
