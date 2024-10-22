@@ -321,7 +321,7 @@ async def open_android_netsim_host_transport_with_channel(
         async def start(self):  # Send the startup info
             device_info = DeviceInfo(
                 name=self.name,
-                kind='Bumble',
+                kind='BUMBLE',
                 version=bumble.__version__,
                 sdk_version=platform.python_version(),
                 build_id=platform.platform(),
