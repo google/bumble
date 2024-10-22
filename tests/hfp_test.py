@@ -576,7 +576,6 @@ async def test_hf_batched_response(
 ):
     hf, ag = hfp_connections
 
-    ag.send_response = lambda str: None
     ag.dlc.write(b'\r\n+BIND: (1,2)\r\n\r\nOK\r\n')
 
     await hf.execute_command("AT+BIND=?", response_type=hfp.AtResponseType.SINGLE)
