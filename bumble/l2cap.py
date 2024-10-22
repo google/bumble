@@ -1911,6 +1911,7 @@ class ChannelManager:
             data = sum(1 << cid for cid in self.fixed_channels).to_bytes(8, 'little')
         else:
             result = L2CAP_Information_Response.NOT_SUPPORTED
+            data = b''
 
         self.send_control_frame(
             connection,

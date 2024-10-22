@@ -64,6 +64,7 @@ async def main() -> None:
                 [(AdvertisingData.COMPLETE_LOCAL_NAME, "Bumble 2".encode("utf-8"))]
             )
 
+        # pylint: disable=possibly-used-before-assignment
         if device.host.number_of_supported_advertising_sets >= 2:
             set2 = await device.create_advertising_set(
                 random_address=Address("F0:F0:F0:F0:F0:F1"),

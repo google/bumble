@@ -45,6 +45,7 @@ ignore="pandora" # FIXME: pylint does not support stubs yet:
 
 [tool.pylint.typecheck]
 signature-mutators="AsyncRunner.run_in_task"
+disable="not-callable"
 
 [tool.black]
 skip-string-normalization = true
