@@ -20,12 +20,14 @@ import atexit
 import logging
 import os
 import pathlib
+import platform
 import sys
 from typing import Dict, Optional
 
 import grpc.aio
 
-from .common import (
+import bumble
+from bumble.transport.common import (
     ParserSource,
     PumpedTransport,
     PumpedPacketSource,
@@ -36,15 +38,15 @@ from .common import (
 )
 
 # pylint: disable=no-name-in-module
-from .grpc_protobuf.packet_streamer_pb2_grpc import (
+from .grpc_protobuf.netsim.packet_streamer_pb2_grpc import (
     PacketStreamerStub,
     PacketStreamerServicer,
     add_PacketStreamerServicer_to_server,
 )
-from .grpc_protobuf.packet_streamer_pb2 import PacketRequest, PacketResponse
-from .grpc_protobuf.hci_packet_pb2 import HCIPacket
-from .grpc_protobuf.startup_pb2 import Chip, ChipInfo
-from .grpc_protobuf.common_pb2 import ChipKind
+from .grpc_protobuf.netsim.packet_streamer_pb2 import PacketRequest, PacketResponse
+from .grpc_protobuf.netsim.hci_packet_pb2 import HCIPacket
+from .grpc_protobuf.netsim.startup_pb2 import Chip, ChipInfo, DeviceInfo
+from .grpc_protobuf.netsim.common_pb2 import ChipKind
 
 
 # -----------------------------------------------------------------------------
@@ -199,7 +201,6 @@ async def open_android_netsim_controller_transport(
                 data = (
                     bytes([request.hci_packet.packet_type]) + request.hci_packet.packet
                 )
-                logger.debug(f'<<< PACKET: {data.hex()}')
                 self.on_data_received(data)
 
         async def send_packet(self, data):
@@ -253,7 +254,7 @@ async def open_android_netsim_controller_transport(
 
             # Check that we don't already have a device
             if self.device:
-                logger.debug('busy, already serving a device')
+                logger.debug('Busy, already serving a device')
                 return PacketResponse(error='Busy')
 
             # Instantiate a new device
@@ -318,10 +319,16 @@ async def open_android_netsim_host_transport_with_channel(
             self.hci_device = hci_device
 
         async def start(self):  # Send the startup info
-            chip_info = ChipInfo(
+            device_info = DeviceInfo(
                 name=self.name,
-                chip=Chip(kind=ChipKind.BLUETOOTH, manufacturer=self.manufacturer),
+                kind='Bumble',
+                version=bumble.__version__,
+                sdk_version=platform.python_version(),
+                build_id=platform.platform(),
+                arch=platform.machine(),
             )
+            chip = Chip(kind=ChipKind.BLUETOOTH, manufacturer=self.manufacturer)
+            chip_info = ChipInfo(name=self.name, chip=chip, device_info=device_info)
             logger.debug(f'Sending chip info to netsim: {chip_info}')
             await self.hci_device.write(PacketRequest(initial_info=chip_info))
 
