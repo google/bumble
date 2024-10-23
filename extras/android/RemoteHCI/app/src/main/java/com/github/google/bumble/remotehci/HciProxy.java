@@ -23,6 +23,7 @@ public class HciProxy {
         HciHal hciHal = HciHal.create(new HciHalCallback() {
             @Override
             public void onPacket(HciPacket.Type type, byte[] packet) {
+                Log.d(TAG, String.format("CONTROLLER->HOST: type=%s, size=%d", type, packet.length));
                 mServer.sendPacket(type, packet);
 
                 switch (type) {
@@ -83,7 +84,7 @@ public class HciProxy {
 
             @Override
             public void onPacket(HciPacket.Type type, byte[] packet) {
-                Log.d(TAG, String.format("onPacket: type=%s, size=%d", type, packet.length));
+                Log.d(TAG, String.format("HOST->CONTROLLER: type=%s, size=%d", type, packet.length));
                 hciHal.sendPacket(type, packet);
 
                 switch (type) {
