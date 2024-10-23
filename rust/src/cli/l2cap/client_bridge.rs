@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,9 @@
 use crate::cli::l2cap::{
     inject_py_event_loop, proxy_l2cap_rx_to_tcp_tx, proxy_tcp_rx_to_l2cap_tx, BridgeData,
 };
+use anyhow::anyhow;
+use bumble::wrapper::hci::packets::AddressType;
+use bumble::wrapper::hci::Address;
 use bumble::wrapper::{
     device::{Connection, Device},
     hci::HciConstant,
@@ -52,7 +55,12 @@ pub async fn start(args: &Args, device: &mut Device) -> PyResult<()> {
         "{}",
         format!("### Connecting to {}...", args.bluetooth_address).yellow()
     );
-    let mut ble_connection = device.connect(&args.bluetooth_address).await?;
+    let mut ble_connection = device
+        .connect(
+            &Address::from_be_hex(&args.bluetooth_address, AddressType::RandomDeviceAddress)
+                .map_err(|e| anyhow!("{:?}", e))?,
+        )
+        .await?;
     ble_connection.on_disconnection(|_py, reason| {
         let disconnection_info = match HciConstant::error_name(reason) {
             Ok(info_string) => info_string,
