@@ -710,7 +710,7 @@ class ATT_Prepare_Write_Response(ATT_PDU):
 
 
 # -----------------------------------------------------------------------------
-@ATT_PDU.subclass([])
+@ATT_PDU.subclass([("flags", 1)])
 class ATT_Execute_Write_Request(ATT_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part F - 3.4.6.3 Execute Write Request
