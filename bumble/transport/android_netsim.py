@@ -20,12 +20,14 @@ import atexit
 import logging
 import os
 import pathlib
+import platform
 import sys
 from typing import Dict, Optional
 
 import grpc.aio
 
-from .common import (
+import bumble
+from bumble.transport.common import (
     ParserSource,
     PumpedTransport,
     PumpedPacketSource,
@@ -36,15 +38,15 @@ from .common import (
 )
 
 # pylint: disable=no-name-in-module
-from .grpc_protobuf.packet_streamer_pb2_grpc import (
+from .grpc_protobuf.netsim.packet_streamer_pb2_grpc import (
     PacketStreamerStub,
     PacketStreamerServicer,
     add_PacketStreamerServicer_to_server,
 )
-from .grpc_protobuf.packet_streamer_pb2 import PacketRequest, PacketResponse
-from .grpc_protobuf.hci_packet_pb2 import HCIPacket
-from .grpc_protobuf.startup_pb2 import Chip, ChipInfo
-from .grpc_protobuf.common_pb2 import ChipKind
+from .grpc_protobuf.netsim.packet_streamer_pb2 import PacketRequest, PacketResponse
+from .grpc_protobuf.netsim.hci_packet_pb2 import HCIPacket
+from .grpc_protobuf.netsim.startup_pb2 import Chip, ChipInfo, DeviceInfo
+from .grpc_protobuf.netsim.common_pb2 import ChipKind
 
 
 # -----------------------------------------------------------------------------
@@ -58,6 +60,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 DEFAULT_NAME = 'bumble0'
 DEFAULT_MANUFACTURER = 'Bumble'
+DEFAULT_VARIANT = ''
 
 
 # -----------------------------------------------------------------------------
@@ -199,7 +202,6 @@ async def open_android_netsim_controller_transport(
                 data = (
                     bytes([request.hci_packet.packet_type]) + request.hci_packet.packet
                 )
-                logger.debug(f'<<< PACKET: {data.hex()}')
                 self.on_data_received(data)
 
         async def send_packet(self, data):
@@ -253,7 +255,7 @@ async def open_android_netsim_controller_transport(
 
             # Check that we don't already have a device
             if self.device:
-                logger.debug('busy, already serving a device')
+                logger.debug('Busy, already serving a device')
                 return PacketResponse(error='Busy')
 
             # Instantiate a new device
@@ -312,16 +314,24 @@ async def open_android_netsim_host_transport_with_channel(
 ):
     # Wrapper for I/O operations
     class HciDevice:
-        def __init__(self, name, manufacturer, hci_device):
+        def __init__(self, name, variant, manufacturer, hci_device):
             self.name = name
+            self.variant = variant
             self.manufacturer = manufacturer
             self.hci_device = hci_device
 
         async def start(self):  # Send the startup info
-            chip_info = ChipInfo(
+            device_info = DeviceInfo(
                 name=self.name,
-                chip=Chip(kind=ChipKind.BLUETOOTH, manufacturer=self.manufacturer),
+                kind='BUMBLE',
+                version=bumble.__version__,
+                sdk_version=platform.python_version(),
+                build_id=platform.platform(),
+                arch=platform.machine(),
+                variant=self.variant,
             )
+            chip = Chip(kind=ChipKind.BLUETOOTH, manufacturer=self.manufacturer)
+            chip_info = ChipInfo(name=self.name, chip=chip, device_info=device_info)
             logger.debug(f'Sending chip info to netsim: {chip_info}')
             await self.hci_device.write(PacketRequest(initial_info=chip_info))
 
@@ -349,12 +359,16 @@ async def open_android_netsim_host_transport_with_channel(
             )
 
     name = DEFAULT_NAME if options is None else options.get('name', DEFAULT_NAME)
+    variant = (
+        DEFAULT_VARIANT if options is None else options.get('variant', DEFAULT_VARIANT)
+    )
     manufacturer = DEFAULT_MANUFACTURER
 
     # Connect as a host
     service = PacketStreamerStub(channel)
     hci_device = HciDevice(
         name=name,
+        variant=variant,
         manufacturer=manufacturer,
         hci_device=service.StreamPackets(),
     )
@@ -404,6 +418,9 @@ async def open_android_netsim_transport(spec: Optional[str]) -> Transport:
           The "chip" name, used to identify the "chip" instance. This
           may be useful when several clients are connected, since each needs to use a
           different name.
+        variant=<variant>
+          The device info variant field, which may be used to convey a device or
+          application type (ex: "virtual-speaker", or "keyboard")
 
     In `controller` mode:
       The <host>:<port> part is required. <host> may be the address of a local network

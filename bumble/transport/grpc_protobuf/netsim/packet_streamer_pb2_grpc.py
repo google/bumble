@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from . import packet_streamer_pb2 as packet__streamer__pb2
+from bumble.transport.grpc_protobuf.netsim import packet_streamer_pb2 as netsim_dot_packet__streamer__pb2
 
 
 class PacketStreamerStub(object):
@@ -30,8 +30,8 @@ class PacketStreamerStub(object):
         """
         self.StreamPackets = channel.stream_stream(
                 '/netsim.packet.PacketStreamer/StreamPackets',
-                request_serializer=packet__streamer__pb2.PacketRequest.SerializeToString,
-                response_deserializer=packet__streamer__pb2.PacketResponse.FromString,
+                request_serializer=netsim_dot_packet__streamer__pb2.PacketRequest.SerializeToString,
+                response_deserializer=netsim_dot_packet__streamer__pb2.PacketResponse.FromString,
                 )
 
 
@@ -64,8 +64,8 @@ def add_PacketStreamerServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'StreamPackets': grpc.stream_stream_rpc_method_handler(
                     servicer.StreamPackets,
-                    request_deserializer=packet__streamer__pb2.PacketRequest.FromString,
-                    response_serializer=packet__streamer__pb2.PacketResponse.SerializeToString,
+                    request_deserializer=netsim_dot_packet__streamer__pb2.PacketRequest.FromString,
+                    response_serializer=netsim_dot_packet__streamer__pb2.PacketResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -103,7 +103,7 @@ class PacketStreamer(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.stream_stream(request_iterator, target, '/netsim.packet.PacketStreamer/StreamPackets',
-            packet__streamer__pb2.PacketRequest.SerializeToString,
-            packet__streamer__pb2.PacketResponse.FromString,
+            netsim_dot_packet__streamer__pb2.PacketRequest.SerializeToString,
+            netsim_dot_packet__streamer__pb2.PacketResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
