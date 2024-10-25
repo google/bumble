@@ -60,6 +60,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 DEFAULT_NAME = 'bumble0'
 DEFAULT_MANUFACTURER = 'Bumble'
+DEFAULT_VARIANT = ''
 
 
 # -----------------------------------------------------------------------------
@@ -313,8 +314,9 @@ async def open_android_netsim_host_transport_with_channel(
 ):
     # Wrapper for I/O operations
     class HciDevice:
-        def __init__(self, name, manufacturer, hci_device):
+        def __init__(self, name, variant, manufacturer, hci_device):
             self.name = name
+            self.variant = variant
             self.manufacturer = manufacturer
             self.hci_device = hci_device
 
@@ -326,6 +328,7 @@ async def open_android_netsim_host_transport_with_channel(
                 sdk_version=platform.python_version(),
                 build_id=platform.platform(),
                 arch=platform.machine(),
+                variant=self.variant,
             )
             chip = Chip(kind=ChipKind.BLUETOOTH, manufacturer=self.manufacturer)
             chip_info = ChipInfo(name=self.name, chip=chip, device_info=device_info)
@@ -356,12 +359,16 @@ async def open_android_netsim_host_transport_with_channel(
             )
 
     name = DEFAULT_NAME if options is None else options.get('name', DEFAULT_NAME)
+    variant = (
+        DEFAULT_VARIANT if options is None else options.get('variant', DEFAULT_VARIANT)
+    )
     manufacturer = DEFAULT_MANUFACTURER
 
     # Connect as a host
     service = PacketStreamerStub(channel)
     hci_device = HciDevice(
         name=name,
+        variant=variant,
         manufacturer=manufacturer,
         hci_device=service.StreamPackets(),
     )
@@ -411,6 +418,9 @@ async def open_android_netsim_transport(spec: Optional[str]) -> Transport:
           The "chip" name, used to identify the "chip" instance. This
           may be useful when several clients are connected, since each needs to use a
           different name.
+        variant=<variant>
+          The device info variant field, which may be used to convey a device or
+          application type (ex: "virtual-speaker", or "keyboard")
 
     In `controller` mode:
       The <host>:<port> part is required. <host> may be the address of a local network
