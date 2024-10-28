@@ -21,7 +21,13 @@ import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.socket-server")
 
-class SocketServer(private val viewModel: AppViewModel, private val serverSocket: BluetoothServerSocket) {
+class SocketServer(
+    private val viewModel: AppViewModel,
+    private val serverSocket: BluetoothServerSocket,
+    private val createIoClient: (packetIo: PacketIO) -> IoClient
+) {
+    private var serverThread: Thread? = null
+
     fun run(onConnected: () -> Unit, onDisconnected: () -> Unit) {
         var aborted = false
         viewModel.running = true
@@ -31,7 +37,7 @@ class SocketServer(private val viewModel: AppViewModel, private val serverSocket
             viewModel.running = false
         }
 
-        thread(name = "SocketServer") {
+        serverThread = thread(name = "SocketServer") {
             while (!aborted) {
                 viewModel.aborter = {
                     serverSocket.close()
@@ -46,6 +52,8 @@ class SocketServer(private val viewModel: AppViewModel, private val serverSocket
                     return@thread
                 }
                 Log.info("got connection from ${socket.remoteDevice.address}")
+                Log.info("maxReceivePacketSize=${socket.maxReceivePacketSize}")
+                Log.info("maxTransmitPacketSize=${socket.maxTransmitPacketSize}")
                 onConnected()
 
                 viewModel.aborter = {
@@ -57,11 +65,22 @@ class SocketServer(private val viewModel: AppViewModel, private val serverSocket
                 val socketDataSink = SocketDataSink(socket)
                 val streamIO = StreamedPacketIO(socketDataSink)
                 val socketDataSource = SocketDataSource(socket, streamIO::onData)
-                val receiver = Receiver(viewModel, streamIO)
+
+                val ioThread = thread(name = "IoClient") {
+                    val ioClient = createIoClient(streamIO)
+                    ioClient.run()
+                }
+
                 socketDataSource.receive()
                 socket.close()
+                ioThread.join()
             }
             cleanup()
         }
+
+    }
+
+    fun waitForCompletion() {
+        serverThread?.join()
     }
 }

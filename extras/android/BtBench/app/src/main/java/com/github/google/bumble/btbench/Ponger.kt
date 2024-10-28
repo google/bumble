@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,15 +15,14 @@
 package com.github.google.bumble.btbench
 
 import java.util.logging.Logger
-import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 
 private val Log = Logger.getLogger("btbench.receiver")
 
-class Receiver(private val viewModel: AppViewModel, private val packetIO: PacketIO) : IoClient, PacketSink() {
+class Ponger(private val viewModel: AppViewModel, private val packetIO: PacketIO) : IoClient, PacketSink() {
     private var startTime: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
     private var lastPacketTime: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
-    private var bytesReceived = 0
+    private var expectedSequenceNumber: Int = 0
 
     init {
         packetIO.packetSink = this
@@ -38,30 +37,26 @@ class Receiver(private val viewModel: AppViewModel, private val packetIO: Packet
     override fun onResetPacket() {
         startTime = TimeSource.Monotonic.markNow()
         lastPacketTime = startTime
-        bytesReceived = 0
-        viewModel.throughput = 0
+        expectedSequenceNumber = 0
         viewModel.packetsSent = 0
         viewModel.packetsReceived = 0
         viewModel.stats = ""
     }
 
     override fun onAckPacket(packet: AckPacket) {
-
     }
 
     override fun onSequencePacket(packet: SequencePacket) {
-        val received = packet.payload.size + 6
-        bytesReceived += received
         val now = TimeSource.Monotonic.markNow()
         lastPacketTime = now
         viewModel.packetsReceived += 1
-        if (packet.flags and Packet.LAST_FLAG != 0) {
-            Log.info("received last packet")
-            val elapsed = now - startTime
-            val throughput = (bytesReceived / elapsed.toDouble(DurationUnit.SECONDS)).toInt()
-            Log.info("throughput: $throughput")
-            viewModel.throughput = throughput
-            packetIO.sendPacket(AckPacket(packet.flags, packet.sequenceNumber))
+
+        if (packet.sequenceNumber != expectedSequenceNumber) {
+            Log.warning("unexpected packet sequence number (expected ${expectedSequenceNumber}, got ${packet.sequenceNumber})")
         }
+        expectedSequenceNumber += 1
+
+        packetIO.sendPacket(AckPacket(packet.flags, packet.sequenceNumber))
+        viewModel.packetsSent += 1
     }
 }

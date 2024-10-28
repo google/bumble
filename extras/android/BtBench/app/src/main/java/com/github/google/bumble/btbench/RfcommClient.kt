@@ -16,22 +16,30 @@ package com.github.google.bumble.btbench
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
-import java.io.IOException
 import java.util.logging.Logger
-import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.rfcomm-client")
 
-class RfcommClient(private val viewModel: AppViewModel, val bluetoothAdapter: BluetoothAdapter) {
+class RfcommClient(
+    private val viewModel: AppViewModel,
+    private val bluetoothAdapter: BluetoothAdapter,
+    private val createIoClient: (packetIo: PacketIO) -> IoClient
+) : Mode {
+    private var socketClient: SocketClient? = null
+
     @SuppressLint("MissingPermission")
-    fun run() {
+    override fun run() {
         val address = viewModel.peerBluetoothAddress.take(17)
         val remoteDevice = bluetoothAdapter.getRemoteDevice(address)
         val socket = remoteDevice.createInsecureRfcommSocketToServiceRecord(
             DEFAULT_RFCOMM_UUID
         )
 
-        val client = SocketClient(viewModel, socket)
-        client.run()
+        socketClient = SocketClient(viewModel, socket, createIoClient)
+        socketClient!!.run()
+    }
+
+    override fun waitForCompletion() {
+        socketClient?.waitForCompletion()
     }
 }

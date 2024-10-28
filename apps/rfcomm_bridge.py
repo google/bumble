@@ -237,6 +237,7 @@ class ClientBridge:
         address: str,
         tcp_host: str,
         tcp_port: int,
+        authenticate: bool,
         encrypt: bool,
     ):
         self.channel = channel
@@ -245,6 +246,7 @@ class ClientBridge:
         self.address = address
         self.tcp_host = tcp_host
         self.tcp_port = tcp_port
+        self.authenticate = authenticate
         self.encrypt = encrypt
         self.device: Optional[Device] = None
         self.connection: Optional[Connection] = None
@@ -273,6 +275,11 @@ class ClientBridge:
         )
         print(color(f"@@@ Bluetooth connection: {self.connection}", "blue"))
         self.connection.on("disconnection", self.on_disconnection)
+
+        if self.authenticate:
+            print(color("@@@ Authenticating Bluetooth connection", "blue"))
+            await self.connection.authenticate()
+            print(color("@@@ Bluetooth connection authenticated", "blue"))
 
         if self.encrypt:
             print(color("@@@ Encrypting Bluetooth connection", "blue"))
@@ -491,8 +498,9 @@ def server(context, tcp_host, tcp_port):
 @click.argument("bluetooth-address")
 @click.option("--tcp-host", help="TCP host", default="_")
 @click.option("--tcp-port", help="TCP port", default=DEFAULT_CLIENT_TCP_PORT)
+@click.option("--authenticate", is_flag=True, help="Authenticate the connection")
 @click.option("--encrypt", is_flag=True, help="Encrypt the connection")
-def client(context, bluetooth_address, tcp_host, tcp_port, encrypt):
+def client(context, bluetooth_address, tcp_host, tcp_port, authenticate, encrypt):
     bridge = ClientBridge(
         context.obj["channel"],
         context.obj["uuid"],
@@ -500,6 +508,7 @@ def client(context, bluetooth_address, tcp_host, tcp_port, encrypt):
         bluetooth_address,
         tcp_host,
         tcp_port,
+        authenticate,
         encrypt,
     )
     asyncio.run(run(context.obj["device_config"], context.obj["hci_transport"], bridge))

@@ -27,11 +27,17 @@ import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.l2cap-server")
 
-class L2capServer(private val viewModel: AppViewModel, private val bluetoothAdapter: BluetoothAdapter) {
+class L2capServer(
+    private val viewModel: AppViewModel,
+    private val bluetoothAdapter: BluetoothAdapter,
+    private val createIoClient: (packetIo: PacketIO) -> IoClient
+) : Mode {
+    private var socketServer: SocketServer? = null
+
     @SuppressLint("MissingPermission")
-    fun run() {
+    override fun run() {
         // Advertise so that the peer can find us and connect.
-        val callback = object: AdvertiseCallback() {
+        val callback = object : AdvertiseCallback() {
             override fun onStartFailure(errorCode: Int) {
                 Log.warning("failed to start advertising: $errorCode")
             }
@@ -55,7 +61,14 @@ class L2capServer(private val viewModel: AppViewModel, private val bluetoothAdap
         viewModel.l2capPsm = serverSocket.psm
         Log.info("psm = $serverSocket.psm")
 
-        val server = SocketServer(viewModel, serverSocket)
-        server.run({ advertiser.stopAdvertising(callback) }, { advertiser.startAdvertising(advertiseSettings, advertiseData, scanData, callback) })
+        socketServer = SocketServer(viewModel, serverSocket, createIoClient)
+        socketServer!!.run(
+            { advertiser.stopAdvertising(callback) },
+            { advertiser.startAdvertising(advertiseSettings, advertiseData, scanData, callback) }
+        )
+    }
+
+    override fun waitForCompletion() {
+        socketServer?.waitForCompletion()
     }
 }
