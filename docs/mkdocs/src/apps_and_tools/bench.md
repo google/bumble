@@ -83,19 +83,19 @@ using the ``--peripheral`` option. The address will be printed by the Peripheral
 it starts.
 
 Independently of whether the device is the Central or Peripheral, each device selects a
-``mode`` and and ``role`` to run as. The ``mode`` and ``role`` of the Central and Peripheral
+``mode`` and and ``scenario`` to run as. The ``mode`` and ``scenario`` of the Central and Peripheral
 must be compatible.
 
-Device 1 mode     | Device 2 mode
+Device 1 scenario | Device 2 scenario
 ------------------|------------------
 ``gatt-client``   | ``gatt-server``
 ``l2cap-client``  | ``l2cap-server``
 ``rfcomm-client`` | ``rfcomm-server``
 
-Device 1 role | Device 2 role
---------------|--------------
-``send``      | ``receive``
-``ping``      | ``pong``
+Device 1 scenario | Device 2 scenario
+------------------|--------------
+``send``          | ``receive``
+``ping``          | ``pong``
 
 
 # Examples
@@ -104,7 +104,7 @@ In the following examples, we have two USB Bluetooth controllers, one on `usb:0`
 the other on `usb:1`, and two consoles/terminals. We will run a command in each.
 
 !!! example "GATT Throughput"
-    Using the default mode and role for the Central and Peripheral.
+    Using the default mode and scenario for the Central and Peripheral.
 
     In the first console/terminal:
     ```
@@ -179,7 +179,7 @@ the other on `usb:1`, and two consoles/terminals. We will run a command in each.
     $ bumble-bench --mode l2cap-server central --phy 2m usb:1
     ```
 
-!!! example "Reversed roles with L2CAP"
+!!! example "Reversed scenarios with L2CAP"
     In the first console/terminal:
     ```
     $ bumble-bench --mode l2cap-client --scenario send peripheral usb:0
