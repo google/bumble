@@ -102,6 +102,7 @@ class ContextType(enum.IntFlag):
 
     # fmt: off
     PROHIBITED       = 0x0000
+    UNSPECIFIED      = 0x0001
     CONVERSATIONAL   = 0x0002
     MEDIA            = 0x0004
     GAME             = 0x0008
