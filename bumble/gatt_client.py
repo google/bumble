@@ -898,6 +898,12 @@ class Client:
                 ) and subscriber in subscribers:
                     subscribers.remove(subscriber)
 
+                    # The characteristic itself is added as subscriber. If it is the
+                    # last remaining subscriber, we remove it, such that the clean up
+                    # works correctly. Otherwise the CCCD never is set back to 0.
+                    if len(subscribers) == 1 and characteristic in subscribers:
+                        subscribers.remove(characteristic)
+
                     # Cleanup if we removed the last one
                     if not subscribers:
                         del subscriber_set[characteristic.handle]
