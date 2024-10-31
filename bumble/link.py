@@ -122,6 +122,8 @@ class LocalLink:
         elif transport == BT_BR_EDR_TRANSPORT:
             destination_controller = self.find_classic_controller(destination_address)
             source_address = sender_controller.public_address
+        else:
+            raise ValueError("unsupported transport type")
 
         if destination_controller is not None:
             destination_controller.on_link_acl_data(source_address, transport, data)

@@ -434,6 +434,8 @@ class DataElement:
             if size != 1:
                 raise InvalidArgumentError('boolean must be 1 byte')
             size_index = 0
+        else:
+            raise RuntimeError("internal error - self.type not supported")
 
         self.bytes = bytes([self.type << 3 | size_index]) + size_bytes + data
         return self.bytes

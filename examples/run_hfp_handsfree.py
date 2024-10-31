@@ -57,6 +57,9 @@ def on_dlc(dlc: rfcomm.DLC, configuration: hfp.HfConfiguration):
                 esco_parameters = hfp.ESCO_PARAMETERS[
                     hfp.DefaultCodecParameters.ESCO_CVSD_S4
                 ]
+            else:
+                raise RuntimeError("unknown active codec")
+
             connection.abort_on(
                 'disconnection',
                 connection.device.send_command(

@@ -350,6 +350,7 @@ class CodecSpecificCapabilities:
                 supported_max_codec_frames_per_sdu = value
 
         # It is expected here that if some fields are missing, an error should be raised.
+        # pylint: disable=possibly-used-before-assignment,used-before-assignment
         return CodecSpecificCapabilities(
             supported_sampling_frequencies=supported_sampling_frequencies,
             supported_frame_durations=supported_frame_durations,
@@ -426,6 +427,7 @@ class CodecSpecificConfiguration:
                 codec_frames_per_sdu = value
 
         # It is expected here that if some fields are missing, an error should be raised.
+        # pylint: disable=possibly-used-before-assignment,used-before-assignment
         return CodecSpecificConfiguration(
             sampling_frequency=sampling_frequency,
             frame_duration=frame_duration,

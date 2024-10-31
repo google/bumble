@@ -134,6 +134,8 @@ class Frame:
                 opcode_offset = 3
         elif subunit_id == 6:
             raise core.InvalidPacketError("reserved subunit ID")
+        else:
+            raise core.InvalidPacketError("invalid subunit ID")
 
         opcode = Frame.OperationCode(data[opcode_offset])
         operands = data[opcode_offset + 1 :]

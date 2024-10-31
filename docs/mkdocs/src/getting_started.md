@@ -3,9 +3,7 @@ GETTING STARTED WITH BUMBLE
 
 # Prerequisites
 
-You need Python 3.8 or above. Python >= 3.9 is recommended, but 3.8 should be sufficient if
-necessary (there may be some optional functionality that will not work on some platforms with
-python 3.8).
+You need Python 3.9 or above.
 Visit the [Python site](https://www.python.org/) for instructions on how to install Python
 for your platform.
 Throughout the documentation, when shell commands are shown, it is assumed that you can
