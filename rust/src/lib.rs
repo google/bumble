@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,6 +28,12 @@
 
 pub mod wrapper;
 
-pub mod adv;
-
+pub use internal::adv;
 pub(crate) mod internal;
+
+/// Directory for Bumble local storage for the current user according to the OS's conventions,
+/// if a convention is known for the current OS
+#[cfg(any(feature = "bumble-tools", test))]
+pub fn project_dir() -> Option<directories::ProjectDirs> {
+    directories::ProjectDirs::from("com", "google", "bumble")
+}

@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 use crate::{Download, Source};
 use anyhow::anyhow;
+use bumble::project_dir;
 use bumble::wrapper::{
     drivers::rtk::{Driver, DriverInfo, Firmware},
     host::{DriverFactory, Host},
@@ -28,10 +29,7 @@ use std::{fs, path};
 pub(crate) async fn download(dl: Download) -> PyResult<()> {
     let data_dir = dl
         .output_dir
-        .or_else(|| {
-            directories::ProjectDirs::from("com", "google", "bumble")
-                .map(|pd| pd.data_local_dir().join("firmware").join("realtek"))
-        })
+        .or_else(|| project_dir().map(|pd| pd.data_local_dir().join("firmware").join("realtek")))
         .unwrap_or_else(|| {
             eprintln!("Could not determine standard data directory");
             path::PathBuf::from(".")

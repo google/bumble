@@ -491,7 +491,7 @@ class Server(EventEmitter):
         attribute: Attribute,
         value: Optional[bytes] = None,
         force: bool = False,
-    ):
+    ) -> None:
         return await self.notify_or_indicate_subscribers(False, attribute, value, force)
 
     async def indicate_subscribers(

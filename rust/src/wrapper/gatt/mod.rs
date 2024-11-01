@@ -12,10 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Assigned numbers from the Bluetooth spec.
+//! GATT support
 
-mod company_ids;
-pub mod services;
+pub use crate::internal::gatt::{CharacteristicProperties, CharacteristicProperty};
+use crate::wrapper::core::TryToPy;
+use pyo3::{intern, prelude::PyModule, PyAny, PyResult, Python};
 
-pub use company_ids::COMPANY_IDS;
-pub use services::SERVICE_IDS;
+pub mod client;
+pub mod profile;
+pub mod server;
+
+impl TryToPy for CharacteristicProperties {
+    fn try_to_py<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        PyModule::import(py, intern!(py, "bumble.gatt"))?
+            .getattr(intern!(py, "Characteristic"))?
+            .getattr(intern!(py, "Properties"))?
+            .call1((self.bits,))
+    }
+}

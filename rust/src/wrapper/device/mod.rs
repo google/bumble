@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2024 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,40 +14,43 @@
 
 //! Devices and connections to them
 
+use crate::wrapper::gatt::profile::proxy::ProfileServiceProxy;
+#[cfg(doc)]
+use crate::wrapper::gatt::server::Characteristic;
 #[cfg(feature = "unstable_extended_adv")]
-use crate::wrapper::{
-    hci::packets::{
+use crate::wrapper::hci::{
+    packets::{
         self, AdvertisingEventProperties, AdvertisingFilterPolicy, Enable, EnabledSet,
         FragmentPreference, LeSetAdvertisingSetRandomAddressBuilder,
         LeSetExtendedAdvertisingDataBuilder, LeSetExtendedAdvertisingEnableBuilder,
         LeSetExtendedAdvertisingParametersBuilder, Operation, OwnAddressType, PeerAddressType,
         PrimaryPhyType, SecondaryPhyType,
     },
-    ConversionError,
+    AddressConversionError,
 };
-use crate::{
-    adv::AdvertisementDataBuilder,
-    wrapper::{
-        core::AdvertisingData,
-        gatt_client::{ProfileServiceProxy, ServiceProxy},
-        hci::{
-            packets::{Command, ErrorCode, Event},
-            Address, HciCommand, WithPacketType,
-        },
-        host::Host,
-        l2cap::LeConnectionOrientedChannel,
-        transport::{Sink, Source},
-        ClosureCallback, PyDictExt, PyObjectExt,
+use crate::wrapper::{
+    att::AttributeUuid,
+    core::{AdvertisementDataBuilder, AdvertisingData, TryFromPy, TryToPy},
+    gatt::{client::ServiceProxy, server::Service},
+    hci::{
+        packets::{Command, ErrorCode, Event},
+        Address, HciCommand, WithPacketType,
     },
+    host::Host,
+    l2cap::LeConnectionOrientedChannel,
+    transport::{Sink, Source},
+    wrap_python_async, ClosureCallback, PyDictExt, PyObjectExt,
 };
+#[cfg(feature = "unstable_extended_adv")]
+use anyhow::anyhow;
 use pyo3::{
     exceptions::PyException,
     intern,
-    types::{PyDict, PyModule},
-    IntoPy, PyErr, PyObject, PyResult, Python, ToPyObject,
+    types::{PyDict, PyList, PyModule},
+    IntoPy, PyAny, PyErr, PyObject, PyResult, Python, ToPyObject,
 };
 use pyo3_asyncio::tokio::into_future;
-use std::path;
+use std::{collections, path};
 
 #[cfg(test)]
 mod tests;
@@ -92,6 +95,7 @@ enum AdvertisingStatus {
 
 /// A device that can send/receive HCI frames.
 pub struct Device {
+    /// Python `Device`
     obj: PyObject,
     advertising_status: AdvertisingStatus,
 }
@@ -102,7 +106,7 @@ impl Device {
 
     /// Creates a Device. When optional arguments are not specified, the Python object specifies the
     /// defaults.
-    pub fn new(
+    pub async fn new(
         name: Option<&str>,
         address: Option<Address>,
         config: Option<DeviceConfiguration>,
@@ -112,51 +116,73 @@ impl Device {
         Python::with_gil(|py| {
             let kwargs = PyDict::new(py);
             kwargs.set_opt_item("name", name)?;
-            kwargs.set_opt_item("address", address)?;
+            kwargs.set_opt_item("address", address.map(|a| a.try_to_py(py)).transpose()?)?;
             kwargs.set_opt_item("config", config)?;
             kwargs.set_opt_item("host", host)?;
             kwargs.set_opt_item("generic_access_service", generic_access_service)?;
 
-            PyModule::import(py, intern!(py, "bumble.device"))?
-                .getattr(intern!(py, "Device"))?
+            let device_ctor = PyModule::import(py, intern!(py, "bumble.device"))?
+                .getattr(intern!(py, "Device"))?;
+
+            // Needed for Python 3.8-3.9, in which the Semaphore object, when constructed, calls
+            // `get_event_loop`.
+            wrap_python_async(py, device_ctor)?
                 .call((), Some(kwargs))
-                .map(|any| Self {
-                    obj: any.into(),
-                    advertising_status: AdvertisingStatus::NotAdvertising,
-                })
+                .and_then(into_future)
+        })?
+        .await
+        .map(|obj| Self {
+            obj,
+            advertising_status: AdvertisingStatus::NotAdvertising,
         })
     }
 
     /// Create a Device per the provided file configured to communicate with a controller through an HCI source/sink
-    pub fn from_config_file_with_hci(
+    pub async fn from_config_file_with_hci(
         device_config: &path::Path,
         source: Source,
         sink: Sink,
     ) -> PyResult<Self> {
         Python::with_gil(|py| {
-            PyModule::import(py, intern!(py, "bumble.device"))?
+            let device_ctor = PyModule::import(py, intern!(py, "bumble.device"))?
                 .getattr(intern!(py, "Device"))?
-                .call_method1(
-                    intern!(py, "from_config_file_with_hci"),
-                    (device_config, source.0, sink.0),
-                )
-                .map(|any| Self {
-                    obj: any.into(),
-                    advertising_status: AdvertisingStatus::NotAdvertising,
-                })
+                .getattr(intern!(py, "from_config_file_with_hci"))?;
+
+            // Needed for Python 3.8-3.9, in which the Semaphore object, when constructed, calls
+            // `get_event_loop`.
+            wrap_python_async(py, device_ctor)?
+                .call((device_config, source.0, sink.0), None)
+                .and_then(into_future)
+        })?
+        .await
+        .map(|obj| Self {
+            obj,
+            advertising_status: AdvertisingStatus::NotAdvertising,
         })
     }
 
     /// Create a Device configured to communicate with a controller through an HCI source/sink
-    pub fn with_hci(name: &str, address: Address, source: Source, sink: Sink) -> PyResult<Self> {
+    pub async fn with_hci(
+        name: &str,
+        address: Address,
+        source: Source,
+        sink: Sink,
+    ) -> PyResult<Self> {
         Python::with_gil(|py| {
-            PyModule::import(py, intern!(py, "bumble.device"))?
+            let device_ctor = PyModule::import(py, intern!(py, "bumble.device"))?
                 .getattr(intern!(py, "Device"))?
-                .call_method1(intern!(py, "with_hci"), (name, address.0, source.0, sink.0))
-                .map(|any| Self {
-                    obj: any.into(),
-                    advertising_status: AdvertisingStatus::NotAdvertising,
-                })
+                .getattr(intern!(py, "with_hci"))?;
+
+            // Needed for Python 3.8-3.9, in which the Semaphore object, when constructed, calls
+            // `get_event_loop`.
+            wrap_python_async(py, device_ctor)?
+                .call((name, address.try_to_py(py)?, source.0, sink.0), None)
+                .and_then(into_future)
+        })?
+        .await
+        .map(|obj| Self {
+            obj,
+            advertising_status: AdvertisingStatus::NotAdvertising,
         })
     }
 
@@ -199,10 +225,10 @@ impl Device {
     }
 
     /// Connect to a peer
-    pub async fn connect(&self, peer_addr: &str) -> PyResult<Connection> {
+    pub async fn connect(&self, peer_addr: &Address) -> PyResult<Connection> {
         Python::with_gil(|py| {
             self.obj
-                .call_method1(py, intern!(py, "connect"), (peer_addr,))
+                .call_method1(py, intern!(py, "connect"), (peer_addr.try_to_py(py)?,))
                 .and_then(|coroutine| into_future(coroutine.as_ref(py)))
         })?
         .await
@@ -244,7 +270,7 @@ impl Device {
         callback: impl Fn(Python, Advertisement) -> PyResult<()> + Send + 'static,
     ) -> PyResult<()> {
         let boxed = ClosureCallback::new(move |py, args, _kwargs| {
-            callback(py, Advertisement(args.get_item(0)?.into()))
+            callback(py, Advertisement::try_from_py(py, args.get_item(0)?)?)
         });
 
         Python::with_gil(|py| {
@@ -352,11 +378,10 @@ impl Device {
             .await?;
 
         // set random address
-        let random_address: packets::Address =
-            self.random_address()?.try_into().map_err(|e| match e {
-                ConversionError::Python(pyerr) => pyerr,
-                ConversionError::Native(e) => PyErr::new::<PyException, _>(format!("{e:?}")),
-            })?;
+        let random_address: packets::Address = self
+            .random_address()?
+            .try_into()
+            .map_err(|e: AddressConversionError| anyhow!(e))?;
         let random_address_cmd = LeSetAdvertisingSetRandomAddressBuilder {
             advertising_handle: Self::ADVERTISING_HANDLE_EXTENDED,
             random_address,
@@ -467,13 +492,65 @@ impl Device {
         Python::with_gil(|py| {
             self.obj
                 .getattr(py, intern!(py, "random_address"))
-                .map(Address)
+                .and_then(|obj| Address::try_from_py(py, obj.as_ref(py)))
         })
+    }
+
+    /// Add a GATT service to the device
+    pub fn add_service(&mut self, service: &Service) -> PyResult<ServiceHandle> {
+        Python::with_gil(|py| {
+            let (char_handles, py_chars): (
+                collections::HashMap<AttributeUuid, CharacteristicHandle>,
+                Vec<_>,
+            ) = service
+                .characteristics
+                .iter()
+                .map(|characteristic| {
+                    characteristic.try_to_py(py).map(|py_characteristic| {
+                        (
+                            (
+                                characteristic.uuid,
+                                CharacteristicHandle {
+                                    uuid: characteristic.uuid,
+                                    obj: py_characteristic.into(),
+                                },
+                            ),
+                            py_characteristic,
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .unzip();
+
+            let py_service = PyModule::import(py, intern!(py, "bumble.gatt"))?
+                .getattr(intern!(py, "Service"))?
+                .call1((service.uuid.try_to_py(py)?, PyList::new(py, py_chars)))?;
+
+            self.obj
+                .call_method1(py, intern!(py, "add_service"), (py_service,))
+                .map(|_| ServiceHandle {
+                    uuid: service.uuid,
+                    char_handles,
+                })
+        })
+    }
+
+    /// Notify subscribers to the characteristic
+    pub async fn notify_subscribers(&mut self, char_handle: &CharacteristicHandle) -> PyResult<()> {
+        Python::with_gil(|py| {
+            self.obj
+                .call_method1(py, intern!(py, "notify_subscribers"), (&char_handle.obj,))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
+        })?
+        .await
+        .map(|_| ())
     }
 }
 
 /// A connection to a remote device.
-pub struct Connection(PyObject);
+// Wraps a `bumble.device.Connection`
+pub struct Connection(pub(crate) PyObject);
 
 impl Connection {
     /// Open an L2CAP channel using this connection. When optional arguments are not specified, the
@@ -536,6 +613,15 @@ impl Connection {
             str_obj.gil_ref(py).extract()
         })
     }
+
+    /// Returns the address of the peer on the other end of the connection.
+    pub fn peer_address(&self) -> PyResult<Address> {
+        Python::with_gil(|py| {
+            self.0
+                .getattr(py, intern!(py, "peer_address"))
+                .and_then(|obj| Address::try_from_py(py, obj.as_ref(py)))
+        })
+    }
 }
 
 /// The other end of a connection
@@ -543,13 +629,19 @@ pub struct Peer(PyObject);
 
 impl Peer {
     /// Wrap a [Connection] in a Peer
-    pub fn new(conn: Connection) -> PyResult<Self> {
+    pub async fn new(conn: Connection) -> PyResult<Self> {
         Python::with_gil(|py| {
-            PyModule::import(py, intern!(py, "bumble.device"))?
-                .getattr(intern!(py, "Peer"))?
-                .call1((conn.0,))
-                .map(|obj| Self(obj.into()))
-        })
+            let peer_ctor =
+                PyModule::import(py, intern!(py, "bumble.device"))?.getattr(intern!(py, "Peer"))?;
+
+            // Needed for Python 3.8-3.9, in which the Semaphore object, when constructed, calls
+            // `get_event_loop`.
+            wrap_python_async(py, peer_ctor)?
+                .call((conn.0,), None)
+                .and_then(into_future)
+        })?
+        .await
+        .map(Self)
     }
 
     /// Populates the peer's cache of services.
@@ -572,11 +664,42 @@ impl Peer {
         })
     }
 
+    /// Populate the peer's cache of characteristics for cached services.
+    ///
+    /// Should be called after [Peer::discover_services] has cached the available services.
+    pub async fn discover_characteristics(&mut self) -> PyResult<()> {
+        Python::with_gil(|py| {
+            self.0
+                .call_method0(py, intern!(py, "discover_characteristics"))
+                .and_then(|coroutine| into_future(coroutine.as_ref(py)))
+        })?
+        .await
+        .map(|_| ())
+    }
+
     /// Returns a snapshot of the Services currently in the peer's cache
     pub fn services(&self) -> PyResult<Vec<ServiceProxy>> {
         Python::with_gil(|py| {
             self.0
                 .getattr(py, intern!(py, "services"))?
+                .as_ref(py)
+                .iter()?
+                .map(|r| r.map(|h| ServiceProxy(h.to_object(py))))
+                .collect()
+        })
+    }
+
+    /// Returns the services matching the provided UUID.
+    ///
+    /// The service cache must have already been populated, e.g. via [Peer::discover_services].
+    pub fn services_by_uuid(&self, uuid: impl Into<AttributeUuid>) -> PyResult<Vec<ServiceProxy>> {
+        Python::with_gil(|py| {
+            self.0
+                .call_method1(
+                    py,
+                    intern!(py, "get_services_by_uuid"),
+                    (uuid.into().try_to_py(py)?,),
+                )?
                 .as_ref(py)
                 .iter()?
                 .map(|r| r.map(|h| ServiceProxy(h.to_object(py))))
@@ -599,31 +722,49 @@ impl Peer {
 }
 
 /// A BLE advertisement
-pub struct Advertisement(PyObject);
+pub struct Advertisement {
+    address: Address,
+    connectable: bool,
+    rssi: i8,
+    data: AdvertisingData,
+}
 
 impl Advertisement {
     /// Address that sent the advertisement
-    pub fn address(&self) -> PyResult<Address> {
-        Python::with_gil(|py| self.0.getattr(py, intern!(py, "address")).map(Address))
+    pub fn address(&self) -> Address {
+        self.address
     }
 
     /// Returns true if the advertisement is connectable
-    pub fn is_connectable(&self) -> PyResult<bool> {
-        Python::with_gil(|py| {
-            self.0
-                .getattr(py, intern!(py, "is_connectable"))?
-                .extract::<bool>(py)
-        })
+    pub fn is_connectable(&self) -> bool {
+        self.connectable
     }
 
     /// RSSI of the advertisement
-    pub fn rssi(&self) -> PyResult<i8> {
-        Python::with_gil(|py| self.0.getattr(py, intern!(py, "rssi"))?.extract::<i8>(py))
+    pub fn rssi(&self) -> i8 {
+        self.rssi
     }
 
     /// Data in the advertisement
-    pub fn data(&self) -> PyResult<AdvertisingData> {
-        Python::with_gil(|py| self.0.getattr(py, intern!(py, "data")).map(AdvertisingData))
+    pub fn data(&self) -> &AdvertisingData {
+        &self.data
+    }
+}
+
+impl TryFromPy for Advertisement {
+    fn try_from_py<'py>(py: Python<'py>, obj: &'py PyAny) -> PyResult<Self> {
+        Ok(Self {
+            address: obj
+                .getattr(intern!(py, "address"))
+                .and_then(|obj| Address::try_from_py(py, obj))?,
+            connectable: obj
+                .getattr(intern!(py, "is_connectable"))?
+                .extract::<bool>()?,
+            rssi: obj.getattr(intern!(py, "rssi"))?.extract::<i8>()?,
+            data: obj
+                .getattr(intern!(py, "data"))
+                .and_then(|obj| AdvertisingData::try_from_py(py, obj))?,
+        })
     }
 }
 
@@ -635,4 +776,61 @@ impl Advertisement {
 #[cfg(feature = "unstable_extended_adv")]
 fn default_ignored_peer_address() -> packets::Address {
     packets::Address::try_from(0x0000_0000_0000_u64).unwrap()
+}
+
+/// The result of adding a [Service] to a [Device]'s GATT server.
+///
+/// See [Device::add_service]
+///
+/// # Background
+///
+/// Under the hood this is the same Python `Service` type used as an argument to
+/// `Device.add_service`, but that relies on `Service` inheriting `Attribute` so that
+/// the attribute protocol's handle can be written during `add_service` directly into
+/// the `Service` and `Characteristic` objects. The presence of ATT-internal mutable bookkeeping
+/// in the higher level `Service` and `Characteristic` doesn't seem very Rust-idiomatic,
+/// so the Python `Service` and `Characteristic` produced by [Service] and
+/// [Characteristic] during [Device::add_service] are instead exposed
+/// as [ServiceHandle] and [CharacteristicHandle], distinct from the higher level
+/// [Service] and [Characteristic].
+pub struct ServiceHandle {
+    uuid: AttributeUuid,
+    char_handles: collections::HashMap<AttributeUuid, CharacteristicHandle>,
+    // no need for the `Service` PyObject yet, but could certainly be added if needed
+}
+
+impl ServiceHandle {
+    /// Returns the UUID for the service
+    pub fn uuid(&self) -> AttributeUuid {
+        self.uuid
+    }
+
+    /// Returns the characteristic handle for the characteristic UUID, if it exists.
+    pub fn characteristic_handle(
+        &self,
+        uuid: impl Into<AttributeUuid>,
+    ) -> Option<&CharacteristicHandle> {
+        self.char_handles.get(&uuid.into())
+    }
+
+    /// Returns an iterator over the characteristic handlesin the service.
+    pub fn characteristic_handles(&self) -> impl Iterator<Item = &CharacteristicHandle> {
+        self.char_handles.values()
+    }
+}
+
+/// A handle for the result of adding a [Characteristic] as part of a [Service].
+///
+/// See [Device::add_service] and [ServiceHandle].
+pub struct CharacteristicHandle {
+    uuid: AttributeUuid,
+    /// Python `Characteristic`
+    obj: PyObject,
+}
+
+impl CharacteristicHandle {
+    /// Returns the UUID for the characteristc
+    pub fn uuid(&self) -> AttributeUuid {
+        self.uuid
+    }
 }
