@@ -1839,7 +1839,7 @@ class Session:
         if self.is_initiator:
             if self.pairing_method == PairingMethod.OOB:
                 self.send_pairing_random_command()
-            else:
+            elif self.pairing_method == PairingMethod.PASSKEY:
                 self.send_pairing_confirm_command()
         else:
             if self.pairing_method == PairingMethod.PASSKEY:
