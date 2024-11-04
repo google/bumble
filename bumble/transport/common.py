@@ -370,11 +370,13 @@ class PumpedPacketSource(ParserSource):
                     self.parser.feed_data(packet)
                 except asyncio.CancelledError:
                     logger.debug('source pump task done')
-                    self.terminated.set_result(None)
+                    if not self.terminated.done():
+                        self.terminated.set_result(None)
                     break
                 except Exception as error:
                     logger.warning(f'exception while waiting for packet: {error}')
-                    self.terminated.set_exception(error)
+                    if not self.terminated.done():
+                        self.terminated.set_exception(error)
                     break
 
         self.pump_task = asyncio.create_task(pump_packets())
