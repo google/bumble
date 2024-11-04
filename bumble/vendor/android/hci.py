@@ -24,7 +24,6 @@ from bumble.hci import (
     HCI_Constant,
     HCI_Object,
     HCI_Command,
-    HCI_Vendor_Event,
     STATUS_SPEC,
 )
 
@@ -48,7 +47,6 @@ HCI_DYNAMIC_AUDIO_BUFFER_COMMAND = hci_vendor_command_op_code(0x15F)
 HCI_BLUETOOTH_QUALITY_REPORT_EVENT = 0x58
 
 HCI_Command.register_commands(globals())
-HCI_Vendor_Event.register_subevents(globals())
 
 
 # -----------------------------------------------------------------------------

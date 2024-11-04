@@ -851,7 +851,12 @@ async def test_unsubscribe():
     await async_barrier()
     mock1.assert_called_once_with(ANY, True, False)
 
-    await c2.subscribe()
+    assert len(server.gatt_server.subscribers) == 1
+
+    def callback(_):
+        pass
+
+    await c2.subscribe(callback)
     await async_barrier()
     mock2.assert_called_once_with(ANY, True, False)
 
@@ -861,9 +866,15 @@ async def test_unsubscribe():
     mock1.assert_called_once_with(ANY, False, False)
 
     mock2.reset_mock()
-    await c2.unsubscribe()
+    await c2.unsubscribe(callback)
     await async_barrier()
     mock2.assert_called_once_with(ANY, False, False)
+
+    # All CCCDs should be zeros now
+    assert list(server.gatt_server.subscribers.values())[0] == {
+        c1.handle: bytes([0, 0]),
+        c2.handle: bytes([0, 0]),
+    }
 
     mock1.reset_mock()
     await c1.unsubscribe()

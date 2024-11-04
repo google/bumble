@@ -5070,12 +5070,6 @@ class HCI_Event(HCI_Packet):
             if cls is None:
                 # No class registered, just use a generic class instance
                 return HCI_LE_Meta_Event(subevent_code, parameters)
-        elif event_code == HCI_VENDOR_EVENT:
-            subevent_code = parameters[0]
-            cls = HCI_Vendor_Event.subevent_classes.get(subevent_code)
-            if cls is None:
-                # No class registered, just use a generic class instance
-                return HCI_Vendor_Event(subevent_code, parameters)
         else:
             cls = HCI_Event.event_classes.get(event_code)
             if cls is None:
@@ -5129,7 +5123,7 @@ HCI_Event.register_events(globals())
 # -----------------------------------------------------------------------------
 class HCI_Extended_Event(HCI_Event):
     '''
-    HCI_Event subclass for events that has a subevent code.
+    HCI_Event subclass for events that have a subevent code.
     '''
 
     subevent_names: Dict[int, str] = {}
@@ -5223,12 +5217,6 @@ class HCI_LE_Meta_Event(HCI_Extended_Event):
 
 
 HCI_LE_Meta_Event.register_subevents(globals())
-
-
-# -----------------------------------------------------------------------------
-class HCI_Vendor_Event(HCI_Extended_Event):
-    event_code: int = HCI_VENDOR_EVENT
-    subevent_classes = {}
 
 
 # -----------------------------------------------------------------------------
@@ -6638,6 +6626,14 @@ class HCI_Keypress_Notification_Event(HCI_Event):
 class HCI_Remote_Host_Supported_Features_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.50 Remote Host Supported Features Notification Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Event.event([('data', "*")])
+class HCI_Vendor_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 5.4.4 HCI Event packet
     '''
 
 

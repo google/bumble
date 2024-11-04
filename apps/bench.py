@@ -199,7 +199,7 @@ def log_stats(title, stats, precision=2):
     stats_min = min(stats)
     stats_max = max(stats)
     stats_avg = statistics.mean(stats)
-    stats_stdev = statistics.stdev(stats)
+    stats_stdev = statistics.stdev(stats) if len(stats) >= 2 else 0
     logging.info(
         color(
             (
@@ -468,6 +468,7 @@ class Ping:
 
         for run in range(self.repeat + 1):
             self.done.clear()
+            self.ping_times = []
 
             if run > 0 and self.repeat and self.repeat_delay:
                 logging.info(color(f'*** Repeat delay: {self.repeat_delay}', 'green'))
