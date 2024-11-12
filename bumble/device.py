@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import asyncio
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from contextlib import (
     asynccontextmanager,
     AsyncExitStack,
@@ -119,6 +119,8 @@ DEVICE_MIN_LE_RSSI                            = -127
 DEVICE_MAX_LE_RSSI                            = 20
 DEVICE_MIN_EXTENDED_ADVERTISING_SET_HANDLE    = 0x00
 DEVICE_MAX_EXTENDED_ADVERTISING_SET_HANDLE    = 0xEF
+DEVICE_MIN_BIG_HANDLE                         = 0x00
+DEVICE_MAX_BIG_HANDLE                         = 0xEF
 
 DEVICE_DEFAULT_ADDRESS                        = '00:00:00:00:00:00'
 DEVICE_DEFAULT_ADVERTISING_INTERVAL           = 1000  # ms
@@ -993,6 +995,130 @@ class PeriodicAdvertisingSync(EventEmitter):
 
 
 # -----------------------------------------------------------------------------
+@dataclass
+class BigParameters:
+    num_bis: int
+    sdu_interval: int
+    max_sdu: int
+    max_transport_latency: int
+    rtn: int
+    phy: hci.PhyBit = hci.PhyBit.LE_2M
+    packing: int = 0
+    framing: int = 0
+    broadcast_code: bytes | None = None
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class Big(EventEmitter):
+    class State(IntEnum):
+        PENDING = 0
+        ACTIVE = 1
+        TERMINATED = 2
+
+    class Event(str, Enum):
+        ESTABLISHMENT = 'establishment'
+        ESTABLISHMENT_FAILURE = 'establishment_failure'
+        TERMINATION = 'termination'
+
+    big_handle: int
+    advertising_set: AdvertisingSet
+    parameters: BigParameters
+    state: State = State.PENDING
+
+    # Attributes provided by BIG Create Complete event
+    big_sync_delay: int = 0
+    transport_latency_big: int = 0
+    phy: int = 0
+    nse: int = 0
+    bn: int = 0
+    pto: int = 0
+    irc: int = 0
+    max_pdu: int = 0
+    iso_interval: int = 0
+    bis_links: Sequence[BisLink] = ()
+
+    def __post_init__(self) -> None:
+        super().__init__()
+        self.device = self.advertising_set.device
+
+    async def terminate(
+        self,
+        reason: int = hci.HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
+    ) -> None:
+        if self.state != Big.State.ACTIVE:
+            logger.error('BIG %d is not active.', self.big_handle)
+            return
+
+        with closing(EventWatcher()) as watcher:
+            terminated = asyncio.Event()
+            watcher.once(self, Big.Event.TERMINATION, lambda _: terminated.set())
+            await self.device.send_command(
+                hci.HCI_LE_Terminate_BIG_Command(
+                    big_handle=self.big_handle, reason=reason
+                ),
+                check_result=True,
+            )
+            await terminated.wait()
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class BigSyncParameters:
+    big_sync_timeout: int
+    bis: Sequence[int]
+    mse: int = 0
+    broadcast_code: bytes | None = None
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class BigSync(EventEmitter):
+    class State(IntEnum):
+        PENDING = 0
+        ACTIVE = 1
+        TERMINATED = 2
+
+    class Event(str, Enum):
+        ESTABLISHMENT = 'establishment'
+        ESTABLISHMENT_FAILURE = 'establishment_failure'
+        TERMINATION = 'termination'
+
+    big_handle: int
+    pa_sync: PeriodicAdvertisingSync
+    parameters: BigSyncParameters
+    state: State = State.PENDING
+
+    # Attributes provided by BIG Create Sync Complete event
+    transport_latency_big: int = 0
+    nse: int = 0
+    bn: int = 0
+    pto: int = 0
+    irc: int = 0
+    max_pdu: int = 0
+    iso_interval: int = 0
+    bis_links: Sequence[BisLink] = ()
+
+    def __post_init__(self) -> None:
+        super().__init__()
+        self.device = self.pa_sync.device
+
+    async def terminate(self) -> None:
+        if self.state != BigSync.State.ACTIVE:
+            logger.error('BIG Sync %d is not active.', self.big_handle)
+            return
+
+        with closing(EventWatcher()) as watcher:
+            terminated = asyncio.Event()
+            watcher.once(self, BigSync.Event.TERMINATION, lambda _: terminated.set())
+            await self.device.send_command(
+                hci.HCI_LE_BIG_Terminate_Sync_Command(big_handle=self.big_handle),
+                check_result=True,
+            )
+            await terminated.wait()
+
+
+# -----------------------------------------------------------------------------
 class LePhyOptions:
     # Coded PHY preference
     ANY_CODED_PHY = 0
@@ -1223,6 +1349,32 @@ class CisLink(CompositeEventEmitter):
         self, reason: int = hci.HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
     ) -> None:
         await self.device.disconnect(self, reason)
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class BisLink:
+    handle: int
+    big: Big | BigSync
+    sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
+
+    def __post_init__(self) -> None:
+        self.device = self.big.device
+        self.packet_sequence_number = 0
+
+    def write(self, sdu: bytes) -> None:
+        self.device.host.send_hci_packet(
+            hci.HCI_IsoDataPacket(
+                connection_handle=self.handle,
+                data_total_length=len(sdu) + 4,
+                packet_sequence_number=self.packet_sequence_number,
+                pb_flag=0b10,
+                packet_status_flag=0,
+                iso_sdu_length=len(sdu),
+                iso_sdu_fragment=sdu,
+            )
+        )
+        self.packet_sequence_number += 1
 
 
 # -----------------------------------------------------------------------------
@@ -1713,6 +1865,9 @@ class Device(CompositeEventEmitter):
     legacy_advertiser: Optional[LegacyAdvertiser]
     sco_links: Dict[int, ScoLink]
     cis_links: Dict[int, CisLink]
+    bigs = dict[int, Big]()
+    bis_links = dict[int, BisLink]()
+    big_syncs = dict[int, BigSync]()
     _pending_cis: Dict[int, Tuple[int, int]]
 
     @composite_listener
@@ -2005,6 +2160,17 @@ class Device(CompositeEventEmitter):
                 sync
                 for sync in self.periodic_advertising_syncs
                 if sync.sync_handle == sync_handle
+            ),
+            None,
+        )
+
+    def next_big_handle(self) -> int | None:
+        return next(
+            (
+                handle
+                for handle in range(DEVICE_MIN_BIG_HANDLE, DEVICE_MAX_BIG_HANDLE + 1)
+                if handle
+                not in itertools.chain(self.bigs.keys(), self.big_syncs.keys())
             ),
             None,
         )
@@ -4112,6 +4278,106 @@ class Device(CompositeEventEmitter):
             check_result=True,
         )
 
+    # [LE only]
+    @experimental('Only for testing.')
+    async def create_big(
+        self, advertising_set: AdvertisingSet, parameters: BigParameters
+    ) -> Big:
+        if (big_handle := self.next_big_handle()) is None:
+            raise core.OutOfResourcesError("All valid BIG handles already in use")
+
+        with closing(EventWatcher()) as watcher:
+            big = Big(
+                big_handle=big_handle,
+                parameters=parameters,
+                advertising_set=advertising_set,
+            )
+            self.bigs[big_handle] = big
+            established = asyncio.get_running_loop().create_future()
+            watcher.once(
+                big, big.Event.ESTABLISHMENT, lambda: established.set_result(None)
+            )
+            watcher.once(
+                big,
+                big.Event.ESTABLISHMENT_FAILURE,
+                lambda status: established.set_exception(hci.HCI_Error(status)),
+            )
+
+            try:
+                await self.send_command(
+                    hci.HCI_LE_Create_BIG_Command(
+                        big_handle=big_handle,
+                        advertising_handle=advertising_set.advertising_handle,
+                        num_bis=parameters.num_bis,
+                        sdu_interval=parameters.sdu_interval,
+                        max_sdu=parameters.max_sdu,
+                        max_transport_latency=parameters.max_transport_latency,
+                        rtn=parameters.rtn,
+                        phy=parameters.phy,
+                        packing=parameters.packing,
+                        framing=parameters.framing,
+                        encryption=1 if parameters.broadcast_code else 0,
+                        broadcast_code=parameters.broadcast_code or bytes(16),
+                    ),
+                    check_result=True,
+                )
+                await established
+            except hci.HCI_Error:
+                del self.bigs[big_handle]
+                raise
+
+        return big
+
+    # [LE only]
+    @experimental('Only for testing.')
+    async def create_big_sync(
+        self, pa_sync: PeriodicAdvertisingSync, parameters: BigSyncParameters
+    ) -> BigSync:
+        if (big_handle := self.next_big_handle()) is None:
+            raise core.OutOfResourcesError("All valid BIG handles already in use")
+
+        if (pa_sync_handle := pa_sync.sync_handle) is None:
+            raise core.InvalidStateError("PA Sync is not established")
+
+        with closing(EventWatcher()) as watcher:
+            big_sync = BigSync(
+                big_handle=big_handle,
+                parameters=parameters,
+                pa_sync=pa_sync,
+            )
+            self.big_syncs[big_handle] = big_sync
+            established = asyncio.get_running_loop().create_future()
+            watcher.once(
+                big_sync,
+                big_sync.Event.ESTABLISHMENT,
+                lambda: established.set_result(None),
+            )
+            watcher.once(
+                big_sync,
+                big_sync.Event.ESTABLISHMENT_FAILURE,
+                lambda status: established.set_exception(hci.HCI_Error(status)),
+            )
+
+            try:
+                await self.send_command(
+                    hci.HCI_LE_BIG_Create_Sync_Command(
+                        big_handle=big_handle,
+                        sync_handle=pa_sync_handle,
+                        encryption=1 if parameters.broadcast_code else 0,
+                        broadcast_code=parameters.broadcast_code or bytes(16),
+                        mse=parameters.mse,
+                        big_sync_timeout=parameters.big_sync_timeout,
+                        bis=parameters.bis,
+                    ),
+                    check_result=True,
+                )
+                await established
+            except hci.HCI_Error:
+                del self.big_syncs[big_handle]
+                raise
+
+        return big_sync
+
     async def get_remote_le_features(self, connection: Connection) -> hci.LeFeatureMask:
         """[LE Only] Reads remote LE supported features.
 
@@ -4232,6 +4498,112 @@ class Device(CompositeEventEmitter):
             f'the connection with handle {connection_handle:04X} will complete later'
         )
         self.connecting_extended_advertising_sets[connection_handle] = advertising_set
+
+    @host_event_handler
+    def on_big_establishment(
+        self,
+        status: int,
+        big_handle: int,
+        bis_handles: List[int],
+        big_sync_delay: int,
+        transport_latency_big: int,
+        phy: int,
+        nse: int,
+        bn: int,
+        pto: int,
+        irc: int,
+        max_pdu: int,
+        iso_interval: int,
+    ) -> None:
+        if not (big := self.bigs.get(big_handle)):
+            logger.warning('BIG %d not found', big_handle)
+            return
+
+        if status != hci.HCI_SUCCESS:
+            del self.bigs[big_handle]
+            logger.debug('Unable to create BIG %d', big_handle)
+            big.state = Big.State.TERMINATED
+            big.emit(Big.Event.ESTABLISHMENT_FAILURE, status)
+            return
+
+        big.bis_links = [BisLink(handle=handle, big=big) for handle in bis_handles]
+        big.big_sync_delay = big_sync_delay
+        big.transport_latency_big = transport_latency_big
+        big.phy = phy
+        big.nse = nse
+        big.bn = bn
+        big.pto = pto
+        big.irc = irc
+        big.max_pdu = max_pdu
+        big.iso_interval = iso_interval
+        big.state = Big.State.ACTIVE
+
+        for bis_link in big.bis_links:
+            self.bis_links[bis_link.handle] = bis_link
+        big.emit(Big.Event.ESTABLISHMENT)
+
+    @host_event_handler
+    def on_big_termination(self, reason: int, big_handle: int) -> None:
+        if not (big := self.bigs.pop(big_handle, None)):
+            logger.warning('BIG %d not found', big_handle)
+            return
+
+        big.state = Big.State.TERMINATED
+        for bis_link in big.bis_links:
+            self.bis_links.pop(bis_link.handle, None)
+        big.emit(Big.Event.TERMINATION, reason)
+
+    @host_event_handler
+    def on_big_sync_establishment(
+        self,
+        status: int,
+        big_handle: int,
+        transport_latency_big: int,
+        nse: int,
+        bn: int,
+        pto: int,
+        irc: int,
+        max_pdu: int,
+        iso_interval: int,
+        bis_handles: list[int],
+    ) -> None:
+        if not (big_sync := self.big_syncs.get(big_handle)):
+            logger.warning('BIG Sync %d not found', big_handle)
+            return
+
+        if status != hci.HCI_SUCCESS:
+            del self.big_syncs[big_handle]
+            logger.debug('Unable to create BIG Sync %d', big_handle)
+            big_sync.state = BigSync.State.TERMINATED
+            big_sync.emit(BigSync.Event.ESTABLISHMENT_FAILURE, status)
+            return
+
+        big_sync.transport_latency_big = transport_latency_big
+        big_sync.nse = nse
+        big_sync.bn = bn
+        big_sync.pto = pto
+        big_sync.irc = irc
+        big_sync.max_pdu = max_pdu
+        big_sync.iso_interval = iso_interval
+        big_sync.bis_links = [
+            BisLink(handle=handle, big=big_sync) for handle in bis_handles
+        ]
+        big_sync.state = BigSync.State.ACTIVE
+
+        for bis_link in big_sync.bis_links:
+            self.bis_links[bis_link.handle] = bis_link
+        big_sync.emit(BigSync.Event.ESTABLISHMENT)
+
+    @host_event_handler
+    def on_big_sync_lost(self, big_handle: int, reason: int) -> None:
+        if not (big_sync := self.big_syncs.pop(big_handle, None)):
+            logger.warning('BIG %d not found', big_handle)
+            return
+
+        for bis_link in big_sync.bis_links:
+            self.bis_links.pop(bis_link.handle, None)
+        big_sync.state = BigSync.State.TERMINATED
+        big_sync.emit(BigSync.Event.TERMINATION, reason)
 
     def _complete_le_extended_advertising_connection(
         self, connection: Connection, advertising_set: AdvertisingSet
@@ -4879,6 +5251,8 @@ class Device(CompositeEventEmitter):
     def on_iso_packet(self, handle: int, packet: hci.HCI_IsoDataPacket) -> None:
         if (cis_link := self.cis_links.get(handle)) and cis_link.sink:
             cis_link.sink(packet)
+        elif (bis_link := self.bis_links.get(handle)) and bis_link.sink:
+            bis_link.sink(packet)
 
     @host_event_handler
     @with_connection_from_handle
