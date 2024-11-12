@@ -953,6 +953,48 @@ class Host(AbortableEventEmitter):
             event.cis_id,
         )
 
+    def on_hci_le_create_big_complete_event(self, event):
+        self.emit(
+            'big_establishment',
+            event.status,
+            event.big_handle,
+            event.connection_handle,
+            event.big_sync_delay,
+            event.transport_latency_big,
+            event.phy,
+            event.nse,
+            event.bn,
+            event.pto,
+            event.irc,
+            event.max_pdu,
+            event.iso_interval,
+        )
+
+    def on_hci_le_big_sync_established_event(self, event):
+        self.emit(
+            'big_sync_establishment',
+            event.status,
+            event.big_handle,
+            event.transport_latency_big,
+            event.nse,
+            event.bn,
+            event.pto,
+            event.irc,
+            event.max_pdu,
+            event.iso_interval,
+            event.connection_handle,
+        )
+
+    def on_hci_le_big_sync_lost_event(self, event):
+        self.emit(
+            'big_sync_lost',
+            event.big_handle,
+            event.reason,
+        )
+
+    def on_hci_le_terminate_big_complete_event(self, event):
+        self.emit('big_termination', event.reason, event.big_handle)
+
     def on_hci_le_cis_established_event(self, event):
         # The remaining parameters are unused for now.
         if event.status == hci.HCI_SUCCESS:
