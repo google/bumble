@@ -4934,7 +4934,7 @@ class HCI_LE_Create_BIG_Command(HCI_Command):
     packing: int
     framing: int
     encryption: int
-    broadcast_code: int
+    broadcast_code: bytes
 
 
 # -----------------------------------------------------------------------------
@@ -5823,7 +5823,7 @@ class HCI_LE_Periodic_Advertising_Sync_Lost_Event(HCI_LE_Meta_Event):
 # -----------------------------------------------------------------------------
 @HCI_LE_Meta_Event.event(
     [
-        ('status', 1),
+        ('status', STATUS_SPEC),
         ('advertising_handle', 1),
         ('connection_handle', 2),
         ('num_completed_extended_advertising_events', 1),
@@ -5903,6 +5903,70 @@ class HCI_LE_CIS_Established_Event(HCI_LE_Meta_Event):
 class HCI_LE_CIS_Request_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.26 LE CIS Request Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('big_handle', 1),
+        ('big_sync_delay', 3),
+        ('transport_latency_big', 3),
+        ('phy', 1),
+        ('nse', 1),
+        ('bn', 1),
+        ('pto', 1),
+        ('irc', 1),
+        ('max_pdu', 2),
+        ('iso_interval', 2),
+        [('connection_handle', 2)],
+    ]
+)
+class HCI_LE_Create_BIG_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.27 LE Create BIG Complete Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event([('big_handle', 1), ('reason', 1)])
+class HCI_LE_Terminate_BIG_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.28 LE Terminate BIG Complete Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+
+
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('big_handle', 1),
+        ('transport_latency_big', 3),
+        ('nse', 1),
+        ('bn', 1),
+        ('pto', 1),
+        ('irc', 1),
+        ('max_pdu', 2),
+        ('iso_interval', 2),
+        [('connection_handle', 2)],
+    ]
+)
+class HCI_LE_BIG_Sync_Established_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.29 LE BIG Sync Established event
+    '''
+
+
+# -----------------------------------------------------------------------------
+
+
+@HCI_LE_Meta_Event.event([('big_handle', 1), ('reason', 1)])
+class HCI_LE_BIG_Sync_Lost_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.30 LE BIG Sync Lost event
     '''
 
 
