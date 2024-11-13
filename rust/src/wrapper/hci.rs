@@ -80,7 +80,7 @@ impl Address {
     /// Creates a new [Address] object.
     pub fn new(address: &str, address_type: AddressType) -> PyResult<Self> {
         Python::with_gil(|py| {
-            PyModule::import(py, intern!(py, "bumble.device"))?
+            PyModule::import(py, intern!(py, "bumble.hci"))?
                 .getattr(intern!(py, "Address"))?
                 .call1((address, address_type))
                 .map(|any| Self(any.into()))
