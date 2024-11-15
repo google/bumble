@@ -60,7 +60,7 @@ AURACAST_DEFAULT_ATT_MTU = 256
 class BroadcastScanner(pyee.EventEmitter):
     @dataclasses.dataclass
     class Broadcast(pyee.EventEmitter):
-        name: str
+        name: str | None
         sync: bumble.device.PeriodicAdvertisingSync
         rssi: int = 0
         public_broadcast_announcement: Optional[
@@ -135,7 +135,8 @@ class BroadcastScanner(pyee.EventEmitter):
                 self.sync.advertiser_address,
                 color(self.sync.state.name, 'green'),
             )
-            print(f'  {color("Name", "cyan")}:         {self.name}')
+            if self.name is not None:
+                print(f'  {color("Name", "cyan")}:         {self.name}')
             if self.appearance:
                 print(f'  {color("Appearance", "cyan")}:   {str(self.appearance)}')
             print(f'  {color("RSSI", "cyan")}:         {self.rssi}')
@@ -174,7 +175,7 @@ class BroadcastScanner(pyee.EventEmitter):
                     print(color('      Codec ID:', 'yellow'))
                     print(
                         color('        Coding Format:           ', 'green'),
-                        subgroup.codec_id.coding_format.name,
+                        subgroup.codec_id.codec_id.name,
                     )
                     print(
                         color('        Company ID:              ', 'green'),
@@ -274,13 +275,24 @@ class BroadcastScanner(pyee.EventEmitter):
         await self.device.stop_scanning()
 
     def on_advertisement(self, advertisement: bumble.device.Advertisement) -> None:
-        if (
-            broadcast_name := advertisement.data.get(
-                bumble.core.AdvertisingData.BROADCAST_NAME
+        if not (
+            ads := advertisement.data.get_all(
+                bumble.core.AdvertisingData.SERVICE_DATA_16_BIT_UUID
             )
-        ) is None:
+        ) or not (
+            any(
+                ad
+                for ad in ads
+                if isinstance(ad, tuple)
+                and ad[0] == bumble.gatt.GATT_BROADCAST_AUDIO_ANNOUNCEMENT_SERVICE
+            )
+        ):
             return
-        assert isinstance(broadcast_name, str)
+
+        broadcast_name = advertisement.data.get(
+            bumble.core.AdvertisingData.BROADCAST_NAME
+        )
+        assert isinstance(broadcast_name, str) or broadcast_name is None
 
         if broadcast := self.broadcasts.get(advertisement.address):
             broadcast.update(advertisement)
@@ -291,7 +303,7 @@ class BroadcastScanner(pyee.EventEmitter):
         )
 
     async def on_new_broadcast(
-        self, name: str, advertisement: bumble.device.Advertisement
+        self, name: str | None, advertisement: bumble.device.Advertisement
     ) -> None:
         periodic_advertising_sync = await self.device.create_periodic_advertising_sync(
             advertiser_address=advertisement.address,
@@ -299,10 +311,7 @@ class BroadcastScanner(pyee.EventEmitter):
             sync_timeout=self.sync_timeout,
             filter_duplicates=self.filter_duplicates,
         )
-        broadcast = self.Broadcast(
-            name,
-            periodic_advertising_sync,
-        )
+        broadcast = self.Broadcast(name, periodic_advertising_sync)
         broadcast.update(advertisement)
         self.broadcasts[advertisement.address] = broadcast
         periodic_advertising_sync.on('loss', lambda: self.on_broadcast_loss(broadcast))
