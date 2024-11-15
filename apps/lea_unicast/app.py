@@ -486,7 +486,12 @@ class Speaker:
 
             def on_pdu(pdu: HCI_IsoDataPacket, ase: ascs.AseStateMachine):
                 codec_config = ase.codec_specific_configuration
-                assert isinstance(codec_config, bap.CodecSpecificConfiguration)
+                if (
+                    not isinstance(codec_config, bap.CodecSpecificConfiguration)
+                    or codec_config.frame_duration is None
+                    or codec_config.audio_channel_allocation is None
+                ):
+                    return
                 pcm = decode(
                     codec_config.frame_duration.us,
                     codec_config.audio_channel_allocation.channel_count,
@@ -495,11 +500,17 @@ class Speaker:
                 self.device.abort_on('disconnection', self.ui_server.send_audio(pcm))
 
             def on_ase_state_change(ase: ascs.AseStateMachine) -> None:
+                codec_config = ase.codec_specific_configuration
                 if ase.state == ascs.AseStateMachine.State.STREAMING:
-                    codec_config = ase.codec_specific_configuration
-                    assert isinstance(codec_config, bap.CodecSpecificConfiguration)
-                    assert ase.cis_link
                     if ase.role == ascs.AudioRole.SOURCE:
+                        if (
+                            not isinstance(codec_config, bap.CodecSpecificConfiguration)
+                            or ase.cis_link is None
+                            or codec_config.octets_per_codec_frame is None
+                            or codec_config.frame_duration is None
+                            or codec_config.codec_frames_per_sdu is None
+                        ):
+                            return
                         ase.cis_link.abort_on(
                             'disconnection',
                             lc3_source_task(
@@ -514,10 +525,17 @@ class Speaker:
                             ),
                         )
                     else:
+                        if not ase.cis_link:
+                            return
                         ase.cis_link.sink = functools.partial(on_pdu, ase=ase)
                 elif ase.state == ascs.AseStateMachine.State.CODEC_CONFIGURED:
-                    codec_config = ase.codec_specific_configuration
-                    assert isinstance(codec_config, bap.CodecSpecificConfiguration)
+                    if (
+                        not isinstance(codec_config, bap.CodecSpecificConfiguration)
+                        or codec_config.sampling_frequency is None
+                        or codec_config.frame_duration is None
+                        or codec_config.audio_channel_allocation is None
+                    ):
+                        return
                     if ase.role == ascs.AudioRole.SOURCE:
                         setup_encoders(
                             codec_config.sampling_frequency.hz,

@@ -161,7 +161,13 @@ async def main() -> None:
             else:
                 file_output = open(f'{datetime.datetime.now().isoformat()}.lc3', 'wb')
                 codec_configuration = ase.codec_specific_configuration
-                assert isinstance(codec_configuration, CodecSpecificConfiguration)
+                if (
+                    not isinstance(codec_configuration, CodecSpecificConfiguration)
+                    or codec_configuration.sampling_frequency is None
+                    or codec_configuration.audio_channel_allocation is None
+                    or codec_configuration.frame_duration is None
+                ):
+                    return
                 # Write a LC3 header.
                 file_output.write(
                     bytes([0x1C, 0xCC])  # Header.

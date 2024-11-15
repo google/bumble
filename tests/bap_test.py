@@ -39,6 +39,8 @@ from bumble.profiles.ascs import (
 )
 from bumble.profiles.bap import (
     AudioLocation,
+    BasicAudioAnnouncement,
+    BroadcastAudioAnnouncement,
     SupportedFrameDuration,
     SupportedSamplingFrequency,
     SamplingFrequency,
@@ -198,6 +200,56 @@ def test_codec_specific_configuration() -> None:
         codec_frames_per_sdu=1,
     )
     assert CodecSpecificConfiguration.from_bytes(bytes(config)) == config
+
+
+# -----------------------------------------------------------------------------
+def test_broadcast_audio_announcement() -> None:
+    broadcast_audio_announcement = BroadcastAudioAnnouncement(123456)
+    assert (
+        BroadcastAudioAnnouncement.from_bytes(bytes(broadcast_audio_announcement))
+        == broadcast_audio_announcement
+    )
+
+
+# -----------------------------------------------------------------------------
+def test_basic_audio_announcement() -> None:
+    basic_audio_announcement = BasicAudioAnnouncement(
+        presentation_delay=40000,
+        subgroups=[
+            BasicAudioAnnouncement.Subgroup(
+                codec_id=CodingFormat(codec_id=CodecID.LC3),
+                codec_specific_configuration=CodecSpecificConfiguration(
+                    sampling_frequency=SamplingFrequency.FREQ_48000,
+                    frame_duration=FrameDuration.DURATION_10000_US,
+                    octets_per_codec_frame=100,
+                ),
+                metadata=Metadata(
+                    [
+                        Metadata.Entry(tag=Metadata.Tag.LANGUAGE, data=b'eng'),
+                        Metadata.Entry(tag=Metadata.Tag.PROGRAM_INFO, data=b'Disco'),
+                    ]
+                ),
+                bis=[
+                    BasicAudioAnnouncement.BIS(
+                        index=0,
+                        codec_specific_configuration=CodecSpecificConfiguration(
+                            audio_channel_allocation=AudioLocation.FRONT_LEFT
+                        ),
+                    ),
+                    BasicAudioAnnouncement.BIS(
+                        index=1,
+                        codec_specific_configuration=CodecSpecificConfiguration(
+                            audio_channel_allocation=AudioLocation.FRONT_RIGHT
+                        ),
+                    ),
+                ],
+            )
+        ],
+    )
+    assert (
+        BasicAudioAnnouncement.from_bytes(bytes(basic_audio_announcement))
+        == basic_audio_announcement
+    )
 
 
 # -----------------------------------------------------------------------------

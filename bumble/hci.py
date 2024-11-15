@@ -1482,7 +1482,7 @@ class CodingFormat:
     vendor_specific_codec_id: int = 0
 
     @classmethod
-    def parse_from_bytes(cls, data: bytes, offset: int):
+    def parse_from_bytes(cls, data: bytes, offset: int) -> tuple[int, CodingFormat]:
         (codec_id, company_id, vendor_specific_codec_id) = struct.unpack_from(
             '<BHH', data, offset
         )
@@ -1491,6 +1491,10 @@ class CodingFormat:
             company_id=company_id,
             vendor_specific_codec_id=vendor_specific_codec_id,
         )
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> CodingFormat:
+        return cls.parse_from_bytes(data, 0)[1]
 
     def to_bytes(self) -> bytes:
         return struct.pack(
