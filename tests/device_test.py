@@ -19,9 +19,7 @@ import asyncio
 import functools
 import logging
 import os
-from types import LambdaType
 import pytest
-from unittest import mock
 
 from bumble.core import (
     BT_BR_EDR_TRANSPORT,
@@ -29,7 +27,13 @@ from bumble.core import (
     BT_PERIPHERAL_ROLE,
     ConnectionParameters,
 )
-from bumble.device import AdvertisingParameters, Connection, Device
+from bumble.device import (
+    AdvertisingEventProperties,
+    AdvertisingParameters,
+    Connection,
+    Device,
+    PeriodicAdvertisingParameters,
+)
 from bumble.host import AclPacketQueue, Host
 from bumble.hci import (
     HCI_ACCEPT_CONNECTION_REQUEST_COMMAND,
@@ -265,7 +269,8 @@ async def test_flush():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_legacy_advertising():
-    device = Device(host=mock.AsyncMock(Host))
+    device = TwoDevices()[0]
+    await device.power_on()
 
     # Start advertising
     await device.start_advertising()
@@ -283,7 +288,10 @@ async def test_legacy_advertising():
 )
 @pytest.mark.asyncio
 async def test_legacy_advertising_disconnection(auto_restart):
-    device = Device(host=mock.AsyncMock(spec=Host))
+    devices = TwoDevices()
+    device = devices[0]
+    devices.controllers[0].le_features = bytes.fromhex('ffffffffffffffff')
+    await device.power_on()
     peer_address = Address('F0:F1:F2:F3:F4:F5')
     await device.start_advertising(auto_restart=auto_restart)
     device.on_connection(
@@ -305,6 +313,11 @@ async def test_legacy_advertising_disconnection(auto_restart):
     await async_barrier()
 
     if auto_restart:
+        assert device.legacy_advertising_set
+        started = asyncio.Event()
+        if not device.is_advertising:
+            device.legacy_advertising_set.once('start', started.set)
+            await asyncio.wait_for(started.wait(), _TIMEOUT)
         assert device.is_advertising
     else:
         assert not device.is_advertising
@@ -313,7 +326,8 @@ async def test_legacy_advertising_disconnection(auto_restart):
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_extended_advertising():
-    device = Device(host=mock.AsyncMock(Host))
+    device = TwoDevices()[0]
+    await device.power_on()
 
     # Start advertising
     advertising_set = await device.create_advertising_set()
@@ -332,7 +346,8 @@ async def test_extended_advertising():
 )
 @pytest.mark.asyncio
 async def test_extended_advertising_connection(own_address_type):
-    device = Device(host=mock.AsyncMock(spec=Host))
+    device = TwoDevices()[0]
+    await device.power_on()
     peer_address = Address('F0:F1:F2:F3:F4:F5')
     advertising_set = await device.create_advertising_set(
         advertising_parameters=AdvertisingParameters(own_address_type=own_address_type)
@@ -368,8 +383,10 @@ async def test_extended_advertising_connection(own_address_type):
 )
 @pytest.mark.asyncio
 async def test_extended_advertising_connection_out_of_order(own_address_type):
-    device = Device(host=mock.AsyncMock(spec=Host))
-    peer_address = Address('F0:F1:F2:F3:F4:F5')
+    devices = TwoDevices()
+    device = devices[0]
+    devices.controllers[0].le_features = bytes.fromhex('ffffffffffffffff')
+    await device.power_on()
     advertising_set = await device.create_advertising_set(
         advertising_parameters=AdvertisingParameters(own_address_type=own_address_type)
     )
@@ -382,7 +399,7 @@ async def test_extended_advertising_connection_out_of_order(own_address_type):
     device.on_connection(
         0x0001,
         BT_LE_TRANSPORT,
-        peer_address,
+        Address('F0:F1:F2:F3:F4:F5'),
         None,
         None,
         BT_PERIPHERAL_ROLE,
@@ -395,6 +412,34 @@ async def test_extended_advertising_connection_out_of_order(own_address_type):
         assert device.lookup_connection(0x0001).self_address == device.random_address
 
     await async_barrier()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_periodic_advertising():
+    device = TwoDevices()[0]
+    await device.power_on()
+
+    # Start advertising
+    advertising_set = await device.create_advertising_set(
+        advertising_parameters=AdvertisingParameters(
+            advertising_event_properties=AdvertisingEventProperties(
+                is_connectable=False
+            )
+        ),
+        advertising_data=b'123',
+        periodic_advertising_parameters=PeriodicAdvertisingParameters(),
+        periodic_advertising_data=b'abc',
+    )
+    assert device.extended_advertising_sets
+    assert advertising_set.enabled
+    assert not advertising_set.periodic_enabled
+
+    await advertising_set.start_periodic()
+    assert advertising_set.periodic_enabled
+
+    await advertising_set.stop_periodic()
+    assert not advertising_set.periodic_enabled
 
 
 # -----------------------------------------------------------------------------
