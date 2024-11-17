@@ -1542,6 +1542,10 @@ class DeviceConfiguration:
                 )
             )
 
+        # Load scan response data
+        if scan_response_data := config.pop('scan_response_data', None):
+            self.scan_response_data = bytes.fromhex(scan_response_data)
+
         # Load advertising interval (for backward compatibility)
         if advertising_interval := config.pop('advertising_interval', None):
             self.advertising_interval_min = advertising_interval
