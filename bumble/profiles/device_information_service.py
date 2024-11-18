@@ -64,7 +64,10 @@ class DeviceInformationService(TemplateService):
     ):
         characteristics = [
             Characteristic(
-                uuid, Characteristic.Properties.READ, Characteristic.READABLE, field
+                uuid,
+                Characteristic.Properties.READ,
+                Characteristic.READABLE,
+                bytes(field, 'utf-8'),
             )
             for (field, uuid) in (
                 (manufacturer_name, GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC),

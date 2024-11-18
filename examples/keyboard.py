@@ -282,7 +282,7 @@ async def keyboard_device(device, command):
                         GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
                         Characteristic.Properties.READ,
                         Characteristic.READABLE,
-                        'Bumble',
+                        bytes('Bumble', 'utf-8'),
                     )
                 ],
             ),

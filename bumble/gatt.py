@@ -28,12 +28,15 @@ import functools
 import logging
 import struct
 from typing import (
+    Any,
     Callable,
     Dict,
     Iterable,
     List,
     Optional,
     Sequence,
+    SupportsBytes,
+    Type,
     Union,
     TYPE_CHECKING,
 )
@@ -41,6 +44,7 @@ from typing import (
 from bumble.colors import color
 from bumble.core import BaseBumbleError, UUID
 from bumble.att import Attribute, AttributeValue
+from bumble.utils import ByteSerializable
 
 if TYPE_CHECKING:
     from bumble.gatt_client import AttributeProxy
@@ -343,7 +347,7 @@ class Service(Attribute):
     def __init__(
         self,
         uuid: Union[str, UUID],
-        characteristics: List[Characteristic],
+        characteristics: Iterable[Characteristic],
         primary=True,
         included_services: Iterable[Service] = (),
     ) -> None:
@@ -362,7 +366,7 @@ class Service(Attribute):
         )
         self.uuid = uuid
         self.included_services = list(included_services)
-        self.characteristics = characteristics[:]
+        self.characteristics = list(characteristics)
         self.primary = primary
 
     def get_advertising_data(self) -> Optional[bytes]:
@@ -393,7 +397,7 @@ class TemplateService(Service):
 
     def __init__(
         self,
-        characteristics: List[Characteristic],
+        characteristics: Iterable[Characteristic],
         primary: bool = True,
         included_services: Iterable[Service] = (),
     ) -> None:
@@ -490,7 +494,7 @@ class Characteristic(Attribute):
         uuid: Union[str, bytes, UUID],
         properties: Characteristic.Properties,
         permissions: Union[str, Attribute.Permissions],
-        value: Union[str, bytes, CharacteristicValue] = b'',
+        value: Any = b'',
         descriptors: Sequence[Descriptor] = (),
     ):
         super().__init__(uuid, permissions, value)
@@ -525,7 +529,11 @@ class CharacteristicDeclaration(Attribute):
 
     characteristic: Characteristic
 
-    def __init__(self, characteristic: Characteristic, value_handle: int) -> None:
+    def __init__(
+        self,
+        characteristic: Characteristic,
+        value_handle: int,
+    ) -> None:
         declaration_bytes = (
             struct.pack('<BH', characteristic.properties, value_handle)
             + characteristic.uuid.to_pdu_bytes()
@@ -705,7 +713,7 @@ class MappedCharacteristicAdapter(PackedCharacteristicAdapter):
     '''
     Adapter that packs/unpacks characteristic values according to a standard
     Python `struct` format.
-    The adapted `read_value` and `write_value` methods return/accept aa dictionary which
+    The adapted `read_value` and `write_value` methods return/accept a dictionary which
     is packed/unpacked according to format, with the arguments extracted from the
     dictionary by key, in the same order as they occur in the `keys` parameter.
     '''
@@ -733,6 +741,24 @@ class UTF8CharacteristicAdapter(CharacteristicAdapter):
 
     def decode_value(self, value: bytes) -> str:
         return value.decode('utf-8')
+
+
+# -----------------------------------------------------------------------------
+class SerializableCharacteristicAdapter(CharacteristicAdapter):
+    '''
+    Adapter that converts any class to/from bytes using the class'
+    `to_bytes` and `__bytes__` methods, respectively.
+    '''
+
+    def __init__(self, characteristic, cls: Type[ByteSerializable]):
+        super().__init__(characteristic)
+        self.cls = cls
+
+    def encode_value(self, value: SupportsBytes) -> bytes:
+        return bytes(value)
+
+    def decode_value(self, value: bytes) -> Any:
+        return self.cls.from_bytes(value)
 
 
 # -----------------------------------------------------------------------------

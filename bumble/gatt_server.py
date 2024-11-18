@@ -28,7 +28,17 @@ import asyncio
 import logging
 from collections import defaultdict
 import struct
-from typing import List, Tuple, Optional, TypeVar, Type, Dict, Iterable, TYPE_CHECKING
+from typing import (
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+    Type,
+    Union,
+    TYPE_CHECKING,
+)
 from pyee import EventEmitter
 
 from bumble.colors import color
@@ -68,6 +78,7 @@ from bumble.gatt import (
     GATT_REQUEST_TIMEOUT,
     GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
     Characteristic,
+    CharacteristicAdapter,
     CharacteristicDeclaration,
     CharacteristicValue,
     IncludedServiceDeclaration,

@@ -276,10 +276,7 @@ class BroadcastReceiveState:
     subgroups: List[SubgroupInfo]
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> Optional[BroadcastReceiveState]:
-        if not data:
-            return None
-
+    def from_bytes(cls, data: bytes) -> BroadcastReceiveState:
         source_id = data[0]
         _, source_address = hci.Address.parse_address_preceded_by_type(data, 2)
         source_adv_sid = data[8]
@@ -357,7 +354,7 @@ class BroadcastAudioScanServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = BroadcastAudioScanService
 
     broadcast_audio_scan_control_point: gatt_client.CharacteristicProxy
-    broadcast_receive_states: List[gatt.DelegatedCharacteristicAdapter]
+    broadcast_receive_states: List[gatt.SerializableCharacteristicAdapter]
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy):
         self.service_proxy = service_proxy
@@ -381,8 +378,8 @@ class BroadcastAudioScanServiceProxy(gatt_client.ProfileServiceProxy):
                 "Broadcast Receive State characteristic not found"
             )
         self.broadcast_receive_states = [
-            gatt.DelegatedCharacteristicAdapter(
-                characteristic, decode=BroadcastReceiveState.from_bytes
+            gatt.SerializableCharacteristicAdapter(
+                characteristic, BroadcastReceiveState
             )
             for characteristic in characteristics
         ]

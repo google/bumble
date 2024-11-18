@@ -759,13 +759,13 @@ class AttributeValue:
     def __init__(
         self,
         read: Union[
-            Callable[[Optional[Connection]], bytes],
-            Callable[[Optional[Connection]], Awaitable[bytes]],
+            Callable[[Optional[Connection]], Any],
+            Callable[[Optional[Connection]], Awaitable[Any]],
             None,
         ] = None,
         write: Union[
-            Callable[[Optional[Connection], bytes], None],
-            Callable[[Optional[Connection], bytes], Awaitable[None]],
+            Callable[[Optional[Connection], Any], None],
+            Callable[[Optional[Connection], Any], Awaitable[None]],
             None,
         ] = None,
     ):
@@ -824,13 +824,13 @@ class Attribute(EventEmitter):
     READ_REQUIRES_AUTHORIZATION = Permissions.READ_REQUIRES_AUTHORIZATION
     WRITE_REQUIRES_AUTHORIZATION = Permissions.WRITE_REQUIRES_AUTHORIZATION
 
-    value: Union[bytes, AttributeValue]
+    value: Any
 
     def __init__(
         self,
         attribute_type: Union[str, bytes, UUID],
         permissions: Union[str, Attribute.Permissions],
-        value: Union[str, bytes, AttributeValue] = b'',
+        value: Any = b'',
     ) -> None:
         EventEmitter.__init__(self)
         self.handle = 0
@@ -848,11 +848,7 @@ class Attribute(EventEmitter):
         else:
             self.type = attribute_type
 
-        # Convert the value to a byte array
-        if isinstance(value, str):
-            self.value = bytes(value, 'utf-8')
-        else:
-            self.value = value
+        self.value = value
 
     def encode_value(self, value: Any) -> bytes:
         return value
@@ -894,6 +890,8 @@ class Attribute(EventEmitter):
                 ) from error
         else:
             value = self.value
+
+        self.emit('read', connection, value)
 
         return self.encode_value(value)
 
