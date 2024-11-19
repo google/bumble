@@ -4332,6 +4332,61 @@ class HCI_LE_Clear_Advertising_Sets_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('advertising_handle', 1),
+        ('periodic_advertising_interval_min', 2),
+        ('periodic_advertising_interval_max', 2),
+        ('periodic_advertising_properties', 2),
+    ]
+)
+class HCI_LE_Set_Periodic_Advertising_Parameters_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.61 LE Set Periodic Advertising Parameters command
+    '''
+
+    class Properties(enum.IntFlag):
+        INCLUDE_TX_POWER = 1 << 6
+
+    advertising_handle: int
+    periodic_advertising_interval_min: int
+    periodic_advertising_interval_max: int
+    periodic_advertising_properties: int
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('advertising_handle', 1),
+        (
+            'operation',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Set_Extended_Advertising_Data_Command.Operation(
+                    x
+                ).name,
+            },
+        ),
+        (
+            'advertising_data',
+            {
+                'parser': HCI_Object.parse_length_prefixed_bytes,
+                'serializer': HCI_Object.serialize_length_prefixed_bytes,
+            },
+        ),
+    ]
+)
+class HCI_LE_Set_Periodic_Advertising_Data_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.62 LE Set Periodic Advertising Data command
+    '''
+
+    advertising_handle: int
+    operation: int
+    advertising_data: bytes
+
+
+# -----------------------------------------------------------------------------
 @HCI_Command.command([('enable', 1), ('advertising_handle', 1)])
 class HCI_LE_Set_Periodic_Advertising_Enable_Command(HCI_Command):
     '''
