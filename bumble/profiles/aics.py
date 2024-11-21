@@ -104,7 +104,7 @@ class AudioInputControlPointOpCode(OpenIntEnum):
     Cf. 3.5.1 Audio Input Control Point procedure requirements
     '''
 
-    SET_GAIN_SETTING = 0x00
+    SET_GAIN_SETTING = 0x01
     UNMUTE = 0x02
     MUTE = 0x03
     SET_MANUAL_GAIN_MODE = 0x04
