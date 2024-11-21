@@ -95,7 +95,7 @@ class AudioInputStatus(OpenIntEnum):
     Cf. 3.4 Audio Input Status
     '''
 
-    INATIVE = 0x00
+    INACTIVE = 0x00
     ACTIVE = 0x01
 
 
@@ -239,7 +239,7 @@ class AudioInputControlPoint:
             or gain_settings_operand
             > self.gain_settings_properties.gain_settings_maximum
         ):
-            logger.error("gain_seetings value out of range")
+            logger.error("gain_settings value out of range")
             raise ATT_Error(ErrorCode.VALUE_OUT_OF_RANGE)
 
         if self.audio_input_state.gain_settings != gain_settings_operand:
