@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Support for Intel USB controllers.
+Loosely based on the Fuchsia OS implementation.
+"""
 
 # -----------------------------------------------------------------------------
 # Imports
@@ -405,7 +409,8 @@ class Driver(common.Driver):
 
         if self.max_in_flight_firmware_load_commands != event.num_hci_command_packets:
             logger.debug(
-                f"max_in_flight_firmware_load_commands update: {event.num_hci_command_packets}"
+                "max_in_flight_firmware_load_commands update: "
+                f"{event.num_hci_command_packets}"
             )
             self.max_in_flight_firmware_load_commands = event.num_hci_command_packets
         logger.debug(f"event: {event}")
@@ -521,7 +526,7 @@ class Driver(common.Driver):
         # because they are formatted as HCI event packets but are received
         # on the ACL channel, so the host parser would get confused.
         saved_on_packet = self.host.on_packet
-        self.host.on_packet = self.on_packet
+        self.host.on_packet = self.on_packet  # type: ignore
         self.firmware_load_complete.clear()
 
         # Send the CSS header
@@ -577,7 +582,7 @@ class Driver(common.Driver):
         logger.debug("firmware loaded")
 
         # Restore the original packet handler.
-        self.host.on_packet = saved_on_packet
+        self.host.on_packet = saved_on_packet  # type: ignore
 
         # Reset
         self.reset_complete.clear()
@@ -653,10 +658,10 @@ class Driver(common.Driver):
         if not isinstance(response, hci.HCI_Command_Complete_Event):
             raise DriverError("unexpected HCI response")
 
-        if response.return_parameters.status != 0:
+        if response.return_parameters.status != 0:  # type: ignore
             raise DriverError("HCI_Intel_Read_Version_Command error")
 
-        tlvs = _parse_tlv(response.return_parameters.tlv)
+        tlvs = _parse_tlv(response.return_parameters.tlv)  # type: ignore
 
         # Convert the list to a dict. That's Ok here because we only expect each type
         # to appear just once.

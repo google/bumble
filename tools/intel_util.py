@@ -18,7 +18,7 @@
 import logging
 import asyncio
 import os
-from typing import Any
+from typing import Any, Optional
 
 import click
 
@@ -46,32 +46,41 @@ def print_device_info(device_info: dict[intel.ValueType, Any]) -> None:
 
 
 # -----------------------------------------------------------------------------
+async def get_driver(host: Host, force: bool) -> Optional[intel.Driver]:
+    # Create a driver
+    driver = await intel.Driver.for_host(host, force)
+    if driver is None:
+        print("Device does not appear to be an Intel device")
+        return None
+
+    return driver
+
+
+# -----------------------------------------------------------------------------
 async def do_info(usb_transport, force):
     async with await transport.open_transport(usb_transport) as (
         hci_source,
         hci_sink,
     ):
-        # Create a host to communicate with the device
         host = Host(hci_source, hci_sink)
-
-        # Create a driver
-        driver = await intel.Driver.for_host(host, force)
+        driver = await get_driver(host, force)
+        if driver is None:
+            return
 
         # Get and print the device info
         print_device_info(await driver.read_device_info())
 
 
 # -----------------------------------------------------------------------------
-async def do_load(usb_transport, force):
+async def do_load(usb_transport: str, force: bool) -> None:
     async with await transport.open_transport(usb_transport) as (
         hci_source,
         hci_sink,
     ):
-        # Create a host to communicate with the device
         host = Host(hci_source, hci_sink)
-
-        # Create a driver
-        driver = await intel.Driver.for_host(host, force)
+        driver = await get_driver(host, force)
+        if driver is None:
+            return
 
         # Reboot in bootloader mode
         await driver.load_firmware()
@@ -81,16 +90,15 @@ async def do_load(usb_transport, force):
 
 
 # -----------------------------------------------------------------------------
-async def do_bootloader(usb_transport, force):
+async def do_bootloader(usb_transport: str, force: bool) -> None:
     async with await transport.open_transport(usb_transport) as (
         hci_source,
         hci_sink,
     ):
-        # Create a host to communicate with the device
         host = Host(hci_source, hci_sink)
-
-        # Create a driver
-        driver = await intel.Driver.for_host(host, force)
+        driver = await get_driver(host, force)
+        if driver is None:
+            return
 
         # Reboot in bootloader mode
         await driver.reboot_bootloader()

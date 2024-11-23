@@ -144,18 +144,18 @@ class Printer:
     help='Format of the input file',
 )
 @click.option(
-    '--vendors',
+    '--vendor',
     type=click.Choice(['android', 'zephyr']),
     multiple=True,
     help='Support vendor-specific commands (list one or more)',
 )
 @click.argument('filename')
 # pylint: disable=redefined-builtin
-def main(format, vendors, filename):
-    for vendor in vendors:
-        if vendor == 'android':
+def main(format, vendor, filename):
+    for vendor_name in vendor:
+        if vendor_name == 'android':
             import bumble.vendor.android.hci
-        elif vendor == 'zephyr':
+        elif vendor_name == 'zephyr':
             import bumble.vendor.zephyr.hci
 
     input = open(filename, 'rb')
@@ -180,7 +180,7 @@ def main(format, vendors, filename):
             else:
                 printer.print(color("[TRUNCATED]", "red"))
         except Exception as error:
-            logger.exception()
+            logger.exception('')
             print(color(f'!!! {error}', 'red'))
 
 
