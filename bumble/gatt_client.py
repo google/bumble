@@ -292,7 +292,7 @@ class Client:
         logger.debug(
             f'GATT Command from client: [0x{self.connection.handle:04X}] {command}'
         )
-        self.send_gatt_pdu(command.to_bytes())
+        self.send_gatt_pdu(bytes(command))
 
     async def send_request(self, request: ATT_PDU):
         logger.debug(
@@ -310,7 +310,7 @@ class Client:
             self.pending_request = request
 
             try:
-                self.send_gatt_pdu(request.to_bytes())
+                self.send_gatt_pdu(bytes(request))
                 response = await asyncio.wait_for(
                     self.pending_response, GATT_REQUEST_TIMEOUT
                 )
@@ -328,7 +328,7 @@ class Client:
             f'GATT Confirmation from client: [0x{self.connection.handle:04X}] '
             f'{confirmation}'
         )
-        self.send_gatt_pdu(confirmation.to_bytes())
+        self.send_gatt_pdu(bytes(confirmation))
 
     async def request_mtu(self, mtu: int) -> int:
         # Check the range

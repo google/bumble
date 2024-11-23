@@ -298,11 +298,8 @@ class SMP_Command:
     def init_from_bytes(self, pdu: bytes, offset: int) -> None:
         return HCI_Object.init_from_bytes(self, pdu, offset, self.fields)
 
-    def to_bytes(self):
-        return self.pdu
-
     def __bytes__(self):
-        return self.to_bytes()
+        return self.pdu
 
     def __str__(self):
         result = color(self.name, 'yellow')
@@ -1949,7 +1946,7 @@ class Manager(EventEmitter):
             f'{connection.peer_address}: {command}'
         )
         cid = SMP_BR_CID if connection.transport == BT_BR_EDR_TRANSPORT else SMP_CID
-        connection.send_l2cap_pdu(cid, command.to_bytes())
+        connection.send_l2cap_pdu(cid, bytes(command))
 
     def on_smp_security_request_command(
         self, connection: Connection, request: SMP_Security_Request_Command

@@ -225,16 +225,13 @@ class L2CAP_PDU:
 
         return L2CAP_PDU(l2cap_pdu_cid, l2cap_pdu_payload)
 
-    def to_bytes(self) -> bytes:
+    def __bytes__(self) -> bytes:
         header = struct.pack('<HH', len(self.payload), self.cid)
         return header + self.payload
 
     def __init__(self, cid: int, payload: bytes) -> None:
         self.cid = cid
         self.payload = payload
-
-    def __bytes__(self) -> bytes:
-        return self.to_bytes()
 
     def __str__(self) -> str:
         return f'{color("L2CAP", "green")} [CID={self.cid}]: {self.payload.hex()}'
@@ -333,11 +330,8 @@ class L2CAP_Control_Frame:
     def init_from_bytes(self, pdu, offset):
         return HCI_Object.init_from_bytes(self, pdu, offset, self.fields)
 
-    def to_bytes(self) -> bytes:
-        return self.pdu
-
     def __bytes__(self) -> bytes:
-        return self.to_bytes()
+        return self.pdu
 
     def __str__(self) -> str:
         result = f'{color(self.name, "yellow")} [ID={self.identifier}]'

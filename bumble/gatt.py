@@ -410,7 +410,7 @@ class IncludedServiceDeclaration(Attribute):
 
     def __init__(self, service: Service) -> None:
         declaration_bytes = struct.pack(
-            '<HH2s', service.handle, service.end_group_handle, service.uuid.to_bytes()
+            '<HH2s', service.handle, service.end_group_handle, bytes(service.uuid)
         )
         super().__init__(
             GATT_INCLUDE_ATTRIBUTE_TYPE, Attribute.READABLE, declaration_bytes

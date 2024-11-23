@@ -291,9 +291,6 @@ class ATT_PDU:
     def init_from_bytes(self, pdu, offset):
         return HCI_Object.init_from_bytes(self, pdu, offset, self.fields)
 
-    def to_bytes(self):
-        return self.pdu
-
     @property
     def is_command(self):
         return ((self.op_code >> 6) & 1) == 1
@@ -303,7 +300,7 @@ class ATT_PDU:
         return ((self.op_code >> 7) & 1) == 1
 
     def __bytes__(self):
-        return self.to_bytes()
+        return self.pdu
 
     def __str__(self):
         result = color(self.name, 'yellow')

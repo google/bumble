@@ -344,9 +344,6 @@ class DataElement:
         ]  # Keep a copy so we can re-serialize to an exact replica
         return result
 
-    def to_bytes(self):
-        return bytes(self)
-
     def __bytes__(self):
         # Return early if we have a cache
         if self.bytes:
@@ -623,11 +620,8 @@ class SDP_PDU:
     def init_from_bytes(self, pdu, offset):
         return HCI_Object.init_from_bytes(self, pdu, offset, self.fields)
 
-    def to_bytes(self):
-        return self.pdu
-
     def __bytes__(self):
-        return self.to_bytes()
+        return self.pdu
 
     def __str__(self):
         result = f'{color(self.name, "blue")} [TID={self.transaction_id}]'

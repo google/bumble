@@ -57,7 +57,7 @@ from .test_utils import async_barrier
 
 # -----------------------------------------------------------------------------
 def basic_check(x):
-    pdu = x.to_bytes()
+    pdu = bytes(x)
     parsed = ATT_PDU.from_bytes(pdu)
     x_str = str(x)
     parsed_str = str(parsed)
@@ -74,7 +74,7 @@ def test_UUID():
     assert str(u) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6'
     v = UUID(str(u))
     assert str(v) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6'
-    w = UUID.from_bytes(v.to_bytes())
+    w = UUID.from_bytes(bytes(v))
     assert str(w) == '61A3512C-09BE-4DDC-A6A6-0B03667AAFC6'
 
     u1 = UUID.from_16_bits(0x1234)

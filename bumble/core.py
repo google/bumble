@@ -1624,9 +1624,6 @@ class AdvertisingData:
             [bytes([len(x[1]) + 1, x[0]]) + x[1] for x in self.ad_structures]
         )
 
-    def to_bytes(self) -> bytes:
-        return bytes(self)
-
     def to_string(self, separator=', '):
         return separator.join(
             [AdvertisingData.ad_data_to_string(x[0], x[1]) for x in self.ad_structures]

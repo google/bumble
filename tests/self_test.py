@@ -240,7 +240,7 @@ async def test_self_gatt():
     result = await peer.discover_included_services(result[0])
     assert len(result) == 2
     # Service UUID is only present when the UUID is 16-bit Bluetooth UUID
-    assert result[1].uuid.to_bytes() == s3.uuid.to_bytes()
+    assert bytes(result[1].uuid) == bytes(s3.uuid)
 
 
 # -----------------------------------------------------------------------------
