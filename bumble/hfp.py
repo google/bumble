@@ -141,7 +141,7 @@ class HfFeature(enum.IntFlag):
     """
     HF supported features (AT+BRSF=) (normative).
 
-    Hands-Free Profile v1.8, 4.34.2, AT Capabilities Re-Used from GSM 07.07 and 3GPP 27.007.
+    Hands-Free Profile v1.9, 4.34.2, AT Capabilities Re-Used from GSM 07.07 and 3GPP 27.007.
     """
 
     EC_NR = 0x001  # Echo Cancel & Noise reduction
@@ -155,14 +155,14 @@ class HfFeature(enum.IntFlag):
     HF_INDICATORS = 0x100
     ESCO_S4_SETTINGS_SUPPORTED = 0x200
     ENHANCED_VOICE_RECOGNITION_STATUS = 0x400
-    VOICE_RECOGNITION_TEST = 0x800
+    VOICE_RECOGNITION_TEXT = 0x800
 
 
 class AgFeature(enum.IntFlag):
     """
     AG supported features (+BRSF:) (normative).
 
-    Hands-Free Profile v1.8, 4.34.2, AT Capabilities Re-Used from GSM 07.07 and 3GPP 27.007.
+    Hands-Free Profile v1.9, 4.34.2, AT Capabilities Re-Used from GSM 07.07 and 3GPP 27.007.
     """
 
     THREE_WAY_CALLING = 0x001
@@ -178,7 +178,7 @@ class AgFeature(enum.IntFlag):
     HF_INDICATORS = 0x400
     ESCO_S4_SETTINGS_SUPPORTED = 0x800
     ENHANCED_VOICE_RECOGNITION_STATUS = 0x1000
-    VOICE_RECOGNITION_TEST = 0x2000
+    VOICE_RECOGNITION_TEXT = 0x2000
 
 
 class AudioCodec(enum.IntEnum):
@@ -1390,6 +1390,7 @@ class AgProtocol(pyee.EventEmitter):
 
     def _on_bac(self, *args) -> None:
         self.supported_audio_codecs = [AudioCodec(int(value)) for value in args]
+        self.emit('supported_audio_codecs', self.supported_audio_codecs)
         self.send_ok()
 
     def _on_bcs(self, codec: bytes) -> None:
@@ -1618,7 +1619,7 @@ class ProfileVersion(enum.IntEnum):
     """
     Profile version (normative).
 
-    Hands-Free Profile v1.8, 5.3 SDP Interoperability Requirements.
+    Hands-Free Profile v1.8, 6.3 SDP Interoperability Requirements.
     """
 
     V1_5 = 0x0105
@@ -1632,7 +1633,7 @@ class HfSdpFeature(enum.IntFlag):
     """
     HF supported features (normative).
 
-    Hands-Free Profile v1.8, 5.3 SDP Interoperability Requirements.
+    Hands-Free Profile v1.9, 6.3 SDP Interoperability Requirements.
     """
 
     EC_NR = 0x01  # Echo Cancel & Noise reduction
@@ -1640,16 +1641,17 @@ class HfSdpFeature(enum.IntFlag):
     CLI_PRESENTATION_CAPABILITY = 0x04
     VOICE_RECOGNITION_ACTIVATION = 0x08
     REMOTE_VOLUME_CONTROL = 0x10
-    WIDE_BAND = 0x20  # Wide band speech
+    WIDE_BAND_SPEECH = 0x20
     ENHANCED_VOICE_RECOGNITION_STATUS = 0x40
-    VOICE_RECOGNITION_TEST = 0x80
+    VOICE_RECOGNITION_TEXT = 0x80
+    SUPER_WIDE_BAND = 0x100
 
 
 class AgSdpFeature(enum.IntFlag):
     """
     AG supported features (normative).
 
-    Hands-Free Profile v1.8, 5.3 SDP Interoperability Requirements.
+    Hands-Free Profile v1.9, 6.3 SDP Interoperability Requirements.
     """
 
     THREE_WAY_CALLING = 0x01
@@ -1657,9 +1659,10 @@ class AgSdpFeature(enum.IntFlag):
     VOICE_RECOGNITION_FUNCTION = 0x04
     IN_BAND_RING_TONE_CAPABILITY = 0x08
     VOICE_TAG = 0x10  # Attach a number to voice tag
-    WIDE_BAND = 0x20  # Wide band speech
+    WIDE_BAND_SPEECH = 0x20
     ENHANCED_VOICE_RECOGNITION_STATUS = 0x40
-    VOICE_RECOGNITION_TEST = 0x80
+    VOICE_RECOGNITION_TEXT = 0x80
+    SUPER_WIDE_BAND_SPEED_SPEECH = 0x100
 
 
 def make_hf_sdp_records(
@@ -1692,11 +1695,11 @@ def make_hf_sdp_records(
         in configuration.supported_hf_features
     ):
         hf_supported_features |= HfSdpFeature.ENHANCED_VOICE_RECOGNITION_STATUS
-    if HfFeature.VOICE_RECOGNITION_TEST in configuration.supported_hf_features:
-        hf_supported_features |= HfSdpFeature.VOICE_RECOGNITION_TEST
+    if HfFeature.VOICE_RECOGNITION_TEXT in configuration.supported_hf_features:
+        hf_supported_features |= HfSdpFeature.VOICE_RECOGNITION_TEXT
 
     if AudioCodec.MSBC in configuration.supported_audio_codecs:
-        hf_supported_features |= HfSdpFeature.WIDE_BAND
+        hf_supported_features |= HfSdpFeature.WIDE_BAND_SPEECH
 
     return [
         sdp.ServiceAttribute(
@@ -1772,14 +1775,14 @@ def make_ag_sdp_records(
         in configuration.supported_ag_features
     ):
         ag_supported_features |= AgSdpFeature.ENHANCED_VOICE_RECOGNITION_STATUS
-    if AgFeature.VOICE_RECOGNITION_TEST in configuration.supported_ag_features:
-        ag_supported_features |= AgSdpFeature.VOICE_RECOGNITION_TEST
+    if AgFeature.VOICE_RECOGNITION_TEXT in configuration.supported_ag_features:
+        ag_supported_features |= AgSdpFeature.VOICE_RECOGNITION_TEXT
     if AgFeature.IN_BAND_RING_TONE_CAPABILITY in configuration.supported_ag_features:
         ag_supported_features |= AgSdpFeature.IN_BAND_RING_TONE_CAPABILITY
     if AgFeature.VOICE_RECOGNITION_FUNCTION in configuration.supported_ag_features:
         ag_supported_features |= AgSdpFeature.VOICE_RECOGNITION_FUNCTION
     if AudioCodec.MSBC in configuration.supported_audio_codecs:
-        ag_supported_features |= AgSdpFeature.WIDE_BAND
+        ag_supported_features |= AgSdpFeature.WIDE_BAND_SPEECH
 
     return [
         sdp.ServiceAttribute(

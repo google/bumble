@@ -61,7 +61,7 @@ def _default_hf_configuration() -> hfp.HfConfiguration:
 # -----------------------------------------------------------------------------
 def _default_hf_sdp_features() -> hfp.HfSdpFeature:
     return (
-        hfp.HfSdpFeature.WIDE_BAND
+        hfp.HfSdpFeature.WIDE_BAND_SPEECH
         | hfp.HfSdpFeature.THREE_WAY_CALLING
         | hfp.HfSdpFeature.CLI_PRESENTATION_CAPABILITY
     )
@@ -108,7 +108,7 @@ def _default_ag_configuration() -> hfp.AgConfiguration:
 # -----------------------------------------------------------------------------
 def _default_ag_sdp_features() -> hfp.AgSdpFeature:
     return (
-        hfp.AgSdpFeature.WIDE_BAND
+        hfp.AgSdpFeature.WIDE_BAND_SPEECH
         | hfp.AgSdpFeature.IN_BAND_RING_TONE_CAPABILITY
         | hfp.AgSdpFeature.THREE_WAY_CALLING
     )
