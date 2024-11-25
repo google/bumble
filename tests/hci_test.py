@@ -75,13 +75,13 @@ from bumble.hci import (
 
 
 def basic_check(x):
-    packet = x.to_bytes()
+    packet = bytes(x)
     print(packet.hex())
     parsed = HCI_Packet.from_bytes(packet)
     x_str = str(x)
     parsed_str = str(parsed)
     print(x_str)
-    parsed_bytes = parsed.to_bytes()
+    parsed_bytes = bytes(parsed)
     assert x_str == parsed_str
     assert packet == parsed_bytes
 
@@ -188,7 +188,7 @@ def test_HCI_Command_Complete_Event():
         return_parameters=bytes([7]),
     )
     basic_check(event)
-    event = HCI_Packet.from_bytes(event.to_bytes())
+    event = HCI_Packet.from_bytes(bytes(event))
     assert event.return_parameters == 7
 
     # With a simple status as an integer status
@@ -562,7 +562,7 @@ def test_iso_data_packet():
         '6281bc77ed6a3206d984bcdabee6be831c699cb50e2'
     )
 
-    assert packet.to_bytes() == data
+    assert bytes(packet) == data
 
 
 # -----------------------------------------------------------------------------

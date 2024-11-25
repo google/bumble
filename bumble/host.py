@@ -199,7 +199,7 @@ class Host(AbortableEventEmitter):
         check_address_type: bool = False,
     ) -> Optional[Connection]:
         for connection in self.connections.values():
-            if connection.peer_address.to_bytes() == bd_addr.to_bytes():
+            if bytes(connection.peer_address) == bytes(bd_addr):
                 if (
                     check_address_type
                     and connection.peer_address.address_type != bd_addr.address_type

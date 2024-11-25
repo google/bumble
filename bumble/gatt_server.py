@@ -353,7 +353,7 @@ class Server(EventEmitter):
         logger.debug(
             f'GATT Response from server: [0x{connection.handle:04X}] {response}'
         )
-        self.send_gatt_pdu(connection.handle, response.to_bytes())
+        self.send_gatt_pdu(connection.handle, bytes(response))
 
     async def notify_subscriber(
         self,
@@ -450,7 +450,7 @@ class Server(EventEmitter):
             )
 
             try:
-                self.send_gatt_pdu(connection.handle, indication.to_bytes())
+                self.send_gatt_pdu(connection.handle, bytes(indication))
                 await asyncio.wait_for(pending_confirmation, GATT_REQUEST_TIMEOUT)
             except asyncio.TimeoutError as error:
                 logger.warning(color('!!! GATT Indicate timeout', 'red'))

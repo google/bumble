@@ -1496,13 +1496,10 @@ class CodingFormat:
     def from_bytes(cls, data: bytes) -> CodingFormat:
         return cls.parse_from_bytes(data, 0)[1]
 
-    def to_bytes(self) -> bytes:
+    def __bytes__(self) -> bytes:
         return struct.pack(
             '<BHH', self.codec_id, self.company_id, self.vendor_specific_codec_id
         )
-
-    def __bytes__(self) -> bytes:
-        return self.to_bytes()
 
 
 # -----------------------------------------------------------------------------
@@ -1720,7 +1717,7 @@ class HCI_Object:
             field_length = len(field_bytes)
             field_bytes = bytes([field_length]) + field_bytes
         elif isinstance(field_value, (bytes, bytearray)) or hasattr(
-            field_value, 'to_bytes'
+            field_value, '__bytes__'
         ):
             field_bytes = bytes(field_value)
             if isinstance(field_type, int) and 4 < field_type <= 256:
@@ -1765,7 +1762,7 @@ class HCI_Object:
     def from_bytes(cls, data, offset, fields):
         return cls(fields, **cls.dict_from_bytes(data, offset, fields))
 
-    def to_bytes(self):
+    def __bytes__(self):
         return HCI_Object.dict_to_bytes(self.__dict__, self.fields)
 
     @staticmethod
@@ -1859,9 +1856,6 @@ class HCI_Object:
             f'{color(f"{field_name + sep:{1 + max_field_name_length}}", "cyan")} {field_value}'
             for field_name, field_value in field_strings
         )
-
-    def __bytes__(self):
-        return self.to_bytes()
 
     def __init__(self, fields, **kwargs):
         self.fields = fields
@@ -2037,9 +2031,6 @@ class Address:
     def is_static(self):
         return self.is_random and (self.address_bytes[5] >> 6 == 3)
 
-    def to_bytes(self):
-        return self.address_bytes
-
     def to_string(self, with_type_qualifier=True):
         '''
         String representation of the address, MSB first, with an optional type
@@ -2051,7 +2042,7 @@ class Address:
         return result + '/P'
 
     def __bytes__(self):
-        return self.to_bytes()
+        return self.address_bytes
 
     def __hash__(self):
         return hash(self.address_bytes)
@@ -2257,15 +2248,12 @@ class HCI_Command(HCI_Packet):
         self.op_code = op_code
         self.parameters = parameters
 
-    def to_bytes(self):
+    def __bytes__(self):
         parameters = b'' if self.parameters is None else self.parameters
         return (
             struct.pack('<BHB', HCI_COMMAND_PACKET, self.op_code, len(parameters))
             + parameters
         )
-
-    def __bytes__(self):
-        return self.to_bytes()
 
     def __str__(self):
         result = color(self.name, 'green')
@@ -5190,12 +5178,9 @@ class HCI_Event(HCI_Packet):
         self.event_code = event_code
         self.parameters = parameters
 
-    def to_bytes(self):
+    def __bytes__(self):
         parameters = b'' if self.parameters is None else self.parameters
         return bytes([HCI_EVENT_PACKET, self.event_code, len(parameters)]) + parameters
-
-    def __bytes__(self):
-        return self.to_bytes()
 
     def __str__(self):
         result = color(self.name, 'magenta')
@@ -6747,7 +6732,7 @@ class HCI_AclDataPacket(HCI_Packet):
             connection_handle, pb_flag, bc_flag, data_total_length, data
         )
 
-    def to_bytes(self):
+    def __bytes__(self):
         h = (self.pb_flag << 12) | (self.bc_flag << 14) | self.connection_handle
         return (
             struct.pack('<BHH', HCI_ACL_DATA_PACKET, h, self.data_total_length)
@@ -6760,9 +6745,6 @@ class HCI_AclDataPacket(HCI_Packet):
         self.bc_flag = bc_flag
         self.data_total_length = data_total_length
         self.data = data
-
-    def __bytes__(self):
-        return self.to_bytes()
 
     def __str__(self):
         return (
@@ -6797,7 +6779,7 @@ class HCI_SynchronousDataPacket(HCI_Packet):
             connection_handle, packet_status, data_total_length, data
         )
 
-    def to_bytes(self) -> bytes:
+    def __bytes__(self) -> bytes:
         h = (self.packet_status << 12) | self.connection_handle
         return (
             struct.pack('<BHB', HCI_SYNCHRONOUS_DATA_PACKET, h, self.data_total_length)
@@ -6815,9 +6797,6 @@ class HCI_SynchronousDataPacket(HCI_Packet):
         self.packet_status = packet_status
         self.data_total_length = data_total_length
         self.data = data
-
-    def __bytes__(self) -> bytes:
-        return self.to_bytes()
 
     def __str__(self) -> str:
         return (
@@ -6891,9 +6870,6 @@ class HCI_IsoDataPacket(HCI_Packet):
         )
 
     def __bytes__(self) -> bytes:
-        return self.to_bytes()
-
-    def to_bytes(self) -> bytes:
         fmt = '<BHH'
         args = [
             HCI_ISO_DATA_PACKET,

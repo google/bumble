@@ -83,7 +83,7 @@ async def async_main():
                         return_parameters=bytes([hci.HCI_SUCCESS]),
                     )
                     # Return a packet with 'respond to sender' set to True
-                    return (response.to_bytes(), True)
+                    return (bytes(response), True)
 
                 return None
 

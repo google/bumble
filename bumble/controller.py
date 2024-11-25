@@ -314,7 +314,7 @@ class Controller:
             f'{color("CONTROLLER -> HOST", "green")}: {packet}'
         )
         if self.host:
-            self.host.on_packet(packet.to_bytes())
+            self.host.on_packet(bytes(packet))
 
     # This method allows the controller to emulate the same API as a transport source
     async def wait_for_termination(self):
@@ -1192,7 +1192,7 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.4.6 Read BD_ADDR Command
         '''
         bd_addr = (
-            self._public_address.to_bytes()
+            bytes(self._public_address)
             if self._public_address is not None
             else bytes(6)
         )

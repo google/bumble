@@ -265,7 +265,7 @@ class UnicastServerAdvertisingData:
                         core.AdvertisingData.SERVICE_DATA_16_BIT_UUID,
                         struct.pack(
                             '<2sBIB',
-                            gatt.GATT_AUDIO_STREAM_CONTROL_SERVICE.to_bytes(),
+                            bytes(gatt.GATT_AUDIO_STREAM_CONTROL_SERVICE),
                             self.announcement_type,
                             self.available_audio_contexts,
                             len(self.metadata),
@@ -487,24 +487,23 @@ class BroadcastAudioAnnouncement:
     def from_bytes(cls, data: bytes) -> Self:
         return cls(int.from_bytes(data[:3], 'little'))
 
-    def to_bytes(self) -> bytes:
+    def __bytes__(self) -> bytes:
         return self.broadcast_id.to_bytes(3, 'little')
 
-    def __bytes__(self) -> bytes:
-        return self.to_bytes()
-
     def get_advertising_data(self) -> bytes:
-        return core.AdvertisingData(
-            [
-                (
-                    core.AdvertisingData.SERVICE_DATA_16_BIT_UUID,
+        return bytes(
+            core.AdvertisingData(
+                [
                     (
-                        gatt.GATT_BROADCAST_AUDIO_ANNOUNCEMENT_SERVICE.to_bytes()
-                        + self.to_bytes()
-                    ),
-                )
-            ]
-        ).to_bytes()
+                        core.AdvertisingData.SERVICE_DATA_16_BIT_UUID,
+                        (
+                            bytes(gatt.GATT_BROADCAST_AUDIO_ANNOUNCEMENT_SERVICE)
+                            + bytes(self)
+                        ),
+                    )
+                ]
+            )
+        )
 
 
 @dataclasses.dataclass
@@ -514,7 +513,7 @@ class BasicAudioAnnouncement:
         index: int
         codec_specific_configuration: CodecSpecificConfiguration
 
-        def to_bytes(self) -> bytes:
+        def __bytes__(self) -> bytes:
             codec_specific_configuration_bytes = bytes(
                 self.codec_specific_configuration
             )
@@ -523,9 +522,6 @@ class BasicAudioAnnouncement:
                 + codec_specific_configuration_bytes
             )
 
-        def __bytes__(self) -> bytes:
-            return self.to_bytes()
-
     @dataclasses.dataclass
     class Subgroup:
         codec_id: hci.CodingFormat
@@ -533,23 +529,20 @@ class BasicAudioAnnouncement:
         metadata: le_audio.Metadata
         bis: List[BasicAudioAnnouncement.BIS]
 
-        def to_bytes(self) -> bytes:
+        def __bytes__(self) -> bytes:
             metadata_bytes = bytes(self.metadata)
             codec_specific_configuration_bytes = bytes(
                 self.codec_specific_configuration
             )
             return (
                 bytes([len(self.bis)])
-                + self.codec_id.to_bytes()
+                + bytes(self.codec_id)
                 + bytes([len(codec_specific_configuration_bytes)])
                 + codec_specific_configuration_bytes
                 + bytes([len(metadata_bytes)])
                 + metadata_bytes
                 + b''.join(map(bytes, self.bis))
             )
-
-        def __bytes__(self) -> bytes:
-            return self.to_bytes()
 
     presentation_delay: int
     subgroups: List[BasicAudioAnnouncement.Subgroup]
@@ -607,25 +600,24 @@ class BasicAudioAnnouncement:
 
         return cls(presentation_delay, subgroups)
 
-    def to_bytes(self) -> bytes:
+    def __bytes__(self) -> bytes:
         return (
             self.presentation_delay.to_bytes(3, 'little')
             + bytes([len(self.subgroups)])
             + b''.join(map(bytes, self.subgroups))
         )
 
-    def __bytes__(self) -> bytes:
-        return self.to_bytes()
-
     def get_advertising_data(self) -> bytes:
-        return core.AdvertisingData(
-            [
-                (
-                    core.AdvertisingData.SERVICE_DATA_16_BIT_UUID,
+        return bytes(
+            core.AdvertisingData(
+                [
                     (
-                        gatt.GATT_BASIC_AUDIO_ANNOUNCEMENT_SERVICE.to_bytes()
-                        + self.to_bytes()
-                    ),
-                )
-            ]
-        ).to_bytes()
+                        core.AdvertisingData.SERVICE_DATA_16_BIT_UUID,
+                        (
+                            bytes(gatt.GATT_BASIC_AUDIO_ANNOUNCEMENT_SERVICE)
+                            + bytes(self)
+                        ),
+                    )
+                ]
+            )
+        )
