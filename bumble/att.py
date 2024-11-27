@@ -57,6 +57,7 @@ if TYPE_CHECKING:
 # pylint: disable=line-too-long
 
 ATT_CID = 0x04
+ATT_PSM = 0x001F
 
 ATT_ERROR_RESPONSE              = 0x01
 ATT_EXCHANGE_MTU_REQUEST        = 0x02

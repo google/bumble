@@ -373,7 +373,9 @@ async def pair(
             shared_data = (
                 None
                 if oob == '-'
-                else OobData.from_ad(AdvertisingData.from_bytes(bytes.fromhex(oob)))
+                else OobData.from_ad(
+                    AdvertisingData.from_bytes(bytes.fromhex(oob))
+                ).shared_data
             )
             legacy_context = OobLegacyContext()
             oob_contexts = PairingConfig.OobConfig(
@@ -381,16 +383,19 @@ async def pair(
                 peer_data=shared_data,
                 legacy_context=legacy_context,
             )
-            oob_data = OobData(
-                address=device.random_address,
-                shared_data=shared_data,
-                legacy_context=legacy_context,
-            )
             print(color('@@@-----------------------------------', 'yellow'))
             print(color('@@@ OOB Data:', 'yellow'))
-            print(color(f'@@@   {our_oob_context.share()}', 'yellow'))
+            if shared_data is None:
+                oob_data = OobData(
+                    address=device.random_address, shared_data=our_oob_context.share()
+                )
+                print(
+                    color(
+                        f'@@@   SHARE: {bytes(oob_data.to_ad()).hex()}',
+                        'yellow',
+                    )
+                )
             print(color(f'@@@   TK={legacy_context.tk.hex()}', 'yellow'))
-            print(color(f'@@@   HEX: ({bytes(oob_data.to_ad()).hex()})', 'yellow'))
             print(color('@@@-----------------------------------', 'yellow'))
         else:
             oob_contexts = None
