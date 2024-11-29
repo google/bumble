@@ -149,7 +149,10 @@ async def open_usb_transport(spec: str) -> Transport:
 
             if status != usb1.TRANSFER_COMPLETED:
                 logger.warning(
-                    color(f'!!! OUT transfer not completed: status={status}', 'red')
+                    color(
+                        f'!!! OUT transfer not completed: status={status}',
+                        'red',
+                    )
                 )
 
         async def process_queue(self):
@@ -275,7 +278,10 @@ async def open_usb_transport(spec: str) -> Transport:
                 )
             else:
                 logger.warning(
-                    color(f'!!! IN transfer not completed: status={status}', 'red')
+                    color(
+                        f'!!! IN[{packet_type}] transfer not completed: status={status}',
+                        'red',
+                    )
                 )
                 self.loop.call_soon_threadsafe(self.on_transport_lost)
 

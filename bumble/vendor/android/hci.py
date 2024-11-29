@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import struct
+from typing import Dict, Optional, Type
 
 from bumble.hci import (
     name_or_number,
@@ -24,7 +25,9 @@ from bumble.hci import (
     HCI_Constant,
     HCI_Object,
     HCI_Command,
-    HCI_Vendor_Event,
+    HCI_Event,
+    HCI_Extended_Event,
+    HCI_VENDOR_EVENT,
     STATUS_SPEC,
 )
 
@@ -48,7 +51,6 @@ HCI_DYNAMIC_AUDIO_BUFFER_COMMAND = hci_vendor_command_op_code(0x15F)
 HCI_BLUETOOTH_QUALITY_REPORT_EVENT = 0x58
 
 HCI_Command.register_commands(globals())
-HCI_Vendor_Event.register_subevents(globals())
 
 
 # -----------------------------------------------------------------------------
@@ -279,7 +281,29 @@ class HCI_Dynamic_Audio_Buffer_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Vendor_Event.event(
+class HCI_Android_Vendor_Event(HCI_Extended_Event):
+    event_code: int = HCI_VENDOR_EVENT
+    subevent_classes: Dict[int, Type[HCI_Extended_Event]] = {}
+
+    @classmethod
+    def subclass_from_parameters(
+        cls, parameters: bytes
+    ) -> Optional[HCI_Extended_Event]:
+        subevent_code = parameters[0]
+        if subevent_code == HCI_BLUETOOTH_QUALITY_REPORT_EVENT:
+            quality_report_id = parameters[1]
+            if quality_report_id in (0x01, 0x02, 0x03, 0x04, 0x07, 0x08, 0x09):
+                return HCI_Bluetooth_Quality_Report_Event.from_parameters(parameters)
+
+        return None
+
+
+HCI_Android_Vendor_Event.register_subevents(globals())
+HCI_Event.vendor_factory = HCI_Android_Vendor_Event.subclass_from_parameters
+
+
+# -----------------------------------------------------------------------------
+@HCI_Extended_Event.event(
     fields=[
         ('quality_report_id', 1),
         ('packet_types', 1),
@@ -308,10 +332,11 @@ class HCI_Dynamic_Audio_Buffer_Command(HCI_Command):
         ('tx_last_subevent_packets', 4),
         ('crc_error_packets', 4),
         ('rx_duplicate_packets', 4),
+        ('rx_unreceived_packets', 4),
         ('vendor_specific_parameters', '*'),
     ]
 )
-class HCI_Bluetooth_Quality_Report_Event(HCI_Vendor_Event):
+class HCI_Bluetooth_Quality_Report_Event(HCI_Android_Vendor_Event):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#bluetooth-quality-report-sub-event

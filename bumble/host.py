@@ -552,7 +552,7 @@ class Host(AbortableEventEmitter):
 
                 return response
             except Exception as error:
-                logger.warning(
+                logger.exception(
                     f'{color("!!! Exception while sending command:", "red")} {error}'
                 )
                 raise error
@@ -1248,3 +1248,6 @@ class Host(AbortableEventEmitter):
                 event.connection_handle,
                 int.from_bytes(event.le_features, 'little'),
             )
+
+    def on_hci_vendor_event(self, event):
+        self.emit('vendor_event', event)
