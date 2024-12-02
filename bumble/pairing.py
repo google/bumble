@@ -146,7 +146,7 @@ class PairingDelegate:
         io_capability: IoCapability = NO_OUTPUT_NO_INPUT,
         local_initiator_key_distribution: KeyDistribution = DEFAULT_KEY_DISTRIBUTION,
         local_responder_key_distribution: KeyDistribution = DEFAULT_KEY_DISTRIBUTION,
-        maximum_encryption_key_size: int = 16
+        maximum_encryption_key_size: int = 16,
     ) -> None:
         self.io_capability = io_capability
         self.local_initiator_key_distribution = local_initiator_key_distribution
