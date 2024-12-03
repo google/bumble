@@ -15,11 +15,13 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 import asyncio
 import logging
 import os
 import struct
 import pytest
+from typing_extensions import Self
 from unittest.mock import AsyncMock, Mock, ANY
 
 from bumble.controller import Controller
@@ -31,6 +33,7 @@ from bumble.gatt import (
     GATT_BATTERY_LEVEL_CHARACTERISTIC,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
     CharacteristicAdapter,
+    SerializableCharacteristicAdapter,
     DelegatedCharacteristicAdapter,
     PackedCharacteristicAdapter,
     MappedCharacteristicAdapter,
@@ -310,7 +313,7 @@ async def test_attribute_getters():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_CharacteristicAdapter():
+async def test_CharacteristicAdapter() -> None:
     # Check that the CharacteristicAdapter base class is transparent
     v = bytes([1, 2, 3])
     c = Characteristic(
@@ -329,67 +332,94 @@ async def test_CharacteristicAdapter():
     assert c.value == v
 
     # Simple delegated adapter
-    a = DelegatedCharacteristicAdapter(
+    delegated = DelegatedCharacteristicAdapter(
         c, lambda x: bytes(reversed(x)), lambda x: bytes(reversed(x))
     )
 
-    value = await a.read_value(None)
-    assert value == bytes(reversed(v))
+    delegated_value = await delegated.read_value(None)
+    assert delegated_value == bytes(reversed(v))
 
-    v = bytes([3, 4, 5])
-    await a.write_value(None, v)
-    assert a.value == bytes(reversed(v))
+    delegated_value2 = bytes([3, 4, 5])
+    await delegated.write_value(None, delegated_value2)
+    assert delegated.value == bytes(reversed(delegated_value2))
 
     # Packed adapter with single element format
-    v = 1234
-    pv = struct.pack('>H', v)
-    c.value = v
-    a = PackedCharacteristicAdapter(c, '>H')
+    packed_value_ref = 1234
+    packed_value_bytes = struct.pack('>H', packed_value_ref)
+    c.value = packed_value_ref
+    packed = PackedCharacteristicAdapter(c, '>H')
 
-    value = await a.read_value(None)
-    assert value == pv
-    c.value = None
-    await a.write_value(None, pv)
-    assert a.value == v
+    packed_value_read = await packed.read_value(None)
+    assert packed_value_read == packed_value_bytes
+    c.value = b''
+    await packed.write_value(None, packed_value_bytes)
+    assert packed.value == packed_value_ref
 
     # Packed adapter with multi-element format
     v1 = 1234
     v2 = 5678
-    pv = struct.pack('>HH', v1, v2)
+    packed_multi_value_bytes = struct.pack('>HH', v1, v2)
     c.value = (v1, v2)
-    a = PackedCharacteristicAdapter(c, '>HH')
+    packed_multi = PackedCharacteristicAdapter(c, '>HH')
 
-    value = await a.read_value(None)
-    assert value == pv
-    c.value = None
-    await a.write_value(None, pv)
-    assert a.value == (v1, v2)
+    packed_multi_read_value = await packed_multi.read_value(None)
+    assert packed_multi_read_value == packed_multi_value_bytes
+    packed_multi.value = b''
+    await packed_multi.write_value(None, packed_multi_value_bytes)
+    assert packed_multi.value == (v1, v2)
 
     # Mapped adapter
     v1 = 1234
     v2 = 5678
-    pv = struct.pack('>HH', v1, v2)
+    packed_mapped_value_bytes = struct.pack('>HH', v1, v2)
     mapped = {'v1': v1, 'v2': v2}
     c.value = mapped
-    a = MappedCharacteristicAdapter(c, '>HH', ('v1', 'v2'))
+    packed_mapped = MappedCharacteristicAdapter(c, '>HH', ('v1', 'v2'))
 
-    value = await a.read_value(None)
-    assert value == pv
-    c.value = None
-    await a.write_value(None, pv)
-    assert a.value == mapped
+    packed_mapped_read_value = await packed_mapped.read_value(None)
+    assert packed_mapped_read_value == packed_mapped_value_bytes
+    c.value = b''
+    await packed_mapped.write_value(None, packed_mapped_value_bytes)
+    assert packed_mapped.value == mapped
 
     # UTF-8 adapter
-    v = 'Hello π'
-    ev = v.encode('utf-8')
-    c.value = v
-    a = UTF8CharacteristicAdapter(c)
+    string_value = 'Hello π'
+    string_value_bytes = string_value.encode('utf-8')
+    c.value = string_value
+    string_c = UTF8CharacteristicAdapter(c)
 
-    value = await a.read_value(None)
-    assert value == ev
-    c.value = None
-    await a.write_value(None, ev)
-    assert a.value == v
+    string_read_value = await string_c.read_value(None)
+    assert string_read_value == string_value_bytes
+    c.value = b''
+    await string_c.write_value(None, string_value_bytes)
+    assert string_c.value == string_value
+
+    # Class adapter
+    class BlaBla:
+        def __init__(self, a: int, b: int) -> None:
+            self.a = a
+            self.b = b
+
+        @classmethod
+        def from_bytes(cls, data: bytes) -> Self:
+            a, b = struct.unpack(">II", data)
+            return cls(a, b)
+
+        def __bytes__(self) -> bytes:
+            return struct.pack(">II", self.a, self.b)
+
+    class_value = BlaBla(3, 4)
+    class_value_bytes = struct.pack(">II", 3, 4)
+    c.value = class_value
+    class_c = SerializableCharacteristicAdapter(c, BlaBla)
+
+    class_read_value = await class_c.read_value(None)
+    assert class_read_value == class_value_bytes
+    c.value = b''
+    await class_c.write_value(None, class_value_bytes)
+    assert isinstance(c.value, BlaBla)
+    assert c.value.a == 3
+    assert c.value.b == 4
 
 
 # -----------------------------------------------------------------------------

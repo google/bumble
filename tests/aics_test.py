@@ -28,6 +28,7 @@ from bumble.profiles.aics import (
     AudioInputState,
     AICSServiceProxy,
     GainMode,
+    GainSettingsProperties,
     AudioInputStatus,
     AudioInputControlPointOpCode,
     ErrorCode,
@@ -82,7 +83,12 @@ async def test_init_service(aics_client: AICSServiceProxy):
         gain_mode=GainMode.MANUAL,
         change_counter=0,
     )
-    assert await aics_client.gain_settings_properties.read_value() == (1, 0, 255)
+    assert (
+        await aics_client.gain_settings_properties.read_value()
+        == GainSettingsProperties(
+            gain_settings_unit=1, gain_settings_minimum=0, gain_settings_maximum=255
+        )
+    )
     assert await aics_client.audio_input_status.read_value() == (
         AudioInputStatus.ACTIVE
     )
@@ -481,12 +487,12 @@ async def test_set_automatic_gain_mode_when_automatic_only(
 @pytest.mark.asyncio
 async def test_audio_input_description_initial_value(aics_client: AICSServiceProxy):
     description = await aics_client.audio_input_description.read_value()
-    assert description.decode('utf-8') == "Bluetooth"
+    assert description == "Bluetooth"
 
 
 @pytest.mark.asyncio
 async def test_audio_input_description_write_and_read(aics_client: AICSServiceProxy):
-    new_description = "Line Input".encode('utf-8')
+    new_description = "Line Input"
 
     await aics_client.audio_input_description.write_value(new_description)
 

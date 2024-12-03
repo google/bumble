@@ -30,6 +30,7 @@ from ..gatt import (
     TemplateService,
     Characteristic,
     CharacteristicValue,
+    SerializableCharacteristicAdapter,
     DelegatedCharacteristicAdapter,
     PackedCharacteristicAdapter,
 )
@@ -150,15 +151,14 @@ class HeartRateService(TemplateService):
         body_sensor_location=None,
         reset_energy_expended=None,
     ):
-        self.heart_rate_measurement_characteristic = DelegatedCharacteristicAdapter(
+        self.heart_rate_measurement_characteristic = SerializableCharacteristicAdapter(
             Characteristic(
                 GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
                 Characteristic.Properties.NOTIFY,
                 0,
                 CharacteristicValue(read=read_heart_rate_measurement),
             ),
-            # pylint: disable=unnecessary-lambda
-            encode=lambda value: bytes(value),
+            HeartRateService.HeartRateMeasurement,
         )
         characteristics = [self.heart_rate_measurement_characteristic]
 
@@ -204,9 +204,8 @@ class HeartRateServiceProxy(ProfileServiceProxy):
         if characteristics := service_proxy.get_characteristics_by_uuid(
             GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC
         ):
-            self.heart_rate_measurement = DelegatedCharacteristicAdapter(
-                characteristics[0],
-                decode=HeartRateService.HeartRateMeasurement.from_bytes,
+            self.heart_rate_measurement = SerializableCharacteristicAdapter(
+                characteristics[0], HeartRateService.HeartRateMeasurement
             )
         else:
             self.heart_rate_measurement = None

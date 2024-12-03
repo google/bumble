@@ -127,7 +127,7 @@ async def main() -> None:
                     '486F64C6-4B5F-4B3B-8AFF-EDE134A8446A',
                     Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
                     Characteristic.READABLE,
-                    'hello',
+                    bytes('hello', 'utf-8'),
                 ),
             ],
         )

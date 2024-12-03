@@ -24,17 +24,19 @@ import logging
 import sys
 import warnings
 from typing import (
-    Awaitable,
-    Set,
-    TypeVar,
-    List,
-    Tuple,
-    Callable,
     Any,
+    Awaitable,
+    Callable,
+    List,
     Optional,
+    Protocol,
+    Set,
+    Tuple,
+    TypeVar,
     Union,
     overload,
 )
+from typing_extensions import Self
 
 from pyee import EventEmitter
 
@@ -487,3 +489,16 @@ class OpenIntEnum(enum.IntEnum):
         obj._value_ = value
         obj._name_ = f"{cls.__name__}[{value}]"
         return obj
+
+
+# -----------------------------------------------------------------------------
+class ByteSerializable(Protocol):
+    """
+    Type protocol for classes that can be instantiated from bytes and serialized
+    to bytes.
+    """
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self: ...
+
+    def __bytes__(self) -> bytes: ...
