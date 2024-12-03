@@ -695,6 +695,7 @@ class Session:
         self.ltk_ediv = 0
         self.ltk_rand = bytes(8)
         self.link_key: Optional[bytes] = None
+        self.maximum_encryption_key_size: int = 0
         self.initiator_key_distribution: int = 0
         self.responder_key_distribution: int = 0
         self.peer_random_value: Optional[bytes] = None
@@ -740,6 +741,10 @@ class Session:
             )
         else:
             self.pairing_result = None
+
+        self.maximum_encryption_key_size = (
+            pairing_config.delegate.maximum_encryption_key_size
+        )
 
         # Key Distribution (default values before negotiation)
         self.initiator_key_distribution = (
@@ -993,7 +998,7 @@ class Session:
             io_capability=self.io_capability,
             oob_data_flag=self.oob_data_flag,
             auth_req=self.auth_req,
-            maximum_encryption_key_size=16,
+            maximum_encryption_key_size=self.maximum_encryption_key_size,
             initiator_key_distribution=self.initiator_key_distribution,
             responder_key_distribution=self.responder_key_distribution,
         )
@@ -1005,7 +1010,7 @@ class Session:
             io_capability=self.io_capability,
             oob_data_flag=self.oob_data_flag,
             auth_req=self.auth_req,
-            maximum_encryption_key_size=16,
+            maximum_encryption_key_size=self.maximum_encryption_key_size,
             initiator_key_distribution=self.initiator_key_distribution,
             responder_key_distribution=self.responder_key_distribution,
         )
