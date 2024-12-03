@@ -36,7 +36,10 @@ from .test_utils import TwoDevices
 # Tests
 # -----------------------------------------------------------------------------
 gmas_service = GamingAudioService(
-    gmap_role=GmapRole.UNICAST_GAME_GATEWAY,
+    gmap_role=GmapRole.UNICAST_GAME_GATEWAY
+    | GmapRole.UNICAST_GAME_TERMINAL
+    | GmapRole.BROADCAST_GAME_RECEIVER
+    | GmapRole.BROADCAST_GAME_SENDER,
     ugg_features=UggFeatures.UGG_MULTISINK,
     ugt_features=UgtFeatures.UGT_SOURCE,
     bgr_features=BgrFeatures.BGR_MULTISINK,
@@ -68,7 +71,13 @@ async def gmap_client():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_init_service(gmap_client: GamingAudioServiceProxy):
-    assert await gmap_client.gmap_role.read_value() == GmapRole.UNICAST_GAME_GATEWAY
+    assert (
+        await gmap_client.gmap_role.read_value()
+        == GmapRole.UNICAST_GAME_GATEWAY
+        | GmapRole.UNICAST_GAME_TERMINAL
+        | GmapRole.BROADCAST_GAME_RECEIVER
+        | GmapRole.BROADCAST_GAME_SENDER
+    )
     assert await gmap_client.ugg_features.read_value() == UggFeatures.UGG_MULTISINK
     assert await gmap_client.ugt_features.read_value() == UgtFeatures.UGT_SOURCE
     assert await gmap_client.bgr_features.read_value() == BgrFeatures.BGR_MULTISINK

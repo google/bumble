@@ -101,7 +101,7 @@ class GamingAudioService(TemplateService):
         )
         characteristics.append(self.gmap_role)
 
-        if ugg_features is not None:
+        if gmap_role & GmapRole.UNICAST_GAME_GATEWAY:
             self.ugg_features = Characteristic(
                 uuid=GATT_UGG_FEATURES_CHARACTERISTIC,
                 properties=Characteristic.Properties.READ,
@@ -110,7 +110,7 @@ class GamingAudioService(TemplateService):
             )
             characteristics.append(self.ugg_features)
 
-        if ugt_features is not None:
+        if gmap_role & GmapRole.UNICAST_GAME_TERMINAL:
             self.ugt_features = Characteristic(
                 uuid=GATT_UGT_FEATURES_CHARACTERISTIC,
                 properties=Characteristic.Properties.READ,
@@ -119,7 +119,7 @@ class GamingAudioService(TemplateService):
             )
             characteristics.append(self.ugt_features)
 
-        if bgs_features is not None:
+        if gmap_role & GmapRole.BROADCAST_GAME_SENDER:
             self.bgs_features = Characteristic(
                 uuid=GATT_BGS_FEATURES_CHARACTERISTIC,
                 properties=Characteristic.Properties.READ,
@@ -128,7 +128,7 @@ class GamingAudioService(TemplateService):
             )
             characteristics.append(self.bgs_features)
 
-        if bgr_features is not None:
+        if gmap_role & GmapRole.BROADCAST_GAME_RECEIVER:
             self.bgr_features = Characteristic(
                 uuid=GATT_BGR_FEATURES_CHARACTERISTIC,
                 properties=Characteristic.Properties.READ,
