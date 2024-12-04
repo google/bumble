@@ -78,10 +78,10 @@ class GamingAudioService(TemplateService):
     UUID = GATT_GAMING_AUDIO_SERVICE
 
     gmap_role: Characteristic
-    ugg_features: Optional[Characteristic]
-    ugt_features: Optional[Characteristic]
-    bgs_features: Optional[Characteristic]
-    bgr_features: Optional[Characteristic]
+    ugg_features: Optional[Characteristic] = None
+    ugt_features: Optional[Characteristic] = None
+    bgs_features: Optional[Characteristic] = None
+    bgr_features: Optional[Characteristic] = None
 
     def __init__(
         self,
@@ -92,6 +92,11 @@ class GamingAudioService(TemplateService):
         bgr_features: Optional[BgrFeatures] = None,
     ) -> None:
         characteristics = []
+
+        ugg_features = UggFeatures(0) if ugg_features is None else ugg_features
+        ugt_features = UgtFeatures(0) if ugt_features is None else ugt_features
+        bgs_features = BgsFeatures(0) if bgs_features is None else bgs_features
+        bgr_features = BgrFeatures(0) if bgr_features is None else bgr_features
 
         self.gmap_role = Characteristic(
             uuid=GATT_GMAP_ROLE_CHARACTERISTIC,
