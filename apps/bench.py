@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import dataclasses
 import enum
 import logging
 import os
@@ -97,34 +98,6 @@ DEFAULT_RFCOMM_MTU = 2048
 # -----------------------------------------------------------------------------
 # Utils
 # -----------------------------------------------------------------------------
-def parse_packet(packet):
-    if len(packet) < 1:
-        logging.info(
-            color(f'!!! Packet too short (got {len(packet)} bytes, need >= 1)', 'red')
-        )
-        raise ValueError('packet too short')
-
-    try:
-        packet_type = PacketType(packet[0])
-    except ValueError:
-        logging.info(color(f'!!! Invalid packet type 0x{packet[0]:02X}', 'red'))
-        raise
-
-    return (packet_type, packet[1:])
-
-
-def parse_packet_sequence(packet_data):
-    if len(packet_data) < 5:
-        logging.info(
-            color(
-                f'!!!Packet too short (got {len(packet_data)} bytes, need >= 5)',
-                'red',
-            )
-        )
-        raise ValueError('packet too short')
-    return struct.unpack_from('>bI', packet_data, 0)
-
-
 def le_phy_name(phy_id):
     return {HCI_LE_1M_PHY: '1M', HCI_LE_2M_PHY: '2M', HCI_LE_CODED_PHY: 'CODED'}.get(
         phy_id, HCI_Constant.le_phy_name(phy_id)
@@ -225,13 +198,135 @@ async def switch_roles(connection, role):
             logging.info(f'{color("### Role switch failed:", "red")} {error}')
 
 
-class PacketType(enum.IntEnum):
-    RESET = 0
-    SEQUENCE = 1
-    ACK = 2
+# -----------------------------------------------------------------------------
+# Packet
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class Packet:
+    class PacketType(enum.IntEnum):
+        RESET = 0
+        SEQUENCE = 1
+        ACK = 2
+
+    class PacketFlags(enum.IntFlag):
+        LAST = 1
+
+    packet_type: PacketType
+    flags: PacketFlags = PacketFlags(0)
+    sequence: int = 0
+    timestamp: int = 0
+    payload: bytes = b""
+
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        if len(data) < 1:
+            logging.warning(
+                color(f'!!! Packet too short (got {len(data)} bytes, need >= 1)', 'red')
+            )
+            raise ValueError('packet too short')
+
+        try:
+            packet_type = cls.PacketType(data[0])
+        except ValueError:
+            logging.warning(color(f'!!! Invalid packet type 0x{data[0]:02X}', 'red'))
+            raise
+
+        if packet_type == cls.PacketType.RESET:
+            return cls(packet_type)
+
+        flags = cls.PacketFlags(data[1])
+        (sequence,) = struct.unpack_from("<I", data, 2)
+
+        if packet_type == cls.PacketType.ACK:
+            if len(data) < 6:
+                logging.warning(
+                    color(
+                        f'!!! Packet too short (got {len(data)} bytes, need >= 6)',
+                        'red',
+                    )
+                )
+            return cls(packet_type, flags, sequence)
+
+        if len(data) < 10:
+            logging.warning(
+                color(
+                    f'!!! Packet too short (got {len(data)} bytes, need >= 10)', 'red'
+                )
+            )
+            raise ValueError('packet too short')
+
+        (timestamp,) = struct.unpack_from("<I", data, 6)
+        return cls(packet_type, flags, sequence, timestamp, data[10:])
+
+    def __bytes__(self):
+        if self.packet_type == self.PacketType.RESET:
+            return bytes([self.packet_type])
+
+        if self.packet_type == self.PacketType.ACK:
+            return struct.pack("<BBI", self.packet_type, self.flags, self.sequence)
+
+        return (
+            struct.pack(
+                "<BBII", self.packet_type, self.flags, self.sequence, self.timestamp
+            )
+            + self.payload
+        )
 
 
-PACKET_FLAG_LAST = 1
+# -----------------------------------------------------------------------------
+# Jitter Stats
+# -----------------------------------------------------------------------------
+class JitterStats:
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.packets = []
+        self.receive_times = []
+        self.jitter = []
+
+    def on_packet_received(self, packet):
+        now = time.time()
+        self.packets.append(packet)
+        self.receive_times.append(now)
+
+        if packet.timestamp and len(self.packets) > 1:
+            expected_time = (
+                self.receive_times[0]
+                + (packet.timestamp - self.packets[0].timestamp) / 1000000
+            )
+            jitter = now - expected_time
+        else:
+            jitter = 0.0
+
+        self.jitter.append(jitter)
+        return jitter
+
+    def show_stats(self):
+        if len(self.jitter) < 3:
+            return
+        average = sum(self.jitter) / len(self.jitter)
+        adjusted = [jitter - average for jitter in self.jitter]
+
+        log_stats('Jitter (signed)', adjusted, 3)
+        log_stats('Jitter (absolute)', [abs(jitter) for jitter in adjusted], 3)
+
+        # Show a histogram
+        bin_count = 20
+        bins = [0] * bin_count
+        interval_min = min(adjusted)
+        interval_max = max(adjusted)
+        interval_range = interval_max - interval_min
+        bin_thresholds = [
+            interval_min + i * (interval_range / bin_count) for i in range(bin_count)
+        ]
+        for jitter in adjusted:
+            for i in reversed(range(bin_count)):
+                if jitter >= bin_thresholds[i]:
+                    bins[i] += 1
+                    break
+        for i in range(bin_count):
+            logging.info(f'@@@ >= {bin_thresholds[i]:.4f}: {bins[i]}')
 
 
 # -----------------------------------------------------------------------------
@@ -281,19 +376,37 @@ class Sender:
                 await asyncio.sleep(self.tx_start_delay)
 
             logging.info(color('=== Sending RESET', 'magenta'))
-            await self.packet_io.send_packet(bytes([PacketType.RESET]))
+            await self.packet_io.send_packet(
+                bytes(Packet(packet_type=Packet.PacketType.RESET))
+            )
+
             self.start_time = time.time()
             self.bytes_sent = 0
             for tx_i in range(self.tx_packet_count):
-                packet_flags = (
-                    PACKET_FLAG_LAST if tx_i == self.tx_packet_count - 1 else 0
+                if self.pace > 0:
+                    # Wait until it is time to send the next packet
+                    target_time = self.start_time + (tx_i * self.pace / 1000)
+                    now = time.time()
+                    if now < target_time:
+                        await asyncio.sleep(target_time - now)
+                else:
+                    await self.packet_io.drain()
+
+                packet = bytes(
+                    Packet(
+                        packet_type=Packet.PacketType.SEQUENCE,
+                        flags=(
+                            Packet.PacketFlags.LAST
+                            if tx_i == self.tx_packet_count - 1
+                            else 0
+                        ),
+                        sequence=tx_i,
+                        timestamp=int((time.time() - self.start_time) * 1000000),
+                        payload=bytes(
+                            self.tx_packet_size - 10 - self.packet_io.overhead_size
+                        ),
+                    )
                 )
-                packet = struct.pack(
-                    '>bbI',
-                    PacketType.SEQUENCE,
-                    packet_flags,
-                    tx_i,
-                ) + bytes(self.tx_packet_size - 6 - self.packet_io.overhead_size)
                 logging.info(
                     color(
                         f'Sending packet {tx_i}: {self.tx_packet_size} bytes', 'yellow'
@@ -301,14 +414,6 @@ class Sender:
                 )
                 self.bytes_sent += len(packet)
                 await self.packet_io.send_packet(packet)
-
-                if self.pace is None:
-                    continue
-
-                if self.pace > 0:
-                    await asyncio.sleep(self.pace / 1000)
-                else:
-                    await self.packet_io.drain()
 
             await self.done.wait()
 
@@ -321,13 +426,13 @@ class Sender:
         if self.repeat:
             logging.info(color('--- End of runs', 'blue'))
 
-    def on_packet_received(self, packet):
+    def on_packet_received(self, data):
         try:
-            packet_type, _ = parse_packet(packet)
+            packet = Packet.from_bytes(data)
         except ValueError:
             return
 
-        if packet_type == PacketType.ACK:
+        if packet.packet_type == Packet.PacketType.ACK:
             elapsed = time.time() - self.start_time
             average_tx_speed = self.bytes_sent / elapsed
             self.stats.append(average_tx_speed)
@@ -350,52 +455,53 @@ class Receiver:
     last_timestamp: float
 
     def __init__(self, packet_io, linger):
-        self.reset()
+        self.jitter_stats = JitterStats()
         self.packet_io = packet_io
         self.packet_io.packet_listener = self
         self.linger = linger
         self.done = asyncio.Event()
+        self.reset()
 
     def reset(self):
         self.expected_packet_index = 0
         self.measurements = [(time.time(), 0)]
         self.total_bytes_received = 0
+        self.jitter_stats.reset()
 
-    def on_packet_received(self, packet):
+    def on_packet_received(self, data):
         try:
-            packet_type, packet_data = parse_packet(packet)
+            packet = Packet.from_bytes(data)
         except ValueError:
+            logging.exception("invalid packet")
             return
 
-        if packet_type == PacketType.RESET:
+        if packet.packet_type == Packet.PacketType.RESET:
             logging.info(color('=== Received RESET', 'magenta'))
             self.reset()
             return
 
-        try:
-            packet_flags, packet_index = parse_packet_sequence(packet_data)
-        except ValueError:
-            return
+        jitter = self.jitter_stats.on_packet_received(packet)
         logging.info(
-            f'<<< Received packet {packet_index}: '
-            f'flags=0x{packet_flags:02X}, '
-            f'{len(packet) + self.packet_io.overhead_size} bytes'
+            f'<<< Received packet {packet.sequence}: '
+            f'flags={packet.flags}, '
+            f'jitter={jitter:.4f}, '
+            f'{len(data) + self.packet_io.overhead_size} bytes',
         )
 
-        if packet_index != self.expected_packet_index:
+        if packet.sequence != self.expected_packet_index:
             logging.info(
                 color(
                     f'!!! Unexpected packet, expected {self.expected_packet_index} '
-                    f'but received {packet_index}'
+                    f'but received {packet.sequence}'
                 )
             )
 
         now = time.time()
         elapsed_since_start = now - self.measurements[0][0]
         elapsed_since_last = now - self.measurements[-1][0]
-        self.measurements.append((now, len(packet)))
-        self.total_bytes_received += len(packet)
-        instant_rx_speed = len(packet) / elapsed_since_last
+        self.measurements.append((now, len(data)))
+        self.total_bytes_received += len(data)
+        instant_rx_speed = len(data) / elapsed_since_last
         average_rx_speed = self.total_bytes_received / elapsed_since_start
         window = self.measurements[-64:]
         windowed_rx_speed = sum(measurement[1] for measurement in window[1:]) / (
@@ -411,15 +517,17 @@ class Receiver:
             )
         )
 
-        self.expected_packet_index = packet_index + 1
+        self.expected_packet_index = packet.sequence + 1
 
-        if packet_flags & PACKET_FLAG_LAST:
+        if packet.flags & Packet.PacketFlags.LAST:
             AsyncRunner.spawn(
                 self.packet_io.send_packet(
-                    struct.pack('>bbI', PacketType.ACK, packet_flags, packet_index)
+                    bytes(Packet(Packet.PacketType.ACK, packet.flags, packet.sequence))
                 )
             )
             logging.info(color('@@@ Received last packet', 'green'))
+            self.jitter_stats.show_stats()
+
             if not self.linger:
                 self.done.set()
 
@@ -479,25 +587,32 @@ class Ping:
                 await asyncio.sleep(self.tx_start_delay)
 
             logging.info(color('=== Sending RESET', 'magenta'))
-            await self.packet_io.send_packet(bytes([PacketType.RESET]))
+            await self.packet_io.send_packet(bytes(Packet(Packet.PacketType.RESET)))
 
-            packet_interval = self.pace / 1000
             start_time = time.time()
             self.next_expected_packet_index = 0
             for i in range(self.tx_packet_count):
-                target_time = start_time + (i * packet_interval)
+                target_time = start_time + (i * self.pace / 1000)
                 now = time.time()
                 if now < target_time:
                     await asyncio.sleep(target_time - now)
+                    now = time.time()
 
-                packet = struct.pack(
-                    '>bbI',
-                    PacketType.SEQUENCE,
-                    (PACKET_FLAG_LAST if i == self.tx_packet_count - 1 else 0),
-                    i,
-                ) + bytes(self.tx_packet_size - 6)
+                packet = bytes(
+                    Packet(
+                        packet_type=Packet.PacketType.SEQUENCE,
+                        flags=(
+                            Packet.PacketFlags.LAST
+                            if i == self.tx_packet_count - 1
+                            else 0
+                        ),
+                        sequence=i,
+                        timestamp=int((now - start_time) * 1000000),
+                        payload=bytes(self.tx_packet_size - 10),
+                    )
+                )
                 logging.info(color(f'Sending packet {i}', 'yellow'))
-                self.ping_times.append(time.time())
+                self.ping_times.append(now)
                 await self.packet_io.send_packet(packet)
 
             await self.done.wait()
@@ -531,40 +646,35 @@ class Ping:
         if self.repeat:
             logging.info(color('--- End of runs', 'blue'))
 
-    def on_packet_received(self, packet):
+    def on_packet_received(self, data):
         try:
-            packet_type, packet_data = parse_packet(packet)
+            packet = Packet.from_bytes(data)
         except ValueError:
             return
 
-        try:
-            packet_flags, packet_index = parse_packet_sequence(packet_data)
-        except ValueError:
-            return
-
-        if packet_type == PacketType.ACK:
-            elapsed = time.time() - self.ping_times[packet_index]
+        if packet.packet_type == Packet.PacketType.ACK:
+            elapsed = time.time() - self.ping_times[packet.sequence]
             rtt = elapsed * 1000
             self.rtts.append(rtt)
             logging.info(
                 color(
-                    f'<<< Received ACK [{packet_index}], RTT={rtt:.2f}ms',
+                    f'<<< Received ACK [{packet.sequence}], RTT={rtt:.2f}ms',
                     'green',
                 )
             )
 
-            if packet_index == self.next_expected_packet_index:
+            if packet.sequence == self.next_expected_packet_index:
                 self.next_expected_packet_index += 1
             else:
                 logging.info(
                     color(
                         f'!!! Unexpected packet, '
                         f'expected {self.next_expected_packet_index} '
-                        f'but received {packet_index}'
+                        f'but received {packet.sequence}'
                     )
                 )
 
-        if packet_flags & PACKET_FLAG_LAST:
+        if packet.flags & Packet.PacketFlags.LAST:
             self.done.set()
             return
 
@@ -576,89 +686,56 @@ class Pong:
     expected_packet_index: int
 
     def __init__(self, packet_io, linger):
-        self.reset()
+        self.jitter_stats = JitterStats()
         self.packet_io = packet_io
         self.packet_io.packet_listener = self
         self.linger = linger
         self.done = asyncio.Event()
+        self.reset()
 
     def reset(self):
         self.expected_packet_index = 0
-        self.receive_times = []
+        self.jitter_stats.reset()
 
-    def on_packet_received(self, packet):
-        self.receive_times.append(time.time())
-
+    def on_packet_received(self, data):
         try:
-            packet_type, packet_data = parse_packet(packet)
+            packet = Packet.from_bytes(data)
         except ValueError:
             return
 
-        if packet_type == PacketType.RESET:
+        if packet.packet_type == Packet.PacketType.RESET:
             logging.info(color('=== Received RESET', 'magenta'))
             self.reset()
             return
 
-        try:
-            packet_flags, packet_index = parse_packet_sequence(packet_data)
-        except ValueError:
-            return
-        interval = (
-            self.receive_times[-1] - self.receive_times[-2]
-            if len(self.receive_times) >= 2
-            else 0
-        )
+        jitter = self.jitter_stats.on_packet_received(packet)
         logging.info(
             color(
-                f'<<< Received packet {packet_index}: '
-                f'flags=0x{packet_flags:02X}, {len(packet)} bytes, '
-                f'interval={interval:.4f}',
+                f'<<< Received packet {packet.sequence}: '
+                f'flags={packet.flags}, {len(data)} bytes, '
+                f'jitter={jitter:.4f}',
                 'green',
             )
         )
 
-        if packet_index != self.expected_packet_index:
+        if packet.sequence != self.expected_packet_index:
             logging.info(
                 color(
                     f'!!! Unexpected packet, expected {self.expected_packet_index} '
-                    f'but received {packet_index}'
+                    f'but received {packet.sequence}'
                 )
             )
 
-        self.expected_packet_index = packet_index + 1
+        self.expected_packet_index = packet.sequence + 1
 
         AsyncRunner.spawn(
             self.packet_io.send_packet(
-                struct.pack('>bbI', PacketType.ACK, packet_flags, packet_index)
+                bytes(Packet(Packet.PacketType.ACK, packet.flags, packet.sequence))
             )
         )
 
-        if packet_flags & PACKET_FLAG_LAST:
-            if len(self.receive_times) >= 3:
-                # Show basic stats
-                intervals = [
-                    self.receive_times[i + 1] - self.receive_times[i]
-                    for i in range(len(self.receive_times) - 1)
-                ]
-                log_stats('Packet intervals', intervals, 3)
-
-                # Show a histogram
-                bin_count = 20
-                bins = [0] * bin_count
-                interval_min = min(intervals)
-                interval_max = max(intervals)
-                interval_range = interval_max - interval_min
-                bin_thresholds = [
-                    interval_min + i * (interval_range / bin_count)
-                    for i in range(bin_count)
-                ]
-                for interval in intervals:
-                    for i in reversed(range(bin_count)):
-                        if interval >= bin_thresholds[i]:
-                            bins[i] += 1
-                            break
-                for i in range(bin_count):
-                    logging.info(f'@@@ >= {bin_thresholds[i]:.4f}: {bins[i]}')
+        if packet.flags & Packet.PacketFlags.LAST:
+            self.jitter_stats.show_stats()
 
             if not self.linger:
                 self.done.set()
@@ -1471,7 +1548,7 @@ def create_mode_factory(ctx, default_mode):
 def create_scenario_factory(ctx, default_scenario):
     scenario = ctx.obj['scenario']
     if scenario is None:
-        scenarion = default_scenario
+        scenario = default_scenario
 
     def create_scenario(packet_io):
         if scenario == 'send':
@@ -1605,7 +1682,7 @@ def create_scenario_factory(ctx, default_scenario):
     '--packet-size',
     '-s',
     metavar='SIZE',
-    type=click.IntRange(8, 8192),
+    type=click.IntRange(10, 8192),
     default=500,
     help='Packet size (send or ping scenario)',
 )

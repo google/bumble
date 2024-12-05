@@ -35,6 +35,8 @@ const val L2CAP_CLIENT_MODE = "L2CAP Client"
 const val L2CAP_SERVER_MODE = "L2CAP Server"
 const val RFCOMM_CLIENT_MODE = "RFCOMM Client"
 const val RFCOMM_SERVER_MODE = "RFCOMM Server"
+const val GATT_CLIENT_MODE = "GATT Client"
+const val GATT_SERVER_MODE = "GATT Server"
 
 const val SEND_SCENARIO = "Send"
 const val RECEIVE_SCENARIO = "Receive"
