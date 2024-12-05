@@ -25,6 +25,7 @@ import java.util.UUID
 
 val DEFAULT_RFCOMM_UUID: UUID = UUID.fromString("E6D55659-C8B4-4B85-96BB-B1143AF6D3AE")
 const val DEFAULT_PEER_BLUETOOTH_ADDRESS = "AA:BB:CC:DD:EE:FF"
+const val DEFAULT_STARTUP_DELAY = 3000
 const val DEFAULT_SENDER_PACKET_COUNT = 100
 const val DEFAULT_SENDER_PACKET_SIZE = 1024
 const val DEFAULT_SENDER_PACKET_INTERVAL = 100
@@ -47,8 +48,10 @@ class AppViewModel : ViewModel() {
     var mode by mutableStateOf(RFCOMM_SERVER_MODE)
     var scenario by mutableStateOf(RECEIVE_SCENARIO)
     var peerBluetoothAddress by mutableStateOf(DEFAULT_PEER_BLUETOOTH_ADDRESS)
+    var startupDelay by mutableIntStateOf(DEFAULT_STARTUP_DELAY)
     var l2capPsm by mutableIntStateOf(DEFAULT_PSM)
     var use2mPhy by mutableStateOf(true)
+    var connectionPriority by mutableStateOf("BALANCED")
     var mtu by mutableIntStateOf(0)
     var rxPhy by mutableIntStateOf(0)
     var txPhy by mutableIntStateOf(0)
@@ -97,6 +100,11 @@ class AppViewModel : ViewModel() {
         val savedScenario = preferences.getString(SCENARIO_PREF_KEY, null)
         if (savedScenario != null) {
             scenario = savedScenario
+        }
+
+        val savedConnectionPriority = preferences.getString(CONNECTION_PRIORITY_PREF_KEY, null)
+        if (savedConnectionPriority != null) {
+            connectionPriority = savedConnectionPriority
         }
     }
 
@@ -216,6 +224,14 @@ class AppViewModel : ViewModel() {
         this.mode = mode
         with(preferences!!.edit()) {
             putString(MODE_PREF_KEY, mode)
+            apply()
+        }
+    }
+
+    fun updateConnectionPriority(connectionPriority: String) {
+        this.connectionPriority = connectionPriority
+        with(preferences!!.edit()) {
+            putString(CONNECTION_PRIORITY_PREF_KEY, connectionPriority)
             apply()
         }
     }

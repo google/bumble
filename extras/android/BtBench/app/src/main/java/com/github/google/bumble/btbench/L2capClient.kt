@@ -90,6 +90,18 @@ class L2capClient(
                         // Request an MTU update, even though we don't use GATT, because Android
                         // won't request a larger link layer maximum data length otherwise.
                         gatt.requestMtu(517)
+
+                        // Request a specific connection priority
+                        val connectionPriority = when (viewModel.connectionPriority) {
+                            "BALANCED" -> BluetoothGatt.CONNECTION_PRIORITY_BALANCED
+                            "LOW_POWER" -> BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER
+                            "HIGH" -> BluetoothGatt.CONNECTION_PRIORITY_HIGH
+                            "DCK" -> BluetoothGatt.CONNECTION_PRIORITY_DCK
+                            else -> 0
+                        }
+                        if (!gatt.requestConnectionPriority(connectionPriority)) {
+                            Log.warning("requestConnectionPriority failed")
+                        }
                     }
                 }
             },
