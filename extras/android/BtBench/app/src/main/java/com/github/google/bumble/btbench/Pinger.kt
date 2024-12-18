@@ -19,8 +19,6 @@ import java.util.logging.Logger
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-private const val DEFAULT_STARTUP_DELAY = 3000
-
 private val Log = Logger.getLogger("btbench.pinger")
 
 class Pinger(private val viewModel: AppViewModel, private val packetIO: PacketIO) : IoClient,
@@ -36,8 +34,8 @@ class Pinger(private val viewModel: AppViewModel, private val packetIO: PacketIO
     override fun run() {
         viewModel.clear()
 
-        Log.info("startup delay: $DEFAULT_STARTUP_DELAY")
-        Thread.sleep(DEFAULT_STARTUP_DELAY.toLong());
+        Log.info("startup delay: ${viewModel.startupDelay}")
+        Thread.sleep(viewModel.startupDelay.toLong());
         Log.info("running")
 
         Log.info("sending reset")
@@ -48,19 +46,23 @@ class Pinger(private val viewModel: AppViewModel, private val packetIO: PacketIO
 
         val startTime = TimeSource.Monotonic.markNow()
         for (i in 0..<packetCount) {
-            val now = TimeSource.Monotonic.markNow()
-            val targetTime = startTime + (i * viewModel.senderPacketInterval).milliseconds
-            val delay = targetTime - now
-            if (delay.isPositive()) {
-                Log.info("sleeping ${delay.inWholeMilliseconds} ms")
-                Thread.sleep(delay.inWholeMilliseconds)
+            var now = TimeSource.Monotonic.markNow()
+            if (viewModel.senderPacketInterval > 0) {
+                val targetTime = startTime + (i * viewModel.senderPacketInterval).milliseconds
+                val delay = targetTime - now
+                if (delay.isPositive()) {
+                    Log.info("sleeping ${delay.inWholeMilliseconds} ms")
+                    Thread.sleep(delay.inWholeMilliseconds)
+                    now = TimeSource.Monotonic.markNow()
+                }
             }
             pingTimes.add(TimeSource.Monotonic.markNow())
             packetIO.sendPacket(
                 SequencePacket(
                     if (i < packetCount - 1) 0 else Packet.LAST_FLAG,
                     i,
-                    ByteArray(packetSize - 6)
+                    (now - startTime).inWholeMicroseconds.toInt(),
+                    ByteArray(packetSize - 10)
                 )
             )
             viewModel.packetsSent = i + 1
