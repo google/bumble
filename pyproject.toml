@@ -1,21 +1,131 @@
 [build-system]
-requires = ["setuptools>=52", "wheel", "setuptools_scm>=6.2"]
+requires = ["setuptools>=61", "wheel", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "bumble"
+dynamic = ["version"]
+description = "Bluetooth Stack for Apps, Emulation, Test and Experimentation"
+readme = "README.md"
+authors = [{ name = "Google", email = "bumble-dev@google.com" }]
+requires-python = ">=3.8"
+dependencies = [
+    "aiohttp ~= 3.8; platform_system!='Emscripten'",
+    "appdirs >= 1.4; platform_system!='Emscripten'",
+    "click >= 8.1.3; platform_system!='Emscripten'",
+    "cryptography == 39; platform_system!='Emscripten'",
+    # Pyodide bundles a version of cryptography that is built for wasm, which may not match the
+    # versions available on PyPI. Relax the version requirement since it's better than being
+    # completely unable to import the package in case of version mismatch.
+    "cryptography >= 39.0; platform_system=='Emscripten'",
+    "grpcio >= 1.62.1; platform_system!='Emscripten'",
+    "humanize >= 4.6.0; platform_system!='Emscripten'",
+    "libusb1 >= 2.0.1; platform_system!='Emscripten'",
+    "libusb-package == 1.0.26.1; platform_system!='Emscripten'",
+    "platformdirs >= 3.10.0; platform_system!='Emscripten'",
+    "prompt_toolkit >= 3.0.16; platform_system!='Emscripten'",
+    "prettytable >= 3.6.0; platform_system!='Emscripten'",
+    "protobuf >= 3.12.4; platform_system!='Emscripten'",
+    "pyee >= 8.2.2",
+    "pyserial-asyncio >= 0.5; platform_system!='Emscripten'",
+    "pyserial >= 3.5; platform_system!='Emscripten'",
+    "pyusb >= 1.2; platform_system!='Emscripten'",
+    "websockets == 13.1; platform_system!='Emscripten'",
+]
+
+[project.optional-dependencies]
+build = ["build >= 0.7"]
+test = [
+    "pytest >= 8.2",
+    "pytest-asyncio >= 0.23.5",
+    "pytest-html >= 3.2.0",
+    "coverage >= 6.4",
+]
+development = [
+    "black == 24.3",
+    "bt-test-interfaces >= 0.0.6",
+    "grpcio-tools >= 1.62.1",
+    "invoke >= 1.7.3",
+    "mobly >= 1.12.2",
+    "mypy == 1.12.0",
+    "nox >= 2022",
+    "pylint == 3.3.1",
+    "pyyaml >= 6.0",
+    "types-appdirs >= 1.4.3",
+    "types-invoke >= 1.7.3",
+    "types-protobuf >= 4.21.0",
+    "wasmtime == 20.0.0",
+]
+avatar = [
+    "pandora-avatar == 0.0.10",
+    "rootcanal == 1.10.0 ; python_version>='3.10'",
+]
+pandora = ["bt-test-interfaces >= 0.0.6"]
+documentation = [
+    "mkdocs >= 1.4.0",
+    "mkdocs-material >= 8.5.6",
+    "mkdocstrings[python] >= 0.19.0",
+]
+
+[project.scripts]
+bumble-ble-rpa-tool = "bumble.apps.ble_rpa_tool:main"
+bumble-console = "bumble.apps.console:main"
+bumble-controller-info = "bumble.apps.controller_info:main"
+bumble-controller-loopback = "bumble.apps.controller_loopback:main"
+bumble-gatt-dump = "bumble.apps.gatt_dump:main"
+bumble-hci-bridge = "bumble.apps.hci_bridge:main"
+bumble-l2cap-bridge = "bumble.apps.l2cap_bridge:main"
+bumble-rfcomm-bridge = "bumble.apps.rfcomm_bridge:main"
+bumble-pair = "bumble.apps.pair:main"
+bumble-scan = "bumble.apps.scan:main"
+bumble-show = "bumble.apps.show:main"
+bumble-unbond = "bumble.apps.unbond:main"
+bumble-usb-probe = "bumble.apps.usb_probe:main"
+bumble-link-relay = "bumble.apps.link_relay.link_relay:main"
+bumble-bench = "bumble.apps.bench:main"
+bumble-player = "bumble.apps.player.player:main"
+bumble-speaker = "bumble.apps.speaker.speaker:main"
+bumble-pandora-server = "bumble.apps.pandora_server:main"
+bumble-rtk-util = "bumble.tools.rtk_util:main"
+bumble-rtk-fw-download = "bumble.tools.rtk_fw_download:main"
+bumble-intel-util = "bumble.tools.intel_util:main"
+bumble-intel-fw-download = "bumble.tools.intel_fw_download:main"
+
+
+[project.urls]
+Homepage = "https://github.com/google/bumble"
+
+[tool.setuptools]
+packages = [
+    "bumble",
+    "bumble.transport",
+    "bumble.transport.grpc_protobuf",
+    "bumble.drivers",
+    "bumble.profiles",
+    "bumble.apps",
+    "bumble.apps.link_relay",
+    "bumble.pandora",
+    "bumble.tools",
+]
+
+[tool.setuptools.package-dir]
+"bumble" = "bumble"
+"bumble.apps" = "apps"
+"bumble.tools" = "tools"
 
 [tool.setuptools_scm]
 write_to = "bumble/_version.py"
 
+[tool.setuptools.package-data]
+"*" = ["*.pyi", "py.typed"]
+
 [tool.pytest.ini_options]
 pythonpath = "."
-testpaths = [
-    "tests"
-]
+testpaths = ["tests"]
 
 [tool.pylint.master]
 init-hook = 'import sys; sys.path.append(".")'
-ignore-paths = [
-    '.*_pb2(_grpc)?.py'
-]
+ignore-paths = ['.*_pb2(_grpc)?.py']
 
 [tool.pylint.messages_control]
 max-line-length = "88"
@@ -25,8 +135,8 @@ disable = [
     "fixme",
     "logging-fstring-interpolation",
     "logging-not-lazy",
-    "no-member", # Temporary until pylint works better with class/method decorators
-    "no-value-for-parameter", # Temporary until pylint works better with class/method decorators
+    "no-member",                     # Temporary until pylint works better with class/method decorators
+    "no-value-for-parameter",        # Temporary until pylint works better with class/method decorators
     "missing-class-docstring",
     "missing-function-docstring",
     "missing-module-docstring",
@@ -41,11 +151,11 @@ disable = [
 ]
 
 [tool.pylint.main]
-ignore="pandora" # FIXME: pylint does not support stubs yet:
+ignore = "pandora" # FIXME: pylint does not support stubs yet:
 
 [tool.pylint.typecheck]
-signature-mutators="AsyncRunner.run_in_task"
-disable="not-callable"
+signature-mutators = "AsyncRunner.run_in_task"
+disable = "not-callable"
 
 [tool.black]
 skip-string-normalization = true
@@ -85,4 +195,3 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "usb1.*"
 ignore_missing_imports = true
-
