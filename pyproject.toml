@@ -54,7 +54,6 @@ development = [
     "types-appdirs >= 1.4.3",
     "types-invoke >= 1.7.3",
     "types-protobuf >= 4.21.0",
-    "wasmtime == 20.0.0",
 ]
 avatar = [
     "pandora-avatar == 0.0.10",
@@ -65,6 +64,9 @@ documentation = [
     "mkdocs >= 1.4.0",
     "mkdocs-material >= 8.5.6",
     "mkdocstrings[python] >= 0.19.0",
+]
+lc3 = [
+    "lc3 @ git+https://github.com/google/liblc3.git",
 ]
 
 [project.scripts]
