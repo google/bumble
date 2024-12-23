@@ -17,6 +17,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import enum
 import logging
 import struct
@@ -258,8 +259,8 @@ class AseReasonCode(enum.IntEnum):
 
 # -----------------------------------------------------------------------------
 class AudioRole(enum.IntEnum):
-    SINK = hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.CONTROLLER_TO_HOST
-    SOURCE = hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.HOST_TO_CONTROLLER
+    SINK = device.CisLink.Direction.CONTROLLER_TO_HOST
+    SOURCE = device.CisLink.Direction.HOST_TO_CONTROLLER
 
 
 # -----------------------------------------------------------------------------
@@ -354,16 +355,7 @@ class AseStateMachine(gatt.Characteristic):
             cis_link.on('disconnection', self.on_cis_disconnection)
 
             async def post_cis_established():
-                await self.service.device.send_command(
-                    hci.HCI_LE_Setup_ISO_Data_Path_Command(
-                        connection_handle=cis_link.handle,
-                        data_path_direction=self.role,
-                        data_path_id=0x00,  # Fixed HCI
-                        codec_id=hci.CodingFormat(hci.CodecID.TRANSPARENT),
-                        controller_delay=0,
-                        codec_configuration=b'',
-                    )
-                )
+                await cis_link.setup_data_path(direction=self.role)
                 if self.role == AudioRole.SINK:
                     self.state = self.State.STREAMING
                 await self.service.device.notify_subscribers(self, self.value)
@@ -511,12 +503,8 @@ class AseStateMachine(gatt.Characteristic):
         self.state = self.State.RELEASING
 
         async def remove_cis_async():
-            await self.service.device.send_command(
-                hci.HCI_LE_Remove_ISO_Data_Path_Command(
-                    connection_handle=self.cis_link.handle,
-                    data_path_direction=self.role,
-                )
-            )
+            if self.cis_link:
+                await self.cis_link.remove_data_path(self.role)
             self.state = self.State.IDLE
             await self.service.device.notify_subscribers(self, self.value)
 
