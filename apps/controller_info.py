@@ -75,7 +75,7 @@ async def get_classic_info(host: Host) -> None:
         if command_succeeded(response):
             print()
             print(
-                color('Classic Address:', 'yellow'),
+                color('Public Address:', 'yellow'),
                 response.return_parameters.bd_addr.to_string(False),
             )
 
