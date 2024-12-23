@@ -696,7 +696,7 @@ async def run_receive(
         )
         sdus = [b''] * num_bis
         subprocess = await asyncio.create_subprocess_shell(
-            f'stdbuf -i0 ffplay -ar 48000 -ac {num_bis} -f f32le pipe:0',
+            f'stdbuf -i0 ffplay -ar {sampling_frequency.hz} -ac {num_bis} -f f32le pipe:0',
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
