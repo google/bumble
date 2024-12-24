@@ -21,6 +21,7 @@ import collections
 import dataclasses
 import logging
 import struct
+import itertools
 
 from typing import (
     Any,
@@ -149,6 +150,7 @@ class Host(AbortableEventEmitter):
     connections: Dict[int, Connection]
     cis_links: Dict[int, CisLink]
     sco_links: Dict[int, ScoLink]
+    bigs: dict[int, set[int]] = {}  # BIG Handle to BIS Handles
     acl_packet_queue: Optional[AclPacketQueue] = None
     le_acl_packet_queue: Optional[AclPacketQueue] = None
     hci_sink: Optional[TransportSink] = None
@@ -733,9 +735,10 @@ class Host(AbortableEventEmitter):
         ):
             if connection := self.connections.get(connection_handle):
                 connection.acl_packet_queue.on_packets_completed(num_completed_packets)
-            elif not (
-                self.cis_links.get(connection_handle)
-                or self.sco_links.get(connection_handle)
+            elif connection_handle not in itertools.chain(
+                self.cis_links.keys(),
+                self.sco_links.keys(),
+                itertools.chain.from_iterable(self.bigs.values()),
             ):
                 logger.warning(
                     'received packet completion event for unknown handle '
@@ -952,6 +955,50 @@ class Host(AbortableEventEmitter):
             event.cig_id,
             event.cis_id,
         )
+
+    def on_hci_le_create_big_complete_event(self, event):
+        self.bigs[event.big_handle] = set(event.connection_handle)
+        self.emit(
+            'big_establishment',
+            event.status,
+            event.big_handle,
+            event.connection_handle,
+            event.big_sync_delay,
+            event.transport_latency_big,
+            event.phy,
+            event.nse,
+            event.bn,
+            event.pto,
+            event.irc,
+            event.max_pdu,
+            event.iso_interval,
+        )
+
+    def on_hci_le_big_sync_established_event(self, event):
+        self.emit(
+            'big_sync_establishment',
+            event.status,
+            event.big_handle,
+            event.transport_latency_big,
+            event.nse,
+            event.bn,
+            event.pto,
+            event.irc,
+            event.max_pdu,
+            event.iso_interval,
+            event.connection_handle,
+        )
+
+    def on_hci_le_big_sync_lost_event(self, event):
+        self.emit(
+            'big_sync_lost',
+            event.big_handle,
+            event.reason,
+        )
+
+    def on_hci_le_terminate_big_complete_event(self, event):
+        self.bigs.pop(event.big_handle)
+        self.emit('big_termination', event.reason, event.big_handle)
 
     def on_hci_le_cis_established_event(self, event):
         # The remaining parameters are unused for now.
