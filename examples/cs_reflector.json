@@ -1,0 +1,9 @@
+{
+    "name": "Bumble CS Reflector",
+    "address": "F0:F1:F2:F3:F4:F6",
+    "advertising_interval": 100,
+    "keystore": "JsonKeyStore",
+    "irk": "0c7d74db03a1c98e7be691f76141d53d",
+    "identity_address_type": 1,
+    "channel_sounding_enabled": true
+}

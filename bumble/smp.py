@@ -1326,7 +1326,7 @@ class Session:
         self.connection.abort_on('disconnection', self.on_pairing())
 
     def on_connection_encryption_change(self) -> None:
-        if self.connection.is_encrypted:
+        if self.connection.is_encrypted and not self.completed:
             if self.is_responder:
                 # The responder distributes its keys first, the initiator later
                 self.distribute_keys()
