@@ -16,7 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-import dataclasses
+import asyncio
 import enum
 import struct
 from typing import List, Optional, Tuple, Union, cast, Dict
@@ -158,6 +158,14 @@ class OutOfResourcesError(BaseBumbleError, RuntimeError):
 
 class UnreachableError(BaseBumbleError):
     """The code path raising this error should be unreachable."""
+
+
+class CancelledError(BaseBumbleError, asyncio.CancelledError):
+    """Operation has been cancelled or aborted."""
+
+
+class BearerLostError(BaseBumbleError):
+    """Bearer transport (ACL, L2CAP Channel) has been terminated or lost."""
 
 
 class ConnectionError(BaseError):  # pylint: disable=redefined-builtin

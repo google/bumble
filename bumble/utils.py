@@ -21,7 +21,6 @@ import collections
 import enum
 import functools
 import logging
-import sys
 import warnings
 from typing import (
     Any,
@@ -185,33 +184,43 @@ _T = TypeVar('_T')
 
 
 class AbortableEventEmitter(EventEmitter):
-    def abort_on(self, event: str, awaitable: Awaitable[_T]) -> Awaitable[_T]:
+    def abort_on(self, event: str, awaitable: Awaitable[_T]) -> asyncio.Future[_T]:
         """
         Set a coroutine or future to abort when an event occur.
         """
-        future = asyncio.ensure_future(awaitable)
-        if future.done():
-            return future
+        inner_future = asyncio.ensure_future(awaitable)
+        if inner_future.done():
+            return inner_future
+
+        exposed_future: asyncio.Future[_T]
+        if isinstance(inner_future, asyncio.Task):
+            exposed_future = asyncio.get_running_loop().create_future()
+        else:
+            exposed_future = inner_future
 
         def on_event(*_):
-            if future.done():
+            if exposed_future.done():
                 return
-            msg = f'abort: {event} event occurred.'
-            if isinstance(future, asyncio.Task):
-                # python < 3.9 does not support passing a message on `Task.cancel`
-                if sys.version_info < (3, 9, 0):
-                    future.cancel()
-                else:
-                    future.cancel(msg)
-            else:
-                future.set_exception(asyncio.CancelledError(msg))
+            if isinstance(inner_future, asyncio.Task):
+                inner_future.cancel()
+
+            from bumble.core import CancelledError
+
+            exposed_future.set_exception(
+                CancelledError(f'abort: {event} event occurred.')
+            )
 
         def on_done(_):
             self.remove_listener(event, on_event)
+            if exposed_future is not inner_future:
+                try:
+                    exposed_future.set_result(inner_future.result())
+                except BaseException as e:
+                    exposed_future.set_exception(e)
 
         self.on(event, on_event)
-        future.add_done_callback(on_done)
-        return future
+        inner_future.add_done_callback(on_done)
+        return exposed_future
 
 
 # -----------------------------------------------------------------------------

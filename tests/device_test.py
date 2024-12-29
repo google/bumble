@@ -25,6 +25,7 @@ from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     BT_LE_TRANSPORT,
     BT_PERIPHERAL_ROLE,
+    CancelledError,
     ConnectionParameters,
 )
 from bumble.device import (
@@ -259,11 +260,8 @@ async def test_flush():
     d0 = Device(host=Host(None, None))
     task = d0.abort_on('flush', asyncio.sleep(10000))
     await d0.host.flush()
-    try:
+    with pytest.raises(CancelledError):
         await task
-        assert False
-    except asyncio.CancelledError:
-        pass
 
 
 # -----------------------------------------------------------------------------

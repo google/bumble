@@ -727,10 +727,10 @@ class DLC(EventEmitter):
     def abort(self) -> None:
         logger.debug(f'aborting DLC: {self}')
         if self.connection_result:
-            self.connection_result.cancel()
+            self.connection_result.set_exception(core.CancelledError("Aborted"))
             self.connection_result = None
         if self.disconnection_result:
-            self.disconnection_result.cancel()
+            self.disconnection_result.set_exception(core.CancelledError("Aborted"))
             self.disconnection_result = None
         self.change_state(DLC.State.RESET)
         self.emit('close')
@@ -1011,10 +1011,12 @@ class Multiplexer(EventEmitter):
     def on_l2cap_channel_close(self) -> None:
         logger.debug('L2CAP channel closed, cleaning up')
         if self.open_result:
-            self.open_result.cancel()
+            self.open_result.set_exception(core.BearerLostError("L2CAP channel closed"))
             self.open_result = None
         if self.disconnection_result:
-            self.disconnection_result.cancel()
+            self.disconnection_result.set_exception(
+                core.BearerLostError("L2CAP channel closed")
+            )
             self.disconnection_result = None
         for dlc in self.dlcs.values():
             dlc.abort()

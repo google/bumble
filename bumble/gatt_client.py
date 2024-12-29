@@ -1060,9 +1060,11 @@ class Client:
                 )
             )
 
-    def on_disconnection(self, _) -> None:
+    def on_disconnection(self, reason: int) -> None:
         if self.pending_response and not self.pending_response.done():
-            self.pending_response.cancel()
+            self.pending_response.set_exception(
+                core.BearerLostError(f"Connection terminated, reason={reason}")
+            )
 
     def on_gatt_pdu(self, att_pdu: ATT_PDU) -> None:
         logger.debug(
