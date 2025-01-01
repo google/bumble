@@ -1501,7 +1501,10 @@ class AdvertisingData:
             ad_data_str = f'"{ad_data.decode("utf-8")}"'
         elif ad_type == AdvertisingData.COMPLETE_LOCAL_NAME:
             ad_type_str = 'Complete Local Name'
-            ad_data_str = f'"{ad_data.decode("utf-8")}"'
+            try:
+                ad_data_str = f'"{ad_data.decode("utf-8")}"'
+            except UnicodeDecodeError:
+                ad_data_str = ad_data.hex()
         elif ad_type == AdvertisingData.TX_POWER_LEVEL:
             ad_type_str = 'TX Power Level'
             ad_data_str = str(ad_data[0])
