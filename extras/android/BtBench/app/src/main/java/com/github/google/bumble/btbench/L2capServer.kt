@@ -37,34 +37,15 @@ class L2capServer(
     @SuppressLint("MissingPermission")
     override fun run() {
         // Advertise so that the peer can find us and connect.
-        val callback = object : AdvertiseCallback() {
-            override fun onStartFailure(errorCode: Int) {
-                Log.warning("failed to start advertising: $errorCode")
-            }
-
-            override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
-                Log.info("advertising started: $settingsInEffect")
-            }
-        }
-        val advertiseSettingsBuilder = AdvertiseSettings.Builder()
-            .setAdvertiseMode(ADVERTISE_MODE_LOW_LATENCY)
-            .setConnectable(true)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            advertiseSettingsBuilder.setDiscoverable(true)
-        }
-        val advertiseSettings = advertiseSettingsBuilder.build()
-        val advertiseData = AdvertiseData.Builder().build()
-        val scanData = AdvertiseData.Builder().setIncludeDeviceName(true).build()
-        val advertiser = bluetoothAdapter.bluetoothLeAdvertiser
-
+        val advertiser = Advertiser(bluetoothAdapter)
         val serverSocket = bluetoothAdapter.listenUsingInsecureL2capChannel()
         viewModel.l2capPsm = serverSocket.psm
         Log.info("psm = $serverSocket.psm")
 
         socketServer = SocketServer(viewModel, serverSocket, createIoClient)
         socketServer!!.run(
-            { advertiser.stopAdvertising(callback) },
-            { advertiser.startAdvertising(advertiseSettings, advertiseData, scanData, callback) }
+            { advertiser.stop() },
+            { advertiser.start() }
         )
     }
 

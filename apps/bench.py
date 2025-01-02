@@ -1607,6 +1607,7 @@ def create_scenario_factory(ctx, default_scenario):
     '--att-mtu',
     metavar='MTU',
     type=click.IntRange(23, 517),
+    default=517,
     help='GATT MTU (gatt-client mode)',
 )
 @click.option(

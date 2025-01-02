@@ -14,6 +14,7 @@
 
 package com.github.google.bumble.btbench
 
+import java.util.concurrent.CountDownLatch
 import java.util.logging.Logger
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
@@ -24,6 +25,7 @@ class Receiver(private val viewModel: AppViewModel, private val packetIO: Packet
     private var startTime: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
     private var lastPacketTime: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
     private var bytesReceived = 0
+    private val done = CountDownLatch(1)
 
     init {
         packetIO.packetSink = this
@@ -31,6 +33,7 @@ class Receiver(private val viewModel: AppViewModel, private val packetIO: Packet
 
     override fun run() {
         viewModel.clear()
+        done.await()
     }
 
     override fun abort() {}
@@ -62,6 +65,7 @@ class Receiver(private val viewModel: AppViewModel, private val packetIO: Packet
             Log.info("throughput: $throughput")
             viewModel.throughput = throughput
             packetIO.sendPacket(AckPacket(packet.flags, packet.sequenceNumber))
+            done.countDown()
         }
     }
 }

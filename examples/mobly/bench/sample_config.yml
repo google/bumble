@@ -2,8 +2,8 @@ TestBeds:
   - Name: BenchTestBed
     Controllers:
         AndroidDevice:
-          - serial: 37211FDJG000DJ
+          - serial: emulator-5554
             local_bt_address: 94:45:60:5E:03:B0
 
-          - serial: 23071FDEE001F7
-            local_bt_address: DC:E5:5B:E5:51:2C
+          #- serial: 23071FDEE001F7
+          #  local_bt_address: DC:E5:5B:E5:51:2C

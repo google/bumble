@@ -211,6 +211,9 @@ class MainActivity : ComponentActivity() {
             GATT_CLIENT_MODE -> GattClient(
                 appViewModel, bluetoothAdapter!!, baseContext, ::createIoClient
             )
+            GATT_SERVER_MODE -> GattServer(
+                appViewModel, bluetoothAdapter!!, baseContext, ::createIoClient
+            )
 
             else -> throw IllegalStateException()
         }

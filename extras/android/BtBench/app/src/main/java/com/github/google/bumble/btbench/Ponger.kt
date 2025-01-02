@@ -14,6 +14,7 @@
 
 package com.github.google.bumble.btbench
 
+import java.util.concurrent.CountDownLatch
 import java.util.logging.Logger
 import kotlin.time.TimeSource
 
@@ -23,6 +24,7 @@ class Ponger(private val viewModel: AppViewModel, private val packetIO: PacketIO
     private var startTime: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
     private var lastPacketTime: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
     private var expectedSequenceNumber: Int = 0
+    private val done = CountDownLatch(1)
 
     init {
         packetIO.packetSink = this
@@ -30,6 +32,7 @@ class Ponger(private val viewModel: AppViewModel, private val packetIO: PacketIO
 
     override fun run() {
         viewModel.clear()
+        done.await()
     }
 
     override fun abort() {}
@@ -58,5 +61,10 @@ class Ponger(private val viewModel: AppViewModel, private val packetIO: PacketIO
 
         packetIO.sendPacket(AckPacket(packet.flags, packet.sequenceNumber))
         viewModel.packetsSent += 1
+
+        if (packet.flags and Packet.LAST_FLAG != 0) {
+            Log.info("received last packet")
+            done.countDown()
+        }
     }
 }

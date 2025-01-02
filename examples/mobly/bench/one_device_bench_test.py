@@ -50,6 +50,20 @@ class OneDeviceBenchTest(base_test.BaseTestClass):
         final_status = self.dut.bench.waitForRunnerCompletion(runner["id"])
         print("### Final status:", final_status)
 
+    def test_gatt_client_send(self):
+        runner = self.dut.bench.runGattClient(
+            "send", "F1:F1:F1:F1:F1:F1", 128, True, 100, 970, 100, "HIGH"
+        )
+        print("### Initial status:", runner)
+        final_status = self.dut.bench.waitForRunnerCompletion(runner["id"])
+        print("### Final status:", final_status)
+
+    def test_gatt_server_receive(self):
+        runner = self.dut.bench.runGattServer("receive")
+        print("### Initial status:", runner)
+        final_status = self.dut.bench.waitForRunnerCompletion(runner["id"])
+        print("### Final status:", final_status)
+
 
 if __name__ == "__main__":
     test_runner.main()
