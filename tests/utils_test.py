@@ -15,13 +15,16 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+import asyncio
 import contextlib
 import logging
 import os
-from unittest.mock import MagicMock
+import pytest
+from unittest.mock import MagicMock, AsyncMock
 
 from pyee import EventEmitter
 
+from bumble import core
 from bumble import utils
 
 
@@ -93,6 +96,75 @@ def test_open_int_enums():
     assert x + 1 == 5
 
     print(list(Foo))
+
+
+# -----------------------------------------------------------------------------
+async def test_abort_on_coroutine_aborted():
+    ee = utils.AbortableEventEmitter()
+
+    future = ee.abort_on('e', asyncio.Event().wait())
+    ee.emit('e')
+
+    with pytest.raises(core.CancelledError):
+        await future
+
+
+# -----------------------------------------------------------------------------
+async def test_abort_on_coroutine_non_aborted():
+    ee = utils.AbortableEventEmitter()
+    event = asyncio.Event()
+
+    future = ee.abort_on('e', event.wait())
+    event.set()
+
+    await future
+
+
+# -----------------------------------------------------------------------------
+async def test_abort_on_coroutine_exception():
+    ee = utils.AbortableEventEmitter()
+    coroutine_factory = AsyncMock(side_effect=Exception("test"))
+
+    future = ee.abort_on('e', coroutine_factory())
+    with pytest.raises(Exception) as e:
+        await future
+    assert e.value.args == ("test",)
+
+
+# -----------------------------------------------------------------------------
+async def test_abort_on_future_aborted():
+    ee = utils.AbortableEventEmitter()
+    real_future = asyncio.get_running_loop().create_future()
+
+    future = ee.abort_on('e', real_future)
+    ee.emit('e')
+
+    with pytest.raises(core.CancelledError):
+        await future
+
+
+# -----------------------------------------------------------------------------
+async def test_abort_on_future_non_aborted():
+    ee = utils.AbortableEventEmitter()
+    real_future = asyncio.get_running_loop().create_future()
+
+    future = ee.abort_on('e', real_future)
+    real_future.set_result(None)
+
+    await future
+
+
+# -----------------------------------------------------------------------------
+async def test_abort_on_future_exception():
+    ee = utils.AbortableEventEmitter()
+    real_future = asyncio.get_running_loop().create_future()
+
+    future = ee.abort_on('e', real_future)
+    real_future.set_exception(Exception("test"))
+
+    with pytest.raises(Exception) as e:
+        await future
+    assert e.value.args == ("test",)
 
 
 # -----------------------------------------------------------------------------
