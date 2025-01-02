@@ -712,16 +712,8 @@ async def run_receive(
                     sdus = [b''] * num_bis
 
             bis_link.sink = functools.partial(sink, i)
-            await device.send_command(
-                hci.HCI_LE_Setup_ISO_Data_Path_Command(
-                    connection_handle=bis_link.handle,
-                    data_path_direction=hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.CONTROLLER_TO_HOST,
-                    data_path_id=0,
-                    codec_id=hci.CodingFormat(codec_id=hci.CodecID.TRANSPARENT),
-                    controller_delay=0,
-                    codec_configuration=b'',
-                ),
-                check_result=True,
+            await bis_link.setup_data_path(
+                direction=bis_link.Direction.CONTROLLER_TO_HOST
             )
 
         terminated = asyncio.Event()
@@ -834,16 +826,8 @@ async def run_broadcast(
         )
         print('Setup ISO Data Path')
         for bis_link in big.bis_links:
-            await device.send_command(
-                hci.HCI_LE_Setup_ISO_Data_Path_Command(
-                    connection_handle=bis_link.handle,
-                    data_path_direction=hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.HOST_TO_CONTROLLER,
-                    data_path_id=0,
-                    codec_id=hci.CodingFormat(hci.CodecID.TRANSPARENT),
-                    controller_delay=0,
-                    codec_configuration=b'',
-                ),
-                check_result=True,
+            await bis_link.setup_data_path(
+                direction=bis_link.Direction.HOST_TO_CONTROLLER
             )
 
         for frame in itertools.cycle(frames):
