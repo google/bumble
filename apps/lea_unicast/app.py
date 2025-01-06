@@ -39,7 +39,7 @@ import aiohttp.web
 import bumble
 from bumble.core import AdvertisingData
 from bumble.colors import color
-from bumble.device import Device, DeviceConfiguration, AdvertisingParameters
+from bumble.device import Device, DeviceConfiguration, AdvertisingParameters, CisLink
 from bumble.transport import open_transport
 from bumble.profiles import ascs, bap, pacs
 from bumble.hci import Address, CodecID, CodingFormat, HCI_IsoDataPacket
@@ -110,7 +110,7 @@ async def lc3_source_task(
     sdu_length: int,
     frame_duration_us: int,
     device: Device,
-    cis_handle: int,
+    cis_link: CisLink,
 ) -> None:
     logger.info(
         "lc3_source_task filename=%s, sdu_length=%d, frame_duration=%.1f",
@@ -120,7 +120,6 @@ async def lc3_source_task(
     )
     with wave.open(filename, 'rb') as wav:
         bits_per_sample = wav.getsampwidth() * 8
-        packet_sequence_number = 0
 
         encoder: lc3.Encoder | None = None
 
@@ -150,18 +149,8 @@ async def lc3_source_task(
                     num_bytes=sdu_length,
                     bit_depth=bits_per_sample,
                 )
+                cis_link.write(sdu)
 
-                iso_packet = HCI_IsoDataPacket(
-                    connection_handle=cis_handle,
-                    data_total_length=sdu_length + 4,
-                    packet_sequence_number=packet_sequence_number,
-                    pb_flag=0b10,
-                    packet_status_flag=0,
-                    iso_sdu_length=sdu_length,
-                    iso_sdu_fragment=sdu,
-                )
-                device.host.send_hci_packet(iso_packet)
-                packet_sequence_number += 1
             sleep_time = next_round - datetime.datetime.now()
             await asyncio.sleep(sleep_time.total_seconds() * 0.9)
 
@@ -309,6 +298,7 @@ class Speaker:
                     advertising_interval_min=25,
                     advertising_interval_max=25,
                     address=Address('F1:F2:F3:F4:F5:F6'),
+                    identity_address_type=Address.RANDOM_DEVICE_ADDRESS,
                 )
 
             device_config.le_enabled = True
@@ -393,7 +383,7 @@ class Speaker:
                                 ),
                                 frame_duration_us=codec_config.frame_duration.us,
                                 device=self.device,
-                                cis_handle=ase.cis_link.handle,
+                                cis_link=ase.cis_link,
                             ),
                         )
                     else:
