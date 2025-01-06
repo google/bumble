@@ -5070,7 +5070,7 @@ class HCI_Event(HCI_Packet):
     hci_packet_type = HCI_EVENT_PACKET
     event_names: Dict[int, str] = {}
     event_classes: Dict[int, Type[HCI_Event]] = {}
-    vendor_factory: Optional[Callable[[bytes], Optional[HCI_Event]]] = None
+    vendor_factories: list[Callable[[bytes], Optional[HCI_Event]]] = []
 
     @staticmethod
     def event(fields=()):
@@ -5129,6 +5129,19 @@ class HCI_Event(HCI_Packet):
         return event_class
 
     @classmethod
+    def add_vendor_factory(
+        cls, factory: Callable[[bytes], Optional[HCI_Event]]
+    ) -> None:
+        cls.vendor_factories.append(factory)
+
+    @classmethod
+    def remove_vendor_factory(
+        cls, factory: Callable[[bytes], Optional[HCI_Event]]
+    ) -> None:
+        if factory in cls.vendor_factories:
+            cls.vendor_factories.remove(factory)
+
+    @classmethod
     def from_bytes(cls, packet: bytes) -> HCI_Event:
         event_code = packet[1]
         length = packet[2]
@@ -5148,8 +5161,8 @@ class HCI_Event(HCI_Packet):
         elif event_code == HCI_VENDOR_EVENT:
             # Invoke all the registered factories to see if any of them can handle
             # the event
-            if cls.vendor_factory:
-                if event := cls.vendor_factory(parameters):
+            for vendor_factory in cls.vendor_factories:
+                if event := vendor_factory(parameters):
                     return event
 
             # No factory, or the factory could not create an instance,
