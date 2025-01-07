@@ -299,7 +299,7 @@ class HCI_Android_Vendor_Event(HCI_Extended_Event):
 
 
 HCI_Android_Vendor_Event.register_subevents(globals())
-HCI_Event.vendor_factory = HCI_Android_Vendor_Event.subclass_from_parameters
+HCI_Event.add_vendor_factory(HCI_Android_Vendor_Event.subclass_from_parameters)
 
 
 # -----------------------------------------------------------------------------
