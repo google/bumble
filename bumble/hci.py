@@ -5167,7 +5167,7 @@ class HCI_Event(HCI_Packet):
 
             # No factory, or the factory could not create an instance,
             # return a generic vendor event
-            return HCI_Event(event_code, parameters)
+            return HCI_Vendor_Event(data=parameters)
         else:
             subclass = HCI_Event.event_classes.get(event_code)
             if subclass is None:
