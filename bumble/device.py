@@ -1406,7 +1406,7 @@ class _IsoLink:
                 iso_sdu_fragment=sdu,
             )
         )
-        self.packet_sequence_number += 1
+        self.packet_sequence_number = (self.packet_sequence_number + 1) % 0x10000
 
 
 # -----------------------------------------------------------------------------
