@@ -957,11 +957,12 @@ async def test_discover_all():
     peer = Peer(connection)
 
     await peer.discover_all()
-    assert len(peer.gatt_client.services) == 3
-    # service 1800 gets added automatically
+    assert len(peer.gatt_client.services) == 4
+    # service 1800 and 1801 get added automatically
     assert peer.gatt_client.services[0].uuid == UUID('1800')
-    assert peer.gatt_client.services[1].uuid == service1.uuid
-    assert peer.gatt_client.services[2].uuid == service2.uuid
+    assert peer.gatt_client.services[1].uuid == UUID('1801')
+    assert peer.gatt_client.services[2].uuid == service1.uuid
+    assert peer.gatt_client.services[3].uuid == service2.uuid
     s = peer.get_services_by_uuid(service1.uuid)
     assert len(s) == 1
     assert len(s[0].characteristics) == 2
@@ -1084,10 +1085,18 @@ CharacteristicDeclaration(handle=0x0002, value_handle=0x0003, uuid=UUID-16:2A00 
 Characteristic(handle=0x0003, end=0x0003, uuid=UUID-16:2A00 (Device Name), READ)
 CharacteristicDeclaration(handle=0x0004, value_handle=0x0005, uuid=UUID-16:2A01 (Appearance), READ)
 Characteristic(handle=0x0005, end=0x0005, uuid=UUID-16:2A01 (Appearance), READ)
-Service(handle=0x0006, end=0x0009, uuid=3A657F47-D34F-46B3-B1EC-698E29B6B829)
-CharacteristicDeclaration(handle=0x0007, value_handle=0x0008, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, READ|WRITE|NOTIFY)
-Characteristic(handle=0x0008, end=0x0009, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, READ|WRITE|NOTIFY)
-Descriptor(handle=0x0009, type=UUID-16:2902 (Client Characteristic Configuration), value=0000)"""
+Service(handle=0x0006, end=0x000D, uuid=UUID-16:1801 (Generic Attribute))
+CharacteristicDeclaration(handle=0x0007, value_handle=0x0008, uuid=UUID-16:2A05 (Service Changed), INDICATE)
+Characteristic(handle=0x0008, end=0x0009, uuid=UUID-16:2A05 (Service Changed), INDICATE)
+Descriptor(handle=0x0009, type=UUID-16:2902 (Client Characteristic Configuration), value=0000)
+CharacteristicDeclaration(handle=0x000A, value_handle=0x000B, uuid=UUID-16:2B29 (Client Supported Features), READ|WRITE)
+Characteristic(handle=0x000B, end=0x000B, uuid=UUID-16:2B29 (Client Supported Features), READ|WRITE)
+CharacteristicDeclaration(handle=0x000C, value_handle=0x000D, uuid=UUID-16:2B2A (Database Hash), READ)
+Characteristic(handle=0x000D, end=0x000D, uuid=UUID-16:2B2A (Database Hash), READ)
+Service(handle=0x000E, end=0x0011, uuid=3A657F47-D34F-46B3-B1EC-698E29B6B829)
+CharacteristicDeclaration(handle=0x000F, value_handle=0x0010, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, READ|WRITE|NOTIFY)
+Characteristic(handle=0x0010, end=0x0011, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, READ|WRITE|NOTIFY)
+Descriptor(handle=0x0011, type=UUID-16:2902 (Client Characteristic Configuration), value=0000)"""
     )
 
 
