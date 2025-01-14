@@ -2909,7 +2909,7 @@ class Device(CompositeEventEmitter):
                     scanning_filter_policy=scanning_filter_policy,
                     scanning_phys=scanning_phys_bits,
                     scan_types=[scan_type] * scanning_phy_count,
-                    scan_intervals=[int(scan_window / 0.625)] * scanning_phy_count,
+                    scan_intervals=[int(scan_interval / 0.625)] * scanning_phy_count,
                     scan_windows=[int(scan_window / 0.625)] * scanning_phy_count,
                 ),
                 check_result=True,
