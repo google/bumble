@@ -275,7 +275,7 @@ HCI_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE_EVENT = 0x2C
 HCI_LE_CS_READ_REMOTE_FAE_TABLE_COMPLETE_EVENT              = 0x2D
 HCI_LE_CS_SECURITY_ENABLE_COMPLETE_EVENT                    = 0x2E
 HCI_LE_CS_CONFIG_COMPLETE_EVENT                             = 0x2F
-HCI_LE_CS_PROCEDURE_ENABLE_EVENT                            = 0x30
+HCI_LE_CS_PROCEDURE_ENABLE_COMPLETE_EVENT                   = 0x30
 HCI_LE_CS_SUBEVENT_RESULT_EVENT                             = 0x31
 HCI_LE_CS_SUBEVENT_RESULT_CONTINUE_EVENT                    = 0x32
 HCI_LE_CS_TEST_END_COMPLETE_EVENT                           = 0x33
@@ -599,7 +599,7 @@ HCI_LE_READ_ALL_LOCAL_SUPPORTED_FEATURES_COMMAND                         = hci_c
 HCI_LE_READ_ALL_REMOTE_FEATURES_COMMAND                                  = hci_command_op_code(0x08, 0x0088)
 HCI_LE_CS_READ_LOCAL_SUPPORTED_CAPABILITIES_COMMAND                      = hci_command_op_code(0x08, 0x0089)
 HCI_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMMAND                     = hci_command_op_code(0x08, 0x008A)
-HCI_LE_CS_WRITE_CACHED_REMOTE_SUPPORTED_CAPABILITIES                     = hci_command_op_code(0x08, 0x008B)
+HCI_LE_CS_WRITE_CACHED_REMOTE_SUPPORTED_CAPABILITIES_COMMAND             = hci_command_op_code(0x08, 0x008B)
 HCI_LE_CS_SECURITY_ENABLE_COMMAND                                        = hci_command_op_code(0x08, 0x008C)
 HCI_LE_CS_SET_DEFAULT_SETTINGS_COMMAND                                   = hci_command_op_code(0x08, 0x008D)
 HCI_LE_CS_READ_REMOTE_FAE_TABLE_COMMAND                                  = hci_command_op_code(0x08, 0x008E)
@@ -749,6 +749,46 @@ class PhyBit(enum.IntFlag):
     LE_1M    = 1 << HCI_LE_1M_PHY_BIT
     LE_2M    = 1 << HCI_LE_2M_PHY_BIT
     LE_CODED = 1 << HCI_LE_CODED_PHY_BIT
+
+
+class CsRole(OpenIntEnum):
+    INITIATOR = 0x00
+    REFLECTOR = 0x01
+
+
+class CsRoleMask(enum.IntFlag):
+    INITIATOR = 0x01
+    REFLECTOR = 0x02
+
+
+class CsSyncPhy(OpenIntEnum):
+    LE_1M     = 1
+    LE_2M     = 2
+    LE_2M_2BT = 3
+
+
+class CsSyncPhySupported(enum.IntFlag):
+    LE_2M     = 0x01
+    LE_2M_2BT = 0x02
+
+
+class RttType(OpenIntEnum):
+    AA_ONLY = 0x00
+    SOUNDING_SEQUENCE_32_BIT = 0x01
+    SOUNDING_SEQUENCE_96_BIT = 0x02
+    RANDOM_SEQUENCE_32_BIT = 0x03
+    RANDOM_SEQUENCE_64_BIT = 0x04
+    RANDOM_SEQUENCE_96_BIT = 0x05
+    RANDOM_SEQUENCE_128_BIT = 0x06
+
+
+class CsSnr(OpenIntEnum):
+    SNR_18_DB = 0x00
+    SNR_21_DB = 0x01
+    SNR_24_DB = 0x02
+    SNR_27_DB = 0x03
+    SNR_30_DB = 0x04
+    NOT_APPLIED = 0xFF
 
 
 # Connection Parameters
@@ -971,7 +1011,7 @@ HCI_SUPPORTED_COMMANDS_MASKS = {
     HCI_READ_ENCRYPTION_KEY_SIZE_COMMAND                                      : 1 << (20*8+4),
     HCI_LE_CS_READ_LOCAL_SUPPORTED_CAPABILITIES_COMMAND                       : 1 << (20*8+5),
     HCI_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMMAND                      : 1 << (20*8+6),
-    HCI_LE_CS_WRITE_CACHED_REMOTE_SUPPORTED_CAPABILITIES                      : 1 << (20*8+7),
+    HCI_LE_CS_WRITE_CACHED_REMOTE_SUPPORTED_CAPABILITIES_COMMAND              : 1 << (20*8+7),
     HCI_SET_EVENT_MASK_PAGE_2_COMMAND                                         : 1 << (22*8+2),
     HCI_READ_FLOW_CONTROL_MODE_COMMAND                                        : 1 << (23*8+0),
     HCI_WRITE_FLOW_CONTROL_MODE_COMMAND                                       : 1 << (23*8+1),
@@ -1462,6 +1502,12 @@ class LmpFeatureMask(enum.IntFlag):
 # -----------------------------------------------------------------------------
 # pylint: disable-next=unnecessary-lambda
 STATUS_SPEC = {'size': 1, 'mapper': lambda x: HCI_Constant.status_name(x)}
+CS_ROLE_SPEC = {'size': 1, 'mapper': lambda x: CsRole(x).name}
+CS_ROLE_MASK_SPEC = {'size': 1, 'mapper': lambda x: CsRoleMask(x).name}
+CS_SYNC_PHY_SPEC = {'size': 1, 'mapper': lambda x: CsSyncPhy(x).name}
+CS_SYNC_PHY_SUPPORTED_SPEC = {'size': 1, 'mapper': lambda x: CsSyncPhySupported(x).name}
+RTT_TYPE_SPEC = {'size': 1, 'mapper': lambda x: RttType(x).name}
+CS_SNR_SPEC = {'size': 1, 'mapper': lambda x: CsSnr(x).name}
 
 
 class CodecID(OpenIntEnum):
@@ -5060,6 +5106,275 @@ class HCI_LE_Set_Host_Feature_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('num_config_supported', 1),
+        ('max_consecutive_procedures_supported', 2),
+        ('num_antennas_supported', 1),
+        ('max_antenna_paths_supported', 1),
+        ('roles_supported', 1),
+        ('modes_supported', 1),
+        ('rtt_capability', 1),
+        ('rtt_aa_only_n', 1),
+        ('rtt_sounding_n', 1),
+        ('rtt_random_payload_n', 1),
+        ('nadm_sounding_capability', 2),
+        ('nadm_random_capability', 2),
+        ('cs_sync_phys_supported', CS_SYNC_PHY_SUPPORTED_SPEC),
+        ('subfeatures_supported', 2),
+        ('t_ip1_times_supported', 2),
+        ('t_ip2_times_supported', 2),
+        ('t_fcs_times_supported', 2),
+        ('t_pm_times_supported', 2),
+        ('t_sw_time_supported', 1),
+        ('tx_snr_capability', CS_SNR_SPEC),
+    ]
+)
+class HCI_LE_CS_Read_Local_Supported_Capabilities_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.130 LE CS Read Local Supported Capabilities command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([('connection_handle', 2)])
+class HCI_LE_CS_Read_Remote_Supported_Capabilities_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.131 LE CS Read Remote Supported Capabilities command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('num_config_supported', 1),
+        ('max_consecutive_procedures_supported', 2),
+        ('num_antennas_supported', 1),
+        ('max_antenna_paths_supported', 1),
+        ('roles_supported', 1),
+        ('modes_supported', 1),
+        ('rtt_capability', 1),
+        ('rtt_aa_only_n', 1),
+        ('rtt_sounding_n', 1),
+        ('rtt_random_payload_n', 1),
+        ('nadm_sounding_capability', 2),
+        ('nadm_random_capability', 2),
+        ('cs_sync_phys_supported', CS_SYNC_PHY_SUPPORTED_SPEC),
+        ('subfeatures_supported', 2),
+        ('t_ip1_times_supported', 2),
+        ('t_ip2_times_supported', 2),
+        ('t_fcs_times_supported', 2),
+        ('t_pm_times_supported', 2),
+        ('t_sw_time_supported', 1),
+        ('tx_snr_capability', CS_SNR_SPEC),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+    ],
+)
+class HCI_LE_CS_Write_Cached_Remote_Supported_Capabilities_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.132 LE CS Write Cached Remote Supported Capabilities command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([('connection_handle', 2)])
+class HCI_LE_CS_Security_Enable_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.133 LE CS Security Enable command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        (
+            'role_enable',
+            CS_ROLE_MASK_SPEC,
+        ),
+        ('cs_sync_antenna_selection', 1),
+        ('max_tx_power', 1),
+    ],
+    return_parameters_fields=[('status', STATUS_SPEC), ('connection_handle', 2)],
+)
+class HCI_LE_CS_Set_Default_Settings_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.134 LE CS Security Enable command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command([('connection_handle', 2)])
+class HCI_LE_CS_Read_Remote_FAE_Table_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.135 LE CS Read Remote FAE Table command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('remote_fae_table', 72),
+    ],
+    return_parameters_fields=[('status', STATUS_SPEC), ('connection_handle', 2)],
+)
+class HCI_LE_CS_Write_Cached_Remote_FAE_Table_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.136  LE CS Write Cached Remote FAE Table command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('config_id', 1),
+        ('create_context', 1),
+        ('main_mode_type', 1),
+        ('sub_mode_type', 1),
+        ('min_main_mode_steps', 1),
+        ('max_main_mode_steps', 1),
+        ('main_mode_repetition', 1),
+        ('mode_0_steps', 1),
+        ('role', CS_ROLE_SPEC),
+        ('rtt_type', RTT_TYPE_SPEC),
+        ('cs_sync_phy', CS_SYNC_PHY_SPEC),
+        ('channel_map', 10),
+        ('channel_map_repetition', 1),
+        ('channel_selection_type', 1),
+        ('ch3c_shape', 1),
+        ('ch3c_jump', 1),
+        ('reserved', 1),
+    ],
+)
+class HCI_LE_CS_Create_Config_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.137 LE CS Create Config command
+    '''
+
+    class ChannelSelectionType(OpenIntEnum):
+        ALGO_3B = 0
+        ALGO_3C = 1
+
+    class Ch3cShape(OpenIntEnum):
+        HAT = 0x00
+        X = 0x01
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('config_id', 1),
+    ],
+)
+class HCI_LE_CS_Remove_Config_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.138 LE CS Remove Config command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [('channel_classification', 10)], return_parameters_fields=[('status', STATUS_SPEC)]
+)
+class HCI_LE_CS_Set_Channel_Classification_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.139 LE CS Set Channel Classification command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('config_id', 1),
+        ('max_procedure_len', 2),
+        ('min_procedure_interval', 2),
+        ('max_procedure_interval', 2),
+        ('max_procedure_count', 2),
+        ('min_subevent_len', 3),
+        ('max_subevent_len', 3),
+        ('tone_antenna_config_selection', 1),
+        ('phy', 1),
+        ('tx_power_delta', 1),
+        ('preferred_peer_antenna', 1),
+        ('snr_control_initiator', CS_SNR_SPEC),
+        ('snr_control_reflector', CS_SNR_SPEC),
+    ],
+    return_parameters_fields=[('status', STATUS_SPEC), ('connection_handle', 2)],
+)
+class HCI_LE_CS_Set_Procedure_Parameters_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.140 LE CS Set Procedure Parameters command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('connection_handle', 2),
+        ('config_id', 1),
+        ('enable', 1),
+    ],
+)
+class HCI_LE_CS_Procedure_Enable_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.141 LE CS Procedure Enable command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    [
+        ('main_mode_type', 1),
+        ('sub_mode_type', 1),
+        ('main_mode_repetition', 1),
+        ('mode_0_steps', 1),
+        ('role', CS_ROLE_SPEC),
+        ('rtt_type', RTT_TYPE_SPEC),
+        ('cs_sync_phy', CS_SYNC_PHY_SPEC),
+        ('cs_sync_antenna_selection', 1),
+        ('subevent_len', 3),
+        ('subevent_interval', 2),
+        ('max_num_subevents', 1),
+        ('transmit_power_level', 1),
+        ('t_ip1_time', 1),
+        ('t_ip2_time', 1),
+        ('t_fcs_time', 1),
+        ('t_pm_time', 1),
+        ('t_sw_time', 1),
+        ('tone_antenna_config_selection', 1),
+        ('reserved', 1),
+        ('snr_control_initiator', CS_SNR_SPEC),
+        ('snr_control_reflector', CS_SNR_SPEC),
+        ('drbg_nonce', 2),
+        ('channel_map_repetition', 1),
+        ('override_config', 2),
+        ('override_parameters_data', 'v'),
+    ],
+)
+class HCI_LE_CS_Test_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.142 LE CS Test command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command()
+class HCI_LE_CS_Test_End_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.143 LE CS Test End command
+    '''
+
+
+# -----------------------------------------------------------------------------
 # HCI Events
 # -----------------------------------------------------------------------------
 class HCI_Event(HCI_Packet):
@@ -6006,6 +6321,291 @@ class HCI_LE_BIG_Sync_Lost_Event(HCI_LE_Meta_Event):
 class HCI_LE_BIGInfo_Advertising_Report_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.34 LE BIGInfo Advertising Report Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('num_config_supported', 1),
+        ('max_consecutive_procedures_supported', 2),
+        ('num_antennas_supported', 1),
+        ('max_antenna_paths_supported', 1),
+        ('roles_supported', 1),
+        ('modes_supported', 1),
+        ('rtt_capability', 1),
+        ('rtt_aa_only_n', 1),
+        ('rtt_sounding_n', 1),
+        ('rtt_random_payload_n', 1),
+        ('nadm_sounding_capability', 2),
+        ('nadm_random_capability', 2),
+        ('cs_sync_phys_supported', CS_SYNC_PHY_SUPPORTED_SPEC),
+        ('subfeatures_supported', 2),
+        ('t_ip1_times_supported', 2),
+        ('t_ip2_times_supported', 2),
+        ('t_fcs_times_supported', 2),
+        ('t_pm_times_supported', 2),
+        ('t_sw_time_supported', 1),
+        ('tx_snr_capability', CS_SNR_SPEC),
+    ]
+)
+class HCI_LE_CS_Read_Remote_Supported_Capabilities_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.39 LE CS Read Remote Supported Capabilities Complete event
+    '''
+
+    status: int
+    connection_handle: int
+    num_config_supported: int
+    max_consecutive_procedures_supported: int
+    num_antennas_supported: int
+    max_antenna_paths_supported: int
+    roles_supported: int
+    modes_supported: int
+    rtt_capability: int
+    rtt_aa_only_n: int
+    rtt_sounding_n: int
+    rtt_random_payload_n: int
+    nadm_sounding_capability: int
+    nadm_random_capability: int
+    cs_sync_phys_supported: int
+    subfeatures_supported: int
+    t_ip1_times_supported: int
+    t_ip2_times_supported: int
+    t_fcs_times_supported: int
+    t_pm_times_supported: int
+    t_sw_time_supported: int
+    tx_snr_capability: int
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('remote_fae_table', 72),
+    ]
+)
+class HCI_LE_CS_Read_Remote_FAE_Table_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.40 LE CS Read Remote FAE Table Complete event
+    '''
+
+    status: int
+    connection_handle: int
+    remote_fae_table: bytes
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+    ]
+)
+class HCI_LE_CS_Security_Enable_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.41 LE CS Security Enable Complete event
+    '''
+
+    status: int
+    connection_handle: int
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('config_id', 1),
+        (
+            'action',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_CS_Config_Complete_Event.Action(x).name,
+            },
+        ),
+        ('main_mode_type', 1),
+        ('sub_mode_type', 1),
+        ('min_main_mode_steps', 1),
+        ('max_main_mode_steps', 1),
+        ('main_mode_repetition', 1),
+        ('mode_0_steps', 1),
+        ('role', CS_ROLE_SPEC),
+        ('rtt_type', RTT_TYPE_SPEC),
+        ('cs_sync_phy', CS_SYNC_PHY_SPEC),
+        ('channel_map', 10),
+        ('channel_map_repetition', 1),
+        ('channel_selection_type', 1),
+        ('ch3c_shape', 1),
+        ('ch3c_jump', 1),
+        ('reserved', 1),
+        ('t_ip1_time', 1),
+        ('t_ip2_time', 1),
+        ('t_fcs_time', 1),
+        ('t_pm_time', 1),
+    ]
+)
+class HCI_LE_CS_Config_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.42 LE CS Config Complete event
+    '''
+
+    class Action(OpenIntEnum):
+        REMOVED = 0
+        CREATED = 1
+
+    status: int
+    connection_handle: int
+    config_id: int
+    action: int
+    main_mode_type: int
+    sub_mode_type: int
+    min_main_mode_steps: int
+    max_main_mode_steps: int
+    main_mode_repetition: int
+    mode_0_steps: int
+    role: int
+    rtt_type: int
+    cs_sync_phy: int
+    channel_map: bytes
+    channel_map_repetition: int
+    channel_selection_type: int
+    ch3c_shape: int
+    ch3c_jump: int
+    reserved: int
+    t_ip1_time: int
+    t_ip2_time: int
+    t_fcs_time: int
+    t_pm_time: int
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('config_id', 1),
+        ('state', 1),
+        ('tone_antenna_config_selection', 1),
+        ('selected_tx_power', 1),
+        ('subevent_len', 3),
+        ('subevents_per_event', 1),
+        ('subevent_interval', 2),
+        ('event_interval', 2),
+        ('procedure_interval', 2),
+        ('procedure_count', 2),
+        ('max_procedure_len', 2),
+    ]
+)
+class HCI_LE_CS_Procedure_Enable_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.43 LE CS Procedure Enable Complete event
+    '''
+
+    class State(OpenIntEnum):
+        DISABLED = 0
+        ENABLED = 1
+
+    status: int
+    connection_handle: int
+    config_id: int
+    state: int
+    tone_antenna_config_selection: int
+    selected_tx_power: int
+    subevent_len: int
+    subevents_per_event: int
+    subevent_interval: int
+    event_interval: int
+    procedure_interval: int
+    procedure_count: int
+    max_procedure_len: int
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('connection_handle', 2),
+        ('config_id', 1),
+        ('start_acl_conn_event_counter', 2),
+        ('procedure_counter', 2),
+        ('frequency_compensation', 2),
+        ('reference_power_level', 1),
+        ('procedure_done_status', 1),
+        ('subevent_done_status', 1),
+        ('abort_reason', 1),
+        ('num_antenna_paths', 1),
+        [
+            ('step_mode', 1),
+            ('step_channel', 1),
+            ('step_data', 'v'),
+        ],
+    ]
+)
+class HCI_LE_CS_Subevent_Result_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.44 LE CS Subevent Result event
+    '''
+
+    status: int
+    config_id: int
+    start_acl_conn_event_counter: int
+    procedure_counter: int
+    frequency_compensation: int
+    reference_power_level: int
+    procedure_done_status: int
+    subevent_done_status: int
+    abort_reason: int
+    num_antenna_paths: int
+    step_mode: list[int]
+    step_channel: list[int]
+    step_data: list[bytes]
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('connection_handle', 2),
+        ('config_id', 1),
+        ('procedure_done_status', 1),
+        ('subevent_done_status', 1),
+        ('abort_reason', 1),
+        ('num_antenna_paths', 1),
+        [
+            ('step_mode', 1),
+            ('step_channel', 1),
+            ('step_data', 'v'),
+        ],
+    ]
+)
+class HCI_LE_CS_Subevent_Result_Continue_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.45 LE CS Subevent Result Continue event
+    '''
+
+    status: int
+    config_id: int
+    procedure_done_status: int
+    subevent_done_status: int
+    abort_reason: int
+    num_antenna_paths: int
+    step_mode: list[int]
+    step_channel: list[int]
+    step_data: list[bytes]
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('connection_handle', 2),
+        ('status', STATUS_SPEC),
+    ]
+)
+class HCI_LE_CS_Test_End_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.46 LE CS Test End Complete event
     '''
 
 
