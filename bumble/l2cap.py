@@ -773,7 +773,6 @@ class ClassicChannel(EventEmitter):
         self.psm = psm
         self.source_cid = source_cid
         self.destination_cid = 0
-        self.response = None
         self.connection_result = None
         self.disconnection_result = None
         self.sink = None
@@ -783,27 +782,15 @@ class ClassicChannel(EventEmitter):
         self.state = new_state
 
     def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
+        if self.state != self.State.OPEN:
+            raise InvalidStateError('channel not open')
         self.manager.send_pdu(self.connection, self.destination_cid, pdu)
 
     def send_control_frame(self, frame: L2CAP_Control_Frame) -> None:
         self.manager.send_control_frame(self.connection, self.signaling_cid, frame)
 
-    async def send_request(self, request: SupportsBytes) -> bytes:
-        # Check that there isn't already a request pending
-        if self.response:
-            raise InvalidStateError('request already pending')
-        if self.state != self.State.OPEN:
-            raise InvalidStateError('channel not open')
-
-        self.response = asyncio.get_running_loop().create_future()
-        self.send_pdu(request)
-        return await self.response
-
     def on_pdu(self, pdu: bytes) -> None:
-        if self.response:
-            self.response.set_result(pdu)
-            self.response = None
-        elif self.sink:
+        if self.sink:
             # pylint: disable=not-callable
             self.sink(pdu)
         else:
