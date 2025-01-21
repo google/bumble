@@ -20,12 +20,11 @@ import logging
 import os
 import pytest
 
-from bumble.core import UUID, BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID
+from bumble.core import UUID, BT_L2CAP_PROTOCOL_ID
 from bumble.sdp import (
     DataElement,
     ServiceAttribute,
     Client,
-    Server,
     SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
     SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
     SDP_PUBLIC_BROWSE_ROOT,
@@ -174,9 +173,10 @@ def test_data_elements() -> None:
 
 
 # -----------------------------------------------------------------------------
-def sdp_records():
+def sdp_records(record_count=1):
     return {
-        0x00010001: [
+        0x00010001
+        + i: [
             ServiceAttribute(
                 SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
                 DataElement.unsigned_integer_32(0x00010001),
@@ -200,6 +200,7 @@ def sdp_records():
                 ),
             ),
         ]
+        for i in range(record_count)
     }
 
 
@@ -216,19 +217,55 @@ async def test_service_search():
     devices.devices[0].sdp_server.service_records.update(sdp_records())
 
     # Search for service
-    client = Client(devices.connections[1])
-    await client.connect()
-    services = await client.search_services(
-        [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE')]
-    )
+    async with Client(devices.connections[1]) as client:
+        services = await client.search_services(
+            [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AF')]
+        )
+        assert len(services) == 0
 
-    # Then
-    assert services[0] == 0x00010001
+        services = await client.search_services(
+            [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE')]
+        )
+        assert len(services) == 1
+        assert services[0] == 0x00010001
+
+        services = await client.search_services(
+            [BT_L2CAP_PROTOCOL_ID, SDP_PUBLIC_BROWSE_ROOT]
+        )
+        assert len(services) == 1
+        assert services[0] == 0x00010001
+
+        services = await client.search_services(
+            [BT_L2CAP_PROTOCOL_ID, SDP_PUBLIC_BROWSE_ROOT]
+        )
+        assert len(services) == 1
+        assert services[0] == 0x00010001
 
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_service_attribute():
+async def test_service_search_with_continuation():
+    # Setup connections
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    # Register SDP service
+    records = sdp_records(100)
+    devices.devices[0].sdp_server.service_records.update(records)
+
+    # Search for service
+    async with Client(devices.connections[1], mtu=48) as client:
+        services = await client.search_services(
+            [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE')]
+        )
+        assert len(services) == len(records)
+        for i in range(len(records)):
+            assert services[i] == 0x00010001 + i
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_service_attributes():
     # Setup connections
     devices = TwoDevices()
     await devices.setup_connection()
@@ -236,15 +273,43 @@ async def test_service_attribute():
     # Register SDP service
     devices.devices[0].sdp_server.service_records.update(sdp_records())
 
-    # Search for service
-    client = Client(devices.connections[1])
-    await client.connect()
-    attributes = await client.get_attributes(
-        0x00010001, [SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID]
-    )
+    # Get attributes
+    async with Client(devices.connections[1]) as client:
+        attributes = await client.get_attributes(0x00010001, [1234])
+        assert len(attributes) == 0
 
-    # Then
-    assert attributes[0].value.value == sdp_records()[0x00010001][0].value.value
+        attributes = await client.get_attributes(
+            0x00010001, [SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID]
+        )
+        assert len(attributes) == 1
+        assert attributes[0].value.value == sdp_records()[0x00010001][0].value.value
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_service_attributes_with_continuation():
+    # Setup connections
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    # Register SDP service
+    records = {
+        0x00010001: [
+            ServiceAttribute(
+                x,
+                DataElement.unsigned_integer_32(0x00010001),
+            )
+            for x in range(100)
+        ]
+    }
+    devices.devices[0].sdp_server.service_records.update(records)
+
+    # Get attributes
+    async with Client(devices.connections[1], mtu=48) as client:
+        attributes = await client.get_attributes(0x00010001, list(range(100)))
+        assert len(attributes) == 100
+        for i, attribute in enumerate(attributes):
+            assert attribute.id == i
 
 
 # -----------------------------------------------------------------------------
@@ -255,19 +320,81 @@ async def test_service_search_attribute():
     await devices.setup_connection()
 
     # Register SDP service
-    devices.devices[0].sdp_server.service_records.update(sdp_records())
+    records = {
+        0x00010001: [
+            ServiceAttribute(
+                4,
+                DataElement.sequence(
+                    [DataElement.uuid(UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'))]
+                ),
+            ),
+            ServiceAttribute(
+                3,
+                DataElement.sequence(
+                    [DataElement.uuid(UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'))]
+                ),
+            ),
+            ServiceAttribute(
+                1,
+                DataElement.sequence(
+                    [DataElement.uuid(UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'))]
+                ),
+            ),
+        ]
+    }
+
+    devices.devices[0].sdp_server.service_records.update(records)
 
     # Search for service
-    client = Client(devices.connections[1])
-    await client.connect()
-    attributes = await client.search_attributes(
-        [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE')], [(0x0000FFFF, 8)]
-    )
+    async with Client(devices.connections[1]) as client:
+        attributes = await client.search_attributes(
+            [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE')], [(0, 0xFFFF)]
+        )
+        assert len(attributes) == 1
+        assert len(attributes[0]) == 3
+        assert attributes[0][0].id == 1
+        assert attributes[0][1].id == 3
+        assert attributes[0][2].id == 4
 
-    # Then
-    for expect, actual in zip(attributes, sdp_records().values()):
-        assert expect.id == actual.id
-        assert expect.value == actual.value
+        attributes = await client.search_attributes(
+            [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE')], [1, 2, 3]
+        )
+        assert len(attributes) == 1
+        assert len(attributes[0]) == 2
+        assert attributes[0][0].id == 1
+        assert attributes[0][1].id == 3
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_service_search_attribute_with_continuation():
+    # Setup connections
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    # Register SDP service
+    records = {
+        0x00010001: [
+            ServiceAttribute(
+                x,
+                DataElement.sequence(
+                    [DataElement.uuid(UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'))]
+                ),
+            )
+            for x in range(100)
+        ]
+    }
+    devices.devices[0].sdp_server.service_records.update(records)
+
+    # Search for service
+    async with Client(devices.connections[1], mtu=48) as client:
+        attributes = await client.search_attributes(
+            [UUID('E6D55659-C8B4-4B85-96BB-B1143AF6D3AE')], [(0, 0xFFFF)]
+        )
+        assert len(attributes) == 1
+        assert len(attributes[0]) == 100
+        for i in range(100):
+            assert attributes[0][i].id == i
 
 
 # -----------------------------------------------------------------------------
@@ -287,9 +414,12 @@ async def test_client_async_context():
 # -----------------------------------------------------------------------------
 async def run():
     test_data_elements()
-    await test_service_attribute()
+    await test_service_attributes()
+    await test_service_attributes_with_continuation()
     await test_service_search()
+    await test_service_search_with_continuation()
     await test_service_search_attribute()
+    await test_service_search_attribute_with_continuation()
 
 
 # -----------------------------------------------------------------------------
