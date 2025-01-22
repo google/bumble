@@ -170,8 +170,8 @@ def test_HCI_Command_Complete_Event():
         command_opcode=HCI_LE_READ_BUFFER_SIZE_COMMAND,
         return_parameters=HCI_LE_Read_Buffer_Size_Command.create_return_parameters(
             status=0,
-            hc_le_acl_data_packet_length=1234,
-            hc_total_num_le_acl_data_packets=56,
+            le_acl_data_packet_length=1234,
+            total_num_le_acl_data_packets=56,
         ),
     )
     basic_check(event)

@@ -825,10 +825,24 @@ async def run_broadcast(
             ),
         )
         print('Setup ISO Data Path')
+
+        def on_drain(packet_queue):
+            print(
+                f'\rPACKETS: pending={packet_queue.pending}, '
+                f'queued={packet_queue.queued}, completed={packet_queue.completed}',
+                end='',
+            )
+
+        packet_queue = None
         for bis_link in big.bis_links:
             await bis_link.setup_data_path(
                 direction=bis_link.Direction.HOST_TO_CONTROLLER
             )
+            if packet_queue is None:
+                packet_queue = bis_link.data_packet_queue
+
+        if packet_queue:
+            packet_queue.on('drain', lambda: on_drain(packet_queue))
 
         for frame in itertools.cycle(frames):
             mid = len(frame) // 2

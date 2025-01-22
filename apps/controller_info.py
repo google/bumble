@@ -37,6 +37,8 @@ from bumble.hci import (
     HCI_Command_Status_Event,
     HCI_READ_BUFFER_SIZE_COMMAND,
     HCI_Read_Buffer_Size_Command,
+    HCI_LE_READ_BUFFER_SIZE_V2_COMMAND,
+    HCI_LE_Read_Buffer_Size_V2_Command,
     HCI_READ_BD_ADDR_COMMAND,
     HCI_Read_BD_ADDR_Command,
     HCI_READ_LOCAL_NAME_COMMAND,
@@ -147,7 +149,7 @@ async def get_le_info(host: Host) -> None:
 
 
 # -----------------------------------------------------------------------------
-async def get_acl_flow_control_info(host: Host) -> None:
+async def get_flow_control_info(host: Host) -> None:
     print()
 
     if host.supports_command(HCI_READ_BUFFER_SIZE_COMMAND):
@@ -160,14 +162,28 @@ async def get_acl_flow_control_info(host: Host) -> None:
             f'packets of size {response.return_parameters.hc_acl_data_packet_length}',
         )
 
-    if host.supports_command(HCI_LE_READ_BUFFER_SIZE_COMMAND):
+    if host.supports_command(HCI_LE_READ_BUFFER_SIZE_V2_COMMAND):
+        response = await host.send_command(
+            HCI_LE_Read_Buffer_Size_V2_Command(), check_result=True
+        )
+        print(
+            color('LE ACL Flow Control:', 'yellow'),
+            f'{response.return_parameters.total_num_le_acl_data_packets} '
+            f'packets of size {response.return_parameters.le_acl_data_packet_length}',
+        )
+        print(
+            color('LE ISO Flow Control:', 'yellow'),
+            f'{response.return_parameters.total_num_iso_data_packets} '
+            f'packets of size {response.return_parameters.iso_data_packet_length}',
+        )
+    elif host.supports_command(HCI_LE_READ_BUFFER_SIZE_COMMAND):
         response = await host.send_command(
             HCI_LE_Read_Buffer_Size_Command(), check_result=True
         )
         print(
             color('LE ACL Flow Control:', 'yellow'),
-            f'{response.return_parameters.hc_total_num_le_acl_data_packets} '
-            f'packets of size {response.return_parameters.hc_le_acl_data_packet_length}',
+            f'{response.return_parameters.total_num_le_acl_data_packets} '
+            f'packets of size {response.return_parameters.le_acl_data_packet_length}',
         )
 
 
@@ -274,8 +290,8 @@ async def async_main(latency_probes, transport):
         # Get the LE info
         await get_le_info(host)
 
-        # Print the ACL flow control info
-        await get_acl_flow_control_info(host)
+        # Print the flow control info
+        await get_flow_control_info(host)
 
         # Get codec info
         await get_codecs_info(host)

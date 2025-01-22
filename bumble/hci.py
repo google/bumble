@@ -3585,13 +3585,29 @@ class HCI_LE_Set_Event_Mask_Command(HCI_Command):
 @HCI_Command.command(
     return_parameters_fields=[
         ('status', STATUS_SPEC),
-        ('hc_le_acl_data_packet_length', 2),
-        ('hc_total_num_le_acl_data_packets', 1),
+        ('le_acl_data_packet_length', 2),
+        ('total_num_le_acl_data_packets', 1),
     ]
 )
 class HCI_LE_Read_Buffer_Size_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.2 LE Read Buffer Size Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('le_acl_data_packet_length', 2),
+        ('total_num_le_acl_data_packets', 1),
+        ('iso_data_packet_length', 2),
+        ('total_num_iso_data_packets', 1),
+    ]
+)
+class HCI_LE_Read_Buffer_Size_V2_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.2 LE Read Buffer Size V2 Command
     '''
 
 
@@ -7555,7 +7571,7 @@ class HCI_IsoDataPacket(HCI_Packet):
         if should_include_sdu_info:
             packet_sequence_number, sdu_info = struct.unpack_from('<HH', packet, pos)
             iso_sdu_length = sdu_info & 0xFFF
-            packet_status_flag = sdu_info >> 14
+            packet_status_flag = (sdu_info >> 15) & 1
             pos += 4
 
         iso_sdu_fragment = packet[pos:]
@@ -7589,7 +7605,7 @@ class HCI_IsoDataPacket(HCI_Packet):
             fmt += 'HH'
             args += [
                 self.packet_sequence_number,
-                self.iso_sdu_length | self.packet_status_flag << 14,
+                self.iso_sdu_length | self.packet_status_flag << 15,
             ]
         return struct.pack(fmt, *args) + self.iso_sdu_fragment
 
@@ -7597,9 +7613,10 @@ class HCI_IsoDataPacket(HCI_Packet):
         return (
             f'{color("ISO", "blue")}: '
             f'handle=0x{self.connection_handle:04x}, '
+            f'pb={self.pb_flag}, '
             f'ps={self.packet_status_flag}, '
             f'data_total_length={self.data_total_length}, '
-            f'sdu={self.iso_sdu_fragment.hex()}'
+            f'sdu_fragment={self.iso_sdu_fragment.hex()}'
         )
 
 

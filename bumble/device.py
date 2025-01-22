@@ -52,7 +52,7 @@ from pyee import EventEmitter
 from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
 from .gatt import Characteristic, Descriptor, Service
-from .host import Host
+from .host import DataPacketQueue, Host
 from .profiles.gap import GenericAccessService
 from .core import (
     BT_BR_EDR_TRANSPORT,
@@ -1329,7 +1329,6 @@ class ScoLink(CompositeEventEmitter):
 class _IsoLink:
     handle: int
     device: Device
-    packet_sequence_number: int
     sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
 
     class Direction(IntEnum):
@@ -1391,22 +1390,12 @@ class _IsoLink:
         return response.return_parameters.status
 
     def write(self, sdu: bytes) -> None:
-        """Write an ISO SDU.
+        """Write an ISO SDU."""
+        self.device.host.send_iso_sdu(connection_handle=self.handle, sdu=sdu)
 
-        This will automatically increase the packet sequence number.
-        """
-        self.device.host.send_hci_packet(
-            hci.HCI_IsoDataPacket(
-                connection_handle=self.handle,
-                data_total_length=len(sdu) + 4,
-                packet_sequence_number=self.packet_sequence_number,
-                pb_flag=0b10,
-                packet_status_flag=0,
-                iso_sdu_length=len(sdu),
-                iso_sdu_fragment=sdu,
-            )
-        )
-        self.packet_sequence_number = (self.packet_sequence_number + 1) % 0x10000
+    @property
+    def data_packet_queue(self) -> DataPacketQueue | None:
+        return self.device.host.get_data_packet_queue(self.handle)
 
 
 # -----------------------------------------------------------------------------
@@ -1426,7 +1415,6 @@ class CisLink(CompositeEventEmitter, _IsoLink):
 
     def __post_init__(self) -> None:
         super().__init__()
-        self.packet_sequence_number = 0
 
     async def disconnect(
         self, reason: int = hci.HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
@@ -1443,7 +1431,6 @@ class BisLink(_IsoLink):
 
     def __post_init__(self) -> None:
         self.device = self.big.device
-        self.packet_sequence_number = 0
 
 
 # -----------------------------------------------------------------------------
@@ -1690,6 +1677,10 @@ class Connection(CompositeEventEmitter):
         """
         self.peer_le_features = await self.device.get_remote_le_features(self)
         return self.peer_le_features
+
+    @property
+    def data_packet_queue(self) -> DataPacketQueue | None:
+        return self.device.host.get_data_packet_queue(self.handle)
 
     async def __aenter__(self):
         return self
