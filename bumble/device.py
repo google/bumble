@@ -380,8 +380,8 @@ class LegacyAdvertiser:
         # Set the advertising parameters
         await self.device.send_command(
             hci.HCI_LE_Set_Advertising_Parameters_Command(
-                advertising_interval_min=self.device.advertising_interval_min,
-                advertising_interval_max=self.device.advertising_interval_max,
+                advertising_interval_min=int(self.device.advertising_interval_min / 0.625),
+                advertising_interval_max=int(self.device.advertising_interval_max / 0.625),
                 advertising_type=int(self.advertising_type),
                 own_address_type=self.own_address_type,
                 peer_address_type=self.peer_address.address_type,
@@ -2583,8 +2583,8 @@ class Device(CompositeEventEmitter):
         auto_restart: bool = False,
         advertising_data: Optional[bytes] = None,
         scan_response_data: Optional[bytes] = None,
-        advertising_interval_min: Optional[int] = None,
-        advertising_interval_max: Optional[int] = None,
+        advertising_interval_min: Optional[float] = None,
+        advertising_interval_max: Optional[float] = None,
     ) -> None:
         """Start legacy advertising.
 
