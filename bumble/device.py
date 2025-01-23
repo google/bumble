@@ -1296,8 +1296,8 @@ class Peer:
 @dataclass
 class ConnectionParametersPreferences:
     default: ClassVar[ConnectionParametersPreferences]
-    connection_interval_min: int = DEVICE_DEFAULT_CONNECTION_INTERVAL_MIN
-    connection_interval_max: int = DEVICE_DEFAULT_CONNECTION_INTERVAL_MAX
+    connection_interval_min: float = DEVICE_DEFAULT_CONNECTION_INTERVAL_MIN
+    connection_interval_max: float = DEVICE_DEFAULT_CONNECTION_INTERVAL_MAX
     max_latency: int = DEVICE_DEFAULT_CONNECTION_MAX_LATENCY
     supervision_timeout: int = DEVICE_DEFAULT_CONNECTION_SUPERVISION_TIMEOUT
     min_ce_length: int = DEVICE_DEFAULT_CONNECTION_MIN_CE_LENGTH
@@ -2858,8 +2858,8 @@ class Device(CompositeEventEmitter):
         self,
         legacy: bool = False,
         active: bool = True,
-        scan_interval: int = DEVICE_DEFAULT_SCAN_INTERVAL,  # Scan interval in ms
-        scan_window: int = DEVICE_DEFAULT_SCAN_WINDOW,  # Scan window in ms
+        scan_interval: float = DEVICE_DEFAULT_SCAN_INTERVAL,  # Scan interval in ms
+        scan_window: float = DEVICE_DEFAULT_SCAN_WINDOW,  # Scan window in ms
         own_address_type: int = hci.OwnAddressType.RANDOM,
         filter_duplicates: bool = False,
         scanning_phys: Sequence[int] = (hci.HCI_LE_1M_PHY, hci.HCI_LE_CODED_PHY),
