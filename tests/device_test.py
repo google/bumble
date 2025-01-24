@@ -34,7 +34,7 @@ from bumble.device import (
     Device,
     PeriodicAdvertisingParameters,
 )
-from bumble.host import AclPacketQueue, Host
+from bumble.host import DataPacketQueue, Host
 from bumble.hci import (
     HCI_ACCEPT_CONNECTION_REQUEST_COMMAND,
     HCI_COMMAND_STATUS_PENDING,
@@ -90,9 +90,9 @@ async def test_device_connect_parallel():
     def _send(packet):
         pass
 
-    d0.host.acl_packet_queue = AclPacketQueue(0, 0, _send)
-    d1.host.acl_packet_queue = AclPacketQueue(0, 0, _send)
-    d2.host.acl_packet_queue = AclPacketQueue(0, 0, _send)
+    d0.host.acl_packet_queue = DataPacketQueue(0, 0, _send)
+    d1.host.acl_packet_queue = DataPacketQueue(0, 0, _send)
+    d2.host.acl_packet_queue = DataPacketQueue(0, 0, _send)
 
     # enable classic
     d0.classic_enabled = True

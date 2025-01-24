@@ -154,15 +154,17 @@ class Controller:
             '0000000060000000'
         )  # BR/EDR Not Supported, LE Supported (Controller)
         self.manufacturer_name = 0xFFFF
-        self.hc_data_packet_length = 27
-        self.hc_total_num_data_packets = 64
-        self.hc_le_data_packet_length = 27
-        self.hc_total_num_le_data_packets = 64
+        self.acl_data_packet_length = 27
+        self.total_num_acl_data_packets = 64
+        self.le_acl_data_packet_length = 27
+        self.total_num_le_acl_data_packets = 64
+        self.iso_data_packet_length = 960
+        self.total_num_iso_data_packets = 64
         self.event_mask = 0
         self.event_mask_page_2 = 0
         self.supported_commands = bytes.fromhex(
             '2000800000c000000000e4000000a822000000000000040000f7ffff7f000000'
-            '30f0f9ff01008004000000000000000000000000000000000000000000000000'
+            '30f0f9ff01008004002000000000000000000000000000000000000000000000'
         )
         self.le_event_mask = 0
         self.advertising_parameters = None
@@ -1181,9 +1183,9 @@ class Controller:
         return struct.pack(
             '<BHBHH',
             HCI_SUCCESS,
-            self.hc_data_packet_length,
+            self.acl_data_packet_length,
             0,
-            self.hc_total_num_data_packets,
+            self.total_num_acl_data_packets,
             0,
         )
 
@@ -1212,8 +1214,21 @@ class Controller:
         return struct.pack(
             '<BHB',
             HCI_SUCCESS,
-            self.hc_le_data_packet_length,
-            self.hc_total_num_le_data_packets,
+            self.le_acl_data_packet_length,
+            self.total_num_le_acl_data_packets,
+        )
+
+    def on_hci_le_read_buffer_size_v2_command(self, _command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.2 LE Read Buffer Size Command
+        '''
+        return struct.pack(
+            '<BHBHB',
+            HCI_SUCCESS,
+            self.le_acl_data_packet_length,
+            self.total_num_le_acl_data_packets,
+            self.iso_data_packet_length,
+            self.total_num_iso_data_packets,
         )
 
     def on_hci_le_read_local_supported_features_command(self, _command):

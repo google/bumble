@@ -16,11 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
+import unittest.mock
 import pytest
+import unittest
 
 from bumble.controller import Controller
-from bumble.host import Host
+from bumble.host import Host, DataPacketQueue
 from bumble.transport import AsyncPipeSink
+from bumble.hci import HCI_AclDataPacket
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -60,3 +63,90 @@ async def test_reset(supported_commands: str, lmp_features: str):
     assert host.local_lmp_features == int.from_bytes(
         bytes.fromhex(lmp_features), 'little'
     )
+
+
+# -----------------------------------------------------------------------------
+def test_data_packet_queue():
+    controller = unittest.mock.Mock()
+    queue = DataPacketQueue(10, 2, controller.send)
+    assert queue.queued == 0
+    assert queue.completed == 0
+    packet = HCI_AclDataPacket(
+        connection_handle=123, pb_flag=0, bc_flag=0, data_total_length=0, data=b''
+    )
+
+    queue.enqueue(packet, packet.connection_handle)
+    assert queue.queued == 1
+    assert queue.completed == 0
+    assert controller.send.call_count == 1
+
+    queue.enqueue(packet, packet.connection_handle)
+    assert queue.queued == 2
+    assert queue.completed == 0
+    assert controller.send.call_count == 2
+
+    queue.enqueue(packet, packet.connection_handle)
+    assert queue.queued == 3
+    assert queue.completed == 0
+    assert controller.send.call_count == 2
+
+    queue.on_packets_completed(1, 8000)
+    assert queue.queued == 3
+    assert queue.completed == 0
+    assert controller.send.call_count == 2
+
+    queue.on_packets_completed(1, 123)
+    assert queue.queued == 3
+    assert queue.completed == 1
+    assert controller.send.call_count == 3
+
+    queue.enqueue(packet, packet.connection_handle)
+    assert queue.queued == 4
+    assert queue.completed == 1
+    assert controller.send.call_count == 3
+
+    queue.on_packets_completed(2, 123)
+    assert queue.queued == 4
+    assert queue.completed == 3
+    assert controller.send.call_count == 4
+
+    queue.on_packets_completed(1, 123)
+    assert queue.queued == 4
+    assert queue.completed == 4
+    assert controller.send.call_count == 4
+
+    queue.enqueue(packet, 123)
+    queue.enqueue(packet, 123)
+    queue.enqueue(packet, 123)
+    queue.enqueue(packet, 124)
+    queue.enqueue(packet, 124)
+    queue.enqueue(packet, 124)
+    queue.on_packets_completed(1, 123)
+    assert queue.queued == 10
+    assert queue.completed == 5
+    queue.flush(123)
+    queue.flush(124)
+    assert queue.queued == 10
+    assert queue.completed == 10
+
+    queue.enqueue(packet, 123)
+    queue.on_packets_completed(1, 124)
+    assert queue.queued == 11
+    assert queue.completed == 10
+    queue.on_packets_completed(1000, 123)
+    assert queue.queued == 11
+    assert queue.completed == 11
+
+    drain_listener = unittest.mock.Mock()
+    queue.on('flow', drain_listener.on_flow)
+    queue.enqueue(packet, 123)
+    assert drain_listener.on_flow.call_count == 0
+    queue.on_packets_completed(1, 123)
+    assert drain_listener.on_flow.call_count == 1
+    queue.enqueue(packet, 123)
+    queue.enqueue(packet, 123)
+    queue.enqueue(packet, 123)
+    queue.flush(123)
+    assert drain_listener.on_flow.call_count == 1
+    assert queue.queued == 15
+    assert queue.completed == 15
