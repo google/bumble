@@ -17,15 +17,31 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
+import abc
 import asyncio
+import asyncio.subprocess
+from concurrent.futures import ThreadPoolExecutor
 import contextlib
 import dataclasses
+import enum
 import functools
 import logging
 import os
+import pathlib
 import wave
-import itertools
-from typing import cast, Any, AsyncGenerator, Coroutine, Dict, Optional, Tuple
+import struct
+import sys
+import time
+from typing import (
+    cast,
+    Any,
+    AsyncGenerator,
+    BinaryIO,
+    Coroutine,
+    Optional,
+    Tuple,
+    TYPE_CHECKING,
+)
 
 import click
 import pyee
@@ -33,7 +49,7 @@ import pyee
 try:
     import lc3  # type: ignore  # pylint: disable=E0401
 except ImportError as e:
-    raise ImportError("Try `python -m pip install \".[lc3]\"`.") from e
+    raise ImportError("Try `python -m pip install \".[auracast]\"`.") from e
 
 from bumble.colors import color
 from bumble import company_ids
@@ -48,6 +64,8 @@ import bumble.device
 import bumble.transport
 import bumble.utils
 
+if TYPE_CHECKING:
+    import sounddevice
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -62,6 +80,502 @@ AURACAST_DEFAULT_DEVICE_NAME = 'Bumble Auracast'
 AURACAST_DEFAULT_DEVICE_ADDRESS = hci.Address('F0:F1:F2:F3:F4:F5')
 AURACAST_DEFAULT_SYNC_TIMEOUT = 5.0
 AURACAST_DEFAULT_ATT_MTU = 256
+AURACAST_DEFAULT_FRAME_DURATION = 10000
+AURACAST_DEFAULT_SAMPLE_RATE = 48000
+
+
+# -----------------------------------------------------------------------------
+# Audio I/O Support
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class PcmFormat:
+    class Endianness(enum.Enum):
+        LITTLE = 0
+        BIG = 1
+
+    class SampleType(enum.Enum):
+        FLOAT32 = 0
+        INT16 = 1
+
+    endianness: Endianness
+    sample_type: SampleType
+    sample_rate: int
+    channels: int
+
+    @classmethod
+    def from_str(cls, format_str: str) -> PcmFormat:
+        endianness = cls.Endianness.LITTLE  # Others not yet supported.
+        sample_type_str, sample_rate_str, channels_str = format_str.split(',')
+        if sample_type_str == 'int16le':
+            sample_type = cls.SampleType.INT16
+        elif sample_rate_str == 'float32le':
+            sample_type = cls.SampleType.FLOAT32
+        else:
+            raise ValueError(f'sample type {sample_type_str} not supported')
+        sample_rate = int(sample_rate_str)
+        channels = int(channels_str)
+
+        return cls(endianness, sample_type, sample_rate, channels)
+
+
+def check_audio_output(output: str) -> bool:
+    if output == 'device' or output.startswith('device:'):
+        try:
+            import sounddevice
+        except ImportError as exc:
+            raise ValueError(
+                'audio output not available (sounddevice python module not installed)'
+            ) from exc
+
+        if output == 'device':
+            # Default device
+            return True
+
+        # Specific device
+        device = output[7:]
+        if device == '?':
+            print(color('Audio Devices:', 'yellow'))
+            for device_info in [
+                device_info
+                for device_info in sounddevice.query_devices()
+                if device_info['max_output_channels'] > 0
+            ]:
+                device_index = device_info['index']
+                is_default = (
+                    color(' [default]', 'green')
+                    if sounddevice.default.device[1] == device_index
+                    else ''
+                )
+                print(
+                    f'{color(device_index, "cyan")}: {device_info["name"]}{is_default}'
+                )
+            return False
+
+        try:
+            device_info = sounddevice.query_devices(int(device))
+        except sounddevice.PortAudioError as exc:
+            raise ValueError('No such audio device') from exc
+
+        if device_info['max_output_channels'] < 1:
+            raise ValueError(
+                f'Device {device} ({device_info["name"]}) does not have an output'
+            )
+
+    return True
+
+
+async def create_audio_output(output: str) -> AudioOutput:
+    if output == 'stdout':
+        return StreamAudioOutput(sys.stdout.buffer)
+
+    if output == 'device' or output.startswith('device:'):
+        device_name = '' if output == 'device' else output[7:]
+        return SoundDeviceAudioOutput(device_name)
+
+    if output == 'ffplay':
+        return SubprocessAudioOutput(
+            command=(
+                'ffplay -probesize 32 -fflags nobuffer -analyzeduration 0 '
+                '-ar {sample_rate} '
+                '-ch_layout {channel_layout} '
+                '-f f32le pipe:0'
+            )
+        )
+
+    if output.startswith('file:'):
+        return FileAudioOutput(output[5:])
+
+    raise ValueError('unsupported audio output')
+
+
+class AudioOutput(abc.ABC):
+    """Audio output to which PCM samples can be written."""
+
+    async def open(self, pcm_format: PcmFormat) -> None:
+        """Start the output."""
+
+    @abc.abstractmethod
+    def write(self, pcm_samples: bytes) -> None:
+        """Write PCM samples. Must not block."""
+
+    async def aclose(self) -> None:
+        """Close the output."""
+
+
+class ThreadedAudioOutput(AudioOutput):
+    """Base class for AudioOutput classes that may need to call blocking functions.
+
+    The actual writing is performed in a thread, so as to ensure that calling write()
+    does not block the caller.
+    """
+
+    def __init__(self) -> None:
+        self._thread_pool = ThreadPoolExecutor(1)
+        self._pcm_samples: asyncio.Queue[bytes] = asyncio.Queue()
+        self._write_task = asyncio.create_task(self._write_loop())
+
+    async def _write_loop(self) -> None:
+        while True:
+            pcm_samples = await self._pcm_samples.get()
+            await asyncio.get_running_loop().run_in_executor(
+                self._thread_pool, self._write, pcm_samples
+            )
+
+    @abc.abstractmethod
+    def _write(self, pcm_samples: bytes) -> None:
+        """This method does the actual writing and can block."""
+
+    def write(self, pcm_samples: bytes) -> None:
+        self._pcm_samples.put_nowait(pcm_samples)
+
+    def _close(self) -> None:
+        """This method does the actual closing and can block."""
+
+    async def aclose(self) -> None:
+        await asyncio.get_running_loop().run_in_executor(self._thread_pool, self._close)
+        self._write_task.cancel()
+        self._thread_pool.shutdown()
+
+
+class SoundDeviceAudioOutput(ThreadedAudioOutput):
+    def __init__(self, device_name: str) -> None:
+        super().__init__()
+        self._device = int(device_name) if device_name else None
+        self._stream: sounddevice.RawOutputStream | None = None
+
+    async def open(self, pcm_format: PcmFormat) -> None:
+        import sounddevice
+
+        self._stream = sounddevice.RawOutputStream(
+            samplerate=pcm_format.sample_rate,
+            device=self._device,
+            channels=pcm_format.channels,
+            dtype='float32',
+        )
+        self._stream.start()
+
+    def _write(self, pcm_samples: bytes) -> None:
+        if self._stream is None:
+            return
+
+        try:
+            self._stream.write(pcm_samples)
+        except Exception as error:
+            print(f'Sound device error: {error}')
+            raise
+
+    def _close(self):
+        self._stream.stop()
+        self._stream = None
+
+
+class StreamAudioOutput(ThreadedAudioOutput):
+    """AudioOutput where PCM samples are written to a stream that may block."""
+
+    def __init__(self, stream: BinaryIO) -> None:
+        super().__init__()
+        self._stream = stream
+
+    def _write(self, pcm_samples: bytes) -> None:
+        self._stream.write(pcm_samples)
+        self._stream.flush()
+
+
+class FileAudioOutput(StreamAudioOutput):
+    """AudioOutput where PCM samples are written to a file."""
+
+    def __init__(self, filename: str) -> None:
+        self._file = open(filename, "wb")
+        super().__init__(self._file)
+
+    async def shutdown(self):
+        self._file.close()
+        return await super().shutdown()
+
+
+class SubprocessAudioOutput(AudioOutput):
+    """AudioOutput where audio samples are written to a subprocess via stdin."""
+
+    def __init__(self, command: str) -> None:
+        self._command = command
+        self._subprocess: asyncio.subprocess.Process | None
+
+    async def open(self, pcm_format: PcmFormat) -> None:
+        if pcm_format.channels == 1:
+            channel_layout = 'mono'
+        elif pcm_format.channels == 2:
+            channel_layout = 'stereo'
+        else:
+            raise ValueError(f'{pcm_format.channels} channels not supported')
+
+        command = self._command.format(
+            sample_rate=pcm_format.sample_rate, channel_layout=channel_layout
+        )
+        self._subprocess = await asyncio.create_subprocess_shell(
+            command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+    def write(self, pcm_samples: bytes) -> None:
+        if self._subprocess is None or self._subprocess.stdin is None:
+            return
+
+        self._subprocess.stdin.write(pcm_samples)
+
+    async def aclose(self):
+        if self._subprocess:
+            self._subprocess.terminate()
+
+
+def check_audio_input(input: str) -> bool:
+    if input == 'device' or input.startswith('device:'):
+        try:
+            import sounddevice
+        except ImportError as exc:
+            raise ValueError(
+                'audio input not available (sounddevice python module not installed)'
+            ) from exc
+
+        if input == 'device':
+            # Default device
+            return True
+
+        # Specific device
+        device = input[7:]
+        if device == '?':
+            print(color('Audio Devices:', 'yellow'))
+            for device_info in [
+                device_info
+                for device_info in sounddevice.query_devices()
+                if device_info['max_input_channels'] > 0
+            ]:
+                device_index = device_info["index"]
+                is_mono = device_info['max_input_channels'] == 1
+                max_channels = color(f'[{"mono" if is_mono else "stereo"}]', 'cyan')
+                is_default = (
+                    color(' [default]', 'green')
+                    if sounddevice.default.device[0] == device_index
+                    else ''
+                )
+                print(
+                    f'{color(device_index, "cyan")}: {device_info["name"]}'
+                    f' {max_channels}{is_default}'
+                )
+            return False
+
+        try:
+            device_info = sounddevice.query_devices(int(device))
+        except sounddevice.PortAudioError as exc:
+            raise ValueError('No such audio device') from exc
+
+        if device_info['max_input_channels'] < 1:
+            raise ValueError(
+                f'Device {device} ({device_info["name"]}) does not have an input'
+            )
+
+    return True
+
+
+async def create_audio_input(input: str, input_format: str) -> AudioInput:
+    pcm_format: PcmFormat | None
+    if input_format == 'auto':
+        pcm_format = None
+    else:
+        pcm_format = PcmFormat.from_str(input_format)
+
+    if input == 'stdin':
+        if not pcm_format:
+            raise ValueError('input format details required for stdin')
+        return StreamAudioInput(sys.stdin.buffer, pcm_format)
+
+    if input == 'device' or input.startswith('device:'):
+        if not pcm_format:
+            raise ValueError('input format details required for device')
+        device_name = '' if input == 'device' else input[7:]
+        return SoundDeviceAudioInput(device_name, pcm_format)
+
+    # If there's no file: prefix, check if we can assume it is a file.
+    if pathlib.Path(input).is_file():
+        input = 'file:' + input
+
+    if input.startswith('file:'):
+        filename = input[5:]
+        if filename.endswith('.wav'):
+            if input_format != 'auto':
+                raise ValueError(".wav file only supported with 'auto' format")
+            return WaveAudioInput(filename)
+
+        if pcm_format is None:
+            raise ValueError('input format details required for raw PCM files')
+        return FileAudioInput(filename, pcm_format)
+
+    raise ValueError('input not supported')
+
+
+class AudioInput(abc.ABC):
+    """Audio input that produces PCM samples."""
+
+    @abc.abstractmethod
+    async def open(self) -> PcmFormat:
+        """Open the input."""
+
+    @abc.abstractmethod
+    def frames(self, frame_size: int) -> AsyncGenerator[bytes]:
+        """Generate one frame of PCM samples. Must not block."""
+
+    async def aclose(self) -> None:
+        """Close the input."""
+
+
+class ThreadedAudioInput(AudioInput):
+    """Base class for AudioInput implementation where reading samples may block."""
+
+    def __init__(self) -> None:
+        self._thread_pool = ThreadPoolExecutor(1)
+        self._pcm_samples: asyncio.Queue[bytes] = asyncio.Queue()
+
+    @abc.abstractmethod
+    def _read(self, frame_size: int) -> bytes:
+        pass
+
+    @abc.abstractmethod
+    def _open(self) -> PcmFormat:
+        pass
+
+    def _close(self) -> None:
+        pass
+
+    async def open(self) -> PcmFormat:
+        return await asyncio.get_running_loop().run_in_executor(
+            self._thread_pool, self._open
+        )
+
+    async def frames(self, frame_size: int) -> AsyncGenerator[bytes]:
+        while pcm_sample := await asyncio.get_running_loop().run_in_executor(
+            self._thread_pool, self._read, frame_size
+        ):
+            yield pcm_sample
+
+    async def aclose(self) -> None:
+        await asyncio.get_running_loop().run_in_executor(self._thread_pool, self._close)
+        self._thread_pool.shutdown()
+
+
+class WaveAudioInput(ThreadedAudioInput):
+    """Audio input that reads PCM samples from a .wav file."""
+
+    def __init__(self, filename: str) -> None:
+        super().__init__()
+        self._filename = filename
+        self._wav: wave.Wave_read | None = None
+        self._bytes_read = 0
+
+    def _open(self) -> PcmFormat:
+        self._wav = wave.open(self._filename, 'rb')
+        if self._wav.getsampwidth() != 2:
+            raise ValueError('sample width not supported')
+        return PcmFormat(
+            PcmFormat.Endianness.LITTLE,
+            PcmFormat.SampleType.INT16,
+            self._wav.getframerate(),
+            self._wav.getnchannels(),
+        )
+
+    def _read(self, frame_size: int) -> bytes:
+        if not self._wav:
+            return b''
+
+        pcm_samples = self._wav.readframes(frame_size)
+        if not pcm_samples and self._bytes_read:
+            # Loop around.
+            self._wav.rewind()
+            self._bytes_read = 0
+            pcm_samples = self._wav.readframes(frame_size)
+
+        self._bytes_read += len(pcm_samples)
+        return pcm_samples
+
+    def _close(self) -> None:
+        if self._wav:
+            self._wav.close()
+
+
+class StreamAudioInput(ThreadedAudioInput):
+    """AudioInput where samples are read from a raw PCM stream that may block."""
+
+    def __init__(self, stream: BinaryIO, pcm_format: PcmFormat) -> None:
+        super().__init__()
+        self._stream = stream
+        self._pcm_format = pcm_format
+
+    def _open(self) -> PcmFormat:
+        return self._pcm_format
+
+    def _read(self, frame_size: int) -> bytes:
+        return self._stream.read(frame_size * self._pcm_format.channels * 2)
+
+
+class FileAudioInput(StreamAudioInput):
+    """AudioInput where PCM samples are read from a raw PCM file."""
+
+    def __init__(self, filename: str, pcm_format: PcmFormat) -> None:
+        self._stream = open(filename, "rb")
+        super().__init__(self._stream, pcm_format)
+
+    def _read(self, frame_size: int) -> bytes:
+        return self._stream.read(frame_size * self._pcm_format.channels * 2)
+
+    def _close(self) -> None:
+        self._stream.close()
+
+
+class SoundDeviceAudioInput(ThreadedAudioInput):
+    def __init__(self, device_name: str, pcm_format: PcmFormat) -> None:
+        super().__init__()
+        self._device = int(device_name) if device_name else None
+        self._pcm_format = pcm_format
+        self._stream: sounddevice.RawInputStream | None = None
+
+    def _open(self) -> PcmFormat:
+        import sounddevice
+
+        self._stream = sounddevice.RawInputStream(
+            samplerate=self._pcm_format.sample_rate,
+            device=self._device,
+            channels=self._pcm_format.channels,
+            dtype='int16',
+        )
+        self._stream.start()
+
+        return PcmFormat(
+            PcmFormat.Endianness.LITTLE,
+            PcmFormat.SampleType.INT16,
+            self._pcm_format.sample_rate,
+            2,
+        )
+
+    def _read(self, frame_size: int) -> bytes:
+        if not self._stream:
+            return b''
+        pcm_buffer, overflowed = self._stream.read(frame_size)
+        if overflowed:
+            logger.warning("input overflow")
+
+        # Convert the buffer to stereo if needed
+        if self._pcm_format.channels == 1:
+            stereo_buffer = bytearray()
+            for i in range(frame_size):
+                sample = pcm_buffer[i * 2 : i * 2 + 2]
+                stereo_buffer += sample + sample
+            return stereo_buffer
+
+        return bytes(pcm_buffer)
+
+    def _close(self):
+        self._stream.stop()
+        self._stream = None
 
 
 # -----------------------------------------------------------------------------
@@ -625,11 +1139,20 @@ async def run_pair(transport: str, address: str) -> None:
 
 async def run_receive(
     transport: str,
-    broadcast_id: int,
+    broadcast_id: Optional[int],
+    output: str,
     broadcast_code: str | None,
     sync_timeout: float,
     subgroup_index: int,
 ) -> None:
+    # Run a pre-flight check for the output.
+    try:
+        if not check_audio_output(output):
+            return
+    except ValueError as error:
+        print(error)
+        return
+
     async with create_device(transport) as device:
         if not device.supports_le_periodic_advertising:
             print(color('Periodic advertising not supported', 'red'))
@@ -643,7 +1166,7 @@ async def run_receive(
         def on_new_broadcast(broadcast: BroadcastScanner.Broadcast) -> None:
             if scan_result.done():
                 return
-            if broadcast.broadcast_id == broadcast_id:
+            if broadcast_id is None or broadcast.broadcast_id == broadcast_id:
                 scan_result.set_result(broadcast)
 
         scanner.on('new_broadcast', on_new_broadcast)
@@ -695,55 +1218,68 @@ async def run_receive(
             num_channels=num_bis,
         )
         sdus = [b''] * num_bis
-        subprocess = await asyncio.create_subprocess_shell(
-            f'stdbuf -i0 ffplay -ar {sampling_frequency.hz} -ac {num_bis} -f f32le pipe:0',
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        for i, bis_link in enumerate(big_sync.bis_links):
-            print(f'Setup ISO for BIS {bis_link.handle}')
 
-            def sink(index: int, packet: hci.HCI_IsoDataPacket):
-                nonlocal sdus
-                sdus[index] = packet.iso_sdu_fragment
-                if all(sdus) and subprocess.stdin:
-                    subprocess.stdin.write(decoder.decode(b''.join(sdus)).tobytes())
-                    sdus = [b''] * num_bis
-
-            bis_link.sink = functools.partial(sink, i)
-            await bis_link.setup_data_path(
-                direction=bis_link.Direction.CONTROLLER_TO_HOST
+        async with contextlib.aclosing(
+            await create_audio_output(output)
+        ) as audio_output:
+            await audio_output.open(
+                PcmFormat(
+                    PcmFormat.Endianness.LITTLE,
+                    PcmFormat.SampleType.FLOAT32,
+                    sampling_frequency.hz,
+                    num_bis,
+                )
             )
 
-        terminated = asyncio.Event()
-        big_sync.on(big_sync.Event.TERMINATION, lambda _: terminated.set())
-        await terminated.wait()
+            for i, bis_link in enumerate(big_sync.bis_links):
+                print(f'Setup ISO for BIS {bis_link.handle}')
+
+                def sink(index: int, packet: hci.HCI_IsoDataPacket):
+                    nonlocal sdus
+                    sdus[index] = packet.iso_sdu_fragment
+                    if all(sdus):
+                        audio_output.write(decoder.decode(b''.join(sdus)).tobytes())
+                        sdus = [b''] * num_bis
+
+                bis_link.sink = functools.partial(sink, i)
+                await device.send_command(
+                    hci.HCI_LE_Setup_ISO_Data_Path_Command(
+                        connection_handle=bis_link.handle,
+                        data_path_direction=hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.CONTROLLER_TO_HOST,
+                        data_path_id=0,
+                        codec_id=hci.CodingFormat(codec_id=hci.CodecID.TRANSPARENT),
+                        controller_delay=0,
+                        codec_configuration=b'',
+                    ),
+                    check_result=True,
+                )
+
+            terminated = asyncio.Event()
+            big_sync.on(big_sync.Event.TERMINATION, lambda _: terminated.set())
+            await terminated.wait()
 
 
 async def run_broadcast(
-    transport: str, broadcast_id: int, broadcast_code: str | None, wav_file_path: str
+    transport: str,
+    broadcast_id: int,
+    broadcast_code: str | None,
+    broadcast_name: str,
+    manufacturer_data: tuple[int, bytes] | None,
+    input: str,
+    input_format: str,
 ) -> None:
+    # Run a pre-flight check for the input.
+    try:
+        if not check_audio_input(input):
+            return
+    except ValueError as error:
+        print(error)
+        return
+
     async with create_device(transport) as device:
         if not device.supports_le_periodic_advertising:
             print(color('Periodic advertising not supported', 'red'))
             return
-
-        with wave.open(wav_file_path, 'rb') as wav:
-            print('Encoding wav file into lc3...')
-            encoder = lc3.Encoder(
-                frame_duration_us=10000,
-                sample_rate_hz=48000,
-                num_channels=2,
-                input_sample_rate_hz=wav.getframerate(),
-            )
-            frames = list[bytes]()
-            while pcm := wav.readframes(encoder.get_frame_samples()):
-                frames.append(
-                    encoder.encode(pcm, num_bytes=200, bit_depth=wav.getsampwidth() * 8)
-                )
-            del encoder
-            print('Encoding complete.')
 
         basic_audio_announcement = bap.BasicAudioAnnouncement(
             presentation_delay=40000,
@@ -783,7 +1319,23 @@ async def run_broadcast(
             ],
         )
         broadcast_audio_announcement = bap.BroadcastAudioAnnouncement(broadcast_id)
-        print('Start Advertising')
+
+        advertising_manufacturer_data = (
+            b''
+            if manufacturer_data is None
+            else bytes(
+                core.AdvertisingData(
+                    [
+                        (
+                            core.AdvertisingData.MANUFACTURER_SPECIFIC_DATA,
+                            struct.pack('<H', manufacturer_data[0])
+                            + manufacturer_data[1],
+                        )
+                    ]
+                )
+            )
+        )
+
         advertising_set = await device.create_advertising_set(
             advertising_parameters=bumble.device.AdvertisingParameters(
                 advertising_event_properties=bumble.device.AdvertisingEventProperties(
@@ -796,9 +1348,10 @@ async def run_broadcast(
                 broadcast_audio_announcement.get_advertising_data()
                 + bytes(
                     core.AdvertisingData(
-                        [(core.AdvertisingData.BROADCAST_NAME, b'Bumble Auracast')]
+                        [(core.AdvertisingData.BROADCAST_NAME, broadcast_name.encode())]
                     )
                 )
+                + advertising_manufacturer_data
             ),
             periodic_advertising_parameters=bumble.device.PeriodicAdvertisingParameters(
                 periodic_advertising_interval_min=80,
@@ -808,14 +1361,16 @@ async def run_broadcast(
             auto_restart=True,
             auto_start=True,
         )
+
         print('Start Periodic Advertising')
         await advertising_set.start_periodic()
+
         print('Setup BIG')
         big = await device.create_big(
             advertising_set,
             parameters=bumble.device.BigParameters(
                 num_bis=2,
-                sdu_interval=10000,
+                sdu_interval=AURACAST_DEFAULT_FRAME_DURATION,
                 max_sdu=100,
                 max_transport_latency=65,
                 rtn=4,
@@ -826,29 +1381,50 @@ async def run_broadcast(
         )
         print('Setup ISO Data Path')
 
-        def on_flow(packet_queue):
+        data_packet_queue = big.bis_links[0].data_packet_queue
+
+        def on_flow():
             print(
-                f'\rPACKETS: pending={packet_queue.pending}, '
-                f'queued={packet_queue.queued}, completed={packet_queue.completed}',
+                f'\rPACKETS: pending={data_packet_queue.pending}, '
+                f'queued={data_packet_queue.queued}, '
+                f'completed={data_packet_queue.completed}',
                 end='',
             )
 
-        packet_queue = None
-        for bis_link in big.bis_links:
-            await bis_link.setup_data_path(
-                direction=bis_link.Direction.HOST_TO_CONTROLLER
-            )
-            if packet_queue is None:
-                packet_queue = bis_link.data_packet_queue
+        data_packet_queue.on('flow', on_flow)
 
-        if packet_queue:
-            packet_queue.on('flow', lambda: on_flow(packet_queue))
+        audio_input = await create_audio_input(input, input_format)
+        pcm_format = await audio_input.open()
+        if pcm_format.channels != 2:
+            print("Only 2 channels PCM configurations are supported")
+            return
+        encoder = lc3.Encoder(
+            frame_duration_us=AURACAST_DEFAULT_FRAME_DURATION,
+            sample_rate_hz=AURACAST_DEFAULT_SAMPLE_RATE,
+            num_channels=pcm_format.channels,
+            input_sample_rate_hz=pcm_format.sample_rate,
+        )
+        frame_size = encoder.get_frame_samples()
+        async with contextlib.aclosing(audio_input):
+            frame_count = 0
+            start_time = time.time()
+            async for pcm_frame in audio_input.frames(frame_size):
+                now = time.time()
+                if (
+                    target_time := (
+                        start_time
+                        + frame_count * AURACAST_DEFAULT_FRAME_DURATION / 1_000_000
+                    )
+                ) >= now:
+                    await asyncio.sleep(target_time - now)
 
-        for frame in itertools.cycle(frames):
-            mid = len(frame) // 2
-            big.bis_links[0].write(frame[:mid])
-            big.bis_links[1].write(frame[mid:])
-            await asyncio.sleep(0.009)
+                lc3_frame = encoder.encode(pcm_frame, num_bytes=200, bit_depth=16)
+
+                mid = len(lc3_frame) // 2
+                big.bis_links[0].write(lc3_frame[:mid])
+                big.bis_links[1].write(lc3_frame[mid:])
+
+                frame_count += 1
 
 
 def run_async(async_command: Coroutine) -> None:
@@ -917,7 +1493,7 @@ def scan(ctx, filter_duplicates, sync_timeout, transport):
 @click.argument('address')
 @click.pass_context
 def assist(ctx, broadcast_name, source_id, command, transport, address):
-    """Scan for broadcasts on behalf of a audio server"""
+    """Scan for broadcasts on behalf of an audio server"""
     run_async(run_assist(broadcast_name, source_id, command, transport, address))
 
 
@@ -932,7 +1508,24 @@ def pair(ctx, transport, address):
 
 @auracast.command('receive')
 @click.argument('transport')
-@click.argument('broadcast_id', type=int)
+@click.argument(
+    'broadcast_id',
+    type=int,
+    required=False,
+)
+@click.option(
+    '--output',
+    default='device',
+    help=(
+        "Audio output. "
+        "'device' -> use the host's default sound output device, "
+        "'device:<DEVICE_ID>' -> use one of the  host's sound output device "
+        "(specify 'device:?' to get a list of available sound output devices), "
+        "'stdout' -> send audio to stdout, "
+        "'file:<filename> -> write audio to a raw float32 PCM file, "
+        "'ffplay' -> pipe the audio to ffplay"
+    ),
+)
 @click.option(
     '--broadcast-code',
     metavar='BROADCAST_CODE',
@@ -954,16 +1547,56 @@ def pair(ctx, transport, address):
     help='Index of Subgroup',
 )
 @click.pass_context
-def receive(ctx, transport, broadcast_id, broadcast_code, sync_timeout, subgroup):
+def receive(
+    ctx,
+    transport,
+    broadcast_id,
+    output,
+    broadcast_code,
+    sync_timeout,
+    subgroup,
+):
     """Receive a broadcast source"""
     run_async(
-        run_receive(transport, broadcast_id, broadcast_code, sync_timeout, subgroup)
+        run_receive(
+            transport,
+            broadcast_id,
+            output,
+            broadcast_code,
+            sync_timeout,
+            subgroup,
+        )
     )
 
 
 @auracast.command('broadcast')
 @click.argument('transport')
-@click.argument('wav_file_path', type=str)
+@click.option(
+    '--input',
+    required=True,
+    help=(
+        "Audio input. "
+        "'device' -> use the host's default sound input device, "
+        "'device:<DEVICE_ID>' -> use one of the host's sound input devices "
+        "(specify 'device:?' to get a list of available sound input devices), "
+        "'stdin' -> receive audio from stdin as int16 PCM, "
+        "'file:<filename> -> read audio from a .wav or raw int16 PCM file. "
+        "(The file: prefix may be ommitted if the file path does not start with "
+        "the substring 'device:' or 'file:' and is not 'stdin')"
+    ),
+)
+@click.option(
+    '--input-format',
+    metavar="FORMAT",
+    default='auto',
+    help=(
+        "Audio input format. "
+        "Use 'auto' for .wav files, or for the default setting with the devices. "
+        "For other inputs, the format is specified as "
+        "<sample-type>,<sample-rate>,<channels> (supported <sample-type>: 'int16le' "
+        "for 16 bit signed integers with little-endian byte order)"
+    ),
+)
 @click.option(
     '--broadcast-id',
     metavar='BROADCAST_ID',
@@ -974,18 +1607,52 @@ def receive(ctx, transport, broadcast_id, broadcast_code, sync_timeout, subgroup
 @click.option(
     '--broadcast-code',
     metavar='BROADCAST_CODE',
-    type=str,
     help='Broadcast encryption code in hex format',
 )
+@click.option(
+    '--broadcast-name',
+    metavar='BROADCAST_NAME',
+    default='Bumble Auracast',
+    help='Broadcast name',
+)
+@click.option(
+    '--manufacturer-data',
+    metavar='VENDOR-ID:DATA-HEX',
+    help='Manufacturer data (specify as <vendor-id>:<data-hex>)',
+)
 @click.pass_context
-def broadcast(ctx, transport, broadcast_id, broadcast_code, wav_file_path):
+def broadcast(
+    ctx,
+    transport,
+    broadcast_id,
+    broadcast_code,
+    manufacturer_data,
+    broadcast_name,
+    input,
+    input_format,
+):
     """Start a broadcast as a source."""
+    if manufacturer_data:
+        vendor_id_str, data_hex = manufacturer_data.split(':')
+        vendor_id = int(vendor_id_str)
+        data = bytes.fromhex(data_hex)
+        manufacturer_data_tuple = (vendor_id, data)
+    else:
+        manufacturer_data_tuple = None
+
+    if (input == 'device' or input.startswith('device:')) and input_format == 'auto':
+        # Use a default format for device inputs
+        input_format = 'int16le,48000,1'
+
     run_async(
         run_broadcast(
             transport=transport,
             broadcast_id=broadcast_id,
             broadcast_code=broadcast_code,
-            wav_file_path=wav_file_path,
+            broadcast_name=broadcast_name,
+            manufacturer_data=manufacturer_data_tuple,
+            input=input,
+            input_format=input_format,
         )
     )
 

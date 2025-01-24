@@ -18,22 +18,32 @@
 from __future__ import annotations
 import dataclasses
 import struct
-from typing import List, Type
+from typing import Any, List, Type
 from typing_extensions import Self
 
+from bumble.profiles import bap
 from bumble import utils
 
 
 # -----------------------------------------------------------------------------
 # Classes
 # -----------------------------------------------------------------------------
+class AudioActiveState(utils.OpenIntEnum):
+    NO_AUDIO_DATA_TRANSMITTED = 0x00
+    AUDIO_DATA_TRANSMITTED = 0x01
+
+
+class AssistedListeningStream(utils.OpenIntEnum):
+    UNSPECIFIED_AUDIO_ENHANCEMENT = 0x00
+
+
 @dataclasses.dataclass
 class Metadata:
     '''Bluetooth Assigned Numbers, Section 6.12.6 - Metadata LTV structures.
 
-    As Metadata fields may extend, and Spec doesn't forbid duplication, we don't parse
-    Metadata into a key-value style dataclass here. Rather, we encourage users to parse
-    again outside the lib.
+    As Metadata fields may extend, and Spec doesn't forbid duplication, we don't
+    automatically parse the Metadata data into specific classes. Callers may decode
+    the data by themselves, or use the Entry.decode method.
     '''
 
     class Tag(utils.OpenIntEnum):
@@ -56,6 +66,44 @@ class Metadata:
     class Entry:
         tag: Metadata.Tag
         data: bytes
+
+        def decode(self) -> Any:
+            """
+            Decode the data into an object, if possible.
+
+            If no specific object class exists to represent the data, the raw data
+            bytes are returned.
+            """
+
+            if self.tag in (
+                Metadata.Tag.PREFERRED_AUDIO_CONTEXTS,
+                Metadata.Tag.STREAMING_AUDIO_CONTEXTS,
+            ):
+                return bap.ContextType(struct.unpack("<H", self.data)[0])
+
+            if self.tag in (
+                Metadata.Tag.PROGRAM_INFO,
+                Metadata.Tag.PROGRAM_INFO_URI,
+                Metadata.Tag.BROADCAST_NAME,
+            ):
+                return self.data.decode("utf-8")
+
+            if self.tag == Metadata.Tag.LANGUAGE:
+                return self.data.decode("ascii")
+
+            if self.tag == Metadata.Tag.CCID_LIST:
+                return list(self.data)
+
+            if self.tag == Metadata.Tag.PARENTAL_RATING:
+                return self.data[0]
+
+            if self.tag == Metadata.Tag.AUDIO_ACTIVE_STATE:
+                return AudioActiveState(self.data[0])
+
+            if self.tag == Metadata.Tag.ASSISTED_LISTENING_STREAM:
+                return AssistedListeningStream(self.data[0])
+
+            return self.data
 
         @classmethod
         def from_bytes(cls: Type[Self], data: bytes) -> Self:
@@ -81,3 +129,13 @@ class Metadata:
 
     def __bytes__(self) -> bytes:
         return b''.join([bytes(entry) for entry in self.entries])
+
+    def __str__(self) -> str:
+        entries_str = []
+        for entry in self.entries:
+            decoded = entry.decode()
+            entries_str.append(
+                f'{entry.tag.name}: '
+                f'{decoded.hex() if isinstance(decoded, bytes) else decoded!r}'
+            )
+        return f'Metadata(entries={", ".join(entry_str for entry_str in entries_str)})'
