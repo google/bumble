@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -826,7 +826,7 @@ async def run_broadcast(
         )
         print('Setup ISO Data Path')
 
-        def on_drain(packet_queue):
+        def on_flow(packet_queue):
             print(
                 f'\rPACKETS: pending={packet_queue.pending}, '
                 f'queued={packet_queue.queued}, completed={packet_queue.completed}',
@@ -842,7 +842,7 @@ async def run_broadcast(
                 packet_queue = bis_link.data_packet_queue
 
         if packet_queue:
-            packet_queue.on('drain', lambda: on_drain(packet_queue))
+            packet_queue.on('flow', lambda: on_flow(packet_queue))
 
         for frame in itertools.cycle(frames):
             mid = len(frame) // 2

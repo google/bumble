@@ -1,4 +1,4 @@
-# Copyright 2021-2022 Google LLC
+# Copyright 2021-2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ class DataPacketQueue(pyee.EventEmitter):
     but not completed yet. Packets are no longer "in flight" when the controller
     declares them as completed.
 
-    The queue emits a 'drain' event whenever one or more packets are completed.
+    The queue emits a 'flow' event whenever one or more packets are completed.
     """
 
     max_packet_size: int
@@ -126,7 +126,7 @@ class DataPacketQueue(pyee.EventEmitter):
         Remove all packets associated with a connection.
 
         All packets associated with the connection that are in flight are implicitly
-        marked as completed, but no 'drain' event is emitted.
+        marked as completed, but no 'flow' event is emitted.
         """
 
         packets_to_keep = [
@@ -180,7 +180,7 @@ class DataPacketQueue(pyee.EventEmitter):
             self._completed = self._queued
 
         self._check_queue()
-        self.emit('drain')
+        self.emit('flow')
 
 
 # -----------------------------------------------------------------------------
@@ -920,23 +920,9 @@ class Host(AbortableEventEmitter):
         for connection_handle, num_completed_packets in zip(
             event.connection_handles, event.num_completed_packets
         ):
-            if connection := self.connections.get(connection_handle):
-                connection.acl_packet_queue.on_packets_completed(
-                    num_completed_packets, connection_handle
-                )
-                return
-
-            if cis_link := self.cis_links.get(connection_handle):
-                cis_link.packet_queue.on_packets_completed(
-                    num_completed_packets, connection_handle
-                )
-                return
-
-            if bis_link := self.bis_links.get(connection_handle):
-                bis_link.packet_queue.on_packets_completed(
-                    num_completed_packets, connection_handle
-                )
-                return
+            if queue := self.get_data_packet_queue(connection_handle):
+                queue.on_packets_completed(num_completed_packets, connection_handle)
+                continue
 
             if connection_handle not in self.sco_links:
                 logger.warning(

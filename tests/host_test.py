@@ -138,15 +138,15 @@ def test_data_packet_queue():
     assert queue.completed == 11
 
     drain_listener = unittest.mock.Mock()
-    queue.on('drain', drain_listener.on_drain)
+    queue.on('flow', drain_listener.on_flow)
     queue.enqueue(packet, 123)
-    assert drain_listener.on_drain.call_count == 0
+    assert drain_listener.on_flow.call_count == 0
     queue.on_packets_completed(1, 123)
-    assert drain_listener.on_drain.call_count == 1
+    assert drain_listener.on_flow.call_count == 1
     queue.enqueue(packet, 123)
     queue.enqueue(packet, 123)
     queue.enqueue(packet, 123)
     queue.flush(123)
-    assert drain_listener.on_drain.call_count == 1
+    assert drain_listener.on_flow.call_count == 1
     assert queue.queued == 15
     assert queue.completed == 15
