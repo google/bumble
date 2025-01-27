@@ -2509,7 +2509,7 @@ class Device(CompositeEventEmitter):
         """Update the RPA periodically"""
         while self.le_rpa_timeout != 0:
             await asyncio.sleep(self.le_rpa_timeout)
-            if not self.update_rpa():
+            if not await self.update_rpa():
                 logger.debug("periodic RPA update failed")
 
     async def refresh_resolving_list(self) -> None:
