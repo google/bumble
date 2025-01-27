@@ -380,8 +380,12 @@ class LegacyAdvertiser:
         # Set the advertising parameters
         await self.device.send_command(
             hci.HCI_LE_Set_Advertising_Parameters_Command(
-                advertising_interval_min=int(self.device.advertising_interval_min / 0.625),
-                advertising_interval_max=int(self.device.advertising_interval_max / 0.625),
+                advertising_interval_min=int(
+                    self.device.advertising_interval_min / 0.625
+                ),
+                advertising_interval_max=int(
+                    self.device.advertising_interval_max / 0.625
+                ),
                 advertising_type=int(self.advertising_type),
                 own_address_type=self.own_address_type,
                 peer_address_type=self.peer_address.address_type,
