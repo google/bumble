@@ -50,12 +50,7 @@ from bumble.hci import (
     HCI_Error,
     HCI_Packet,
 )
-from bumble.gatt import (
-    GATT_GENERIC_ACCESS_SERVICE,
-    GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
-    GATT_DEVICE_NAME_CHARACTERISTIC,
-    GATT_APPEARANCE_CHARACTERISTIC,
-)
+from bumble import gatt
 
 from .test_utils import TwoDevices, async_barrier
 
@@ -592,32 +587,54 @@ async def test_power_on_default_static_address_should_not_be_any():
 
 
 # -----------------------------------------------------------------------------
-def test_gatt_services_with_gas():
+def test_gatt_services_with_gas_and_gatt():
     device = Device(host=Host(None, None))
 
-    # there should be one service and two chars, therefore 5 attributes
-    assert len(device.gatt_server.attributes) == 5
-    assert device.gatt_server.attributes[0].uuid == GATT_GENERIC_ACCESS_SERVICE
-    assert device.gatt_server.attributes[1].type == GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
-    assert device.gatt_server.attributes[2].uuid == GATT_DEVICE_NAME_CHARACTERISTIC
-    assert device.gatt_server.attributes[3].type == GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
-    assert device.gatt_server.attributes[4].uuid == GATT_APPEARANCE_CHARACTERISTIC
+    # there should be 2 service, 5 chars, and 1 descriptors, therefore 13 attributes
+    assert len(device.gatt_server.attributes) == 13
+    assert device.gatt_server.attributes[0].uuid == gatt.GATT_GENERIC_ACCESS_SERVICE
+    assert (
+        device.gatt_server.attributes[1].type == gatt.GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+    )
+    assert device.gatt_server.attributes[2].uuid == gatt.GATT_DEVICE_NAME_CHARACTERISTIC
+    assert (
+        device.gatt_server.attributes[3].type == gatt.GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+    )
+    assert device.gatt_server.attributes[4].uuid == gatt.GATT_APPEARANCE_CHARACTERISTIC
 
-
-# -----------------------------------------------------------------------------
-def test_gatt_services_without_gas():
-    device = Device(host=Host(None, None), generic_access_service=False)
-
-    # there should be no services
-    assert len(device.gatt_server.attributes) == 0
+    assert device.gatt_server.attributes[5].uuid == gatt.GATT_GENERIC_ATTRIBUTE_SERVICE
+    assert (
+        device.gatt_server.attributes[6].type == gatt.GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+    )
+    assert (
+        device.gatt_server.attributes[7].uuid
+        == gatt.GATT_SERVICE_CHANGED_CHARACTERISTIC
+    )
+    assert (
+        device.gatt_server.attributes[8].type
+        == gatt.GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR
+    )
+    assert (
+        device.gatt_server.attributes[9].type == gatt.GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+    )
+    assert (
+        device.gatt_server.attributes[10].uuid
+        == gatt.GATT_CLIENT_SUPPORTED_FEATURES_CHARACTERISTIC
+    )
+    assert (
+        device.gatt_server.attributes[11].type
+        == gatt.GATT_CHARACTERISTIC_ATTRIBUTE_TYPE
+    )
+    assert (
+        device.gatt_server.attributes[12].uuid == gatt.GATT_DATABASE_HASH_CHARACTERISTIC
+    )
 
 
 # -----------------------------------------------------------------------------
 async def run_test_device():
     await test_device_connect_parallel()
     await test_flush()
-    await test_gatt_services_with_gas()
-    await test_gatt_services_without_gas()
+    await test_gatt_services_with_gas_and_gatt()
 
 
 # -----------------------------------------------------------------------------

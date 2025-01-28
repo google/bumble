@@ -48,7 +48,6 @@ from bumble.utils import ByteSerializable
 
 if TYPE_CHECKING:
     from bumble.gatt_client import AttributeProxy
-    from bumble.device import Connection
 
 
 # -----------------------------------------------------------------------------
@@ -802,3 +801,23 @@ class ClientCharacteristicConfigurationBits(enum.IntFlag):
     DEFAULT = 0x0000
     NOTIFICATION = 0x0001
     INDICATION = 0x0002
+
+
+# -----------------------------------------------------------------------------
+class ClientSupportedFeatures(enum.IntFlag):
+    '''
+    See Vol 3, Part G - 7.2 - Table 7.6: Client Supported Features bit assignments.
+    '''
+
+    ROBUST_CACHING = 0x01
+    ENHANCED_ATT_BEARER = 0x02
+    MULTIPLE_HANDLE_VALUE_NOTIFICATIONS = 0x04
+
+
+# -----------------------------------------------------------------------------
+class ServerSupportedFeatures(enum.IntFlag):
+    '''
+    See Vol 3, Part G - 7.4 - Table 7.11: Server Supported Features bit assignments.
+    '''
+
+    EATT_SUPPORTED = 0x01
