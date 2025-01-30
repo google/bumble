@@ -2587,8 +2587,8 @@ class Device(CompositeEventEmitter):
         auto_restart: bool = False,
         advertising_data: Optional[bytes] = None,
         scan_response_data: Optional[bytes] = None,
-        advertising_interval_min: Optional[float] = None,
-        advertising_interval_max: Optional[float] = None,
+        advertising_interval_min: Optional[int] = None,
+        advertising_interval_max: Optional[int] = None,
     ) -> None:
         """Start legacy advertising.
 
