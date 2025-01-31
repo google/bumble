@@ -447,7 +447,7 @@ def deprecated(msg: str):
     def wrapper(function):
         @functools.wraps(function)
         def inner(*args, **kwargs):
-            warnings.warn(msg, DeprecationWarning)
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
             return function(*args, **kwargs)
 
         return inner
@@ -464,7 +464,7 @@ def experimental(msg: str):
     def wrapper(function):
         @functools.wraps(function)
         def inner(*args, **kwargs):
-            warnings.warn(msg, FutureWarning)
+            warnings.warn(msg, FutureWarning, stacklevel=2)
             return function(*args, **kwargs)
 
         return inner

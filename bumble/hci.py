@@ -791,6 +791,27 @@ class CsSnr(OpenIntEnum):
     NOT_APPLIED = 0xFF
 
 
+class CsDoneStatus(OpenIntEnum):
+    ALL_RESULTS_COMPLETED = 0x00
+    PARTIAL = 0x01
+    ABORTED = 0x0F
+
+
+class CsProcedureAbortReason(OpenIntEnum):
+    NO_ABORT = 0x00
+    LOCAL_HOST_OR_REMOTE_REQUEST = 0x01
+    CHANNEL_MAP_UPDATE_INSTANT_PASSED = 0x02
+    UNSPECIFIED = 0x0F
+
+
+class CsSubeventAbortReason(OpenIntEnum):
+    NO_ABORT = 0x00
+    LOCAL_HOST_OR_REMOTE_REQUEST = 0x01
+    NO_CS_SYNC_RECEIVED = 0x02
+    SCHEDULING_CONFLICT_OR_LIMITED_RESOURCES = 0x03
+    UNSPECIFIED = 0x0F
+
+
 # Connection Parameters
 HCI_CONNECTION_INTERVAL_MS_PER_UNIT = 1.25
 HCI_CONNECTION_LATENCY_MS_PER_UNIT  = 1.25
@@ -6506,7 +6527,7 @@ class HCI_LE_CS_Config_Complete_Event(HCI_LE_Meta_Event):
         ('config_id', 1),
         ('state', 1),
         ('tone_antenna_config_selection', 1),
-        ('selected_tx_power', 1),
+        ('selected_tx_power', -1),
         ('subevent_len', 3),
         ('subevents_per_event', 1),
         ('subevent_interval', 2),
@@ -6548,7 +6569,7 @@ class HCI_LE_CS_Procedure_Enable_Complete_Event(HCI_LE_Meta_Event):
         ('start_acl_conn_event_counter', 2),
         ('procedure_counter', 2),
         ('frequency_compensation', 2),
-        ('reference_power_level', 1),
+        ('reference_power_level', -1),
         ('procedure_done_status', 1),
         ('subevent_done_status', 1),
         ('abort_reason', 1),
@@ -6565,7 +6586,7 @@ class HCI_LE_CS_Subevent_Result_Event(HCI_LE_Meta_Event):
     See Bluetooth spec @ 7.7.65.44 LE CS Subevent Result event
     '''
 
-    status: int
+    connection_handle: int
     config_id: int
     start_acl_conn_event_counter: int
     procedure_counter: int
@@ -6601,7 +6622,7 @@ class HCI_LE_CS_Subevent_Result_Continue_Event(HCI_LE_Meta_Event):
     See Bluetooth spec @ 7.7.65.45 LE CS Subevent Result Continue event
     '''
 
-    status: int
+    connection_handle: int
     config_id: int
     procedure_done_status: int
     subevent_done_status: int

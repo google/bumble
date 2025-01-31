@@ -476,6 +476,12 @@ class Host(AbortableEventEmitter):
                     hci.HCI_LE_TRANSMIT_POWER_REPORTING_EVENT,
                     hci.HCI_LE_BIGINFO_ADVERTISING_REPORT_EVENT,
                     hci.HCI_LE_SUBRATE_CHANGE_EVENT,
+                    hci.HCI_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE_EVENT,
+                    hci.HCI_LE_CS_PROCEDURE_ENABLE_COMPLETE_EVENT,
+                    hci.HCI_LE_CS_SECURITY_ENABLE_COMPLETE_EVENT,
+                    hci.HCI_LE_CS_CONFIG_COMPLETE_EVENT,
+                    hci.HCI_LE_CS_SUBEVENT_RESULT_EVENT,
+                    hci.HCI_LE_CS_SUBEVENT_RESULT_CONTINUE_EVENT,
                 ]
             )
 
@@ -1494,6 +1500,24 @@ class Host(AbortableEventEmitter):
                 event.connection_handle,
                 int.from_bytes(event.le_features, 'little'),
             )
+
+    def on_hci_le_cs_read_remote_supported_capabilities_complete_event(self, event):
+        self.emit('cs_remote_supported_capabilities', event)
+
+    def on_hci_le_cs_security_enable_complete_event(self, event):
+        self.emit('cs_security', event)
+
+    def on_hci_le_cs_config_complete_event(self, event):
+        self.emit('cs_config', event)
+
+    def on_hci_le_cs_procedure_enable_complete_event(self, event):
+        self.emit('cs_procedure', event)
+
+    def on_hci_le_cs_subevent_result_event(self, event):
+        self.emit('cs_subevent_result', event)
+
+    def on_hci_le_cs_subevent_result_continue_event(self, event):
+        self.emit('cs_subevent_result_continue', event)
 
     def on_hci_vendor_event(self, event):
         self.emit('vendor_event', event)
