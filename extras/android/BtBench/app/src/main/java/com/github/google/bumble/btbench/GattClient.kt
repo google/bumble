@@ -30,12 +30,6 @@ import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.gatt-client")
 
-private var CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
-
-private val SPEED_SERVICE_UUID = UUID.fromString("50DB505C-8AC4-4738-8448-3B1D9CC09CC5")
-private val SPEED_TX_UUID = UUID.fromString("E789C754-41A1-45F4-A948-A0A1A90DBA53")
-private val SPEED_RX_UUID = UUID.fromString("016A2CC7-E14B-4819-935F-1F56EAE4098D")
-
 
 class GattClientConnection(
     viewModel: AppViewModel,
@@ -52,7 +46,8 @@ class GattClientConnection(
         super.connect()
 
         // Check if we're already connected and have discovered the services
-        if (gatt?.getService(SPEED_SERVICE_UUID) != null) {
+        if (gatt?.getService(BENCH_SERVICE_UUID) != null) {
+            Log.fine("already connected")
             onServicesDiscovered(gatt, BluetoothGatt.GATT_SUCCESS)
         }
     }
@@ -63,6 +58,7 @@ class GattClientConnection(
     ) {
         super.onConnectionStateChange(gatt, status, newState)
         if (status != BluetoothGatt.GATT_SUCCESS) {
+            Log.warning("onConnectionStateChange status=$status")
             discoveryDone.countDown()
             return
         }
@@ -76,6 +72,8 @@ class GattClientConnection(
 
     @SuppressLint("MissingPermission")
     override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+        Log.fine("onServicesDiscovered")
+
         if (status != BluetoothGatt.GATT_SUCCESS) {
             Log.warning("failed to discover services: ${status}")
             discoveryDone.countDown()
@@ -83,7 +81,7 @@ class GattClientConnection(
         }
 
         // Find the service
-        val service = gatt!!.getService(SPEED_SERVICE_UUID)
+        val service = gatt!!.getService(BENCH_SERVICE_UUID)
         if (service == null) {
             Log.warning("GATT Service not found")
             discoveryDone.countDown()
@@ -91,13 +89,13 @@ class GattClientConnection(
         }
 
         // Find the RX and TX characteristics
-        rxCharacteristic = service.getCharacteristic(SPEED_RX_UUID)
+        rxCharacteristic = service.getCharacteristic(BENCH_RX_UUID)
         if (rxCharacteristic == null) {
             Log.warning("GATT RX Characteristics not found")
             discoveryDone.countDown()
             return
         }
-        txCharacteristic = service.getCharacteristic(SPEED_TX_UUID)
+        txCharacteristic = service.getCharacteristic(BENCH_TX_UUID)
         if (txCharacteristic == null) {
             Log.warning("GATT TX Characteristics not found")
             discoveryDone.countDown()
@@ -105,6 +103,7 @@ class GattClientConnection(
         }
 
         // Subscribe to the RX characteristic
+        Log.fine("subscribing to RX")
         gatt.setCharacteristicNotification(rxCharacteristic, true)
         val cccdDescriptor = rxCharacteristic!!.getDescriptor(CCCD_UUID)
         gatt.writeDescriptor(cccdDescriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
@@ -132,7 +131,7 @@ class GattClientConnection(
         characteristic: BluetoothGattCharacteristic,
         value: ByteArray
     ) {
-        if (characteristic.uuid == SPEED_RX_UUID && packetSink != null) {
+        if (characteristic.uuid == BENCH_RX_UUID && packetSink != null) {
             val packet = Packet.from(value)
             packetSink!!.onPacket(packet)
         }
@@ -161,6 +160,12 @@ class GattClientConnection(
             clampedData,
             BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
         )
+    }
+
+    override
+    fun disconnect() {
+        super.disconnect()
+        discoveryDone.countDown()
     }
 
     fun waitForDiscoveryCompletion() {

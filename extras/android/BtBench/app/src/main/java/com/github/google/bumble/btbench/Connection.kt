@@ -49,7 +49,7 @@ open class Connection(
     }
 
     @SuppressLint("MissingPermission")
-    fun disconnect() {
+    open fun disconnect() {
         gatt?.disconnect()
     }
 

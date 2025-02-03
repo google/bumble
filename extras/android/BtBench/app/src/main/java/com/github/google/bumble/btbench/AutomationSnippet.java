@@ -112,6 +112,18 @@ public class AutomationSnippet implements Snippet {
                                                                                  packetIO));
                 break;
 
+            case "gatt-client":
+                runnable = new GattClient(model, mBluetoothAdapter, mContext,
+                                          (PacketIO packetIO) -> createIoClient(model, scenario,
+                                                                                packetIO));
+                break;
+
+            case "gatt-server":
+                runnable = new GattServer(model, mBluetoothAdapter, mContext,
+                                          (PacketIO packetIO) -> createIoClient(model, scenario,
+                                                                                packetIO));
+                break;
+
             default:
                 return null;
         }
@@ -273,6 +285,53 @@ public class AutomationSnippet implements Snippet {
         }
 
         Runner runner = runScenario(model, "l2cap-server", scenario);
+        assert runner != null;
+        return runner.toJson();
+    }
+
+    @Rpc(description = "Run a scenario in GATT Client mode")
+    public JSONObject runGattClient(String scenario, String peerBluetoothAddress,
+                                    boolean use_2m_phy, int packetCount, int packetSize,
+                                    int packetInterval, @RpcOptional String connectionPriority,
+                                    @RpcOptional Integer startupDelay) throws JSONException {
+        // We only support "send" and "ping" for this mode for now
+        if (!(scenario.equals("send") || scenario.equals("ping"))) {
+            throw new InvalidParameterException(
+                    "only 'send' and 'ping' are supported for this mode");
+        }
+
+        AppViewModel model = new AppViewModel();
+        model.setPeerBluetoothAddress(peerBluetoothAddress);
+        model.setUse2mPhy(use_2m_phy);
+        model.setSenderPacketCount(packetCount);
+        model.setSenderPacketSize(packetSize);
+        model.setSenderPacketInterval(packetInterval);
+        if (connectionPriority != null) {
+            model.setConnectionPriority(connectionPriority);
+        }
+        if (startupDelay != null) {
+            model.setStartupDelay(startupDelay);
+        }
+        Runner runner = runScenario(model, "gatt-client", scenario);
+        assert runner != null;
+        return runner.toJson();
+    }
+
+    @Rpc(description = "Run a scenario in GATT Server mode")
+    public JSONObject runGattServer(String scenario,
+                                    @RpcOptional Integer startupDelay) throws JSONException {
+        // We only support "receive" and "pong" for this mode for now
+        if (!(scenario.equals("receive") || scenario.equals("pong"))) {
+            throw new InvalidParameterException(
+                    "only 'receive' and 'pong' are supported for this mode");
+        }
+
+        AppViewModel model = new AppViewModel();
+        if (startupDelay != null) {
+            model.setStartupDelay(startupDelay);
+        }
+
+        Runner runner = runScenario(model, "gatt-server", scenario);
         assert runner != null;
         return runner.toJson();
     }
