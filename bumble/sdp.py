@@ -130,7 +130,7 @@ SDP_ATTRIBUTE_ID_NAMES = {
 SDP_PUBLIC_BROWSE_ROOT = core.UUID.from_16_bits(0x1002, 'PublicBrowseRoot')
 
 # To be used in searches where an attribute ID list allows a range to be specified
-SDP_ALL_ATTRIBUTES_RANGE = (0x0000FFFF, 4)  # Express this as tuple so we can convey the desired encoding size
+SDP_ALL_ATTRIBUTES_RANGE = (0x0000, 0xFFFF)
 
 # fmt: on
 # pylint: enable=line-too-long
