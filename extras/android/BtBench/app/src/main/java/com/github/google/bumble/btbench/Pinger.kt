@@ -46,19 +46,23 @@ class Pinger(private val viewModel: AppViewModel, private val packetIO: PacketIO
 
         val startTime = TimeSource.Monotonic.markNow()
         for (i in 0..<packetCount) {
-            val now = TimeSource.Monotonic.markNow()
-            val targetTime = startTime + (i * viewModel.senderPacketInterval).milliseconds
-            val delay = targetTime - now
-            if (delay.isPositive()) {
-                Log.info("sleeping ${delay.inWholeMilliseconds} ms")
-                Thread.sleep(delay.inWholeMilliseconds)
+            var now = TimeSource.Monotonic.markNow()
+            if (viewModel.senderPacketInterval > 0) {
+                val targetTime = startTime + (i * viewModel.senderPacketInterval).milliseconds
+                val delay = targetTime - now
+                if (delay.isPositive()) {
+                    Log.info("sleeping ${delay.inWholeMilliseconds} ms")
+                    Thread.sleep(delay.inWholeMilliseconds)
+                    now = TimeSource.Monotonic.markNow()
+                }
             }
             pingTimes.add(TimeSource.Monotonic.markNow())
             packetIO.sendPacket(
                 SequencePacket(
                     if (i < packetCount - 1) 0 else Packet.LAST_FLAG,
                     i,
-                    ByteArray(packetSize - 6)
+                    (now - startTime).inWholeMicroseconds.toInt(),
+                    ByteArray(packetSize - 10)
                 )
             )
             viewModel.packetsSent = i + 1

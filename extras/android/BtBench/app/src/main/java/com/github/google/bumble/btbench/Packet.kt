@@ -17,6 +17,7 @@ package com.github.google.bumble.btbench
 import android.bluetooth.BluetoothSocket
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.logging.Logger
 import kotlin.math.min
 
@@ -37,11 +38,16 @@ abstract class Packet(val type: Int, val payload: ByteArray = ByteArray(0)) {
                 RESET -> ResetPacket()
                 SEQUENCE -> SequencePacket(
                     data[1].toInt(),
-                    ByteBuffer.wrap(data, 2, 4).getInt(),
-                    data.sliceArray(6..<data.size)
+                    ByteBuffer.wrap(data, 2, 4).order(ByteOrder.LITTLE_ENDIAN).getInt(),
+                    ByteBuffer.wrap(data, 6, 4).order(ByteOrder.LITTLE_ENDIAN).getInt(),
+                    data.sliceArray(10..<data.size)
                 )
 
-                ACK -> AckPacket(data[1].toInt(), ByteBuffer.wrap(data, 2, 4).getInt())
+                ACK -> AckPacket(
+                    data[1].toInt(),
+                    ByteBuffer.wrap(data, 2, 4).order(ByteOrder.LITTLE_ENDIAN).getInt()
+                )
+
                 else -> GenericPacket(data[0].toInt(), data.sliceArray(1..<data.size))
             }
         }
@@ -57,16 +63,24 @@ class ResetPacket : Packet(RESET)
 
 class AckPacket(val flags: Int, val sequenceNumber: Int) : Packet(ACK) {
     override fun toBytes(): ByteArray {
-        return ByteBuffer.allocate(1 + 1 + 4).put(type.toByte()).put(flags.toByte())
+        return ByteBuffer.allocate(6).order(
+            ByteOrder.LITTLE_ENDIAN
+        ).put(type.toByte()).put(flags.toByte())
             .putInt(sequenceNumber).array()
     }
 }
 
-class SequencePacket(val flags: Int, val sequenceNumber: Int, payload: ByteArray) :
+class SequencePacket(
+    val flags: Int,
+    val sequenceNumber: Int,
+    val timestamp: Int,
+    payload: ByteArray
+) :
     Packet(SEQUENCE, payload) {
     override fun toBytes(): ByteArray {
-        return ByteBuffer.allocate(1 + 1 + 4 + payload.size).put(type.toByte()).put(flags.toByte())
-            .putInt(sequenceNumber).put(payload).array()
+        return ByteBuffer.allocate(10 + payload.size).order(ByteOrder.LITTLE_ENDIAN)
+            .put(type.toByte()).put(flags.toByte())
+            .putInt(sequenceNumber).putInt(timestamp).put(payload).array()
     }
 }
 

@@ -146,9 +146,7 @@ class MainActivity : ComponentActivity() {
         initBluetooth()
         setContent {
             MainView(
-                appViewModel,
-                ::becomeDiscoverable,
-                ::runScenario
+                appViewModel, ::becomeDiscoverable, ::runScenario
             )
         }
 
@@ -184,6 +182,8 @@ class MainActivity : ComponentActivity() {
                 "rfcomm-server" -> appViewModel.mode = RFCOMM_SERVER_MODE
                 "l2cap-client" -> appViewModel.mode = L2CAP_CLIENT_MODE
                 "l2cap-server" -> appViewModel.mode = L2CAP_SERVER_MODE
+                "gatt-client" -> appViewModel.mode = GATT_CLIENT_MODE
+                "gatt-server" -> appViewModel.mode = GATT_SERVER_MODE
             }
         }
         intent.getStringExtra("autostart")?.let {
@@ -204,12 +204,14 @@ class MainActivity : ComponentActivity() {
             RFCOMM_CLIENT_MODE -> RfcommClient(appViewModel, bluetoothAdapter!!, ::createIoClient)
             RFCOMM_SERVER_MODE -> RfcommServer(appViewModel, bluetoothAdapter!!, ::createIoClient)
             L2CAP_CLIENT_MODE -> L2capClient(
-                appViewModel,
-                bluetoothAdapter!!,
-                baseContext,
-                ::createIoClient
+                appViewModel, bluetoothAdapter!!, baseContext, ::createIoClient
             )
+
             L2CAP_SERVER_MODE -> L2capServer(appViewModel, bluetoothAdapter!!, ::createIoClient)
+            GATT_CLIENT_MODE -> GattClient(
+                appViewModel, bluetoothAdapter!!, baseContext, ::createIoClient
+            )
+
             else -> throw IllegalStateException()
         }
         runner.run()
@@ -283,7 +285,7 @@ fun MainView(
                         keyboardController?.hide()
                         focusManager.clearFocus()
                     }),
-                    enabled = (appViewModel.mode == RFCOMM_CLIENT_MODE) or (appViewModel.mode == L2CAP_CLIENT_MODE)
+                    enabled = (appViewModel.mode == RFCOMM_CLIENT_MODE || appViewModel.mode == L2CAP_CLIENT_MODE || appViewModel.mode == GATT_CLIENT_MODE)
                 )
                 Divider()
                 TextField(
@@ -351,43 +353,36 @@ fun MainView(
                         keyboardController?.hide()
                         focusManager.clearFocus()
                     }),
-                    enabled = (appViewModel.scenario == PING_SCENARIO)
+                    enabled = (appViewModel.scenario == PING_SCENARIO || appViewModel.scenario == SEND_SCENARIO)
                 )
                 Divider()
-                ActionButton(
-                    text = "Become Discoverable", onClick = becomeDiscoverable, true
-                )
                 Row(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(text = "2M PHY")
                     Spacer(modifier = Modifier.padding(start = 8.dp))
-                    Switch(
-                        enabled = (appViewModel.mode == L2CAP_CLIENT_MODE || appViewModel.mode == L2CAP_SERVER_MODE),
+                    Switch(enabled = (appViewModel.mode == L2CAP_CLIENT_MODE || appViewModel.mode == L2CAP_SERVER_MODE || appViewModel.mode == GATT_CLIENT_MODE || appViewModel.mode == GATT_SERVER_MODE),
                         checked = appViewModel.use2mPhy,
-                        onCheckedChange = { appViewModel.use2mPhy = it }
-                    )
+                        onCheckedChange = { appViewModel.use2mPhy = it })
                     Column(Modifier.selectableGroup()) {
                         listOf(
-                            "BALANCED",
-                            "LOW",
-                            "HIGH",
-                            "DCK"
+                            "BALANCED", "LOW", "HIGH", "DCK"
                         ).forEach { text ->
                             Row(
                                 Modifier
                                     .selectable(
                                         selected = (text == appViewModel.connectionPriority),
                                         onClick = { appViewModel.updateConnectionPriority(text) },
-                                        role = Role.RadioButton
+                                        role = Role.RadioButton,
                                     )
                                     .padding(horizontal = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 RadioButton(
                                     selected = (text == appViewModel.connectionPriority),
-                                    onClick = null
+                                    onClick = null,
+                                    enabled = (appViewModel.mode == L2CAP_CLIENT_MODE || appViewModel.mode == L2CAP_SERVER_MODE || appViewModel.mode == GATT_CLIENT_MODE || appViewModel.mode == GATT_SERVER_MODE)
                                 )
                                 Text(
                                     text = text,
@@ -404,7 +399,9 @@ fun MainView(
                             RFCOMM_CLIENT_MODE,
                             RFCOMM_SERVER_MODE,
                             L2CAP_CLIENT_MODE,
-                            L2CAP_SERVER_MODE
+                            L2CAP_SERVER_MODE,
+                            GATT_CLIENT_MODE,
+                            GATT_SERVER_MODE
                         ).forEach { text ->
                             Row(
                                 Modifier
@@ -417,8 +414,7 @@ fun MainView(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 RadioButton(
-                                    selected = (text == appViewModel.mode),
-                                    onClick = null
+                                    selected = (text == appViewModel.mode), onClick = null
                                 )
                                 Text(
                                     text = text,
@@ -430,10 +426,7 @@ fun MainView(
                     }
                     Column(Modifier.selectableGroup()) {
                         listOf(
-                            SEND_SCENARIO,
-                            RECEIVE_SCENARIO,
-                            PING_SCENARIO,
-                            PONG_SCENARIO
+                            SEND_SCENARIO, RECEIVE_SCENARIO, PING_SCENARIO, PONG_SCENARIO
                         ).forEach { text ->
                             Row(
                                 Modifier
@@ -446,8 +439,7 @@ fun MainView(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 RadioButton(
-                                    selected = (text == appViewModel.scenario),
-                                    onClick = null
+                                    selected = (text == appViewModel.scenario), onClick = null
                                 )
                                 Text(
                                     text = text,
@@ -465,20 +457,29 @@ fun MainView(
                     ActionButton(
                         text = "Stop", onClick = appViewModel::abort, enabled = appViewModel.running
                     )
+                    ActionButton(
+                        text = "Become Discoverable", onClick = becomeDiscoverable, true
+                    )
                 }
                 Divider()
-                Text(
-                    text = if (appViewModel.mtu != 0) "MTU: ${appViewModel.mtu}" else ""
-                )
-                Text(
-                    text = if (appViewModel.rxPhy != 0 || appViewModel.txPhy != 0) "PHY: tx=${appViewModel.txPhy}, rx=${appViewModel.rxPhy}" else ""
-                )
+                if (appViewModel.mtu != 0) {
+                    Text(
+                        text = "MTU: ${appViewModel.mtu}"
+                    )
+                }
+                if (appViewModel.rxPhy != 0) {
+                    Text(
+                        text = "PHY: tx=${appViewModel.txPhy}, rx=${appViewModel.rxPhy}"
+                    )
+                }
                 Text(
                     text = "Status: ${appViewModel.status}"
                 )
-                Text(
-                    text = "Last Error: ${appViewModel.lastError}"
-                )
+                if (appViewModel.lastError.isNotEmpty()) {
+                    Text(
+                        text = "Last Error: ${appViewModel.lastError}"
+                    )
+                }
                 Text(
                     text = "Packets Sent: ${appViewModel.packetsSent}"
                 )
