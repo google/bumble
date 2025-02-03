@@ -39,12 +39,14 @@ nav:
   - Drivers:
     - drivers/index.md
     - Realtek: drivers/realtek.md
+    - Intel: drivers/intel.md
   - API:
     - Guide: api/guide.md
     - Examples: api/examples.md
     - Reference: api/reference.md
   - Apps & Tools:
     - apps_and_tools/index.md
+    - Auracast: apps_and_tools/auracast.md
     - Console: apps_and_tools/console.md
     - Bench: apps_and_tools/bench.md
     - Speaker: apps_and_tools/speaker.md
@@ -108,8 +110,8 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.superfences
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.tabbed:
       alternate_style: true
   - codehilite:

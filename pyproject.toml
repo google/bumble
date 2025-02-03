@@ -61,16 +61,17 @@ avatar = [
 ]
 pandora = ["bt-test-interfaces >= 0.0.6"]
 documentation = [
-    "mkdocs >= 1.4.0",
-    "mkdocs-material >= 8.5.6",
-    "mkdocstrings[python] >= 0.19.0",
+    "mkdocs >= 1.6.0",
+    "mkdocs-material >= 9.6",
+    "mkdocstrings[python] >= 0.27.0",
 ]
 auracast = [
-    "lc3 @ git+https://github.com/google/liblc3.git",
+    "lc3py ; python_version>='3.10' and platform_system=='Linux' and platform_machine=='x86_64'",
     "sounddevice >= 0.5.1",
 ]
 
 [project.scripts]
+bumble-auracast = "bumble.apps.auracast:main"
 bumble-ble-rpa-tool = "bumble.apps.ble_rpa_tool:main"
 bumble-console = "bumble.apps.console:main"
 bumble-controller-info = "bumble.apps.controller_info:main"

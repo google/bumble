@@ -1,4 +1,4 @@
-# Copyright 2021-2024 Google LLC
+# Copyright 2021-2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,14 +17,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+import dataclasses
 import enum
+
+from typing import Optional, Sequence
 
 from bumble import att
 from bumble import device
 from bumble import gatt
 from bumble import gatt_client
 
-from typing import Optional, Sequence
 
 # -----------------------------------------------------------------------------
 # Constants
@@ -65,6 +67,20 @@ class VolumeControlPointOpcode(enum.IntEnum):
     SET_ABSOLUTE_VOLUME         = 0x04
     UNMUTE                      = 0x05
     MUTE                        = 0x06
+
+
+@dataclasses.dataclass
+class VolumeState:
+    volume_setting: int
+    mute: int
+    change_counter: int
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> VolumeState:
+        return cls(data[0], data[1], data[2])
+
+    def __bytes__(self) -> bytes:
+        return bytes([self.volume_setting, self.mute, self.change_counter])
 
 
 # -----------------------------------------------------------------------------
@@ -126,16 +142,8 @@ class VolumeControlService(gatt.TemplateService):
             included_services=list(included_services),
         )
 
-    @property
-    def volume_state_bytes(self) -> bytes:
-        return bytes([self.volume_setting, self.muted, self.change_counter])
-
-    @volume_state_bytes.setter
-    def volume_state_bytes(self, new_value: bytes) -> None:
-        self.volume_setting, self.muted, self.change_counter = new_value
-
     def _on_read_volume_state(self, _connection: Optional[device.Connection]) -> bytes:
-        return self.volume_state_bytes
+        return bytes(VolumeState(self.volume_setting, self.muted, self.change_counter))
 
     def _on_write_volume_control_point(
         self, connection: Optional[device.Connection], value: bytes
@@ -153,14 +161,9 @@ class VolumeControlService(gatt.TemplateService):
             self.change_counter = (self.change_counter + 1) % 256
             connection.abort_on(
                 'disconnection',
-                connection.device.notify_subscribers(
-                    attribute=self.volume_state,
-                    value=self.volume_state_bytes,
-                ),
+                connection.device.notify_subscribers(attribute=self.volume_state),
             )
-            self.emit(
-                'volume_state', self.volume_setting, self.muted, self.change_counter
-            )
+            self.emit('volume_state_change')
 
     def _on_relative_volume_down(self) -> bool:
         old_volume = self.volume_setting
@@ -207,24 +210,26 @@ class VolumeControlServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = VolumeControlService
 
     volume_control_point: gatt_client.CharacteristicProxy
+    volume_state: gatt.SerializableCharacteristicAdapter
+    volume_flags: gatt.DelegatedCharacteristicAdapter
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        self.volume_state = gatt.PackedCharacteristicAdapter(
-            service_proxy.get_characteristics_by_uuid(
+        self.volume_state = gatt.SerializableCharacteristicAdapter(
+            service_proxy.get_required_characteristic_by_uuid(
                 gatt.GATT_VOLUME_STATE_CHARACTERISTIC
-            )[0],
-            'BBB',
+            ),
+            VolumeState,
         )
 
-        self.volume_control_point = service_proxy.get_characteristics_by_uuid(
+        self.volume_control_point = service_proxy.get_required_characteristic_by_uuid(
             gatt.GATT_VOLUME_CONTROL_POINT_CHARACTERISTIC
-        )[0]
+        )
 
-        self.volume_flags = gatt.PackedCharacteristicAdapter(
-            service_proxy.get_characteristics_by_uuid(
+        self.volume_flags = gatt.DelegatedCharacteristicAdapter(
+            service_proxy.get_required_characteristic_by_uuid(
                 gatt.GATT_VOLUME_FLAGS_CHARACTERISTIC
-            )[0],
-            'B',
+            ),
+            decode=lambda data: VolumeFlags(data[0]),
         )

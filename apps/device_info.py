@@ -29,7 +29,9 @@ from bumble.gatt import Service
 from bumble.profiles.device_information_service import DeviceInformationServiceProxy
 from bumble.profiles.battery_service import BatteryServiceProxy
 from bumble.profiles.gap import GenericAccessServiceProxy
+from bumble.profiles.pacs import PublishedAudioCapabilitiesServiceProxy
 from bumble.profiles.tmap import TelephonyAndMediaAudioServiceProxy
+from bumble.profiles.vcs import VolumeControlServiceProxy
 from bumble.transport import open_transport_or_link
 
 
@@ -126,12 +128,50 @@ async def show_tmas(
     print(color('### Telephony And Media Audio Service', 'yellow'))
 
     if tmas.role:
-        print(
-            color('  Role:', 'green'),
-            await tmas.role.read_value(),
-        )
+        role = await tmas.role.read_value()
+        print(color('  Role:', 'green'), role)
 
     print()
+
+
+# -----------------------------------------------------------------------------
+async def show_pacs(pacs: PublishedAudioCapabilitiesServiceProxy) -> None:
+    print(color('### Published Audio Capabilities Service', 'yellow'))
+
+    contexts = await pacs.available_audio_contexts.read_value()
+    print(color('  Available Audio Contexts:', 'green'), contexts)
+
+    contexts = await pacs.supported_audio_contexts.read_value()
+    print(color('  Supported Audio Contexts:', 'green'), contexts)
+
+    if pacs.sink_pac:
+        pac = await pacs.sink_pac.read_value()
+        print(color('  Sink PAC:                ', 'green'), pac)
+
+    if pacs.sink_audio_locations:
+        audio_locations = await pacs.sink_audio_locations.read_value()
+        print(color('  Sink Audio Locations:    ', 'green'), audio_locations)
+
+    if pacs.source_pac:
+        pac = await pacs.source_pac.read_value()
+        print(color('  Source PAC:              ', 'green'), pac)
+
+    if pacs.source_audio_locations:
+        audio_locations = await pacs.source_audio_locations.read_value()
+        print(color('  Source Audio Locations:  ', 'green'), audio_locations)
+
+    print()
+
+
+# -----------------------------------------------------------------------------
+async def show_vcs(vcs: VolumeControlServiceProxy) -> None:
+    print(color('### Volume Control Service', 'yellow'))
+
+    volume_state = await vcs.volume_state.read_value()
+    print(color('  Volume State:', 'green'), volume_state)
+
+    volume_flags = await vcs.volume_flags.read_value()
+    print(color('  Volume Flags:', 'green'), volume_flags)
 
 
 # -----------------------------------------------------------------------------
@@ -160,6 +200,12 @@ async def show_device_info(peer, done: Optional[asyncio.Future]) -> None:
 
         if tmas := peer.create_service_proxy(TelephonyAndMediaAudioServiceProxy):
             await try_show(show_tmas, tmas)
+
+        if pacs := peer.create_service_proxy(PublishedAudioCapabilitiesServiceProxy):
+            await try_show(show_pacs, pacs)
+
+        if vcs := peer.create_service_proxy(VolumeControlServiceProxy):
+            await try_show(show_vcs, vcs)
 
         if done is not None:
             done.set_result(None)

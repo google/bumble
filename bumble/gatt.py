@@ -323,8 +323,6 @@ GATT_SERVER_SUPPORTED_FEATURES_CHARACTERISTIC                  = UUID.from_16_bi
 # -----------------------------------------------------------------------------
 # Utils
 # -----------------------------------------------------------------------------
-
-
 def show_services(services: Iterable[Service]) -> None:
     for service in services:
         print(color(str(service), 'cyan'))

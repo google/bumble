@@ -34,7 +34,7 @@ from bumble.profiles.vocs import (
     VolumeOffsetState,
     VocsAudioLocation,
 )
-from bumble.profiles.vcp import VolumeControlService, VolumeControlServiceProxy
+from bumble.profiles.vcs import VolumeControlService, VolumeControlServiceProxy
 from bumble.profiles.bap import AudioLocation
 
 from .test_utils import TwoDevices

@@ -33,7 +33,7 @@ from bumble.profiles.aics import (
     AudioInputControlPointOpCode,
     ErrorCode,
 )
-from bumble.profiles.vcp import VolumeControlService, VolumeControlServiceProxy
+from bumble.profiles.vcs import VolumeControlService, VolumeControlServiceProxy
 
 from .test_utils import TwoDevices
 

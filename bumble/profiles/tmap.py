@@ -25,7 +25,6 @@ from bumble.gatt import (
     TemplateService,
     Characteristic,
     DelegatedCharacteristicAdapter,
-    InvalidServiceError,
     GATT_TELEPHONY_AND_MEDIA_AUDIO_SERVICE,
     GATT_TMAP_ROLE_CHARACTERISTIC,
 )
@@ -74,15 +73,10 @@ class TelephonyAndMediaAudioServiceProxy(ProfileServiceProxy):
     def __init__(self, service_proxy: ServiceProxy):
         self.service_proxy = service_proxy
 
-        if not (
-            characteristics := service_proxy.get_characteristics_by_uuid(
-                GATT_TMAP_ROLE_CHARACTERISTIC
-            )
-        ):
-            raise InvalidServiceError('TMAP Role characteristic not found')
-
         self.role = DelegatedCharacteristicAdapter(
-            characteristics[0],
+            service_proxy.get_required_characteristic_by_uuid(
+                GATT_TMAP_ROLE_CHARACTERISTIC
+            ),
             decode=lambda value: Role(
                 struct.unpack_from('<H', value, 0)[0],
             ),

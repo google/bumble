@@ -42,7 +42,7 @@ from bumble.profiles.bap import (
 from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
-from bumble.profiles.vcp import VolumeControlService
+from bumble.profiles.vcs import VolumeControlService
 
 from bumble.transport import open_transport_or_link
 
@@ -117,13 +117,17 @@ async def main() -> None:
 
         ws: Optional[websockets.WebSocketServerProtocol] = None
 
-        def on_volume_state(volume_setting: int, muted: int, change_counter: int):
+        def on_volume_state_change():
             if ws:
                 asyncio.create_task(
-                    ws.send(dumps_volume_state(volume_setting, muted, change_counter))
+                    ws.send(
+                        dumps_volume_state(
+                            vcs.volume_setting, vcs.muted, vcs.change_counter
+                        )
+                    )
                 )
 
-        vcs.on('volume_state', on_volume_state)
+        vcs.on('volume_state_change', on_volume_state_change)
 
         advertising_data = (
             bytes(

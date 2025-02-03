@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import asyncio
+import collections
 from collections.abc import Iterable, Sequence
 from contextlib import (
     asynccontextmanager,
@@ -36,6 +37,7 @@ from typing import (
     Any,
     Callable,
     ClassVar,
+    Deque,
     Dict,
     Optional,
     Type,
@@ -1431,6 +1433,49 @@ class BisLink(_IsoLink):
 
     def __post_init__(self) -> None:
         self.device = self.big.device
+
+
+# -----------------------------------------------------------------------------
+class IsoPacketStream:
+    """Async stream that can write SDUs to a CIS or BIS, with a maximum queue size."""
+
+    iso_link: _IsoLink
+    data_packet_queue: DataPacketQueue
+
+    def __init__(self, iso_link: _IsoLink, max_queue_size: int) -> None:
+        if iso_link.data_packet_queue is None:
+            raise ValueError('link has no data packet queue')
+
+        self.iso_link = iso_link
+        self.data_packet_queue = iso_link.data_packet_queue
+        self.data_packet_queue.on('flow', self._on_flow)
+        self._thresholds: Deque[int] = collections.deque()
+        self._semaphore = asyncio.Semaphore(max_queue_size)
+
+    def _on_flow(self) -> None:
+        # Release the semaphore once for each completed packet.
+        while (
+            self._thresholds and self.data_packet_queue.completed >= self._thresholds[0]
+        ):
+            self._thresholds.popleft()
+            self._semaphore.release()
+
+    async def write(self, sdu: bytes) -> None:
+        """
+        Write an SDU to the queue.
+
+        This method blocks until there are fewer than max_queue_size packets queued
+        but not yet completed.
+        """
+
+        # Wait until there's space in the queue.
+        await self._semaphore.acquire()
+
+        # Queue the packet.
+        self.iso_link.write(sdu)
+
+        # Remember the position of the packet so we can know when it is completed.
+        self._thresholds.append(self.data_packet_queue.queued)
 
 
 # -----------------------------------------------------------------------------

@@ -9,9 +9,9 @@ for your platform.
 Throughout the documentation, when shell commands are shown, it is assumed that you can
 invoke Python as
 ```
-$ python
+$ python3
 ```
-If invoking python is different on your platform (it may be `python3` for example, or just `py` or `py.exe`),
+If invoking python is different on your platform (it may be `python` for example, or just `py` or `py.exe`),
 adjust accordingly.
 
 You may be simply using Bumble as a module for your own application or as a dependency to your own
@@ -30,12 +30,18 @@ manager, or from source.
     python environment, or in a virtual environment, such as a `venv`, `pyenv` or `conda` environment.
     See the [Python Environments page](development/python_environments.md) page for details.
 
+### Install from PyPI
+
+```
+$ python3 -m pip install bumble
+```
+
 ### Install From Source
 
 Install with `pip`. Run in a command shell in the directory where you downloaded the source
 distribution
 ```
-$ python -m pip install -e .
+$ python3 -m pip install -e .
 ```
 
 ### Install from GitHub
@@ -44,21 +50,21 @@ You can install directly from GitHub without first downloading the repo.
 
 Install the latest commit from the main branch with `pip`:
 ```
-$ python -m pip install git+https://github.com/google/bumble.git
+$ python3 -m pip install git+https://github.com/google/bumble.git
 ```
 
 You can specify a specific tag.
 
 Install tag `v0.0.1` with `pip`:
 ```
-$ python -m pip install git+https://github.com/google/bumble.git@v0.0.1
+$ python3 -m pip install git+https://github.com/google/bumble.git@v0.0.1
 ```
 
 You can also specify a specific commit.
 
 Install commit `27c0551` with `pip`:
 ```
-$ python -m pip install git+https://github.com/google/bumble.git@27c0551
+$ python3 -m pip install git+https://github.com/google/bumble.git@27c0551
 ```
 
 # Working On The Bumble Code
@@ -78,21 +84,21 @@ directory of the project.
 
 ```bash
 $ export PYTHONPATH=.
-$ python apps/console.py serial:/dev/tty.usbmodem0006839912171
+$ python3 apps/console.py serial:/dev/tty.usbmodem0006839912171
 ```
 
 or running an example, with the working directory set to the `examples` subdirectory
 ```bash
 $ cd examples
 $ export PYTHONPATH=..
-$ python run_scanner.py usb:0
+$ python3 run_scanner.py usb:0
 ```
 
 Or course, `export PYTHONPATH` only needs to be invoked once, not before each app/script execution.
 
 Setting `PYTHONPATH` locally with each command would look something like:
 ```
-$ PYTHONPATH=. python examples/run_advertiser.py examples/device1.json serial:/dev/tty.usbmodem0006839912171
+$ PYTHONPATH=. python3 examples/run_advertiser.py examples/device1.json serial:/dev/tty.usbmodem0006839912171
 ```
 
 # Where To Go Next

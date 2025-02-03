@@ -72,6 +72,19 @@ class PacRecord:
             metadata=metadata,
         )
 
+    @classmethod
+    def list_from_bytes(cls, data: bytes) -> list[PacRecord]:
+        """Parse a serialized list of records preceded by a one byte list length."""
+        record_count = data[0]
+        records = []
+        offset = 1
+        for _ in range(record_count):
+            record = PacRecord.from_bytes(data[offset:])
+            offset += len(bytes(record))
+            records.append(record)
+
+        return records
+
     def __bytes__(self) -> bytes:
         capabilities_bytes = bytes(self.codec_specific_capabilities)
         metadata_bytes = bytes(self.metadata)
@@ -172,39 +185,58 @@ class PublishedAudioCapabilitiesService(gatt.TemplateService):
 class PublishedAudioCapabilitiesServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = PublishedAudioCapabilitiesService
 
-    sink_pac: Optional[gatt_client.CharacteristicProxy] = None
-    sink_audio_locations: Optional[gatt_client.CharacteristicProxy] = None
-    source_pac: Optional[gatt_client.CharacteristicProxy] = None
-    source_audio_locations: Optional[gatt_client.CharacteristicProxy] = None
-    available_audio_contexts: gatt_client.CharacteristicProxy
-    supported_audio_contexts: gatt_client.CharacteristicProxy
+    sink_pac: Optional[gatt.DelegatedCharacteristicAdapter] = None
+    sink_audio_locations: Optional[gatt.DelegatedCharacteristicAdapter] = None
+    source_pac: Optional[gatt.DelegatedCharacteristicAdapter] = None
+    source_audio_locations: Optional[gatt.DelegatedCharacteristicAdapter] = None
+    available_audio_contexts: gatt.DelegatedCharacteristicAdapter
+    supported_audio_contexts: gatt.DelegatedCharacteristicAdapter
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy):
         self.service_proxy = service_proxy
 
-        self.available_audio_contexts = service_proxy.get_characteristics_by_uuid(
-            gatt.GATT_AVAILABLE_AUDIO_CONTEXTS_CHARACTERISTIC
-        )[0]
-        self.supported_audio_contexts = service_proxy.get_characteristics_by_uuid(
-            gatt.GATT_SUPPORTED_AUDIO_CONTEXTS_CHARACTERISTIC
-        )[0]
+        self.available_audio_contexts = gatt.DelegatedCharacteristicAdapter(
+            service_proxy.get_required_characteristic_by_uuid(
+                gatt.GATT_AVAILABLE_AUDIO_CONTEXTS_CHARACTERISTIC
+            ),
+            decode=lambda x: tuple(map(ContextType, struct.unpack('<HH', x))),
+        )
+
+        self.supported_audio_contexts = gatt.DelegatedCharacteristicAdapter(
+            service_proxy.get_required_characteristic_by_uuid(
+                gatt.GATT_SUPPORTED_AUDIO_CONTEXTS_CHARACTERISTIC
+            ),
+            decode=lambda x: tuple(map(ContextType, struct.unpack('<HH', x))),
+        )
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             gatt.GATT_SINK_PAC_CHARACTERISTIC
         ):
-            self.sink_pac = characteristics[0]
+            self.sink_pac = gatt.DelegatedCharacteristicAdapter(
+                characteristics[0],
+                decode=PacRecord.list_from_bytes,
+            )
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             gatt.GATT_SOURCE_PAC_CHARACTERISTIC
         ):
-            self.source_pac = characteristics[0]
+            self.source_pac = gatt.DelegatedCharacteristicAdapter(
+                characteristics[0],
+                decode=PacRecord.list_from_bytes,
+            )
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             gatt.GATT_SINK_AUDIO_LOCATION_CHARACTERISTIC
         ):
-            self.sink_audio_locations = characteristics[0]
+            self.sink_audio_locations = gatt.DelegatedCharacteristicAdapter(
+                characteristics[0],
+                decode=lambda x: AudioLocation(struct.unpack('<I', x)[0]),
+            )
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             gatt.GATT_SOURCE_AUDIO_LOCATION_CHARACTERISTIC
         ):
-            self.source_audio_locations = characteristics[0]
+            self.source_audio_locations = gatt.DelegatedCharacteristicAdapter(
+                characteristics[0],
+                decode=lambda x: AudioLocation(struct.unpack('<I', x)[0]),
+            )

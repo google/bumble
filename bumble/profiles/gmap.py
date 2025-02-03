@@ -30,7 +30,6 @@ from bumble.gatt import (
     GATT_UGT_FEATURES_CHARACTERISTIC,
     GATT_BGS_FEATURES_CHARACTERISTIC,
     GATT_BGR_FEATURES_CHARACTERISTIC,
-    InvalidServiceError,
 )
 from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
 from enum import IntFlag
@@ -154,14 +153,10 @@ class GamingAudioServiceProxy(ProfileServiceProxy):
     def __init__(self, service_proxy: ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        if not (
-            characteristics := service_proxy.get_characteristics_by_uuid(
-                GATT_GMAP_ROLE_CHARACTERISTIC
-            )
-        ):
-            raise InvalidServiceError("GMAP Role Characteristic not found")
         self.gmap_role = DelegatedCharacteristicAdapter(
-            characteristic=characteristics[0],
+            service_proxy.get_required_characteristic_by_uuid(
+                GATT_GMAP_ROLE_CHARACTERISTIC
+            ),
             decode=lambda value: GmapRole(value[0]),
         )
 

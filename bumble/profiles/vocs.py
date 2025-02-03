@@ -27,8 +27,8 @@ from bumble.gatt import (
     DelegatedCharacteristicAdapter,
     TemplateService,
     CharacteristicValue,
+    SerializableCharacteristicAdapter,
     UTF8CharacteristicAdapter,
-    InvalidServiceError,
     GATT_VOLUME_OFFSET_CONTROL_SERVICE,
     GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC,
     GATT_AUDIO_LOCATION_CHARACTERISTIC,
@@ -287,44 +287,28 @@ class VolumeOffsetControlServiceProxy(ProfileServiceProxy):
     def __init__(self, service_proxy: ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        if not (
-            characteristics := service_proxy.get_characteristics_by_uuid(
-                GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC
-            )
-        ):
-            raise InvalidServiceError("Volume Offset State characteristic not found")
         self.volume_offset_state = DelegatedCharacteristicAdapter(
-            characteristics[0], decode=VolumeOffsetState.from_bytes
+            service_proxy.get_required_characteristic_by_uuid(
+                GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC
+            ),
+            decode=VolumeOffsetState.from_bytes,
         )
 
-        if not (
-            characteristics := service_proxy.get_characteristics_by_uuid(
+        self.audio_location = SerializableCharacteristicAdapter(
+            service_proxy.get_required_characteristic_by_uuid(
                 GATT_AUDIO_LOCATION_CHARACTERISTIC
-            )
-        ):
-            raise InvalidServiceError("Audio Location characteristic not found")
-        self.audio_location = DelegatedCharacteristicAdapter(
-            characteristics[0],
-            encode=lambda value: bytes(value),
-            decode=VocsAudioLocation.from_bytes,
+            ),
+            VocsAudioLocation,
         )
 
-        if not (
-            characteristics := service_proxy.get_characteristics_by_uuid(
+        self.volume_offset_control_point = (
+            service_proxy.get_required_characteristic_by_uuid(
                 GATT_VOLUME_OFFSET_CONTROL_POINT_CHARACTERISTIC
             )
-        ):
-            raise InvalidServiceError(
-                "Volume Offset Control Point characteristic not found"
-            )
-        self.volume_offset_control_point = characteristics[0]
+        )
 
-        if not (
-            characteristics := service_proxy.get_characteristics_by_uuid(
+        self.audio_output_description = UTF8CharacteristicAdapter(
+            service_proxy.get_required_characteristic_by_uuid(
                 GATT_AUDIO_OUTPUT_DESCRIPTION_CHARACTERISTIC
             )
-        ):
-            raise InvalidServiceError(
-                "Audio Output Description characteristic not found"
-            )
-        self.audio_output_description = UTF8CharacteristicAdapter(characteristics[0])
+        )

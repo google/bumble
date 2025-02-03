@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import dataclasses
+import enum
 import struct
 from typing import Any, List, Type
 from typing_extensions import Self
@@ -41,9 +42,10 @@ class AssistedListeningStream(utils.OpenIntEnum):
 class Metadata:
     '''Bluetooth Assigned Numbers, Section 6.12.6 - Metadata LTV structures.
 
-    As Metadata fields may extend, and Spec doesn't forbid duplication, we don't
-    automatically parse the Metadata data into specific classes. Callers may decode
-    the data by themselves, or use the Entry.decode method.
+    As Metadata fields may extend, and the spec may not guarantee the uniqueness of
+    tags, we don't automatically parse the Metadata data into specific classes.
+    Users of this class may decode the data by themselves, or use the Entry.decode
+    method.
     '''
 
     class Tag(utils.OpenIntEnum):
@@ -113,6 +115,29 @@ class Metadata:
             return bytes([len(self.data) + 1, self.tag]) + self.data
 
     entries: List[Entry] = dataclasses.field(default_factory=list)
+
+    def pretty_print(self, indent: str) -> str:
+        """Convenience method to generate a string with one key-value pair per line."""
+
+        max_key_length = 0
+        keys = []
+        values = []
+        for entry in self.entries:
+            key = entry.tag.name
+            max_key_length = max(max_key_length, len(key))
+            keys.append(key)
+            decoded = entry.decode()
+            if isinstance(decoded, enum.Enum):
+                values.append(decoded.name)
+            elif isinstance(decoded, bytes):
+                values.append(decoded.hex())
+            else:
+                values.append(str(decoded))
+
+        return '\n'.join(
+            f'{indent}{key}: {" " * (max_key_length-len(key))}{value}'
+            for key, value in zip(keys, values)
+        )
 
     @classmethod
     def from_bytes(cls: Type[Self], data: bytes) -> Self:
