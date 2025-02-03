@@ -44,7 +44,7 @@ jobs:
         run: cat rootcanal.log
       - name: Upload Mobly logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: mobly-logs-${{ matrix.runs-on }}
+          name: mobly-logs
           path: /tmp/logs/mobly/bumble.bumbles/
