@@ -28,7 +28,7 @@ class OneDeviceBenchTest(base_test.BaseTestClass):
 
     def test_l2cap_client_ping(self):
         runner = self.dut.bench.runL2capClient(
-            "ping", "4B:2A:67:76:2B:E3", 128, True, 100, 970, 100
+            "ping", "4B:2A:67:76:2B:E3", 128, True, 100, 970, 100, "HIGH"
         )
         print("### Initial status:", runner)
         final_status = self.dut.bench.waitForRunnerCompletion(runner["id"])
@@ -36,7 +36,15 @@ class OneDeviceBenchTest(base_test.BaseTestClass):
 
     def test_l2cap_client_send(self):
         runner = self.dut.bench.runL2capClient(
-            "send", "7E:90:D0:F2:7A:11", 131, True, 100, 970, 0
+            "send",
+            "F1:F1:F1:F1:F1:F1",
+            128,
+            True,
+            100,
+            970,
+            0,
+            "HIGH",
+            10000,
         )
         print("### Initial status:", runner)
         final_status = self.dut.bench.waitForRunnerCompletion(runner["id"])

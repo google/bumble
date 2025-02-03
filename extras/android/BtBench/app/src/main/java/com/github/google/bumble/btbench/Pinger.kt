@@ -19,8 +19,6 @@ import java.util.logging.Logger
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-private const val DEFAULT_STARTUP_DELAY = 3000
-
 private val Log = Logger.getLogger("btbench.pinger")
 
 class Pinger(private val viewModel: AppViewModel, private val packetIO: PacketIO) : IoClient,
@@ -36,8 +34,8 @@ class Pinger(private val viewModel: AppViewModel, private val packetIO: PacketIO
     override fun run() {
         viewModel.clear()
 
-        Log.info("startup delay: $DEFAULT_STARTUP_DELAY")
-        Thread.sleep(DEFAULT_STARTUP_DELAY.toLong());
+        Log.info("startup delay: ${viewModel.startupDelay}")
+        Thread.sleep(viewModel.startupDelay.toLong());
         Log.info("running")
 
         Log.info("sending reset")

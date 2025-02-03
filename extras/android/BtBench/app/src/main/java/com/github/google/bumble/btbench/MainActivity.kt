@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.github.google.bumble.btbench.ui.theme.BTBenchTheme
+import java.io.IOException
 import java.util.logging.Logger
 
 private val Log = Logger.getLogger("bumble.main-activity")
@@ -76,6 +77,7 @@ const val SENDER_PACKET_SIZE_PREF_KEY = "sender_packet_size"
 const val SENDER_PACKET_INTERVAL_PREF_KEY = "sender_packet_interval"
 const val SCENARIO_PREF_KEY = "scenario"
 const val MODE_PREF_KEY = "mode"
+const val CONNECTION_PRIORITY_PREF_KEY = "connection_priority"
 
 class MainActivity : ComponentActivity() {
     private val appViewModel = AppViewModel()
@@ -195,7 +197,7 @@ class MainActivity : ComponentActivity() {
 
     private fun runScenario() {
         if (bluetoothAdapter == null) {
-            return
+            throw IOException("bluetooth not enabled")
         }
 
         val runner = when (appViewModel.mode) {
@@ -366,7 +368,35 @@ fun MainView(
                         checked = appViewModel.use2mPhy,
                         onCheckedChange = { appViewModel.use2mPhy = it }
                     )
-
+                    Column(Modifier.selectableGroup()) {
+                        listOf(
+                            "BALANCED",
+                            "LOW",
+                            "HIGH",
+                            "DCK"
+                        ).forEach { text ->
+                            Row(
+                                Modifier
+                                    .selectable(
+                                        selected = (text == appViewModel.connectionPriority),
+                                        onClick = { appViewModel.updateConnectionPriority(text) },
+                                        role = Role.RadioButton
+                                    )
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = (text == appViewModel.connectionPriority),
+                                    onClick = null
+                                )
+                                Text(
+                                    text = text,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.padding(start = 16.dp)
+                                )
+                            }
+                        }
+                    }
                 }
                 Row {
                     Column(Modifier.selectableGroup()) {
