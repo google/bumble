@@ -25,7 +25,6 @@ use clap::Parser as _;
 use pyo3::PyResult;
 use rand::Rng;
 use std::path;
-
 #[pyo3_asyncio::tokio::main]
 async fn main() -> PyResult<()> {
     env_logger::builder()

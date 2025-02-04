@@ -28,7 +28,7 @@ use bumble::wrapper::{
 };
 use pyo3::{
     exceptions::PyException,
-    {PyErr, PyResult},
+    FromPyObject, IntoPy, Python, {PyErr, PyResult},
 };
 
 #[pyo3_asyncio::tokio::test]
@@ -75,6 +75,28 @@ async fn test_hci_roundtrip_success_and_failure() -> PyResult<()> {
 
     assert_eq!(ErrorCode::CommandDisallowed, event.get_status());
 
+    Ok(())
+}
+
+#[pyo3_asyncio::tokio::test]
+fn valid_error_code_extraction_succeeds() -> PyResult<()> {
+    let error_code = Python::with_gil(|py| {
+        let python_error_code_success = 0x00_u8.into_py(py);
+        ErrorCode::extract(python_error_code_success.as_ref(py))
+    })?;
+
+    assert_eq!(ErrorCode::Success, error_code);
+    Ok(())
+}
+
+#[pyo3_asyncio::tokio::test]
+fn invalid_error_code_extraction_fails() -> PyResult<()> {
+    let failed_extraction = Python::with_gil(|py| {
+        let python_invalid_error_code = 0xFE_u8.into_py(py);
+        ErrorCode::extract(python_invalid_error_code.as_ref(py))
+    });
+
+    assert!(failed_extraction.is_err());
     Ok(())
 }
 
