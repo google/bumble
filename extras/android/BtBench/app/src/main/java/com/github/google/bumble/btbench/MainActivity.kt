@@ -17,9 +17,12 @@ package com.github.google.bumble.btbench
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -86,6 +89,47 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         appViewModel.loadPreferences(getPreferences(Context.MODE_PRIVATE))
         checkPermissions()
+        registerReceivers()
+    }
+
+    private fun registerReceivers() {
+        val pairingRequestIntentFilter = IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST)
+        registerReceiver(object: BroadcastReceiver() {
+            @SuppressLint("MissingPermission")
+            override fun onReceive(context: Context, intent: Intent) {
+                Log.info("ACTION_PAIRING_REQUEST")
+                val extras = intent.extras
+                if (extras != null) {
+                    for (key in extras.keySet()) {
+                        Log.info("$key: ${extras.get(key)}")
+                    }
+                }
+                val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                if (device != null) {
+                    if (checkSelfPermission(Manifest.permission.BLUETOOTH_PRIVILEGED) == PackageManager.PERMISSION_GRANTED) {
+                        Log.info("confirming pairing")
+                        device.setPairingConfirmation(true)
+                    } else {
+                        Log.info("we don't have BLUETOOTH_PRIVILEGED, not confirming")
+                    }
+                }
+
+            }
+        }, pairingRequestIntentFilter)
+
+        val bondStateChangedIntentFilter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        registerReceiver(object: BroadcastReceiver() {
+            @SuppressLint("MissingPermission")
+            override fun onReceive(context: Context, intent: Intent) {
+                Log.info("ACTION_BOND_STATE_CHANGED")
+                val extras = intent.extras
+                if (extras != null) {
+                    for (key in extras.keySet()) {
+                        Log.info("$key: ${extras.get(key)}")
+                    }
+                }
+            }
+        }, bondStateChangedIntentFilter)
     }
 
     private fun checkPermissions() {
