@@ -53,7 +53,7 @@ def test_import():
         le_audio,
         pacs,
         pbp,
-        vcp,
+        vcs,
     )
 
     assert att
@@ -87,7 +87,7 @@ def test_import():
     assert le_audio
     assert pacs
     assert pbp
-    assert vcp
+    assert vcs
 
 
 # -----------------------------------------------------------------------------

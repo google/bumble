@@ -23,15 +23,19 @@ from concurrent.futures import ThreadPoolExecutor
 import dataclasses
 import enum
 import logging
+import pathlib
 from typing import (
     AsyncGenerator,
     BinaryIO,
     TYPE_CHECKING,
 )
+import sys
 import wave
 
+from bumble.colors import color
+
 if TYPE_CHECKING:
-    import sounddevice
+    import sounddevice  # type: ignore[import-untyped]
 
 
 # -----------------------------------------------------------------------------
@@ -78,9 +82,10 @@ def check_audio_output(output: str) -> bool:
     if output == 'device' or output.startswith('device:'):
         try:
             import sounddevice
-        except ImportError as exc:
+        except (ImportError, OSError) as exc:
             raise ValueError(
-                'audio output not available (sounddevice python module not installed)'
+                'audio output not available '
+                '(sounddevice python module not installed or failed to load)'
             ) from exc
 
         if output == 'device':
@@ -289,9 +294,10 @@ def check_audio_input(input: str) -> bool:
     if input == 'device' or input.startswith('device:'):
         try:
             import sounddevice
-        except ImportError as exc:
+        except (ImportError, OSError) as exc:
             raise ValueError(
-                'audio input not available (sounddevice python module not installed)'
+                'audio input not available '
+                '(sounddevice python module not installed or failed to load)'
             ) from exc
 
         if input == 'device':

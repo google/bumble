@@ -174,16 +174,10 @@ async def main() -> None:
             ws = websocket
             async for message in websocket:
                 volume_state = json.loads(message)
-                vcs.volume_state_bytes = bytes(
-                    [
-                        volume_state['volume_setting'],
-                        volume_state['muted'],
-                        volume_state['change_counter'],
-                    ]
-                )
-                await device.notify_subscribers(
-                    vcs.volume_state, vcs.volume_state_bytes
-                )
+                vcs.volume_setting = volume_state['volume_setting']
+                vcs.muted = volume_state['muted']
+                vcs.change_counter = volume_state['change_counter']
+                await device.notify_subscribers(vcs.volume_state)
             ws = None
 
         await websockets.serve(serve, 'localhost', 8989)

@@ -25,7 +25,7 @@ import struct
 import sys
 from typing import Any, List, Union
 
-from bumble.device import Connection, Device, Peer
+from bumble.device import Device, Peer
 from bumble import transport
 from bumble import gatt
 from bumble import hci
@@ -82,19 +82,19 @@ async def client(device: Device, address: hci.Address) -> None:
     for index in range(1, 9):
         characteristics.append(
             service.get_characteristics_by_uuid(
-                CHARACTERISTIC_UUID_BASE + f"{index:02X}"
+                core.UUID(CHARACTERISTIC_UUID_BASE + f"{index:02X}")
             )[0]
         )
 
     # Read all characteristics as raw bytes.
     for characteristic in characteristics:
         value = await characteristic.read_value()
-        print(f"### {characteristic} = {value} ({value.hex()})")
+        print(f"### {characteristic} = {value!r} ({value.hex()})")
 
     # Static characteristic with a bytes value.
     c1 = characteristics[0]
     c1_value = await c1.read_value()
-    print(f"@@@ C1 {c1} value = {c1_value} (type={type(c1_value)})")
+    print(f"@@@ C1 {c1} value = {c1_value!r} (type={type(c1_value)})")
     await c1.write_value("happy π day".encode("utf-8"))
 
     # Static characteristic with a string value.
@@ -136,7 +136,7 @@ async def client(device: Device, address: hci.Address) -> None:
     # Dynamic characteristic with a bytes value.
     c7 = characteristics[6]
     c7_value = await c7.read_value()
-    print(f"@@@ C7 {c7} value = {c7_value} (type={type(c7_value)})")
+    print(f"@@@ C7 {c7} value = {c7_value!r} (type={type(c7_value)})")
     await c7.write_value(bytes.fromhex("01020304"))
 
     # Dynamic characteristic with a string value.

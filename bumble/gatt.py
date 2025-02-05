@@ -315,6 +315,7 @@ GATT_CENTRAL_ADDRESS_RESOLUTION__CHARACTERISTIC                = UUID.from_16_bi
 GATT_CLIENT_SUPPORTED_FEATURES_CHARACTERISTIC                  = UUID.from_16_bits(0x2B29, 'Client Supported Features')
 GATT_DATABASE_HASH_CHARACTERISTIC                              = UUID.from_16_bits(0x2B2A, 'Database Hash')
 GATT_SERVER_SUPPORTED_FEATURES_CHARACTERISTIC                  = UUID.from_16_bits(0x2B3A, 'Server Supported Features')
+GATT_LE_GATT_SECURITY_LEVELS_CHARACTERISTIC                    = UUID.from_16_bits(0x2BF5, 'E GATT Security Levels')
 
 # fmt: on
 # pylint: enable=line-too-long
