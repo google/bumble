@@ -257,7 +257,7 @@ class ExtendedAdvertisement(Advertisement):
             secondary_phy    = report.secondary_phy,
             tx_power         = report.tx_power,
             sid              = report.advertising_sid,
-            data_bytes       = report.data
+            data_bytes       = report.data,
         )
         # fmt: on
 
@@ -912,11 +912,11 @@ class PeriodicAdvertisingSync(EventEmitter):
 
     def on_establishment(
         self,
-        status,
-        sync_handle,
-        advertiser_phy,
-        periodic_advertising_interval,
-        advertiser_clock_accuracy,
+        status: int,
+        sync_handle: int,
+        advertiser_phy: int,
+        periodic_advertising_interval: int,
+        advertiser_clock_accuracy: int,
     ) -> None:
         self.status = status
 
@@ -3182,6 +3182,41 @@ class Device(CompositeEventEmitter):
         logger.warning(
             "periodic advertising sync establishment for unknown address/sid"
         )
+
+    @host_event_handler
+    def on_periodic_advertising_sync_transfer(
+        self,
+        status: int,
+        connection_handle: int,
+        sync_handle: int,
+        advertising_sid: int,
+        advertiser_address: hci.Address,
+        advertiser_phy: int,
+        periodic_advertising_interval: int,
+        advertiser_clock_accuracy: int,
+    ) -> None:
+        if not (connection := self.lookup_connection(connection_handle)):
+            logger.error(
+                "Receive PAST from unknown connection 0x%04X", connection_handle
+            )
+
+        pa_sync = PeriodicAdvertisingSync(
+            device=self,
+            advertiser_address=advertiser_address,
+            sid=advertising_sid,
+            skip=0,
+            sync_timeout=0.0,
+            filter_duplicates=False,
+        )
+        self.periodic_advertising_syncs.append(pa_sync)
+        pa_sync.on_establishment(
+            status=status,
+            sync_handle=sync_handle,
+            advertiser_phy=advertiser_phy,
+            periodic_advertising_interval=periodic_advertising_interval,
+            advertiser_clock_accuracy=advertiser_clock_accuracy,
+        )
+        self.emit('periodic_advertising_sync_transfer', pa_sync, connection)
 
     @host_event_handler
     @with_periodic_advertising_sync_from_handle

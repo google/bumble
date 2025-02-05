@@ -1204,6 +1204,32 @@ class Host(AbortableEventEmitter):
         self.remove_big(event.big_handle)
         self.emit('big_termination', event.reason, event.big_handle)
 
+    def on_hci_le_periodic_advertising_sync_transfer_received_event(self, event):
+        self.emit(
+            'periodic_advertising_sync_transfer',
+            event.status,
+            event.connection_handle,
+            event.sync_handle,
+            event.advertising_sid,
+            event.advertiser_address,
+            event.advertiser_phy,
+            event.periodic_advertising_interval,
+            event.advertiser_clock_accuracy,
+        )
+
+    def on_hci_le_periodic_advertising_sync_transfer_received_v2_event(self, event):
+        self.emit(
+            'periodic_advertising_sync_transfer',
+            event.status,
+            event.connection_handle,
+            event.sync_handle,
+            event.advertising_sid,
+            event.advertiser_address,
+            event.advertiser_phy,
+            event.periodic_advertising_interval,
+            event.advertiser_clock_accuracy,
+        )
+
     def on_hci_le_cis_established_event(self, event):
         # The remaining parameters are unused for now.
         if event.status == hci.HCI_SUCCESS:
