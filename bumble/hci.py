@@ -4881,6 +4881,62 @@ class HCI_LE_Periodic_Advertising_Sync_Transfer_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
     fields=[
+        ('connection_handle', 2),
+        ('mode', 1),
+        ('skip', 2),
+        ('sync_timeout', 2),
+        (
+            'cte_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Periodic_Advertising_Report_Event.CteType(
+                    x
+                ).name,
+            },
+        ),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+    ],
+)
+class HCI_LE_Set_Periodic_Advertising_Sync_Transfer_Parameters_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.91 LE Set Periodic Advertising Sync Transfer Parameters command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
+        ('mode', 1),
+        ('skip', 2),
+        ('sync_timeout', 2),
+        (
+            'cte_type',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_Periodic_Advertising_Report_Event.CteType(
+                    x
+                ).name,
+            },
+        ),
+    ],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+    ],
+)
+class HCI_LE_Set_Default_Periodic_Advertising_Sync_Transfer_Parameters_Command(
+    HCI_Command
+):
+    '''
+    See Bluetooth spec @ 7.8.92 LE Set Default Periodic Advertising Sync Transfer Parameters command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
+    fields=[
         ('cig_id', 1),
         ('sdu_interval_c_to_p', 3),
         ('sdu_interval_p_to_c', 3),
@@ -6226,6 +6282,31 @@ class HCI_LE_Channel_Selection_Algorithm_Event(HCI_LE_Meta_Event):
     ]
 )
 class HCI_LE_Periodic_Advertising_Sync_Transfer_Received_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.24 LE Periodic Advertising Sync Transfer Received Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('service_data', 2),
+        ('sync_handle', 2),
+        ('advertising_sid', 1),
+        ('advertiser_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('advertiser_address', Address.parse_address_preceded_by_type),
+        ('advertiser_phy', 1),
+        ('periodic_advertising_interval', 2),
+        ('advertiser_clock_accuracy', 1),
+        ('num_subevents', 1),
+        ('subevent_interval', 1),
+        ('response_slot_delay', 1),
+        ('response_slot_spacing', 1),
+    ]
+)
+class HCI_LE_Periodic_Advertising_Sync_Transfer_Received_V2_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.24 LE Periodic Advertising Sync Transfer Received Event
     '''
