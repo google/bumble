@@ -932,6 +932,10 @@ async def run_transmit(
             )
             lc3_frame_samples = encoder.get_frame_samples()
             lc3_frame_size = encoder.get_frame_bytes(bitrate)
+            print(
+                f'Encoding with {lc3_frame_samples} '
+                f'PCM samples per {lc3_frame_size} byte frame'
+            )
 
             print('Setup BIG')
             big = await device.create_big(
