@@ -42,7 +42,7 @@ from typing import (
 )
 
 from bumble.colors import color
-from bumble.core import BaseBumbleError, UUID
+from bumble.core import BaseBumbleError, InvalidOperationError, UUID
 from bumble.att import Attribute, AttributeValue
 from bumble.utils import ByteSerializable
 
@@ -679,10 +679,14 @@ class DelegatedCharacteristicAdapter(CharacteristicAdapter):
         self.decode = decode
 
     def encode_value(self, value):
-        return self.encode(value) if self.encode else value
+        if self.encode is None:
+            raise InvalidOperationError('delegated adapter does not have an encoder')
+        return self.encode(value)
 
     def decode_value(self, value):
-        return self.decode(value) if self.decode else value
+        if self.decode is None:
+            raise InvalidOperationError('delegate adapter does not have a decoder')
+        return self.decode(value)
 
 
 # -----------------------------------------------------------------------------

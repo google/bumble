@@ -32,7 +32,6 @@ from bumble.profiles.vocs import (
     SetVolumeOffsetOpCode,
     VolumeOffsetControlServiceProxy,
     VolumeOffsetState,
-    VocsAudioLocation,
 )
 from bumble.profiles.vcs import VolumeControlService, VolumeControlServiceProxy
 from bumble.profiles.bap import AudioLocation
@@ -81,9 +80,7 @@ async def test_init_service(vocs_client: VolumeOffsetControlServiceProxy):
         volume_offset=0,
         change_counter=0,
     )
-    assert await vocs_client.audio_location.read_value() == VocsAudioLocation(
-        audio_location=AudioLocation.NOT_ALLOWED
-    )
+    assert await vocs_client.audio_location.read_value() == AudioLocation.NOT_ALLOWED
     description = await vocs_client.audio_output_description.read_value()
     assert description == ''
 
@@ -162,11 +159,9 @@ async def test_set_volume_offset(vocs_client: VolumeOffsetControlServiceProxy):
 
 @pytest.mark.asyncio
 async def test_set_audio_channel_location(vocs_client: VolumeOffsetControlServiceProxy):
-    new_audio_location = VocsAudioLocation(audio_location=AudioLocation.FRONT_LEFT)
+    new_audio_location = AudioLocation.FRONT_LEFT
 
-    await vocs_client.audio_location.write_value(
-        struct.pack('<I', new_audio_location.audio_location)
-    )
+    await vocs_client.audio_location.write_value(new_audio_location)
 
     location = await vocs_client.audio_location.read_value()
     assert location == new_audio_location

@@ -82,9 +82,7 @@ class VolumeOffsetState:
 
     async def notify_subscribers_via_connection(self, connection: Connection) -> None:
         assert self.attribute_value is not None
-        await connection.device.notify_subscribers(
-            attribute=self.attribute_value, value=bytes(self)
-        )
+        await connection.device.notify_subscribers(attribute=self.attribute_value)
 
     def on_read(self, _connection: Optional[Connection]) -> bytes:
         return bytes(self)
@@ -111,9 +109,7 @@ class VocsAudioLocation:
         assert self.attribute_value
 
         self.audio_location = AudioLocation(int.from_bytes(value, 'little'))
-        await connection.device.notify_subscribers(
-            attribute=self.attribute_value, value=value
-        )
+        await connection.device.notify_subscribers(attribute=self.attribute_value)
 
 
 @dataclass
@@ -169,9 +165,7 @@ class AudioOutputDescription:
         assert self.attribute_value
 
         self.audio_output_description = value.decode('utf-8')
-        await connection.device.notify_subscribers(
-            attribute=self.attribute_value, value=value
-        )
+        await connection.device.notify_subscribers(attribute=self.attribute_value)
 
 
 # -----------------------------------------------------------------------------
@@ -203,37 +197,30 @@ class VolumeOffsetControlService(TemplateService):
             VolumeOffsetControlPoint(self.volume_offset_state)
         )
 
-        self.volume_offset_state_characteristic = DelegatedCharacteristicAdapter(
-            Characteristic(
-                uuid=GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC,
-                properties=(
-                    Characteristic.Properties.READ | Characteristic.Properties.NOTIFY
-                ),
-                permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-                value=CharacteristicValue(read=self.volume_offset_state.on_read),
+        self.volume_offset_state_characteristic = Characteristic(
+            uuid=GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC,
+            properties=(
+                Characteristic.Properties.READ | Characteristic.Properties.NOTIFY
             ),
-            encode=lambda value: bytes(value),
+            permissions=Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
+            value=CharacteristicValue(read=self.volume_offset_state.on_read),
         )
 
-        self.audio_location_characteristic = DelegatedCharacteristicAdapter(
-            Characteristic(
-                uuid=GATT_AUDIO_LOCATION_CHARACTERISTIC,
-                properties=(
-                    Characteristic.Properties.READ
-                    | Characteristic.Properties.NOTIFY
-                    | Characteristic.Properties.WRITE_WITHOUT_RESPONSE
-                ),
-                permissions=(
-                    Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
-                    | Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION
-                ),
-                value=CharacteristicValue(
-                    read=self.audio_location.on_read,
-                    write=self.audio_location.on_write,
-                ),
+        self.audio_location_characteristic = Characteristic(
+            uuid=GATT_AUDIO_LOCATION_CHARACTERISTIC,
+            properties=(
+                Characteristic.Properties.READ
+                | Characteristic.Properties.NOTIFY
+                | Characteristic.Properties.WRITE_WITHOUT_RESPONSE
             ),
-            encode=lambda value: bytes(value),
-            decode=VocsAudioLocation.from_bytes,
+            permissions=(
+                Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
+                | Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION
+            ),
+            value=CharacteristicValue(
+                read=self.audio_location.on_read,
+                write=self.audio_location.on_write,
+            ),
         )
         self.audio_location.attribute_value = self.audio_location_characteristic.value
 
@@ -244,25 +231,22 @@ class VolumeOffsetControlService(TemplateService):
             value=CharacteristicValue(write=self.volume_offset_control_point.on_write),
         )
 
-        self.audio_output_description_characteristic = DelegatedCharacteristicAdapter(
-            Characteristic(
-                uuid=GATT_AUDIO_OUTPUT_DESCRIPTION_CHARACTERISTIC,
-                properties=(
-                    Characteristic.Properties.READ
-                    | Characteristic.Properties.NOTIFY
-                    | Characteristic.Properties.WRITE_WITHOUT_RESPONSE
-                ),
-                permissions=(
-                    Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
-                    | Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION
-                ),
-                value=CharacteristicValue(
-                    read=self.audio_output_description.on_read,
-                    write=self.audio_output_description.on_write,
-                ),
-            )
+        self.audio_output_description_characteristic = Characteristic(
+            uuid=GATT_AUDIO_OUTPUT_DESCRIPTION_CHARACTERISTIC,
+            properties=(
+                Characteristic.Properties.READ
+                | Characteristic.Properties.NOTIFY
+                | Characteristic.Properties.WRITE_WITHOUT_RESPONSE
+            ),
+            permissions=(
+                Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
+                | Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION
+            ),
+            value=CharacteristicValue(
+                read=self.audio_output_description.on_read,
+                write=self.audio_output_description.on_write,
+            ),
         )
-
         self.audio_output_description.attribute_value = (
             self.audio_output_description_characteristic.value
         )
@@ -287,18 +271,19 @@ class VolumeOffsetControlServiceProxy(ProfileServiceProxy):
     def __init__(self, service_proxy: ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        self.volume_offset_state = DelegatedCharacteristicAdapter(
+        self.volume_offset_state = SerializableCharacteristicAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC
             ),
-            decode=VolumeOffsetState.from_bytes,
+            VolumeOffsetState,
         )
 
-        self.audio_location = SerializableCharacteristicAdapter(
+        self.audio_location = DelegatedCharacteristicAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_AUDIO_LOCATION_CHARACTERISTIC
             ),
-            VocsAudioLocation,
+            encode=lambda value: bytes([int(value)]),
+            decode=lambda data: AudioLocation(data[0]),
         )
 
         self.volume_offset_control_point = (

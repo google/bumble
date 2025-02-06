@@ -1195,7 +1195,7 @@ def transmit(
     input,
     input_format,
 ):
-    """Transmit a broadcast source."""
+    """Transmit a broadcast source"""
     if manufacturer_data:
         vendor_id_str, data_hex = manufacturer_data.split(':')
         vendor_id = int(vendor_id_str)
