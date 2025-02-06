@@ -746,9 +746,10 @@ async def run_receive(
         lc3_queues: list[Deque[bytes]] = [collections.deque() for i in range(num_bis)]
         packet_stats = [0, 0]
 
-        async with contextlib.aclosing(
-            await audio_io.create_audio_output(output)
-        ) as audio_output:
+        audio_output = await audio_io.create_audio_output(output)
+        # This try should be replaced with contextlib.aclosing() when python 3.9 is no
+        # longer needed.
+        try:
             await audio_output.open(
                 audio_io.PcmFormat(
                     audio_io.PcmFormat.Endianness.LITTLE,
@@ -804,6 +805,8 @@ async def run_receive(
             terminated = asyncio.Event()
             big_sync.on(big_sync.Event.TERMINATION, lambda _: terminated.set())
             await terminated.wait()
+        finally:
+            await audio_output.aclose()
 
 
 async def run_transmit(
@@ -915,50 +918,52 @@ async def run_transmit(
 
         audio_input = await audio_io.create_audio_input(input, input_format)
         pcm_format = await audio_input.open()
-        if pcm_format.channels != 2:
-            print("Only 2 channels PCM configurations are supported")
-            return
-        encoder = lc3.Encoder(
-            frame_duration_us=AURACAST_DEFAULT_FRAME_DURATION,
-            sample_rate_hz=AURACAST_DEFAULT_SAMPLE_RATE,
-            num_channels=pcm_format.channels,
-            input_sample_rate_hz=pcm_format.sample_rate,
-        )
-        lc3_frame_samples = encoder.get_frame_samples()
-        lc3_frame_size = encoder.get_frame_bytes(bitrate)
+        # This try should be replaced with contextlib.aclosing() when python 3.9 is no
+        # longer needed.
+        try:
+            if pcm_format.channels != 2:
+                print("Only 2 channels PCM configurations are supported")
+                return
+            encoder = lc3.Encoder(
+                frame_duration_us=AURACAST_DEFAULT_FRAME_DURATION,
+                sample_rate_hz=AURACAST_DEFAULT_SAMPLE_RATE,
+                num_channels=pcm_format.channels,
+                input_sample_rate_hz=pcm_format.sample_rate,
+            )
+            lc3_frame_samples = encoder.get_frame_samples()
+            lc3_frame_size = encoder.get_frame_bytes(bitrate)
 
-        print('Setup BIG')
-        big = await device.create_big(
-            advertising_set,
-            parameters=bumble.device.BigParameters(
-                num_bis=pcm_format.channels,
-                sdu_interval=AURACAST_DEFAULT_FRAME_DURATION,
-                max_sdu=lc3_frame_size,
-                max_transport_latency=65,
-                rtn=4,
-                broadcast_code=(
-                    bytes.fromhex(broadcast_code) if broadcast_code else None
+            print('Setup BIG')
+            big = await device.create_big(
+                advertising_set,
+                parameters=bumble.device.BigParameters(
+                    num_bis=pcm_format.channels,
+                    sdu_interval=AURACAST_DEFAULT_FRAME_DURATION,
+                    max_sdu=lc3_frame_size,
+                    max_transport_latency=65,
+                    rtn=4,
+                    broadcast_code=(
+                        bytes.fromhex(broadcast_code) if broadcast_code else None
+                    ),
                 ),
-            ),
-        )
-
-        iso_queues = [
-            bumble.device.IsoPacketStream(big.bis_links[0], 2),
-            bumble.device.IsoPacketStream(big.bis_links[1], 2),
-        ]
-
-        def on_flow():
-            data_packet_queue = iso_queues[0].data_packet_queue
-            print(
-                f'\rPACKETS: pending={data_packet_queue.pending}, '
-                f'queued={data_packet_queue.queued}, '
-                f'completed={data_packet_queue.completed}',
-                end='',
             )
 
-        iso_queues[0].data_packet_queue.on('flow', on_flow)
+            iso_queues = [
+                bumble.device.IsoPacketStream(big.bis_links[0], 5),
+                bumble.device.IsoPacketStream(big.bis_links[1], 5),
+            ]
 
-        async with contextlib.aclosing(audio_input):
+            def on_flow():
+                data_packet_queue = iso_queues[0].data_packet_queue
+                print(
+                    f'\rPACKETS: pending={data_packet_queue.pending}, '
+                    f'queued={data_packet_queue.queued}, '
+                    f'completed={data_packet_queue.completed}',
+                    end='',
+                )
+
+            iso_queues[0].data_packet_queue.on('flow', on_flow)
+
             frame_count = 0
             async for pcm_frame in audio_input.frames(lc3_frame_samples):
                 lc3_frame = encoder.encode(
@@ -970,6 +975,8 @@ async def run_transmit(
                 await iso_queues[1].write(lc3_frame[mid:])
 
                 frame_count += 1
+        finally:
+            await audio_input.aclose()
 
 
 def run_async(async_command: Coroutine) -> None:
