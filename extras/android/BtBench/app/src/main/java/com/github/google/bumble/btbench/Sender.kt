@@ -16,10 +16,9 @@ package com.github.google.bumble.btbench
 
 import java.util.concurrent.Semaphore
 import java.util.logging.Logger
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
-
-private const val DEFAULT_STARTUP_DELAY = 3000
 
 private val Log = Logger.getLogger("btbench.sender")
 
@@ -36,8 +35,8 @@ class Sender(private val viewModel: AppViewModel, private val packetIO: PacketIO
     override fun run() {
         viewModel.clear()
 
-        Log.info("startup delay: $DEFAULT_STARTUP_DELAY")
-        Thread.sleep(DEFAULT_STARTUP_DELAY.toLong());
+        Log.info("startup delay: ${viewModel.startupDelay}")
+        Thread.sleep(viewModel.startupDelay.toLong());
         Log.info("running")
 
         Log.info("sending reset")
@@ -47,20 +46,32 @@ class Sender(private val viewModel: AppViewModel, private val packetIO: PacketIO
 
         val packetCount = viewModel.senderPacketCount
         val packetSize = viewModel.senderPacketSize
-        for (i in 0..<packetCount - 1) {
-            packetIO.sendPacket(SequencePacket(0, i, ByteArray(packetSize - 6)))
+        for (i in 0..<packetCount) {
+            var now = TimeSource.Monotonic.markNow()
+            if (viewModel.senderPacketInterval > 0) {
+                val targetTime = startTime + (i * viewModel.senderPacketInterval).milliseconds
+                val delay = targetTime - now
+                if (delay.isPositive()) {
+                    Log.info("sleeping ${delay.inWholeMilliseconds} ms")
+                    Thread.sleep(delay.inWholeMilliseconds)
+                }
+                now = TimeSource.Monotonic.markNow()
+            }
+            val flags = when (i) {
+                packetCount - 1 -> Packet.LAST_FLAG
+                else -> 0
+            }
+            packetIO.sendPacket(
+                SequencePacket(
+                    flags,
+                    i,
+                    (now - startTime).inWholeMicroseconds.toInt(),
+                    ByteArray(packetSize - 10)
+                )
+            )
             bytesSent += packetSize
             viewModel.packetsSent = i + 1
         }
-        packetIO.sendPacket(
-            SequencePacket(
-                Packet.LAST_FLAG,
-                packetCount - 1,
-                ByteArray(packetSize - 6)
-            )
-        )
-        bytesSent += packetSize
-        viewModel.packetsSent = packetCount
 
         // Wait for the ACK
         Log.info("waiting for ACK")

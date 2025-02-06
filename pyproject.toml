@@ -153,7 +153,7 @@ disable = [
 ]
 
 [tool.pylint.main]
-ignore = "pandora" # FIXME: pylint does not support stubs yet:
+ignore=["pandora", "mobly"] # FIXME: pylint does not support stubs yet
 
 [tool.pylint.typecheck]
 signature-mutators = "AsyncRunner.run_in_task"

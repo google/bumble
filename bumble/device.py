@@ -2475,7 +2475,7 @@ class Device(CompositeEventEmitter):
             if self.random_address != hci.Address.ANY_RANDOM:
                 logger.debug(
                     color(
-                        f'LE Random hci.Address: {self.random_address}',
+                        f'LE Random Address: {self.random_address}',
                         'yellow',
                     )
                 )

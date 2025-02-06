@@ -17,9 +17,12 @@ package com.github.google.bumble.btbench
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -66,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.github.google.bumble.btbench.ui.theme.BTBenchTheme
+import java.io.IOException
 import java.util.logging.Logger
 
 private val Log = Logger.getLogger("bumble.main-activity")
@@ -76,6 +80,7 @@ const val SENDER_PACKET_SIZE_PREF_KEY = "sender_packet_size"
 const val SENDER_PACKET_INTERVAL_PREF_KEY = "sender_packet_interval"
 const val SCENARIO_PREF_KEY = "scenario"
 const val MODE_PREF_KEY = "mode"
+const val CONNECTION_PRIORITY_PREF_KEY = "connection_priority"
 
 class MainActivity : ComponentActivity() {
     private val appViewModel = AppViewModel()
@@ -84,6 +89,47 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         appViewModel.loadPreferences(getPreferences(Context.MODE_PRIVATE))
         checkPermissions()
+        registerReceivers()
+    }
+
+    private fun registerReceivers() {
+        val pairingRequestIntentFilter = IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST)
+        registerReceiver(object: BroadcastReceiver() {
+            @SuppressLint("MissingPermission")
+            override fun onReceive(context: Context, intent: Intent) {
+                Log.info("ACTION_PAIRING_REQUEST")
+                val extras = intent.extras
+                if (extras != null) {
+                    for (key in extras.keySet()) {
+                        Log.info("$key: ${extras.get(key)}")
+                    }
+                }
+                val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                if (device != null) {
+                    if (checkSelfPermission(Manifest.permission.BLUETOOTH_PRIVILEGED) == PackageManager.PERMISSION_GRANTED) {
+                        Log.info("confirming pairing")
+                        device.setPairingConfirmation(true)
+                    } else {
+                        Log.info("we don't have BLUETOOTH_PRIVILEGED, not confirming")
+                    }
+                }
+
+            }
+        }, pairingRequestIntentFilter)
+
+        val bondStateChangedIntentFilter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        registerReceiver(object: BroadcastReceiver() {
+            @SuppressLint("MissingPermission")
+            override fun onReceive(context: Context, intent: Intent) {
+                Log.info("ACTION_BOND_STATE_CHANGED")
+                val extras = intent.extras
+                if (extras != null) {
+                    for (key in extras.keySet()) {
+                        Log.info("$key: ${extras.get(key)}")
+                    }
+                }
+            }
+        }, bondStateChangedIntentFilter)
     }
 
     private fun checkPermissions() {
@@ -144,9 +190,7 @@ class MainActivity : ComponentActivity() {
         initBluetooth()
         setContent {
             MainView(
-                appViewModel,
-                ::becomeDiscoverable,
-                ::runScenario
+                appViewModel, ::becomeDiscoverable, ::runScenario
             )
         }
 
@@ -182,6 +226,8 @@ class MainActivity : ComponentActivity() {
                 "rfcomm-server" -> appViewModel.mode = RFCOMM_SERVER_MODE
                 "l2cap-client" -> appViewModel.mode = L2CAP_CLIENT_MODE
                 "l2cap-server" -> appViewModel.mode = L2CAP_SERVER_MODE
+                "gatt-client" -> appViewModel.mode = GATT_CLIENT_MODE
+                "gatt-server" -> appViewModel.mode = GATT_SERVER_MODE
             }
         }
         intent.getStringExtra("autostart")?.let {
@@ -195,19 +241,24 @@ class MainActivity : ComponentActivity() {
 
     private fun runScenario() {
         if (bluetoothAdapter == null) {
-            return
+            throw IOException("bluetooth not enabled")
         }
 
         val runner = when (appViewModel.mode) {
             RFCOMM_CLIENT_MODE -> RfcommClient(appViewModel, bluetoothAdapter!!, ::createIoClient)
             RFCOMM_SERVER_MODE -> RfcommServer(appViewModel, bluetoothAdapter!!, ::createIoClient)
             L2CAP_CLIENT_MODE -> L2capClient(
-                appViewModel,
-                bluetoothAdapter!!,
-                baseContext,
-                ::createIoClient
+                appViewModel, bluetoothAdapter!!, baseContext, ::createIoClient
             )
+
             L2CAP_SERVER_MODE -> L2capServer(appViewModel, bluetoothAdapter!!, ::createIoClient)
+            GATT_CLIENT_MODE -> GattClient(
+                appViewModel, bluetoothAdapter!!, baseContext, ::createIoClient
+            )
+            GATT_SERVER_MODE -> GattServer(
+                appViewModel, bluetoothAdapter!!, baseContext, ::createIoClient
+            )
+
             else -> throw IllegalStateException()
         }
         runner.run()
@@ -281,7 +332,7 @@ fun MainView(
                         keyboardController?.hide()
                         focusManager.clearFocus()
                     }),
-                    enabled = (appViewModel.mode == RFCOMM_CLIENT_MODE) or (appViewModel.mode == L2CAP_CLIENT_MODE)
+                    enabled = (appViewModel.mode == RFCOMM_CLIENT_MODE || appViewModel.mode == L2CAP_CLIENT_MODE || appViewModel.mode == GATT_CLIENT_MODE)
                 )
                 Divider()
                 TextField(
@@ -349,24 +400,45 @@ fun MainView(
                         keyboardController?.hide()
                         focusManager.clearFocus()
                     }),
-                    enabled = (appViewModel.scenario == PING_SCENARIO)
+                    enabled = (appViewModel.scenario == PING_SCENARIO || appViewModel.scenario == SEND_SCENARIO)
                 )
                 Divider()
-                ActionButton(
-                    text = "Become Discoverable", onClick = becomeDiscoverable, true
-                )
                 Row(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(text = "2M PHY")
                     Spacer(modifier = Modifier.padding(start = 8.dp))
-                    Switch(
-                        enabled = (appViewModel.mode == L2CAP_CLIENT_MODE || appViewModel.mode == L2CAP_SERVER_MODE),
+                    Switch(enabled = (appViewModel.mode == L2CAP_CLIENT_MODE || appViewModel.mode == L2CAP_SERVER_MODE || appViewModel.mode == GATT_CLIENT_MODE || appViewModel.mode == GATT_SERVER_MODE),
                         checked = appViewModel.use2mPhy,
-                        onCheckedChange = { appViewModel.use2mPhy = it }
-                    )
-
+                        onCheckedChange = { appViewModel.use2mPhy = it })
+                    Column(Modifier.selectableGroup()) {
+                        listOf(
+                            "BALANCED", "LOW", "HIGH", "DCK"
+                        ).forEach { text ->
+                            Row(
+                                Modifier
+                                    .selectable(
+                                        selected = (text == appViewModel.connectionPriority),
+                                        onClick = { appViewModel.updateConnectionPriority(text) },
+                                        role = Role.RadioButton,
+                                    )
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = (text == appViewModel.connectionPriority),
+                                    onClick = null,
+                                    enabled = (appViewModel.mode == L2CAP_CLIENT_MODE || appViewModel.mode == L2CAP_SERVER_MODE || appViewModel.mode == GATT_CLIENT_MODE || appViewModel.mode == GATT_SERVER_MODE)
+                                )
+                                Text(
+                                    text = text,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.padding(start = 16.dp)
+                                )
+                            }
+                        }
+                    }
                 }
                 Row {
                     Column(Modifier.selectableGroup()) {
@@ -374,7 +446,9 @@ fun MainView(
                             RFCOMM_CLIENT_MODE,
                             RFCOMM_SERVER_MODE,
                             L2CAP_CLIENT_MODE,
-                            L2CAP_SERVER_MODE
+                            L2CAP_SERVER_MODE,
+                            GATT_CLIENT_MODE,
+                            GATT_SERVER_MODE
                         ).forEach { text ->
                             Row(
                                 Modifier
@@ -387,8 +461,7 @@ fun MainView(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 RadioButton(
-                                    selected = (text == appViewModel.mode),
-                                    onClick = null
+                                    selected = (text == appViewModel.mode), onClick = null
                                 )
                                 Text(
                                     text = text,
@@ -400,10 +473,7 @@ fun MainView(
                     }
                     Column(Modifier.selectableGroup()) {
                         listOf(
-                            SEND_SCENARIO,
-                            RECEIVE_SCENARIO,
-                            PING_SCENARIO,
-                            PONG_SCENARIO
+                            SEND_SCENARIO, RECEIVE_SCENARIO, PING_SCENARIO, PONG_SCENARIO
                         ).forEach { text ->
                             Row(
                                 Modifier
@@ -416,8 +486,7 @@ fun MainView(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 RadioButton(
-                                    selected = (text == appViewModel.scenario),
-                                    onClick = null
+                                    selected = (text == appViewModel.scenario), onClick = null
                                 )
                                 Text(
                                     text = text,
@@ -435,20 +504,29 @@ fun MainView(
                     ActionButton(
                         text = "Stop", onClick = appViewModel::abort, enabled = appViewModel.running
                     )
+                    ActionButton(
+                        text = "Become Discoverable", onClick = becomeDiscoverable, true
+                    )
                 }
                 Divider()
-                Text(
-                    text = if (appViewModel.mtu != 0) "MTU: ${appViewModel.mtu}" else ""
-                )
-                Text(
-                    text = if (appViewModel.rxPhy != 0 || appViewModel.txPhy != 0) "PHY: tx=${appViewModel.txPhy}, rx=${appViewModel.rxPhy}" else ""
-                )
+                if (appViewModel.mtu != 0) {
+                    Text(
+                        text = "MTU: ${appViewModel.mtu}"
+                    )
+                }
+                if (appViewModel.rxPhy != 0) {
+                    Text(
+                        text = "PHY: tx=${appViewModel.txPhy}, rx=${appViewModel.rxPhy}"
+                    )
+                }
                 Text(
                     text = "Status: ${appViewModel.status}"
                 )
-                Text(
-                    text = "Last Error: ${appViewModel.lastError}"
-                )
+                if (appViewModel.lastError.isNotEmpty()) {
+                    Text(
+                        text = "Last Error: ${appViewModel.lastError}"
+                    )
+                }
                 Text(
                     text = "Packets Sent: ${appViewModel.packetsSent}"
                 )
