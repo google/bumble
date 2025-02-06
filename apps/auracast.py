@@ -960,24 +960,12 @@ async def run_transmit(
 
         async with contextlib.aclosing(audio_input):
             frame_count = 0
-            # start_time = time.time()
             async for pcm_frame in audio_input.frames(lc3_frame_samples):
-                # now = time.time()
-                # if (
-                #     target_time := (
-                #         start_time
-                #         + frame_count * AURACAST_DEFAULT_FRAME_DURATION / 1_000_000
-                #     )
-                # ) >= now:
-                #     await asyncio.sleep(target_time - now)
-
                 lc3_frame = encoder.encode(
                     pcm_frame, num_bytes=2 * lc3_frame_size, bit_depth=16
                 )
 
                 mid = len(lc3_frame) // 2
-                # big.bis_links[0].write(lc3_frame[:mid])
-                # big.bis_links[1].write(lc3_frame[mid:])
                 await iso_queues[0].write(lc3_frame[:mid])
                 await iso_queues[1].write(lc3_frame[mid:])
 
