@@ -193,6 +193,10 @@ module = "serial_asyncio.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "sounddevice.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = "usb.*"
 ignore_missing_imports = true
 

@@ -210,7 +210,7 @@ class SoundDeviceAudioOutput(ThreadedAudioOutput):
         self._stream: sounddevice.RawOutputStream | None = None
 
     async def open(self, pcm_format: PcmFormat) -> None:
-        import sounddevice
+        import sounddevice  # pylint: disable=import-error
 
         self._stream = sounddevice.RawOutputStream(
             samplerate=pcm_format.sample_rate,
@@ -298,7 +298,7 @@ class SubprocessAudioOutput(AudioOutput):
 def check_audio_input(input: str) -> bool:
     if input == 'device' or input.startswith('device:'):
         try:
-            import sounddevice
+            import sounddevice  # pylint: disable=import-error
         except ImportError as exc:
             raise ValueError(
                 'audio input not available (sounddevice python module not installed)'
@@ -511,7 +511,7 @@ class SoundDeviceAudioInput(ThreadedAudioInput):
         self._stream: sounddevice.RawInputStream | None = None
 
     def _open(self) -> PcmFormat:
-        import sounddevice
+        import sounddevice  # pylint: disable=import-error
 
         self._stream = sounddevice.RawInputStream(
             samplerate=self._pcm_format.sample_rate,
