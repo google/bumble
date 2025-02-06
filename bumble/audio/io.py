@@ -88,7 +88,9 @@ def check_audio_output(output: str) -> bool:
             ) from exc
         except OSError as exc:
             raise ValueError(
-                'audio output not available (sounddevice python module failed to load)'
+                'audio output not available '
+                '(sounddevice python module failed to load: '
+                f'{exc})'
             ) from exc
 
         if output == 'device':
@@ -303,7 +305,9 @@ def check_audio_input(input: str) -> bool:
             ) from exc
         except OSError as exc:
             raise ValueError(
-                'audio input not available (sounddevice python module failed to load)'
+                'audio input not available '
+                '(sounddevice python module failed to load: '
+                f'{exc})'
             ) from exc
 
         if input == 'device':

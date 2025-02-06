@@ -675,7 +675,7 @@ async def run_receive(
     try:
         if not audio_io.check_audio_output(output):
             return
-    except (ValueError, ImportError, OSError) as error:
+    except ValueError as error:
         print(error)
         return
 
@@ -820,7 +820,7 @@ async def run_transmit(
     try:
         if not audio_io.check_audio_input(input):
             return
-    except (ValueError, ImportError, OSError) as error:
+    except ValueError as error:
         print(error)
         return
 
