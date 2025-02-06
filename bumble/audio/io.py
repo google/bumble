@@ -82,10 +82,13 @@ def check_audio_output(output: str) -> bool:
     if output == 'device' or output.startswith('device:'):
         try:
             import sounddevice
-        except (ImportError, OSError) as exc:
+        except ImportError as exc:
             raise ValueError(
-                'audio output not available '
-                '(sounddevice python module not installed or failed to load)'
+                'audio output not available (sounddevice python module not installed)'
+            ) from exc
+        except OSError as exc:
+            raise ValueError(
+                'audio output not available (sounddevice python module failed to load)'
             ) from exc
 
         if output == 'device':
@@ -294,10 +297,13 @@ def check_audio_input(input: str) -> bool:
     if input == 'device' or input.startswith('device:'):
         try:
             import sounddevice
-        except (ImportError, OSError) as exc:
+        except ImportError as exc:
             raise ValueError(
-                'audio input not available '
-                '(sounddevice python module not installed or failed to load)'
+                'audio input not available (sounddevice python module not installed)'
+            ) from exc
+        except OSError as exc:
+            raise ValueError(
+                'audio input not available (sounddevice python module failed to load)'
             ) from exc
 
         if input == 'device':
