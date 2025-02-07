@@ -4005,13 +4005,12 @@ class Device(CompositeEventEmitter):
         # Create a future to wait for an address to be found
         peer_address = asyncio.get_running_loop().create_future()
 
-        def on_peer_found(address, ad_data):
-            local_name = ad_data.get(AdvertisingData.COMPLETE_LOCAL_NAME, raw=True)
-            if local_name is None:
-                local_name = ad_data.get(AdvertisingData.SHORTENED_LOCAL_NAME, raw=True)
-            if local_name is not None:
-                if local_name.decode('utf-8') == name:
-                    peer_address.set_result(address)
+        def on_peer_found(address: hci.Address, ad_data: AdvertisingData) -> None:
+            local_name = ad_data.get(
+                AdvertisingData.Type.COMPLETE_LOCAL_NAME
+            ) or ad_data.get(AdvertisingData.Type.SHORTENED_LOCAL_NAME)
+            if local_name == name:
+                peer_address.set_result(address)
 
         listener = None
         was_scanning = self.scanning

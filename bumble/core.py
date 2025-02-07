@@ -1,4 +1,4 @@
-# Copyright 2021-2022 Google LLC
+# Copyright 2021-2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-import dataclasses
+
 import enum
 import struct
-from typing import List, Optional, Tuple, Union, cast, Dict
+from typing import cast, overload, Literal, Union, Optional
 from typing_extensions import Self
 
 from bumble.company_ids import COMPANY_IDENTIFIERS
@@ -57,7 +57,7 @@ def bit_flags_to_strings(bits, bit_flag_names):
     return names
 
 
-def name_or_number(dictionary: Dict[int, str], number: int, width: int = 2) -> str:
+def name_or_number(dictionary: dict[int, str], number: int, width: int = 2) -> str:
     name = dictionary.get(number)
     if name is not None:
         return name
@@ -200,7 +200,7 @@ class UUID:
     '''
 
     BASE_UUID = bytes.fromhex('00001000800000805F9B34FB')[::-1]  # little-endian
-    UUIDS: List[UUID] = []  # Registry of all instances created
+    UUIDS: list[UUID] = []  # Registry of all instances created
 
     uuid_bytes: bytes
     name: Optional[str]
@@ -259,11 +259,11 @@ class UUID:
         return cls.from_bytes(struct.pack('<I', uuid_32), name)
 
     @classmethod
-    def parse_uuid(cls, uuid_as_bytes: bytes, offset: int) -> Tuple[int, UUID]:
+    def parse_uuid(cls, uuid_as_bytes: bytes, offset: int) -> tuple[int, UUID]:
         return len(uuid_as_bytes), cls.from_bytes(uuid_as_bytes[offset:])
 
     @classmethod
-    def parse_uuid_2(cls, uuid_as_bytes: bytes, offset: int) -> Tuple[int, UUID]:
+    def parse_uuid_2(cls, uuid_as_bytes: bytes, offset: int) -> tuple[int, UUID]:
         return offset + 2, cls.from_bytes(uuid_as_bytes[offset : offset + 2])
 
     def to_bytes(self, force_128: bool = False) -> bytes:
@@ -1280,13 +1280,13 @@ class Appearance:
 # Advertising Data
 # -----------------------------------------------------------------------------
 AdvertisingDataObject = Union[
-    List[UUID],
-    Tuple[UUID, bytes],
+    list[UUID],
+    tuple[UUID, bytes],
     bytes,
     str,
     int,
-    Tuple[int, int],
-    Tuple[int, bytes],
+    tuple[int, int],
+    tuple[int, bytes],
     Appearance,
 ]
 
@@ -1295,116 +1295,116 @@ class AdvertisingData:
     # fmt: off
     # pylint: disable=line-too-long
 
-    FLAGS                                            = 0x01
-    INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS    = 0x02
-    COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS      = 0x03
-    INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS    = 0x04
-    COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS      = 0x05
-    INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS   = 0x06
-    COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS     = 0x07
-    SHORTENED_LOCAL_NAME                             = 0x08
-    COMPLETE_LOCAL_NAME                              = 0x09
-    TX_POWER_LEVEL                                   = 0x0A
-    CLASS_OF_DEVICE                                  = 0x0D
-    SIMPLE_PAIRING_HASH_C                            = 0x0E
-    SIMPLE_PAIRING_HASH_C_192                        = 0x0E
-    SIMPLE_PAIRING_RANDOMIZER_R                      = 0x0F
-    SIMPLE_PAIRING_RANDOMIZER_R_192                  = 0x0F
-    DEVICE_ID                                        = 0x10
-    SECURITY_MANAGER_TK_VALUE                        = 0x10
-    SECURITY_MANAGER_OUT_OF_BAND_FLAGS               = 0x11
-    PERIPHERAL_CONNECTION_INTERVAL_RANGE             = 0x12
-    LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS        = 0x14
-    LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS       = 0x15
-    SERVICE_DATA                                     = 0x16
-    SERVICE_DATA_16_BIT_UUID                         = 0x16
-    PUBLIC_TARGET_ADDRESS                            = 0x17
-    RANDOM_TARGET_ADDRESS                            = 0x18
-    APPEARANCE                                       = 0x19
-    ADVERTISING_INTERVAL                             = 0x1A
-    LE_BLUETOOTH_DEVICE_ADDRESS                      = 0x1B
-    LE_ROLE                                          = 0x1C
-    SIMPLE_PAIRING_HASH_C_256                        = 0x1D
-    SIMPLE_PAIRING_RANDOMIZER_R_256                  = 0x1E
-    LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS        = 0x1F
-    SERVICE_DATA_32_BIT_UUID                         = 0x20
-    SERVICE_DATA_128_BIT_UUID                        = 0x21
-    LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE         = 0x22
-    LE_SECURE_CONNECTIONS_RANDOM_VALUE               = 0x23
-    URI                                              = 0x24
-    INDOOR_POSITIONING                               = 0x25
-    TRANSPORT_DISCOVERY_DATA                         = 0x26
-    LE_SUPPORTED_FEATURES                            = 0x27
-    CHANNEL_MAP_UPDATE_INDICATION                    = 0x28
-    PB_ADV                                           = 0x29
-    MESH_MESSAGE                                     = 0x2A
-    MESH_BEACON                                      = 0x2B
-    BIGINFO                                          = 0x2C
-    BROADCAST_CODE                                   = 0x2D
-    RESOLVABLE_SET_IDENTIFIER                        = 0x2E
-    ADVERTISING_INTERVAL_LONG                        = 0x2F
-    BROADCAST_NAME                                   = 0x30
-    ENCRYPTED_ADVERTISING_DATA                       = 0X31
-    PERIODIC_ADVERTISING_RESPONSE_TIMING_INFORMATION = 0X32
-    ELECTRONIC_SHELF_LABEL                           = 0X34
-    THREE_D_INFORMATION_DATA                         = 0x3D
-    MANUFACTURER_SPECIFIC_DATA                       = 0xFF
+    class Type(OpenIntEnum):
+        FLAGS                                               = 0x01
+        INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS       = 0x02
+        COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS         = 0x03
+        INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS       = 0x04
+        COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS         = 0x05
+        INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS      = 0x06
+        COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS        = 0x07
+        SHORTENED_LOCAL_NAME                                = 0x08
+        COMPLETE_LOCAL_NAME                                 = 0x09
+        TX_POWER_LEVEL                                      = 0x0A
+        CLASS_OF_DEVICE                                     = 0x0D
+        SIMPLE_PAIRING_HASH_C                               = 0x0E
+        SIMPLE_PAIRING_HASH_C_192                           = 0x0E
+        SIMPLE_PAIRING_RANDOMIZER_R                         = 0x0F
+        SIMPLE_PAIRING_RANDOMIZER_R_192                     = 0x0F
+        DEVICE_ID                                           = 0x10
+        SECURITY_MANAGER_TK_VALUE                           = 0x10
+        SECURITY_MANAGER_OUT_OF_BAND_FLAGS                  = 0x11
+        PERIPHERAL_CONNECTION_INTERVAL_RANGE                = 0x12
+        LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS           = 0x14
+        LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS          = 0x15
+        SERVICE_DATA_16_BIT_UUID                            = 0x16
+        PUBLIC_TARGET_ADDRESS                               = 0x17
+        RANDOM_TARGET_ADDRESS                               = 0x18
+        APPEARANCE                                          = 0x19
+        ADVERTISING_INTERVAL                                = 0x1A
+        LE_BLUETOOTH_DEVICE_ADDRESS                         = 0x1B
+        LE_ROLE                                             = 0x1C
+        SIMPLE_PAIRING_HASH_C_256                           = 0x1D
+        SIMPLE_PAIRING_RANDOMIZER_R_256                     = 0x1E
+        LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS           = 0x1F
+        SERVICE_DATA_32_BIT_UUID                            = 0x20
+        SERVICE_DATA_128_BIT_UUID                           = 0x21
+        LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE            = 0x22
+        LE_SECURE_CONNECTIONS_RANDOM_VALUE                  = 0x23
+        URI                                                 = 0x24
+        INDOOR_POSITIONING                                  = 0x25
+        TRANSPORT_DISCOVERY_DATA                            = 0x26
+        LE_SUPPORTED_FEATURES                               = 0x27
+        CHANNEL_MAP_UPDATE_INDICATION                       = 0x28
+        PB_ADV                                              = 0x29
+        MESH_MESSAGE                                        = 0x2A
+        MESH_BEACON                                         = 0x2B
+        BIGINFO                                             = 0x2C
+        BROADCAST_CODE                                      = 0x2D
+        RESOLVABLE_SET_IDENTIFIER                           = 0x2E
+        ADVERTISING_INTERVAL_LONG                           = 0x2F
+        BROADCAST_NAME                                      = 0x30
+        ENCRYPTED_ADVERTISING_DATA                          = 0x31
+        PERIODIC_ADVERTISING_RESPONSE_TIMING_INFORMATION    = 0x32
+        ELECTRONIC_SHELF_LABEL                              = 0x34
+        THREE_D_INFORMATION_DATA                            = 0x3D
+        MANUFACTURER_SPECIFIC_DATA                          = 0xFF
 
-    AD_TYPE_NAMES = {
-        FLAGS:                                            'FLAGS',
-        INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:    'INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS',
-        COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:      'COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS',
-        INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:    'INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS',
-        COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:      'COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS',
-        INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS:   'INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS',
-        COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS:     'COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS',
-        SHORTENED_LOCAL_NAME:                             'SHORTENED_LOCAL_NAME',
-        COMPLETE_LOCAL_NAME:                              'COMPLETE_LOCAL_NAME',
-        TX_POWER_LEVEL:                                   'TX_POWER_LEVEL',
-        CLASS_OF_DEVICE:                                  'CLASS_OF_DEVICE',
-        SIMPLE_PAIRING_HASH_C:                            'SIMPLE_PAIRING_HASH_C',
-        SIMPLE_PAIRING_HASH_C_192:                        'SIMPLE_PAIRING_HASH_C_192',
-        SIMPLE_PAIRING_RANDOMIZER_R:                      'SIMPLE_PAIRING_RANDOMIZER_R',
-        SIMPLE_PAIRING_RANDOMIZER_R_192:                  'SIMPLE_PAIRING_RANDOMIZER_R_192',
-        DEVICE_ID:                                        'DEVICE_ID',
-        SECURITY_MANAGER_TK_VALUE:                        'SECURITY_MANAGER_TK_VALUE',
-        SECURITY_MANAGER_OUT_OF_BAND_FLAGS:               'SECURITY_MANAGER_OUT_OF_BAND_FLAGS',
-        PERIPHERAL_CONNECTION_INTERVAL_RANGE:             'PERIPHERAL_CONNECTION_INTERVAL_RANGE',
-        LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS:        'LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS',
-        LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS:       'LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS',
-        SERVICE_DATA_16_BIT_UUID:                         'SERVICE_DATA_16_BIT_UUID',
-        PUBLIC_TARGET_ADDRESS:                            'PUBLIC_TARGET_ADDRESS',
-        RANDOM_TARGET_ADDRESS:                            'RANDOM_TARGET_ADDRESS',
-        APPEARANCE:                                       'APPEARANCE',
-        ADVERTISING_INTERVAL:                             'ADVERTISING_INTERVAL',
-        LE_BLUETOOTH_DEVICE_ADDRESS:                      'LE_BLUETOOTH_DEVICE_ADDRESS',
-        LE_ROLE:                                          'LE_ROLE',
-        SIMPLE_PAIRING_HASH_C_256:                        'SIMPLE_PAIRING_HASH_C_256',
-        SIMPLE_PAIRING_RANDOMIZER_R_256:                  'SIMPLE_PAIRING_RANDOMIZER_R_256',
-        LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS:        'LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS',
-        SERVICE_DATA_32_BIT_UUID:                         'SERVICE_DATA_32_BIT_UUID',
-        SERVICE_DATA_128_BIT_UUID:                        'SERVICE_DATA_128_BIT_UUID',
-        LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE:         'LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE',
-        LE_SECURE_CONNECTIONS_RANDOM_VALUE:               'LE_SECURE_CONNECTIONS_RANDOM_VALUE',
-        URI:                                              'URI',
-        INDOOR_POSITIONING:                               'INDOOR_POSITIONING',
-        TRANSPORT_DISCOVERY_DATA:                         'TRANSPORT_DISCOVERY_DATA',
-        LE_SUPPORTED_FEATURES:                            'LE_SUPPORTED_FEATURES',
-        CHANNEL_MAP_UPDATE_INDICATION:                    'CHANNEL_MAP_UPDATE_INDICATION',
-        PB_ADV:                                           'PB_ADV',
-        MESH_MESSAGE:                                     'MESH_MESSAGE',
-        MESH_BEACON:                                      'MESH_BEACON',
-        BIGINFO:                                          'BIGINFO',
-        BROADCAST_CODE:                                   'BROADCAST_CODE',
-        RESOLVABLE_SET_IDENTIFIER:                        'RESOLVABLE_SET_IDENTIFIER',
-        ADVERTISING_INTERVAL_LONG:                        'ADVERTISING_INTERVAL_LONG',
-        BROADCAST_NAME:                                   'BROADCAST_NAME',
-        ENCRYPTED_ADVERTISING_DATA:                       'ENCRYPTED_ADVERTISING_DATA',
-        PERIODIC_ADVERTISING_RESPONSE_TIMING_INFORMATION: 'PERIODIC_ADVERTISING_RESPONSE_TIMING_INFORMATION',
-        ELECTRONIC_SHELF_LABEL:                           'ELECTRONIC_SHELF_LABEL',
-        THREE_D_INFORMATION_DATA:                         'THREE_D_INFORMATION_DATA',
-        MANUFACTURER_SPECIFIC_DATA:                       'MANUFACTURER_SPECIFIC_DATA'
-    }
+    # For backward-compatibility
+    FLAGS                                            = Type.FLAGS
+    INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS    = Type.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS
+    COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS      = Type.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS
+    INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS    = Type.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS
+    COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS      = Type.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS
+    INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS   = Type.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS
+    COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS     = Type.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS
+    SHORTENED_LOCAL_NAME                             = Type.SHORTENED_LOCAL_NAME
+    COMPLETE_LOCAL_NAME                              = Type.COMPLETE_LOCAL_NAME
+    TX_POWER_LEVEL                                   = Type.TX_POWER_LEVEL
+    CLASS_OF_DEVICE                                  = Type.CLASS_OF_DEVICE
+    SIMPLE_PAIRING_HASH_C                            = Type.SIMPLE_PAIRING_HASH_C
+    SIMPLE_PAIRING_HASH_C_192                        = Type.SIMPLE_PAIRING_HASH_C_192
+    SIMPLE_PAIRING_RANDOMIZER_R                      = Type.SIMPLE_PAIRING_RANDOMIZER_R
+    SIMPLE_PAIRING_RANDOMIZER_R_192                  = Type.SIMPLE_PAIRING_RANDOMIZER_R_192
+    DEVICE_ID                                        = Type.DEVICE_ID
+    SECURITY_MANAGER_TK_VALUE                        = Type.SECURITY_MANAGER_TK_VALUE
+    SECURITY_MANAGER_OUT_OF_BAND_FLAGS               = Type.SECURITY_MANAGER_OUT_OF_BAND_FLAGS
+    PERIPHERAL_CONNECTION_INTERVAL_RANGE             = Type.PERIPHERAL_CONNECTION_INTERVAL_RANGE
+    LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS        = Type.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS
+    LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS       = Type.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS
+    SERVICE_DATA                                     = Type.SERVICE_DATA_16_BIT_UUID
+    SERVICE_DATA_16_BIT_UUID                         = Type.SERVICE_DATA_16_BIT_UUID
+    PUBLIC_TARGET_ADDRESS                            = Type.PUBLIC_TARGET_ADDRESS
+    RANDOM_TARGET_ADDRESS                            = Type.RANDOM_TARGET_ADDRESS
+    APPEARANCE                                       = Type.APPEARANCE
+    ADVERTISING_INTERVAL                             = Type.ADVERTISING_INTERVAL
+    LE_BLUETOOTH_DEVICE_ADDRESS                      = Type.LE_BLUETOOTH_DEVICE_ADDRESS
+    LE_ROLE                                          = Type.LE_ROLE
+    SIMPLE_PAIRING_HASH_C_256                        = Type.SIMPLE_PAIRING_HASH_C_256
+    SIMPLE_PAIRING_RANDOMIZER_R_256                  = Type.SIMPLE_PAIRING_RANDOMIZER_R_256
+    LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS        = Type.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS
+    SERVICE_DATA_32_BIT_UUID                         = Type.SERVICE_DATA_32_BIT_UUID
+    SERVICE_DATA_128_BIT_UUID                        = Type.SERVICE_DATA_128_BIT_UUID
+    LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE         = Type.LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE
+    LE_SECURE_CONNECTIONS_RANDOM_VALUE               = Type.LE_SECURE_CONNECTIONS_RANDOM_VALUE
+    URI                                              = Type.URI
+    INDOOR_POSITIONING                               = Type.INDOOR_POSITIONING
+    TRANSPORT_DISCOVERY_DATA                         = Type.TRANSPORT_DISCOVERY_DATA
+    LE_SUPPORTED_FEATURES                            = Type.LE_SUPPORTED_FEATURES
+    CHANNEL_MAP_UPDATE_INDICATION                    = Type.CHANNEL_MAP_UPDATE_INDICATION
+    PB_ADV                                           = Type.PB_ADV
+    MESH_MESSAGE                                     = Type.MESH_MESSAGE
+    MESH_BEACON                                      = Type.MESH_BEACON
+    BIGINFO                                          = Type.BIGINFO
+    BROADCAST_CODE                                   = Type.BROADCAST_CODE
+    RESOLVABLE_SET_IDENTIFIER                        = Type.RESOLVABLE_SET_IDENTIFIER
+    ADVERTISING_INTERVAL_LONG                        = Type.ADVERTISING_INTERVAL_LONG
+    BROADCAST_NAME                                   = Type.BROADCAST_NAME
+    ENCRYPTED_ADVERTISING_DATA                       = Type.ENCRYPTED_ADVERTISING_DATA
+    PERIODIC_ADVERTISING_RESPONSE_TIMING_INFORMATION = Type.PERIODIC_ADVERTISING_RESPONSE_TIMING_INFORMATION
+    ELECTRONIC_SHELF_LABEL                           = Type.ELECTRONIC_SHELF_LABEL
+    THREE_D_INFORMATION_DATA                         = Type.THREE_D_INFORMATION_DATA
+    MANUFACTURER_SPECIFIC_DATA                       = Type.MANUFACTURER_SPECIFIC_DATA
 
     LE_LIMITED_DISCOVERABLE_MODE_FLAG = 0x01
     LE_GENERAL_DISCOVERABLE_MODE_FLAG = 0x02
@@ -1412,12 +1412,12 @@ class AdvertisingData:
     BR_EDR_CONTROLLER_FLAG            = 0x08
     BR_EDR_HOST_FLAG                  = 0x10
 
-    ad_structures: List[Tuple[int, bytes]]
+    ad_structures: list[tuple[int, bytes]]
 
     # fmt: on
     # pylint: enable=line-too-long
 
-    def __init__(self, ad_structures: Optional[List[Tuple[int, bytes]]] = None) -> None:
+    def __init__(self, ad_structures: Optional[list[tuple[int, bytes]]] = None) -> None:
         if ad_structures is None:
             ad_structures = []
         self.ad_structures = ad_structures[:]
@@ -1444,7 +1444,7 @@ class AdvertisingData:
         return ','.join(bit_flags_to_strings(flags, flag_names))
 
     @staticmethod
-    def uuid_list_to_objects(ad_data: bytes, uuid_size: int) -> List[UUID]:
+    def uuid_list_to_objects(ad_data: bytes, uuid_size: int) -> list[UUID]:
         uuids = []
         offset = 0
         while (offset + uuid_size) <= len(ad_data):
@@ -1461,8 +1461,8 @@ class AdvertisingData:
             ]
         )
 
-    @staticmethod
-    def ad_data_to_string(ad_type, ad_data):
+    @classmethod
+    def ad_data_to_string(cls, ad_type: int, ad_data: bytes) -> str:
         if ad_type == AdvertisingData.FLAGS:
             ad_type_str = 'Flags'
             ad_data_str = AdvertisingData.flags_to_string(ad_data[0], short=True)
@@ -1521,71 +1521,71 @@ class AdvertisingData:
             ad_type_str = 'Broadcast Name'
             ad_data_str = ad_data.decode('utf-8')
         else:
-            ad_type_str = AdvertisingData.AD_TYPE_NAMES.get(ad_type, f'0x{ad_type:02X}')
+            ad_type_str = AdvertisingData.Type(ad_type).name
             ad_data_str = ad_data.hex()
 
         return f'[{ad_type_str}]: {ad_data_str}'
 
     # pylint: disable=too-many-return-statements
-    @staticmethod
-    def ad_data_to_object(ad_type: int, ad_data: bytes) -> AdvertisingDataObject:
+    @classmethod
+    def ad_data_to_object(cls, ad_type: int, ad_data: bytes) -> AdvertisingDataObject:
         if ad_type in (
-            AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-            AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-            AdvertisingData.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS,
+            AdvertisingData.Type.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS,
         ):
             return AdvertisingData.uuid_list_to_objects(ad_data, 2)
 
         if ad_type in (
-            AdvertisingData.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
-            AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
-            AdvertisingData.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS,
+            AdvertisingData.Type.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS,
         ):
             return AdvertisingData.uuid_list_to_objects(ad_data, 4)
 
         if ad_type in (
-            AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
-            AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
-            AdvertisingData.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS,
+            AdvertisingData.Type.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS,
         ):
             return AdvertisingData.uuid_list_to_objects(ad_data, 16)
 
-        if ad_type == AdvertisingData.SERVICE_DATA_16_BIT_UUID:
+        if ad_type == AdvertisingData.Type.SERVICE_DATA_16_BIT_UUID:
             return (UUID.from_bytes(ad_data[:2]), ad_data[2:])
 
-        if ad_type == AdvertisingData.SERVICE_DATA_32_BIT_UUID:
+        if ad_type == AdvertisingData.Type.SERVICE_DATA_32_BIT_UUID:
             return (UUID.from_bytes(ad_data[:4]), ad_data[4:])
 
-        if ad_type == AdvertisingData.SERVICE_DATA_128_BIT_UUID:
+        if ad_type == AdvertisingData.Type.SERVICE_DATA_128_BIT_UUID:
             return (UUID.from_bytes(ad_data[:16]), ad_data[16:])
 
         if ad_type in (
-            AdvertisingData.SHORTENED_LOCAL_NAME,
-            AdvertisingData.COMPLETE_LOCAL_NAME,
-            AdvertisingData.URI,
-            AdvertisingData.BROADCAST_NAME,
+            AdvertisingData.Type.SHORTENED_LOCAL_NAME,
+            AdvertisingData.Type.COMPLETE_LOCAL_NAME,
+            AdvertisingData.Type.URI,
+            AdvertisingData.Type.BROADCAST_NAME,
         ):
             return ad_data.decode("utf-8")
 
-        if ad_type in (AdvertisingData.TX_POWER_LEVEL, AdvertisingData.FLAGS):
+        if ad_type in (AdvertisingData.Type.TX_POWER_LEVEL, AdvertisingData.Type.FLAGS):
             return cast(int, struct.unpack('B', ad_data)[0])
 
-        if ad_type in (AdvertisingData.ADVERTISING_INTERVAL,):
+        if ad_type in (AdvertisingData.Type.ADVERTISING_INTERVAL,):
             return cast(int, struct.unpack('<H', ad_data)[0])
 
-        if ad_type == AdvertisingData.CLASS_OF_DEVICE:
+        if ad_type == AdvertisingData.Type.CLASS_OF_DEVICE:
             return cast(int, struct.unpack('<I', bytes([*ad_data, 0]))[0])
 
-        if ad_type == AdvertisingData.PERIPHERAL_CONNECTION_INTERVAL_RANGE:
-            return cast(Tuple[int, int], struct.unpack('<HH', ad_data))
+        if ad_type == AdvertisingData.Type.PERIPHERAL_CONNECTION_INTERVAL_RANGE:
+            return cast(tuple[int, int], struct.unpack('<HH', ad_data))
 
-        if ad_type == AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
-            return (cast(int, struct.unpack_from('<H', ad_data, 0)[0]), ad_data[2:])
-
-        if ad_type == AdvertisingData.APPEARANCE:
+        if ad_type == AdvertisingData.Type.APPEARANCE:
             return Appearance.from_int(
                 cast(int, struct.unpack_from('<H', ad_data, 0)[0])
             )
+
+        if ad_type == AdvertisingData.Type.MANUFACTURER_SPECIFIC_DATA:
+            return (cast(int, struct.unpack_from('<H', ad_data, 0)[0]), ad_data[2:])
 
         return ad_data
 
@@ -1600,7 +1600,80 @@ class AdvertisingData:
                 self.ad_structures.append((ad_type, ad_data))
             offset += length
 
-    def get_all(self, type_id: int, raw: bool = False) -> List[AdvertisingDataObject]:
+    @overload
+    def get_all(
+        self,
+        type_id: Literal[
+            AdvertisingData.Type.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS,
+            AdvertisingData.Type.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS,
+            AdvertisingData.Type.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS,
+        ],
+        raw: Literal[False] = False,
+    ) -> list[list[UUID]]: ...
+    @overload
+    def get_all(
+        self,
+        type_id: Literal[
+            AdvertisingData.Type.SERVICE_DATA_16_BIT_UUID,
+            AdvertisingData.Type.SERVICE_DATA_32_BIT_UUID,
+            AdvertisingData.Type.SERVICE_DATA_128_BIT_UUID,
+        ],
+        raw: Literal[False] = False,
+    ) -> list[tuple[UUID, bytes]]: ...
+    @overload
+    def get_all(
+        self,
+        type_id: Literal[
+            AdvertisingData.Type.SHORTENED_LOCAL_NAME,
+            AdvertisingData.Type.COMPLETE_LOCAL_NAME,
+            AdvertisingData.Type.URI,
+            AdvertisingData.Type.BROADCAST_NAME,
+        ],
+        raw: Literal[False] = False,
+    ) -> list[str]: ...
+    @overload
+    def get_all(
+        self,
+        type_id: Literal[
+            AdvertisingData.Type.TX_POWER_LEVEL,
+            AdvertisingData.Type.FLAGS,
+            AdvertisingData.Type.ADVERTISING_INTERVAL,
+            AdvertisingData.Type.CLASS_OF_DEVICE,
+        ],
+        raw: Literal[False] = False,
+    ) -> list[int]: ...
+    @overload
+    def get_all(
+        self,
+        type_id: Literal[AdvertisingData.Type.PERIPHERAL_CONNECTION_INTERVAL_RANGE,],
+        raw: Literal[False] = False,
+    ) -> list[tuple[int, int]]: ...
+    @overload
+    def get_all(
+        self,
+        type_id: Literal[AdvertisingData.Type.MANUFACTURER_SPECIFIC_DATA,],
+        raw: Literal[False] = False,
+    ) -> list[tuple[int, bytes]]: ...
+    @overload
+    def get_all(
+        self,
+        type_id: Literal[AdvertisingData.Type.APPEARANCE,],
+        raw: Literal[False] = False,
+    ) -> list[Appearance]: ...
+    @overload
+    def get_all(self, type_id: int, raw: Literal[True]) -> list[bytes]: ...
+    @overload
+    def get_all(
+        self, type_id: int, raw: bool = False
+    ) -> list[AdvertisingDataObject]: ...
+
+    def get_all(self, type_id: int, raw: bool = False) -> list[AdvertisingDataObject]:  # type: ignore[misc]
         '''
         Get Advertising Data Structure(s) with a given type
 
@@ -1611,6 +1684,79 @@ class AdvertisingData:
             return ad_data if raw else self.ad_data_to_object(type_id, ad_data)
 
         return [process_ad_data(ad[1]) for ad in self.ad_structures if ad[0] == type_id]
+
+    @overload
+    def get(
+        self,
+        type_id: Literal[
+            AdvertisingData.Type.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS,
+            AdvertisingData.Type.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS,
+            AdvertisingData.Type.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
+            AdvertisingData.Type.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS,
+        ],
+        raw: Literal[False] = False,
+    ) -> Optional[list[UUID]]: ...
+    @overload
+    def get(
+        self,
+        type_id: Literal[
+            AdvertisingData.Type.SERVICE_DATA_16_BIT_UUID,
+            AdvertisingData.Type.SERVICE_DATA_32_BIT_UUID,
+            AdvertisingData.Type.SERVICE_DATA_128_BIT_UUID,
+        ],
+        raw: Literal[False] = False,
+    ) -> Optional[tuple[UUID, bytes]]: ...
+    @overload
+    def get(
+        self,
+        type_id: Literal[
+            AdvertisingData.Type.SHORTENED_LOCAL_NAME,
+            AdvertisingData.Type.COMPLETE_LOCAL_NAME,
+            AdvertisingData.Type.URI,
+            AdvertisingData.Type.BROADCAST_NAME,
+        ],
+        raw: Literal[False] = False,
+    ) -> Optional[Optional[str]]: ...
+    @overload
+    def get(
+        self,
+        type_id: Literal[
+            AdvertisingData.Type.TX_POWER_LEVEL,
+            AdvertisingData.Type.FLAGS,
+            AdvertisingData.Type.ADVERTISING_INTERVAL,
+            AdvertisingData.Type.CLASS_OF_DEVICE,
+        ],
+        raw: Literal[False] = False,
+    ) -> Optional[int]: ...
+    @overload
+    def get(
+        self,
+        type_id: Literal[AdvertisingData.Type.PERIPHERAL_CONNECTION_INTERVAL_RANGE,],
+        raw: Literal[False] = False,
+    ) -> Optional[tuple[int, int]]: ...
+    @overload
+    def get(
+        self,
+        type_id: Literal[AdvertisingData.Type.MANUFACTURER_SPECIFIC_DATA,],
+        raw: Literal[False] = False,
+    ) -> Optional[tuple[int, bytes]]: ...
+    @overload
+    def get(
+        self,
+        type_id: Literal[AdvertisingData.Type.APPEARANCE,],
+        raw: Literal[False] = False,
+    ) -> Optional[Appearance]: ...
+    @overload
+    def get(self, type_id: int, raw: Literal[True]) -> Optional[bytes]: ...
+    @overload
+    def get(
+        self, type_id: int, raw: bool = False
+    ) -> Optional[AdvertisingDataObject]: ...
 
     def get(self, type_id: int, raw: bool = False) -> Optional[AdvertisingDataObject]:
         '''
