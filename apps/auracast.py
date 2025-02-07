@@ -953,8 +953,8 @@ async def run_transmit(
             )
 
             iso_queues = [
-                bumble.device.IsoPacketStream(big.bis_links[0], 5),
-                bumble.device.IsoPacketStream(big.bis_links[1], 5),
+                bumble.device.IsoPacketStream(big.bis_links[0], 64),
+                bumble.device.IsoPacketStream(big.bis_links[1], 64),
             ]
 
             def on_flow():
