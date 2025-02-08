@@ -924,6 +924,14 @@ async def run_transmit(
             if pcm_format.channels != 2:
                 print("Only 2 channels PCM configurations are supported")
                 return
+            if pcm_format.sample_type == audio_io.PcmFormat.SampleType.INT16:
+                pcm_bit_depth = 16
+            elif pcm_format.sample_type == audio_io.PcmFormat.SampleType.FLOAT32:
+                pcm_bit_depth = None
+            else:
+                print("Only INT16 and FLOAT32 sample types are supported")
+                return
+
             encoder = lc3.Encoder(
                 frame_duration_us=AURACAST_DEFAULT_FRAME_DURATION,
                 sample_rate_hz=AURACAST_DEFAULT_SAMPLE_RATE,
@@ -971,7 +979,7 @@ async def run_transmit(
             frame_count = 0
             async for pcm_frame in audio_input.frames(lc3_frame_samples):
                 lc3_frame = encoder.encode(
-                    pcm_frame, num_bytes=2 * lc3_frame_size, bit_depth=16
+                    pcm_frame, num_bytes=2 * lc3_frame_size, bit_depth=pcm_bit_depth
                 )
 
                 mid = len(lc3_frame) // 2
@@ -1150,7 +1158,8 @@ def receive(
         "Use 'auto' for .wav files, or for the default setting with the devices. "
         "For other inputs, the format is specified as "
         "<sample-type>,<sample-rate>,<channels> (supported <sample-type>: 'int16le' "
-        "for 16 bit signed integers with little-endian byte order)"
+        "for 16-bit signed integers with little-endian byte order or 'float32le' for "
+        "32-bit floating point with little-endian byte order)"
     ),
 )
 @click.option(

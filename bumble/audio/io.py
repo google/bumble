@@ -68,7 +68,7 @@ class PcmFormat:
         sample_type_str, sample_rate_str, channels_str = format_str.split(',')
         if sample_type_str == 'int16le':
             sample_type = cls.SampleType.INT16
-        elif sample_rate_str == 'float32le':
+        elif sample_type_str == 'float32le':
             sample_type = cls.SampleType.FLOAT32
         else:
             raise ValueError(f'sample type {sample_type_str} not supported')
@@ -76,6 +76,10 @@ class PcmFormat:
         channels = int(channels_str)
 
         return cls(endianness, sample_type, sample_rate, channels)
+
+    @property
+    def bytes_per_sample(self) -> int:
+        return 2 if self.sample_type == self.SampleType.INT16 else 4
 
 
 def check_audio_output(output: str) -> bool:
@@ -486,7 +490,9 @@ class StreamAudioInput(ThreadedAudioInput):
         return self._pcm_format
 
     def _read(self, frame_size: int) -> bytes:
-        return self._stream.read(frame_size * self._pcm_format.channels * 2)
+        return self._stream.read(
+            frame_size * self._pcm_format.channels * self._pcm_format.bytes_per_sample
+        )
 
 
 class FileAudioInput(StreamAudioInput):
@@ -495,9 +501,6 @@ class FileAudioInput(StreamAudioInput):
     def __init__(self, filename: str, pcm_format: PcmFormat) -> None:
         self._stream = open(filename, "rb")
         super().__init__(self._stream, pcm_format)
-
-    def _read(self, frame_size: int) -> bytes:
-        return self._stream.read(frame_size * self._pcm_format.channels * 2)
 
     def _close(self) -> None:
         self._stream.close()
