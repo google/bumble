@@ -24,6 +24,11 @@ class PacketSource {
 }
 
 class PacketSink {
+    constructor() {
+        this.queue = [];
+        this.isProcessing = false;
+    }
+
     on_packet(packet) {
         if (!this.writer) {
             return;
@@ -31,10 +36,23 @@ class PacketSink {
         const buffer = packet.toJs({create_proxies : false});
         packet.destroy();
         //console.log(`HCI[host->controller]: ${bufferToHex(buffer)}`);
-        // TODO: create an async queue here instead of blindly calling write without awaiting
-        this.writer(buffer);
+        this.queue.push(buffer);
+        this.processQueue();
+    }
+
+    async processQueue() {
+        if (this.isProcessing) {
+            return;
+        }
+        this.isProcessing = true;
+        while (this.queue.length > 0) {
+            const buffer = this.queue.shift();
+            await this.writer(buffer);
+        }
+        this.isProcessing = false;
     }
 }
+
 
 class LogEvent extends Event {
     constructor(message) {
@@ -57,7 +75,6 @@ export class Bumble extends EventTarget {
         }
 
         // Load the Bumble module
-        bumblePackage ||= 'bumble';
         console.log('Installing micropip');
         this.log(`Installing ${bumblePackage}`)
         await this.pyodide.loadPackage('micropip');
@@ -148,6 +165,20 @@ export class Bumble extends EventTarget {
     }
 }
 
+async function getBumblePackage() {
+    const params = (new URL(document.location)).searchParams;
+    // First check the packageFile override param
+    if (params.has('packageFile')) {
+        return await (await fetch('/packageFile')).text() 
+    }
+    // Then check the package override param
+    if (params.has('package')) {
+        return params.get('package')
+    }
+    // If no override params, default to the main package
+    return 'bumble'
+}
+
 export async function setupSimpleApp(appUrl, bumbleControls, log) {
     // Load Bumble
     log('Loading Bumble');
@@ -155,8 +186,7 @@ export async function setupSimpleApp(appUrl, bumbleControls, log) {
     bumble.addEventListener('log', (event) => {
         log(event.message);
     })
-    const params = (new URL(document.location)).searchParams;
-    await bumble.loadRuntime(params.get('package'));
+    await bumble.loadRuntime(await getBumblePackage());
 
     log('Bumble is ready!')
     const app = await bumble.loadApp(appUrl);
