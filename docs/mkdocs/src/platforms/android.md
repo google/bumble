@@ -35,11 +35,11 @@ the command line.
     visit [this Android Studio user guide page](https://developer.android.com/studio/run/emulator-commandline)
 
 The `-packet-streamer-endpoint <endpoint>` command line option may be used to enable
-Bluetooth emulation and tell the emulator which virtual controller to connect to. 
+Bluetooth emulation and tell the emulator which virtual controller to connect to.
 
 ## Connecting to Netsim
 
-If the emulator doesn't have Bluetooth emulation enabled by default, use the 
+If the emulator doesn't have Bluetooth emulation enabled by default, use the
 `-packet-streamer-endpoint default` option to tell it to connect to Netsim.
 If Netsim is not running, the emulator will start it automatically.
 
@@ -60,17 +60,17 @@ the Bumble `android-netsim` transport in `host` mode (the default).
 
 !!! example "Run the example GATT server connected to the emulator via Netsim"
     ``` shell
-    $ python run_gatt_server.py device1.json android-netsim
+    $ python3 run_gatt_server.py device1.json android-netsim
     ```
 
 By default, the Bumble `android-netsim` transport will try to automatically discover
 the port number on which the netsim process is exposing its gRPC server interface. If
-that discovery process fails, or if you want to specify the interface manually, you 
+that discovery process fails, or if you want to specify the interface manually, you
 can pass a `hostname` and `port` as parameters to the transport, as: `android-netsim:<host>:<port>`.
 
 !!! example "Run the example GATT server connected to the emulator via Netsim on a localhost, port 8877"
     ``` shell
-    $ python run_gatt_server.py device1.json android-netsim:localhost:8877
+    $ python3 run_gatt_server.py device1.json android-netsim:localhost:8877
     ```
 
 ### Multiple Instances
@@ -84,7 +84,7 @@ For example: `android-netsim:localhost:8877,name=bumble1`
 This is an advanced use case, which may not be officially supported, but should work in recent
 versions of the emulator.
 
-The first step is to run the Bumble HCI bridge, specifying netsim as the "host" end of the 
+The first step is to run the Bumble HCI bridge, specifying netsim as the "host" end of the
 bridge, and another controller (typically a USB Bluetooth dongle, but any other supported
 transport can work as well) as the "controller" end of the bridge.
 

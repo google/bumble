@@ -18,14 +18,23 @@
 from __future__ import annotations
 
 import asyncio
+import asyncio.subprocess
+import collections
 import contextlib
 import dataclasses
 import functools
 import logging
 import os
-import wave
-import itertools
-from typing import cast, Any, AsyncGenerator, Coroutine, Dict, Optional, Tuple
+import struct
+from typing import (
+    cast,
+    Any,
+    AsyncGenerator,
+    Coroutine,
+    Deque,
+    Optional,
+    Tuple,
+)
 
 import click
 import pyee
@@ -33,8 +42,11 @@ import pyee
 try:
     import lc3  # type: ignore  # pylint: disable=E0401
 except ImportError as e:
-    raise ImportError("Try `python -m pip install \".[lc3]\"`.") from e
+    raise ImportError(
+        "Try `python -m pip install \"git+https://github.com/google/liblc3.git\"`."
+    ) from e
 
+from bumble.audio import io as audio_io
 from bumble.colors import color
 from bumble import company_ids
 from bumble import core
@@ -47,7 +59,6 @@ from bumble.profiles import bass
 import bumble.device
 import bumble.transport
 import bumble.utils
-
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -62,6 +73,31 @@ AURACAST_DEFAULT_DEVICE_NAME = 'Bumble Auracast'
 AURACAST_DEFAULT_DEVICE_ADDRESS = hci.Address('F0:F1:F2:F3:F4:F5')
 AURACAST_DEFAULT_SYNC_TIMEOUT = 5.0
 AURACAST_DEFAULT_ATT_MTU = 256
+AURACAST_DEFAULT_FRAME_DURATION = 10000
+AURACAST_DEFAULT_SAMPLE_RATE = 48000
+AURACAST_DEFAULT_TRANSMIT_BITRATE = 80000
+
+
+# -----------------------------------------------------------------------------
+# Utils
+# -----------------------------------------------------------------------------
+def codec_config_string(
+    codec_config: bap.CodecSpecificConfiguration, indent: str
+) -> str:
+    lines = []
+    if codec_config.sampling_frequency is not None:
+        lines.append(f'Sampling Frequency: {codec_config.sampling_frequency.hz} hz')
+    if codec_config.frame_duration is not None:
+        lines.append(f'Frame Duration:     {codec_config.frame_duration.us} µs')
+    if codec_config.octets_per_codec_frame is not None:
+        lines.append(f'Frame Size:         {codec_config.octets_per_codec_frame} bytes')
+    if codec_config.codec_frames_per_sdu is not None:
+        lines.append(f'Frames Per SDU:     {codec_config.codec_frames_per_sdu}')
+    if codec_config.audio_channel_allocation is not None:
+        lines.append(
+            f'Audio Location:     {codec_config.audio_channel_allocation.name}'
+        )
+    return '\n'.join(indent + line for line in lines)
 
 
 # -----------------------------------------------------------------------------
@@ -156,18 +192,17 @@ class BroadcastScanner(pyee.EventEmitter):
             if self.public_broadcast_announcement:
                 print(
                     f'  {color("Features", "cyan")}:     '
-                    f'{self.public_broadcast_announcement.features}'
+                    f'{self.public_broadcast_announcement.features.name}'
                 )
-                print(
-                    f'  {color("Metadata", "cyan")}:     '
-                    f'{self.public_broadcast_announcement.metadata}'
-                )
+                print(f'  {color("Metadata", "cyan")}:')
+                print(self.public_broadcast_announcement.metadata.pretty_print('    '))
 
             if self.basic_audio_announcement:
                 print(color('  Audio:', 'cyan'))
                 print(
                     color('    Presentation Delay:', 'magenta'),
                     self.basic_audio_announcement.presentation_delay,
+                    "µs",
                 )
                 for subgroup in self.basic_audio_announcement.subgroups:
                     print(color('    Subgroup:', 'magenta'))
@@ -184,17 +219,22 @@ class BroadcastScanner(pyee.EventEmitter):
                         color('        Vendor Specific Codec ID:', 'green'),
                         subgroup.codec_id.vendor_specific_codec_id,
                     )
+                    print(color('      Codec Config:', 'yellow'))
                     print(
-                        color('      Codec Config:', 'yellow'),
-                        subgroup.codec_specific_configuration,
+                        codec_config_string(
+                            subgroup.codec_specific_configuration, '        '
+                        ),
                     )
-                    print(color('      Metadata:    ', 'yellow'), subgroup.metadata)
+                    print(color('      Metadata:    ', 'yellow'))
+                    print(subgroup.metadata.pretty_print('        '))
 
                     for bis in subgroup.bis:
                         print(color(f'      BIS [{bis.index}]:', 'yellow'))
+                        print(color('       Codec Config:', 'green'))
                         print(
-                            color('       Codec Config:', 'green'),
-                            bis.codec_specific_configuration,
+                            codec_config_string(
+                                bis.codec_specific_configuration, '         '
+                            ),
                         )
 
             if self.biginfo:
@@ -494,7 +534,7 @@ async def run_assist(
             except core.ProtocolError as error:
                 print(
                     color(
-                        f'!!! Failed to subscribe to Broadcast Receive State characteristic:',
+                        '!!! Failed to subscribe to Broadcast Receive State characteristic',
                         'red',
                     ),
                     error,
@@ -625,11 +665,20 @@ async def run_pair(transport: str, address: str) -> None:
 
 async def run_receive(
     transport: str,
-    broadcast_id: int,
+    broadcast_id: Optional[int],
+    output: str,
     broadcast_code: str | None,
     sync_timeout: float,
     subgroup_index: int,
 ) -> None:
+    # Run a pre-flight check for the output.
+    try:
+        if not audio_io.check_audio_output(output):
+            return
+    except ValueError as error:
+        print(error)
+        return
+
     async with create_device(transport) as device:
         if not device.supports_le_periodic_advertising:
             print(color('Periodic advertising not supported', 'red'))
@@ -643,7 +692,7 @@ async def run_receive(
         def on_new_broadcast(broadcast: BroadcastScanner.Broadcast) -> None:
             if scan_result.done():
                 return
-            if broadcast.broadcast_id == broadcast_id:
+            if broadcast_id is None or broadcast.broadcast_id == broadcast_id:
                 scan_result.set_result(broadcast)
 
         scanner.on('new_broadcast', on_new_broadcast)
@@ -694,56 +743,94 @@ async def run_receive(
             sample_rate_hz=sampling_frequency.hz,
             num_channels=num_bis,
         )
-        sdus = [b''] * num_bis
-        subprocess = await asyncio.create_subprocess_shell(
-            f'stdbuf -i0 ffplay -ar {sampling_frequency.hz} -ac {num_bis} -f f32le pipe:0',
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        for i, bis_link in enumerate(big_sync.bis_links):
-            print(f'Setup ISO for BIS {bis_link.handle}')
+        lc3_queues: list[Deque[bytes]] = [collections.deque() for i in range(num_bis)]
+        packet_stats = [0, 0]
 
-            def sink(index: int, packet: hci.HCI_IsoDataPacket):
-                nonlocal sdus
-                sdus[index] = packet.iso_sdu_fragment
-                if all(sdus) and subprocess.stdin:
-                    subprocess.stdin.write(decoder.decode(b''.join(sdus)).tobytes())
-                    sdus = [b''] * num_bis
-
-            bis_link.sink = functools.partial(sink, i)
-            await bis_link.setup_data_path(
-                direction=bis_link.Direction.CONTROLLER_TO_HOST
+        audio_output = await audio_io.create_audio_output(output)
+        # This try should be replaced with contextlib.aclosing() when python 3.9 is no
+        # longer needed.
+        try:
+            await audio_output.open(
+                audio_io.PcmFormat(
+                    audio_io.PcmFormat.Endianness.LITTLE,
+                    audio_io.PcmFormat.SampleType.FLOAT32,
+                    sampling_frequency.hz,
+                    num_bis,
+                )
             )
 
-        terminated = asyncio.Event()
-        big_sync.on(big_sync.Event.TERMINATION, lambda _: terminated.set())
-        await terminated.wait()
+            def sink(queue: Deque[bytes], packet: hci.HCI_IsoDataPacket):
+                # TODO: re-assemble fragments and detect errors
+                queue.append(packet.iso_sdu_fragment)
+
+                while all(lc3_queues):
+                    # This assumes SDUs contain one LC3 frame each, which may not
+                    # be correct for all cases. TODO: revisit this assumption.
+                    frame = b''.join([lc3_queue.popleft() for lc3_queue in lc3_queues])
+                    if not frame:
+                        print(color('!!! received empty frame', 'red'))
+                        continue
+
+                    packet_stats[0] += len(frame)
+                    packet_stats[1] += 1
+                    print(
+                        f'\rRECEIVED: {packet_stats[0]} bytes in '
+                        f'{packet_stats[1]} packets',
+                        end='',
+                    )
+
+                    try:
+                        pcm = decoder.decode(frame).tobytes()
+                    except lc3.BaseError as error:
+                        print(color(f'!!! LC3 decoding error: {error}'))
+                        continue
+
+                    audio_output.write(pcm)
+
+            for i, bis_link in enumerate(big_sync.bis_links):
+                print(f'Setup ISO for BIS {bis_link.handle}')
+                bis_link.sink = functools.partial(sink, lc3_queues[i])
+                await device.send_command(
+                    hci.HCI_LE_Setup_ISO_Data_Path_Command(
+                        connection_handle=bis_link.handle,
+                        data_path_direction=hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.CONTROLLER_TO_HOST,
+                        data_path_id=0,
+                        codec_id=hci.CodingFormat(codec_id=hci.CodecID.TRANSPARENT),
+                        controller_delay=0,
+                        codec_configuration=b'',
+                    ),
+                    check_result=True,
+                )
+
+            terminated = asyncio.Event()
+            big_sync.on(big_sync.Event.TERMINATION, lambda _: terminated.set())
+            await terminated.wait()
+        finally:
+            await audio_output.aclose()
 
 
-async def run_broadcast(
-    transport: str, broadcast_id: int, broadcast_code: str | None, wav_file_path: str
+async def run_transmit(
+    transport: str,
+    broadcast_id: int,
+    broadcast_code: str | None,
+    broadcast_name: str,
+    bitrate: int,
+    manufacturer_data: tuple[int, bytes] | None,
+    input: str,
+    input_format: str,
 ) -> None:
+    # Run a pre-flight check for the input.
+    try:
+        if not audio_io.check_audio_input(input):
+            return
+    except ValueError as error:
+        print(error)
+        return
+
     async with create_device(transport) as device:
         if not device.supports_le_periodic_advertising:
             print(color('Periodic advertising not supported', 'red'))
             return
-
-        with wave.open(wav_file_path, 'rb') as wav:
-            print('Encoding wav file into lc3...')
-            encoder = lc3.Encoder(
-                frame_duration_us=10000,
-                sample_rate_hz=48000,
-                num_channels=2,
-                input_sample_rate_hz=wav.getframerate(),
-            )
-            frames = list[bytes]()
-            while pcm := wav.readframes(encoder.get_frame_samples()):
-                frames.append(
-                    encoder.encode(pcm, num_bytes=200, bit_depth=wav.getsampwidth() * 8)
-                )
-            del encoder
-            print('Encoding complete.')
 
         basic_audio_announcement = bap.BasicAudioAnnouncement(
             presentation_delay=40000,
@@ -783,7 +870,23 @@ async def run_broadcast(
             ],
         )
         broadcast_audio_announcement = bap.BroadcastAudioAnnouncement(broadcast_id)
-        print('Start Advertising')
+
+        advertising_manufacturer_data = (
+            b''
+            if manufacturer_data is None
+            else bytes(
+                core.AdvertisingData(
+                    [
+                        (
+                            core.AdvertisingData.MANUFACTURER_SPECIFIC_DATA,
+                            struct.pack('<H', manufacturer_data[0])
+                            + manufacturer_data[1],
+                        )
+                    ]
+                )
+            )
+        )
+
         advertising_set = await device.create_advertising_set(
             advertising_parameters=bumble.device.AdvertisingParameters(
                 advertising_event_properties=bumble.device.AdvertisingEventProperties(
@@ -796,9 +899,10 @@ async def run_broadcast(
                 broadcast_audio_announcement.get_advertising_data()
                 + bytes(
                     core.AdvertisingData(
-                        [(core.AdvertisingData.BROADCAST_NAME, b'Bumble Auracast')]
+                        [(core.AdvertisingData.BROADCAST_NAME, broadcast_name.encode())]
                     )
                 )
+                + advertising_manufacturer_data
             ),
             periodic_advertising_parameters=bumble.device.PeriodicAdvertisingParameters(
                 periodic_advertising_interval_min=80,
@@ -808,47 +912,83 @@ async def run_broadcast(
             auto_restart=True,
             auto_start=True,
         )
+
         print('Start Periodic Advertising')
         await advertising_set.start_periodic()
-        print('Setup BIG')
-        big = await device.create_big(
-            advertising_set,
-            parameters=bumble.device.BigParameters(
-                num_bis=2,
-                sdu_interval=10000,
-                max_sdu=100,
-                max_transport_latency=65,
-                rtn=4,
-                broadcast_code=(
-                    bytes.fromhex(broadcast_code) if broadcast_code else None
-                ),
-            ),
-        )
-        print('Setup ISO Data Path')
 
-        def on_flow(packet_queue):
+        audio_input = await audio_io.create_audio_input(input, input_format)
+        pcm_format = await audio_input.open()
+        # This try should be replaced with contextlib.aclosing() when python 3.9 is no
+        # longer needed.
+        try:
+            if pcm_format.channels != 2:
+                print("Only 2 channels PCM configurations are supported")
+                return
+            if pcm_format.sample_type == audio_io.PcmFormat.SampleType.INT16:
+                pcm_bit_depth = 16
+            elif pcm_format.sample_type == audio_io.PcmFormat.SampleType.FLOAT32:
+                pcm_bit_depth = None
+            else:
+                print("Only INT16 and FLOAT32 sample types are supported")
+                return
+
+            encoder = lc3.Encoder(
+                frame_duration_us=AURACAST_DEFAULT_FRAME_DURATION,
+                sample_rate_hz=AURACAST_DEFAULT_SAMPLE_RATE,
+                num_channels=pcm_format.channels,
+                input_sample_rate_hz=pcm_format.sample_rate,
+            )
+            lc3_frame_samples = encoder.get_frame_samples()
+            lc3_frame_size = encoder.get_frame_bytes(bitrate)
             print(
-                f'\rPACKETS: pending={packet_queue.pending}, '
-                f'queued={packet_queue.queued}, completed={packet_queue.completed}',
-                end='',
+                f'Encoding with {lc3_frame_samples} '
+                f'PCM samples per {lc3_frame_size} byte frame'
             )
 
-        packet_queue = None
-        for bis_link in big.bis_links:
-            await bis_link.setup_data_path(
-                direction=bis_link.Direction.HOST_TO_CONTROLLER
+            print('Setup BIG')
+            big = await device.create_big(
+                advertising_set,
+                parameters=bumble.device.BigParameters(
+                    num_bis=pcm_format.channels,
+                    sdu_interval=AURACAST_DEFAULT_FRAME_DURATION,
+                    max_sdu=lc3_frame_size,
+                    max_transport_latency=65,
+                    rtn=4,
+                    broadcast_code=(
+                        bytes.fromhex(broadcast_code) if broadcast_code else None
+                    ),
+                ),
             )
-            if packet_queue is None:
-                packet_queue = bis_link.data_packet_queue
 
-        if packet_queue:
-            packet_queue.on('flow', lambda: on_flow(packet_queue))
+            iso_queues = [
+                bumble.device.IsoPacketStream(big.bis_links[0], 64),
+                bumble.device.IsoPacketStream(big.bis_links[1], 64),
+            ]
 
-        for frame in itertools.cycle(frames):
-            mid = len(frame) // 2
-            big.bis_links[0].write(frame[:mid])
-            big.bis_links[1].write(frame[mid:])
-            await asyncio.sleep(0.009)
+            def on_flow():
+                data_packet_queue = iso_queues[0].data_packet_queue
+                print(
+                    f'\rPACKETS: pending={data_packet_queue.pending}, '
+                    f'queued={data_packet_queue.queued}, '
+                    f'completed={data_packet_queue.completed}',
+                    end='',
+                )
+
+            iso_queues[0].data_packet_queue.on('flow', on_flow)
+
+            frame_count = 0
+            async for pcm_frame in audio_input.frames(lc3_frame_samples):
+                lc3_frame = encoder.encode(
+                    pcm_frame, num_bytes=2 * lc3_frame_size, bit_depth=pcm_bit_depth
+                )
+
+                mid = len(lc3_frame) // 2
+                await iso_queues[0].write(lc3_frame[:mid])
+                await iso_queues[1].write(lc3_frame[mid:])
+
+                frame_count += 1
+        finally:
+            await audio_input.aclose()
 
 
 def run_async(async_command: Coroutine) -> None:
@@ -917,7 +1057,7 @@ def scan(ctx, filter_duplicates, sync_timeout, transport):
 @click.argument('address')
 @click.pass_context
 def assist(ctx, broadcast_name, source_id, command, transport, address):
-    """Scan for broadcasts on behalf of a audio server"""
+    """Scan for broadcasts on behalf of an audio server"""
     run_async(run_assist(broadcast_name, source_id, command, transport, address))
 
 
@@ -932,7 +1072,24 @@ def pair(ctx, transport, address):
 
 @auracast.command('receive')
 @click.argument('transport')
-@click.argument('broadcast_id', type=int)
+@click.argument(
+    'broadcast_id',
+    type=int,
+    required=False,
+)
+@click.option(
+    '--output',
+    default='device',
+    help=(
+        "Audio output. "
+        "'device' -> use the host's default sound output device, "
+        "'device:<DEVICE_ID>' -> use one of the  host's sound output device "
+        "(specify 'device:?' to get a list of available sound output devices), "
+        "'stdout' -> send audio to stdout, "
+        "'file:<filename> -> write audio to a raw float32 PCM file, "
+        "'ffplay' -> pipe the audio to ffplay"
+    ),
+)
 @click.option(
     '--broadcast-code',
     metavar='BROADCAST_CODE',
@@ -954,16 +1111,57 @@ def pair(ctx, transport, address):
     help='Index of Subgroup',
 )
 @click.pass_context
-def receive(ctx, transport, broadcast_id, broadcast_code, sync_timeout, subgroup):
+def receive(
+    ctx,
+    transport,
+    broadcast_id,
+    output,
+    broadcast_code,
+    sync_timeout,
+    subgroup,
+):
     """Receive a broadcast source"""
     run_async(
-        run_receive(transport, broadcast_id, broadcast_code, sync_timeout, subgroup)
+        run_receive(
+            transport,
+            broadcast_id,
+            output,
+            broadcast_code,
+            sync_timeout,
+            subgroup,
+        )
     )
 
 
-@auracast.command('broadcast')
+@auracast.command('transmit')
 @click.argument('transport')
-@click.argument('wav_file_path', type=str)
+@click.option(
+    '--input',
+    required=True,
+    help=(
+        "Audio input. "
+        "'device' -> use the host's default sound input device, "
+        "'device:<DEVICE_ID>' -> use one of the host's sound input devices "
+        "(specify 'device:?' to get a list of available sound input devices), "
+        "'stdin' -> receive audio from stdin as int16 PCM, "
+        "'file:<filename> -> read audio from a .wav or raw int16 PCM file. "
+        "(The file: prefix may be omitted if the file path does not start with "
+        "the substring 'device:' or 'file:' and is not 'stdin')"
+    ),
+)
+@click.option(
+    '--input-format',
+    metavar="FORMAT",
+    default='auto',
+    help=(
+        "Audio input format. "
+        "Use 'auto' for .wav files, or for the default setting with the devices. "
+        "For other inputs, the format is specified as "
+        "<sample-type>,<sample-rate>,<channels> (supported <sample-type>: 'int16le' "
+        "for 16-bit signed integers with little-endian byte order or 'float32le' for "
+        "32-bit floating point with little-endian byte order)"
+    ),
+)
 @click.option(
     '--broadcast-id',
     metavar='BROADCAST_ID',
@@ -974,18 +1172,60 @@ def receive(ctx, transport, broadcast_id, broadcast_code, sync_timeout, subgroup
 @click.option(
     '--broadcast-code',
     metavar='BROADCAST_CODE',
-    type=str,
     help='Broadcast encryption code in hex format',
 )
+@click.option(
+    '--broadcast-name',
+    metavar='BROADCAST_NAME',
+    default='Bumble Auracast',
+    help='Broadcast name',
+)
+@click.option(
+    '--bitrate',
+    type=int,
+    default=AURACAST_DEFAULT_TRANSMIT_BITRATE,
+    help='Bitrate, per channel, in bps',
+)
+@click.option(
+    '--manufacturer-data',
+    metavar='VENDOR-ID:DATA-HEX',
+    help='Manufacturer data (specify as <vendor-id>:<data-hex>)',
+)
 @click.pass_context
-def broadcast(ctx, transport, broadcast_id, broadcast_code, wav_file_path):
-    """Start a broadcast as a source."""
+def transmit(
+    ctx,
+    transport,
+    broadcast_id,
+    broadcast_code,
+    manufacturer_data,
+    broadcast_name,
+    bitrate,
+    input,
+    input_format,
+):
+    """Transmit a broadcast source"""
+    if manufacturer_data:
+        vendor_id_str, data_hex = manufacturer_data.split(':')
+        vendor_id = int(vendor_id_str)
+        data = bytes.fromhex(data_hex)
+        manufacturer_data_tuple = (vendor_id, data)
+    else:
+        manufacturer_data_tuple = None
+
+    if (input == 'device' or input.startswith('device:')) and input_format == 'auto':
+        # Use a default format for device inputs
+        input_format = 'int16le,48000,1'
+
     run_async(
-        run_broadcast(
+        run_transmit(
             transport=transport,
             broadcast_id=broadcast_id,
             broadcast_code=broadcast_code,
-            wav_file_path=wav_file_path,
+            broadcast_name=broadcast_name,
+            bitrate=bitrate,
+            manufacturer_data=manufacturer_data_tuple,
+            input=input,
+            input_format=input_format,
         )
     )
 

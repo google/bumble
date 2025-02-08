@@ -78,6 +78,7 @@ from .gatt import (
     GATT_INCLUDE_ATTRIBUTE_TYPE,
     Characteristic,
     ClientCharacteristicConfigurationBits,
+    InvalidServiceError,
     TemplateService,
 )
 
@@ -162,11 +163,22 @@ class ServiceProxy(AttributeProxy):
         self.uuid = uuid
         self.characteristics = []
 
-    async def discover_characteristics(self, uuids=()):
+    async def discover_characteristics(self, uuids=()) -> list[CharacteristicProxy]:
         return await self.client.discover_characteristics(uuids, self)
 
-    def get_characteristics_by_uuid(self, uuid):
+    def get_characteristics_by_uuid(self, uuid: UUID) -> list[CharacteristicProxy]:
+        """Get all the characteristics with a specified UUID."""
         return self.client.get_characteristics_by_uuid(uuid, self)
+
+    def get_required_characteristic_by_uuid(self, uuid: UUID) -> CharacteristicProxy:
+        """
+        Get the first characteristic with a specified UUID.
+
+        If no characteristic with that UUID is found, an InvalidServiceError is raised.
+        """
+        if not (characteristics := self.get_characteristics_by_uuid(uuid)):
+            raise InvalidServiceError(f'{uuid} characteristic not found')
+        return characteristics[0]
 
     def __str__(self) -> str:
         return f'Service(handle=0x{self.handle:04X}, uuid={self.uuid})'

@@ -354,34 +354,25 @@ class BroadcastAudioScanServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = BroadcastAudioScanService
 
     broadcast_audio_scan_control_point: gatt_client.CharacteristicProxy
-    broadcast_receive_states: List[gatt.SerializableCharacteristicAdapter]
+    broadcast_receive_states: List[gatt.DelegatedCharacteristicAdapter]
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy):
         self.service_proxy = service_proxy
 
-        if not (
-            characteristics := service_proxy.get_characteristics_by_uuid(
+        self.broadcast_audio_scan_control_point = (
+            service_proxy.get_required_characteristic_by_uuid(
                 gatt.GATT_BROADCAST_AUDIO_SCAN_CONTROL_POINT_CHARACTERISTIC
             )
-        ):
-            raise gatt.InvalidServiceError(
-                "Broadcast Audio Scan Control Point characteristic not found"
-            )
-        self.broadcast_audio_scan_control_point = characteristics[0]
+        )
 
-        if not (
-            characteristics := service_proxy.get_characteristics_by_uuid(
+        self.broadcast_receive_states = [
+            gatt.DelegatedCharacteristicAdapter(
+                characteristic,
+                decode=lambda x: BroadcastReceiveState.from_bytes(x) if x else None,
+            )
+            for characteristic in service_proxy.get_characteristics_by_uuid(
                 gatt.GATT_BROADCAST_RECEIVE_STATE_CHARACTERISTIC
             )
-        ):
-            raise gatt.InvalidServiceError(
-                "Broadcast Receive State characteristic not found"
-            )
-        self.broadcast_receive_states = [
-            gatt.SerializableCharacteristicAdapter(
-                characteristic, BroadcastReceiveState
-            )
-            for characteristic in characteristics
         ]
 
     async def send_control_point_operation(

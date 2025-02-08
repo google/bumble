@@ -288,8 +288,8 @@ class AshaServiceProxy(gatt_client.ProfileServiceProxy):
                 'psm_characteristic',
             ),
         ):
-            if not (
-                characteristics := self.service_proxy.get_characteristics_by_uuid(uuid)
-            ):
-                raise gatt.InvalidServiceError(f"Missing {uuid} Characteristic")
-            setattr(self, attribute_name, characteristics[0])
+            setattr(
+                self,
+                attribute_name,
+                self.service_proxy.get_required_characteristic_by_uuid(uuid),
+            )

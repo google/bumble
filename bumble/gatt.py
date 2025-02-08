@@ -42,7 +42,7 @@ from typing import (
 )
 
 from bumble.colors import color
-from bumble.core import BaseBumbleError, UUID
+from bumble.core import BaseBumbleError, InvalidOperationError, UUID
 from bumble.att import Attribute, AttributeValue
 from bumble.utils import ByteSerializable
 
@@ -314,6 +314,7 @@ GATT_CENTRAL_ADDRESS_RESOLUTION__CHARACTERISTIC                = UUID.from_16_bi
 GATT_CLIENT_SUPPORTED_FEATURES_CHARACTERISTIC                  = UUID.from_16_bits(0x2B29, 'Client Supported Features')
 GATT_DATABASE_HASH_CHARACTERISTIC                              = UUID.from_16_bits(0x2B2A, 'Database Hash')
 GATT_SERVER_SUPPORTED_FEATURES_CHARACTERISTIC                  = UUID.from_16_bits(0x2B3A, 'Server Supported Features')
+GATT_LE_GATT_SECURITY_LEVELS_CHARACTERISTIC                    = UUID.from_16_bits(0x2BF5, 'E GATT Security Levels')
 
 # fmt: on
 # pylint: enable=line-too-long
@@ -322,8 +323,6 @@ GATT_SERVER_SUPPORTED_FEATURES_CHARACTERISTIC                  = UUID.from_16_bi
 # -----------------------------------------------------------------------------
 # Utils
 # -----------------------------------------------------------------------------
-
-
 def show_services(services: Iterable[Service]) -> None:
     for service in services:
         print(color(str(service), 'cyan'))
@@ -679,10 +678,14 @@ class DelegatedCharacteristicAdapter(CharacteristicAdapter):
         self.decode = decode
 
     def encode_value(self, value):
-        return self.encode(value) if self.encode else value
+        if self.encode is None:
+            raise InvalidOperationError('delegated adapter does not have an encoder')
+        return self.encode(value)
 
     def decode_value(self, value):
-        return self.decode(value) if self.decode else value
+        if self.decode is None:
+            raise InvalidOperationError('delegate adapter does not have a decoder')
+        return self.decode(value)
 
 
 # -----------------------------------------------------------------------------
