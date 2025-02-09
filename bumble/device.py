@@ -794,6 +794,17 @@ class AdvertisingSet(EventEmitter):
         )
         del self.device.extended_advertising_sets[self.advertising_handle]
 
+    async def transfer_periodic_info(
+        self, connection: Connection, service_data: int = 0
+    ) -> None:
+        if not self.periodic_enabled:
+            raise core.InvalidStateError(
+                f"Periodic Advertising is not enabled on Advertising Set 0x{self.advertising_handle:02X}"
+            )
+        await connection.transfer_periodic_set_info(
+            self.advertising_handle, service_data
+        )
+
     def on_termination(self, status: int) -> None:
         self.enabled = False
         self.emit('termination', status)
@@ -1781,6 +1792,13 @@ class Connection(CompositeEventEmitter):
         self, sync_handle: int, service_data: int = 0
     ) -> None:
         await self.device.transfer_periodic_sync(self, sync_handle, service_data)
+
+    async def transfer_periodic_set_info(
+        self, advertising_handle: int, service_data: int = 0
+    ) -> None:
+        await self.device.transfer_periodic_set_info(
+            self, advertising_handle, service_data
+        )
 
     # [Classic only]
     async def request_remote_name(self):
@@ -3997,6 +4015,18 @@ class Device(CompositeEventEmitter):
                 connection_handle=connection.handle,
                 service_data=service_data,
                 sync_handle=sync_handle,
+            ),
+            check_result=True,
+        )
+
+    async def transfer_periodic_set_info(
+        self, connection: Connection, advertising_handle: int, service_data: int = 0
+    ) -> None:
+        return await self.send_command(
+            hci.HCI_LE_Periodic_Advertising_Set_Info_Transfer_Command(
+                connection_handle=connection.handle,
+                service_data=service_data,
+                advertising_handle=advertising_handle,
             ),
             check_result=True,
         )
