@@ -127,11 +127,9 @@ class BroadcastScanner(pyee.EventEmitter):
         def update(self, advertisement: bumble.device.Advertisement) -> None:
             self.rssi = advertisement.rssi
             for service_data in advertisement.data.get_all(
-                core.AdvertisingData.SERVICE_DATA
+                core.AdvertisingData.Type.SERVICE_DATA_16_BIT_UUID
             ):
-                assert isinstance(service_data, tuple)
                 service_uuid, data = service_data
-                assert isinstance(data, bytes)
 
                 if service_uuid == gatt.GATT_PUBLIC_BROADCAST_ANNOUNCEMENT_SERVICE:
                     self.public_broadcast_announcement = (
@@ -145,16 +143,14 @@ class BroadcastScanner(pyee.EventEmitter):
                     )
                     continue
 
-            self.appearance = advertisement.data.get(  # type: ignore[assignment]
-                core.AdvertisingData.APPEARANCE
+            self.appearance = advertisement.data.get(
+                core.AdvertisingData.Type.APPEARANCE
             )
 
             if manufacturer_data := advertisement.data.get(
-                core.AdvertisingData.MANUFACTURER_SPECIFIC_DATA
+                core.AdvertisingData.Type.MANUFACTURER_SPECIFIC_DATA
             ):
-                assert isinstance(manufacturer_data, tuple)
-                company_id = cast(int, manufacturer_data[0])
-                data = cast(bytes, manufacturer_data[1])
+                company_id, data = manufacturer_data
                 self.manufacturer_data = (
                     company_ids.COMPANY_IDENTIFIERS.get(
                         company_id, f'0x{company_id:04X}'
@@ -271,11 +267,9 @@ class BroadcastScanner(pyee.EventEmitter):
                 return
 
             for service_data in advertisement.data.get_all(
-                core.AdvertisingData.SERVICE_DATA
+                core.AdvertisingData.Type.SERVICE_DATA_16_BIT_UUID
             ):
-                assert isinstance(service_data, tuple)
                 service_uuid, data = service_data
-                assert isinstance(data, bytes)
 
                 if service_uuid == gatt.GATT_BASIC_AUDIO_ANNOUNCEMENT_SERVICE:
                     self.basic_audio_announcement = (
@@ -316,24 +310,23 @@ class BroadcastScanner(pyee.EventEmitter):
     def on_advertisement(self, advertisement: bumble.device.Advertisement) -> None:
         if not (
             ads := advertisement.data.get_all(
-                core.AdvertisingData.SERVICE_DATA_16_BIT_UUID
+                core.AdvertisingData.Type.SERVICE_DATA_16_BIT_UUID
             )
         ) or not (
             broadcast_audio_announcement := next(
                 (
                     ad
                     for ad in ads
-                    if isinstance(ad, tuple)
-                    and ad[0] == gatt.GATT_BROADCAST_AUDIO_ANNOUNCEMENT_SERVICE
+                    if ad[0] == gatt.GATT_BROADCAST_AUDIO_ANNOUNCEMENT_SERVICE
                 ),
                 None,
             )
         ):
             return
 
-        broadcast_name = advertisement.data.get(core.AdvertisingData.BROADCAST_NAME)
-        assert isinstance(broadcast_name, str) or broadcast_name is None
-        assert isinstance(broadcast_audio_announcement[1], bytes)
+        broadcast_name = advertisement.data.get_all(
+            core.AdvertisingData.Type.BROADCAST_NAME
+        )
 
         if broadcast := self.broadcasts.get(advertisement.address):
             broadcast.update(advertisement)
@@ -341,7 +334,7 @@ class BroadcastScanner(pyee.EventEmitter):
 
         bumble.utils.AsyncRunner.spawn(
             self.on_new_broadcast(
-                broadcast_name,
+                broadcast_name[0] if broadcast_name else None,
                 advertisement,
                 bap.BroadcastAudioAnnouncement.from_bytes(
                     broadcast_audio_announcement[1]
