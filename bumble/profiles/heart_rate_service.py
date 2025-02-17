@@ -16,13 +16,14 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
 from enum import IntEnum
 import struct
+from typing import Optional
 
 from bumble import core
-from ..gatt_client import ProfileServiceProxy
-from ..att import ATT_Error
-from ..gatt import (
+from bumble.att import ATT_Error
+from bumble.gatt import (
     GATT_HEART_RATE_SERVICE,
     GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
     GATT_BODY_SENSOR_LOCATION_CHARACTERISTIC,
@@ -30,10 +31,13 @@ from ..gatt import (
     TemplateService,
     Characteristic,
     CharacteristicValue,
-    SerializableCharacteristicAdapter,
+)
+from bumble.gatt_adapters import (
     DelegatedCharacteristicAdapter,
     PackedCharacteristicAdapter,
+    SerializableCharacteristicAdapter,
 )
+from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy
 
 
 # -----------------------------------------------------------------------------
@@ -42,6 +46,10 @@ class HeartRateService(TemplateService):
     HEART_RATE_CONTROL_POINT_FORMAT = 'B'
     CONTROL_POINT_NOT_SUPPORTED = 0x80
     RESET_ENERGY_EXPENDED = 0x01
+
+    heart_rate_measurement_characteristic: Characteristic[HeartRateMeasurement]
+    body_sensor_location_characteristic: Characteristic[BodySensorLocation]
+    heart_rate_control_point_characteristic: Characteristic[int]
 
     class BodySensorLocation(IntEnum):
         OTHER = 0
@@ -197,6 +205,14 @@ class HeartRateService(TemplateService):
 # -----------------------------------------------------------------------------
 class HeartRateServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = HeartRateService
+
+    heart_rate_measurement: Optional[
+        CharacteristicProxy[HeartRateService.HeartRateMeasurement]
+    ]
+    body_sensor_location: Optional[
+        CharacteristicProxy[HeartRateService.BodySensorLocation]
+    ]
+    heart_rate_control_point: Optional[CharacteristicProxy[int]]
 
     def __init__(self, service_proxy):
         self.service_proxy = service_proxy

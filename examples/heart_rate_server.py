@@ -102,7 +102,6 @@ async def main() -> None:
         )
 
         # Notify subscribers of the current value as soon as they subscribe
-        @heart_rate_service.heart_rate_measurement_characteristic.on('subscription')
         def on_subscription(connection, notify_enabled, indicate_enabled):
             if notify_enabled or indicate_enabled:
                 AsyncRunner.spawn(
@@ -111,6 +110,10 @@ async def main() -> None:
                         heart_rate_service.heart_rate_measurement_characteristic,
                     )
                 )
+
+        heart_rate_service.heart_rate_measurement_characteristic.on(
+            'subscription', on_subscription
+        )
 
         # Go!
         await device.power_on()

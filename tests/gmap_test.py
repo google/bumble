@@ -78,7 +78,11 @@ async def test_init_service(gmap_client: GamingAudioServiceProxy):
         | GmapRole.BROADCAST_GAME_RECEIVER
         | GmapRole.BROADCAST_GAME_SENDER
     )
+    assert gmap_client.ugg_features is not None
     assert await gmap_client.ugg_features.read_value() == UggFeatures.UGG_MULTISINK
+    assert gmap_client.ugt_features is not None
     assert await gmap_client.ugt_features.read_value() == UgtFeatures.UGT_SOURCE
+    assert gmap_client.bgr_features is not None
     assert await gmap_client.bgr_features.read_value() == BgrFeatures.BGR_MULTISINK
+    assert gmap_client.bgs_features is not None
     assert await gmap_client.bgs_features.read_value() == BgsFeatures.BGS_96_KBPS

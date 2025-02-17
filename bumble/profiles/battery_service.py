@@ -16,14 +16,20 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from ..gatt_client import ProfileServiceProxy
-from ..gatt import (
+from typing import Optional
+
+from bumble.gatt_client import ProfileServiceProxy
+from bumble.gatt import (
     GATT_BATTERY_SERVICE,
     GATT_BATTERY_LEVEL_CHARACTERISTIC,
     TemplateService,
     Characteristic,
     CharacteristicValue,
+)
+from bumble.gatt_client import CharacteristicProxy
+from bumble.gatt_adapters import (
     PackedCharacteristicAdapter,
+    PackedCharacteristicProxyAdapter,
 )
 
 
@@ -31,6 +37,8 @@ from ..gatt import (
 class BatteryService(TemplateService):
     UUID = GATT_BATTERY_SERVICE
     BATTERY_LEVEL_FORMAT = 'B'
+
+    battery_level_characteristic: Characteristic[int]
 
     def __init__(self, read_battery_level):
         self.battery_level_characteristic = PackedCharacteristicAdapter(
@@ -49,13 +57,15 @@ class BatteryService(TemplateService):
 class BatteryServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = BatteryService
 
+    battery_level: Optional[CharacteristicProxy[int]]
+
     def __init__(self, service_proxy):
         self.service_proxy = service_proxy
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             GATT_BATTERY_LEVEL_CHARACTERISTIC
         ):
-            self.battery_level = PackedCharacteristicAdapter(
+            self.battery_level = PackedCharacteristicProxyAdapter(
                 characteristics[0], pack_format=BatteryService.BATTERY_LEVEL_FORMAT
             )
         else:

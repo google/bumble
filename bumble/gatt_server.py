@@ -36,7 +36,6 @@ from typing import (
     Tuple,
     TypeVar,
     Type,
-    Union,
     TYPE_CHECKING,
 )
 from pyee import EventEmitter
@@ -78,7 +77,6 @@ from bumble.gatt import (
     GATT_REQUEST_TIMEOUT,
     GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
     Characteristic,
-    CharacteristicAdapter,
     CharacteristicDeclaration,
     CharacteristicValue,
     IncludedServiceDeclaration,
@@ -469,7 +467,7 @@ class Server(EventEmitter):
             finally:
                 self.pending_confirmations[connection.handle] = None
 
-    async def notify_or_indicate_subscribers(
+    async def _notify_or_indicate_subscribers(
         self,
         indicate: bool,
         attribute: Attribute,
@@ -503,7 +501,9 @@ class Server(EventEmitter):
         value: Optional[bytes] = None,
         force: bool = False,
     ):
-        return await self.notify_or_indicate_subscribers(False, attribute, value, force)
+        return await self._notify_or_indicate_subscribers(
+            False, attribute, value, force
+        )
 
     async def indicate_subscribers(
         self,
@@ -511,7 +511,7 @@ class Server(EventEmitter):
         value: Optional[bytes] = None,
         force: bool = False,
     ):
-        return await self.notify_or_indicate_subscribers(True, attribute, value, force)
+        return await self._notify_or_indicate_subscribers(True, attribute, value, force)
 
     def on_disconnection(self, connection: Connection) -> None:
         if connection.handle in self.subscribers:

@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+import pytest
 
 from . import test_utils
 
@@ -25,6 +26,7 @@ from bumble.profiles import gatt_service
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_database_hash():
     devices = await test_utils.TwoDevices.create_with_connection()
     devices[0].gatt_server.services.clear()
@@ -118,6 +120,7 @@ async def test_database_hash():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_service_changed():
     devices = await test_utils.TwoDevices.create_with_connection()
     assert (service := devices[0].gatt_service)

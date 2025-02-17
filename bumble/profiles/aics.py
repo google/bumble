@@ -24,16 +24,13 @@ import struct
 from dataclasses import dataclass
 from typing import Optional
 
-from bumble import gatt
 from bumble.device import Connection
 from bumble.att import ATT_Error
 from bumble.gatt import (
+    Attribute,
     Characteristic,
-    SerializableCharacteristicAdapter,
-    PackedCharacteristicAdapter,
     TemplateService,
     CharacteristicValue,
-    UTF8CharacteristicAdapter,
     GATT_AUDIO_INPUT_CONTROL_SERVICE,
     GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
     GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
@@ -41,6 +38,14 @@ from bumble.gatt import (
     GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC,
     GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
     GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
+)
+from bumble.gatt_adapters import (
+    CharacteristicProxy,
+    PackedCharacteristicProxyAdapter,
+    SerializableCharacteristicAdapter,
+    SerializableCharacteristicProxyAdapter,
+    UTF8CharacteristicAdapter,
+    UTF8CharacteristicProxyAdapter,
 )
 from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
 from bumble.utils import OpenIntEnum
@@ -124,7 +129,7 @@ class AudioInputState:
     mute: Mute = Mute.NOT_MUTED
     gain_mode: GainMode = GainMode.MANUAL
     change_counter: int = 0
-    attribute_value: Optional[CharacteristicValue] = None
+    attribute: Optional[Attribute] = None
 
     def __bytes__(self) -> bytes:
         return bytes(
@@ -151,10 +156,8 @@ class AudioInputState:
         self.change_counter = (self.change_counter + 1) % (CHANGE_COUNTER_MAX_VALUE + 1)
 
     async def notify_subscribers_via_connection(self, connection: Connection) -> None:
-        assert self.attribute_value is not None
-        await connection.device.notify_subscribers(
-            attribute=self.attribute_value, value=bytes(self)
-        )
+        assert self.attribute is not None
+        await connection.device.notify_subscribers(attribute=self.attribute)
 
 
 @dataclass
@@ -315,23 +318,27 @@ class AudioInputDescription:
     '''
 
     audio_input_description: str = "Bluetooth"
-    attribute_value: Optional[CharacteristicValue] = None
+    attribute: Optional[Attribute] = None
 
     def on_read(self, _connection: Optional[Connection]) -> str:
         return self.audio_input_description
 
     async def on_write(self, connection: Optional[Connection], value: str) -> None:
         assert connection
-        assert self.attribute_value
+        assert self.attribute
 
         self.audio_input_description = value
-        await connection.device.notify_subscribers(
-            attribute=self.attribute_value, value=value
-        )
+        await connection.device.notify_subscribers(attribute=self.attribute)
 
 
 class AICSService(TemplateService):
     UUID = GATT_AUDIO_INPUT_CONTROL_SERVICE
+
+    audio_input_state_characteristic: Characteristic[AudioInputState]
+    audio_input_type_characteristic: Characteristic[bytes]
+    audio_input_status_characteristic: Characteristic[bytes]
+    audio_input_control_point_characteristic: Characteristic[bytes]
+    gain_settings_properties_characteristic: Characteristic[GainSettingsProperties]
 
     def __init__(
         self,
@@ -374,9 +381,7 @@ class AICSService(TemplateService):
             ),
             AudioInputState,
         )
-        self.audio_input_state.attribute_value = (
-            self.audio_input_state_characteristic.value
-        )
+        self.audio_input_state.attribute = self.audio_input_state_characteristic
 
         self.gain_settings_properties_characteristic = (
             SerializableCharacteristicAdapter(
@@ -425,8 +430,8 @@ class AICSService(TemplateService):
                 ),
             )
         )
-        self.audio_input_description.attribute_value = (
-            self.audio_input_control_point_characteristic.value
+        self.audio_input_description.attribute = (
+            self.audio_input_control_point_characteristic
         )
 
         super().__init__(
@@ -448,24 +453,29 @@ class AICSService(TemplateService):
 class AICSServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = AICSService
 
+    audio_input_state: CharacteristicProxy[AudioInputState]
+    gain_settings_properties: CharacteristicProxy[GainSettingsProperties]
+    audio_input_status: CharacteristicProxy[int]
+    audio_input_control_point: CharacteristicProxy[bytes]
+
     def __init__(self, service_proxy: ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        self.audio_input_state = SerializableCharacteristicAdapter(
+        self.audio_input_state = SerializableCharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_AUDIO_INPUT_STATE_CHARACTERISTIC
             ),
             AudioInputState,
         )
 
-        self.gain_settings_properties = SerializableCharacteristicAdapter(
+        self.gain_settings_properties = SerializableCharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC
             ),
             GainSettingsProperties,
         )
 
-        self.audio_input_status = PackedCharacteristicAdapter(
+        self.audio_input_status = PackedCharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC
             ),
@@ -478,7 +488,7 @@ class AICSServiceProxy(ProfileServiceProxy):
             )
         )
 
-        self.audio_input_description = UTF8CharacteristicAdapter(
+        self.audio_input_description = UTF8CharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC
             )

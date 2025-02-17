@@ -502,3 +502,13 @@ class ByteSerializable(Protocol):
     def from_bytes(cls, data: bytes) -> Self: ...
 
     def __bytes__(self) -> bytes: ...
+
+
+# -----------------------------------------------------------------------------
+class IntConvertible(Protocol):
+    """
+    Type protocol for classes that can be instantiated from int and converted to int.
+    """
+
+    def __init__(self, value: int) -> None: ...
+    def __int__(self) -> int: ...

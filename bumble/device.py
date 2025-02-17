@@ -53,7 +53,7 @@ from pyee import EventEmitter
 
 from .colors import color
 from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
-from .gatt import Characteristic, Descriptor, Service
+from .gatt import Attribute, Characteristic, Descriptor, Service
 from .host import DataPacketQueue, Host
 from .profiles.gap import GenericAccessService
 from .core import (
@@ -2221,7 +2221,7 @@ class Device(CompositeEventEmitter):
                         permissions=descriptor["permissions"],
                     )
                     descriptors.append(new_descriptor)
-                new_characteristic = Characteristic(
+                new_characteristic: Characteristic[bytes] = Characteristic(
                     uuid=characteristic["uuid"],
                     properties=Characteristic.Properties.from_string(
                         characteristic["properties"]
@@ -4920,16 +4920,84 @@ class Device(CompositeEventEmitter):
             self.gatt_service = gatt_service.GenericAttributeProfileService()
             self.gatt_server.add_service(self.gatt_service)
 
-    async def notify_subscriber(self, connection, attribute, value=None, force=False):
+    async def notify_subscriber(
+        self,
+        connection: Connection,
+        attribute: Attribute,
+        value: Optional[Any] = None,
+        force: bool = False,
+    ) -> None:
+        """
+        Send a notification to an attribute subscriber.
+
+        Args:
+           connection:
+             The connection of the subscriber.
+           attribute:
+             The attribute whose value is notified.
+           value:
+             The value of the attribute (if None, the value is read from the attribute)
+            force:
+              If True, send a notification even if there is no subscriber.
+        """
         await self.gatt_server.notify_subscriber(connection, attribute, value, force)
 
-    async def notify_subscribers(self, attribute, value=None, force=False):
+    async def notify_subscribers(
+        self, attribute: Attribute, value=None, force=False
+    ) -> None:
+        """
+        Send a notification to all the subscribers of an attribute.
+
+        Args:
+           attribute:
+             The attribute whose value is notified.
+           value:
+             The value of the attribute (if None, the value is read from the attribute)
+            force:
+              If True, send a notification for every connection even if there is no
+              subscriber.
+        """
         await self.gatt_server.notify_subscribers(attribute, value, force)
 
-    async def indicate_subscriber(self, connection, attribute, value=None, force=False):
+    async def indicate_subscriber(
+        self,
+        connection: Connection,
+        attribute: Attribute,
+        value: Optional[Any] = None,
+        force: bool = False,
+    ):
+        """
+        Send an indication to an attribute subscriber.
+
+        This method returns when the response to the indication has been received.
+
+        Args:
+           connection:
+             The connection of the subscriber.
+           attribute:
+             The attribute whose value is indicated.
+           value:
+             The value of the attribute (if None, the value is read from the attribute)
+            force:
+              If True, send an indication even if there is no subscriber.
+        """
         await self.gatt_server.indicate_subscriber(connection, attribute, value, force)
 
-    async def indicate_subscribers(self, attribute, value=None, force=False):
+    async def indicate_subscribers(
+        self, attribute: Attribute, value: Optional[Any] = None, force: bool = False
+    ):
+        """
+        Send an indication to all the subscribers of an attribute.
+
+        Args:
+           attribute:
+             The attribute whose value is notified.
+           value:
+             The value of the attribute (if None, the value is read from the attribute)
+            force:
+              If True, send an indication for every connection even if there is no
+              subscriber.
+        """
         await self.gatt_server.indicate_subscribers(attribute, value, force)
 
     @host_event_handler
