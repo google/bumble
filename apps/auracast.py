@@ -692,7 +692,7 @@ async def run_receive(
         def on_new_broadcast(broadcast: BroadcastScanner.Broadcast) -> None:
             if scan_result.done():
                 return
-            if broadcast_id is None or broadcast.broadcast_:id == broadcast_id:
+            if broadcast_id is None or broadcast.broadcast_id == broadcast_id:
                 scan_result.set_result(broadcast)
 
         scanner.on('new_broadcast', on_new_broadcast)
