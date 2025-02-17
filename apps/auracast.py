@@ -965,9 +965,9 @@ async def run_transmit(
                 bumble.device.IsoPacketStream(big.bis_links[1], 64),
             ]
 
-            for queue in iso_queues:
-                await queue.iso_link.setup_data_path(
-                    direction=queue.iso_link.Direction.HOST_TO_CONTROLLER
+            for bis_link in big.bis_links:
+                await bis_link.setup_data_path(
+                    direction=bis_link.Direction.HOST_TO_CONTROLLER
             )
 
             def on_flow():
