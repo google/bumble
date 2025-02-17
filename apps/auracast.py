@@ -692,7 +692,7 @@ async def run_receive(
         def on_new_broadcast(broadcast: BroadcastScanner.Broadcast) -> None:
             if scan_result.done():
                 return
-            if broadcast_id is None or broadcast.broadcast_id == broadcast_id:
+            if broadcast_id is None or broadcast.broadcast_:id == broadcast_id:
                 scan_result.set_result(broadcast)
 
         scanner.on('new_broadcast', on_new_broadcast)
@@ -959,16 +959,15 @@ async def run_transmit(
                     ),
                 ),
             )
+            for bis_link in big.bis_links:
+                await bis_link.setup_data_path(
+                    direction=bis_link.Direction.HOST_TO_CONTROLLER
+            )
 
             iso_queues = [
                 bumble.device.IsoPacketStream(big.bis_links[0], 64),
                 bumble.device.IsoPacketStream(big.bis_links[1], 64),
             ]
-
-            for bis_link in big.bis_links:
-                await bis_link.setup_data_path(
-                    direction=bis_link.Direction.HOST_TO_CONTROLLER
-            )
 
             def on_flow():
                 data_packet_queue = iso_queues[0].data_packet_queue
