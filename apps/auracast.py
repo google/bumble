@@ -959,6 +959,10 @@ async def run_transmit(
                     ),
                 ),
             )
+            for bis_link in big.bis_links:
+                await bis_link.setup_data_path(
+                    direction=bis_link.Direction.HOST_TO_CONTROLLER
+                )
 
             iso_queues = [
                 bumble.device.IsoPacketStream(big.bis_links[0], 64),
