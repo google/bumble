@@ -371,9 +371,7 @@ class HostService(HostServicer):
             scan_response_data=scan_response_data,
         )
 
-        pending_connection: asyncio.Future[bumble.device.Connection] = (
-            asyncio.get_running_loop().create_future()
-        )
+        connections: asyncio.Queue[bumble.device.Connection] = asyncio.Queue()
 
         if request.connectable:
 
@@ -382,7 +380,7 @@ class HostService(HostServicer):
                     connection.transport == BT_LE_TRANSPORT
                     and connection.role == BT_PERIPHERAL_ROLE
                 ):
-                    pending_connection.set_result(connection)
+                    connections.put_nowait(connection)
 
             self.device.on('connection', on_connection)
 
@@ -397,8 +395,7 @@ class HostService(HostServicer):
                     await asyncio.sleep(1)
                     continue
 
-                connection = await pending_connection
-                pending_connection = asyncio.get_running_loop().create_future()
+                connection = await connections.get()
 
                 cookie = any_pb2.Any(value=connection.handle.to_bytes(4, 'big'))
                 yield AdvertiseResponse(connection=Connection(cookie=cookie))
@@ -492,6 +489,8 @@ class HostService(HostServicer):
                 target = Address(target_bytes, Address.RANDOM_DEVICE_ADDRESS)
                 advertising_type = AdvertisingType.DIRECTED_CONNECTABLE_LOW_DUTY
 
+        connections: asyncio.Queue[bumble.device.Connection] = asyncio.Queue()
+
         if request.connectable:
 
             def on_connection(connection: bumble.device.Connection) -> None:
@@ -499,7 +498,7 @@ class HostService(HostServicer):
                     connection.transport == BT_LE_TRANSPORT
                     and connection.role == BT_PERIPHERAL_ROLE
                 ):
-                    pending_connection.set_result(connection)
+                    connections.put_nowait(connection)
 
             self.device.on('connection', on_connection)
 
@@ -517,12 +516,8 @@ class HostService(HostServicer):
                     await asyncio.sleep(1)
                     continue
 
-                pending_connection: asyncio.Future[bumble.device.Connection] = (
-                    asyncio.get_running_loop().create_future()
-                )
-
                 self.log.debug('Wait for LE connection...')
-                connection = await pending_connection
+                connection = await connections.get()
 
                 self.log.debug(
                     f"Advertise: Connected to {connection.peer_address} (handle={connection.handle})"
