@@ -22,7 +22,6 @@
 import asyncio
 import logging
 import os
-import random
 import re
 import humanize
 from typing import Optional, Union
@@ -57,7 +56,13 @@ from bumble import __version__
 import bumble.core
 from bumble import colors
 from bumble.core import UUID, AdvertisingData, BT_LE_TRANSPORT
-from bumble.device import ConnectionParametersPreferences, Device, Connection, Peer
+from bumble.device import (
+    ConnectionParametersPreferences,
+    ConnectionPHY,
+    Device,
+    Connection,
+    Peer,
+)
 from bumble.utils import AsyncRunner
 from bumble.transport import open_transport_or_link
 from bumble.gatt import Characteristic, Service, CharacteristicDeclaration, Descriptor
@@ -125,6 +130,7 @@ def parse_phys(phys):
 # -----------------------------------------------------------------------------
 class ConsoleApp:
     connected_peer: Optional[Peer]
+    connection_phy: Optional[ConnectionPHY]
 
     def __init__(self):
         self.known_addresses = set()
@@ -132,6 +138,7 @@ class ConsoleApp:
         self.known_local_attributes = []
         self.device = None
         self.connected_peer = None
+        self.connection_phy = None
         self.top_tab = 'device'
         self.monitor_rssi = False
         self.connection_rssi = None
@@ -332,10 +339,10 @@ class ConsoleApp:
                     f'{connection.parameters.peripheral_latency}/'
                     f'{connection.parameters.supervision_timeout}'
                 )
-                if connection.transport == BT_LE_TRANSPORT:
+                if self.connection_phy is not None:
                     phy_state = (
-                        f' RX={le_phy_name(connection.phy.rx_phy)}/'
-                        f'TX={le_phy_name(connection.phy.tx_phy)}'
+                        f' RX={le_phy_name(self.connection_phy.rx_phy)}/'
+                        f'TX={le_phy_name(self.connection_phy.tx_phy)}'
                     )
                 else:
                     phy_state = ''
@@ -654,11 +661,12 @@ class ConsoleApp:
         self.append_to_output('connecting...')
 
         try:
-            await self.device.connect(
+            connection = await self.device.connect(
                 params[0],
                 connection_parameters_preferences=connection_parameters_preferences,
                 timeout=DEFAULT_CONNECTION_TIMEOUT,
             )
+            self.connection_phy = await connection.get_phy()
             self.top_tab = 'services'
         except bumble.core.TimeoutError:
             self.show_error('connection timed out')
@@ -838,8 +846,8 @@ class ConsoleApp:
 
         phy = await self.connected_peer.connection.get_phy()
         self.append_to_output(
-            f'PHY: RX={HCI_Constant.le_phy_name(phy[0])}, '
-            f'TX={HCI_Constant.le_phy_name(phy[1])}'
+            f'PHY: RX={HCI_Constant.le_phy_name(phy.rx_phy)}, '
+            f'TX={HCI_Constant.le_phy_name(phy.tx_phy)}'
         )
 
     async def do_request_mtu(self, params):
@@ -1076,10 +1084,9 @@ class DeviceListener(Device.Listener, Connection.Listener):
             f'{self.app.connected_peer.connection.parameters}'
         )
 
-    def on_connection_phy_update(self):
-        self.app.append_to_output(
-            f'connection phy update: {self.app.connected_peer.connection.phy}'
-        )
+    def on_connection_phy_update(self, phy):
+        self.app.connection_phy = phy
+        self.app.append_to_output(f'connection phy update: {phy}')
 
     def on_connection_att_mtu_update(self):
         self.app.append_to_output(

@@ -1098,8 +1098,11 @@ class Host(AbortableEventEmitter):
 
         # Notify the client
         if event.status == hci.HCI_SUCCESS:
-            connection_phy = ConnectionPHY(event.tx_phy, event.rx_phy)
-            self.emit('connection_phy_update', connection.handle, connection_phy)
+            self.emit(
+                'connection_phy_update',
+                connection.handle,
+                ConnectionPHY(event.tx_phy, event.rx_phy),
+            )
         else:
             self.emit('connection_phy_update_failure', connection.handle, event.status)
 

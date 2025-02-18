@@ -1586,7 +1586,7 @@ class Connection(CompositeEventEmitter):
         def on_connection_data_length_change(self):
             pass
 
-        def on_connection_phy_update(self):
+        def on_connection_phy_update(self, phy):
             pass
 
         def on_connection_phy_update_failure(self, error):
@@ -1612,7 +1612,6 @@ class Connection(CompositeEventEmitter):
         peer_resolvable_address,
         role,
         parameters,
-        phy,
     ):
         super().__init__()
         self.device = device
@@ -1629,7 +1628,6 @@ class Connection(CompositeEventEmitter):
         self.authenticated = False
         self.sc = False
         self.link_key_type = None
-        self.phy = phy
         self.att_mtu = ATT_DEFAULT_MTU
         self.data_length = DEVICE_DEFAULT_DATA_LENGTH
         self.gatt_client = None  # Per-connection client
@@ -1657,7 +1655,6 @@ class Connection(CompositeEventEmitter):
             peer_address,
             None,
             role,
-            None,
             None,
         )
 
@@ -1774,11 +1771,11 @@ class Connection(CompositeEventEmitter):
     async def set_phy(self, tx_phys=None, rx_phys=None, phy_options=None):
         return await self.device.set_connection_phy(self, tx_phys, rx_phys, phy_options)
 
+    async def get_phy(self) -> ConnectionPHY:
+        return await self.device.get_connection_phy(self)
+
     async def get_rssi(self):
         return await self.device.get_connection_rssi(self)
-
-    async def get_phy(self):
-        return await self.device.get_connection_phy(self)
 
     async def transfer_periodic_sync(
         self, sync_handle: int, service_data: int = 0
@@ -3937,12 +3934,14 @@ class Device(CompositeEventEmitter):
         )
         return result.return_parameters.rssi
 
-    async def get_connection_phy(self, connection):
+    async def get_connection_phy(self, connection: Connection) -> ConnectionPHY:
         result = await self.send_command(
             hci.HCI_LE_Read_PHY_Command(connection_handle=connection.handle),
             check_result=True,
         )
-        return (result.return_parameters.tx_phy, result.return_parameters.rx_phy)
+        return ConnectionPHY(
+            result.return_parameters.tx_phy, result.return_parameters.rx_phy
+        )
 
     async def set_connection_phy(
         self, connection, tx_phys=None, rx_phys=None, phy_options=None
@@ -5101,29 +5100,6 @@ class Device(CompositeEventEmitter):
                 lambda _: self.abort_on('flush', advertising_set.start()),
             )
 
-        self._emit_le_connection(connection)
-
-    def _emit_le_connection(self, connection: Connection) -> None:
-        # If supported, read which PHY we're connected with before
-        # notifying listeners of the new connection.
-        if self.host.supports_command(hci.HCI_LE_READ_PHY_COMMAND):
-
-            async def read_phy():
-                result = await self.send_command(
-                    hci.HCI_LE_Read_PHY_Command(connection_handle=connection.handle),
-                    check_result=True,
-                )
-                connection.phy = ConnectionPHY(
-                    result.return_parameters.tx_phy, result.return_parameters.rx_phy
-                )
-                # Emit an event to notify listeners of the new connection
-                self.emit('connection', connection)
-
-            # Do so asynchronously to not block the current event handler
-            connection.abort_on('disconnection', read_phy())
-
-            return
-
         self.emit('connection', connection)
 
     @host_event_handler
@@ -5222,7 +5198,6 @@ class Device(CompositeEventEmitter):
             peer_resolvable_address,
             role,
             connection_parameters,
-            ConnectionPHY(hci.HCI_LE_1M_PHY, hci.HCI_LE_1M_PHY),
         )
         self.connections[connection_handle] = connection
 
@@ -5238,7 +5213,7 @@ class Device(CompositeEventEmitter):
 
         if role == hci.HCI_CENTRAL_ROLE or not self.supports_le_extended_advertising:
             # We can emit now, we have all the info we need
-            self._emit_le_connection(connection)
+            self.emit('connection', connection)
             return
 
         if role == hci.HCI_PERIPHERAL_ROLE and self.supports_le_extended_advertising:
@@ -5792,14 +5767,13 @@ class Device(CompositeEventEmitter):
 
     @host_event_handler
     @with_connection_from_handle
-    def on_connection_phy_update(self, connection, connection_phy):
+    def on_connection_phy_update(self, connection, phy):
         logger.debug(
             f'*** Connection PHY Update: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}, '
-            f'{connection_phy}'
+            f'{phy}'
         )
-        connection.phy = connection_phy
-        connection.emit('connection_phy_update')
+        connection.emit('connection_phy_update', phy)
 
     @host_event_handler
     @with_connection_from_handle
