@@ -104,15 +104,16 @@ def le_phy_name(phy_id):
     )
 
 
+def print_connection_phy(phy):
+    logging.info(
+        color('@@@ PHY: ', 'yellow') + f'TX:{le_phy_name(phy.tx_phy)}/'
+        f'RX:{le_phy_name(phy.rx_phy)}'
+    )
+
+
 def print_connection(connection):
     params = []
     if connection.transport == BT_LE_TRANSPORT:
-        params.append(
-            'PHY='
-            f'TX:{le_phy_name(connection.phy.tx_phy)}/'
-            f'RX:{le_phy_name(connection.phy.rx_phy)}'
-        )
-
         params.append(
             'DL=('
             f'TX:{connection.data_length[0]}/{connection.data_length[1]},'
@@ -1288,6 +1289,8 @@ class Central(Connection.Listener):
             logging.info(color('### Connected', 'cyan'))
             self.connection.listener = self
             print_connection(self.connection)
+            phy = await self.connection.get_phy()
+            print_connection_phy(phy)
 
             # Switch roles if needed.
             if self.role_switch:
@@ -1345,8 +1348,8 @@ class Central(Connection.Listener):
     def on_connection_parameters_update(self):
         print_connection(self.connection)
 
-    def on_connection_phy_update(self):
-        print_connection(self.connection)
+    def on_connection_phy_update(self, phy):
+        print_connection_phy(phy)
 
     def on_connection_att_mtu_update(self):
         print_connection(self.connection)
@@ -1472,8 +1475,8 @@ class Peripheral(Device.Listener, Connection.Listener):
     def on_connection_parameters_update(self):
         print_connection(self.connection)
 
-    def on_connection_phy_update(self):
-        print_connection(self.connection)
+    def on_connection_phy_update(self, phy):
+        print_connection_phy(phy)
 
     def on_connection_att_mtu_update(self):
         print_connection(self.connection)
