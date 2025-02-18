@@ -48,10 +48,7 @@ _T3 = TypeVar('_T3', bound=IntConvertible)
 
 # -----------------------------------------------------------------------------
 class CharacteristicAdapter(Characteristic, Generic[_T]):
-    '''
-    An adapter that can adapt a Characteristic to automatically encode/decode values
-    read/written from the characteristic.
-    '''
+    '''Base class for GATT Characteristic adapters.'''
 
     def __init__(self, characteristic: Characteristic) -> None:
         super().__init__(
@@ -65,20 +62,7 @@ class CharacteristicAdapter(Characteristic, Generic[_T]):
 
 # -----------------------------------------------------------------------------
 class CharacteristicProxyAdapter(CharacteristicProxy[_T]):
-    '''
-    An adapter that can adapt Characteristic and AttributeProxy objects
-    by wrapping their `read_value()` and `write_value()` methods with ones that
-    return/accept encoded/decoded values.
-
-    For proxies (i.e used by a GATT client), the adaptation is one where the return
-    value of `read_value()` is decoded and the value passed to `write_value()` is
-    encoded. The `subscribe()` method, is wrapped with one where the values are decoded
-    before being passed to the subscriber.
-
-    For local values (i.e hosted by a GATT server) the adaptation is one where the
-    return value of `read_value()` is encoded and the value passed to `write_value()`
-    is decoded.
-    '''
+    '''Base class for GATT CharacteristicProxy adapters.'''
 
     def __init__(self, characteristic_proxy: CharacteristicProxy):
         super().__init__(
