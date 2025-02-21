@@ -235,7 +235,7 @@ class Host(AbortableEventEmitter):
     cis_links: Dict[int, IsoLink]
     bis_links: Dict[int, IsoLink]
     sco_links: Dict[int, ScoLink]
-    bigs: dict[int, set[int]] = {}  # BIG Handle to BIS Handles
+    bigs: dict[int, set[int]]
     acl_packet_queue: Optional[DataPacketQueue] = None
     le_acl_packet_queue: Optional[DataPacketQueue] = None
     iso_packet_queue: Optional[DataPacketQueue] = None
@@ -259,6 +259,7 @@ class Host(AbortableEventEmitter):
         self.cis_links = {}  # CIS links, by connection handle
         self.bis_links = {}  # BIS links, by connection handle
         self.sco_links = {}  # SCO links, by connection handle
+        self.bigs = {}  # BIG Handle to BIS Handles
         self.pending_command = None
         self.pending_response: Optional[asyncio.Future[Any]] = None
         self.number_of_supported_advertising_sets = 0
