@@ -1,4 +1,4 @@
-# Copyright 2021-2023 Google LLC
+# Copyright 2021-2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -76,18 +76,18 @@ class OobData:
         return instance
 
     def to_ad(self) -> AdvertisingData:
-        ad_structures = []
+        ad_structures: list[tuple[int, bytes]] = []
         if self.address is not None:
             ad_structures.append(
-                (AdvertisingData.LE_BLUETOOTH_DEVICE_ADDRESS, bytes(self.address))
+                (AdvertisingData.Type.LE_BLUETOOTH_DEVICE_ADDRESS, bytes(self.address))
             )
         if self.role is not None:
-            ad_structures.append((AdvertisingData.LE_ROLE, bytes([self.role])))
+            ad_structures.append((AdvertisingData.Type.LE_ROLE, bytes([self.role])))
         if self.shared_data is not None:
             ad_structures.extend(self.shared_data.to_ad().ad_structures)
         if self.legacy_context is not None:
             ad_structures.append(
-                (AdvertisingData.SECURITY_MANAGER_TK_VALUE, self.legacy_context.tk)
+                (AdvertisingData.Type.SECURITY_MANAGER_TK_VALUE, self.legacy_context.tk)
             )
 
         return AdvertisingData(ad_structures)
