@@ -301,7 +301,7 @@ class AseStateMachine(gatt.Characteristic):
     presentation_delay = 0
 
     # Additional parameters in ENABLING, STREAMING, DISABLING State
-    metadata = le_audio.Metadata()
+    metadata: le_audio.Metadata
 
     def __init__(
         self,
@@ -313,6 +313,7 @@ class AseStateMachine(gatt.Characteristic):
         self.ase_id = ase_id
         self._state = AseStateMachine.State.IDLE
         self.role = role
+        self.metadata = le_audio.Metadata()
 
         uuid = (
             gatt.GATT_SINK_ASE_CHARACTERISTIC

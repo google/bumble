@@ -1569,8 +1569,8 @@ class Connection(CompositeEventEmitter):
     gatt_client: gatt_client.Client
     pairing_peer_io_capability: Optional[int]
     pairing_peer_authentication_requirements: Optional[int]
-    cs_configs: dict[int, ChannelSoundingConfig] = {}  # Config ID to Configuration
-    cs_procedures: dict[int, ChannelSoundingProcedure] = {}  # Config ID to Procedures
+    cs_configs: dict[int, ChannelSoundingConfig]  # Config ID to Configuration
+    cs_procedures: dict[int, ChannelSoundingProcedure]  # Config ID to Procedures
 
     @composite_listener
     class Listener:
@@ -1637,6 +1637,8 @@ class Connection(CompositeEventEmitter):
         self.pairing_peer_io_capability = None
         self.pairing_peer_authentication_requirements = None
         self.peer_le_features = None
+        self.cs_configs = {}
+        self.cs_procedures = {}
 
     # [Classic only]
     @classmethod
@@ -2046,9 +2048,9 @@ class Device(CompositeEventEmitter):
     legacy_advertiser: Optional[LegacyAdvertiser]
     sco_links: Dict[int, ScoLink]
     cis_links: Dict[int, CisLink]
-    bigs = dict[int, Big]()
-    bis_links = dict[int, BisLink]()
-    big_syncs = dict[int, BigSync]()
+    bigs: dict[int, Big]
+    bis_links: dict[int, BisLink]
+    big_syncs: dict[int, BigSync]
     _pending_cis: Dict[int, tuple[int, int]]
     gatt_service: gatt_service.GenericAttributeProfileService | None = None
 
@@ -2141,6 +2143,9 @@ class Device(CompositeEventEmitter):
         self.sco_links = {}  # ScoLinks, by connection handle (BR/EDR only)
         self.cis_links = {}  # CisLinks, by connection handle (LE only)
         self._pending_cis = {}  # (CIS_ID, CIG_ID), by CIS_handle
+        self.bigs = {}
+        self.bis_links = {}
+        self.big_syncs = {}
         self.classic_enabled = False
         self.inquiry_response = None
         self.address_resolver = None
