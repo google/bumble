@@ -27,7 +27,6 @@ import logging
 import os
 import struct
 from typing import (
-    cast,
     Any,
     AsyncGenerator,
     Coroutine,
