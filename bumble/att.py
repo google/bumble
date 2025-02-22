@@ -885,9 +885,7 @@ class Attribute(EventEmitter, Generic[_T]):
             )
 
         value: Union[_T, None]
-        if self.value is None:
-            value = None
-        elif hasattr(self.value, 'read'):
+        if isinstance(self.value, AttributeValue):
             try:
                 read_value = self.value.read(connection)
                 if inspect.isawaitable(read_value):
@@ -930,7 +928,7 @@ class Attribute(EventEmitter, Generic[_T]):
 
         decoded_value = self.decode_value(value)
 
-        if self.value is not None and hasattr(self.value, 'write'):
+        if isinstance(self.value, AttributeValue):
             try:
                 result = self.value.write(connection, decoded_value)
                 if inspect.isawaitable(result):
