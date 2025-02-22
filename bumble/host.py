@@ -1062,8 +1062,10 @@ class Host(AbortableEventEmitter):
             )
 
             # Flush the data queues
-            self.acl_packet_queue.flush(handle)
-            self.le_acl_packet_queue.flush(handle)
+            if self.acl_packet_queue:
+                self.acl_packet_queue.flush(handle)
+            if self.le_acl_packet_queue:
+                self.le_acl_packet_queue.flush(handle)
             if self.iso_packet_queue:
                 self.iso_packet_queue.flush(handle)
         else:
