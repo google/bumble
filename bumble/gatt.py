@@ -27,28 +27,16 @@ import enum
 import functools
 import logging
 import struct
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    SupportsBytes,
-    Type,
-    Union,
-    TYPE_CHECKING,
-)
+from typing import Iterable, List, Optional, Sequence, TypeVar, Union
 
 from bumble.colors import color
-from bumble.core import BaseBumbleError, InvalidOperationError, UUID
+from bumble.core import BaseBumbleError, UUID
 from bumble.att import Attribute, AttributeValue
-from bumble.utils import ByteSerializable
 
-if TYPE_CHECKING:
-    from bumble.gatt_client import AttributeProxy
-
+# -----------------------------------------------------------------------------
+# Typing
+# -----------------------------------------------------------------------------
+_T = TypeVar('_T')
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -436,7 +424,7 @@ class IncludedServiceDeclaration(Attribute):
 
 
 # -----------------------------------------------------------------------------
-class Characteristic(Attribute):
+class Characteristic(Attribute[_T]):
     '''
     See Vol 3, Part G - 3.3 CHARACTERISTIC DEFINITION
     '''
@@ -499,7 +487,7 @@ class Characteristic(Attribute):
         uuid: Union[str, bytes, UUID],
         properties: Characteristic.Properties,
         permissions: Union[str, Attribute.Permissions],
-        value: Any = b'',
+        value: Union[AttributeValue[_T], _T, None] = None,
         descriptors: Sequence[Descriptor] = (),
     ):
         super().__init__(uuid, permissions, value)
@@ -559,215 +547,8 @@ class CharacteristicDeclaration(Attribute):
 
 
 # -----------------------------------------------------------------------------
-class CharacteristicValue(AttributeValue):
+class CharacteristicValue(AttributeValue[_T]):
     """Same as AttributeValue, for backward compatibility"""
-
-
-# -----------------------------------------------------------------------------
-class CharacteristicAdapter:
-    '''
-    An adapter that can adapt Characteristic and AttributeProxy objects
-    by wrapping their `read_value()` and `write_value()` methods with ones that
-    return/accept encoded/decoded values.
-
-    For proxies (i.e used by a GATT client), the adaptation is one where the return
-    value of `read_value()` is decoded and the value passed to `write_value()` is
-    encoded. The `subscribe()` method, is wrapped with one where the values are decoded
-    before being passed to the subscriber.
-
-    For local values (i.e hosted by a GATT server) the adaptation is one where the
-    return value of `read_value()` is encoded and the value passed to `write_value()`
-    is decoded.
-    '''
-
-    read_value: Callable
-    write_value: Callable
-
-    def __init__(self, characteristic: Union[Characteristic, AttributeProxy]):
-        self.wrapped_characteristic = characteristic
-        self.subscribers: Dict[Callable, Callable] = (
-            {}
-        )  # Map from subscriber to proxy subscriber
-
-        if isinstance(characteristic, Characteristic):
-            self.read_value = self.read_encoded_value
-            self.write_value = self.write_encoded_value
-        else:
-            self.read_value = self.read_decoded_value
-            self.write_value = self.write_decoded_value
-            self.subscribe = self.wrapped_subscribe
-            self.unsubscribe = self.wrapped_unsubscribe
-
-    def __getattr__(self, name):
-        return getattr(self.wrapped_characteristic, name)
-
-    def __setattr__(self, name, value):
-        if name in (
-            'wrapped_characteristic',
-            'subscribers',
-            'read_value',
-            'write_value',
-            'subscribe',
-            'unsubscribe',
-        ):
-            super().__setattr__(name, value)
-        else:
-            setattr(self.wrapped_characteristic, name, value)
-
-    async def read_encoded_value(self, connection):
-        return self.encode_value(
-            await self.wrapped_characteristic.read_value(connection)
-        )
-
-    async def write_encoded_value(self, connection, value):
-        return await self.wrapped_characteristic.write_value(
-            connection, self.decode_value(value)
-        )
-
-    async def read_decoded_value(self):
-        return self.decode_value(await self.wrapped_characteristic.read_value())
-
-    async def write_decoded_value(self, value, with_response=False):
-        return await self.wrapped_characteristic.write_value(
-            self.encode_value(value), with_response
-        )
-
-    def encode_value(self, value):
-        return value
-
-    def decode_value(self, value):
-        return value
-
-    def wrapped_subscribe(self, subscriber=None):
-        if subscriber is not None:
-            if subscriber in self.subscribers:
-                # We already have a proxy subscriber
-                subscriber = self.subscribers[subscriber]
-            else:
-                # Create and register a proxy that will decode the value
-                original_subscriber = subscriber
-
-                def on_change(value):
-                    original_subscriber(self.decode_value(value))
-
-                self.subscribers[subscriber] = on_change
-                subscriber = on_change
-
-        return self.wrapped_characteristic.subscribe(subscriber)
-
-    def wrapped_unsubscribe(self, subscriber=None):
-        if subscriber in self.subscribers:
-            subscriber = self.subscribers.pop(subscriber)
-
-        return self.wrapped_characteristic.unsubscribe(subscriber)
-
-    def __str__(self) -> str:
-        wrapped = str(self.wrapped_characteristic)
-        return f'{self.__class__.__name__}({wrapped})'
-
-
-# -----------------------------------------------------------------------------
-class DelegatedCharacteristicAdapter(CharacteristicAdapter):
-    '''
-    Adapter that converts bytes values using an encode and a decode function.
-    '''
-
-    def __init__(self, characteristic, encode=None, decode=None):
-        super().__init__(characteristic)
-        self.encode = encode
-        self.decode = decode
-
-    def encode_value(self, value):
-        if self.encode is None:
-            raise InvalidOperationError('delegated adapter does not have an encoder')
-        return self.encode(value)
-
-    def decode_value(self, value):
-        if self.decode is None:
-            raise InvalidOperationError('delegate adapter does not have a decoder')
-        return self.decode(value)
-
-
-# -----------------------------------------------------------------------------
-class PackedCharacteristicAdapter(CharacteristicAdapter):
-    '''
-    Adapter that packs/unpacks characteristic values according to a standard
-    Python `struct` format.
-    For formats with a single value, the adapted `read_value` and `write_value`
-    methods return/accept single values. For formats with multiple values,
-    they return/accept a tuple with the same number of elements as is required for
-    the format.
-    '''
-
-    def __init__(self, characteristic, pack_format):
-        super().__init__(characteristic)
-        self.struct = struct.Struct(pack_format)
-
-    def pack(self, *values):
-        return self.struct.pack(*values)
-
-    def unpack(self, buffer):
-        return self.struct.unpack(buffer)
-
-    def encode_value(self, value):
-        return self.pack(*value if isinstance(value, tuple) else (value,))
-
-    def decode_value(self, value):
-        unpacked = self.unpack(value)
-        return unpacked[0] if len(unpacked) == 1 else unpacked
-
-
-# -----------------------------------------------------------------------------
-class MappedCharacteristicAdapter(PackedCharacteristicAdapter):
-    '''
-    Adapter that packs/unpacks characteristic values according to a standard
-    Python `struct` format.
-    The adapted `read_value` and `write_value` methods return/accept a dictionary which
-    is packed/unpacked according to format, with the arguments extracted from the
-    dictionary by key, in the same order as they occur in the `keys` parameter.
-    '''
-
-    def __init__(self, characteristic, pack_format, keys):
-        super().__init__(characteristic, pack_format)
-        self.keys = keys
-
-    # pylint: disable=arguments-differ
-    def pack(self, values):
-        return super().pack(*(values[key] for key in self.keys))
-
-    def unpack(self, buffer):
-        return dict(zip(self.keys, super().unpack(buffer)))
-
-
-# -----------------------------------------------------------------------------
-class UTF8CharacteristicAdapter(CharacteristicAdapter):
-    '''
-    Adapter that converts strings to/from bytes using UTF-8 encoding
-    '''
-
-    def encode_value(self, value: str) -> bytes:
-        return value.encode('utf-8')
-
-    def decode_value(self, value: bytes) -> str:
-        return value.decode('utf-8')
-
-
-# -----------------------------------------------------------------------------
-class SerializableCharacteristicAdapter(CharacteristicAdapter):
-    '''
-    Adapter that converts any class to/from bytes using the class'
-    `to_bytes` and `__bytes__` methods, respectively.
-    '''
-
-    def __init__(self, characteristic, cls: Type[ByteSerializable]):
-        super().__init__(characteristic)
-        self.cls = cls
-
-    def encode_value(self, value: SupportsBytes) -> bytes:
-        return bytes(value)
-
-    def decode_value(self, value: bytes) -> Any:
-        return self.cls.from_bytes(value)
 
 
 # -----------------------------------------------------------------------------

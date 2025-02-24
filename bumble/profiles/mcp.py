@@ -208,7 +208,7 @@ class MediaControlService(gatt.TemplateService):
             properties=gatt.Characteristic.Properties.READ
             | gatt.Characteristic.Properties.NOTIFY,
             permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
-            value=media_player_name or 'Bumble Player',
+            value=(media_player_name or 'Bumble Player').encode(),
         )
         self.track_changed_characteristic = gatt.Characteristic(
             uuid=gatt.GATT_TRACK_CHANGED_CHARACTERISTIC,
@@ -247,14 +247,16 @@ class MediaControlService(gatt.TemplateService):
             permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION,
             value=b'',
         )
-        self.media_control_point_characteristic = gatt.Characteristic(
-            uuid=gatt.GATT_MEDIA_CONTROL_POINT_CHARACTERISTIC,
-            properties=gatt.Characteristic.Properties.WRITE
-            | gatt.Characteristic.Properties.WRITE_WITHOUT_RESPONSE
-            | gatt.Characteristic.Properties.NOTIFY,
-            permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
-            | gatt.Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
-            value=gatt.CharacteristicValue(write=self.on_media_control_point),
+        self.media_control_point_characteristic: gatt.Characteristic[bytes] = (
+            gatt.Characteristic(
+                uuid=gatt.GATT_MEDIA_CONTROL_POINT_CHARACTERISTIC,
+                properties=gatt.Characteristic.Properties.WRITE
+                | gatt.Characteristic.Properties.WRITE_WITHOUT_RESPONSE
+                | gatt.Characteristic.Properties.NOTIFY,
+                permissions=gatt.Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
+                | gatt.Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
+                value=gatt.CharacteristicValue(write=self.on_media_control_point),
+            )
         )
         self.media_control_point_opcodes_supported_characteristic = gatt.Characteristic(
             uuid=gatt.GATT_MEDIA_CONTROL_POINT_OPCODES_SUPPORTED_CHARACTERISTIC,

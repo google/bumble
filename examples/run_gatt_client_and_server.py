@@ -70,13 +70,13 @@ async def main() -> None:
     descriptor = Descriptor(
         GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR,
         Descriptor.READABLE,
-        'My Description',
+        'My Description'.encode(),
     )
-    manufacturer_name_characteristic = Characteristic(
+    manufacturer_name_characteristic = Characteristic[bytes](
         GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
         Characteristic.Properties.READ,
         Characteristic.READABLE,
-        "Fitbit",
+        "Fitbit".encode(),
         [descriptor],
     )
     device_info_service = Service(

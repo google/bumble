@@ -29,16 +29,18 @@ import logging
 import struct
 from datetime import datetime
 from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
     List,
     Optional,
-    Dict,
-    Tuple,
-    Callable,
-    Union,
-    Any,
-    Iterable,
-    Type,
     Set,
+    Tuple,
+    Union,
+    Type,
+    TypeVar,
     TYPE_CHECKING,
 )
 
@@ -82,8 +84,13 @@ from .gatt import (
     TemplateService,
 )
 
+# -----------------------------------------------------------------------------
+# Typing
+# -----------------------------------------------------------------------------
 if TYPE_CHECKING:
     from bumble.device import Connection
+
+_T = TypeVar('_T')
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -110,7 +117,7 @@ def show_services(services: Iterable[ServiceProxy]) -> None:
 # -----------------------------------------------------------------------------
 # Proxies
 # -----------------------------------------------------------------------------
-class AttributeProxy(EventEmitter):
+class AttributeProxy(EventEmitter, Generic[_T]):
     def __init__(
         self, client: Client, handle: int, end_group_handle: int, attribute_type: UUID
     ) -> None:
@@ -120,21 +127,21 @@ class AttributeProxy(EventEmitter):
         self.end_group_handle = end_group_handle
         self.type = attribute_type
 
-    async def read_value(self, no_long_read: bool = False) -> bytes:
+    async def read_value(self, no_long_read: bool = False) -> _T:
         return self.decode_value(
             await self.client.read_value(self.handle, no_long_read)
         )
 
-    async def write_value(self, value, with_response=False):
+    async def write_value(self, value: _T, with_response=False):
         return await self.client.write_value(
             self.handle, self.encode_value(value), with_response
         )
 
-    def encode_value(self, value: Any) -> bytes:
-        return value
+    def encode_value(self, value: _T) -> bytes:
+        return value  # type: ignore
 
-    def decode_value(self, value_bytes: bytes) -> Any:
-        return value_bytes
+    def decode_value(self, value: bytes) -> _T:
+        return value  # type: ignore
 
     def __str__(self) -> str:
         return f'Attribute(handle=0x{self.handle:04X}, type={self.type})'
@@ -184,19 +191,19 @@ class ServiceProxy(AttributeProxy):
         return f'Service(handle=0x{self.handle:04X}, uuid={self.uuid})'
 
 
-class CharacteristicProxy(AttributeProxy):
+class CharacteristicProxy(AttributeProxy[_T]):
     properties: Characteristic.Properties
     descriptors: List[DescriptorProxy]
-    subscribers: Dict[Any, Callable[[bytes], Any]]
+    subscribers: Dict[Any, Callable[[_T], Any]]
 
     def __init__(
         self,
-        client,
-        handle,
-        end_group_handle,
-        uuid,
+        client: Client,
+        handle: int,
+        end_group_handle: int,
+        uuid: UUID,
         properties: int,
-    ):
+    ) -> None:
         super().__init__(client, handle, end_group_handle, uuid)
         self.uuid = uuid
         self.properties = Characteristic.Properties(properties)
@@ -204,21 +211,21 @@ class CharacteristicProxy(AttributeProxy):
         self.descriptors_discovered = False
         self.subscribers = {}  # Map from subscriber to proxy subscriber
 
-    def get_descriptor(self, descriptor_type):
+    def get_descriptor(self, descriptor_type: UUID) -> Optional[DescriptorProxy]:
         for descriptor in self.descriptors:
             if descriptor.type == descriptor_type:
                 return descriptor
 
         return None
 
-    async def discover_descriptors(self):
+    async def discover_descriptors(self) -> list[DescriptorProxy]:
         return await self.client.discover_descriptors(self)
 
     async def subscribe(
         self,
-        subscriber: Optional[Callable[[bytes], Any]] = None,
+        subscriber: Optional[Callable[[_T], Any]] = None,
         prefer_notify: bool = True,
-    ):
+    ) -> None:
         if subscriber is not None:
             if subscriber in self.subscribers:
                 # We already have a proxy subscriber
@@ -233,13 +240,13 @@ class CharacteristicProxy(AttributeProxy):
                 self.subscribers[subscriber] = on_change
                 subscriber = on_change
 
-        return await self.client.subscribe(self, subscriber, prefer_notify)
+        await self.client.subscribe(self, subscriber, prefer_notify)
 
-    async def unsubscribe(self, subscriber=None, force=False):
+    async def unsubscribe(self, subscriber=None, force=False) -> None:
         if subscriber in self.subscribers:
             subscriber = self.subscribers.pop(subscriber)
 
-        return await self.client.unsubscribe(self, subscriber, force)
+        await self.client.unsubscribe(self, subscriber, force)
 
     def __str__(self) -> str:
         return (
@@ -250,7 +257,7 @@ class CharacteristicProxy(AttributeProxy):
 
 
 class DescriptorProxy(AttributeProxy):
-    def __init__(self, client, handle, descriptor_type):
+    def __init__(self, client: Client, handle: int, descriptor_type: UUID) -> None:
         super().__init__(client, handle, 0, descriptor_type)
 
     def __str__(self) -> str:
@@ -679,7 +686,7 @@ class Client:
 
                     properties, handle = struct.unpack_from('<BH', attribute_value)
                     characteristic_uuid = UUID.from_bytes(attribute_value[3:])
-                    characteristic = CharacteristicProxy(
+                    characteristic: CharacteristicProxy = CharacteristicProxy(
                         self, handle, 0, characteristic_uuid, properties
                     )
 
@@ -805,7 +812,7 @@ class Client:
                     logger.warning(f'bogus handle value: {attribute_handle}')
                     return []
 
-                attribute = AttributeProxy(
+                attribute: AttributeProxy = AttributeProxy(
                     self, attribute_handle, 0, UUID.from_bytes(attribute_uuid)
                 )
                 attributes.append(attribute)
@@ -818,7 +825,7 @@ class Client:
     async def subscribe(
         self,
         characteristic: CharacteristicProxy,
-        subscriber: Optional[Callable[[bytes], Any]] = None,
+        subscriber: Optional[Callable[[Any], Any]] = None,
         prefer_notify: bool = True,
     ) -> None:
         # If we haven't already discovered the descriptors for this characteristic,
@@ -868,7 +875,7 @@ class Client:
     async def unsubscribe(
         self,
         characteristic: CharacteristicProxy,
-        subscriber: Optional[Callable[[bytes], Any]] = None,
+        subscriber: Optional[Callable[[Any], Any]] = None,
         force: bool = False,
     ) -> None:
         '''

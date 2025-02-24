@@ -25,14 +25,15 @@ from bumble.core import Appearance
 from bumble.gatt import (
     TemplateService,
     Characteristic,
-    CharacteristicAdapter,
-    DelegatedCharacteristicAdapter,
-    UTF8CharacteristicAdapter,
     GATT_GENERIC_ACCESS_SERVICE,
     GATT_DEVICE_NAME_CHARACTERISTIC,
     GATT_APPEARANCE_CHARACTERISTIC,
 )
-from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
+from bumble.gatt_adapters import (
+    DelegatedCharacteristicProxyAdapter,
+    UTF8CharacteristicProxyAdapter,
+)
+from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -48,6 +49,9 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 class GenericAccessService(TemplateService):
     UUID = GATT_GENERIC_ACCESS_SERVICE
+
+    device_name_characteristic: Characteristic[bytes]
+    appearance_characteristic: Characteristic[bytes]
 
     def __init__(
         self, device_name: str, appearance: Union[Appearance, Tuple[int, int], int] = 0
@@ -84,8 +88,8 @@ class GenericAccessService(TemplateService):
 class GenericAccessServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = GenericAccessService
 
-    device_name: Optional[CharacteristicAdapter]
-    appearance: Optional[DelegatedCharacteristicAdapter]
+    device_name: Optional[CharacteristicProxy[str]]
+    appearance: Optional[CharacteristicProxy[Appearance]]
 
     def __init__(self, service_proxy: ServiceProxy):
         self.service_proxy = service_proxy
@@ -93,14 +97,14 @@ class GenericAccessServiceProxy(ProfileServiceProxy):
         if characteristics := service_proxy.get_characteristics_by_uuid(
             GATT_DEVICE_NAME_CHARACTERISTIC
         ):
-            self.device_name = UTF8CharacteristicAdapter(characteristics[0])
+            self.device_name = UTF8CharacteristicProxyAdapter(characteristics[0])
         else:
             self.device_name = None
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             GATT_APPEARANCE_CHARACTERISTIC
         ):
-            self.appearance = DelegatedCharacteristicAdapter(
+            self.appearance = DelegatedCharacteristicProxyAdapter(
                 characteristics[0],
                 decode=lambda value: Appearance.from_int(
                     struct.unpack_from('<H', value, 0)[0],

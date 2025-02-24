@@ -20,11 +20,12 @@ from __future__ import annotations
 import dataclasses
 import logging
 import struct
-from typing import ClassVar, List, Optional, Sequence
+from typing import ClassVar, Optional, Sequence
 
 from bumble import core
 from bumble import device
 from bumble import gatt
+from bumble import gatt_adapters
 from bumble import gatt_client
 from bumble import hci
 from bumble import utils
@@ -52,7 +53,7 @@ def encode_subgroups(subgroups: Sequence[SubgroupInfo]) -> bytes:
     )
 
 
-def decode_subgroups(data: bytes) -> List[SubgroupInfo]:
+def decode_subgroups(data: bytes) -> list[SubgroupInfo]:
     num_subgroups = data[0]
     offset = 1
     subgroups = []
@@ -273,7 +274,7 @@ class BroadcastReceiveState:
     pa_sync_state: PeriodicAdvertisingSyncState
     big_encryption: BigEncryption
     bad_code: bytes
-    subgroups: List[SubgroupInfo]
+    subgroups: list[SubgroupInfo]
 
     @classmethod
     def from_bytes(cls, data: bytes) -> BroadcastReceiveState:
@@ -354,7 +355,9 @@ class BroadcastAudioScanServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = BroadcastAudioScanService
 
     broadcast_audio_scan_control_point: gatt_client.CharacteristicProxy
-    broadcast_receive_states: List[gatt.DelegatedCharacteristicAdapter]
+    broadcast_receive_states: list[
+        gatt_client.CharacteristicProxy[Optional[BroadcastReceiveState]]
+    ]
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy):
         self.service_proxy = service_proxy
@@ -366,7 +369,7 @@ class BroadcastAudioScanServiceProxy(gatt_client.ProfileServiceProxy):
         )
 
         self.broadcast_receive_states = [
-            gatt.DelegatedCharacteristicAdapter(
+            gatt_adapters.DelegatedCharacteristicProxyAdapter(
                 characteristic,
                 decode=lambda x: BroadcastReceiveState.from_bytes(x) if x else None,
             )

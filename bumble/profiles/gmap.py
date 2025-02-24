@@ -22,7 +22,6 @@ from typing import Optional
 
 from bumble.gatt import (
     TemplateService,
-    DelegatedCharacteristicAdapter,
     Characteristic,
     GATT_GAMING_AUDIO_SERVICE,
     GATT_GMAP_ROLE_CHARACTERISTIC,
@@ -31,7 +30,8 @@ from bumble.gatt import (
     GATT_BGS_FEATURES_CHARACTERISTIC,
     GATT_BGR_FEATURES_CHARACTERISTIC,
 )
-from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
+from bumble.gatt_adapters import DelegatedCharacteristicProxyAdapter
+from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
 from enum import IntFlag
 
 
@@ -150,10 +150,15 @@ class GamingAudioService(TemplateService):
 class GamingAudioServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = GamingAudioService
 
+    ugg_features: Optional[CharacteristicProxy[UggFeatures]] = None
+    ugt_features: Optional[CharacteristicProxy[UgtFeatures]] = None
+    bgs_features: Optional[CharacteristicProxy[BgsFeatures]] = None
+    bgr_features: Optional[CharacteristicProxy[BgrFeatures]] = None
+
     def __init__(self, service_proxy: ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        self.gmap_role = DelegatedCharacteristicAdapter(
+        self.gmap_role = DelegatedCharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_GMAP_ROLE_CHARACTERISTIC
             ),
@@ -163,31 +168,31 @@ class GamingAudioServiceProxy(ProfileServiceProxy):
         if characteristics := service_proxy.get_characteristics_by_uuid(
             GATT_UGG_FEATURES_CHARACTERISTIC
         ):
-            self.ugg_features = DelegatedCharacteristicAdapter(
-                characteristic=characteristics[0],
+            self.ugg_features = DelegatedCharacteristicProxyAdapter(
+                characteristics[0],
                 decode=lambda value: UggFeatures(value[0]),
             )
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             GATT_UGT_FEATURES_CHARACTERISTIC
         ):
-            self.ugt_features = DelegatedCharacteristicAdapter(
-                characteristic=characteristics[0],
+            self.ugt_features = DelegatedCharacteristicProxyAdapter(
+                characteristics[0],
                 decode=lambda value: UgtFeatures(value[0]),
             )
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             GATT_BGS_FEATURES_CHARACTERISTIC
         ):
-            self.bgs_features = DelegatedCharacteristicAdapter(
-                characteristic=characteristics[0],
+            self.bgs_features = DelegatedCharacteristicProxyAdapter(
+                characteristics[0],
                 decode=lambda value: BgsFeatures(value[0]),
             )
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             GATT_BGR_FEATURES_CHARACTERISTIC
         ):
-            self.bgr_features = DelegatedCharacteristicAdapter(
-                characteristic=characteristics[0],
+            self.bgr_features = DelegatedCharacteristicProxyAdapter(
+                characteristics[0],
                 decode=lambda value: BgrFeatures(value[0]),
             )

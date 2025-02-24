@@ -134,12 +134,14 @@ class AshaService(gatt.TemplateService):
             ),
         )
 
-        self.audio_control_point_characteristic = gatt.Characteristic(
-            gatt.GATT_ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC,
-            gatt.Characteristic.Properties.WRITE
-            | gatt.Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
-            gatt.Characteristic.WRITEABLE,
-            gatt.CharacteristicValue(write=self._on_audio_control_point_write),
+        self.audio_control_point_characteristic: gatt.Characteristic[bytes] = (
+            gatt.Characteristic(
+                gatt.GATT_ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC,
+                gatt.Characteristic.Properties.WRITE
+                | gatt.Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
+                gatt.Characteristic.WRITEABLE,
+                gatt.CharacteristicValue(write=self._on_audio_control_point_write),
+            )
         )
         self.audio_status_characteristic = gatt.Characteristic(
             gatt.GATT_ASHA_AUDIO_STATUS_CHARACTERISTIC,
@@ -147,7 +149,7 @@ class AshaService(gatt.TemplateService):
             gatt.Characteristic.READABLE,
             bytes([AudioStatus.OK]),
         )
-        self.volume_characteristic = gatt.Characteristic(
+        self.volume_characteristic: gatt.Characteristic[bytes] = gatt.Characteristic(
             gatt.GATT_ASHA_VOLUME_CHARACTERISTIC,
             gatt.Characteristic.Properties.WRITE_WITHOUT_RESPONSE,
             gatt.Characteristic.WRITEABLE,
@@ -166,13 +168,13 @@ class AshaService(gatt.TemplateService):
             struct.pack('<H', self.psm),
         )
 
-        characteristics = [
+        characteristics = (
             self.read_only_properties_characteristic,
             self.audio_control_point_characteristic,
             self.audio_status_characteristic,
             self.volume_characteristic,
             self.le_psm_out_characteristic,
-        ]
+        )
 
         super().__init__(characteristics)
 

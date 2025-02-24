@@ -17,31 +17,42 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import asyncio
+import enum
 import logging
 import os
 import struct
 import pytest
+from typing import Any
 from typing_extensions import Self
 from unittest.mock import AsyncMock, Mock, ANY
 
 from bumble.controller import Controller
-from bumble.gatt_client import CharacteristicProxy
 from bumble.link import LocalLink
 from bumble.device import Device, Peer
 from bumble.host import Host
 from bumble.gatt import (
     GATT_BATTERY_LEVEL_CHARACTERISTIC,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
-    CharacteristicAdapter,
-    SerializableCharacteristicAdapter,
-    DelegatedCharacteristicAdapter,
-    PackedCharacteristicAdapter,
-    MappedCharacteristicAdapter,
-    UTF8CharacteristicAdapter,
     Service,
     Characteristic,
     CharacteristicValue,
     Descriptor,
+)
+from bumble.gatt_client import CharacteristicProxy
+from bumble.gatt_adapters import (
+    CharacteristicProxyAdapter,
+    SerializableCharacteristicAdapter,
+    SerializableCharacteristicProxyAdapter,
+    DelegatedCharacteristicAdapter,
+    DelegatedCharacteristicProxyAdapter,
+    PackedCharacteristicAdapter,
+    PackedCharacteristicProxyAdapter,
+    MappedCharacteristicAdapter,
+    MappedCharacteristicProxyAdapter,
+    UTF8CharacteristicAdapter,
+    UTF8CharacteristicProxyAdapter,
+    EnumCharacteristicAdapter,
+    EnumCharacteristicProxyAdapter,
 )
 from bumble.transport import AsyncPipeSink
 from bumble.core import UUID
@@ -199,7 +210,7 @@ async def test_characteristic_encoding():
     await async_barrier()
     assert characteristic.value == bytes([125])
 
-    cd = DelegatedCharacteristicAdapter(c, encode=lambda x: bytes([x // 2]))
+    cd = DelegatedCharacteristicProxyAdapter(c, encode=lambda x: bytes([x // 2]))
     await cd.write_value(100, with_response=True)
     await async_barrier()
     assert characteristic.value == bytes([50])
@@ -207,7 +218,7 @@ async def test_characteristic_encoding():
     c2 = peer.get_characteristics_by_uuid(async_characteristic.uuid)
     assert len(c2) == 1
     c2 = c2[0]
-    cd2 = PackedCharacteristicAdapter(c2, ">I")
+    cd2 = PackedCharacteristicProxyAdapter(c2, ">I")
     cd2v = await cd2.read_value()
     assert cd2v == 0x05060708
 
@@ -249,7 +260,7 @@ async def test_characteristic_encoding():
     await async_barrier()
     assert last_change is None
 
-    cd = DelegatedCharacteristicAdapter(c, decode=lambda x: x[0])
+    cd = DelegatedCharacteristicProxyAdapter(c, decode=lambda x: x[0])
     await cd.subscribe(on_change)
     await server.notify_subscribers(characteristic)
     await async_barrier()
@@ -314,21 +325,16 @@ async def test_attribute_getters():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_CharacteristicAdapter() -> None:
-    # Check that the CharacteristicAdapter base class is transparent
     v = bytes([1, 2, 3])
-    c = Characteristic(
+    c: Characteristic[Any] = Characteristic(
         GATT_BATTERY_LEVEL_CHARACTERISTIC,
         Characteristic.Properties.READ,
         Characteristic.READABLE,
         v,
     )
-    a = CharacteristicAdapter(c)
-
-    value = await a.read_value(None)
-    assert value == v
 
     v = bytes([3, 4, 5])
-    await a.write_value(None, v)
+    await c.write_value(None, v)
     assert c.value == v
 
     # Simple delegated adapter
@@ -415,11 +421,171 @@ async def test_CharacteristicAdapter() -> None:
 
     class_read_value = await class_c.read_value(None)
     assert class_read_value == class_value_bytes
-    c.value = b''
+    class_c.value = b''
     await class_c.write_value(None, class_value_bytes)
-    assert isinstance(c.value, BlaBla)
-    assert c.value.a == 3
-    assert c.value.b == 4
+    assert isinstance(class_c.value, BlaBla)
+    assert class_c.value.a == class_value.a
+    assert class_c.value.b == class_value.b
+
+    # Enum adapter
+    class MyEnum(enum.IntEnum):
+        ENUM_1 = 1234
+        ENUM_2 = 5678
+
+    enum_value = MyEnum.ENUM_2
+    enum_value_bytes = int(enum_value).to_bytes(3, 'big')
+    c.value = enum_value
+    enum_c = EnumCharacteristicAdapter(c, MyEnum, 3, 'big')
+    enum_read_value = await enum_c.read_value(None)
+    assert enum_read_value == enum_value_bytes
+    enum_c.value = b''
+    await enum_c.write_value(None, enum_value_bytes)
+    assert isinstance(enum_c.value, MyEnum)
+    assert enum_c.value == enum_value
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_CharacteristicProxyAdapter() -> None:
+    class Client:
+        def __init__(self, value):
+            self.value = value
+
+        async def read_value(self, handle, no_long_read=False) -> bytes:
+            return self.value
+
+        async def write_value(self, handle, value, with_response=False):
+            self.value = value
+
+    class TestAttributeProxy(CharacteristicProxy):
+        def __init__(self, value) -> None:
+            super().__init__(Client(value), 0, 0, None, 0)  # type: ignore
+
+        @property
+        def value(self):
+            return self.client.value
+
+        @value.setter
+        def value(self, value):
+            self.client.value = value
+
+    v = bytes([1, 2, 3])
+    c = TestAttributeProxy(v)
+    a: CharacteristicProxyAdapter = CharacteristicProxyAdapter(c)
+
+    value = await a.read_value()
+    assert value == v
+
+    v = bytes([3, 4, 5])
+    await a.write_value(v)
+    assert c.value == v
+
+    # Simple delegated adapter
+    delegated = DelegatedCharacteristicProxyAdapter(
+        c, lambda x: bytes(reversed(x)), lambda x: bytes(reversed(x))
+    )
+
+    delegated_value = await delegated.read_value()
+    assert delegated_value == bytes(reversed(v))
+
+    delegated_value2 = bytes([3, 4, 5])
+    await delegated.write_value(delegated_value2)
+    assert c.value == bytes(reversed(delegated_value2))
+
+    # Packed adapter with single element format
+    packed_value_ref = 1234
+    packed_value_bytes = struct.pack('>H', packed_value_ref)
+    c.value = packed_value_bytes
+    packed = PackedCharacteristicProxyAdapter(c, '>H')
+
+    packed_value_read = await packed.read_value()
+    assert packed_value_read == packed_value_ref
+    c.value = None
+    await packed.write_value(packed_value_ref)
+    assert c.value == packed_value_bytes
+
+    # Packed adapter with multi-element format
+    v1 = 1234
+    v2 = 5678
+    packed_multi_value_bytes = struct.pack('>HH', v1, v2)
+    c.value = packed_multi_value_bytes
+    packed_multi = PackedCharacteristicProxyAdapter(c, '>HH')
+
+    packed_multi_read_value = await packed_multi.read_value()
+    assert packed_multi_read_value == (v1, v2)
+    c.value = b''
+    await packed_multi.write_value((v1, v2))
+    assert c.value == packed_multi_value_bytes
+
+    # Mapped adapter
+    v1 = 1234
+    v2 = 5678
+    packed_mapped_value_bytes = struct.pack('>HH', v1, v2)
+    mapped = {'v1': v1, 'v2': v2}
+    c.value = packed_mapped_value_bytes
+    packed_mapped = MappedCharacteristicProxyAdapter(c, '>HH', ('v1', 'v2'))
+
+    packed_mapped_read_value = await packed_mapped.read_value()
+    assert packed_mapped_read_value == mapped
+    c.value = b''
+    await packed_mapped.write_value(mapped)
+    assert c.value == packed_mapped_value_bytes
+
+    # UTF-8 adapter
+    string_value = 'Hello π'
+    string_value_bytes = string_value.encode('utf-8')
+    c.value = string_value_bytes
+    string_c = UTF8CharacteristicProxyAdapter(c)
+
+    string_read_value = await string_c.read_value()
+    assert string_read_value == string_value
+    c.value = b''
+    await string_c.write_value(string_value)
+    assert c.value == string_value_bytes
+
+    # Class adapter
+    class BlaBla:
+        def __init__(self, a: int, b: int) -> None:
+            self.a = a
+            self.b = b
+
+        @classmethod
+        def from_bytes(cls, data: bytes) -> Self:
+            a, b = struct.unpack(">II", data)
+            return cls(a, b)
+
+        def __bytes__(self) -> bytes:
+            return struct.pack(">II", self.a, self.b)
+
+    class_value = BlaBla(3, 4)
+    class_value_bytes = struct.pack(">II", 3, 4)
+    c.value = class_value_bytes
+    class_c = SerializableCharacteristicProxyAdapter(c, BlaBla)
+
+    class_read_value = await class_c.read_value()
+    assert isinstance(class_read_value, BlaBla)
+    assert class_read_value.a == class_value.a
+    assert class_read_value.b == class_value.b
+    c.value = b''
+    await class_c.write_value(class_value)
+    assert c.value == class_value_bytes
+
+    # Enum adapter
+    class MyEnum(enum.IntEnum):
+        ENUM_1 = 1234
+        ENUM_2 = 5678
+
+    enum_value = MyEnum.ENUM_1
+    enum_value_bytes = int(enum_value).to_bytes(3, 'little')
+    c.value = enum_value_bytes
+    enum_c = EnumCharacteristicProxyAdapter(c, MyEnum, 3)
+
+    enum_read_value = await enum_c.read_value()
+    assert isinstance(enum_read_value, MyEnum)
+    assert enum_read_value == enum_value
+    c.value = b''
+    await enum_c.write_value(enum_value)
+    assert c.value == enum_value_bytes
 
 
 # -----------------------------------------------------------------------------
@@ -601,7 +767,7 @@ async def test_read_write2():
     v1 = await c1.read_value()
     assert v1 == v
 
-    a1 = PackedCharacteristicAdapter(c1, '>I')
+    a1 = PackedCharacteristicProxyAdapter(c1, '>I')
     v1 = await a1.read_value()
     assert v1 == struct.unpack('>I', v)[0]
 
@@ -1114,6 +1280,7 @@ async def async_main():
     await test_CharacteristicValue()
     await test_CharacteristicValue_async()
     await test_CharacteristicAdapter()
+    await test_CharacteristicProxyAdapter()
 
 
 # -----------------------------------------------------------------------------

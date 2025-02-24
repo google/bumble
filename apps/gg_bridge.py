@@ -234,7 +234,7 @@ class GattlinkNodeBridge(GattlinkL2capEndpoint, Device.Listener):
             Characteristic.WRITEABLE,
             CharacteristicValue(write=self.on_rx_write),
         )
-        self.tx_characteristic = Characteristic(
+        self.tx_characteristic: Characteristic[bytes] = Characteristic(
             GG_GATTLINK_TX_CHARACTERISTIC_UUID,
             Characteristic.Properties.NOTIFY,
             Characteristic.READABLE,

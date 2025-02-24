@@ -514,14 +514,19 @@ async def run_assist(
             return
 
         # Subscribe to and read the broadcast receive state characteristics
+        def on_broadcast_receive_state_update(
+            value: bass.BroadcastReceiveState, index: int
+        ) -> None:
+            print(
+                f"{color(f'Broadcast Receive State Update [{index}]:', 'green')} {value}"
+            )
+
         for i, broadcast_receive_state in enumerate(
             bass_client.broadcast_receive_states
         ):
             try:
                 await broadcast_receive_state.subscribe(
-                    lambda value, i=i: print(
-                        f"{color(f'Broadcast Receive State Update [{i}]:', 'green')} {value}"
-                    )
+                    functools.partial(on_broadcast_receive_state_update, index=i)
                 )
             except core.ProtocolError as error:
                 print(

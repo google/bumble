@@ -18,14 +18,15 @@
 from __future__ import annotations
 import asyncio
 import functools
-from bumble import att, gatt, gatt_client
+from dataclasses import dataclass, field
+import logging
+from typing import Any, Dict, List, Optional, Set, Union
+
+from bumble import att, gatt, gatt_adapters, gatt_client
 from bumble.core import InvalidArgumentError, InvalidStateError
 from bumble.device import Device, Connection
 from bumble.utils import AsyncRunner, OpenIntEnum
 from bumble.hci import Address
-from dataclasses import dataclass, field
-import logging
-from typing import Any, Dict, List, Optional, Set, Union
 
 
 # -----------------------------------------------------------------------------
@@ -631,11 +632,12 @@ class HearingAccessServiceProxy(gatt_client.ProfileServiceProxy):
 
     hearing_aid_preset_control_point: gatt_client.CharacteristicProxy
     preset_control_point_indications: asyncio.Queue
+    active_preset_index_notification: asyncio.Queue
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        self.server_features = gatt.PackedCharacteristicAdapter(
+        self.server_features = gatt_adapters.PackedCharacteristicProxyAdapter(
             service_proxy.get_characteristics_by_uuid(
                 gatt.GATT_HEARING_AID_FEATURES_CHARACTERISTIC
             )[0],
@@ -648,7 +650,7 @@ class HearingAccessServiceProxy(gatt_client.ProfileServiceProxy):
             )[0]
         )
 
-        self.active_preset_index = gatt.PackedCharacteristicAdapter(
+        self.active_preset_index = gatt_adapters.PackedCharacteristicProxyAdapter(
             service_proxy.get_characteristics_by_uuid(
                 gatt.GATT_ACTIVE_PRESET_INDEX_CHARACTERISTIC
             )[0],

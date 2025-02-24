@@ -24,16 +24,18 @@ from bumble.device import Connection
 from bumble.att import ATT_Error
 from bumble.gatt import (
     Characteristic,
-    DelegatedCharacteristicAdapter,
     TemplateService,
     CharacteristicValue,
-    SerializableCharacteristicAdapter,
-    UTF8CharacteristicAdapter,
     GATT_VOLUME_OFFSET_CONTROL_SERVICE,
     GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC,
     GATT_AUDIO_LOCATION_CHARACTERISTIC,
     GATT_VOLUME_OFFSET_CONTROL_POINT_CHARACTERISTIC,
     GATT_AUDIO_OUTPUT_DESCRIPTION_CHARACTERISTIC,
+)
+from bumble.gatt_adapters import (
+    DelegatedCharacteristicProxyAdapter,
+    SerializableCharacteristicProxyAdapter,
+    UTF8CharacteristicProxyAdapter,
 )
 from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
 from bumble.utils import OpenIntEnum
@@ -67,7 +69,7 @@ class ErrorCode(OpenIntEnum):
 class VolumeOffsetState:
     volume_offset: int = 0
     change_counter: int = 0
-    attribute_value: Optional[CharacteristicValue] = None
+    attribute: Optional[Characteristic] = None
 
     def __bytes__(self) -> bytes:
         return struct.pack('<hB', self.volume_offset, self.change_counter)
@@ -81,8 +83,8 @@ class VolumeOffsetState:
         self.change_counter = (self.change_counter + 1) % (CHANGE_COUNTER_MAX_VALUE + 1)
 
     async def notify_subscribers_via_connection(self, connection: Connection) -> None:
-        assert self.attribute_value is not None
-        await connection.device.notify_subscribers(attribute=self.attribute_value)
+        assert self.attribute is not None
+        await connection.device.notify_subscribers(attribute=self.attribute)
 
     def on_read(self, _connection: Optional[Connection]) -> bytes:
         return bytes(self)
@@ -91,7 +93,7 @@ class VolumeOffsetState:
 @dataclass
 class VocsAudioLocation:
     audio_location: AudioLocation = AudioLocation.NOT_ALLOWED
-    attribute_value: Optional[CharacteristicValue] = None
+    attribute: Optional[Characteristic] = None
 
     def __bytes__(self) -> bytes:
         return struct.pack('<I', self.audio_location)
@@ -106,10 +108,10 @@ class VocsAudioLocation:
 
     async def on_write(self, connection: Optional[Connection], value: bytes) -> None:
         assert connection
-        assert self.attribute_value
+        assert self.attribute
 
         self.audio_location = AudioLocation(int.from_bytes(value, 'little'))
-        await connection.device.notify_subscribers(attribute=self.attribute_value)
+        await connection.device.notify_subscribers(attribute=self.attribute)
 
 
 @dataclass
@@ -148,7 +150,7 @@ class VolumeOffsetControlPoint:
 @dataclass
 class AudioOutputDescription:
     audio_output_description: str = ''
-    attribute_value: Optional[CharacteristicValue] = None
+    attribute: Optional[Characteristic] = None
 
     @classmethod
     def from_bytes(cls, data: bytes):
@@ -162,10 +164,10 @@ class AudioOutputDescription:
 
     async def on_write(self, connection: Optional[Connection], value: bytes) -> None:
         assert connection
-        assert self.attribute_value
+        assert self.attribute
 
         self.audio_output_description = value.decode('utf-8')
-        await connection.device.notify_subscribers(attribute=self.attribute_value)
+        await connection.device.notify_subscribers(attribute=self.attribute)
 
 
 # -----------------------------------------------------------------------------
@@ -197,7 +199,7 @@ class VolumeOffsetControlService(TemplateService):
             VolumeOffsetControlPoint(self.volume_offset_state)
         )
 
-        self.volume_offset_state_characteristic = Characteristic(
+        self.volume_offset_state_characteristic: Characteristic[bytes] = Characteristic(
             uuid=GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC,
             properties=(
                 Characteristic.Properties.READ | Characteristic.Properties.NOTIFY
@@ -206,7 +208,7 @@ class VolumeOffsetControlService(TemplateService):
             value=CharacteristicValue(read=self.volume_offset_state.on_read),
         )
 
-        self.audio_location_characteristic = Characteristic(
+        self.audio_location_characteristic: Characteristic[bytes] = Characteristic(
             uuid=GATT_AUDIO_LOCATION_CHARACTERISTIC,
             properties=(
                 Characteristic.Properties.READ
@@ -222,33 +224,39 @@ class VolumeOffsetControlService(TemplateService):
                 write=self.audio_location.on_write,
             ),
         )
-        self.audio_location.attribute_value = self.audio_location_characteristic.value
+        self.audio_location.attribute = self.audio_location_characteristic
 
-        self.volume_offset_control_point_characteristic = Characteristic(
-            uuid=GATT_VOLUME_OFFSET_CONTROL_POINT_CHARACTERISTIC,
-            properties=Characteristic.Properties.WRITE,
-            permissions=Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
-            value=CharacteristicValue(write=self.volume_offset_control_point.on_write),
+        self.volume_offset_control_point_characteristic: Characteristic[bytes] = (
+            Characteristic(
+                uuid=GATT_VOLUME_OFFSET_CONTROL_POINT_CHARACTERISTIC,
+                properties=Characteristic.Properties.WRITE,
+                permissions=Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION,
+                value=CharacteristicValue(
+                    write=self.volume_offset_control_point.on_write
+                ),
+            )
         )
 
-        self.audio_output_description_characteristic = Characteristic(
-            uuid=GATT_AUDIO_OUTPUT_DESCRIPTION_CHARACTERISTIC,
-            properties=(
-                Characteristic.Properties.READ
-                | Characteristic.Properties.NOTIFY
-                | Characteristic.Properties.WRITE_WITHOUT_RESPONSE
-            ),
-            permissions=(
-                Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
-                | Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION
-            ),
-            value=CharacteristicValue(
-                read=self.audio_output_description.on_read,
-                write=self.audio_output_description.on_write,
-            ),
+        self.audio_output_description_characteristic: Characteristic[bytes] = (
+            Characteristic(
+                uuid=GATT_AUDIO_OUTPUT_DESCRIPTION_CHARACTERISTIC,
+                properties=(
+                    Characteristic.Properties.READ
+                    | Characteristic.Properties.NOTIFY
+                    | Characteristic.Properties.WRITE_WITHOUT_RESPONSE
+                ),
+                permissions=(
+                    Characteristic.Permissions.READ_REQUIRES_ENCRYPTION
+                    | Characteristic.Permissions.WRITE_REQUIRES_ENCRYPTION
+                ),
+                value=CharacteristicValue(
+                    read=self.audio_output_description.on_read,
+                    write=self.audio_output_description.on_write,
+                ),
+            )
         )
-        self.audio_output_description.attribute_value = (
-            self.audio_output_description_characteristic.value
+        self.audio_output_description.attribute = (
+            self.audio_output_description_characteristic
         )
 
         super().__init__(
@@ -271,14 +279,14 @@ class VolumeOffsetControlServiceProxy(ProfileServiceProxy):
     def __init__(self, service_proxy: ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        self.volume_offset_state = SerializableCharacteristicAdapter(
+        self.volume_offset_state = SerializableCharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_VOLUME_OFFSET_STATE_CHARACTERISTIC
             ),
             VolumeOffsetState,
         )
 
-        self.audio_location = DelegatedCharacteristicAdapter(
+        self.audio_location = DelegatedCharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_AUDIO_LOCATION_CHARACTERISTIC
             ),
@@ -292,7 +300,7 @@ class VolumeOffsetControlServiceProxy(ProfileServiceProxy):
             )
         )
 
-        self.audio_output_description = UTF8CharacteristicAdapter(
+        self.audio_output_description = UTF8CharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_AUDIO_OUTPUT_DESCRIPTION_CHARACTERISTIC
             )

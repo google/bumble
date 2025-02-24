@@ -25,6 +25,7 @@ from typing import Optional, Sequence
 from bumble import att
 from bumble import device
 from bumble import gatt
+from bumble import gatt_adapters
 from bumble import gatt_client
 
 
@@ -209,14 +210,14 @@ class VolumeControlService(gatt.TemplateService):
 class VolumeControlServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = VolumeControlService
 
-    volume_control_point: gatt_client.CharacteristicProxy
-    volume_state: gatt.SerializableCharacteristicAdapter
-    volume_flags: gatt.DelegatedCharacteristicAdapter
+    volume_control_point: gatt_client.CharacteristicProxy[bytes]
+    volume_state: gatt_client.CharacteristicProxy[VolumeState]
+    volume_flags: gatt_client.CharacteristicProxy[VolumeFlags]
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        self.volume_state = gatt.SerializableCharacteristicAdapter(
+        self.volume_state = gatt_adapters.SerializableCharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 gatt.GATT_VOLUME_STATE_CHARACTERISTIC
             ),
@@ -227,7 +228,7 @@ class VolumeControlServiceProxy(gatt_client.ProfileServiceProxy):
             gatt.GATT_VOLUME_CONTROL_POINT_CHARACTERISTIC
         )
 
-        self.volume_flags = gatt.DelegatedCharacteristicAdapter(
+        self.volume_flags = gatt_adapters.DelegatedCharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 gatt.GATT_VOLUME_FLAGS_CHARACTERISTIC
             ),

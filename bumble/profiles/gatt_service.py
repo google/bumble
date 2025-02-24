@@ -110,6 +110,7 @@ class GenericAttributeProfileService(gatt.TemplateService):
             gatt.GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
             gatt.GATT_CHARACTERISTIC_EXTENDED_PROPERTIES_DESCRIPTOR,
         ):
+            assert isinstance(attribute.value, bytes)
             return (
                 struct.pack("<H", attribute.handle)
                 + attribute.type.to_bytes()

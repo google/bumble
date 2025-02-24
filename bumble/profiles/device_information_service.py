@@ -19,7 +19,6 @@
 import struct
 from typing import Optional, Tuple
 
-from bumble.gatt_client import ServiceProxy, ProfileServiceProxy, CharacteristicProxy
 from bumble.gatt import (
     GATT_DEVICE_INFORMATION_SERVICE,
     GATT_FIRMWARE_REVISION_STRING_CHARACTERISTIC,
@@ -32,9 +31,12 @@ from bumble.gatt import (
     GATT_REGULATORY_CERTIFICATION_DATA_LIST_CHARACTERISTIC,
     TemplateService,
     Characteristic,
-    DelegatedCharacteristicAdapter,
-    UTF8CharacteristicAdapter,
 )
+from bumble.gatt_adapters import (
+    DelegatedCharacteristicProxyAdapter,
+    UTF8CharacteristicProxyAdapter,
+)
+from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
 
 
 # -----------------------------------------------------------------------------
@@ -62,7 +64,7 @@ class DeviceInformationService(TemplateService):
         ieee_regulatory_certification_data_list: Optional[bytes] = None,
         # TODO: pnp_id
     ):
-        characteristics = [
+        characteristics: list[Characteristic[bytes]] = [
             Characteristic(
                 uuid,
                 Characteristic.Properties.READ,
@@ -107,14 +109,14 @@ class DeviceInformationService(TemplateService):
 class DeviceInformationServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = DeviceInformationService
 
-    manufacturer_name: Optional[UTF8CharacteristicAdapter]
-    model_number: Optional[UTF8CharacteristicAdapter]
-    serial_number: Optional[UTF8CharacteristicAdapter]
-    hardware_revision: Optional[UTF8CharacteristicAdapter]
-    firmware_revision: Optional[UTF8CharacteristicAdapter]
-    software_revision: Optional[UTF8CharacteristicAdapter]
-    system_id: Optional[DelegatedCharacteristicAdapter]
-    ieee_regulatory_certification_data_list: Optional[CharacteristicProxy]
+    manufacturer_name: Optional[CharacteristicProxy[str]]
+    model_number: Optional[CharacteristicProxy[str]]
+    serial_number: Optional[CharacteristicProxy[str]]
+    hardware_revision: Optional[CharacteristicProxy[str]]
+    firmware_revision: Optional[CharacteristicProxy[str]]
+    software_revision: Optional[CharacteristicProxy[str]]
+    system_id: Optional[CharacteristicProxy[tuple[int, int]]]
+    ieee_regulatory_certification_data_list: Optional[CharacteristicProxy[bytes]]
 
     def __init__(self, service_proxy: ServiceProxy):
         self.service_proxy = service_proxy
@@ -128,7 +130,7 @@ class DeviceInformationServiceProxy(ProfileServiceProxy):
             ('software_revision', GATT_SOFTWARE_REVISION_STRING_CHARACTERISTIC),
         ):
             if characteristics := service_proxy.get_characteristics_by_uuid(uuid):
-                characteristic = UTF8CharacteristicAdapter(characteristics[0])
+                characteristic = UTF8CharacteristicProxyAdapter(characteristics[0])
             else:
                 characteristic = None
             self.__setattr__(field, characteristic)
@@ -136,7 +138,7 @@ class DeviceInformationServiceProxy(ProfileServiceProxy):
         if characteristics := service_proxy.get_characteristics_by_uuid(
             GATT_SYSTEM_ID_CHARACTERISTIC
         ):
-            self.system_id = DelegatedCharacteristicAdapter(
+            self.system_id = DelegatedCharacteristicProxyAdapter(
                 characteristics[0],
                 encode=lambda v: DeviceInformationService.pack_system_id(*v),
                 decode=DeviceInformationService.unpack_system_id,

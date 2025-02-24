@@ -24,11 +24,11 @@ import struct
 from bumble.gatt import (
     TemplateService,
     Characteristic,
-    DelegatedCharacteristicAdapter,
     GATT_TELEPHONY_AND_MEDIA_AUDIO_SERVICE,
     GATT_TMAP_ROLE_CHARACTERISTIC,
 )
-from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
+from bumble.gatt_adapters import DelegatedCharacteristicProxyAdapter
+from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
 
 
 # -----------------------------------------------------------------------------
@@ -53,6 +53,8 @@ class Role(enum.IntFlag):
 class TelephonyAndMediaAudioService(TemplateService):
     UUID = GATT_TELEPHONY_AND_MEDIA_AUDIO_SERVICE
 
+    role_characteristic: Characteristic[bytes]
+
     def __init__(self, role: Role):
         self.role_characteristic = Characteristic(
             GATT_TMAP_ROLE_CHARACTERISTIC,
@@ -68,12 +70,12 @@ class TelephonyAndMediaAudioService(TemplateService):
 class TelephonyAndMediaAudioServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = TelephonyAndMediaAudioService
 
-    role: DelegatedCharacteristicAdapter
+    role: CharacteristicProxy[Role]
 
     def __init__(self, service_proxy: ServiceProxy):
         self.service_proxy = service_proxy
 
-        self.role = DelegatedCharacteristicAdapter(
+        self.role = DelegatedCharacteristicProxyAdapter(
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_TMAP_ROLE_CHARACTERISTIC
             ),
