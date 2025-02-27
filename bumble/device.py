@@ -3091,7 +3091,7 @@ class Device(CompositeEventEmitter):
                 # pylint: disable=line-too-long
                 hci.HCI_LE_Set_Scan_Parameters_Command(
                     le_scan_type=scan_type,
-                    le_scan_interval=int(scan_window / 0.625),
+                    le_scan_interval=int(scan_interval / 0.625),
                     le_scan_window=int(scan_window / 0.625),
                     own_address_type=own_address_type,
                     scanning_filter_policy=hci.HCI_LE_Set_Scan_Parameters_Command.BASIC_UNFILTERED_POLICY,
