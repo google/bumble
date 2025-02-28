@@ -115,9 +115,7 @@ async def open_usb_transport(spec: str) -> Transport:
             self.acl_out = acl_out
             self.acl_out_transfer = device.getTransfer()
             self.acl_out_transfer_ready = asyncio.Semaphore(1)
-            self.packets: asyncio.Queue[bytes] = (
-                asyncio.Queue()
-            )  # Queue of packets waiting to be sent
+            self.packets = asyncio.Queue[bytes]()  # Queue of packets waiting to be sent
             self.loop = asyncio.get_running_loop()
             self.queue_task = None
             self.cancel_done = self.loop.create_future()

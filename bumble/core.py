@@ -31,11 +31,12 @@ from bumble.utils import OpenIntEnum
 # -----------------------------------------------------------------------------
 # fmt: off
 
-BT_CENTRAL_ROLE    = 0
-BT_PERIPHERAL_ROLE = 1
+class PhysicalTransport(enum.IntEnum):
+    BR_EDR = 0
+    LE     = 1
 
-BT_BR_EDR_TRANSPORT = 0
-BT_LE_TRANSPORT     = 1
+BT_BR_EDR_TRANSPORT = PhysicalTransport.BR_EDR
+BT_LE_TRANSPORT     = PhysicalTransport.LE
 
 
 # fmt: on

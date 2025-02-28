@@ -24,11 +24,10 @@ from bumble import hci
 from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     BT_LE_TRANSPORT,
-    BT_PERIPHERAL_ROLE,
     ProtocolError,
 )
 from bumble.device import Connection as BumbleConnection, Device
-from bumble.hci import HCI_Error
+from bumble.hci import HCI_Error, Role
 from bumble.utils import EventWatcher
 from bumble.pairing import PairingConfig, PairingDelegate as BasePairingDelegate
 from google.protobuf import any_pb2  # pytype: disable=pyi-error
@@ -318,7 +317,7 @@ class SecurityService(SecurityServicer):
 
                     if (
                         connection.transport == BT_LE_TRANSPORT
-                        and connection.role == BT_PERIPHERAL_ROLE
+                        and connection.role == Role.PERIPHERAL
                     ):
                         connection.request_pairing()
                     else:

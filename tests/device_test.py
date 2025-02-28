@@ -24,7 +24,6 @@ import pytest
 from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     BT_LE_TRANSPORT,
-    BT_PERIPHERAL_ROLE,
     ConnectionParameters,
 )
 from bumble.device import (
@@ -43,6 +42,7 @@ from bumble.hci import (
     HCI_CONNECTION_FAILED_TO_BE_ESTABLISHED_ERROR,
     Address,
     OwnAddressType,
+    Role,
     HCI_Command_Complete_Event,
     HCI_Command_Status_Event,
     HCI_Connection_Complete_Event,
@@ -295,7 +295,7 @@ async def test_legacy_advertising_disconnection(auto_restart):
         peer_address,
         None,
         None,
-        BT_PERIPHERAL_ROLE,
+        Role.PERIPHERAL,
         ConnectionParameters(0, 0, 0),
     )
 
@@ -353,7 +353,7 @@ async def test_extended_advertising_connection(own_address_type):
         peer_address,
         None,
         None,
-        BT_PERIPHERAL_ROLE,
+        Role.PERIPHERAL,
         ConnectionParameters(0, 0, 0),
     )
     device.on_advertising_set_termination(
@@ -397,7 +397,7 @@ async def test_extended_advertising_connection_out_of_order(own_address_type):
         Address('F0:F1:F2:F3:F4:F5'),
         None,
         None,
-        BT_PERIPHERAL_ROLE,
+        Role.PERIPHERAL,
         ConnectionParameters(0, 0, 0),
     )
 

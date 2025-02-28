@@ -42,7 +42,6 @@ from typing import (
 from .utils import deprecated
 from .colors import color
 from .core import (
-    BT_CENTRAL_ROLE,
     InvalidStateError,
     InvalidArgumentError,
     InvalidPacketError,
@@ -52,6 +51,7 @@ from .core import (
 from .hci import (
     HCI_LE_Connection_Update_Command,
     HCI_Object,
+    Role,
     key_with_value,
     name_or_number,
 )
@@ -1908,7 +1908,7 @@ class ChannelManager:
     def on_l2cap_connection_parameter_update_request(
         self, connection: Connection, cid: int, request
     ):
-        if connection.role == BT_CENTRAL_ROLE:
+        if connection.role == Role.CENTRAL:
             self.send_control_frame(
                 connection,
                 cid,

@@ -25,7 +25,6 @@ from .config import Config
 from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     BT_LE_TRANSPORT,
-    BT_PERIPHERAL_ROLE,
     UUID,
     AdvertisingData,
     Appearance,
@@ -47,6 +46,8 @@ from bumble.hci import (
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     Address,
     Phy,
+    Role,
+    OwnAddressType,
 )
 from google.protobuf import any_pb2  # pytype: disable=pyi-error
 from google.protobuf import empty_pb2  # pytype: disable=pyi-error
@@ -114,11 +115,11 @@ SECONDARY_PHY_TO_BUMBLE_PHY_MAP: Dict[SecondaryPhy, Phy] = {
     SECONDARY_CODED: Phy.LE_CODED,
 }
 
-OWN_ADDRESS_MAP: Dict[host_pb2.OwnAddressType, bumble.hci.OwnAddressType] = {
-    host_pb2.PUBLIC: bumble.hci.OwnAddressType.PUBLIC,
-    host_pb2.RANDOM: bumble.hci.OwnAddressType.RANDOM,
-    host_pb2.RESOLVABLE_OR_PUBLIC: bumble.hci.OwnAddressType.RESOLVABLE_OR_PUBLIC,
-    host_pb2.RESOLVABLE_OR_RANDOM: bumble.hci.OwnAddressType.RESOLVABLE_OR_RANDOM,
+OWN_ADDRESS_MAP: Dict[host_pb2.OwnAddressType, OwnAddressType] = {
+    host_pb2.PUBLIC: OwnAddressType.PUBLIC,
+    host_pb2.RANDOM: OwnAddressType.RANDOM,
+    host_pb2.RESOLVABLE_OR_PUBLIC: OwnAddressType.RESOLVABLE_OR_PUBLIC,
+    host_pb2.RESOLVABLE_OR_RANDOM: OwnAddressType.RESOLVABLE_OR_RANDOM,
 }
 
 
@@ -250,7 +251,7 @@ class HostService(HostServicer):
             connection = await self.device.connect(
                 address,
                 transport=BT_LE_TRANSPORT,
-                own_address_type=request.own_address_type,
+                own_address_type=OwnAddressType(request.own_address_type),
             )
         except ConnectionError as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
@@ -378,7 +379,7 @@ class HostService(HostServicer):
             def on_connection(connection: bumble.device.Connection) -> None:
                 if (
                     connection.transport == BT_LE_TRANSPORT
-                    and connection.role == BT_PERIPHERAL_ROLE
+                    and connection.role == Role.PERIPHERAL
                 ):
                     connections.put_nowait(connection)
 
@@ -496,7 +497,7 @@ class HostService(HostServicer):
             def on_connection(connection: bumble.device.Connection) -> None:
                 if (
                     connection.transport == BT_LE_TRANSPORT
-                    and connection.role == BT_PERIPHERAL_ROLE
+                    and connection.role == Role.PERIPHERAL
                 ):
                     connections.put_nowait(connection)
 
@@ -509,7 +510,7 @@ class HostService(HostServicer):
                     await self.device.start_advertising(
                         target=target,
                         advertising_type=advertising_type,
-                        own_address_type=request.own_address_type,
+                        own_address_type=OwnAddressType(request.own_address_type),
                     )
 
                 if not request.connectable:
@@ -558,7 +559,7 @@ class HostService(HostServicer):
         await self.device.start_scanning(
             legacy=request.legacy,
             active=not request.passive,
-            own_address_type=request.own_address_type,
+            own_address_type=OwnAddressType(request.own_address_type),
             scan_interval=(
                 int(request.interval)
                 if request.interval

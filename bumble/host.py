@@ -44,6 +44,7 @@ from bumble import hci
 from bumble.core import (
     BT_BR_EDR_TRANSPORT,
     BT_LE_TRANSPORT,
+    PhysicalTransport,
     ConnectionPHY,
     ConnectionParameters,
 )
@@ -186,7 +187,11 @@ class DataPacketQueue(pyee.EventEmitter):
 # -----------------------------------------------------------------------------
 class Connection:
     def __init__(
-        self, host: Host, handle: int, peer_address: hci.Address, transport: int
+        self,
+        host: Host,
+        handle: int,
+        peer_address: hci.Address,
+        transport: PhysicalTransport,
     ):
         self.host = host
         self.handle = handle
@@ -979,7 +984,7 @@ class Host(AbortableEventEmitter):
                 event.peer_address,
                 getattr(event, 'local_resolvable_private_address', None),
                 getattr(event, 'peer_resolvable_private_address', None),
-                event.role,
+                hci.Role(event.role),
                 connection_parameters,
             )
         else:
@@ -1337,7 +1342,7 @@ class Host(AbortableEventEmitter):
                 f'role change for {event.bd_addr}: '
                 f'{hci.HCI_Constant.role_name(event.new_role)}'
             )
-            self.emit('role_change', event.bd_addr, event.new_role)
+            self.emit('role_change', event.bd_addr, hci.Role(event.new_role))
         else:
             logger.debug(
                 f'role change for {event.bd_addr} failed: '

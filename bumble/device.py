@@ -58,9 +58,7 @@ from .host import DataPacketQueue, Host
 from .profiles.gap import GenericAccessService
 from .core import (
     BT_BR_EDR_TRANSPORT,
-    BT_CENTRAL_ROLE,
     BT_LE_TRANSPORT,
-    BT_PERIPHERAL_ROLE,
     AdvertisingData,
     BaseBumbleError,
     ConnectionParameterUpdateError,
@@ -1555,13 +1553,13 @@ class IsoPacketStream:
 class Connection(CompositeEventEmitter):
     device: Device
     handle: int
-    transport: int
+    transport: core.PhysicalTransport
     self_address: hci.Address
     self_resolvable_address: Optional[hci.Address]
     peer_address: hci.Address
     peer_resolvable_address: Optional[hci.Address]
     peer_le_features: Optional[hci.LeFeatureMask]
-    role: int
+    role: hci.Role
     encryption: int
     authenticated: bool
     sc: bool
@@ -1674,9 +1672,9 @@ class Connection(CompositeEventEmitter):
     def role_name(self):
         if self.role is None:
             return 'NOT-SET'
-        if self.role == BT_CENTRAL_ROLE:
+        if self.role == hci.Role.CENTRAL:
             return 'CENTRAL'
-        if self.role == BT_PERIPHERAL_ROLE:
+        if self.role == hci.Role.PERIPHERAL:
             return 'PERIPHERAL'
         return f'UNKNOWN[{self.role}]'
 
@@ -1734,7 +1732,7 @@ class Connection(CompositeEventEmitter):
     async def encrypt(self, enable: bool = True) -> None:
         return await self.device.encrypt(self, enable)
 
-    async def switch_role(self, role: int) -> None:
+    async def switch_role(self, role: hci.Role) -> None:
         return await self.device.switch_role(self, role)
 
     async def sustain(self, timeout: Optional[float] = None) -> None:
@@ -2713,7 +2711,7 @@ class Device(CompositeEventEmitter):
         if phy == hci.HCI_LE_1M_PHY:
             return True
 
-        feature_map = {
+        feature_map: dict[int, hci.LeFeatureMask] = {
             hci.HCI_LE_2M_PHY: hci.LeFeatureMask.LE_2M_PHY,
             hci.HCI_LE_CODED_PHY: hci.LeFeatureMask.LE_CODED_PHY,
         }
@@ -2734,7 +2732,7 @@ class Device(CompositeEventEmitter):
         self,
         advertising_type: AdvertisingType = AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
         target: Optional[hci.Address] = None,
-        own_address_type: int = hci.OwnAddressType.RANDOM,
+        own_address_type: hci.OwnAddressType = hci.OwnAddressType.RANDOM,
         auto_restart: bool = False,
         advertising_data: Optional[bytes] = None,
         scan_response_data: Optional[bytes] = None,
@@ -3015,7 +3013,7 @@ class Device(CompositeEventEmitter):
         active: bool = True,
         scan_interval: float = DEVICE_DEFAULT_SCAN_INTERVAL,  # Scan interval in ms
         scan_window: float = DEVICE_DEFAULT_SCAN_WINDOW,  # Scan window in ms
-        own_address_type: int = hci.OwnAddressType.RANDOM,
+        own_address_type: hci.OwnAddressType = hci.OwnAddressType.RANDOM,
         filter_duplicates: bool = False,
         scanning_phys: Sequence[int] = (hci.HCI_LE_1M_PHY, hci.HCI_LE_CODED_PHY),
     ) -> None:
@@ -3381,11 +3379,11 @@ class Device(CompositeEventEmitter):
     async def connect(
         self,
         peer_address: Union[hci.Address, str],
-        transport: int = BT_LE_TRANSPORT,
+        transport: core.PhysicalTransport = BT_LE_TRANSPORT,
         connection_parameters_preferences: Optional[
-            Dict[int, ConnectionParametersPreferences]
+            dict[hci.Phy, ConnectionParametersPreferences]
         ] = None,
-        own_address_type: int = hci.OwnAddressType.RANDOM,
+        own_address_type: hci.OwnAddressType = hci.OwnAddressType.RANDOM,
         timeout: Optional[float] = DEVICE_DEFAULT_CONNECT_TIMEOUT,
         always_resolve: bool = False,
     ) -> Connection:
@@ -3433,6 +3431,7 @@ class Device(CompositeEventEmitter):
         # Check parameters
         if transport not in (BT_LE_TRANSPORT, BT_BR_EDR_TRANSPORT):
             raise InvalidArgumentError('invalid transport')
+        transport = core.PhysicalTransport(transport)
 
         # Adjust the transport automatically if we need to
         if transport == BT_LE_TRANSPORT and not self.le_enabled:
@@ -3628,7 +3627,7 @@ class Device(CompositeEventEmitter):
             else:
                 # Save pending connection
                 self.pending_connections[peer_address] = Connection.incomplete(
-                    self, peer_address, BT_CENTRAL_ROLE
+                    self, peer_address, hci.Role.CENTRAL
                 )
 
                 # TODO: allow passing other settings
@@ -3683,7 +3682,7 @@ class Device(CompositeEventEmitter):
     async def accept(
         self,
         peer_address: Union[hci.Address, str] = hci.Address.ANY,
-        role: int = BT_PERIPHERAL_ROLE,
+        role: hci.Role = hci.Role.PERIPHERAL,
         timeout: Optional[float] = DEVICE_DEFAULT_CONNECT_TIMEOUT,
     ) -> Connection:
         '''
@@ -3769,12 +3768,12 @@ class Device(CompositeEventEmitter):
         self.on('connection', on_connection)
         self.on('connection_failure', on_connection_failure)
 
-        # Save pending connection, with the Peripheral role.
+        # Save pending connection, with the Peripheral hci.role.
         # Even if we requested a role switch in the hci.HCI_Accept_Connection_Request
         # command, this connection is still considered Peripheral until an eventual
         # role change event.
         self.pending_connections[peer_address] = Connection.incomplete(
-            self, peer_address, BT_PERIPHERAL_ROLE
+            self, peer_address, hci.Role.PERIPHERAL
         )
 
         try:
@@ -3903,7 +3902,7 @@ class Device(CompositeEventEmitter):
         '''
 
         if use_l2cap:
-            if connection.role != BT_PERIPHERAL_ROLE:
+            if connection.role != hci.Role.PERIPHERAL:
                 raise InvalidStateError(
                     'only peripheral can update connection parameters with l2cap'
                 )
@@ -4148,10 +4147,10 @@ class Device(CompositeEventEmitter):
                 if keys.ltk:
                     return keys.ltk.value
 
-                if connection.role == BT_CENTRAL_ROLE and keys.ltk_central:
+                if connection.role == hci.Role.CENTRAL and keys.ltk_central:
                     return keys.ltk_central.value
 
-                if connection.role == BT_PERIPHERAL_ROLE and keys.ltk_peripheral:
+                if connection.role == hci.Role.PERIPHERAL and keys.ltk_peripheral:
                     return keys.ltk_peripheral.value
         return None
 
@@ -4303,7 +4302,7 @@ class Device(CompositeEventEmitter):
             self.emit('key_store_update')
 
     # [Classic only]
-    async def switch_role(self, connection: Connection, role: int):
+    async def switch_role(self, connection: Connection, role: hci.Role):
         pending_role_change = asyncio.get_running_loop().create_future()
 
         def on_role_change(new_role):
@@ -5178,11 +5177,11 @@ class Device(CompositeEventEmitter):
     def on_connection(
         self,
         connection_handle: int,
-        transport: int,
+        transport: core.PhysicalTransport,
         peer_address: hci.Address,
         self_resolvable_address: Optional[hci.Address],
         peer_resolvable_address: Optional[hci.Address],
-        role: int,
+        role: hci.Role,
         connection_parameters: ConnectionParameters,
     ) -> None:
         # Convert all-zeros addresses into None.
@@ -5225,7 +5224,7 @@ class Device(CompositeEventEmitter):
                         peer_address = resolved_address
 
         self_address = None
-        own_address_type: Optional[int] = None
+        own_address_type: Optional[hci.OwnAddressType] = None
         if role == hci.HCI_CENTRAL_ROLE:
             own_address_type = self.connect_own_address_type
             assert own_address_type is not None
@@ -5353,7 +5352,7 @@ class Device(CompositeEventEmitter):
         elif self.classic_accept_any:
             # Save pending connection
             self.pending_connections[bd_addr] = Connection.incomplete(
-                self, bd_addr, BT_PERIPHERAL_ROLE
+                self, bd_addr, hci.Role.PERIPHERAL
             )
 
             self.host.send_command_sync(

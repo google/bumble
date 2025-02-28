@@ -25,8 +25,6 @@ import random
 import struct
 from bumble.colors import color
 from bumble.core import (
-    BT_CENTRAL_ROLE,
-    BT_PERIPHERAL_ROLE,
     BT_LE_TRANSPORT,
     BT_BR_EDR_TRANSPORT,
 )
@@ -47,6 +45,7 @@ from bumble.hci import (
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     HCI_VERSION_BLUETOOTH_CORE_5_0,
     Address,
+    Role,
     HCI_AclDataPacket,
     HCI_AclDataPacketAssembler,
     HCI_Command_Complete_Event,
@@ -98,7 +97,7 @@ class CisLink:
 class Connection:
     controller: Controller
     handle: int
-    role: int
+    role: Role
     peer_address: Address
     link: Any
     transport: int
@@ -390,7 +389,7 @@ class Controller:
             connection = Connection(
                 controller=self,
                 handle=connection_handle,
-                role=BT_PERIPHERAL_ROLE,
+                role=Role.PERIPHERAL,
                 peer_address=peer_address,
                 link=self.link,
                 transport=BT_LE_TRANSPORT,
@@ -450,7 +449,7 @@ class Controller:
                 connection = Connection(
                     controller=self,
                     handle=connection_handle,
-                    role=BT_CENTRAL_ROLE,
+                    role=Role.CENTRAL,
                     peer_address=peer_address,
                     link=self.link,
                     transport=BT_LE_TRANSPORT,
@@ -469,7 +468,7 @@ class Controller:
             HCI_LE_Connection_Complete_Event(
                 status=status,
                 connection_handle=connection.handle if connection else 0,
-                role=BT_CENTRAL_ROLE,
+                role=Role.CENTRAL,
                 peer_address_type=le_create_connection_command.peer_address_type,
                 peer_address=le_create_connection_command.peer_address,
                 connection_interval=le_create_connection_command.connection_interval_min,
@@ -693,7 +692,7 @@ class Controller:
                     controller=self,
                     handle=connection_handle,
                     # Role doesn't matter in Classic because they are managed by HCI_Role_Change and HCI_Role_Discovery
-                    role=BT_CENTRAL_ROLE,
+                    role=Role.CENTRAL,
                     peer_address=peer_address,
                     link=self.link,
                     transport=BT_BR_EDR_TRANSPORT,
@@ -761,7 +760,7 @@ class Controller:
                 controller=self,
                 handle=connection_handle,
                 # Role doesn't matter in SCO.
-                role=BT_CENTRAL_ROLE,
+                role=Role.CENTRAL,
                 peer_address=peer_address,
                 link=self.link,
                 transport=BT_BR_EDR_TRANSPORT,
