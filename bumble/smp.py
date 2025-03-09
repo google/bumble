@@ -46,13 +46,13 @@ from pyee import EventEmitter
 from .colors import color
 from .hci import (
     Address,
+    Role,
     HCI_LE_Enable_Encryption_Command,
     HCI_Object,
     key_with_value,
 )
 from .core import (
     BT_BR_EDR_TRANSPORT,
-    BT_CENTRAL_ROLE,
     BT_LE_TRANSPORT,
     AdvertisingData,
     InvalidArgumentError,
@@ -1975,7 +1975,7 @@ class Manager(EventEmitter):
 
         # Look for a session with this connection, and create one if none exists
         if not (session := self.sessions.get(connection.handle)):
-            if connection.role == BT_CENTRAL_ROLE:
+            if connection.role == Role.CENTRAL:
                 logger.warning('Remote starts pairing as Peripheral!')
             pairing_config = self.pairing_config_factory(connection)
             session = self.session_proxy(
@@ -1995,7 +1995,7 @@ class Manager(EventEmitter):
 
     async def pair(self, connection: Connection) -> None:
         # TODO: check if there's already a session for this connection
-        if connection.role != BT_CENTRAL_ROLE:
+        if connection.role != Role.CENTRAL:
             logger.warning('Start pairing as Peripheral!')
         pairing_config = self.pairing_config_factory(connection)
         session = self.session_proxy(

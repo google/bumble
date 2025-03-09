@@ -20,11 +20,11 @@ import inspect
 import logging
 
 from bumble.device import Device
-from bumble.hci import Address
+from bumble.hci import Address, AddressType
 from google.protobuf.message import Message  # pytype: disable=pyi-error
 from typing import Any, Dict, Generator, MutableMapping, Optional, Tuple
 
-ADDRESS_TYPES: Dict[str, int] = {
+ADDRESS_TYPES: Dict[str, AddressType] = {
     "public": Address.PUBLIC_DEVICE_ADDRESS,
     "random": Address.RANDOM_DEVICE_ADDRESS,
     "public_identity": Address.PUBLIC_IDENTITY_ADDRESS,

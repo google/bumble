@@ -24,7 +24,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from bumble.controller import Controller
-from bumble.core import BT_BR_EDR_TRANSPORT, BT_PERIPHERAL_ROLE, BT_CENTRAL_ROLE
+from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT
 from bumble.link import LocalLink
 from bumble.device import Device, Peer
 from bumble.host import Host
@@ -39,6 +39,7 @@ from bumble.smp import (
 )
 from bumble.core import ProtocolError
 from bumble.keys import PairingKeys
+from bumble.hci import Role
 
 
 # -----------------------------------------------------------------------------
@@ -111,7 +112,7 @@ async def test_self_connection():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     'responder_role,',
-    (BT_CENTRAL_ROLE, BT_PERIPHERAL_ROLE),
+    (Role.CENTRAL, Role.PERIPHERAL),
 )
 async def test_self_classic_connection(responder_role):
     # Create two devices, each with a controller, attached to the same link
