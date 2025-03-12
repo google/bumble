@@ -4885,6 +4885,20 @@ class HCI_LE_Periodic_Advertising_Sync_Transfer_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
+    fields=[('connection_handle', 2), ('service_data', 2), ('advertising_handle', 1)],
+    return_parameters_fields=[
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+    ],
+)
+class HCI_LE_Periodic_Advertising_Set_Info_Transfer_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.90 LE Periodic Advertising Set Info Transfer Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command(
     fields=[
         ('connection_handle', 2),
         ('mode', 1),
