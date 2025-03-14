@@ -223,7 +223,12 @@ UUID_2_FIELD_SPEC    = lambda x, y: UUID.parse_uuid_2(x, y)  # noqa: E731
 # Exceptions
 # -----------------------------------------------------------------------------
 class ATT_Error(ProtocolError):
-    def __init__(self, error_code, att_handle=0x0000, message=''):
+    error_code: int
+    att_handle: int
+
+    def __init__(
+        self, error_code: int, att_handle: int = 0x0000, message: str = ''
+    ) -> None:
         super().__init__(
             error_code,
             error_namespace='att',
@@ -233,7 +238,10 @@ class ATT_Error(ProtocolError):
         self.message = message
 
     def __str__(self):
-        return f'ATT_Error(error={self.error_name}, handle={self.att_handle:04X}): {self.message}'
+        return (
+            f'ATT_Error(error={self.error_name}, '
+            f'handle={self.att_handle:04X}): {self.message}'
+        )
 
 
 # -----------------------------------------------------------------------------
