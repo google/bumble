@@ -40,7 +40,7 @@ class PublicBroadcastAnnouncement:
     def from_bytes(cls, data: bytes) -> Self:
         features = cls.Features(data[0])
         metadata_length = data[1]
-        metadata_ltv = data[1 : 1 + metadata_length]
+        metadata_ltv = data[2 : 2 + metadata_length]
         return cls(
             features=features, metadata=le_audio.Metadata.from_bytes(metadata_ltv)
         )

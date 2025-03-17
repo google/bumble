@@ -302,7 +302,10 @@ class ParserSource(BaseSource):
 # -----------------------------------------------------------------------------
 class StreamPacketSource(asyncio.Protocol, ParserSource):
     def data_received(self, data: bytes) -> None:
-        self.parser.feed_data(data)
+        try:
+            self.parser.feed_data(data)
+        except core.InvalidPacketError:
+            logger.warning("invalid packet, ignoring data")
 
 
 # -----------------------------------------------------------------------------
