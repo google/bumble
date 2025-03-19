@@ -139,6 +139,7 @@ class PacketParser:
                         packet_type
                     ) or self.extended_packet_info.get(packet_type)
                     if self.packet_info is None:
+                        self.reset()
                         raise core.InvalidPacketError(
                             f'invalid packet type {packet_type}'
                         )
