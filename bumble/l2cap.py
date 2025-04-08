@@ -1521,6 +1521,9 @@ class ChannelManager:
 
     def next_identifier(self, connection: Connection) -> int:
         identifier = (self.identifiers.setdefault(connection.handle, 0) + 1) % 256
+        # 0x00 is an invalid ID (BT Core Spec, Vol 3, Part A, Sect 4
+        if identifier == 0:
+            identifier = 1
         self.identifiers[connection.handle] = identifier
         return identifier
 
