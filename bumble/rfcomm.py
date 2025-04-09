@@ -34,7 +34,7 @@ from .colors import color
 from .core import (
     UUID,
     BT_RFCOMM_PROTOCOL_ID,
-    BT_BR_EDR_TRANSPORT,
+    PhysicalTransport,
     BT_L2CAP_PROTOCOL_ID,
     InvalidArgumentError,
     InvalidStateError,
@@ -845,7 +845,7 @@ class Multiplexer(EventEmitter):
                 self.open_result.set_exception(
                     core.ConnectionError(
                         core.ConnectionError.CONNECTION_REFUSED,
-                        BT_BR_EDR_TRANSPORT,
+                        PhysicalTransport.BR_EDR,
                         self.l2cap_channel.connection.peer_address,
                         'rfcomm',
                     )

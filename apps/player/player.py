@@ -56,7 +56,7 @@ from bumble.core import (
     AdvertisingData,
     ConnectionError as BumbleConnectionError,
     DeviceClass,
-    BT_BR_EDR_TRANSPORT,
+    PhysicalTransport,
 )
 from bumble.device import Connection, Device, DeviceConfiguration
 from bumble.hci import Address, HCI_CONNECTION_ALREADY_EXISTS_ERROR, HCI_Constant
@@ -286,7 +286,7 @@ class Player:
 
     async def connect(self, device: Device, address: str) -> Connection:
         print(color(f"Connecting to {address}...", "green"))
-        connection = await device.connect(address, transport=BT_BR_EDR_TRANSPORT)
+        connection = await device.connect(address, transport=PhysicalTransport.BR_EDR)
 
         # Request authentication
         if self.authenticate:
@@ -402,7 +402,7 @@ class Player:
 
     async def pair(self, device: Device, address: str) -> None:
         print(color(f"Connecting to {address}...", "green"))
-        connection = await device.connect(address, transport=BT_BR_EDR_TRANSPORT)
+        connection = await device.connect(address, transport=PhysicalTransport.BR_EDR)
 
         print(color("Pairing...", "magenta"))
         await connection.authenticate()

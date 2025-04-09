@@ -34,7 +34,7 @@ from aiohttp import web
 
 import bumble
 from bumble.colors import color
-from bumble.core import BT_BR_EDR_TRANSPORT, CommandTimeoutError
+from bumble.core import PhysicalTransport, CommandTimeoutError
 from bumble.device import Connection, Device, DeviceConfiguration
 from bumble.hci import HCI_StatusError
 from bumble.pairing import PairingConfig
@@ -568,7 +568,9 @@ class Speaker:
     async def connect(self, address):
         # Connect to the source
         print(f'=== Connecting to {address}...')
-        connection = await self.device.connect(address, transport=BT_BR_EDR_TRANSPORT)
+        connection = await self.device.connect(
+            address, transport=PhysicalTransport.BR_EDR
+        )
         print(f'=== Connected to {connection.peer_address}')
 
         # Request authentication

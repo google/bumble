@@ -112,7 +112,7 @@ async def main() -> None:
 
             print(f'<<< Connecting to {target_address}')
             connection = await device.connect(
-                target_address, transport=core.BT_LE_TRANSPORT
+                target_address, transport=core.PhysicalTransport.LE
             )
             print('<<< ACL Connected')
             if not (await device.get_long_term_key(connection.handle, b'', 0)):

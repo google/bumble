@@ -55,7 +55,7 @@ from prompt_toolkit.layout import (
 from bumble import __version__
 import bumble.core
 from bumble import colors
-from bumble.core import UUID, AdvertisingData, BT_LE_TRANSPORT
+from bumble.core import UUID, AdvertisingData, PhysicalTransport
 from bumble.device import (
     ConnectionParametersPreferences,
     ConnectionPHY,

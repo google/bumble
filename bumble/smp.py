@@ -52,8 +52,7 @@ from .hci import (
     key_with_value,
 )
 from .core import (
-    BT_BR_EDR_TRANSPORT,
-    BT_LE_TRANSPORT,
+    PhysicalTransport,
     AdvertisingData,
     InvalidArgumentError,
     ProtocolError,
@@ -857,7 +856,7 @@ class Session:
         initiator_io_capability: int,
         responder_io_capability: int,
     ) -> None:
-        if self.connection.transport == BT_BR_EDR_TRANSPORT:
+        if self.connection.transport == PhysicalTransport.BR_EDR:
             self.pairing_method = PairingMethod.CTKD_OVER_CLASSIC
             return
         if (not self.mitm) and (auth_req & SMP_MITM_AUTHREQ == 0):
@@ -1170,7 +1169,7 @@ class Session:
         if self.is_initiator:
             # CTKD: Derive LTK from LinkKey
             if (
-                self.connection.transport == BT_BR_EDR_TRANSPORT
+                self.connection.transport == PhysicalTransport.BR_EDR
                 and self.initiator_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
                 self.ctkd_task = self.connection.abort_on(
@@ -1209,7 +1208,7 @@ class Session:
         else:
             # CTKD: Derive LTK from LinkKey
             if (
-                self.connection.transport == BT_BR_EDR_TRANSPORT
+                self.connection.transport == PhysicalTransport.BR_EDR
                 and self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
                 self.ctkd_task = self.connection.abort_on(
@@ -1248,7 +1247,7 @@ class Session:
     def compute_peer_expected_distributions(self, key_distribution_flags: int) -> None:
         # Set our expectations for what to wait for in the key distribution phase
         self.peer_expected_distributions = []
-        if not self.sc and self.connection.transport == BT_LE_TRANSPORT:
+        if not self.sc and self.connection.transport == PhysicalTransport.LE:
             if key_distribution_flags & SMP_ENC_KEY_DISTRIBUTION_FLAG != 0:
                 self.peer_expected_distributions.append(
                     SMP_Encryption_Information_Command
@@ -1365,7 +1364,7 @@ class Session:
         keys = PairingKeys()
         keys.address_type = peer_address.address_type
         authenticated = self.pairing_method != PairingMethod.JUST_WORKS
-        if self.sc or self.connection.transport == BT_BR_EDR_TRANSPORT:
+        if self.sc or self.connection.transport == PhysicalTransport.BR_EDR:
             keys.ltk = PairingKeys.Key(value=self.ltk, authenticated=authenticated)
         else:
             our_ltk_key = PairingKeys.Key(
@@ -1506,7 +1505,7 @@ class Session:
         # CTKD over BR/EDR should happen after the connection has been encrypted,
         # so when receiving pairing requests, responder should start distributing keys
         if (
-            self.connection.transport == BT_BR_EDR_TRANSPORT
+            self.connection.transport == PhysicalTransport.BR_EDR
             and self.connection.is_encrypted
             and self.is_responder
             and accepted
@@ -1950,7 +1949,9 @@ class Manager(EventEmitter):
             f'>>> Sending SMP Command on connection [0x{connection.handle:04X}] '
             f'{connection.peer_address}: {command}'
         )
-        cid = SMP_BR_CID if connection.transport == BT_BR_EDR_TRANSPORT else SMP_CID
+        cid = (
+            SMP_BR_CID if connection.transport == PhysicalTransport.BR_EDR else SMP_CID
+        )
         connection.send_l2cap_pdu(cid, bytes(command))
 
     def on_smp_security_request_command(

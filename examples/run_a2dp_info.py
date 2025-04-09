@@ -24,7 +24,7 @@ from bumble.colors import color
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.core import (
-    BT_BR_EDR_TRANSPORT,
+    PhysicalTransport,
     BT_AVDTP_PROTOCOL_ID,
     BT_AUDIO_SINK_SERVICE,
     BT_L2CAP_PROTOCOL_ID,
@@ -165,7 +165,9 @@ async def main() -> None:
         # Connect to a peer
         target_address = sys.argv[3]
         print(f'=== Connecting to {target_address}...')
-        connection = await device.connect(target_address, transport=BT_BR_EDR_TRANSPORT)
+        connection = await device.connect(
+            target_address, transport=PhysicalTransport.BR_EDR
+        )
         print(f'=== Connected to {connection.peer_address}!')
 
         # Request authentication

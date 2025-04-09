@@ -31,8 +31,7 @@ from bumble.keys import JsonKeyStore
 from bumble.core import (
     AdvertisingData,
     ProtocolError,
-    BT_LE_TRANSPORT,
-    BT_BR_EDR_TRANSPORT,
+    PhysicalTransport,
 )
 from bumble.gatt import (
     GATT_DEVICE_NAME_CHARACTERISTIC,
@@ -422,7 +421,9 @@ async def pair(
             print(color(f'=== Connecting to {address_or_name}...', 'green'))
             connection = await device.connect(
                 address_or_name,
-                transport=BT_LE_TRANSPORT if mode == 'le' else BT_BR_EDR_TRANSPORT,
+                transport=(
+                    PhysicalTransport.LE if mode == 'le' else PhysicalTransport.BR_EDR
+                ),
             )
 
             if not request:

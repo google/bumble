@@ -25,8 +25,7 @@ import random
 import struct
 from bumble.colors import color
 from bumble.core import (
-    BT_LE_TRANSPORT,
-    BT_BR_EDR_TRANSPORT,
+    PhysicalTransport,
 )
 
 from bumble.hci import (
@@ -392,7 +391,7 @@ class Controller:
                 role=Role.PERIPHERAL,
                 peer_address=peer_address,
                 link=self.link,
-                transport=BT_LE_TRANSPORT,
+                transport=PhysicalTransport.LE,
                 link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
             )
             self.peripheral_connections[peer_address] = connection
@@ -452,7 +451,7 @@ class Controller:
                     role=Role.CENTRAL,
                     peer_address=peer_address,
                     link=self.link,
-                    transport=BT_LE_TRANSPORT,
+                    transport=PhysicalTransport.LE,
                     link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
                 )
                 self.central_connections[peer_address] = connection
@@ -530,7 +529,7 @@ class Controller:
 
     def on_link_acl_data(self, sender_address, transport, data):
         # Look for the connection to which this data belongs
-        if transport == BT_LE_TRANSPORT:
+        if transport == PhysicalTransport.LE:
             connection = self.find_le_connection_by_address(sender_address)
         else:
             connection = self.find_classic_connection_by_address(sender_address)
@@ -695,7 +694,7 @@ class Controller:
                     role=Role.CENTRAL,
                     peer_address=peer_address,
                     link=self.link,
-                    transport=BT_BR_EDR_TRANSPORT,
+                    transport=PhysicalTransport.BR_EDR,
                     link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
                 )
                 self.classic_connections[peer_address] = connection
@@ -763,7 +762,7 @@ class Controller:
                 role=Role.CENTRAL,
                 peer_address=peer_address,
                 link=self.link,
-                transport=BT_BR_EDR_TRANSPORT,
+                transport=PhysicalTransport.BR_EDR,
                 link_type=link_type,
             )
             self.classic_connections[peer_address] = connection

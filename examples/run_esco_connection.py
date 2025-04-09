@@ -16,11 +16,10 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import dataclasses
 import logging
 import sys
 import os
-from bumble.core import BT_BR_EDR_TRANSPORT
+from bumble.core import PhysicalTransport
 from bumble.device import Device, ScoLink
 from bumble.hci import HCI_Enhanced_Setup_Synchronous_Connection_Command
 from bumble.hfp import DefaultCodecParameters, ESCO_PARAMETERS
@@ -61,7 +60,9 @@ async def main() -> None:
 
     connections = await asyncio.gather(
         devices[0].accept(devices[1].public_address),
-        devices[1].connect(devices[0].public_address, transport=BT_BR_EDR_TRANSPORT),
+        devices[1].connect(
+            devices[0].public_address, transport=PhysicalTransport.BR_EDR
+        ),
     )
 
     def on_sco(sco_link: ScoLink):

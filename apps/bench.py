@@ -28,8 +28,7 @@ import click
 
 from bumble import l2cap
 from bumble.core import (
-    BT_BR_EDR_TRANSPORT,
-    BT_LE_TRANSPORT,
+    PhysicalTransport,
     BT_L2CAP_PROTOCOL_ID,
     BT_RFCOMM_PROTOCOL_ID,
     UUID,
@@ -42,8 +41,7 @@ from bumble.hci import (
     HCI_LE_1M_PHY,
     HCI_LE_2M_PHY,
     HCI_LE_CODED_PHY,
-    HCI_CENTRAL_ROLE,
-    HCI_PERIPHERAL_ROLE,
+    Role,
     HCI_Constant,
     HCI_Error,
     HCI_StatusError,
@@ -113,7 +111,7 @@ def print_connection_phy(phy):
 
 def print_connection(connection):
     params = []
-    if connection.transport == BT_LE_TRANSPORT:
+    if connection.transport == PhysicalTransport.LE:
         params.append(
             'DL=('
             f'TX:{connection.data_length[0]}/{connection.data_length[1]},'
@@ -189,7 +187,7 @@ def log_stats(title, stats, precision=2):
 
 
 async def switch_roles(connection, role):
-    target_role = HCI_CENTRAL_ROLE if role == "central" else HCI_PERIPHERAL_ROLE
+    target_role = Role.CENTRAL if role == "central" else Role.PERIPHERAL
     if connection.role != target_role:
         logging.info(f'{color("### Switching roles to:", "cyan")} {role}')
         try:
@@ -1275,7 +1273,11 @@ class Central(Connection.Listener):
                 self.connection = await self.device.connect(
                     self.peripheral_address,
                     connection_parameters_preferences=self.connection_parameter_preferences,
-                    transport=BT_BR_EDR_TRANSPORT if self.classic else BT_LE_TRANSPORT,
+                    transport=(
+                        PhysicalTransport.BR_EDR
+                        if self.classic
+                        else PhysicalTransport.LE
+                    ),
                 )
             except CommandTimeoutError:
                 logging.info(color('!!! Connection timed out', 'red'))

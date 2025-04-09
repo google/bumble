@@ -29,7 +29,7 @@ from typing_extensions import Self
 from bumble import crypto
 from bumble.colors import color
 from bumble.core import (
-    BT_BR_EDR_TRANSPORT,
+    PhysicalTransport,
     AdvertisingData,
     DeviceClass,
     InvalidArgumentError,
@@ -1976,7 +1976,7 @@ class Address:
     def from_string_for_transport(
         cls: type[Self], string: str, transport: PhysicalTransport
     ) -> Self:
-        if transport == BT_BR_EDR_TRANSPORT:
+        if transport == PhysicalTransport.BR_EDR:
             address_type = Address.PUBLIC_DEVICE_ADDRESS
         else:
             address_type = Address.RANDOM_DEVICE_ADDRESS

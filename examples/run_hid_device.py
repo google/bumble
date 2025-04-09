@@ -26,7 +26,7 @@ import struct
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.core import (
-    BT_BR_EDR_TRANSPORT,
+    PhysicalTransport,
     BT_L2CAP_PROTOCOL_ID,
     BT_HUMAN_INTERFACE_DEVICE_SERVICE,
     BT_HIDP_PROTOCOL_ID,
@@ -721,7 +721,7 @@ async def main() -> None:
                 elif choice == '9':
                     hid_host_bd_addr = str(hid_device.remote_device_bd_address)
                     connection = await device.connect(
-                        hid_host_bd_addr, transport=BT_BR_EDR_TRANSPORT
+                        hid_host_bd_addr, transport=PhysicalTransport.BR_EDR
                     )
                     await connection.authenticate()
                     await connection.encrypt()
