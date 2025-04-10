@@ -28,7 +28,7 @@ from bumble.transport import open_transport_or_link
 from bumble.core import (
     BT_L2CAP_PROTOCOL_ID,
     BT_RFCOMM_PROTOCOL_ID,
-    BT_BR_EDR_TRANSPORT,
+    PhysicalTransport,
 )
 from bumble.rfcomm import Client
 from bumble.sdp import (
@@ -191,7 +191,9 @@ async def main() -> None:
         # Connect to a peer
         target_address = sys.argv[3]
         print(f'=== Connecting to {target_address}...')
-        connection = await device.connect(target_address, transport=BT_BR_EDR_TRANSPORT)
+        connection = await device.connect(
+            target_address, transport=PhysicalTransport.BR_EDR
+        )
         print(f'=== Connected to {connection.peer_address}!')
 
         channel_str = sys.argv[4]

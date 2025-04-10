@@ -22,8 +22,7 @@ from . import utils
 from .config import Config
 from bumble import hci
 from bumble.core import (
-    BT_BR_EDR_TRANSPORT,
-    BT_LE_TRANSPORT,
+    PhysicalTransport,
     ProtocolError,
 )
 from bumble.device import Connection as BumbleConnection, Device
@@ -94,7 +93,7 @@ class PairingDelegate(BasePairingDelegate):
         else:
             # In BR/EDR, connection may not be complete,
             # use address instead
-            assert self.connection.transport == BT_BR_EDR_TRANSPORT
+            assert self.connection.transport == PhysicalTransport.BR_EDR
             ev.address = bytes(reversed(bytes(self.connection.peer_address)))
 
         return ev
@@ -173,7 +172,7 @@ class PairingDelegate(BasePairingDelegate):
 
     async def display_number(self, number: int, digits: int = 6) -> None:
         if (
-            self.connection.transport == BT_BR_EDR_TRANSPORT
+            self.connection.transport == PhysicalTransport.BR_EDR
             and self.io_capability == BasePairingDelegate.DISPLAY_OUTPUT_ONLY
         ):
             return
@@ -286,7 +285,7 @@ class SecurityService(SecurityServicer):
 
         oneof = request.WhichOneof('level')
         level = getattr(request, oneof)
-        assert {BT_BR_EDR_TRANSPORT: 'classic', BT_LE_TRANSPORT: 'le'}[
+        assert {PhysicalTransport.BR_EDR: 'classic', PhysicalTransport.LE: 'le'}[
             connection.transport
         ] == oneof
 
@@ -316,7 +315,7 @@ class SecurityService(SecurityServicer):
                         security_result.set_result('connection_died')
 
                     if (
-                        connection.transport == BT_LE_TRANSPORT
+                        connection.transport == PhysicalTransport.LE
                         and connection.role == Role.PERIPHERAL
                     ):
                         connection.request_pairing()
@@ -378,7 +377,7 @@ class SecurityService(SecurityServicer):
 
         assert request.level
         level = request.level
-        assert {BT_BR_EDR_TRANSPORT: 'classic', BT_LE_TRANSPORT: 'le'}[
+        assert {PhysicalTransport.BR_EDR: 'classic', PhysicalTransport.LE: 'le'}[
             connection.transport
         ] == request.level_variant()
 
@@ -426,7 +425,7 @@ class SecurityService(SecurityServicer):
                 self.log.debug('Wait for security: done')
                 wait_for_security.set_result('success')
             elif (
-                connection.transport == BT_BR_EDR_TRANSPORT
+                connection.transport == PhysicalTransport.BR_EDR
                 and self.need_authentication(connection, level)
             ):
                 nonlocal authenticate_task
@@ -504,12 +503,12 @@ class SecurityService(SecurityServicer):
         return BR_LEVEL_REACHED[level](connection)
 
     def need_pairing(self, connection: BumbleConnection, level: int) -> bool:
-        if connection.transport == BT_LE_TRANSPORT:
+        if connection.transport == PhysicalTransport.LE:
             return level >= LE_LEVEL3 and not connection.authenticated
         return False
 
     def need_authentication(self, connection: BumbleConnection, level: int) -> bool:
-        if connection.transport == BT_LE_TRANSPORT:
+        if connection.transport == PhysicalTransport.LE:
             return False
         if level == LEVEL2 and connection.encryption != 0:
             return not connection.authenticated
@@ -517,7 +516,7 @@ class SecurityService(SecurityServicer):
 
     def need_encryption(self, connection: BumbleConnection, level: int) -> bool:
         # TODO(abel): need to support MITM
-        if connection.transport == BT_LE_TRANSPORT:
+        if connection.transport == PhysicalTransport.LE:
             return level == LE_LEVEL2 and not connection.encryption
         return level >= LEVEL2 and not connection.encryption
 

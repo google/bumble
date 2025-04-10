@@ -24,7 +24,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from bumble.controller import Controller
-from bumble.core import BT_BR_EDR_TRANSPORT, BT_LE_TRANSPORT
+from bumble.core import PhysicalTransport
 from bumble.link import LocalLink
 from bumble.device import Device, Peer
 from bumble.host import Host
@@ -137,7 +137,7 @@ async def test_self_classic_connection(responder_role):
     # Connect the two devices
     await asyncio.gather(
         two_devices.devices[0].connect(
-            two_devices.devices[1].public_address, transport=BT_BR_EDR_TRANSPORT
+            two_devices.devices[1].public_address, transport=PhysicalTransport.BR_EDR
         ),
         two_devices.devices[1].accept(
             two_devices.devices[0].public_address, responder_role
@@ -507,7 +507,7 @@ async def test_self_smp_over_classic():
     # Connect the two devices
     await asyncio.gather(
         two_devices.devices[0].connect(
-            two_devices.devices[1].public_address, transport=BT_BR_EDR_TRANSPORT
+            two_devices.devices[1].public_address, transport=PhysicalTransport.BR_EDR
         ),
         two_devices.devices[1].accept(two_devices.devices[0].public_address),
     )

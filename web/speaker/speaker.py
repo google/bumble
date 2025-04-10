@@ -20,7 +20,7 @@ import enum
 import logging
 from typing import Dict, List
 
-from bumble.core import BT_BR_EDR_TRANSPORT, CommandTimeoutError
+from bumble.core import PhysicalTransport, CommandTimeoutError
 from bumble.device import Device, DeviceConfiguration
 from bumble.pairing import PairingConfig
 from bumble.sdp import ServiceAttribute
@@ -229,7 +229,9 @@ class Speaker:
     async def connect(self, address):
         # Connect to the source
         print(f'=== Connecting to {address}...')
-        connection = await self.device.connect(address, transport=BT_BR_EDR_TRANSPORT)
+        connection = await self.device.connect(
+            address, transport=PhysicalTransport.BR_EDR
+        )
         print(f'=== Connected to {connection.peer_address}')
 
         # Request authentication

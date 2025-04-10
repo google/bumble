@@ -170,7 +170,7 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
         else:
             assert connection
 
-            if connection.transport == core.BT_LE_TRANSPORT:
+            if connection.transport == core.PhysicalTransport.LE:
                 key = await connection.device.get_long_term_key(
                     connection_handle=connection.handle, rand=b'', ediv=0
                 )
@@ -242,7 +242,7 @@ class CoordinatedSetIdentificationProxy(gatt_client.ProfileServiceProxy):
         else:
             connection = self.service_proxy.client.connection
             device = connection.device
-            if connection.transport == core.BT_LE_TRANSPORT:
+            if connection.transport == core.PhysicalTransport.LE:
                 key = await device.get_long_term_key(
                     connection_handle=connection.handle, rand=b'', ediv=0
                 )

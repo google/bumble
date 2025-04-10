@@ -522,7 +522,7 @@ async def test_sco_setup():
 
     connections = await asyncio.gather(
         devices[0].connect(
-            devices[1].public_address, transport=core.BT_BR_EDR_TRANSPORT
+            devices[1].public_address, transport=core.PhysicalTransport.BR_EDR
         ),
         devices[1].accept(devices[0].public_address),
     )

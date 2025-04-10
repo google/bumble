@@ -23,7 +23,7 @@ from bumble.colors import color
 
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
-from bumble.core import BT_BR_EDR_TRANSPORT, BT_L2CAP_PROTOCOL_ID, CommandTimeoutError
+from bumble.core import PhysicalTransport, BT_L2CAP_PROTOCOL_ID, CommandTimeoutError
 from bumble.sdp import (
     Client as SDP_Client,
     SDP_PUBLIC_BROWSE_ROOT,
@@ -57,7 +57,7 @@ async def main() -> None:
             print(f'=== Connecting to {target_address}...')
             try:
                 connection = await device.connect(
-                    target_address, transport=BT_BR_EDR_TRANSPORT
+                    target_address, transport=PhysicalTransport.BR_EDR
                 )
             except CommandTimeoutError:
                 print('!!! Connection timed out')

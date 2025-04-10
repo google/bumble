@@ -21,7 +21,7 @@ import os
 import pytest
 
 from bumble.controller import Controller
-from bumble.core import BT_BR_EDR_TRANSPORT
+from bumble.core import PhysicalTransport
 from bumble.link import LocalLink
 from bumble.device import Device
 from bumble.host import Host
@@ -106,7 +106,7 @@ async def test_self_connection():
     # Connect the two devices
     await asyncio.gather(
         two_devices.devices[0].connect(
-            two_devices.devices[1].public_address, transport=BT_BR_EDR_TRANSPORT
+            two_devices.devices[1].public_address, transport=PhysicalTransport.BR_EDR
         ),
         two_devices.devices[1].accept(two_devices.devices[0].public_address),
     )
@@ -190,7 +190,7 @@ async def test_source_sink_1():
     async def make_connection():
         connections = await asyncio.gather(
             two_devices.devices[0].connect(
-                two_devices.devices[1].public_address, BT_BR_EDR_TRANSPORT
+                two_devices.devices[1].public_address, PhysicalTransport.BR_EDR
             ),
             two_devices.devices[1].accept(two_devices.devices[0].public_address),
         )

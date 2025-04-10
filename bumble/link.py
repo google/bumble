@@ -20,8 +20,7 @@ import asyncio
 from functools import partial
 
 from bumble.core import (
-    BT_BR_EDR_TRANSPORT,
-    BT_LE_TRANSPORT,
+    PhysicalTransport,
     InvalidStateError,
 )
 from bumble.colors import color
@@ -116,10 +115,10 @@ class LocalLink:
 
     def send_acl_data(self, sender_controller, destination_address, transport, data):
         # Send the data to the first controller with a matching address
-        if transport == BT_LE_TRANSPORT:
+        if transport == PhysicalTransport.LE:
             destination_controller = self.find_controller(destination_address)
             source_address = sender_controller.random_address
-        elif transport == BT_BR_EDR_TRANSPORT:
+        elif transport == PhysicalTransport.BR_EDR:
             destination_controller = self.find_classic_controller(destination_address)
             source_address = sender_controller.public_address
         else:

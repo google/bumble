@@ -271,7 +271,7 @@ class ClientBridge:
         print(color(f"@@@ Connecting to Bluetooth {self.address}", "blue"))
         assert self.device
         self.connection = await self.device.connect(
-            self.address, transport=core.BT_BR_EDR_TRANSPORT
+            self.address, transport=core.PhysicalTransport.BR_EDR
         )
         print(color(f"@@@ Bluetooth connection: {self.connection}", "blue"))
         self.connection.on("disconnection", self.on_disconnection)

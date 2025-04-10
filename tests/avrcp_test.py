@@ -70,7 +70,7 @@ class TwoDevices:
 
         self.connections = await asyncio.gather(
             self.devices[0].connect(
-                self.devices[1].public_address, core.BT_BR_EDR_TRANSPORT
+                self.devices[1].public_address, core.PhysicalTransport.BR_EDR
             ),
             self.devices[1].accept(self.devices[0].public_address),
         )

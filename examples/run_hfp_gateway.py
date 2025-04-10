@@ -28,9 +28,7 @@ import websockets
 import bumble.core
 from bumble.device import Device, ScoLink
 from bumble.transport import open_transport_or_link
-from bumble.core import (
-    BT_BR_EDR_TRANSPORT,
-)
+from bumble.core import PhysicalTransport
 from bumble import hci, rfcomm, hfp
 
 
@@ -234,7 +232,7 @@ async def main() -> None:
             target_address = sys.argv[3]
             print(f'=== Connecting to {target_address}...')
             connection = await device.connect(
-                target_address, transport=BT_BR_EDR_TRANSPORT
+                target_address, transport=PhysicalTransport.BR_EDR
             )
             print(f'=== Connected to {connection.peer_address}!')
 

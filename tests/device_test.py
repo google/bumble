@@ -22,8 +22,7 @@ import os
 import pytest
 
 from bumble.core import (
-    BT_BR_EDR_TRANSPORT,
-    BT_LE_TRANSPORT,
+    PhysicalTransport,
     ConnectionParameters,
 )
 from bumble.device import (
@@ -229,10 +228,10 @@ async def test_device_connect_parallel():
     [c01, c02, a10, a20] = await asyncio.gather(
         *[
             asyncio.create_task(
-                d0.connect(d1.public_address, transport=BT_BR_EDR_TRANSPORT)
+                d0.connect(d1.public_address, transport=PhysicalTransport.BR_EDR)
             ),
             asyncio.create_task(
-                d0.connect(d2.public_address, transport=BT_BR_EDR_TRANSPORT)
+                d0.connect(d2.public_address, transport=PhysicalTransport.BR_EDR)
             ),
             d1_accept_task,
             d2_accept_task,
@@ -291,7 +290,7 @@ async def test_legacy_advertising_disconnection(auto_restart):
     await device.start_advertising(auto_restart=auto_restart)
     device.on_connection(
         0x0001,
-        BT_LE_TRANSPORT,
+        PhysicalTransport.LE,
         peer_address,
         None,
         None,
@@ -349,7 +348,7 @@ async def test_extended_advertising_connection(own_address_type):
     )
     device.on_connection(
         0x0001,
-        BT_LE_TRANSPORT,
+        PhysicalTransport.LE,
         peer_address,
         None,
         None,
@@ -393,7 +392,7 @@ async def test_extended_advertising_connection_out_of_order(own_address_type):
     )
     device.on_connection(
         0x0001,
-        BT_LE_TRANSPORT,
+        PhysicalTransport.LE,
         Address('F0:F1:F2:F3:F4:F5'),
         None,
         None,

@@ -26,7 +26,7 @@ from bumble.device import Device
 from bumble.transport import open_transport_or_link
 from bumble.core import (
     BT_HUMAN_INTERFACE_DEVICE_SERVICE,
-    BT_BR_EDR_TRANSPORT,
+    PhysicalTransport,
 )
 from bumble.hci import Address
 from bumble.hid import Host, Message
@@ -349,7 +349,9 @@ async def main() -> None:
         # Connect to a peer
         target_address = sys.argv[3]
         print(f'=== Connecting to {target_address}...')
-        connection = await device.connect(target_address, transport=BT_BR_EDR_TRANSPORT)
+        connection = await device.connect(
+            target_address, transport=PhysicalTransport.BR_EDR
+        )
         print(f'=== Connected to {connection.peer_address}!')
 
         # Request authentication
@@ -519,10 +521,10 @@ async def main() -> None:
 
                 elif choice == '13':
                     peer_address = Address.from_string_for_transport(
-                        target_address, transport=BT_BR_EDR_TRANSPORT
+                        target_address, transport=PhysicalTransport.BR_EDR
                     )
                     connection = device.find_connection_by_bd_addr(
-                        peer_address, transport=BT_BR_EDR_TRANSPORT
+                        peer_address, transport=PhysicalTransport.BR_EDR
                     )
                     if connection is not None:
                         await connection.disconnect()
@@ -538,7 +540,7 @@ async def main() -> None:
 
                 elif choice == '15':
                     connection = await device.connect(
-                        target_address, transport=BT_BR_EDR_TRANSPORT
+                        target_address, transport=PhysicalTransport.BR_EDR
                     )
                     await connection.authenticate()
                     await connection.encrypt()

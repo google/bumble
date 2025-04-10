@@ -23,7 +23,7 @@ from typing import Any, Dict
 
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
-from bumble.core import BT_BR_EDR_TRANSPORT
+from bumble.core import PhysicalTransport
 from bumble.avdtp import (
     AVDTP_AUDIO_MEDIA_TYPE,
     Protocol,
@@ -145,7 +145,7 @@ async def main() -> None:
                 target_address = sys.argv[4]
                 print(f'=== Connecting to {target_address}...')
                 connection = await device.connect(
-                    target_address, transport=BT_BR_EDR_TRANSPORT
+                    target_address, transport=PhysicalTransport.BR_EDR
                 )
                 print(f'=== Connected to {connection.peer_address}!')
 

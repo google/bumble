@@ -23,8 +23,7 @@ import struct
 from . import utils
 from .config import Config
 from bumble.core import (
-    BT_BR_EDR_TRANSPORT,
-    BT_LE_TRANSPORT,
+    PhysicalTransport,
     UUID,
     AdvertisingData,
     Appearance,
@@ -185,7 +184,7 @@ class HostService(HostServicer):
 
         try:
             connection = await self.device.connect(
-                address, transport=BT_BR_EDR_TRANSPORT
+                address, transport=PhysicalTransport.BR_EDR
             )
         except ConnectionError as e:
             if e.error_code == HCI_PAGE_TIMEOUT_ERROR:
@@ -218,7 +217,7 @@ class HostService(HostServicer):
         self.log.debug(f"WaitConnection from {address}...")
 
         connection = self.device.find_connection_by_bd_addr(
-            address, transport=BT_BR_EDR_TRANSPORT
+            address, transport=PhysicalTransport.BR_EDR
         )
         if connection and id(connection) in self.waited_connections:
             # this connection was already returned: wait for a new one.
@@ -250,7 +249,7 @@ class HostService(HostServicer):
         try:
             connection = await self.device.connect(
                 address,
-                transport=BT_LE_TRANSPORT,
+                transport=PhysicalTransport.LE,
                 own_address_type=OwnAddressType(request.own_address_type),
             )
         except ConnectionError as e:
@@ -378,7 +377,7 @@ class HostService(HostServicer):
 
             def on_connection(connection: bumble.device.Connection) -> None:
                 if (
-                    connection.transport == BT_LE_TRANSPORT
+                    connection.transport == PhysicalTransport.LE
                     and connection.role == Role.PERIPHERAL
                 ):
                     connections.put_nowait(connection)
@@ -496,7 +495,7 @@ class HostService(HostServicer):
 
             def on_connection(connection: bumble.device.Connection) -> None:
                 if (
-                    connection.transport == BT_LE_TRANSPORT
+                    connection.transport == PhysicalTransport.LE
                     and connection.role == Role.PERIPHERAL
                 ):
                     connections.put_nowait(connection)
