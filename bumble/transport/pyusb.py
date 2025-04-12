@@ -29,9 +29,9 @@ from usb.core import USBError
 from usb.util import CTRL_TYPE_CLASS, CTRL_RECIPIENT_OTHER
 from usb.legacy import REQ_SET_FEATURE, REQ_CLEAR_FEATURE, CLASS_HUB
 
-from .common import Transport, ParserSource, TransportInitError
-from .. import hci
-from ..colors import color
+from bumble.transport.common import Transport, ParserSource, TransportInitError
+from bumble import hci
+from bumble.colors import color
 
 
 # -----------------------------------------------------------------------------

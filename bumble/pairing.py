@@ -20,14 +20,14 @@ import enum
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
-from .hci import (
+from bumble.hci import (
     Address,
     HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
     HCI_DISPLAY_ONLY_IO_CAPABILITY,
     HCI_DISPLAY_YES_NO_IO_CAPABILITY,
     HCI_KEYBOARD_ONLY_IO_CAPABILITY,
 )
-from .smp import (
+from bumble.smp import (
     SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
     SMP_KEYBOARD_ONLY_IO_CAPABILITY,
     SMP_DISPLAY_ONLY_IO_CAPABILITY,
@@ -41,7 +41,7 @@ from .smp import (
     OobLegacyContext,
     OobSharedData,
 )
-from .core import AdvertisingData, LeRole
+from bumble.core import AdvertisingData, LeRole
 
 
 # -----------------------------------------------------------------------------

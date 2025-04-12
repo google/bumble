@@ -39,14 +39,14 @@ from typing import (
 
 from pyee import EventEmitter
 
-from .core import (
+from bumble.core import (
     BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
     InvalidStateError,
     ProtocolError,
     InvalidArgumentError,
     name_or_number,
 )
-from .a2dp import (
+from bumble.a2dp import (
     A2DP_CODEC_TYPE_NAMES,
     A2DP_MPEG_2_4_AAC_CODEC_TYPE,
     A2DP_NON_A2DP_CODEC_TYPE,
@@ -56,9 +56,9 @@ from .a2dp import (
     SbcMediaCodecInformation,
     VendorSpecificMediaCodecInformation,
 )
-from .rtp import MediaPacket
-from . import sdp, device, l2cap
-from .colors import color
+from bumble.rtp import MediaPacket
+from bumble import sdp, device, l2cap
+from bumble.colors import color
 
 
 # -----------------------------------------------------------------------------

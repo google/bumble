@@ -38,15 +38,18 @@ from bumble.transport.common import (
 )
 
 # pylint: disable=no-name-in-module
-from .grpc_protobuf.netsim.packet_streamer_pb2_grpc import (
+from bumble.transport.grpc_protobuf.netsim.packet_streamer_pb2_grpc import (
     PacketStreamerStub,
     PacketStreamerServicer,
     add_PacketStreamerServicer_to_server,
 )
-from .grpc_protobuf.netsim.packet_streamer_pb2 import PacketRequest, PacketResponse
-from .grpc_protobuf.netsim.hci_packet_pb2 import HCIPacket
-from .grpc_protobuf.netsim.startup_pb2 import Chip, ChipInfo, DeviceInfo
-from .grpc_protobuf.netsim.common_pb2 import ChipKind
+from bumble.transport.grpc_protobuf.netsim.packet_streamer_pb2 import (
+    PacketRequest,
+    PacketResponse,
+)
+from bumble.transport.grpc_protobuf.netsim.hci_packet_pb2 import HCIPacket
+from bumble.transport.grpc_protobuf.netsim.startup_pb2 import Chip, ChipInfo, DeviceInfo
+from bumble.transport.grpc_protobuf.netsim.common_pb2 import ChipKind
 
 
 # -----------------------------------------------------------------------------

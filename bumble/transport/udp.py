@@ -18,7 +18,7 @@
 import asyncio
 import logging
 
-from .common import Transport, ParserSource
+from bumble.transport.common import Transport, ParserSource
 
 # -----------------------------------------------------------------------------
 # Logging

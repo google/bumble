@@ -28,11 +28,11 @@ import json
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Type
 from typing_extensions import Self
 
-from .colors import color
-from .hci import Address
+from bumble.colors import color
+from bumble.hci import Address
 
 if TYPE_CHECKING:
-    from .device import Device
+    from bumble.device import Device
 
 
 # -----------------------------------------------------------------------------

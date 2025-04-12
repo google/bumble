@@ -20,7 +20,7 @@ import asyncio
 import logging
 import socket
 
-from .common import Transport, StreamPacketSource
+from bumble.transport.common import Transport, StreamPacketSource
 
 # -----------------------------------------------------------------------------
 # Logging

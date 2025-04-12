@@ -22,11 +22,11 @@ __version__ = "0.0.1"
 import grpc
 import grpc.aio
 
-from .config import Config
-from .device import PandoraDevice
-from .host import HostService
-from .l2cap import L2CAPService
-from .security import SecurityService, SecurityStorageService
+from bumble.pandora.config import Config
+from bumble.pandora.device import PandoraDevice
+from bumble.pandora.host import HostService
+from bumble.pandora.l2cap import L2CAPService
+from bumble.pandora.security import SecurityService, SecurityStorageService
 from pandora.host_grpc_aio import add_HostServicer_to_server
 from pandora.l2cap_grpc_aio import add_L2CAPServicer_to_server
 from pandora.security_grpc_aio import (

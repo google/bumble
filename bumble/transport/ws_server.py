@@ -18,7 +18,7 @@
 import logging
 import websockets
 
-from .common import Transport, ParserSource, PumpedPacketSink
+from bumble.transport.common import Transport, ParserSource, PumpedPacketSink
 
 # -----------------------------------------------------------------------------
 # Logging

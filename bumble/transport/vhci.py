@@ -19,8 +19,8 @@ import logging
 
 from typing import Optional
 
-from .common import Transport
-from .file import open_file_transport
+from bumble.transport.common import Transport
+from bumble.transport.file import open_file_transport
 
 # -----------------------------------------------------------------------------
 # Logging

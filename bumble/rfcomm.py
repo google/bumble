@@ -30,8 +30,8 @@ from pyee import EventEmitter
 from bumble import core
 from bumble import l2cap
 from bumble import sdp
-from .colors import color
-from .core import (
+from bumble.colors import color
+from bumble.core import (
     UUID,
     BT_RFCOMM_PROTOCOL_ID,
     PhysicalTransport,
