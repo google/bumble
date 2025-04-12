@@ -38,7 +38,6 @@ from typing import (
     Type,
     TYPE_CHECKING,
 )
-from pyee import EventEmitter
 
 from bumble.colors import color
 from bumble.core import UUID
@@ -83,7 +82,7 @@ from bumble.gatt import (
     Descriptor,
     Service,
 )
-from bumble.utils import AsyncRunner
+from bumble import utils
 
 if TYPE_CHECKING:
     from bumble.device import Device, Connection
@@ -103,7 +102,7 @@ GATT_SERVER_DEFAULT_MAX_MTU = 517
 # -----------------------------------------------------------------------------
 # GATT Server
 # -----------------------------------------------------------------------------
-class Server(EventEmitter):
+class Server(utils.EventEmitter):
     attributes: List[Attribute]
     services: List[Service]
     attributes_by_handle: Dict[int, Attribute]
@@ -662,7 +661,7 @@ class Server(EventEmitter):
 
         self.send_response(connection, response)
 
-    @AsyncRunner.run_in_task()
+    @utils.AsyncRunner.run_in_task()
     async def on_att_find_by_type_value_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.3.3 Find By Type Value Request
@@ -715,7 +714,7 @@ class Server(EventEmitter):
 
         self.send_response(connection, response)
 
-    @AsyncRunner.run_in_task()
+    @utils.AsyncRunner.run_in_task()
     async def on_att_read_by_type_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.1 Read By Type Request
@@ -781,7 +780,7 @@ class Server(EventEmitter):
 
         self.send_response(connection, response)
 
-    @AsyncRunner.run_in_task()
+    @utils.AsyncRunner.run_in_task()
     async def on_att_read_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.3 Read Request
@@ -807,7 +806,7 @@ class Server(EventEmitter):
             )
         self.send_response(connection, response)
 
-    @AsyncRunner.run_in_task()
+    @utils.AsyncRunner.run_in_task()
     async def on_att_read_blob_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.5 Read Blob Request
@@ -852,7 +851,7 @@ class Server(EventEmitter):
             )
         self.send_response(connection, response)
 
-    @AsyncRunner.run_in_task()
+    @utils.AsyncRunner.run_in_task()
     async def on_att_read_by_group_type_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.9 Read by Group Type Request
@@ -920,7 +919,7 @@ class Server(EventEmitter):
 
         self.send_response(connection, response)
 
-    @AsyncRunner.run_in_task()
+    @utils.AsyncRunner.run_in_task()
     async def on_att_write_request(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.5.1 Write Request
@@ -967,7 +966,7 @@ class Server(EventEmitter):
             response = ATT_Write_Response()
         self.send_response(connection, response)
 
-    @AsyncRunner.run_in_task()
+    @utils.AsyncRunner.run_in_task()
     async def on_att_write_command(self, connection, request):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.5.3 Write Command

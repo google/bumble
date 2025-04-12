@@ -48,7 +48,7 @@ from bumble.gatt_adapters import (
     UTF8CharacteristicProxyAdapter,
 )
 from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
-from bumble.utils import OpenIntEnum
+from bumble import utils
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -64,7 +64,7 @@ GAIN_SETTINGS_MIN_VALUE = 0
 GAIN_SETTINGS_MAX_VALUE = 255
 
 
-class ErrorCode(OpenIntEnum):
+class ErrorCode(utils.OpenIntEnum):
     '''
     Cf. 1.6 Application error codes
     '''
@@ -76,7 +76,7 @@ class ErrorCode(OpenIntEnum):
     GAIN_MODE_CHANGE_NOT_ALLOWED = 0x84
 
 
-class Mute(OpenIntEnum):
+class Mute(utils.OpenIntEnum):
     '''
     Cf. 2.2.1.2 Mute Field
     '''
@@ -86,7 +86,7 @@ class Mute(OpenIntEnum):
     DISABLED = 0x02
 
 
-class GainMode(OpenIntEnum):
+class GainMode(utils.OpenIntEnum):
     '''
     Cf. 2.2.1.3 Gain Mode
     '''
@@ -97,7 +97,7 @@ class GainMode(OpenIntEnum):
     AUTOMATIC = 0x03
 
 
-class AudioInputStatus(OpenIntEnum):
+class AudioInputStatus(utils.OpenIntEnum):
     '''
     Cf. 3.4 Audio Input Status
     '''
@@ -106,7 +106,7 @@ class AudioInputStatus(OpenIntEnum):
     ACTIVE = 0x01
 
 
-class AudioInputControlPointOpCode(OpenIntEnum):
+class AudioInputControlPointOpCode(utils.OpenIntEnum):
     '''
     Cf. 3.5.1 Audio Input Control Point procedure requirements
     '''

@@ -23,7 +23,6 @@ import logging
 import struct
 
 from collections import deque
-from pyee import EventEmitter
 from typing import (
     Dict,
     Type,
@@ -39,7 +38,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from bumble.utils import deprecated
+from bumble import utils
 from bumble.colors import color
 from bumble.core import (
     InvalidStateError,
@@ -720,7 +719,7 @@ class L2CAP_LE_Flow_Control_Credit(L2CAP_Control_Frame):
 
 
 # -----------------------------------------------------------------------------
-class ClassicChannel(EventEmitter):
+class ClassicChannel(utils.EventEmitter):
     class State(enum.IntEnum):
         # States
         CLOSED = 0x00
@@ -821,8 +820,8 @@ class ClassicChannel(EventEmitter):
 
         # Wait for the connection to succeed or fail
         try:
-            return await self.connection.abort_on(
-                'disconnection', self.connection_result
+            return await utils.cancel_on_event(
+                self.connection, 'disconnection', self.connection_result
             )
         finally:
             self.connection_result = None
@@ -1026,7 +1025,7 @@ class ClassicChannel(EventEmitter):
 
 
 # -----------------------------------------------------------------------------
-class LeCreditBasedChannel(EventEmitter):
+class LeCreditBasedChannel(utils.EventEmitter):
     """
     LE Credit-based Connection Oriented Channel
     """
@@ -1381,7 +1380,7 @@ class LeCreditBasedChannel(EventEmitter):
 
 
 # -----------------------------------------------------------------------------
-class ClassicChannelServer(EventEmitter):
+class ClassicChannelServer(utils.EventEmitter):
     def __init__(
         self,
         manager: ChannelManager,
@@ -1406,7 +1405,7 @@ class ClassicChannelServer(EventEmitter):
 
 
 # -----------------------------------------------------------------------------
-class LeCreditBasedChannelServer(EventEmitter):
+class LeCreditBasedChannelServer(utils.EventEmitter):
     def __init__(
         self,
         manager: ChannelManager,
@@ -1536,7 +1535,7 @@ class ChannelManager:
         if cid in self.fixed_channels:
             del self.fixed_channels[cid]
 
-    @deprecated("Please use create_classic_server")
+    @utils.deprecated("Please use create_classic_server")
     def register_server(
         self,
         psm: int,
@@ -1582,7 +1581,7 @@ class ChannelManager:
 
         return self.servers[spec.psm]
 
-    @deprecated("Please use create_le_credit_based_server()")
+    @utils.deprecated("Please use create_le_credit_based_server()")
     def register_le_coc_server(
         self,
         psm: int,
@@ -2126,7 +2125,7 @@ class ChannelManager:
             if channel.source_cid in connection_channels:
                 del connection_channels[channel.source_cid]
 
-    @deprecated("Please use create_le_credit_based_channel()")
+    @utils.deprecated("Please use create_le_credit_based_channel()")
     async def open_le_coc(
         self, connection: Connection, psm: int, max_credits: int, mtu: int, mps: int
     ) -> LeCreditBasedChannel:
@@ -2183,7 +2182,7 @@ class ChannelManager:
 
         return channel
 
-    @deprecated("Please use create_classic_channel()")
+    @utils.deprecated("Please use create_classic_channel()")
     async def connect(self, connection: Connection, psm: int) -> ClassicChannel:
         return await self.create_classic_channel(
             connection=connection, spec=ClassicChannelSpec(psm=psm)
@@ -2233,12 +2232,12 @@ class ChannelManager:
 
 
 class Channel(ClassicChannel):
-    @deprecated("Please use ClassicChannel")
+    @utils.deprecated("Please use ClassicChannel")
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
 
 class LeConnectionOrientedChannel(LeCreditBasedChannel):
-    @deprecated("Please use LeCreditBasedChannel")
+    @utils.deprecated("Please use LeCreditBasedChannel")
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

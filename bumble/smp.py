@@ -41,7 +41,6 @@ from typing import (
     cast,
 )
 
-from pyee import EventEmitter
 
 from bumble.colors import color
 from bumble.hci import (
@@ -60,6 +59,7 @@ from bumble.core import (
 )
 from bumble.keys import PairingKeys
 from bumble import crypto
+from bumble import utils
 
 if TYPE_CHECKING:
     from bumble.device import Connection, Device
@@ -899,7 +899,7 @@ class Session:
 
             self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
 
-        self.connection.abort_on('disconnection', prompt())
+        utils.cancel_on_event(self.connection, 'disconnection', prompt())
 
     def prompt_user_for_numeric_comparison(
         self, code: int, next_steps: Callable[[], None]
@@ -918,7 +918,7 @@ class Session:
 
             self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
 
-        self.connection.abort_on('disconnection', prompt())
+        utils.cancel_on_event(self.connection, 'disconnection', prompt())
 
     def prompt_user_for_number(self, next_steps: Callable[[int], None]) -> None:
         async def prompt() -> None:
@@ -935,7 +935,7 @@ class Session:
                 logger.warning(f'exception while prompting: {error}')
                 self.send_pairing_failed(SMP_PASSKEY_ENTRY_FAILED_ERROR)
 
-        self.connection.abort_on('disconnection', prompt())
+        utils.cancel_on_event(self.connection, 'disconnection', prompt())
 
     def display_passkey(self) -> None:
         # Generate random Passkey/PIN code
@@ -950,7 +950,8 @@ class Session:
             logger.debug(f'TK from passkey = {self.tk.hex()}')
 
         try:
-            self.connection.abort_on(
+            utils.cancel_on_event(
+                self.connection,
                 'disconnection',
                 self.pairing_config.delegate.display_number(self.passkey, digits=6),
             )
@@ -1049,7 +1050,7 @@ class Session:
                 )
 
             # Perform the next steps asynchronously in case we need to wait for input
-            self.connection.abort_on('disconnection', next_steps())
+            utils.cancel_on_event(self.connection, 'disconnection', next_steps())
         else:
             confirm_value = crypto.c1(
                 self.tk,
@@ -1172,8 +1173,8 @@ class Session:
                 self.connection.transport == PhysicalTransport.BR_EDR
                 and self.initiator_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
-                self.ctkd_task = self.connection.abort_on(
-                    'disconnection', self.get_link_key_and_derive_ltk()
+                self.ctkd_task = utils.cancel_on_event(
+                    self.connection, 'disconnection', self.get_link_key_and_derive_ltk()
                 )
             elif not self.sc:
                 # Distribute the LTK, EDIV and RAND
@@ -1211,8 +1212,8 @@ class Session:
                 self.connection.transport == PhysicalTransport.BR_EDR
                 and self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
             ):
-                self.ctkd_task = self.connection.abort_on(
-                    'disconnection', self.get_link_key_and_derive_ltk()
+                self.ctkd_task = utils.cancel_on_event(
+                    self.connection, 'disconnection', self.get_link_key_and_derive_ltk()
                 )
             # Distribute the LTK, EDIV and RAND
             elif not self.sc:
@@ -1304,7 +1305,9 @@ class Session:
 
         # Wait for the pairing process to finish
         assert self.pairing_result
-        await self.connection.abort_on('disconnection', self.pairing_result)
+        await utils.cancel_on_event(
+            self.connection, 'disconnection', self.pairing_result
+        )
 
     def on_disconnection(self, _: int) -> None:
         self.connection.remove_listener('disconnection', self.on_disconnection)
@@ -1322,7 +1325,7 @@ class Session:
         if self.is_initiator:
             self.distribute_keys()
 
-        self.connection.abort_on('disconnection', self.on_pairing())
+        utils.cancel_on_event(self.connection, 'disconnection', self.on_pairing())
 
     def on_connection_encryption_change(self) -> None:
         if self.connection.is_encrypted and not self.completed:
@@ -1431,8 +1434,10 @@ class Session:
     def on_smp_pairing_request_command(
         self, command: SMP_Pairing_Request_Command
     ) -> None:
-        self.connection.abort_on(
-            'disconnection', self.on_smp_pairing_request_command_async(command)
+        utils.cancel_on_event(
+            self.connection,
+            'disconnection',
+            self.on_smp_pairing_request_command_async(command),
         )
 
     async def on_smp_pairing_request_command_async(
@@ -1877,7 +1882,7 @@ class Session:
                     self.wait_before_continuing = None
                     self.send_pairing_dhkey_check_command()
 
-                self.connection.abort_on('disconnection', next_steps())
+                utils.cancel_on_event(self.connection, 'disconnection', next_steps())
             else:
                 self.send_pairing_dhkey_check_command()
         else:
@@ -1921,7 +1926,7 @@ class Session:
 
 
 # -----------------------------------------------------------------------------
-class Manager(EventEmitter):
+class Manager(utils.EventEmitter):
     '''
     Implements the Initiator and Responder roles of the Security Manager Protocol
     '''

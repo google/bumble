@@ -38,7 +38,6 @@ from typing import (
     Union,
 )
 
-import pyee
 
 from bumble.colors import color
 from bumble.device import Device, Connection
@@ -53,7 +52,7 @@ from bumble.sdp import (
     DataElement,
     ServiceAttribute,
 )
-from bumble.utils import AsyncRunner, OpenIntEnum
+from bumble import utils
 from bumble.core import (
     InvalidArgumentError,
     ProtocolError,
@@ -307,7 +306,7 @@ class Command:
 
 # -----------------------------------------------------------------------------
 class GetCapabilitiesCommand(Command):
-    class CapabilityId(OpenIntEnum):
+    class CapabilityId(utils.OpenIntEnum):
         COMPANY_ID = 0x02
         EVENTS_SUPPORTED = 0x03
 
@@ -637,7 +636,7 @@ class RegisterNotificationResponse(Response):
 
 
 # -----------------------------------------------------------------------------
-class EventId(OpenIntEnum):
+class EventId(utils.OpenIntEnum):
     PLAYBACK_STATUS_CHANGED = 0x01
     TRACK_CHANGED = 0x02
     TRACK_REACHED_END = 0x03
@@ -657,12 +656,12 @@ class EventId(OpenIntEnum):
 
 
 # -----------------------------------------------------------------------------
-class CharacterSetId(OpenIntEnum):
+class CharacterSetId(utils.OpenIntEnum):
     UTF_8 = 0x06
 
 
 # -----------------------------------------------------------------------------
-class MediaAttributeId(OpenIntEnum):
+class MediaAttributeId(utils.OpenIntEnum):
     TITLE = 0x01
     ARTIST_NAME = 0x02
     ALBUM_NAME = 0x03
@@ -682,7 +681,7 @@ class MediaAttribute:
 
 
 # -----------------------------------------------------------------------------
-class PlayStatus(OpenIntEnum):
+class PlayStatus(utils.OpenIntEnum):
     STOPPED = 0x00
     PLAYING = 0x01
     PAUSED = 0x02
@@ -701,33 +700,33 @@ class SongAndPlayStatus:
 
 # -----------------------------------------------------------------------------
 class ApplicationSetting:
-    class AttributeId(OpenIntEnum):
+    class AttributeId(utils.OpenIntEnum):
         EQUALIZER_ON_OFF = 0x01
         REPEAT_MODE = 0x02
         SHUFFLE_ON_OFF = 0x03
         SCAN_ON_OFF = 0x04
 
-    class EqualizerOnOffStatus(OpenIntEnum):
+    class EqualizerOnOffStatus(utils.OpenIntEnum):
         OFF = 0x01
         ON = 0x02
 
-    class RepeatModeStatus(OpenIntEnum):
+    class RepeatModeStatus(utils.OpenIntEnum):
         OFF = 0x01
         SINGLE_TRACK_REPEAT = 0x02
         ALL_TRACK_REPEAT = 0x03
         GROUP_REPEAT = 0x04
 
-    class ShuffleOnOffStatus(OpenIntEnum):
+    class ShuffleOnOffStatus(utils.OpenIntEnum):
         OFF = 0x01
         ALL_TRACKS_SHUFFLE = 0x02
         GROUP_SHUFFLE = 0x03
 
-    class ScanOnOffStatus(OpenIntEnum):
+    class ScanOnOffStatus(utils.OpenIntEnum):
         OFF = 0x01
         ALL_TRACKS_SCAN = 0x02
         GROUP_SCAN = 0x03
 
-    class GenericValue(OpenIntEnum):
+    class GenericValue(utils.OpenIntEnum):
         pass
 
 
@@ -816,7 +815,7 @@ class PlayerApplicationSettingChangedEvent(Event):
     @dataclass
     class Setting:
         attribute_id: ApplicationSetting.AttributeId
-        value_id: OpenIntEnum
+        value_id: utils.OpenIntEnum
 
     player_application_settings: List[Setting]
 
@@ -824,7 +823,7 @@ class PlayerApplicationSettingChangedEvent(Event):
     def from_bytes(cls, pdu: bytes) -> PlayerApplicationSettingChangedEvent:
         def setting(attribute_id_int: int, value_id_int: int):
             attribute_id = ApplicationSetting.AttributeId(attribute_id_int)
-            value_id: OpenIntEnum
+            value_id: utils.OpenIntEnum
             if attribute_id == ApplicationSetting.AttributeId.EQUALIZER_ON_OFF:
                 value_id = ApplicationSetting.EqualizerOnOffStatus(value_id_int)
             elif attribute_id == ApplicationSetting.AttributeId.REPEAT_MODE:
@@ -994,7 +993,7 @@ class Delegate:
 
 
 # -----------------------------------------------------------------------------
-class Protocol(pyee.EventEmitter):
+class Protocol(utils.EventEmitter):
     """AVRCP Controller and Target protocol."""
 
     class PacketType(enum.IntEnum):
@@ -1003,7 +1002,7 @@ class Protocol(pyee.EventEmitter):
         CONTINUE = 0b10
         END = 0b11
 
-    class PduId(OpenIntEnum):
+    class PduId(utils.OpenIntEnum):
         GET_CAPABILITIES = 0x10
         LIST_PLAYER_APPLICATION_SETTING_ATTRIBUTES = 0x11
         LIST_PLAYER_APPLICATION_SETTING_VALUES = 0x12
@@ -1024,7 +1023,7 @@ class Protocol(pyee.EventEmitter):
         GET_FOLDER_ITEMS = 0x71
         GET_TOTAL_NUMBER_OF_ITEMS = 0x75
 
-    class StatusCode(OpenIntEnum):
+    class StatusCode(utils.OpenIntEnum):
         INVALID_COMMAND = 0x00
         INVALID_PARAMETER = 0x01
         PARAMETER_CONTENT_ERROR = 0x02
@@ -1466,7 +1465,7 @@ class Protocol(pyee.EventEmitter):
         if self.avctp_protocol is not None:
             # TODO: find a better strategy instead of just closing
             logger.warning("AVCTP protocol already active, closing connection")
-            AsyncRunner.spawn(l2cap_channel.disconnect())
+            utils.AsyncRunner.spawn(l2cap_channel.disconnect())
             return
 
         self.avctp_protocol = avctp.Protocol(l2cap_channel)

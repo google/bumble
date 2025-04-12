@@ -34,7 +34,6 @@ from typing import (
     TYPE_CHECKING,
 )
 
-import pyee
 
 from bumble.colors import color
 from bumble.l2cap import L2CAP_PDU
@@ -47,7 +46,7 @@ from bumble.core import (
     ConnectionPHY,
     ConnectionParameters,
 )
-from bumble.utils import AbortableEventEmitter
+from bumble import utils
 from bumble.transport.common import TransportLostError
 
 if TYPE_CHECKING:
@@ -61,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-class DataPacketQueue(pyee.EventEmitter):
+class DataPacketQueue(utils.EventEmitter):
     """
     Flow-control queue for host->controller data packets (ACL, ISO).
 
@@ -234,7 +233,7 @@ class IsoLink:
 
 
 # -----------------------------------------------------------------------------
-class Host(AbortableEventEmitter):
+class Host(utils.EventEmitter):
     connections: Dict[int, Connection]
     cis_links: Dict[int, IsoLink]
     bis_links: Dict[int, IsoLink]
@@ -1289,7 +1288,8 @@ class Host(AbortableEventEmitter):
                 logger.debug('no long term key provider')
                 long_term_key = None
             else:
-                long_term_key = await self.abort_on(
+                long_term_key = await utils.cancel_on_event(
+                    self,
                     'flush',
                     # pylint: disable-next=not-callable
                     self.long_term_key_provider(
@@ -1447,7 +1447,8 @@ class Host(AbortableEventEmitter):
                 logger.debug('no link key provider')
                 link_key = None
             else:
-                link_key = await self.abort_on(
+                link_key = await utils.cancel_on_event(
+                    self,
                     'flush',
                     # pylint: disable-next=not-callable
                     self.link_key_provider(event.bd_addr),

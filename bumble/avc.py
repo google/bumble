@@ -21,7 +21,7 @@ import struct
 from typing import Dict, Type, Union, Tuple
 
 from bumble import core
-from bumble.utils import OpenIntEnum
+from bumble import utils
 
 
 # -----------------------------------------------------------------------------
@@ -43,7 +43,7 @@ class Frame:
         EXTENDED = 0x1E
         UNIT = 0x1F
 
-    class OperationCode(OpenIntEnum):
+    class OperationCode(utils.OpenIntEnum):
         # 0x00 - 0x0F: Unit and subunit commands
         VENDOR_DEPENDENT = 0x00
         RESERVE = 0x01
@@ -204,7 +204,7 @@ class Frame:
 
 # -----------------------------------------------------------------------------
 class CommandFrame(Frame):
-    class CommandType(OpenIntEnum):
+    class CommandType(utils.OpenIntEnum):
         # AV/C Digital Interface Command Set General Specification Version 4.1
         # Table 7.1
         CONTROL = 0x00
@@ -240,7 +240,7 @@ class CommandFrame(Frame):
 
 # -----------------------------------------------------------------------------
 class ResponseFrame(Frame):
-    class ResponseCode(OpenIntEnum):
+    class ResponseCode(utils.OpenIntEnum):
         # AV/C Digital Interface Command Set General Specification Version 4.1
         # Table 7.2
         NOT_IMPLEMENTED = 0x08
@@ -368,7 +368,7 @@ class PassThroughFrame:
         PRESSED = 0
         RELEASED = 1
 
-    class OperationId(OpenIntEnum):
+    class OperationId(utils.OpenIntEnum):
         SELECT = 0x00
         UP = 0x01
         DOWN = 0x01

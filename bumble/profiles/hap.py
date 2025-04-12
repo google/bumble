@@ -25,14 +25,14 @@ from typing import Any, Dict, List, Optional, Set, Union
 from bumble import att, gatt, gatt_adapters, gatt_client
 from bumble.core import InvalidArgumentError, InvalidStateError
 from bumble.device import Device, Connection
-from bumble.utils import AsyncRunner, OpenIntEnum
+from bumble import utils
 from bumble.hci import Address
 
 
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
-class ErrorCode(OpenIntEnum):
+class ErrorCode(utils.OpenIntEnum):
     '''See Hearing Access Service 2.4. Attribute Profile error codes.'''
 
     INVALID_OPCODE = 0x80
@@ -42,7 +42,7 @@ class ErrorCode(OpenIntEnum):
     INVALID_PARAMETERS_LENGTH = 0x84
 
 
-class HearingAidType(OpenIntEnum):
+class HearingAidType(utils.OpenIntEnum):
     '''See Hearing Access Service 3.1. Hearing Aid Features.'''
 
     BINAURAL_HEARING_AID = 0b00
@@ -50,35 +50,35 @@ class HearingAidType(OpenIntEnum):
     BANDED_HEARING_AID = 0b10
 
 
-class PresetSynchronizationSupport(OpenIntEnum):
+class PresetSynchronizationSupport(utils.OpenIntEnum):
     '''See Hearing Access Service 3.1. Hearing Aid Features.'''
 
     PRESET_SYNCHRONIZATION_IS_NOT_SUPPORTED = 0b0
     PRESET_SYNCHRONIZATION_IS_SUPPORTED = 0b1
 
 
-class IndependentPresets(OpenIntEnum):
+class IndependentPresets(utils.OpenIntEnum):
     '''See Hearing Access Service 3.1. Hearing Aid Features.'''
 
     IDENTICAL_PRESET_RECORD = 0b0
     DIFFERENT_PRESET_RECORD = 0b1
 
 
-class DynamicPresets(OpenIntEnum):
+class DynamicPresets(utils.OpenIntEnum):
     '''See Hearing Access Service 3.1. Hearing Aid Features.'''
 
     PRESET_RECORDS_DOES_NOT_CHANGE = 0b0
     PRESET_RECORDS_MAY_CHANGE = 0b1
 
 
-class WritablePresetsSupport(OpenIntEnum):
+class WritablePresetsSupport(utils.OpenIntEnum):
     '''See Hearing Access Service 3.1. Hearing Aid Features.'''
 
     WRITABLE_PRESET_RECORDS_NOT_SUPPORTED = 0b0
     WRITABLE_PRESET_RECORDS_SUPPORTED = 0b1
 
 
-class HearingAidPresetControlPointOpcode(OpenIntEnum):
+class HearingAidPresetControlPointOpcode(utils.OpenIntEnum):
     '''See Hearing Access Service 3.3.1 Hearing Aid Preset Control Point operation requirements.'''
 
     # fmt: off
@@ -130,7 +130,7 @@ def HearingAidFeatures_from_bytes(data: int) -> HearingAidFeatures:
 class PresetChangedOperation:
     '''See Hearing Access Service 3.2.2.2. Preset Changed operation.'''
 
-    class ChangeId(OpenIntEnum):
+    class ChangeId(utils.OpenIntEnum):
         # fmt: off
         GENERIC_UPDATE            = 0x00
         PRESET_RECORD_DELETED     = 0x01
@@ -190,11 +190,11 @@ class PresetRecord:
 
     @dataclass
     class Property:
-        class Writable(OpenIntEnum):
+        class Writable(utils.OpenIntEnum):
             CANNOT_BE_WRITTEN = 0b0
             CAN_BE_WRITTEN = 0b1
 
-        class IsAvailable(OpenIntEnum):
+        class IsAvailable(utils.OpenIntEnum):
             IS_UNAVAILABLE = 0b0
             IS_AVAILABLE = 0b1
 
@@ -333,7 +333,7 @@ class HearingAccessService(gatt.TemplateService):
             # Update the active preset index if needed
             await self.notify_active_preset_for_connection(connection)
 
-        connection.abort_on('disconnection', on_connection_async())
+        utils.cancel_on_event(connection, 'disconnection', on_connection_async())
 
     def _on_read_active_preset_index(
         self, __connection__: Optional[Connection]
@@ -382,7 +382,7 @@ class HearingAccessService(gatt.TemplateService):
         if len(presets) == 0:
             raise att.ATT_Error(att.ErrorCode.OUT_OF_RANGE)
 
-        AsyncRunner.spawn(self._read_preset_response(connection, presets))
+        utils.AsyncRunner.spawn(self._read_preset_response(connection, presets))
 
     async def _read_preset_response(
         self, connection: Connection, presets: List[PresetRecord]

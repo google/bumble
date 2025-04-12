@@ -25,6 +25,7 @@ import websockets
 import functools
 from typing import Optional
 
+from bumble import utils
 from bumble import rfcomm
 from bumble import hci
 from bumble.device import Device, Connection
@@ -60,7 +61,8 @@ def on_dlc(dlc: rfcomm.DLC, configuration: hfp.HfConfiguration):
             else:
                 raise RuntimeError("unknown active codec")
 
-            connection.abort_on(
+            utils.cancel_on_event(
+                connection,
                 'disconnection',
                 connection.device.send_command(
                     hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(

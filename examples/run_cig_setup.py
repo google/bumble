@@ -19,12 +19,8 @@ import asyncio
 import logging
 import sys
 import os
-from bumble.device import (
-    Device,
-    Connection,
-    AdvertisingParameters,
-    AdvertisingEventProperties,
-)
+from bumble import utils
+from bumble.device import Device, Connection
 from bumble.hci import (
     OwnAddressType,
 )
@@ -79,7 +75,9 @@ async def main() -> None:
     def on_cis_request(
         connection: Connection, cis_handle: int, _cig_id: int, _cis_id: int
     ):
-        connection.abort_on('disconnection', devices[0].accept_cis_request(cis_handle))
+        utils.cancel_on_event(
+            connection, 'disconnection', devices[0].accept_cis_request(cis_handle)
+        )
 
     devices[0].on('cis_request', on_cis_request)
 

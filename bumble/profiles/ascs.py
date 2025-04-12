@@ -23,6 +23,7 @@ import logging
 import struct
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
 
+from bumble import utils
 from bumble import colors
 from bumble.profiles.bap import CodecSpecificConfiguration
 from bumble.profiles import le_audio
@@ -343,8 +344,10 @@ class AseStateMachine(gatt.Characteristic):
             and cis_id == self.cis_id
             and self.state == self.State.ENABLING
         ):
-            acl_connection.abort_on(
-                'flush', self.service.device.accept_cis_request(cis_handle)
+            utils.cancel_on_event(
+                acl_connection,
+                'flush',
+                self.service.device.accept_cis_request(cis_handle),
             )
 
     def on_cis_establishment(self, cis_link: device.CisLink) -> None:
@@ -361,7 +364,9 @@ class AseStateMachine(gatt.Characteristic):
                     self.state = self.State.STREAMING
                 await self.service.device.notify_subscribers(self, self.value)
 
-            cis_link.acl_connection.abort_on('flush', post_cis_established())
+            utils.cancel_on_event(
+                cis_link.acl_connection, 'flush', post_cis_established()
+            )
             self.cis_link = cis_link
 
     def on_cis_disconnection(self, _reason) -> None:
@@ -509,7 +514,7 @@ class AseStateMachine(gatt.Characteristic):
             self.state = self.State.IDLE
             await self.service.device.notify_subscribers(self, self.value)
 
-        self.service.device.abort_on('flush', remove_cis_async())
+        utils.cancel_on_event(self.service.device, 'flush', remove_cis_async())
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
 
     @property
@@ -691,7 +696,8 @@ class AudioStreamControlService(gatt.TemplateService):
         control_point_notification = bytes(
             [operation.op_code, len(responses)]
         ) + b''.join(map(bytes, responses))
-        self.device.abort_on(
+        utils.cancel_on_event(
+            self.device,
             'flush',
             self.device.notify_subscribers(
                 self.ase_control_point, control_point_notification
@@ -700,7 +706,8 @@ class AudioStreamControlService(gatt.TemplateService):
 
         for ase_id, *_ in responses:
             if ase := self.ase_state_machines.get(ase_id):
-                self.device.abort_on(
+                utils.cancel_on_event(
+                    self.device,
                     'flush',
                     self.device.notify_subscribers(ase, ase.value),
                 )

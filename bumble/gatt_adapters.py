@@ -35,15 +35,15 @@ from typing import (
 from bumble.core import InvalidOperationError
 from bumble.gatt import Characteristic
 from bumble.gatt_client import CharacteristicProxy
-from bumble.utils import ByteSerializable, IntConvertible
+from bumble import utils
 
 
 # -----------------------------------------------------------------------------
 # Typing
 # -----------------------------------------------------------------------------
 _T = TypeVar('_T')
-_T2 = TypeVar('_T2', bound=ByteSerializable)
-_T3 = TypeVar('_T3', bound=IntConvertible)
+_T2 = TypeVar('_T2', bound=utils.ByteSerializable)
+_T3 = TypeVar('_T3', bound=utils.IntConvertible)
 
 
 # -----------------------------------------------------------------------------

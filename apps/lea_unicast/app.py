@@ -37,6 +37,7 @@ import click
 import aiohttp.web
 
 import bumble
+from bumble import utils
 from bumble.core import AdvertisingData
 from bumble.colors import color
 from bumble.device import Device, DeviceConfiguration, AdvertisingParameters, CisLink
@@ -359,7 +360,9 @@ class Speaker:
                 pcm = decoder.decode(
                     pdu.iso_sdu_fragment, bit_depth=DEFAULT_PCM_BYTES_PER_SAMPLE * 8
                 )
-                self.device.abort_on('disconnection', self.ui_server.send_audio(pcm))
+                utils.cancel_on_event(
+                    self.device, 'disconnection', self.ui_server.send_audio(pcm)
+                )
 
             def on_ase_state_change(ase: ascs.AseStateMachine) -> None:
                 codec_config = ase.codec_specific_configuration
@@ -373,7 +376,8 @@ class Speaker:
                             or codec_config.codec_frames_per_sdu is None
                         ):
                             return
-                        ase.cis_link.abort_on(
+                        utils.cancel_on_event(
+                            ase.cis_link,
                             'disconnection',
                             lc3_source_task(
                                 filename=self.lc3_input_file_path,

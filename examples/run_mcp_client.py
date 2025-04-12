@@ -22,6 +22,7 @@ import os
 import websockets
 import json
 
+from bumble import utils
 from bumble.core import AdvertisingData
 from bumble.device import (
     Device,
@@ -169,7 +170,7 @@ async def main() -> None:
                     mcp.on('track_position', on_track_position)
                     await mcp.subscribe_characteristics()
 
-            connection.abort_on('disconnection', on_connection_async())
+            utils.cancel_on_event(connection, 'disconnection', on_connection_async())
 
         device.on('connection', on_connection)
 
