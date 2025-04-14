@@ -25,7 +25,7 @@ import logging
 
 from typing import Optional
 
-from .common import Transport, StreamPacketSource, StreamPacketSink
+from bumble.transport.common import Transport, StreamPacketSource, StreamPacketSink
 
 # -----------------------------------------------------------------------------
 # Logging

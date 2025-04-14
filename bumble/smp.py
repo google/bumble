@@ -43,23 +43,23 @@ from typing import (
 
 from pyee import EventEmitter
 
-from .colors import color
-from .hci import (
+from bumble.colors import color
+from bumble.hci import (
     Address,
     Role,
     HCI_LE_Enable_Encryption_Command,
     HCI_Object,
     key_with_value,
 )
-from .core import (
+from bumble.core import (
     PhysicalTransport,
     AdvertisingData,
     InvalidArgumentError,
     ProtocolError,
     name_or_number,
 )
-from .keys import PairingKeys
-from . import crypto
+from bumble.keys import PairingKeys
+from bumble import crypto
 
 if TYPE_CHECKING:
     from bumble.device import Connection, Device

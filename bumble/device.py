@@ -51,12 +51,12 @@ from typing_extensions import Self
 
 from pyee import EventEmitter
 
-from .colors import color
-from .att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
-from .gatt import Attribute, Characteristic, Descriptor, Service
-from .host import DataPacketQueue, Host
-from .profiles.gap import GenericAccessService
-from .core import (
+from bumble.colors import color
+from bumble.att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
+from bumble.gatt import Attribute, Characteristic, Descriptor, Service
+from bumble.host import DataPacketQueue, Host
+from bumble.profiles.gap import GenericAccessService
+from bumble.core import (
     PhysicalTransport,
     AdvertisingData,
     BaseBumbleError,
@@ -71,7 +71,7 @@ from .core import (
     OutOfResourcesError,
     UnreachableError,
 )
-from .utils import (
+from bumble.utils import (
     AsyncRunner,
     CompositeEventEmitter,
     EventWatcher,
@@ -80,7 +80,7 @@ from .utils import (
     deprecated,
     experimental,
 )
-from .keys import (
+from bumble.keys import (
     KeyStore,
     PairingKeys,
 )
@@ -95,7 +95,7 @@ from bumble import core
 from bumble.profiles import gatt_service
 
 if TYPE_CHECKING:
-    from .transport.common import TransportSource, TransportSink
+    from bumble.transport.common import TransportSource, TransportSink
 
 
 # -----------------------------------------------------------------------------

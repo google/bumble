@@ -26,9 +26,9 @@ from typing import Awaitable, Callable
 from typing_extensions import ClassVar, Self
 
 
-from .codecs import AacAudioRtpPacket
-from .company_ids import COMPANY_IDENTIFIERS
-from .sdp import (
+from bumble.codecs import AacAudioRtpPacket
+from bumble.company_ids import COMPANY_IDENTIFIERS
+from bumble.sdp import (
     DataElement,
     ServiceAttribute,
     SDP_PUBLIC_BROWSE_ROOT,
@@ -38,7 +38,7 @@ from .sdp import (
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
 )
-from .core import (
+from bumble.core import (
     BT_L2CAP_PROTOCOL_ID,
     BT_AUDIO_SOURCE_SERVICE,
     BT_AUDIO_SINK_SERVICE,
@@ -46,7 +46,7 @@ from .core import (
     BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
     name_or_number,
 )
-from .rtp import MediaPacket
+from bumble.rtp import MediaPacket
 
 
 # -----------------------------------------------------------------------------
@@ -155,7 +155,7 @@ def flags_to_list(flags, values):
 # -----------------------------------------------------------------------------
 def make_audio_source_service_sdp_records(service_record_handle, version=(1, 3)):
     # pylint: disable=import-outside-toplevel
-    from .avdtp import AVDTP_PSM
+    from bumble.avdtp import AVDTP_PSM
 
     version_int = version[0] << 8 | version[1]
     return [
@@ -209,7 +209,7 @@ def make_audio_source_service_sdp_records(service_record_handle, version=(1, 3))
 # -----------------------------------------------------------------------------
 def make_audio_sink_service_sdp_records(service_record_handle, version=(1, 3)):
     # pylint: disable=import-outside-toplevel
-    from .avdtp import AVDTP_PSM
+    from bumble.avdtp import AVDTP_PSM
 
     version_int = version[0] << 8 | version[1]
     return [

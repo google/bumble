@@ -18,8 +18,8 @@ import contextlib
 import grpc
 import logging
 
-from . import utils
-from .config import Config
+from bumble.pandora import utils
+from bumble.pandora.config import Config
 from bumble import hci
 from bumble.core import (
     PhysicalTransport,

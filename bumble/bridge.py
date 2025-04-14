@@ -17,8 +17,8 @@
 # -----------------------------------------------------------------------------
 import logging
 
-from .hci import HCI_Packet
-from .helpers import PacketTracer
+from bumble.hci import HCI_Packet
+from bumble.helpers import PacketTracer
 
 # -----------------------------------------------------------------------------
 # Logging

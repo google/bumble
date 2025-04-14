@@ -39,16 +39,16 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from .utils import deprecated
-from .colors import color
-from .core import (
+from bumble.utils import deprecated
+from bumble.colors import color
+from bumble.core import (
     InvalidStateError,
     InvalidArgumentError,
     InvalidPacketError,
     OutOfResourcesError,
     ProtocolError,
 )
-from .hci import (
+from bumble.hci import (
     HCI_LE_Connection_Update_Command,
     HCI_Object,
     Role,

@@ -20,8 +20,8 @@ import grpc.aio
 import logging
 import struct
 
-from . import utils
-from .config import Config
+from bumble.pandora import utils
+from bumble.pandora.config import Config
 from bumble.core import (
     PhysicalTransport,
     UUID,

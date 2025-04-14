@@ -25,7 +25,7 @@ import collections
 
 from typing import Optional
 
-from .common import Transport, ParserSource
+from bumble.transport.common import Transport, ParserSource
 
 
 # -----------------------------------------------------------------------------

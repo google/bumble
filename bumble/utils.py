@@ -40,7 +40,7 @@ from typing_extensions import Self
 
 from pyee import EventEmitter
 
-from .colors import color
+from bumble.colors import color
 
 # -----------------------------------------------------------------------------
 # Logging

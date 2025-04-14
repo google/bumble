@@ -19,8 +19,8 @@ import logging
 
 from asyncio import Queue as AsyncQueue, Future
 
-from . import utils
-from .config import Config
+from bumble.pandora import utils
+from bumble.pandora.config import Config
 from bumble.core import OutOfResourcesError, InvalidArgumentError
 from bumble.device import Device
 from bumble.l2cap import (

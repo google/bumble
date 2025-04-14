@@ -20,7 +20,7 @@ import grpc.aio
 
 from typing import Optional, Union
 
-from .common import (
+from bumble.transport.common import (
     PumpedTransport,
     PumpedPacketSource,
     PumpedPacketSink,
@@ -29,9 +29,13 @@ from .common import (
 )
 
 # pylint: disable=no-name-in-module
-from .grpc_protobuf.emulated_bluetooth_pb2_grpc import EmulatedBluetoothServiceStub
-from .grpc_protobuf.emulated_bluetooth_packets_pb2 import HCIPacket
-from .grpc_protobuf.emulated_bluetooth_vhci_pb2_grpc import VhciForwardingServiceStub
+from bumble.transport.grpc_protobuf.emulated_bluetooth_pb2_grpc import (
+    EmulatedBluetoothServiceStub,
+)
+from bumble.transport.grpc_protobuf.emulated_bluetooth_packets_pb2 import HCIPacket
+from bumble.transport.grpc_protobuf.emulated_bluetooth_vhci_pb2_grpc import (
+    VhciForwardingServiceStub,
+)
 
 
 # -----------------------------------------------------------------------------

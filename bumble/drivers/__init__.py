@@ -25,8 +25,8 @@ import pathlib
 import platform
 from typing import Dict, Iterable, Optional, Type, TYPE_CHECKING
 
-from . import rtk, intel
-from .common import Driver
+from bumble.drivers import rtk, intel
+from bumble.drivers.common import Driver
 
 if TYPE_CHECKING:
     from bumble.host import Host

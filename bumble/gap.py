@@ -18,7 +18,7 @@
 import logging
 import struct
 
-from .gatt import (
+from bumble.gatt import (
     Service,
     Characteristic,
     GATT_GENERIC_ACCESS_SERVICE,

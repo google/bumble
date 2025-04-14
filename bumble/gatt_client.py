@@ -46,9 +46,9 @@ from typing import (
 
 from pyee import EventEmitter
 
-from .colors import color
-from .hci import HCI_Constant
-from .att import (
+from bumble.colors import color
+from bumble.hci import HCI_Constant
+from bumble.att import (
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     ATT_ATTRIBUTE_NOT_LONG_ERROR,
     ATT_CID,
@@ -69,9 +69,9 @@ from .att import (
     ATT_Write_Request,
     ATT_Error,
 )
-from . import core
-from .core import UUID, InvalidStateError
-from .gatt import (
+from bumble import core
+from bumble.core import UUID, InvalidStateError
+from bumble.gatt import (
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
     GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,

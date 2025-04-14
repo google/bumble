@@ -51,7 +51,7 @@ from bumble.utils import AbortableEventEmitter
 from bumble.transport.common import TransportLostError
 
 if TYPE_CHECKING:
-    from .transport.common import TransportSink, TransportSource
+    from bumble.transport.common import TransportSink, TransportSource
 
 
 # -----------------------------------------------------------------------------

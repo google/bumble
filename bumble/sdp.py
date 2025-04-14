@@ -33,7 +33,7 @@ from bumble.core import (
 from bumble.hci import HCI_Object, name_or_number, key_with_value
 
 if TYPE_CHECKING:
-    from .device import Device, Connection
+    from bumble.device import Device, Connection
 
 # -----------------------------------------------------------------------------
 # Logging
