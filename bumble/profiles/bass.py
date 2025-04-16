@@ -354,7 +354,7 @@ class BroadcastAudioScanService(gatt.TemplateService):
 class BroadcastAudioScanServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = BroadcastAudioScanService
 
-    broadcast_audio_scan_control_point: gatt_client.CharacteristicProxy
+    broadcast_audio_scan_control_point: gatt_client.CharacteristicProxy[bytes]
     broadcast_receive_states: list[
         gatt_client.CharacteristicProxy[Optional[BroadcastReceiveState]]
     ]

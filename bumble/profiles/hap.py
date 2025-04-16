@@ -224,9 +224,9 @@ class PresetRecord:
 class HearingAccessService(gatt.TemplateService):
     UUID = gatt.GATT_HEARING_ACCESS_SERVICE
 
-    hearing_aid_features_characteristic: gatt.Characteristic
-    hearing_aid_preset_control_point: gatt.Characteristic
-    active_preset_index_characteristic: gatt.Characteristic
+    hearing_aid_features_characteristic: gatt.Characteristic[bytes]
+    hearing_aid_preset_control_point: gatt.Characteristic[bytes]
+    active_preset_index_characteristic: gatt.Characteristic[bytes]
     active_preset_index: int
     active_preset_index_per_device: Dict[Address, int]
 

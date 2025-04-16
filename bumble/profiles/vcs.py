@@ -91,9 +91,9 @@ class VolumeState:
 class VolumeControlService(gatt.TemplateService):
     UUID = gatt.GATT_VOLUME_CONTROL_SERVICE
 
-    volume_state: gatt.Characteristic
-    volume_control_point: gatt.Characteristic
-    volume_flags: gatt.Characteristic
+    volume_state: gatt.Characteristic[bytes]
+    volume_control_point: gatt.Characteristic[bytes]
+    volume_flags: gatt.Characteristic[bytes]
 
     volume_setting: int
     muted: int

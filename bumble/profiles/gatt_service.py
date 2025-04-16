@@ -32,10 +32,10 @@ class GenericAttributeProfileService(gatt.TemplateService):
 
     UUID = gatt.GATT_GENERIC_ATTRIBUTE_SERVICE
 
-    client_supported_features_characteristic: gatt.Characteristic | None = None
-    server_supported_features_characteristic: gatt.Characteristic | None = None
-    database_hash_characteristic: gatt.Characteristic | None = None
-    service_changed_characteristic: gatt.Characteristic | None = None
+    client_supported_features_characteristic: gatt.Characteristic[bytes] | None = None
+    server_supported_features_characteristic: gatt.Characteristic[bytes] | None = None
+    database_hash_characteristic: gatt.Characteristic[bytes] | None = None
+    service_changed_characteristic: gatt.Characteristic[bytes] | None = None
 
     def __init__(
         self,
@@ -143,14 +143,14 @@ class GenericAttributeProfileService(gatt.TemplateService):
 class GenericAttributeProfileServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = GenericAttributeProfileService
 
-    client_supported_features_characteristic: gatt_client.CharacteristicProxy | None = (
-        None
-    )
-    server_supported_features_characteristic: gatt_client.CharacteristicProxy | None = (
-        None
-    )
-    database_hash_characteristic: gatt_client.CharacteristicProxy | None = None
-    service_changed_characteristic: gatt_client.CharacteristicProxy | None = None
+    client_supported_features_characteristic: (
+        gatt_client.CharacteristicProxy[bytes] | None
+    ) = None
+    server_supported_features_characteristic: (
+        gatt_client.CharacteristicProxy[bytes] | None
+    ) = None
+    database_hash_characteristic: gatt_client.CharacteristicProxy[bytes] | None = None
+    service_changed_characteristic: gatt_client.CharacteristicProxy[bytes] | None = None
 
     _CHARACTERISTICS = {
         gatt.GATT_CLIENT_SUPPORTED_FEATURES_CHARACTERISTIC: 'client_supported_features_characteristic',

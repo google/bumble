@@ -1244,7 +1244,7 @@ class Peer:
         self,
         uuids: Iterable[Union[core.UUID, str]] = (),
         service: Optional[gatt_client.ServiceProxy] = None,
-    ) -> list[gatt_client.CharacteristicProxy]:
+    ) -> list[gatt_client.CharacteristicProxy[bytes]]:
         return await self.gatt_client.discover_characteristics(
             uuids=uuids, service=service
         )
@@ -1259,7 +1259,7 @@ class Peer:
             characteristic, start_handle, end_handle
         )
 
-    async def discover_attributes(self) -> list[gatt_client.AttributeProxy]:
+    async def discover_attributes(self) -> list[gatt_client.AttributeProxy[bytes]]:
         return await self.gatt_client.discover_attributes()
 
     async def discover_all(self):
@@ -1313,7 +1313,7 @@ class Peer:
         self,
         uuid: core.UUID,
         service: Optional[Union[gatt_client.ServiceProxy, core.UUID]] = None,
-    ) -> list[gatt_client.CharacteristicProxy]:
+    ) -> list[gatt_client.CharacteristicProxy[bytes]]:
         if isinstance(service, core.UUID):
             return list(
                 itertools.chain(

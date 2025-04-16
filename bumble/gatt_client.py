@@ -149,7 +149,7 @@ class AttributeProxy(utils.EventEmitter, Generic[_T]):
 
 class ServiceProxy(AttributeProxy):
     uuid: UUID
-    characteristics: List[CharacteristicProxy]
+    characteristics: List[CharacteristicProxy[bytes]]
     included_services: List[ServiceProxy]
 
     @staticmethod
@@ -170,14 +170,20 @@ class ServiceProxy(AttributeProxy):
         self.uuid = uuid
         self.characteristics = []
 
-    async def discover_characteristics(self, uuids=()) -> list[CharacteristicProxy]:
+    async def discover_characteristics(
+        self, uuids=()
+    ) -> list[CharacteristicProxy[bytes]]:
         return await self.client.discover_characteristics(uuids, self)
 
-    def get_characteristics_by_uuid(self, uuid: UUID) -> list[CharacteristicProxy]:
+    def get_characteristics_by_uuid(
+        self, uuid: UUID
+    ) -> list[CharacteristicProxy[bytes]]:
         """Get all the characteristics with a specified UUID."""
         return self.client.get_characteristics_by_uuid(uuid, self)
 
-    def get_required_characteristic_by_uuid(self, uuid: UUID) -> CharacteristicProxy:
+    def get_required_characteristic_by_uuid(
+        self, uuid: UUID
+    ) -> CharacteristicProxy[bytes]:
         """
         Get the first characteristic with a specified UUID.
 
@@ -256,7 +262,7 @@ class CharacteristicProxy(AttributeProxy[_T]):
         )
 
 
-class DescriptorProxy(AttributeProxy):
+class DescriptorProxy(AttributeProxy[bytes]):
     def __init__(self, client: Client, handle: int, descriptor_type: UUID) -> None:
         super().__init__(client, handle, 0, descriptor_type)
 
@@ -376,7 +382,7 @@ class Client:
 
     def get_characteristics_by_uuid(
         self, uuid: UUID, service: Optional[ServiceProxy] = None
-    ) -> List[CharacteristicProxy]:
+    ) -> List[CharacteristicProxy[bytes]]:
         services = [service] if service else self.services
         return [
             c
@@ -628,7 +634,7 @@ class Client:
 
     async def discover_characteristics(
         self, uuids, service: Optional[ServiceProxy]
-    ) -> List[CharacteristicProxy]:
+    ) -> List[CharacteristicProxy[bytes]]:
         '''
         See Vol 3, Part G - 4.6.1 Discover All Characteristics of a Service and 4.6.2
         Discover Characteristics by UUID
@@ -641,12 +647,12 @@ class Client:
         services = [service] if service else self.services
 
         # Perform characteristic discovery for each service
-        discovered_characteristics: List[CharacteristicProxy] = []
+        discovered_characteristics: List[CharacteristicProxy[bytes]] = []
         for service in services:
             starting_handle = service.handle
             ending_handle = service.end_group_handle
 
-            characteristics: List[CharacteristicProxy] = []
+            characteristics: List[CharacteristicProxy[bytes]] = []
             while starting_handle <= ending_handle:
                 response = await self.send_request(
                     ATT_Read_By_Type_Request(
@@ -686,7 +692,7 @@ class Client:
 
                     properties, handle = struct.unpack_from('<BH', attribute_value)
                     characteristic_uuid = UUID.from_bytes(attribute_value[3:])
-                    characteristic: CharacteristicProxy = CharacteristicProxy(
+                    characteristic = CharacteristicProxy[bytes](
                         self, handle, 0, characteristic_uuid, properties
                     )
 
@@ -779,7 +785,7 @@ class Client:
 
         return descriptors
 
-    async def discover_attributes(self) -> List[AttributeProxy]:
+    async def discover_attributes(self) -> List[AttributeProxy[bytes]]:
         '''
         Discover all attributes, regardless of type
         '''
@@ -812,7 +818,7 @@ class Client:
                     logger.warning(f'bogus handle value: {attribute_handle}')
                     return []
 
-                attribute: AttributeProxy = AttributeProxy(
+                attribute = AttributeProxy[bytes](
                     self, attribute_handle, 0, UUID.from_bytes(attribute_uuid)
                 )
                 attributes.append(attribute)

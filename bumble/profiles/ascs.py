@@ -599,7 +599,7 @@ class AudioStreamControlService(gatt.TemplateService):
     UUID = gatt.GATT_AUDIO_STREAM_CONTROL_SERVICE
 
     ase_state_machines: Dict[int, AseStateMachine]
-    ase_control_point: gatt.Characteristic
+    ase_control_point: gatt.Characteristic[bytes]
     _active_client: Optional[device.Connection] = None
 
     def __init__(
@@ -717,9 +717,9 @@ class AudioStreamControlService(gatt.TemplateService):
 class AudioStreamControlServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = AudioStreamControlService
 
-    sink_ase: List[gatt_client.CharacteristicProxy]
-    source_ase: List[gatt_client.CharacteristicProxy]
-    ase_control_point: gatt_client.CharacteristicProxy
+    sink_ase: List[gatt_client.CharacteristicProxy[bytes]]
+    source_ase: List[gatt_client.CharacteristicProxy[bytes]]
+    ase_control_point: gatt_client.CharacteristicProxy[bytes]
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy):
         self.service_proxy = service_proxy

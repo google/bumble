@@ -104,12 +104,12 @@ class PacRecord:
 class PublishedAudioCapabilitiesService(gatt.TemplateService):
     UUID = gatt.GATT_PUBLISHED_AUDIO_CAPABILITIES_SERVICE
 
-    sink_pac: Optional[gatt.Characteristic]
-    sink_audio_locations: Optional[gatt.Characteristic]
-    source_pac: Optional[gatt.Characteristic]
-    source_audio_locations: Optional[gatt.Characteristic]
-    available_audio_contexts: gatt.Characteristic
-    supported_audio_contexts: gatt.Characteristic
+    sink_pac: Optional[gatt.Characteristic[bytes]]
+    sink_audio_locations: Optional[gatt.Characteristic[bytes]]
+    source_pac: Optional[gatt.Characteristic[bytes]]
+    source_audio_locations: Optional[gatt.Characteristic[bytes]]
+    available_audio_contexts: gatt.Characteristic[bytes]
+    supported_audio_contexts: gatt.Characteristic[bytes]
 
     def __init__(
         self,
