@@ -23,6 +23,7 @@ import enum
 from typing import Optional, Sequence
 
 from bumble import att
+from bumble import utils
 from bumble import device
 from bumble import gatt
 from bumble import gatt_adapters
@@ -160,7 +161,8 @@ class VolumeControlService(gatt.TemplateService):
         handler = getattr(self, '_on_' + opcode.name.lower())
         if handler(*value[2:]):
             self.change_counter = (self.change_counter + 1) % 256
-            connection.abort_on(
+            utils.cancel_on_event(
+                connection,
                 'disconnection',
                 connection.device.notify_subscribers(attribute=self.volume_state),
             )

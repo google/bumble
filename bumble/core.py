@@ -23,7 +23,7 @@ from typing import cast, overload, Literal, Union, Optional
 from typing_extensions import Self
 
 from bumble.company_ids import COMPANY_IDENTIFIERS
-from bumble.utils import OpenIntEnum
+from bumble import utils
 
 
 # -----------------------------------------------------------------------------
@@ -730,7 +730,7 @@ class DeviceClass:
 # Appearance
 # -----------------------------------------------------------------------------
 class Appearance:
-    class Category(OpenIntEnum):
+    class Category(utils.OpenIntEnum):
         UNKNOWN = 0x0000
         PHONE = 0x0001
         COMPUTER = 0x0002
@@ -784,13 +784,13 @@ class Appearance:
         SPIROMETER = 0x0037
         OUTDOOR_SPORTS_ACTIVITY = 0x0051
 
-    class UnknownSubcategory(OpenIntEnum):
+    class UnknownSubcategory(utils.OpenIntEnum):
         GENERIC_UNKNOWN = 0x00
 
-    class PhoneSubcategory(OpenIntEnum):
+    class PhoneSubcategory(utils.OpenIntEnum):
         GENERIC_PHONE = 0x00
 
-    class ComputerSubcategory(OpenIntEnum):
+    class ComputerSubcategory(utils.OpenIntEnum):
         GENERIC_COMPUTER = 0x00
         DESKTOP_WORKSTATION = 0x01
         SERVER_CLASS_COMPUTER = 0x02
@@ -808,49 +808,49 @@ class Appearance:
         MINI_PC = 0x0E
         STICK_PC = 0x0F
 
-    class WatchSubcategory(OpenIntEnum):
+    class WatchSubcategory(utils.OpenIntEnum):
         GENENERIC_WATCH = 0x00
         SPORTS_WATCH = 0x01
         SMARTWATCH = 0x02
 
-    class ClockSubcategory(OpenIntEnum):
+    class ClockSubcategory(utils.OpenIntEnum):
         GENERIC_CLOCK = 0x00
 
-    class DisplaySubcategory(OpenIntEnum):
+    class DisplaySubcategory(utils.OpenIntEnum):
         GENERIC_DISPLAY = 0x00
 
-    class RemoteControlSubcategory(OpenIntEnum):
+    class RemoteControlSubcategory(utils.OpenIntEnum):
         GENERIC_REMOTE_CONTROL = 0x00
 
-    class EyeglassesSubcategory(OpenIntEnum):
+    class EyeglassesSubcategory(utils.OpenIntEnum):
         GENERIC_EYEGLASSES = 0x00
 
-    class TagSubcategory(OpenIntEnum):
+    class TagSubcategory(utils.OpenIntEnum):
         GENERIC_TAG = 0x00
 
-    class KeyringSubcategory(OpenIntEnum):
+    class KeyringSubcategory(utils.OpenIntEnum):
         GENERIC_KEYRING = 0x00
 
-    class MediaPlayerSubcategory(OpenIntEnum):
+    class MediaPlayerSubcategory(utils.OpenIntEnum):
         GENERIC_MEDIA_PLAYER = 0x00
 
-    class BarcodeScannerSubcategory(OpenIntEnum):
+    class BarcodeScannerSubcategory(utils.OpenIntEnum):
         GENERIC_BARCODE_SCANNER = 0x00
 
-    class ThermometerSubcategory(OpenIntEnum):
+    class ThermometerSubcategory(utils.OpenIntEnum):
         GENERIC_THERMOMETER = 0x00
         EAR_THERMOMETER = 0x01
 
-    class HeartRateSensorSubcategory(OpenIntEnum):
+    class HeartRateSensorSubcategory(utils.OpenIntEnum):
         GENERIC_HEART_RATE_SENSOR = 0x00
         HEART_RATE_BELT = 0x01
 
-    class BloodPressureSubcategory(OpenIntEnum):
+    class BloodPressureSubcategory(utils.OpenIntEnum):
         GENERIC_BLOOD_PRESSURE = 0x00
         ARM_BLOOD_PRESSURE = 0x01
         WRIST_BLOOD_PRESSURE = 0x02
 
-    class HumanInterfaceDeviceSubcategory(OpenIntEnum):
+    class HumanInterfaceDeviceSubcategory(utils.OpenIntEnum):
         GENERIC_HUMAN_INTERFACE_DEVICE = 0x00
         KEYBOARD = 0x01
         MOUSE = 0x02
@@ -863,16 +863,16 @@ class Appearance:
         TOUCHPAD = 0x09
         PRESENTATION_REMOTE = 0x0A
 
-    class GlucoseMeterSubcategory(OpenIntEnum):
+    class GlucoseMeterSubcategory(utils.OpenIntEnum):
         GENERIC_GLUCOSE_METER = 0x00
 
-    class RunningWalkingSensorSubcategory(OpenIntEnum):
+    class RunningWalkingSensorSubcategory(utils.OpenIntEnum):
         GENERIC_RUNNING_WALKING_SENSOR = 0x00
         IN_SHOE_RUNNING_WALKING_SENSOR = 0x01
         ON_SHOW_RUNNING_WALKING_SENSOR = 0x02
         ON_HIP_RUNNING_WALKING_SENSOR = 0x03
 
-    class CyclingSubcategory(OpenIntEnum):
+    class CyclingSubcategory(utils.OpenIntEnum):
         GENERIC_CYCLING = 0x00
         CYCLING_COMPUTER = 0x01
         SPEED_SENSOR = 0x02
@@ -880,7 +880,7 @@ class Appearance:
         POWER_SENSOR = 0x04
         SPEED_AND_CADENCE_SENSOR = 0x05
 
-    class ControlDeviceSubcategory(OpenIntEnum):
+    class ControlDeviceSubcategory(utils.OpenIntEnum):
         GENERIC_CONTROL_DEVICE = 0x00
         SWITCH = 0x01
         MULTI_SWITCH = 0x02
@@ -895,13 +895,13 @@ class Appearance:
         ENERGY_HARVESTING_SWITCH = 0x0B
         PUSH_BUTTON = 0x0C
 
-    class NetworkDeviceSubcategory(OpenIntEnum):
+    class NetworkDeviceSubcategory(utils.OpenIntEnum):
         GENERIC_NETWORK_DEVICE = 0x00
         ACCESS_POINT = 0x01
         MESH_DEVICE = 0x02
         MESH_NETWORK_PROXY = 0x03
 
-    class SensorSubcategory(OpenIntEnum):
+    class SensorSubcategory(utils.OpenIntEnum):
         GENERIC_SENSOR = 0x00
         MOTION_SENSOR = 0x01
         AIR_QUALITY_SENSOR = 0x02
@@ -929,7 +929,7 @@ class Appearance:
         FLAME_DETECTOR = 0x18
         VEHICLE_TIRE_PRESSURE_SENSOR = 0x19
 
-    class LightFixturesSubcategory(OpenIntEnum):
+    class LightFixturesSubcategory(utils.OpenIntEnum):
         GENERIC_LIGHT_FIXTURES = 0x00
         WALL_LIGHT = 0x01
         CEILING_LIGHT = 0x02
@@ -957,7 +957,7 @@ class Appearance:
         LOW_BAY_LIGHT = 0x18
         HIGH_BAY_LIGHT = 0x19
 
-    class FanSubcategory(OpenIntEnum):
+    class FanSubcategory(utils.OpenIntEnum):
         GENERIC_FAN = 0x00
         CEILING_FAN = 0x01
         AXIAL_FAN = 0x02
@@ -966,7 +966,7 @@ class Appearance:
         DESK_FAN = 0x05
         WALL_FAN = 0x06
 
-    class HvacSubcategory(OpenIntEnum):
+    class HvacSubcategory(utils.OpenIntEnum):
         GENERIC_HVAC = 0x00
         THERMOSTAT = 0x01
         HUMIDIFIER = 0x02
@@ -980,13 +980,13 @@ class Appearance:
         FAN_HEATER = 0x0A
         AIR_CURTAIN = 0x0B
 
-    class AirConditioningSubcategory(OpenIntEnum):
+    class AirConditioningSubcategory(utils.OpenIntEnum):
         GENERIC_AIR_CONDITIONING = 0x00
 
-    class HumidifierSubcategory(OpenIntEnum):
+    class HumidifierSubcategory(utils.OpenIntEnum):
         GENERIC_HUMIDIFIER = 0x00
 
-    class HeatingSubcategory(OpenIntEnum):
+    class HeatingSubcategory(utils.OpenIntEnum):
         GENERIC_HEATING = 0x00
         RADIATOR = 0x01
         BOILER = 0x02
@@ -996,7 +996,7 @@ class Appearance:
         FAN_HEATER = 0x06
         AIR_CURTAIN = 0x07
 
-    class AccessControlSubcategory(OpenIntEnum):
+    class AccessControlSubcategory(utils.OpenIntEnum):
         GENERIC_ACCESS_CONTROL = 0x00
         ACCESS_DOOR = 0x01
         GARAGE_DOOR = 0x02
@@ -1008,7 +1008,7 @@ class Appearance:
         DOOR_LOCK = 0x08
         LOCKER = 0x09
 
-    class MotorizedDeviceSubcategory(OpenIntEnum):
+    class MotorizedDeviceSubcategory(utils.OpenIntEnum):
         GENERIC_MOTORIZED_DEVICE = 0x00
         MOTORIZED_GATE = 0x01
         AWNING = 0x02
@@ -1016,7 +1016,7 @@ class Appearance:
         CURTAINS = 0x04
         SCREEN = 0x05
 
-    class PowerDeviceSubcategory(OpenIntEnum):
+    class PowerDeviceSubcategory(utils.OpenIntEnum):
         GENERIC_POWER_DEVICE = 0x00
         POWER_OUTLET = 0x01
         POWER_STRIP = 0x02
@@ -1028,7 +1028,7 @@ class Appearance:
         CHARGE_CASE = 0x08
         POWER_BANK = 0x09
 
-    class LightSourceSubcategory(OpenIntEnum):
+    class LightSourceSubcategory(utils.OpenIntEnum):
         GENERIC_LIGHT_SOURCE = 0x00
         INCANDESCENT_LIGHT_BULB = 0x01
         LED_LAMP = 0x02
@@ -1039,7 +1039,7 @@ class Appearance:
         LOW_VOLTAGE_HALOGEN = 0x07
         ORGANIC_LIGHT_EMITTING_DIODE = 0x08
 
-    class WindowCoveringSubcategory(OpenIntEnum):
+    class WindowCoveringSubcategory(utils.OpenIntEnum):
         GENERIC_WINDOW_COVERING = 0x00
         WINDOW_SHADES = 0x01
         WINDOW_BLINDS = 0x02
@@ -1048,7 +1048,7 @@ class Appearance:
         EXTERIOR_SHUTTER = 0x05
         EXTERIOR_SCREEN = 0x06
 
-    class AudioSinkSubcategory(OpenIntEnum):
+    class AudioSinkSubcategory(utils.OpenIntEnum):
         GENERIC_AUDIO_SINK = 0x00
         STANDALONE_SPEAKER = 0x01
         SOUNDBAR = 0x02
@@ -1056,7 +1056,7 @@ class Appearance:
         STANDMOUNTED_SPEAKER = 0x04
         SPEAKERPHONE = 0x05
 
-    class AudioSourceSubcategory(OpenIntEnum):
+    class AudioSourceSubcategory(utils.OpenIntEnum):
         GENERIC_AUDIO_SOURCE = 0x00
         MICROPHONE = 0x01
         ALARM = 0x02
@@ -1068,7 +1068,7 @@ class Appearance:
         BROADCASTING_ROOM = 0x08
         AUDITORIUM = 0x09
 
-    class MotorizedVehicleSubcategory(OpenIntEnum):
+    class MotorizedVehicleSubcategory(utils.OpenIntEnum):
         GENERIC_MOTORIZED_VEHICLE = 0x00
         CAR = 0x01
         LARGE_GOODS_VEHICLE = 0x02
@@ -1086,7 +1086,7 @@ class Appearance:
         CAMPER_CARAVAN = 0x0E
         RECREATIONAL_VEHICLE_MOTOR_HOME = 0x0F
 
-    class DomesticApplianceSubcategory(OpenIntEnum):
+    class DomesticApplianceSubcategory(utils.OpenIntEnum):
         GENERIC_DOMESTIC_APPLIANCE = 0x00
         REFRIGERATOR = 0x01
         FREEZER = 0x02
@@ -1104,21 +1104,21 @@ class Appearance:
         RICE_COOKER = 0x0E
         CLOTHES_STEAMER = 0x0F
 
-    class WearableAudioDeviceSubcategory(OpenIntEnum):
+    class WearableAudioDeviceSubcategory(utils.OpenIntEnum):
         GENERIC_WEARABLE_AUDIO_DEVICE = 0x00
         EARBUD = 0x01
         HEADSET = 0x02
         HEADPHONES = 0x03
         NECK_BAND = 0x04
 
-    class AircraftSubcategory(OpenIntEnum):
+    class AircraftSubcategory(utils.OpenIntEnum):
         GENERIC_AIRCRAFT = 0x00
         LIGHT_AIRCRAFT = 0x01
         MICROLIGHT = 0x02
         PARAGLIDER = 0x03
         LARGE_PASSENGER_AIRCRAFT = 0x04
 
-    class AvEquipmentSubcategory(OpenIntEnum):
+    class AvEquipmentSubcategory(utils.OpenIntEnum):
         GENERIC_AV_EQUIPMENT = 0x00
         AMPLIFIER = 0x01
         RECEIVER = 0x02
@@ -1131,65 +1131,65 @@ class Appearance:
         OPTICAL_DISC_PLAYER = 0x09
         SET_TOP_BOX = 0x0A
 
-    class DisplayEquipmentSubcategory(OpenIntEnum):
+    class DisplayEquipmentSubcategory(utils.OpenIntEnum):
         GENERIC_DISPLAY_EQUIPMENT = 0x00
         TELEVISION = 0x01
         MONITOR = 0x02
         PROJECTOR = 0x03
 
-    class HearingAidSubcategory(OpenIntEnum):
+    class HearingAidSubcategory(utils.OpenIntEnum):
         GENERIC_HEARING_AID = 0x00
         IN_EAR_HEARING_AID = 0x01
         BEHIND_EAR_HEARING_AID = 0x02
         COCHLEAR_IMPLANT = 0x03
 
-    class GamingSubcategory(OpenIntEnum):
+    class GamingSubcategory(utils.OpenIntEnum):
         GENERIC_GAMING = 0x00
         HOME_VIDEO_GAME_CONSOLE = 0x01
         PORTABLE_HANDHELD_CONSOLE = 0x02
 
-    class SignageSubcategory(OpenIntEnum):
+    class SignageSubcategory(utils.OpenIntEnum):
         GENERIC_SIGNAGE = 0x00
         DIGITAL_SIGNAGE = 0x01
         ELECTRONIC_LABEL = 0x02
 
-    class PulseOximeterSubcategory(OpenIntEnum):
+    class PulseOximeterSubcategory(utils.OpenIntEnum):
         GENERIC_PULSE_OXIMETER = 0x00
         FINGERTIP_PULSE_OXIMETER = 0x01
         WRIST_WORN_PULSE_OXIMETER = 0x02
 
-    class WeightScaleSubcategory(OpenIntEnum):
+    class WeightScaleSubcategory(utils.OpenIntEnum):
         GENERIC_WEIGHT_SCALE = 0x00
 
-    class PersonalMobilityDeviceSubcategory(OpenIntEnum):
+    class PersonalMobilityDeviceSubcategory(utils.OpenIntEnum):
         GENERIC_PERSONAL_MOBILITY_DEVICE = 0x00
         POWERED_WHEELCHAIR = 0x01
         MOBILITY_SCOOTER = 0x02
 
-    class ContinuousGlucoseMonitorSubcategory(OpenIntEnum):
+    class ContinuousGlucoseMonitorSubcategory(utils.OpenIntEnum):
         GENERIC_CONTINUOUS_GLUCOSE_MONITOR = 0x00
 
-    class InsulinPumpSubcategory(OpenIntEnum):
+    class InsulinPumpSubcategory(utils.OpenIntEnum):
         GENERIC_INSULIN_PUMP = 0x00
         INSULIN_PUMP_DURABLE_PUMP = 0x01
         INSULIN_PUMP_PATCH_PUMP = 0x02
         INSULIN_PEN = 0x03
 
-    class MedicationDeliverySubcategory(OpenIntEnum):
+    class MedicationDeliverySubcategory(utils.OpenIntEnum):
         GENERIC_MEDICATION_DELIVERY = 0x00
 
-    class SpirometerSubcategory(OpenIntEnum):
+    class SpirometerSubcategory(utils.OpenIntEnum):
         GENERIC_SPIROMETER = 0x00
         HANDHELD_SPIROMETER = 0x01
 
-    class OutdoorSportsActivitySubcategory(OpenIntEnum):
+    class OutdoorSportsActivitySubcategory(utils.OpenIntEnum):
         GENERIC_OUTDOOR_SPORTS_ACTIVITY = 0x00
         LOCATION_DISPLAY = 0x01
         LOCATION_AND_NAVIGATION_DISPLAY = 0x02
         LOCATION_POD = 0x03
         LOCATION_AND_NAVIGATION_POD = 0x04
 
-    class _OpenSubcategory(OpenIntEnum):
+    class _OpenSubcategory(utils.OpenIntEnum):
         GENERIC = 0x00
 
     SUBCATEGORY_CLASSES = {
@@ -1296,7 +1296,7 @@ class AdvertisingData:
     # fmt: off
     # pylint: disable=line-too-long
 
-    class Type(OpenIntEnum):
+    class Type(utils.OpenIntEnum):
         FLAGS                                               = 0x01
         INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS       = 0x02
         COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS         = 0x03

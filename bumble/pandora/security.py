@@ -25,9 +25,9 @@ from bumble.core import (
     PhysicalTransport,
     ProtocolError,
 )
+import bumble.utils
 from bumble.device import Connection as BumbleConnection, Device
 from bumble.hci import HCI_Error, Role
-from bumble.utils import EventWatcher
 from bumble.pairing import PairingConfig, PairingDelegate as BasePairingDelegate
 from google.protobuf import any_pb2  # pytype: disable=pyi-error
 from google.protobuf import empty_pb2  # pytype: disable=pyi-error
@@ -300,7 +300,7 @@ class SecurityService(SecurityServicer):
 
                 security_result = asyncio.get_running_loop().create_future()
 
-                with contextlib.closing(EventWatcher()) as watcher:
+                with contextlib.closing(bumble.utils.EventWatcher()) as watcher:
 
                     @watcher.on(connection, 'pairing')
                     def on_pairing(*_: Any) -> None:
@@ -449,7 +449,7 @@ class SecurityService(SecurityServicer):
             'security_request': pair,
         }
 
-        with contextlib.closing(EventWatcher()) as watcher:
+        with contextlib.closing(bumble.utils.EventWatcher()) as watcher:
             # register event handlers
             for event, listener in listeners.items():
                 watcher.on(connection, event, listener)

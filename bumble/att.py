@@ -41,7 +41,6 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from pyee import EventEmitter
 
 from bumble import utils
 from bumble.core import UUID, name_or_number, InvalidOperationError, ProtocolError
@@ -798,7 +797,7 @@ class AttributeValue(Generic[_T]):
 
 
 # -----------------------------------------------------------------------------
-class Attribute(EventEmitter, Generic[_T]):
+class Attribute(utils.EventEmitter, Generic[_T]):
     class Permissions(enum.IntFlag):
         READABLE = 0x01
         WRITEABLE = 0x02
@@ -845,7 +844,7 @@ class Attribute(EventEmitter, Generic[_T]):
         permissions: Union[str, Attribute.Permissions],
         value: Union[AttributeValue[_T], _T, None] = None,
     ) -> None:
-        EventEmitter.__init__(self)
+        utils.EventEmitter.__init__(self)
         self.handle = 0
         self.end_group_handle = 0
         if isinstance(permissions, str):

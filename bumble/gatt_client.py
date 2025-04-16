@@ -44,7 +44,6 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from pyee import EventEmitter
 
 from bumble.colors import color
 from bumble.hci import HCI_Constant
@@ -69,6 +68,7 @@ from bumble.att import (
     ATT_Write_Request,
     ATT_Error,
 )
+from bumble import utils
 from bumble import core
 from bumble.core import UUID, InvalidStateError
 from bumble.gatt import (
@@ -117,11 +117,11 @@ def show_services(services: Iterable[ServiceProxy]) -> None:
 # -----------------------------------------------------------------------------
 # Proxies
 # -----------------------------------------------------------------------------
-class AttributeProxy(EventEmitter, Generic[_T]):
+class AttributeProxy(utils.EventEmitter, Generic[_T]):
     def __init__(
         self, client: Client, handle: int, end_group_handle: int, attribute_type: UUID
     ) -> None:
-        EventEmitter.__init__(self)
+        utils.EventEmitter.__init__(self)
         self.client = client
         self.handle = handle
         self.end_group_handle = end_group_handle

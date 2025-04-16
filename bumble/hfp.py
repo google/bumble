@@ -24,7 +24,6 @@ import asyncio
 import dataclasses
 import enum
 import traceback
-import pyee
 import re
 from typing import (
     Dict,
@@ -45,6 +44,7 @@ from bumble import at
 from bumble import device
 from bumble import rfcomm
 from bumble import sdp
+from bumble import utils
 from bumble.colors import color
 from bumble.core import (
     ProtocolError,
@@ -690,7 +690,7 @@ class HfIndicatorState:
     current_status: int = 0
 
 
-class HfProtocol(pyee.EventEmitter):
+class HfProtocol(utils.EventEmitter):
     """
     Implementation for the Hands-Free side of the Hands-Free profile.
 
@@ -1146,7 +1146,7 @@ class HfProtocol(pyee.EventEmitter):
             logger.error(traceback.format_exc())
 
 
-class AgProtocol(pyee.EventEmitter):
+class AgProtocol(utils.EventEmitter):
     """
     Implementation for the Audio-Gateway side of the Hands-Free profile.
 

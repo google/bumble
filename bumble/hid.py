@@ -22,11 +22,12 @@ import enum
 import struct
 
 from abc import ABC, abstractmethod
-from pyee import EventEmitter
 from typing import Optional, Callable
 from typing_extensions import override
 
-from bumble import l2cap, device
+from bumble import l2cap
+from bumble import device
+from bumble import utils
 from bumble.core import InvalidStateError, ProtocolError
 from bumble.hci import Address
 
@@ -195,7 +196,7 @@ class SendHandshakeMessage(Message):
 
 
 # -----------------------------------------------------------------------------
-class HID(ABC, EventEmitter):
+class HID(ABC, utils.EventEmitter):
     l2cap_ctrl_channel: Optional[l2cap.ClassicChannel] = None
     l2cap_intr_channel: Optional[l2cap.ClassicChannel] = None
     connection: Optional[device.Connection] = None

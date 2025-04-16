@@ -28,7 +28,6 @@ import logging
 import struct
 from typing import Optional, Sequence, Union
 
-from pyee import EventEmitter
 
 from bumble.att import ATT_Error
 from bumble.device import Peer
@@ -42,7 +41,7 @@ from bumble.gatt import (
 )
 from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
 from bumble.gatt_adapters import SerializableCharacteristicProxyAdapter
-from bumble.utils import OpenIntEnum
+from bumble import utils
 
 
 # -----------------------------------------------------------------------------
@@ -60,16 +59,16 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Protocol
 # -----------------------------------------------------------------------------
-class ActionId(OpenIntEnum):
+class ActionId(utils.OpenIntEnum):
     POSITIVE = 0
     NEGATIVE = 1
 
 
-class AppAttributeId(OpenIntEnum):
+class AppAttributeId(utils.OpenIntEnum):
     DISPLAY_NAME = 0
 
 
-class CategoryId(OpenIntEnum):
+class CategoryId(utils.OpenIntEnum):
     OTHER = 0
     INCOMING_CALL = 1
     MISSED_CALL = 2
@@ -84,13 +83,13 @@ class CategoryId(OpenIntEnum):
     ENTERTAINMENT = 11
 
 
-class CommandId(OpenIntEnum):
+class CommandId(utils.OpenIntEnum):
     GET_NOTIFICATION_ATTRIBUTES = 0
     GET_APP_ATTRIBUTES = 1
     PERFORM_NOTIFICATION_ACTION = 2
 
 
-class EventId(OpenIntEnum):
+class EventId(utils.OpenIntEnum):
     NOTIFICATION_ADDED = 0
     NOTIFICATION_MODIFIED = 1
     NOTIFICATION_REMOVED = 2
@@ -104,7 +103,7 @@ class EventFlags(enum.IntFlag):
     NEGATIVE_ACTION = 1 << 4
 
 
-class NotificationAttributeId(OpenIntEnum):
+class NotificationAttributeId(utils.OpenIntEnum):
     APP_IDENTIFIER = 0
     TITLE = 1
     SUBTITLE = 2
@@ -156,7 +155,7 @@ class Notification:
         )
 
 
-class ErrorCode(OpenIntEnum):
+class ErrorCode(utils.OpenIntEnum):
     UNKNOWN_COMMAND = 0xA0
     INVALID_COMMAND = 0xA1
     INVALID_PARAMETER = 0xA2
@@ -243,7 +242,7 @@ class AncsProxy(ProfileServiceProxy):
         )
 
 
-class AncsClient(EventEmitter):
+class AncsClient(utils.EventEmitter):
     _expected_response_command_id: Optional[CommandId]
     _expected_response_notification_uid: Optional[int]
     _expected_response_app_identifier: Optional[str]

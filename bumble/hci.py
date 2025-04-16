@@ -40,7 +40,7 @@ from bumble.core import (
     name_or_number,
     padded_bytes,
 )
-from bumble.utils import OpenIntEnum
+from bumble import utils
 
 
 # -----------------------------------------------------------------------------
@@ -739,7 +739,7 @@ class PhyBit(enum.IntFlag):
     LE_CODED = 1 << HCI_LE_CODED_PHY_BIT
 
 
-class CsRole(OpenIntEnum):
+class CsRole(utils.OpenIntEnum):
     INITIATOR = 0x00
     REFLECTOR = 0x01
 
@@ -749,7 +749,7 @@ class CsRoleMask(enum.IntFlag):
     REFLECTOR = 0x02
 
 
-class CsSyncPhy(OpenIntEnum):
+class CsSyncPhy(utils.OpenIntEnum):
     LE_1M     = 1
     LE_2M     = 2
     LE_2M_2BT = 3
@@ -760,7 +760,7 @@ class CsSyncPhySupported(enum.IntFlag):
     LE_2M_2BT = 0x02
 
 
-class RttType(OpenIntEnum):
+class RttType(utils.OpenIntEnum):
     AA_ONLY = 0x00
     SOUNDING_SEQUENCE_32_BIT = 0x01
     SOUNDING_SEQUENCE_96_BIT = 0x02
@@ -770,7 +770,7 @@ class RttType(OpenIntEnum):
     RANDOM_SEQUENCE_128_BIT = 0x06
 
 
-class CsSnr(OpenIntEnum):
+class CsSnr(utils.OpenIntEnum):
     SNR_18_DB = 0x00
     SNR_21_DB = 0x01
     SNR_24_DB = 0x02
@@ -779,20 +779,20 @@ class CsSnr(OpenIntEnum):
     NOT_APPLIED = 0xFF
 
 
-class CsDoneStatus(OpenIntEnum):
+class CsDoneStatus(utils.OpenIntEnum):
     ALL_RESULTS_COMPLETED = 0x00
     PARTIAL = 0x01
     ABORTED = 0x0F
 
 
-class CsProcedureAbortReason(OpenIntEnum):
+class CsProcedureAbortReason(utils.OpenIntEnum):
     NO_ABORT = 0x00
     LOCAL_HOST_OR_REMOTE_REQUEST = 0x01
     CHANNEL_MAP_UPDATE_INSTANT_PASSED = 0x02
     UNSPECIFIED = 0x0F
 
 
-class CsSubeventAbortReason(OpenIntEnum):
+class CsSubeventAbortReason(utils.OpenIntEnum):
     NO_ABORT = 0x00
     LOCAL_HOST_OR_REMOTE_REQUEST = 0x01
     NO_CS_SYNC_RECEIVED = 0x02
@@ -890,7 +890,7 @@ HCI_LINK_TYPE_NAMES = {
 }
 
 # Address types
-class AddressType(OpenIntEnum):
+class AddressType(utils.OpenIntEnum):
     PUBLIC_DEVICE   = 0x00
     RANDOM_DEVICE   = 0x01
     PUBLIC_IDENTITY = 0x02
@@ -1239,7 +1239,7 @@ HCI_SUPPORTED_COMMANDS_MASKS = {
 
 # LE Supported Features
 # See Bluetooth spec @ Vol 6, Part B, 4.6 FEATURE SUPPORT
-class LeFeature(OpenIntEnum):
+class LeFeature(utils.OpenIntEnum):
     LE_ENCRYPTION                                  = 0
     CONNECTION_PARAMETERS_REQUEST_PROCEDURE        = 1
     EXTENDED_REJECT_INDICATION                     = 2
@@ -1537,7 +1537,7 @@ RTT_TYPE_SPEC = {'size': 1, 'mapper': lambda x: RttType(x).name}
 CS_SNR_SPEC = {'size': 1, 'mapper': lambda x: CsSnr(x).name}
 
 
-class CodecID(OpenIntEnum):
+class CodecID(utils.OpenIntEnum):
     # fmt: off
     U_LOG           = 0x00
     A_LOG           = 0x01
@@ -5370,11 +5370,11 @@ class HCI_LE_CS_Create_Config_Command(HCI_Command):
     See Bluetooth spec @ 7.8.137 LE CS Create Config command
     '''
 
-    class ChannelSelectionType(OpenIntEnum):
+    class ChannelSelectionType(utils.OpenIntEnum):
         ALGO_3B = 0
         ALGO_3C = 1
 
-    class Ch3cShape(OpenIntEnum):
+    class Ch3cShape(utils.OpenIntEnum):
         HAT = 0x00
         X = 0x01
 
@@ -6203,13 +6203,13 @@ class HCI_LE_Periodic_Advertising_Report_Event(HCI_LE_Meta_Event):
     TX_POWER_INFORMATION_NOT_AVAILABLE = 0x7F
     RSSI_NOT_AVAILABLE = 0x7F
 
-    class CteType(OpenIntEnum):
+    class CteType(utils.OpenIntEnum):
         AOA_CONSTANT_TONE_EXTENSION = 0x00
         AOD_CONSTANT_TONE_EXTENSION_1US = 0x01
         AOD_CONSTANT_TONE_EXTENSION_2US = 0x02
         NO_CONSTANT_TONE_EXTENSION = 0xFF
 
-    class DataStatus(OpenIntEnum):
+    class DataStatus(utils.OpenIntEnum):
         DATA_COMPLETE = 0x00
         DATA_INCOMPLETE_MORE_TO_COME = 0x01
         DATA_INCOMPLETE_TRUNCATED_NO_MORE_TO_COME = 0x02
@@ -6590,7 +6590,7 @@ class HCI_LE_CS_Config_Complete_Event(HCI_LE_Meta_Event):
     See Bluetooth spec @ 7.7.65.42 LE CS Config Complete event
     '''
 
-    class Action(OpenIntEnum):
+    class Action(utils.OpenIntEnum):
         REMOVED = 0
         CREATED = 1
 
@@ -6642,7 +6642,7 @@ class HCI_LE_CS_Procedure_Enable_Complete_Event(HCI_LE_Meta_Event):
     See Bluetooth spec @ 7.7.65.43 LE CS Procedure Enable Complete event
     '''
 
-    class State(OpenIntEnum):
+    class State(utils.OpenIntEnum):
         DISABLED = 0
         ENABLED = 1
 
@@ -6984,7 +6984,7 @@ class HCI_QOS_Setup_Complete_Event(HCI_Event):
     See Bluetooth spec @ 7.7.13 QoS Setup Complete Event
     '''
 
-    class ServiceType(OpenIntEnum):
+    class ServiceType(utils.OpenIntEnum):
         NO_TRAFFIC_AVAILABLE = 0x00
         BEST_EFFORT_AVAILABLE = 0x01
         GUARANTEED_AVAILABLE = 0x02

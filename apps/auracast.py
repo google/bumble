@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import asyncio
-import asyncio.subprocess
 import collections
 import contextlib
 import dataclasses
@@ -36,7 +35,6 @@ from typing import (
 )
 
 import click
-import pyee
 
 try:
     import lc3  # type: ignore  # pylint: disable=E0401
@@ -121,9 +119,9 @@ def broadcast_code_bytes(broadcast_code: str) -> bytes:
 # -----------------------------------------------------------------------------
 # Scan For Broadcasts
 # -----------------------------------------------------------------------------
-class BroadcastScanner(pyee.EventEmitter):
+class BroadcastScanner(bumble.utils.EventEmitter):
     @dataclasses.dataclass
-    class Broadcast(pyee.EventEmitter):
+    class Broadcast(bumble.utils.EventEmitter):
         name: str | None
         sync: bumble.device.PeriodicAdvertisingSync
         broadcast_id: int
@@ -376,7 +374,7 @@ class BroadcastScanner(pyee.EventEmitter):
         self.emit('broadcast_loss', broadcast)
 
 
-class PrintingBroadcastScanner(pyee.EventEmitter):
+class PrintingBroadcastScanner(bumble.utils.EventEmitter):
     def __init__(
         self, device: bumble.device.Device, filter_duplicates: bool, sync_timeout: float
     ) -> None:

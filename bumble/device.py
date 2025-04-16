@@ -49,7 +49,6 @@ from typing import (
 )
 from typing_extensions import Self
 
-from pyee import EventEmitter
 
 from bumble.colors import color
 from bumble.att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
@@ -71,15 +70,7 @@ from bumble.core import (
     OutOfResourcesError,
     UnreachableError,
 )
-from bumble.utils import (
-    AsyncRunner,
-    CompositeEventEmitter,
-    EventWatcher,
-    setup_event_forwarding,
-    composite_listener,
-    deprecated,
-    experimental,
-)
+from bumble import utils
 from bumble.keys import (
     KeyStore,
     PairingKeys,
@@ -576,7 +567,7 @@ class PeriodicAdvertisingParameters:
 
 # -----------------------------------------------------------------------------
 @dataclass
-class AdvertisingSet(EventEmitter):
+class AdvertisingSet(utils.EventEmitter):
     device: Device
     advertising_handle: int
     auto_restart: bool
@@ -810,7 +801,7 @@ class AdvertisingSet(EventEmitter):
 
 
 # -----------------------------------------------------------------------------
-class PeriodicAdvertisingSync(EventEmitter):
+class PeriodicAdvertisingSync(utils.EventEmitter):
     class State(Enum):
         INIT = 0
         PENDING = 1
@@ -939,7 +930,7 @@ class PeriodicAdvertisingSync(EventEmitter):
                 "received established event for cancelled sync, will terminate"
             )
             self.state = self.State.ESTABLISHED
-            AsyncRunner.spawn(self.terminate())
+            utils.AsyncRunner.spawn(self.terminate())
             return
 
         if status == hci.HCI_SUCCESS:
@@ -1025,7 +1016,7 @@ class BigParameters:
 
 # -----------------------------------------------------------------------------
 @dataclass
-class Big(EventEmitter):
+class Big(utils.EventEmitter):
     class State(IntEnum):
         PENDING = 0
         ACTIVE = 1
@@ -1065,7 +1056,7 @@ class Big(EventEmitter):
             logger.error('BIG %d is not active.', self.big_handle)
             return
 
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
             terminated = asyncio.Event()
             watcher.once(self, Big.Event.TERMINATION, lambda _: terminated.set())
             await self.device.send_command(
@@ -1088,7 +1079,7 @@ class BigSyncParameters:
 
 # -----------------------------------------------------------------------------
 @dataclass
-class BigSync(EventEmitter):
+class BigSync(utils.EventEmitter):
     class State(IntEnum):
         PENDING = 0
         ACTIVE = 1
@@ -1123,7 +1114,7 @@ class BigSync(EventEmitter):
             logger.error('BIG Sync %d is not active.', self.big_handle)
             return
 
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
             terminated = asyncio.Event()
             watcher.once(self, BigSync.Event.TERMINATION, lambda _: terminated.set())
             await self.device.send_command(
@@ -1392,7 +1383,7 @@ ConnectionParametersPreferences.default = ConnectionParametersPreferences()
 
 # -----------------------------------------------------------------------------
 @dataclass
-class ScoLink(CompositeEventEmitter):
+class ScoLink(utils.CompositeEventEmitter):
     device: Device
     acl_connection: Connection
     handle: int
@@ -1483,7 +1474,7 @@ class _IsoLink:
 
 # -----------------------------------------------------------------------------
 @dataclass
-class CisLink(CompositeEventEmitter, _IsoLink):
+class CisLink(utils.EventEmitter, _IsoLink):
     class State(IntEnum):
         PENDING = 0
         ESTABLISHED = 1
@@ -1560,7 +1551,7 @@ class IsoPacketStream:
 
 
 # -----------------------------------------------------------------------------
-class Connection(CompositeEventEmitter):
+class Connection(utils.CompositeEventEmitter):
     device: Device
     handle: int
     transport: core.PhysicalTransport
@@ -1580,7 +1571,7 @@ class Connection(CompositeEventEmitter):
     cs_configs: dict[int, ChannelSoundingConfig]  # Config ID to Configuration
     cs_procedures: dict[int, ChannelSoundingProcedure]  # Config ID to Procedures
 
-    @composite_listener
+    @utils.composite_listener
     class Listener:
         def on_disconnection(self, reason):
             pass
@@ -1699,7 +1690,7 @@ class Connection(CompositeEventEmitter):
     def send_l2cap_pdu(self, cid: int, pdu: bytes) -> None:
         self.device.send_l2cap_pdu(self.handle, cid, pdu)
 
-    @deprecated("Please use create_l2cap_channel()")
+    @utils.deprecated("Please use create_l2cap_channel()")
     async def open_l2cap_channel(
         self,
         psm,
@@ -1753,7 +1744,9 @@ class Connection(CompositeEventEmitter):
         self.on('disconnection_failure', abort.set_exception)
 
         try:
-            await asyncio.wait_for(self.device.abort_on('flush', abort), timeout)
+            await asyncio.wait_for(
+                utils.cancel_on_event(self.device, 'flush', abort), timeout
+            )
         finally:
             self.remove_listener('disconnection', abort.set_result)
             self.remove_listener('disconnection_failure', abort.set_exception)
@@ -2037,7 +2030,7 @@ device_host_event_handlers: list[str] = []
 
 
 # -----------------------------------------------------------------------------
-class Device(CompositeEventEmitter):
+class Device(utils.CompositeEventEmitter):
     # Incomplete list of fields.
     random_address: hci.Address  # Random private address that may change periodically
     public_address: (
@@ -2069,7 +2062,7 @@ class Device(CompositeEventEmitter):
     _pending_cis: Dict[int, tuple[int, int]]
     gatt_service: gatt_service.GenericAttributeProfileService | None = None
 
-    @composite_listener
+    @utils.composite_listener
     class Listener:
         def on_advertisement(self, advertisement):
             pass
@@ -2290,7 +2283,9 @@ class Device(CompositeEventEmitter):
         self.l2cap_channel_manager.register_fixed_channel(ATT_CID, self.on_gatt_pdu)
 
         # Forward some events
-        setup_event_forwarding(self.gatt_server, self, 'characteristic_subscription')
+        utils.setup_event_forwarding(
+            self.gatt_server, self, 'characteristic_subscription'
+        )
 
         # Set the initial host
         if host:
@@ -2379,11 +2374,11 @@ class Device(CompositeEventEmitter):
             None,
         )
 
-    @deprecated("Please use create_l2cap_server()")
+    @utils.deprecated("Please use create_l2cap_server()")
     def register_l2cap_server(self, psm, server) -> int:
         return self.l2cap_channel_manager.register_server(psm, server)
 
-    @deprecated("Please use create_l2cap_server()")
+    @utils.deprecated("Please use create_l2cap_server()")
     def register_l2cap_channel_server(
         self,
         psm,
@@ -2396,7 +2391,7 @@ class Device(CompositeEventEmitter):
             psm, server, max_credits, mtu, mps
         )
 
-    @deprecated("Please use create_l2cap_channel()")
+    @utils.deprecated("Please use create_l2cap_channel()")
     async def open_l2cap_channel(
         self,
         connection,
@@ -3237,7 +3232,7 @@ class Device(CompositeEventEmitter):
                     advertiser_clock_accuracy,
                 )
 
-                AsyncRunner.spawn(self._update_periodic_advertising_syncs())
+                utils.AsyncRunner.spawn(self._update_periodic_advertising_syncs())
 
                 return
 
@@ -3667,7 +3662,7 @@ class Device(CompositeEventEmitter):
                 self.le_connecting = True
 
             if timeout is None:
-                return await self.abort_on('flush', pending_connection)
+                return await utils.cancel_on_event(self, 'flush', pending_connection)
 
             try:
                 return await asyncio.wait_for(
@@ -3684,7 +3679,9 @@ class Device(CompositeEventEmitter):
                     )
 
                 try:
-                    return await self.abort_on('flush', pending_connection)
+                    return await utils.cancel_on_event(
+                        self, 'flush', pending_connection
+                    )
                 except core.ConnectionError as error:
                     raise core.TimeoutError() from error
         finally:
@@ -3740,7 +3737,7 @@ class Device(CompositeEventEmitter):
 
         try:
             # Wait for a request or a completed connection
-            pending_request = self.abort_on('flush', pending_request_fut)
+            pending_request = utils.cancel_on_event(self, 'flush', pending_request_fut)
             result = await (
                 asyncio.wait_for(pending_request, timeout)
                 if timeout
@@ -3802,7 +3799,7 @@ class Device(CompositeEventEmitter):
             )
 
             # Wait for connection complete
-            return await self.abort_on('flush', pending_connection)
+            return await utils.cancel_on_event(self, 'flush', pending_connection)
 
         finally:
             self.remove_listener('connection', on_connection)
@@ -3876,7 +3873,7 @@ class Device(CompositeEventEmitter):
 
             # Wait for the disconnection process to complete
             self.disconnecting = True
-            return await self.abort_on('flush', pending_disconnection)
+            return await utils.cancel_on_event(self, 'flush', pending_disconnection)
         finally:
             connection.remove_listener(
                 'disconnection', pending_disconnection.set_result
@@ -4075,7 +4072,7 @@ class Device(CompositeEventEmitter):
             else:
                 return None
 
-            return await self.abort_on('flush', peer_address)
+            return await utils.cancel_on_event(self, 'flush', peer_address)
         finally:
             if listener is not None:
                 self.remove_listener(event_name, listener)
@@ -4125,7 +4122,7 @@ class Device(CompositeEventEmitter):
             if not self.scanning:
                 await self.start_scanning(filter_duplicates=True)
 
-            return await self.abort_on('flush', peer_address)
+            return await utils.cancel_on_event(self, 'flush', peer_address)
         finally:
             if listener is not None:
                 self.remove_listener(event_name, listener)
@@ -4229,7 +4226,9 @@ class Device(CompositeEventEmitter):
                 raise hci.HCI_StatusError(result)
 
             # Wait for the authentication to complete
-            await connection.abort_on('disconnection', pending_authentication)
+            await utils.cancel_on_event(
+                connection, 'disconnection', pending_authentication
+            )
         finally:
             connection.remove_listener('connection_authentication', on_authentication)
             connection.remove_listener(
@@ -4309,7 +4308,7 @@ class Device(CompositeEventEmitter):
                     raise hci.HCI_StatusError(result)
 
             # Wait for the result
-            await connection.abort_on('disconnection', pending_encryption)
+            await utils.cancel_on_event(connection, 'disconnection', pending_encryption)
         finally:
             connection.remove_listener(
                 'connection_encryption_change', on_encryption_change
@@ -4353,7 +4352,9 @@ class Device(CompositeEventEmitter):
                     f'{hci.HCI_Constant.error_name(result.status)}'
                 )
                 raise hci.HCI_StatusError(result)
-            await connection.abort_on('disconnection', pending_role_change)
+            await utils.cancel_on_event(
+                connection, 'disconnection', pending_role_change
+            )
         finally:
             connection.remove_listener('role_change', on_role_change)
             connection.remove_listener('role_change_failure', on_role_change_failure)
@@ -4402,13 +4403,13 @@ class Device(CompositeEventEmitter):
                 raise hci.HCI_StatusError(result)
 
             # Wait for the result
-            return await self.abort_on('flush', pending_name)
+            return await utils.cancel_on_event(self, 'flush', pending_name)
         finally:
             self.remove_listener('remote_name', handler)
             self.remove_listener('remote_name_failure', failure_handler)
 
     # [LE only]
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def setup_cig(
         self,
         cig_id: int,
@@ -4466,7 +4467,7 @@ class Device(CompositeEventEmitter):
         return cis_handles
 
     # [LE only]
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def create_cis(
         self, cis_acl_pairs: Sequence[tuple[int, int]]
     ) -> list[CisLink]:
@@ -4482,7 +4483,7 @@ class Device(CompositeEventEmitter):
                 cig_id=cig_id,
             )
 
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
             pending_cis_establishments = {
                 cis_handle: asyncio.get_running_loop().create_future()
                 for cis_handle, _ in cis_acl_pairs
@@ -4509,7 +4510,7 @@ class Device(CompositeEventEmitter):
             return await asyncio.gather(*pending_cis_establishments.values())
 
     # [LE only]
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def accept_cis_request(self, handle: int) -> CisLink:
         """[LE Only] Accepts an incoming CIS request.
 
@@ -4531,7 +4532,7 @@ class Device(CompositeEventEmitter):
             if cis_link.state == CisLink.State.ESTABLISHED:
                 return cis_link
 
-            with closing(EventWatcher()) as watcher:
+            with closing(utils.EventWatcher()) as watcher:
                 pending_establishment = asyncio.get_running_loop().create_future()
 
                 def on_establishment() -> None:
@@ -4555,7 +4556,7 @@ class Device(CompositeEventEmitter):
         raise UnreachableError()
 
     # [LE only]
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def reject_cis_request(
         self,
         handle: int,
@@ -4569,14 +4570,14 @@ class Device(CompositeEventEmitter):
         )
 
     # [LE only]
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def create_big(
         self, advertising_set: AdvertisingSet, parameters: BigParameters
     ) -> Big:
         if (big_handle := self.next_big_handle()) is None:
             raise core.OutOfResourcesError("All valid BIG handles already in use")
 
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
             big = Big(
                 big_handle=big_handle,
                 parameters=parameters,
@@ -4619,7 +4620,7 @@ class Device(CompositeEventEmitter):
         return big
 
     # [LE only]
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def create_big_sync(
         self, pa_sync: PeriodicAdvertisingSync, parameters: BigSyncParameters
     ) -> BigSync:
@@ -4629,7 +4630,7 @@ class Device(CompositeEventEmitter):
         if (pa_sync_handle := pa_sync.sync_handle) is None:
             raise core.InvalidStateError("PA Sync is not established")
 
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
             big_sync = BigSync(
                 big_handle=big_handle,
                 parameters=parameters,
@@ -4677,7 +4678,7 @@ class Device(CompositeEventEmitter):
         Returns:
             LE features supported by the remote device.
         """
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
             read_feature_future: asyncio.Future[hci.LeFeatureMask] = (
                 asyncio.get_running_loop().create_future()
             )
@@ -4700,7 +4701,7 @@ class Device(CompositeEventEmitter):
             )
             return await read_feature_future
 
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def get_remote_cs_capabilities(
         self, connection: Connection
     ) -> ChannelSoundingCapabilities:
@@ -4708,7 +4709,7 @@ class Device(CompositeEventEmitter):
             asyncio.get_running_loop().create_future()
         )
 
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
             watcher.once(
                 connection, 'channel_sounding_capabilities', complete_future.set_result
             )
@@ -4725,7 +4726,7 @@ class Device(CompositeEventEmitter):
             )
             return await complete_future
 
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def set_default_cs_settings(
         self,
         connection: Connection,
@@ -4745,7 +4746,7 @@ class Device(CompositeEventEmitter):
             check_result=True,
         )
 
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def create_cs_config(
         self,
         connection: Connection,
@@ -4782,7 +4783,7 @@ class Device(CompositeEventEmitter):
         if config_id is None:
             raise OutOfResourcesError("No available config ID on this connection!")
 
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
             watcher.once(
                 connection, 'channel_sounding_config', complete_future.set_result
             )
@@ -4816,12 +4817,12 @@ class Device(CompositeEventEmitter):
             )
             return await complete_future
 
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def enable_cs_security(self, connection: Connection) -> None:
         complete_future: asyncio.Future[None] = (
             asyncio.get_running_loop().create_future()
         )
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
 
             def on_event(event: hci.HCI_LE_CS_Security_Enable_Complete_Event) -> None:
                 if event.connection_handle != connection.handle:
@@ -4840,7 +4841,7 @@ class Device(CompositeEventEmitter):
             )
             return await complete_future
 
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def set_cs_procedure_parameters(
         self,
         connection: Connection,
@@ -4878,7 +4879,7 @@ class Device(CompositeEventEmitter):
             check_result=True,
         )
 
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     async def enable_cs_procedure(
         self,
         connection: Connection,
@@ -4888,7 +4889,7 @@ class Device(CompositeEventEmitter):
         complete_future: asyncio.Future[ChannelSoundingProcedure] = (
             asyncio.get_running_loop().create_future()
         )
-        with closing(EventWatcher()) as watcher:
+        with closing(utils.EventWatcher()) as watcher:
             watcher.once(
                 connection, 'channel_sounding_procedure', complete_future.set_result
             )
@@ -4928,7 +4929,9 @@ class Device(CompositeEventEmitter):
                 value=link_key, authenticated=authenticated
             )
 
-            self.abort_on('flush', self.update_keys(str(bd_addr), pairing_keys))
+            utils.cancel_on_event(
+                self, 'flush', self.update_keys(str(bd_addr), pairing_keys)
+            )
 
         if connection := self.find_connection_by_bd_addr(
             bd_addr, transport=PhysicalTransport.BR_EDR
@@ -5197,7 +5200,7 @@ class Device(CompositeEventEmitter):
         if advertising_set.auto_restart:
             connection.once(
                 'disconnection',
-                lambda _: self.abort_on('flush', advertising_set.start()),
+                lambda _: utils.cancel_on_event(self, 'flush', advertising_set.start()),
             )
 
         self.emit('connection', connection)
@@ -5306,7 +5309,7 @@ class Device(CompositeEventEmitter):
                 advertiser = self.legacy_advertiser
                 connection.once(
                     'disconnection',
-                    lambda _: self.abort_on('flush', advertiser.start()),
+                    lambda _: utils.cancel_on_event(self, 'flush', advertiser.start()),
                 )
             else:
                 self.legacy_advertiser = None
@@ -5433,7 +5436,7 @@ class Device(CompositeEventEmitter):
         connection.emit('disconnection_failure', error)
 
     @host_event_handler
-    @AsyncRunner.run_in_task()
+    @utils.AsyncRunner.run_in_task()
     async def on_inquiry_complete(self):
         if self.auto_restart_inquiry:
             # Inquire again
@@ -5565,7 +5568,7 @@ class Device(CompositeEventEmitter):
 
         async def reply() -> None:
             try:
-                if await connection.abort_on('disconnection', method()):
+                if await utils.cancel_on_event(connection, 'disconnection', method()):
                     await self.host.send_command(
                         hci.HCI_User_Confirmation_Request_Reply_Command(
                             bd_addr=connection.peer_address
@@ -5581,7 +5584,7 @@ class Device(CompositeEventEmitter):
                 )
             )
 
-        AsyncRunner.spawn(reply())
+        utils.AsyncRunner.spawn(reply())
 
     # [Classic only]
     @host_event_handler
@@ -5592,8 +5595,8 @@ class Device(CompositeEventEmitter):
 
         async def reply() -> None:
             try:
-                number = await connection.abort_on(
-                    'disconnection', pairing_config.delegate.get_number()
+                number = await utils.cancel_on_event(
+                    connection, 'disconnection', pairing_config.delegate.get_number()
                 )
                 if number is not None:
                     await self.host.send_command(
@@ -5611,7 +5614,7 @@ class Device(CompositeEventEmitter):
                 )
             )
 
-        AsyncRunner.spawn(reply())
+        utils.AsyncRunner.spawn(reply())
 
     # [Classic only]
     @host_event_handler
@@ -5626,8 +5629,8 @@ class Device(CompositeEventEmitter):
         if io_capability == hci.HCI_KEYBOARD_ONLY_IO_CAPABILITY:
             # Ask the user to enter a string
             async def get_pin_code():
-                pin_code = await connection.abort_on(
-                    'disconnection', pairing_config.delegate.get_string(16)
+                pin_code = await utils.cancel_on_event(
+                    connection, 'disconnection', pairing_config.delegate.get_string(16)
                 )
 
                 if pin_code is not None:
@@ -5665,8 +5668,8 @@ class Device(CompositeEventEmitter):
         pairing_config = self.pairing_config_factory(connection)
 
         # Show the passkey to the user
-        connection.abort_on(
-            'disconnection', pairing_config.delegate.display_number(passkey)
+        utils.cancel_on_event(
+            connection, 'disconnection', pairing_config.delegate.display_number(passkey)
         )
 
     # [Classic only]
@@ -5698,7 +5701,7 @@ class Device(CompositeEventEmitter):
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     def on_sco_connection(
         self, acl_connection: Connection, sco_handle: int, link_type: int
     ) -> None:
@@ -5718,7 +5721,7 @@ class Device(CompositeEventEmitter):
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
-    @experimental('Only for testing.')
+    @utils.experimental('Only for testing.')
     def on_sco_connection_failure(
         self, acl_connection: Connection, status: int
     ) -> None:
@@ -5727,7 +5730,7 @@ class Device(CompositeEventEmitter):
 
     # [Classic only]
     @host_event_handler
-    @experimental('Only for testing')
+    @utils.experimental('Only for testing')
     def on_sco_packet(
         self, sco_handle: int, packet: hci.HCI_SynchronousDataPacket
     ) -> None:
@@ -5737,7 +5740,7 @@ class Device(CompositeEventEmitter):
     # [LE only]
     @host_event_handler
     @with_connection_from_handle
-    @experimental('Only for testing')
+    @utils.experimental('Only for testing')
     def on_cis_request(
         self,
         acl_connection: Connection,
@@ -5764,7 +5767,7 @@ class Device(CompositeEventEmitter):
 
     # [LE only]
     @host_event_handler
-    @experimental('Only for testing')
+    @utils.experimental('Only for testing')
     def on_cis_establishment(self, cis_handle: int) -> None:
         cis_link = self.cis_links[cis_handle]
         cis_link.state = CisLink.State.ESTABLISHED
@@ -5784,7 +5787,7 @@ class Device(CompositeEventEmitter):
 
     # [LE only]
     @host_event_handler
-    @experimental('Only for testing')
+    @utils.experimental('Only for testing')
     def on_cis_establishment_failure(self, cis_handle: int, status: int) -> None:
         logger.debug(f'*** CIS Establishment Failure: cis=[0x{cis_handle:04X}] ***')
         if cis_link := self.cis_links.pop(cis_handle):
@@ -5793,7 +5796,7 @@ class Device(CompositeEventEmitter):
 
     # [LE only]
     @host_event_handler
-    @experimental('Only for testing')
+    @utils.experimental('Only for testing')
     def on_iso_packet(self, handle: int, packet: hci.HCI_IsoDataPacket) -> None:
         if (cis_link := self.cis_links.get(handle)) and cis_link.sink:
             cis_link.sink(packet)

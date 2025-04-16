@@ -38,7 +38,7 @@ from bumble.gatt_adapters import (
     UTF8CharacteristicProxyAdapter,
 )
 from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
-from bumble.utils import OpenIntEnum
+from bumble import utils
 from bumble.profiles.bap import AudioLocation
 
 # -----------------------------------------------------------------------------
@@ -50,11 +50,11 @@ MAX_VOLUME_OFFSET = 255
 CHANGE_COUNTER_MAX_VALUE = 0xFF
 
 
-class SetVolumeOffsetOpCode(OpenIntEnum):
+class SetVolumeOffsetOpCode(utils.OpenIntEnum):
     SET_VOLUME_OFFSET = 0x01
 
 
-class ErrorCode(OpenIntEnum):
+class ErrorCode(utils.OpenIntEnum):
     """
     See Volume Offset Control Service 1.6. Application error codes.
     """

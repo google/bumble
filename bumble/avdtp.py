@@ -37,7 +37,6 @@ from typing import (
     cast,
 )
 
-from pyee import EventEmitter
 
 from bumble.core import (
     BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
@@ -57,7 +56,7 @@ from bumble.a2dp import (
     VendorSpecificMediaCodecInformation,
 )
 from bumble.rtp import MediaPacket
-from bumble import sdp, device, l2cap
+from bumble import sdp, device, l2cap, utils
 from bumble.colors import color
 
 
@@ -1194,7 +1193,7 @@ class DelayReport_Reject(Simple_Reject):
 
 
 # -----------------------------------------------------------------------------
-class Protocol(EventEmitter):
+class Protocol(utils.EventEmitter):
     local_endpoints: List[LocalStreamEndPoint]
     remote_endpoints: Dict[int, DiscoveredStreamEndPoint]
     streams: Dict[int, Stream]
@@ -1680,7 +1679,7 @@ class Protocol(EventEmitter):
 
 
 # -----------------------------------------------------------------------------
-class Listener(EventEmitter):
+class Listener(utils.EventEmitter):
     servers: Dict[int, Protocol]
 
     @staticmethod
@@ -2063,7 +2062,7 @@ class DiscoveredStreamEndPoint(StreamEndPoint, StreamEndPointProxy):
 
 
 # -----------------------------------------------------------------------------
-class LocalStreamEndPoint(StreamEndPoint, EventEmitter):
+class LocalStreamEndPoint(StreamEndPoint, utils.EventEmitter):
     stream: Optional[Stream]
 
     def __init__(
@@ -2076,7 +2075,7 @@ class LocalStreamEndPoint(StreamEndPoint, EventEmitter):
         configuration: Optional[Iterable[ServiceCapabilities]] = None,
     ):
         StreamEndPoint.__init__(self, seid, media_type, tsep, 0, capabilities)
-        EventEmitter.__init__(self)
+        utils.EventEmitter.__init__(self)
         self.protocol = protocol
         self.configuration = configuration if configuration is not None else []
         self.stream = None

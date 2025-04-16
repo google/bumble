@@ -25,11 +25,11 @@ import enum
 from typing import Callable, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 from typing_extensions import Self
 
-from pyee import EventEmitter
 
 from bumble import core
 from bumble import l2cap
 from bumble import sdp
+from bumble import utils
 from bumble.colors import color
 from bumble.core import (
     UUID,
@@ -441,7 +441,7 @@ class RFCOMM_MCC_MSC:
 
 
 # -----------------------------------------------------------------------------
-class DLC(EventEmitter):
+class DLC(utils.EventEmitter):
     class State(enum.IntEnum):
         INIT = 0x00
         CONNECTING = 0x01
@@ -749,7 +749,7 @@ class DLC(EventEmitter):
 
 
 # -----------------------------------------------------------------------------
-class Multiplexer(EventEmitter):
+class Multiplexer(utils.EventEmitter):
     class Role(enum.IntEnum):
         INITIATOR = 0x00
         RESPONDER = 0x01
@@ -1075,7 +1075,7 @@ class Client:
 
 
 # -----------------------------------------------------------------------------
-class Server(EventEmitter):
+class Server(utils.EventEmitter):
     def __init__(
         self, device: Device, l2cap_mtu: int = RFCOMM_DEFAULT_L2CAP_MTU
     ) -> None:

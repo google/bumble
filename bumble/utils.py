@@ -38,7 +38,8 @@ from typing import (
 )
 from typing_extensions import Self
 
-from pyee import EventEmitter
+import pyee
+import pyee.asyncio
 
 from bumble.colors import color
 
@@ -54,6 +55,48 @@ def setup_event_forwarding(emitter, forwarder, event_name):
         forwarder.emit(event_name, *args, **kwargs)
 
     emitter.on(event_name, emit)
+
+
+# -----------------------------------------------------------------------------
+def wrap_async(function):
+    """
+    Wraps the provided function in an async function.
+    """
+    return functools.partial(async_call, function)
+
+
+# -----------------------------------------------------------------------------
+def deprecated(msg: str):
+    """
+    Throw deprecation warning before execution.
+    """
+
+    def wrapper(function):
+        @functools.wraps(function)
+        def inner(*args, **kwargs):
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+            return function(*args, **kwargs)
+
+        return inner
+
+    return wrapper
+
+
+# -----------------------------------------------------------------------------
+def experimental(msg: str):
+    """
+    Throws a future warning before execution.
+    """
+
+    def wrapper(function):
+        @functools.wraps(function)
+        def inner(*args, **kwargs):
+            warnings.warn(msg, FutureWarning, stacklevel=2)
+            return function(*args, **kwargs)
+
+        return inner
+
+    return wrapper
 
 
 # -----------------------------------------------------------------------------
@@ -113,21 +156,23 @@ class EventWatcher:
     ```
     '''
 
-    handlers: List[Tuple[EventEmitter, str, Callable[..., Any]]]
+    handlers: List[Tuple[pyee.EventEmitter, str, Callable[..., Any]]]
 
     def __init__(self) -> None:
         self.handlers = []
 
     @overload
     def on(
-        self, emitter: EventEmitter, event: str
+        self, emitter: pyee.EventEmitter, event: str
     ) -> Callable[[_Handler], _Handler]: ...
 
     @overload
-    def on(self, emitter: EventEmitter, event: str, handler: _Handler) -> _Handler: ...
+    def on(
+        self, emitter: pyee.EventEmitter, event: str, handler: _Handler
+    ) -> _Handler: ...
 
     def on(
-        self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None
+        self, emitter: pyee.EventEmitter, event: str, handler: Optional[_Handler] = None
     ) -> Union[_Handler, Callable[[_Handler], _Handler]]:
         '''Watch an event until the context is closed.
 
@@ -147,16 +192,16 @@ class EventWatcher:
 
     @overload
     def once(
-        self, emitter: EventEmitter, event: str
+        self, emitter: pyee.EventEmitter, event: str
     ) -> Callable[[_Handler], _Handler]: ...
 
     @overload
     def once(
-        self, emitter: EventEmitter, event: str, handler: _Handler
+        self, emitter: pyee.EventEmitter, event: str, handler: _Handler
     ) -> _Handler: ...
 
     def once(
-        self, emitter: EventEmitter, event: str, handler: Optional[_Handler] = None
+        self, emitter: pyee.EventEmitter, event: str, handler: Optional[_Handler] = None
     ) -> Union[_Handler, Callable[[_Handler], _Handler]]:
         '''Watch an event for once.
 
@@ -184,38 +229,48 @@ class EventWatcher:
 _T = TypeVar('_T')
 
 
-class AbortableEventEmitter(EventEmitter):
-    def abort_on(self, event: str, awaitable: Awaitable[_T]) -> Awaitable[_T]:
-        """
-        Set a coroutine or future to abort when an event occur.
-        """
-        future = asyncio.ensure_future(awaitable)
-        if future.done():
-            return future
-
-        def on_event(*_):
-            if future.done():
-                return
-            msg = f'abort: {event} event occurred.'
-            if isinstance(future, asyncio.Task):
-                # python < 3.9 does not support passing a message on `Task.cancel`
-                if sys.version_info < (3, 9, 0):
-                    future.cancel()
-                else:
-                    future.cancel(msg)
-            else:
-                future.set_exception(asyncio.CancelledError(msg))
-
-        def on_done(_):
-            self.remove_listener(event, on_event)
-
-        self.on(event, on_event)
-        future.add_done_callback(on_done)
+def cancel_on_event(
+    emitter: pyee.EventEmitter, event: str, awaitable: Awaitable[_T]
+) -> Awaitable[_T]:
+    """Set a coroutine or future to cancel when an event occur."""
+    future = asyncio.ensure_future(awaitable)
+    if future.done():
         return future
+
+    def on_event(*args, **kwargs) -> None:
+        del args, kwargs
+        if future.done():
+            return
+        msg = f'abort: {event} event occurred.'
+        if isinstance(future, asyncio.Task):
+            # python < 3.9 does not support passing a message on `Task.cancel`
+            if sys.version_info < (3, 9, 0):
+                future.cancel()
+            else:
+                future.cancel(msg)
+        else:
+            future.set_exception(asyncio.CancelledError(msg))
+
+    def on_done(_):
+        emitter.remove_listener(event, on_event)
+
+    emitter.on(event, on_event)
+    future.add_done_callback(on_done)
+    return future
 
 
 # -----------------------------------------------------------------------------
-class CompositeEventEmitter(AbortableEventEmitter):
+class EventEmitter(pyee.asyncio.AsyncIOEventEmitter):
+    """A Base EventEmitter for Bumble."""
+
+    @deprecated("Use `cancel_on_event` instead.")
+    def abort_on(self, event: str, awaitable: Awaitable[_T]) -> Awaitable[_T]:
+        """Set a coroutine or future to abort when an event occur."""
+        return cancel_on_event(self, event, awaitable)
+
+
+# -----------------------------------------------------------------------------
+class CompositeEventEmitter(EventEmitter):
     def __init__(self):
         super().__init__()
         self._listener = None
@@ -428,48 +483,6 @@ async def async_call(function, *args, **kwargs):
     result = await async_call(some_function, ...)
     """
     return function(*args, **kwargs)
-
-
-# -----------------------------------------------------------------------------
-def wrap_async(function):
-    """
-    Wraps the provided function in an async function.
-    """
-    return functools.partial(async_call, function)
-
-
-# -----------------------------------------------------------------------------
-def deprecated(msg: str):
-    """
-    Throw deprecation warning before execution.
-    """
-
-    def wrapper(function):
-        @functools.wraps(function)
-        def inner(*args, **kwargs):
-            warnings.warn(msg, DeprecationWarning, stacklevel=2)
-            return function(*args, **kwargs)
-
-        return inner
-
-    return wrapper
-
-
-# -----------------------------------------------------------------------------
-def experimental(msg: str):
-    """
-    Throws a future warning before execution.
-    """
-
-    def wrapper(function):
-        @functools.wraps(function)
-        def inner(*args, **kwargs):
-            warnings.warn(msg, FutureWarning, stacklevel=2)
-            return function(*args, **kwargs)
-
-        return inner
-
-    return wrapper
 
 
 # -----------------------------------------------------------------------------

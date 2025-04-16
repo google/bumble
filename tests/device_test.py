@@ -49,6 +49,7 @@ from bumble.hci import (
     HCI_Error,
     HCI_Packet,
 )
+from bumble import utils
 from bumble import gatt
 
 from .test_utils import TwoDevices, async_barrier
@@ -251,7 +252,7 @@ async def test_device_connect_parallel():
 @pytest.mark.asyncio
 async def test_flush():
     d0 = Device(host=Host(None, None))
-    task = d0.abort_on('flush', asyncio.sleep(10000))
+    task = utils.cancel_on_event(d0, 'flush', asyncio.sleep(10000))
     await d0.host.flush()
     try:
         await task
@@ -482,8 +483,8 @@ async def test_cis():
         _cig_id: int,
         _cis_id: int,
     ):
-        acl_connection.abort_on(
-            'disconnection', devices[1].accept_cis_request(cis_handle)
+        utils.cancel_on_event(
+            acl_connection, 'disconnection', devices[1].accept_cis_request(cis_handle)
         )
         peripheral_cis_futures[cis_handle] = asyncio.get_running_loop().create_future()
 

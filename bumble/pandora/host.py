@@ -20,6 +20,7 @@ import grpc.aio
 import logging
 import struct
 
+import bumble.utils
 from bumble.pandora import utils
 from bumble.pandora.config import Config
 from bumble.core import (
@@ -534,7 +535,9 @@ class HostService(HostServicer):
 
             try:
                 self.log.debug('Stop advertising')
-                await self.device.abort_on('flush', self.device.stop_advertising())
+                await bumble.utils.cancel_on_event(
+                    self.device, 'flush', self.device.stop_advertising()
+                )
             except:
                 pass
 
@@ -602,7 +605,9 @@ class HostService(HostServicer):
             self.device.remove_listener('advertisement', handler)  # type: ignore
             try:
                 self.log.debug('Stop scanning')
-                await self.device.abort_on('flush', self.device.stop_scanning())
+                await bumble.utils.cancel_on_event(
+                    self.device, 'flush', self.device.stop_scanning()
+                )
             except:
                 pass
 
@@ -642,7 +647,9 @@ class HostService(HostServicer):
             self.device.remove_listener('inquiry_result', result_handler)  # type: ignore
             try:
                 self.log.debug('Stop inquiry')
-                await self.device.abort_on('flush', self.device.stop_discovery())
+                await bumble.utils.cancel_on_event(
+                    self.device, 'flush', self.device.stop_discovery()
+                )
             except:
                 pass
 
