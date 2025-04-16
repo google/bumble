@@ -99,10 +99,10 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
     UUID = gatt.GATT_COORDINATED_SET_IDENTIFICATION_SERVICE
 
     set_identity_resolving_key: bytes
-    set_identity_resolving_key_characteristic: gatt.Characteristic
-    coordinated_set_size_characteristic: Optional[gatt.Characteristic] = None
-    set_member_lock_characteristic: Optional[gatt.Characteristic] = None
-    set_member_rank_characteristic: Optional[gatt.Characteristic] = None
+    set_identity_resolving_key_characteristic: gatt.Characteristic[bytes]
+    coordinated_set_size_characteristic: Optional[gatt.Characteristic[bytes]] = None
+    set_member_lock_characteristic: Optional[gatt.Characteristic[bytes]] = None
+    set_member_rank_characteristic: Optional[gatt.Characteristic[bytes]] = None
 
     def __init__(
         self,
@@ -203,10 +203,10 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
 class CoordinatedSetIdentificationProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = CoordinatedSetIdentificationService
 
-    set_identity_resolving_key: gatt_client.CharacteristicProxy
-    coordinated_set_size: Optional[gatt_client.CharacteristicProxy] = None
-    set_member_lock: Optional[gatt_client.CharacteristicProxy] = None
-    set_member_rank: Optional[gatt_client.CharacteristicProxy] = None
+    set_identity_resolving_key: gatt_client.CharacteristicProxy[bytes]
+    coordinated_set_size: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    set_member_lock: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    set_member_rank: Optional[gatt_client.CharacteristicProxy[bytes]] = None
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy

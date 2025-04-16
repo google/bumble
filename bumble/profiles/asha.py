@@ -259,11 +259,11 @@ class AshaService(gatt.TemplateService):
 # -----------------------------------------------------------------------------
 class AshaServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = AshaService
-    read_only_properties_characteristic: gatt_client.CharacteristicProxy
-    audio_control_point_characteristic: gatt_client.CharacteristicProxy
-    audio_status_point_characteristic: gatt_client.CharacteristicProxy
-    volume_characteristic: gatt_client.CharacteristicProxy
-    psm_characteristic: gatt_client.CharacteristicProxy
+    read_only_properties_characteristic: gatt_client.CharacteristicProxy[bytes]
+    audio_control_point_characteristic: gatt_client.CharacteristicProxy[bytes]
+    audio_status_point_characteristic: gatt_client.CharacteristicProxy[bytes]
+    volume_characteristic: gatt_client.CharacteristicProxy[bytes]
+    psm_characteristic: gatt_client.CharacteristicProxy[bytes]
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy

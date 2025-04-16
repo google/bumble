@@ -338,30 +338,32 @@ class MediaControlServiceProxy(
         'content_control_id': gatt.GATT_CONTENT_CONTROL_ID_CHARACTERISTIC,
     }
 
-    media_player_name: Optional[gatt_client.CharacteristicProxy] = None
-    media_player_icon_object_id: Optional[gatt_client.CharacteristicProxy] = None
-    media_player_icon_url: Optional[gatt_client.CharacteristicProxy] = None
-    track_changed: Optional[gatt_client.CharacteristicProxy] = None
-    track_title: Optional[gatt_client.CharacteristicProxy] = None
-    track_duration: Optional[gatt_client.CharacteristicProxy] = None
-    track_position: Optional[gatt_client.CharacteristicProxy] = None
-    playback_speed: Optional[gatt_client.CharacteristicProxy] = None
-    seeking_speed: Optional[gatt_client.CharacteristicProxy] = None
-    current_track_segments_object_id: Optional[gatt_client.CharacteristicProxy] = None
-    current_track_object_id: Optional[gatt_client.CharacteristicProxy] = None
-    next_track_object_id: Optional[gatt_client.CharacteristicProxy] = None
-    parent_group_object_id: Optional[gatt_client.CharacteristicProxy] = None
-    current_group_object_id: Optional[gatt_client.CharacteristicProxy] = None
-    playing_order: Optional[gatt_client.CharacteristicProxy] = None
-    playing_orders_supported: Optional[gatt_client.CharacteristicProxy] = None
-    media_state: Optional[gatt_client.CharacteristicProxy] = None
-    media_control_point: Optional[gatt_client.CharacteristicProxy] = None
-    media_control_point_opcodes_supported: Optional[gatt_client.CharacteristicProxy] = (
-        None
-    )
-    search_control_point: Optional[gatt_client.CharacteristicProxy] = None
-    search_results_object_id: Optional[gatt_client.CharacteristicProxy] = None
-    content_control_id: Optional[gatt_client.CharacteristicProxy] = None
+    media_player_name: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    media_player_icon_object_id: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    media_player_icon_url: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    track_changed: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    track_title: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    track_duration: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    track_position: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    playback_speed: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    seeking_speed: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    current_track_segments_object_id: Optional[
+        gatt_client.CharacteristicProxy[bytes]
+    ] = None
+    current_track_object_id: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    next_track_object_id: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    parent_group_object_id: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    current_group_object_id: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    playing_order: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    playing_orders_supported: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    media_state: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    media_control_point: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    media_control_point_opcodes_supported: Optional[
+        gatt_client.CharacteristicProxy[bytes]
+    ] = None
+    search_control_point: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    search_results_object_id: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    content_control_id: Optional[gatt_client.CharacteristicProxy[bytes]] = None
 
     if TYPE_CHECKING:
         media_control_point_notifications: asyncio.Queue[bytes]
