@@ -5669,7 +5669,9 @@ class Device(utils.CompositeEventEmitter):
 
         # Show the passkey to the user
         utils.cancel_on_event(
-            connection, 'disconnection', pairing_config.delegate.display_number(passkey)
+            connection,
+            'disconnection',
+            pairing_config.delegate.display_number(passkey, digits=6)
         )
 
     # [Classic only]
