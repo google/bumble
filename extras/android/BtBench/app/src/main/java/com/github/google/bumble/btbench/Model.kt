@@ -27,8 +27,8 @@ val DEFAULT_RFCOMM_UUID: UUID = UUID.fromString("E6D55659-C8B4-4B85-96BB-B1143AF
 const val DEFAULT_PEER_BLUETOOTH_ADDRESS = "AA:BB:CC:DD:EE:FF"
 const val DEFAULT_STARTUP_DELAY = 3000
 const val DEFAULT_SENDER_PACKET_COUNT = 100
-const val DEFAULT_SENDER_PACKET_SIZE = 1024
-const val DEFAULT_SENDER_PACKET_INTERVAL = 100
+const val DEFAULT_SENDER_PACKET_SIZE = 970 // 970 is a value that works well on Android.
+const val DEFAULT_SENDER_PACKET_INTERVAL = 0
 const val DEFAULT_PSM = 128
 
 const val L2CAP_CLIENT_MODE = "L2CAP Client"
@@ -192,7 +192,6 @@ class AppViewModel : ViewModel() {
         } else if (senderPacketSizeSlider < 0.5F) {
             512
         } else if (senderPacketSizeSlider < 0.7F) {
-            // 970 is a value that works well on Android.
             970
         } else if (senderPacketSizeSlider < 0.9F) {
             2048
