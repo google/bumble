@@ -1291,8 +1291,10 @@ class Central(Connection.Listener):
             logging.info(color('### Connected', 'cyan'))
             self.connection.listener = self
             print_connection(self.connection)
-            phy = await self.connection.get_phy()
-            print_connection_phy(phy)
+
+            if not self.classic:
+                phy = await self.connection.get_phy()
+                print_connection_phy(phy)
 
             # Switch roles if needed.
             if self.role_switch:

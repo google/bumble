@@ -381,7 +381,7 @@ fun MainView(
                     label = {
                         Text(text = "Packet Interval (ms)")
                     },
-                    value = appViewModel.senderPacketInterval.toString(),
+                    value = (if (appViewModel.senderPacketInterval != 0) appViewModel.senderPacketInterval else "").toString(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
@@ -389,7 +389,9 @@ fun MainView(
                         keyboardType = KeyboardType.Number, imeAction = ImeAction.Done
                     ),
                     onValueChange = {
-                        if (it.isNotEmpty()) {
+                        if (it.isEmpty()) {
+                            appViewModel.updateSenderPacketInterval(0)
+                        } else {
                             val interval = it.toIntOrNull()
                             if (interval != null) {
                                 appViewModel.updateSenderPacketInterval(interval)
