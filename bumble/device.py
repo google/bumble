@@ -581,6 +581,12 @@ class AdvertisingSet(utils.EventEmitter):
     enabled: bool = False
     periodic_enabled: bool = False
 
+    EVENT_START = "start"
+    EVENT_STOP = "stop"
+    EVENT_START_PERIODIC = "start_periodic"
+    EVENT_STOP_PERIODIC = "stop_periodic"
+    EVENT_TERMINATION = "termination"
+
     def __post_init__(self) -> None:
         super().__init__()
 
@@ -731,7 +737,7 @@ class AdvertisingSet(utils.EventEmitter):
         )
         self.enabled = True
 
-        self.emit('start')
+        self.emit(self.EVENT_START)
 
     async def stop(self) -> None:
         await self.device.send_command(
@@ -745,7 +751,7 @@ class AdvertisingSet(utils.EventEmitter):
         )
         self.enabled = False
 
-        self.emit('stop')
+        self.emit(self.EVENT_STOP)
 
     async def start_periodic(self, include_adi: bool = False) -> None:
         if self.periodic_enabled:
@@ -759,7 +765,7 @@ class AdvertisingSet(utils.EventEmitter):
         )
         self.periodic_enabled = True
 
-        self.emit('start_periodic')
+        self.emit(self.EVENT_START_PERIODIC)
 
     async def stop_periodic(self) -> None:
         if not self.periodic_enabled:
@@ -773,7 +779,7 @@ class AdvertisingSet(utils.EventEmitter):
         )
         self.periodic_enabled = False
 
-        self.emit('stop_periodic')
+        self.emit(self.EVENT_STOP_PERIODIC)
 
     async def remove(self) -> None:
         await self.device.send_command(
@@ -797,7 +803,7 @@ class AdvertisingSet(utils.EventEmitter):
 
     def on_termination(self, status: int) -> None:
         self.enabled = False
-        self.emit('termination', status)
+        self.emit(self.EVENT_TERMINATION, status)
 
 
 # -----------------------------------------------------------------------------
@@ -822,6 +828,14 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
     advertiser_phy: int
     periodic_advertising_interval: int
     advertiser_clock_accuracy: int
+
+    EVENT_STATE_CHANGE = "state_change"
+    EVENT_ESTABLISHMENT = "establishment"
+    EVENT_CANCELLATION = "cancellation"
+    EVENT_ERROR = "error"
+    EVENT_LOSS = "loss"
+    EVENT_PERIODIC_ADVERTISEMENT = "periodic_advertisement"
+    EVENT_BIGINFO_ADVERTISEMENT = "biginfo_advertisement"
 
     def __init__(
         self,
@@ -855,7 +869,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
     def state(self, state: State) -> None:
         logger.debug(f'{self} -> {state.name}')
         self._state = state
-        self.emit('state_change')
+        self.emit(self.EVENT_STATE_CHANGE)
 
     async def establish(self) -> None:
         if self.state != self.State.INIT:
@@ -939,7 +953,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
             self.periodic_advertising_interval = periodic_advertising_interval
             self.advertiser_clock_accuracy = advertiser_clock_accuracy
             self.state = self.State.ESTABLISHED
-            self.emit('establishment')
+            self.emit(self.EVENT_ESTABLISHMENT)
             return
 
         # We don't need to keep a reference anymore
@@ -948,15 +962,15 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
 
         if status == hci.HCI_OPERATION_CANCELLED_BY_HOST_ERROR:
             self.state = self.State.CANCELLED
-            self.emit('cancellation')
+            self.emit(self.EVENT_CANCELLATION)
             return
 
         self.state = self.State.ERROR
-        self.emit('error')
+        self.emit(self.EVENT_ERROR)
 
     def on_loss(self):
         self.state = self.State.LOST
-        self.emit('loss')
+        self.emit(self.EVENT_LOSS)
 
     def on_periodic_advertising_report(self, report) -> None:
         self.data_accumulator += report.data
@@ -967,7 +981,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
             return
 
         self.emit(
-            'periodic_advertisement',
+            self.EVENT_PERIODIC_ADVERTISEMENT,
             PeriodicAdvertisement(
                 self.advertiser_address,
                 self.sid,
@@ -984,7 +998,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
 
     def on_biginfo_advertising_report(self, report) -> None:
         self.emit(
-            'biginfo_advertisement',
+            self.EVENT_BIGINFO_ADVERTISEMENT,
             BIGInfoAdvertisement.from_report(self.advertiser_address, self.sid, report),
         )
 
@@ -1222,7 +1236,7 @@ class Peer:
 
     async def request_mtu(self, mtu: int) -> int:
         mtu = await self.gatt_client.request_mtu(mtu)
-        self.connection.emit('connection_att_mtu_update')
+        self.connection.emit(self.connection.EVENT_CONNECTION_ATT_MTU_UPDATE)
         return mtu
 
     async def discover_service(
@@ -1390,6 +1404,9 @@ class ScoLink(utils.CompositeEventEmitter):
     link_type: int
     sink: Optional[Callable[[hci.HCI_SynchronousDataPacket], Any]] = None
 
+    EVENT_DISCONNECTION: ClassVar[str] = "disconnection"
+    EVENT_DISCONNECTION_FAILURE: ClassVar[str] = "disconnection_failure"
+
     def __post_init__(self) -> None:
         super().__init__()
 
@@ -1487,6 +1504,11 @@ class CisLink(utils.EventEmitter, _IsoLink):
     state: State = State.PENDING
     sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
 
+    EVENT_DISCONNECTION: ClassVar[str] = "disconnection"
+    EVENT_DISCONNECTION_FAILURE: ClassVar[str] = "disconnection_failure"
+    EVENT_ESTABLISHMENT: ClassVar[str] = "establishment"
+    EVENT_ESTABLISHMENT_FAILURE: ClassVar[str] = "establishment_failure"
+
     def __post_init__(self) -> None:
         super().__init__()
 
@@ -1570,6 +1592,40 @@ class Connection(utils.CompositeEventEmitter):
     pairing_peer_authentication_requirements: Optional[int]
     cs_configs: dict[int, ChannelSoundingConfig]  # Config ID to Configuration
     cs_procedures: dict[int, ChannelSoundingProcedure]  # Config ID to Procedures
+
+    EVENT_CONNECTION_ATT_MTU_UPDATE = "connection_att_mtu_update"
+    EVENT_DISCONNECTION = "disconnection"
+    EVENT_DISCONNECTION_FAILURE = "disconnection_failure"
+    EVENT_CONNECTION_AUTHENTICATION = "connection_authentication"
+    EVENT_CONNECTION_AUTHENTICATION_FAILURE = "connection_authentication_failure"
+    EVENT_REMOTE_NAME = "remote_name"
+    EVENT_REMOTE_NAME_FAILURE = "remote_name_failure"
+    EVENT_CONNECTION_ENCRYPTION_CHANGE = "connection_encryption_change"
+    EVENT_CONNECTION_ENCRYPTION_FAILURE = "connection_encryption_failure"
+    EVENT_CONNECTION_ENCRYPTION_KEY_REFRESH = "connection_encryption_key_refresh"
+    EVENT_CONNECTION_PARAMETERS_UPDATE = "connection_parameters_update"
+    EVENT_CONNECTION_PARAMETERS_UPDATE_FAILURE = "connection_parameters_update_failure"
+    EVENT_CONNECTION_PHY_UPDATE = "connection_phy_update"
+    EVENT_CONNECTION_PHY_UPDATE_FAILURE = "connection_phy_update_failure"
+    EVENT_CONNECTION_ATT_MTU_UPDATE = "connection_att_mtu_update"
+    EVENT_CONNECTION_DATA_LENGTH_CHANGE = "connection_data_length_change"
+    EVENT_CHANNEL_SOUNDING_CAPABILITIES_FAILURE = (
+        "channel_sounding_capabilities_failure"
+    )
+    EVENT_CHANNEL_SOUNDING_CAPABILITIES = "channel_sounding_capabilities"
+    EVENT_CHANNEL_SOUNDING_CONFIG_FAILURE = "channel_sounding_config_failure"
+    EVENT_CHANNEL_SOUNDING_CONFIG = "channel_sounding_config"
+    EVENT_CHANNEL_SOUNDING_CONFIG_REMOVED = "channel_sounding_config_removed"
+    EVENT_CHANNEL_SOUNDING_PROCEDURE_FAILURE = "channel_sounding_procedure_failure"
+    EVENT_CHANNEL_SOUNDING_PROCEDURE = "channel_sounding_procedure"
+    EVENT_ROLE_CHANGE = "role_change"
+    EVENT_ROLE_CHANGE_FAILURE = "role_change_failure"
+    EVENT_CLASSIC_PAIRING = "classic_pairing"
+    EVENT_CLASSIC_PAIRING_FAILURE = "classic_pairing_failure"
+    EVENT_PAIRING_START = "pairing_start"
+    EVENT_PAIRING = "pairing"
+    EVENT_PAIRING_FAILURE = "pairing_failure"
+    EVENT_SECURITY_REQUEST = "security_request"
 
     @utils.composite_listener
     class Listener:
@@ -1740,16 +1796,16 @@ class Connection(utils.CompositeEventEmitter):
         """Idles the current task waiting for a disconnect or timeout"""
 
         abort = asyncio.get_running_loop().create_future()
-        self.on('disconnection', abort.set_result)
-        self.on('disconnection_failure', abort.set_exception)
+        self.on(self.EVENT_DISCONNECTION, abort.set_result)
+        self.on(self.EVENT_DISCONNECTION_FAILURE, abort.set_exception)
 
         try:
             await asyncio.wait_for(
                 utils.cancel_on_event(self.device, 'flush', abort), timeout
             )
         finally:
-            self.remove_listener('disconnection', abort.set_result)
-            self.remove_listener('disconnection_failure', abort.set_exception)
+            self.remove_listener(self.EVENT_DISCONNECTION, abort.set_result)
+            self.remove_listener(self.EVENT_DISCONNECTION_FAILURE, abort.set_exception)
 
     async def set_data_length(self, tx_octets, tx_time) -> None:
         return await self.device.set_data_length(self, tx_octets, tx_time)
@@ -2061,6 +2117,26 @@ class Device(utils.CompositeEventEmitter):
     big_syncs: dict[int, BigSync]
     _pending_cis: Dict[int, tuple[int, int]]
     gatt_service: gatt_service.GenericAttributeProfileService | None = None
+
+    EVENT_ADVERTISEMENT = "advertisement"
+    EVENT_PERIODIC_ADVERTISING_SYNC_TRANSFER = "periodic_advertising_sync_transfer"
+    EVENT_KEY_STORE_UPDATE = "key_store_update"
+    EVENT_FLUSH = "flush"
+    EVENT_CONNECTION = "connection"
+    EVENT_CONNECTION_FAILURE = "connection_failure"
+    EVENT_SCO_REQUEST = "sco_request"
+    EVENT_INQUIRY_COMPLETE = "inquiry_complete"
+    EVENT_REMOTE_NAME = "remote_name"
+    EVENT_REMOTE_NAME_FAILURE = "remote_name_failure"
+    EVENT_SCO_CONNECTION = "sco_connection"
+    EVENT_SCO_CONNECTION_FAILURE = "sco_connection_failure"
+    EVENT_CIS_REQUEST = "cis_request"
+    EVENT_CIS_ESTABLISHMENT = "cis_establishment"
+    EVENT_CIS_ESTABLISHMENT_FAILURE = "cis_establishment_failure"
+    EVENT_ROLE_CHANGE_FAILURE = "role_change_failure"
+    EVENT_INQUIRY_RESULT = "inquiry_result"
+    EVENT_REMOTE_NAME = "remote_name"
+    EVENT_REMOTE_NAME_FAILURE = "remote_name_failure"
 
     @utils.composite_listener
     class Listener:
@@ -3149,7 +3225,7 @@ class Device(utils.CompositeEventEmitter):
             accumulator = AdvertisementDataAccumulator(passive=self.scanning_is_passive)
             self.advertisement_accumulators[report.address] = accumulator
         if advertisement := accumulator.update(report):
-            self.emit('advertisement', advertisement)
+            self.emit(self.EVENT_ADVERTISEMENT, advertisement)
 
     async def create_periodic_advertising_sync(
         self,
@@ -3273,7 +3349,7 @@ class Device(utils.CompositeEventEmitter):
             periodic_advertising_interval=periodic_advertising_interval,
             advertiser_clock_accuracy=advertiser_clock_accuracy,
         )
-        self.emit('periodic_advertising_sync_transfer', pa_sync, connection)
+        self.emit(self.EVENT_PERIODIC_ADVERTISING_SYNC_TRANSFER, pa_sync, connection)
 
     @host_event_handler
     @with_periodic_advertising_sync_from_handle
@@ -3331,7 +3407,7 @@ class Device(utils.CompositeEventEmitter):
     @host_event_handler
     def on_inquiry_result(self, address, class_of_device, data, rssi):
         self.emit(
-            'inquiry_result',
+            self.EVENT_INQUIRY_RESULT,
             address,
             class_of_device,
             AdvertisingData.from_bytes(data),
@@ -3508,8 +3584,8 @@ class Device(utils.CompositeEventEmitter):
 
         # Create a future so that we can wait for the connection's result
         pending_connection = asyncio.get_running_loop().create_future()
-        self.on('connection', on_connection)
-        self.on('connection_failure', on_connection_failure)
+        self.on(self.EVENT_CONNECTION, on_connection)
+        self.on(self.EVENT_CONNECTION_FAILURE, on_connection_failure)
 
         try:
             # Tell the controller to connect
@@ -3685,8 +3761,8 @@ class Device(utils.CompositeEventEmitter):
                 except core.ConnectionError as error:
                     raise core.TimeoutError() from error
         finally:
-            self.remove_listener('connection', on_connection)
-            self.remove_listener('connection_failure', on_connection_failure)
+            self.remove_listener(self.EVENT_CONNECTION, on_connection)
+            self.remove_listener(self.EVENT_CONNECTION_FAILURE, on_connection_failure)
             if transport == PhysicalTransport.LE:
                 self.le_connecting = False
                 self.connect_own_address_type = None
@@ -3779,8 +3855,8 @@ class Device(utils.CompositeEventEmitter):
             ):
                 pending_connection.set_exception(error)
 
-        self.on('connection', on_connection)
-        self.on('connection_failure', on_connection_failure)
+        self.on(self.EVENT_CONNECTION, on_connection)
+        self.on(self.EVENT_CONNECTION_FAILURE, on_connection_failure)
 
         # Save pending connection, with the Peripheral hci.role.
         # Even if we requested a role switch in the hci.HCI_Accept_Connection_Request
@@ -3802,8 +3878,8 @@ class Device(utils.CompositeEventEmitter):
             return await utils.cancel_on_event(self, 'flush', pending_connection)
 
         finally:
-            self.remove_listener('connection', on_connection)
-            self.remove_listener('connection_failure', on_connection_failure)
+            self.remove_listener(self.EVENT_CONNECTION, on_connection)
+            self.remove_listener(self.EVENT_CONNECTION_FAILURE, on_connection_failure)
             self.pending_connections.pop(peer_address, None)
 
     @asynccontextmanager
@@ -3857,8 +3933,10 @@ class Device(utils.CompositeEventEmitter):
     ) -> None:
         # Create a future so that we can wait for the disconnection's result
         pending_disconnection = asyncio.get_running_loop().create_future()
-        connection.on('disconnection', pending_disconnection.set_result)
-        connection.on('disconnection_failure', pending_disconnection.set_exception)
+        connection.on(connection.EVENT_DISCONNECTION, pending_disconnection.set_result)
+        connection.on(
+            connection.EVENT_DISCONNECTION_FAILURE, pending_disconnection.set_exception
+        )
 
         # Request a disconnection
         result = await self.send_command(
@@ -3876,10 +3954,11 @@ class Device(utils.CompositeEventEmitter):
             return await utils.cancel_on_event(self, 'flush', pending_disconnection)
         finally:
             connection.remove_listener(
-                'disconnection', pending_disconnection.set_result
+                connection.EVENT_DISCONNECTION, pending_disconnection.set_result
             )
             connection.remove_listener(
-                'disconnection_failure', pending_disconnection.set_exception
+                connection.EVENT_DISCONNECTION_FAILURE,
+                pending_disconnection.set_exception,
             )
             self.disconnecting = False
 
@@ -4198,7 +4277,7 @@ class Device(utils.CompositeEventEmitter):
         return keys.link_key.value
 
     # [Classic only]
-    async def authenticate(self, connection):
+    async def authenticate(self, connection: Connection) -> None:
         # Set up event handlers
         pending_authentication = asyncio.get_running_loop().create_future()
 
@@ -4208,8 +4287,11 @@ class Device(utils.CompositeEventEmitter):
         def on_authentication_failure(error_code):
             pending_authentication.set_exception(hci.HCI_Error(error_code))
 
-        connection.on('connection_authentication', on_authentication)
-        connection.on('connection_authentication_failure', on_authentication_failure)
+        connection.on(connection.EVENT_CONNECTION_AUTHENTICATION, on_authentication)
+        connection.on(
+            connection.EVENT_CONNECTION_AUTHENTICATION_FAILURE,
+            on_authentication_failure,
+        )
 
         # Request the authentication
         try:
@@ -4230,9 +4312,12 @@ class Device(utils.CompositeEventEmitter):
                 connection, 'disconnection', pending_authentication
             )
         finally:
-            connection.remove_listener('connection_authentication', on_authentication)
             connection.remove_listener(
-                'connection_authentication_failure', on_authentication_failure
+                connection.EVENT_CONNECTION_AUTHENTICATION, on_authentication
+            )
+            connection.remove_listener(
+                connection.EVENT_CONNECTION_AUTHENTICATION_FAILURE,
+                on_authentication_failure,
             )
 
     async def encrypt(self, connection, enable=True):
@@ -4248,8 +4333,12 @@ class Device(utils.CompositeEventEmitter):
         def on_encryption_failure(error_code):
             pending_encryption.set_exception(hci.HCI_Error(error_code))
 
-        connection.on('connection_encryption_change', on_encryption_change)
-        connection.on('connection_encryption_failure', on_encryption_failure)
+        connection.on(
+            connection.EVENT_CONNECTION_ENCRYPTION_CHANGE, on_encryption_change
+        )
+        connection.on(
+            connection.EVENT_CONNECTION_ENCRYPTION_FAILURE, on_encryption_failure
+        )
 
         # Request the encryption
         try:
@@ -4311,10 +4400,10 @@ class Device(utils.CompositeEventEmitter):
             await utils.cancel_on_event(connection, 'disconnection', pending_encryption)
         finally:
             connection.remove_listener(
-                'connection_encryption_change', on_encryption_change
+                connection.EVENT_CONNECTION_ENCRYPTION_CHANGE, on_encryption_change
             )
             connection.remove_listener(
-                'connection_encryption_failure', on_encryption_failure
+                connection.EVENT_CONNECTION_ENCRYPTION_FAILURE, on_encryption_failure
             )
 
     async def update_keys(self, address: str, keys: PairingKeys) -> None:
@@ -4327,7 +4416,7 @@ class Device(utils.CompositeEventEmitter):
         except Exception as error:
             logger.warning(f'!!! error while storing keys: {error}')
         else:
-            self.emit('key_store_update')
+            self.emit(self.EVENT_KEY_STORE_UPDATE)
 
     # [Classic only]
     async def switch_role(self, connection: Connection, role: hci.Role):
@@ -4339,8 +4428,8 @@ class Device(utils.CompositeEventEmitter):
         def on_role_change_failure(error_code):
             pending_role_change.set_exception(hci.HCI_Error(error_code))
 
-        connection.on('role_change', on_role_change)
-        connection.on('role_change_failure', on_role_change_failure)
+        connection.on(connection.EVENT_ROLE_CHANGE, on_role_change)
+        connection.on(connection.EVENT_ROLE_CHANGE_FAILURE, on_role_change_failure)
 
         try:
             result = await self.send_command(
@@ -4356,8 +4445,10 @@ class Device(utils.CompositeEventEmitter):
                 connection, 'disconnection', pending_role_change
             )
         finally:
-            connection.remove_listener('role_change', on_role_change)
-            connection.remove_listener('role_change_failure', on_role_change_failure)
+            connection.remove_listener(connection.EVENT_ROLE_CHANGE, on_role_change)
+            connection.remove_listener(
+                connection.EVENT_ROLE_CHANGE_FAILURE, on_role_change_failure
+            )
 
     # [Classic only]
     async def request_remote_name(self, remote: Union[hci.Address, Connection]) -> str:
@@ -4369,7 +4460,7 @@ class Device(utils.CompositeEventEmitter):
         )
 
         handler = self.on(
-            'remote_name',
+            self.EVENT_REMOTE_NAME,
             lambda address, remote_name: (
                 pending_name.set_result(remote_name)
                 if address == peer_address
@@ -4377,7 +4468,7 @@ class Device(utils.CompositeEventEmitter):
             ),
         )
         failure_handler = self.on(
-            'remote_name_failure',
+            self.EVENT_REMOTE_NAME_FAILURE,
             lambda address, error_code: (
                 pending_name.set_exception(hci.HCI_Error(error_code))
                 if address == peer_address
@@ -4405,8 +4496,8 @@ class Device(utils.CompositeEventEmitter):
             # Wait for the result
             return await utils.cancel_on_event(self, 'flush', pending_name)
         finally:
-            self.remove_listener('remote_name', handler)
-            self.remove_listener('remote_name_failure', failure_handler)
+            self.remove_listener(self.EVENT_REMOTE_NAME, handler)
+            self.remove_listener(self.EVENT_REMOTE_NAME_FAILURE, failure_handler)
 
     # [LE only]
     @utils.experimental('Only for testing.')
@@ -4497,8 +4588,10 @@ class Device(utils.CompositeEventEmitter):
                 if pending_future := pending_cis_establishments.get(cis_handle):
                     pending_future.set_exception(hci.HCI_Error(status))
 
-            watcher.on(self, 'cis_establishment', on_cis_establishment)
-            watcher.on(self, 'cis_establishment_failure', on_cis_establishment_failure)
+            watcher.on(self, self.EVENT_CIS_ESTABLISHMENT, on_cis_establishment)
+            watcher.on(
+                self, self.EVENT_CIS_ESTABLISHMENT_FAILURE, on_cis_establishment_failure
+            )
             await self.send_command(
                 hci.HCI_LE_Create_CIS_Command(
                     cis_connection_handle=[p[0] for p in cis_acl_pairs],
@@ -4541,8 +4634,12 @@ class Device(utils.CompositeEventEmitter):
                 def on_establishment_failure(status: int) -> None:
                     pending_establishment.set_exception(hci.HCI_Error(status))
 
-                watcher.on(cis_link, 'establishment', on_establishment)
-                watcher.on(cis_link, 'establishment_failure', on_establishment_failure)
+                watcher.on(cis_link, cis_link.EVENT_ESTABLISHMENT, on_establishment)
+                watcher.on(
+                    cis_link,
+                    cis_link.EVENT_ESTABLISHMENT_FAILURE,
+                    on_establishment_failure,
+                )
 
                 await self.send_command(
                     hci.HCI_LE_Accept_CIS_Request_Command(connection_handle=handle),
@@ -4910,9 +5007,9 @@ class Device(utils.CompositeEventEmitter):
 
     @host_event_handler
     def on_flush(self):
-        self.emit('flush')
+        self.emit(self.EVENT_FLUSH)
         for _, connection in self.connections.items():
-            connection.emit('disconnection', 0)
+            connection.emit(connection.EVENT_DISCONNECTION, 0)
         self.connections = {}
 
     # [Classic only]
@@ -5203,7 +5300,7 @@ class Device(utils.CompositeEventEmitter):
                 lambda _: utils.cancel_on_event(self, 'flush', advertising_set.start()),
             )
 
-        self.emit('connection', connection)
+        self.emit(self.EVENT_CONNECTION, connection)
 
     @host_event_handler
     def on_connection(
@@ -5241,7 +5338,7 @@ class Device(utils.CompositeEventEmitter):
             self.connections[connection_handle] = connection
 
             # Emit an event to notify listeners of the new connection
-            self.emit('connection', connection)
+            self.emit(self.EVENT_CONNECTION, connection)
 
             return
 
@@ -5316,7 +5413,7 @@ class Device(utils.CompositeEventEmitter):
 
         if role == hci.Role.CENTRAL or not self.supports_le_extended_advertising:
             # We can emit now, we have all the info we need
-            self.emit('connection', connection)
+            self.emit(self.EVENT_CONNECTION, connection)
             return
 
         if role == hci.Role.PERIPHERAL and self.supports_le_extended_advertising:
@@ -5350,7 +5447,7 @@ class Device(utils.CompositeEventEmitter):
             'hci',
             hci.HCI_Constant.error_name(error_code),
         )
-        self.emit('connection_failure', error)
+        self.emit(self.EVENT_CONNECTION_FAILURE, error)
 
     # FIXME: Explore a delegate-model for BR/EDR wait connection #56.
     @host_event_handler
@@ -5365,7 +5462,7 @@ class Device(utils.CompositeEventEmitter):
             if connection := self.find_connection_by_bd_addr(
                 bd_addr, transport=PhysicalTransport.BR_EDR
             ):
-                self.emit('sco_request', connection, link_type)
+                self.emit(self.EVENT_SCO_REQUEST, connection, link_type)
             else:
                 logger.error(f'SCO request from a non-connected device {bd_addr}')
             return
@@ -5409,14 +5506,14 @@ class Device(utils.CompositeEventEmitter):
                 f'*** Disconnection: [0x{connection.handle:04X}] '
                 f'{connection.peer_address} as {connection.role_name}, reason={reason}'
             )
-            connection.emit('disconnection', reason)
+            connection.emit(connection.EVENT_DISCONNECTION, reason)
 
             # Cleanup subsystems that maintain per-connection state
             self.gatt_server.on_disconnection(connection)
         elif sco_link := self.sco_links.pop(connection_handle, None):
-            sco_link.emit('disconnection', reason)
+            sco_link.emit(sco_link.EVENT_DISCONNECTION, reason)
         elif cis_link := self.cis_links.pop(connection_handle, None):
-            cis_link.emit('disconnection', reason)
+            cis_link.emit(cis_link.EVENT_DISCONNECTION, reason)
         else:
             logger.error(
                 f'*** Unknown disconnection handle=0x{connection_handle}, reason={reason} ***'
@@ -5424,7 +5521,7 @@ class Device(utils.CompositeEventEmitter):
 
     @host_event_handler
     @with_connection_from_handle
-    def on_disconnection_failure(self, connection, error_code):
+    def on_disconnection_failure(self, connection: Connection, error_code: int):
         logger.debug(f'*** Disconnection failed: {error_code}')
         error = core.ConnectionError(
             error_code,
@@ -5433,7 +5530,7 @@ class Device(utils.CompositeEventEmitter):
             'hci',
             hci.HCI_Constant.error_name(error_code),
         )
-        connection.emit('disconnection_failure', error)
+        connection.emit(connection.EVENT_DISCONNECTION_FAILURE, error)
 
     @host_event_handler
     @utils.AsyncRunner.run_in_task()
@@ -5444,7 +5541,7 @@ class Device(utils.CompositeEventEmitter):
         else:
             self.auto_restart_inquiry = True
             self.discovering = False
-            self.emit('inquiry_complete')
+            self.emit(self.EVENT_INQUIRY_COMPLETE)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5454,7 +5551,7 @@ class Device(utils.CompositeEventEmitter):
             f'{connection.peer_address} as {connection.role_name}'
         )
         connection.authenticated = True
-        connection.emit('connection_authentication')
+        connection.emit(connection.EVENT_CONNECTION_AUTHENTICATION)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5463,7 +5560,7 @@ class Device(utils.CompositeEventEmitter):
             f'*** Connection Authentication Failure: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}, error={error}'
         )
-        connection.emit('connection_authentication_failure', error)
+        connection.emit(connection.EVENT_CONNECTION_AUTHENTICATION_FAILURE, error)
 
     # [Classic only]
     @host_event_handler
@@ -5681,22 +5778,22 @@ class Device(utils.CompositeEventEmitter):
             remote_name = remote_name.decode('utf-8')
             if connection:
                 connection.peer_name = remote_name
-                connection.emit('remote_name')
-            self.emit('remote_name', address, remote_name)
+                connection.emit(connection.EVENT_REMOTE_NAME)
+            self.emit(self.EVENT_REMOTE_NAME, address, remote_name)
         except UnicodeDecodeError as error:
             logger.warning('peer name is not valid UTF-8')
             if connection:
-                connection.emit('remote_name_failure', error)
+                connection.emit(connection.EVENT_REMOTE_NAME_FAILURE, error)
             else:
-                self.emit('remote_name_failure', address, error)
+                self.emit(self.EVENT_REMOTE_NAME_FAILURE, address, error)
 
     # [Classic only]
     @host_event_handler
     @try_with_connection_from_address
     def on_remote_name_failure(self, connection: Connection, address, error):
         if connection:
-            connection.emit('remote_name_failure', error)
-        self.emit('remote_name_failure', address, error)
+            connection.emit(connection.EVENT_REMOTE_NAME_FAILURE, error)
+        self.emit(self.EVENT_REMOTE_NAME_FAILURE, address, error)
 
     # [Classic only]
     @host_event_handler
@@ -5716,7 +5813,7 @@ class Device(utils.CompositeEventEmitter):
             handle=sco_handle,
             link_type=link_type,
         )
-        self.emit('sco_connection', sco_link)
+        self.emit(self.EVENT_SCO_CONNECTION, sco_link)
 
     # [Classic only]
     @host_event_handler
@@ -5726,7 +5823,7 @@ class Device(utils.CompositeEventEmitter):
         self, acl_connection: Connection, status: int
     ) -> None:
         logger.debug(f'*** SCO connection failure: {acl_connection.peer_address}***')
-        self.emit('sco_connection_failure')
+        self.emit(self.EVENT_SCO_CONNECTION_FAILURE)
 
     # [Classic only]
     @host_event_handler
@@ -5763,7 +5860,7 @@ class Device(utils.CompositeEventEmitter):
             cig_id=cig_id,
             cis_id=cis_id,
         )
-        self.emit('cis_request', acl_connection, cis_handle, cig_id, cis_id)
+        self.emit(self.EVENT_CIS_REQUEST, acl_connection, cis_handle, cig_id, cis_id)
 
     # [LE only]
     @host_event_handler
@@ -5782,8 +5879,8 @@ class Device(utils.CompositeEventEmitter):
             f'cis_id=[0x{cis_link.cis_id:02X}] ***'
         )
 
-        cis_link.emit('establishment')
-        self.emit('cis_establishment', cis_link)
+        cis_link.emit(cis_link.EVENT_ESTABLISHMENT)
+        self.emit(self.EVENT_CIS_ESTABLISHMENT, cis_link)
 
     # [LE only]
     @host_event_handler
@@ -5791,8 +5888,8 @@ class Device(utils.CompositeEventEmitter):
     def on_cis_establishment_failure(self, cis_handle: int, status: int) -> None:
         logger.debug(f'*** CIS Establishment Failure: cis=[0x{cis_handle:04X}] ***')
         if cis_link := self.cis_links.pop(cis_handle):
-            cis_link.emit('establishment_failure', status)
-        self.emit('cis_establishment_failure', cis_handle, status)
+            cis_link.emit(cis_link.EVENT_ESTABLISHMENT_FAILURE, status)
+        self.emit(self.EVENT_CIS_ESTABLISHMENT_FAILURE, cis_handle, status)
 
     # [LE only]
     @host_event_handler
@@ -5826,7 +5923,7 @@ class Device(utils.CompositeEventEmitter):
         ):
             connection.authenticated = True
             connection.sc = True
-        connection.emit('connection_encryption_change')
+        connection.emit(connection.EVENT_CONNECTION_ENCRYPTION_CHANGE)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5836,7 +5933,7 @@ class Device(utils.CompositeEventEmitter):
             f'{connection.peer_address} as {connection.role_name}, '
             f'error={error}'
         )
-        connection.emit('connection_encryption_failure', error)
+        connection.emit(connection.EVENT_CONNECTION_ENCRYPTION_FAILURE, error)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5845,7 +5942,7 @@ class Device(utils.CompositeEventEmitter):
             f'*** Connection Key Refresh: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}'
         )
-        connection.emit('connection_encryption_key_refresh')
+        connection.emit(connection.EVENT_CONNECTION_ENCRYPTION_KEY_REFRESH)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5856,7 +5953,7 @@ class Device(utils.CompositeEventEmitter):
             f'{connection_parameters}'
         )
         connection.parameters = connection_parameters
-        connection.emit('connection_parameters_update')
+        connection.emit(connection.EVENT_CONNECTION_PARAMETERS_UPDATE)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5866,7 +5963,7 @@ class Device(utils.CompositeEventEmitter):
             f'{connection.peer_address} as {connection.role_name}, '
             f'error={error}'
         )
-        connection.emit('connection_parameters_update_failure', error)
+        connection.emit(connection.EVENT_CONNECTION_PARAMETERS_UPDATE_FAILURE, error)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5876,7 +5973,7 @@ class Device(utils.CompositeEventEmitter):
             f'{connection.peer_address} as {connection.role_name}, '
             f'{phy}'
         )
-        connection.emit('connection_phy_update', phy)
+        connection.emit(connection.EVENT_CONNECTION_PHY_UPDATE, phy)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5886,7 +5983,7 @@ class Device(utils.CompositeEventEmitter):
             f'{connection.peer_address} as {connection.role_name}, '
             f'error={error}'
         )
-        connection.emit('connection_phy_update_failure', error)
+        connection.emit(connection.EVENT_CONNECTION_PHY_UPDATE_FAILURE, error)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5897,7 +5994,7 @@ class Device(utils.CompositeEventEmitter):
             f'{att_mtu}'
         )
         connection.att_mtu = att_mtu
-        connection.emit('connection_att_mtu_update')
+        connection.emit(connection.EVENT_CONNECTION_ATT_MTU_UPDATE)
 
     @host_event_handler
     @with_connection_from_handle
@@ -5914,7 +6011,7 @@ class Device(utils.CompositeEventEmitter):
             max_rx_octets,
             max_rx_time,
         )
-        connection.emit('connection_data_length_change')
+        connection.emit(connection.EVENT_CONNECTION_DATA_LENGTH_CHANGE)
 
     @host_event_handler
     def on_cs_remote_supported_capabilities(
@@ -5924,7 +6021,9 @@ class Device(utils.CompositeEventEmitter):
             return
 
         if event.status != hci.HCI_SUCCESS:
-            connection.emit('channel_sounding_capabilities_failure', event.status)
+            connection.emit(
+                connection.EVENT_CHANNEL_SOUNDING_CAPABILITIES_FAILURE, event.status
+            )
             return
 
         capabilities = ChannelSoundingCapabilities(
@@ -5949,7 +6048,7 @@ class Device(utils.CompositeEventEmitter):
             t_sw_time_supported=event.t_sw_time_supported,
             tx_snr_capability=event.tx_snr_capability,
         )
-        connection.emit('channel_sounding_capabilities', capabilities)
+        connection.emit(connection.EVENT_CHANNEL_SOUNDING_CAPABILITIES, capabilities)
 
     @host_event_handler
     def on_cs_config(self, event: hci.HCI_LE_CS_Config_Complete_Event):
@@ -5957,7 +6056,9 @@ class Device(utils.CompositeEventEmitter):
             return
 
         if event.status != hci.HCI_SUCCESS:
-            connection.emit('channel_sounding_config_failure', event.status)
+            connection.emit(
+                connection.EVENT_CHANNEL_SOUNDING_CONFIG_FAILURE, event.status
+            )
             return
         if event.action == hci.HCI_LE_CS_Config_Complete_Event.Action.CREATED:
             config = ChannelSoundingConfig(
@@ -5983,11 +6084,13 @@ class Device(utils.CompositeEventEmitter):
                 t_pm_time=event.t_pm_time,
             )
             connection.cs_configs[event.config_id] = config
-            connection.emit('channel_sounding_config', config)
+            connection.emit(connection.EVENT_CHANNEL_SOUNDING_CONFIG, config)
         elif event.action == hci.HCI_LE_CS_Config_Complete_Event.Action.REMOVED:
             try:
                 config = connection.cs_configs.pop(event.config_id)
-                connection.emit('channel_sounding_config_removed', config.config_id)
+                connection.emit(
+                    connection.EVENT_CHANNEL_SOUNDING_CONFIG_REMOVED, config.config_id
+                )
             except KeyError:
                 logger.error('Removing unknown config %d', event.config_id)
 
@@ -5997,7 +6100,9 @@ class Device(utils.CompositeEventEmitter):
             return
 
         if event.status != hci.HCI_SUCCESS:
-            connection.emit('channel_sounding_procedure_failure', event.status)
+            connection.emit(
+                connection.EVENT_CHANNEL_SOUNDING_PROCEDURE_FAILURE, event.status
+            )
             return
 
         procedure = ChannelSoundingProcedure(
@@ -6014,37 +6119,37 @@ class Device(utils.CompositeEventEmitter):
             max_procedure_len=event.max_procedure_len,
         )
         connection.cs_procedures[procedure.config_id] = procedure
-        connection.emit('channel_sounding_procedure', procedure)
+        connection.emit(connection.EVENT_CHANNEL_SOUNDING_PROCEDURE, procedure)
 
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
     def on_role_change(self, connection, new_role):
         connection.role = new_role
-        connection.emit('role_change', new_role)
+        connection.emit(connection.EVENT_ROLE_CHANGE, new_role)
 
     # [Classic only]
     @host_event_handler
     @try_with_connection_from_address
     def on_role_change_failure(self, connection, address, error):
         if connection:
-            connection.emit('role_change_failure', error)
-        self.emit('role_change_failure', address, error)
+            connection.emit(connection.EVENT_ROLE_CHANGE_FAILURE, error)
+        self.emit(self.EVENT_ROLE_CHANGE_FAILURE, address, error)
 
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
     def on_classic_pairing(self, connection: Connection) -> None:
-        connection.emit('classic_pairing')
+        connection.emit(connection.EVENT_CLASSIC_PAIRING)
 
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
     def on_classic_pairing_failure(self, connection: Connection, status) -> None:
-        connection.emit('classic_pairing_failure', status)
+        connection.emit(connection.EVENT_CLASSIC_PAIRING_FAILURE, status)
 
     def on_pairing_start(self, connection: Connection) -> None:
-        connection.emit('pairing_start')
+        connection.emit(connection.EVENT_PAIRING_START)
 
     def on_pairing(
         self,
@@ -6058,10 +6163,10 @@ class Device(utils.CompositeEventEmitter):
             connection.peer_address = identity_address
         connection.sc = sc
         connection.authenticated = True
-        connection.emit('pairing', keys)
+        connection.emit(connection.EVENT_PAIRING, keys)
 
     def on_pairing_failure(self, connection: Connection, reason: int) -> None:
-        connection.emit('pairing_failure', reason)
+        connection.emit(connection.EVENT_PAIRING_FAILURE, reason)
 
     @with_connection_from_handle
     def on_gatt_pdu(self, connection, pdu):

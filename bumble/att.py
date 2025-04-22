@@ -836,6 +836,9 @@ class Attribute(utils.EventEmitter, Generic[_T]):
     READ_REQUIRES_AUTHORIZATION = Permissions.READ_REQUIRES_AUTHORIZATION
     WRITE_REQUIRES_AUTHORIZATION = Permissions.WRITE_REQUIRES_AUTHORIZATION
 
+    EVENT_READ = "read"
+    EVENT_WRITE = "write"
+
     value: Union[AttributeValue[_T], _T, None]
 
     def __init__(
@@ -906,7 +909,7 @@ class Attribute(utils.EventEmitter, Generic[_T]):
         else:
             value = self.value
 
-        self.emit('read', connection, b'' if value is None else value)
+        self.emit(self.EVENT_READ, connection, b'' if value is None else value)
 
         return b'' if value is None else self.encode_value(value)
 
@@ -947,7 +950,7 @@ class Attribute(utils.EventEmitter, Generic[_T]):
         else:
             self.value = decoded_value
 
-        self.emit('write', connection, decoded_value)
+        self.emit(self.EVENT_WRITE, connection, decoded_value)
 
     def __repr__(self):
         if isinstance(self.value, bytes):

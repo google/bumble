@@ -250,6 +250,8 @@ class AncsClient(utils.EventEmitter):
     _expected_response_tuples: int
     _response_accumulator: bytes
 
+    EVENT_NOTIFICATION = "notification"
+
     def __init__(self, ancs_proxy: AncsProxy) -> None:
         super().__init__()
         self._ancs_proxy = ancs_proxy
@@ -284,7 +286,7 @@ class AncsClient(utils.EventEmitter):
 
     def _on_notification(self, notification: Notification) -> None:
         logger.debug(f"ANCS NOTIFICATION: {notification}")
-        self.emit("notification", notification)
+        self.emit(self.EVENT_NOTIFICATION, notification)
 
     def _on_data(self, data: bytes) -> None:
         logger.debug(f"ANCS DATA: {data.hex()}")

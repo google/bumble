@@ -744,6 +744,9 @@ class ClassicChannel(utils.EventEmitter):
         WAIT_FINAL_RSP = 0x16
         WAIT_CONTROL_IND = 0x17
 
+    EVENT_OPEN = "open"
+    EVENT_CLOSE = "close"
+
     connection_result: Optional[asyncio.Future[None]]
     disconnection_result: Optional[asyncio.Future[None]]
     response: Optional[asyncio.Future[bytes]]
@@ -847,7 +850,7 @@ class ClassicChannel(utils.EventEmitter):
     def abort(self) -> None:
         if self.state == self.State.OPEN:
             self._change_state(self.State.CLOSED)
-            self.emit('close')
+            self.emit(self.EVENT_CLOSE)
 
     def send_configure_request(self) -> None:
         options = L2CAP_Control_Frame.encode_configuration_options(
@@ -940,7 +943,7 @@ class ClassicChannel(utils.EventEmitter):
             if self.connection_result:
                 self.connection_result.set_result(None)
                 self.connection_result = None
-            self.emit('open')
+            self.emit(self.EVENT_OPEN)
         elif self.state == self.State.WAIT_CONFIG_REQ_RSP:
             self._change_state(self.State.WAIT_CONFIG_RSP)
 
@@ -956,7 +959,7 @@ class ClassicChannel(utils.EventEmitter):
                 if self.connection_result:
                     self.connection_result.set_result(None)
                     self.connection_result = None
-                self.emit('open')
+                self.emit(self.EVENT_OPEN)
             else:
                 logger.warning(color('invalid state', 'red'))
         elif (
@@ -991,7 +994,7 @@ class ClassicChannel(utils.EventEmitter):
                 )
             )
             self._change_state(self.State.CLOSED)
-            self.emit('close')
+            self.emit(self.EVENT_CLOSE)
             self.manager.on_channel_closed(self)
         else:
             logger.warning(color('invalid state', 'red'))
@@ -1012,7 +1015,7 @@ class ClassicChannel(utils.EventEmitter):
         if self.disconnection_result:
             self.disconnection_result.set_result(None)
             self.disconnection_result = None
-        self.emit('close')
+        self.emit(self.EVENT_CLOSE)
         self.manager.on_channel_closed(self)
 
     def __str__(self) -> str:
@@ -1046,6 +1049,9 @@ class LeCreditBasedChannel(utils.EventEmitter):
     state: State
     connection: Connection
     sink: Optional[Callable[[bytes], Any]]
+
+    EVENT_OPEN = "open"
+    EVENT_CLOSE = "close"
 
     def __init__(
         self,
@@ -1098,9 +1104,9 @@ class LeCreditBasedChannel(utils.EventEmitter):
         self.state = new_state
 
         if new_state == self.State.CONNECTED:
-            self.emit('open')
+            self.emit(self.EVENT_OPEN)
         elif new_state == self.State.DISCONNECTED:
-            self.emit('close')
+            self.emit(self.EVENT_CLOSE)
 
     def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
         self.manager.send_pdu(self.connection, self.destination_cid, pdu)
@@ -1381,6 +1387,8 @@ class LeCreditBasedChannel(utils.EventEmitter):
 
 # -----------------------------------------------------------------------------
 class ClassicChannelServer(utils.EventEmitter):
+    EVENT_CONNECTION = "connection"
+
     def __init__(
         self,
         manager: ChannelManager,
@@ -1395,7 +1403,7 @@ class ClassicChannelServer(utils.EventEmitter):
         self.mtu = mtu
 
     def on_connection(self, channel: ClassicChannel) -> None:
-        self.emit('connection', channel)
+        self.emit(self.EVENT_CONNECTION, channel)
         if self.handler:
             self.handler(channel)
 
@@ -1406,6 +1414,8 @@ class ClassicChannelServer(utils.EventEmitter):
 
 # -----------------------------------------------------------------------------
 class LeCreditBasedChannelServer(utils.EventEmitter):
+    EVENT_CONNECTION = "connection"
+
     def __init__(
         self,
         manager: ChannelManager,
@@ -1424,7 +1434,7 @@ class LeCreditBasedChannelServer(utils.EventEmitter):
         self.mps = mps
 
     def on_connection(self, channel: LeCreditBasedChannel) -> None:
-        self.emit('connection', channel)
+        self.emit(self.EVENT_CONNECTION, channel)
         if self.handler:
             self.handler(channel)
 

@@ -296,12 +296,12 @@ class HostService(HostServicer):
             def on_disconnection(_: None) -> None:
                 disconnection_future.set_result(None)
 
-            connection.on('disconnection', on_disconnection)
+            connection.on(connection.EVENT_DISCONNECTION, on_disconnection)
             try:
                 await disconnection_future
                 self.log.debug("Disconnected")
             finally:
-                connection.remove_listener('disconnection', on_disconnection)  # type: ignore
+                connection.remove_listener(connection.EVENT_DISCONNECTION, on_disconnection)  # type: ignore
 
         return empty_pb2.Empty()
 
@@ -383,7 +383,7 @@ class HostService(HostServicer):
                 ):
                     connections.put_nowait(connection)
 
-            self.device.on('connection', on_connection)
+            self.device.on(self.device.EVENT_CONNECTION, on_connection)
 
         try:
             # Advertise until RPC is canceled
@@ -501,7 +501,7 @@ class HostService(HostServicer):
                 ):
                     connections.put_nowait(connection)
 
-            self.device.on('connection', on_connection)
+            self.device.on(self.device.EVENT_CONNECTION, on_connection)
 
         try:
             while True:
@@ -531,7 +531,7 @@ class HostService(HostServicer):
                 await asyncio.sleep(1)
         finally:
             if request.connectable:
-                self.device.remove_listener('connection', on_connection)  # type: ignore
+                self.device.remove_listener(self.device.EVENT_CONNECTION, on_connection)  # type: ignore
 
             try:
                 self.log.debug('Stop advertising')
@@ -557,7 +557,7 @@ class HostService(HostServicer):
             scanning_phys = [int(Phy.LE_1M), int(Phy.LE_CODED)]
 
         scan_queue: asyncio.Queue[Advertisement] = asyncio.Queue()
-        handler = self.device.on('advertisement', scan_queue.put_nowait)
+        handler = self.device.on(self.device.EVENT_ADVERTISEMENT, scan_queue.put_nowait)
         await self.device.start_scanning(
             legacy=request.legacy,
             active=not request.passive,
@@ -602,7 +602,7 @@ class HostService(HostServicer):
                 yield sr
 
         finally:
-            self.device.remove_listener('advertisement', handler)  # type: ignore
+            self.device.remove_listener(self.device.EVENT_ADVERTISEMENT, handler)  # type: ignore
             try:
                 self.log.debug('Stop scanning')
                 await bumble.utils.cancel_on_event(
@@ -621,10 +621,10 @@ class HostService(HostServicer):
             Optional[Tuple[Address, int, AdvertisingData, int]]
         ] = asyncio.Queue()
         complete_handler = self.device.on(
-            'inquiry_complete', lambda: inquiry_queue.put_nowait(None)
+            self.device.EVENT_INQUIRY_COMPLETE, lambda: inquiry_queue.put_nowait(None)
         )
         result_handler = self.device.on(  # type: ignore
-            'inquiry_result',
+            self.device.EVENT_INQUIRY_RESULT,
             lambda address, class_of_device, eir_data, rssi: inquiry_queue.put_nowait(  # type: ignore
                 (address, class_of_device, eir_data, rssi)  # type: ignore
             ),
@@ -643,8 +643,8 @@ class HostService(HostServicer):
                 )
 
         finally:
-            self.device.remove_listener('inquiry_complete', complete_handler)  # type: ignore
-            self.device.remove_listener('inquiry_result', result_handler)  # type: ignore
+            self.device.remove_listener(self.device.EVENT_INQUIRY_COMPLETE, complete_handler)  # type: ignore
+            self.device.remove_listener(self.device.EVENT_INQUIRY_RESULT, result_handler)  # type: ignore
             try:
                 self.log.debug('Stop inquiry')
                 await bumble.utils.cancel_on_event(

@@ -448,6 +448,8 @@ class Characteristic(Attribute[_T]):
     uuid: UUID
     properties: Characteristic.Properties
 
+    EVENT_SUBSCRIPTION = "subscription"
+
     class Properties(enum.IntFlag):
         """Property flags"""
 

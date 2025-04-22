@@ -201,6 +201,13 @@ class HID(ABC, utils.EventEmitter):
     l2cap_intr_channel: Optional[l2cap.ClassicChannel] = None
     connection: Optional[device.Connection] = None
 
+    EVENT_INTERRUPT_DATA = "interrupt_data"
+    EVENT_CONTROL_DATA = "control_data"
+    EVENT_SUSPEND = "suspend"
+    EVENT_EXIT_SUSPEND = "exit_suspend"
+    EVENT_VIRTUAL_CABLE_UNPLUG = "virtual_cable_unplug"
+    EVENT_HANDSHAKE = "handshake"
+
     class Role(enum.IntEnum):
         HOST = 0x00
         DEVICE = 0x01
@@ -215,7 +222,7 @@ class HID(ABC, utils.EventEmitter):
         device.register_l2cap_server(HID_CONTROL_PSM, self.on_l2cap_connection)
         device.register_l2cap_server(HID_INTERRUPT_PSM, self.on_l2cap_connection)
 
-        device.on('connection', self.on_device_connection)
+        device.on(device.EVENT_CONNECTION, self.on_device_connection)
 
     async def connect_control_channel(self) -> None:
         # Create a new L2CAP connection - control channel
@@ -258,15 +265,20 @@ class HID(ABC, utils.EventEmitter):
     def on_device_connection(self, connection: device.Connection) -> None:
         self.connection = connection
         self.remote_device_bd_address = connection.peer_address
-        connection.on('disconnection', self.on_device_disconnection)
+        connection.on(connection.EVENT_DISCONNECTION, self.on_device_disconnection)
 
     def on_device_disconnection(self, reason: int) -> None:
         self.connection = None
 
     def on_l2cap_connection(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         logger.debug(f'+++ New L2CAP connection: {l2cap_channel}')
-        l2cap_channel.on('open', lambda: self.on_l2cap_channel_open(l2cap_channel))
-        l2cap_channel.on('close', lambda: self.on_l2cap_channel_close(l2cap_channel))
+        l2cap_channel.on(
+            l2cap_channel.EVENT_OPEN, lambda: self.on_l2cap_channel_open(l2cap_channel)
+        )
+        l2cap_channel.on(
+            l2cap_channel.EVENT_CLOSE,
+            lambda: self.on_l2cap_channel_close(l2cap_channel),
+        )
 
     def on_l2cap_channel_open(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         if l2cap_channel.psm == HID_CONTROL_PSM:
@@ -290,7 +302,7 @@ class HID(ABC, utils.EventEmitter):
 
     def on_intr_pdu(self, pdu: bytes) -> None:
         logger.debug(f'<<< HID INTERRUPT PDU: {pdu.hex()}')
-        self.emit("interrupt_data", pdu)
+        self.emit(self.EVENT_INTERRUPT_DATA, pdu)
 
     def send_pdu_on_ctrl(self, msg: bytes) -> None:
         assert self.l2cap_ctrl_channel
@@ -363,17 +375,17 @@ class Device(HID):
             self.handle_set_protocol(pdu)
         elif message_type == Message.MessageType.DATA:
             logger.debug('<<< HID CONTROL DATA')
-            self.emit('control_data', pdu)
+            self.emit(self.EVENT_CONTROL_DATA, pdu)
         elif message_type == Message.MessageType.CONTROL:
             if param == Message.ControlCommand.SUSPEND:
                 logger.debug('<<< HID SUSPEND')
-                self.emit('suspend')
+                self.emit(self.EVENT_SUSPEND)
             elif param == Message.ControlCommand.EXIT_SUSPEND:
                 logger.debug('<<< HID EXIT SUSPEND')
-                self.emit('exit_suspend')
+                self.emit(self.EVENT_EXIT_SUSPEND)
             elif param == Message.ControlCommand.VIRTUAL_CABLE_UNPLUG:
                 logger.debug('<<< HID VIRTUAL CABLE UNPLUG')
-                self.emit('virtual_cable_unplug')
+                self.emit(self.EVENT_VIRTUAL_CABLE_UNPLUG)
             else:
                 logger.debug('<<< HID CONTROL OPERATION UNSUPPORTED')
         else:
@@ -538,14 +550,14 @@ class Host(HID):
         message_type = pdu[0] >> 4
         if message_type == Message.MessageType.HANDSHAKE:
             logger.debug(f'<<< HID HANDSHAKE: {Message.Handshake(param).name}')
-            self.emit('handshake', Message.Handshake(param))
+            self.emit(self.EVENT_HANDSHAKE, Message.Handshake(param))
         elif message_type == Message.MessageType.DATA:
             logger.debug('<<< HID CONTROL DATA')
-            self.emit('control_data', pdu)
+            self.emit(self.EVENT_CONTROL_DATA, pdu)
         elif message_type == Message.MessageType.CONTROL:
             if param == Message.ControlCommand.VIRTUAL_CABLE_UNPLUG:
                 logger.debug('<<< HID VIRTUAL CABLE UNPLUG')
-                self.emit('virtual_cable_unplug')
+                self.emit(self.EVENT_VIRTUAL_CABLE_UNPLUG)
             else:
                 logger.debug('<<< HID CONTROL OPERATION UNSUPPORTED')
         else:

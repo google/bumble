@@ -442,6 +442,9 @@ class RFCOMM_MCC_MSC:
 
 # -----------------------------------------------------------------------------
 class DLC(utils.EventEmitter):
+    EVENT_OPEN = "open"
+    EVENT_CLOSE = "close"
+
     class State(enum.IntEnum):
         INIT = 0x00
         CONNECTING = 0x01
@@ -529,7 +532,7 @@ class DLC(utils.EventEmitter):
         self.send_frame(RFCOMM_Frame.uih(c_r=self.c_r, dlci=0, information=mcc))
 
         self.change_state(DLC.State.CONNECTED)
-        self.emit('open')
+        self.emit(self.EVENT_OPEN)
 
     def on_ua_frame(self, _frame: RFCOMM_Frame) -> None:
         if self.state == DLC.State.CONNECTING:
@@ -550,7 +553,7 @@ class DLC(utils.EventEmitter):
                 self.disconnection_result.set_result(None)
                 self.disconnection_result = None
             self.multiplexer.on_dlc_disconnection(self)
-            self.emit('close')
+            self.emit(self.EVENT_CLOSE)
         else:
             logger.warning(
                 color(
@@ -733,7 +736,7 @@ class DLC(utils.EventEmitter):
             self.disconnection_result.cancel()
             self.disconnection_result = None
         self.change_state(DLC.State.RESET)
-        self.emit('close')
+        self.emit(self.EVENT_CLOSE)
 
     def __str__(self) -> str:
         return (
@@ -763,6 +766,8 @@ class Multiplexer(utils.EventEmitter):
         DISCONNECTED = 0x05
         RESET = 0x06
 
+    EVENT_DLC = "dlc"
+
     connection_result: Optional[asyncio.Future]
     disconnection_result: Optional[asyncio.Future]
     open_result: Optional[asyncio.Future]
@@ -785,7 +790,7 @@ class Multiplexer(utils.EventEmitter):
         # Become a sink for the L2CAP channel
         l2cap_channel.sink = self.on_pdu
 
-        l2cap_channel.on('close', self.on_l2cap_channel_close)
+        l2cap_channel.on(l2cap_channel.EVENT_CLOSE, self.on_l2cap_channel_close)
 
     def change_state(self, new_state: State) -> None:
         logger.debug(f'{self} state change -> {color(new_state.name, "cyan")}')
@@ -901,7 +906,7 @@ class Multiplexer(utils.EventEmitter):
                         self.dlcs[pn.dlci] = dlc
 
                         # Re-emit the handshake completion event
-                        dlc.on('open', lambda: self.emit('dlc', dlc))
+                        dlc.on(dlc.EVENT_OPEN, lambda: self.emit(self.EVENT_DLC, dlc))
 
                         # Respond to complete the handshake
                         dlc.accept()
@@ -1076,6 +1081,8 @@ class Client:
 
 # -----------------------------------------------------------------------------
 class Server(utils.EventEmitter):
+    EVENT_START = "start"
+
     def __init__(
         self, device: Device, l2cap_mtu: int = RFCOMM_DEFAULT_L2CAP_MTU
     ) -> None:
@@ -1122,7 +1129,9 @@ class Server(utils.EventEmitter):
 
     def on_connection(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         logger.debug(f'+++ new L2CAP connection: {l2cap_channel}')
-        l2cap_channel.on('open', lambda: self.on_l2cap_channel_open(l2cap_channel))
+        l2cap_channel.on(
+            l2cap_channel.EVENT_OPEN, lambda: self.on_l2cap_channel_open(l2cap_channel)
+        )
 
     def on_l2cap_channel_open(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         logger.debug(f'$$$ L2CAP channel open: {l2cap_channel}')
@@ -1130,10 +1139,10 @@ class Server(utils.EventEmitter):
         # Create a new multiplexer for the channel
         multiplexer = Multiplexer(l2cap_channel, Multiplexer.Role.RESPONDER)
         multiplexer.acceptor = self.accept_dlc
-        multiplexer.on('dlc', self.on_dlc)
+        multiplexer.on(multiplexer.EVENT_DLC, self.on_dlc)
 
         # Notify
-        self.emit('start', multiplexer)
+        self.emit(self.EVENT_START, multiplexer)
 
     def accept_dlc(self, channel_number: int) -> Optional[Tuple[int, int]]:
         return self.dlc_configs.get(channel_number)

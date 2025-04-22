@@ -996,6 +996,10 @@ class Delegate:
 class Protocol(utils.EventEmitter):
     """AVRCP Controller and Target protocol."""
 
+    EVENT_CONNECTION = "connection"
+    EVENT_START = "start"
+    EVENT_STOP = "stop"
+
     class PacketType(enum.IntEnum):
         SINGLE = 0b00
         START = 0b01
@@ -1456,9 +1460,11 @@ class Protocol(utils.EventEmitter):
 
     def _on_avctp_connection(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         logger.debug("AVCTP connection established")
-        l2cap_channel.on("open", lambda: self._on_avctp_channel_open(l2cap_channel))
+        l2cap_channel.on(
+            l2cap_channel.EVENT_OPEN, lambda: self._on_avctp_channel_open(l2cap_channel)
+        )
 
-        self.emit("connection")
+        self.emit(self.EVENT_CONNECTION)
 
     def _on_avctp_channel_open(self, l2cap_channel: l2cap.ClassicChannel) -> None:
         logger.debug("AVCTP channel open")
@@ -1473,15 +1479,15 @@ class Protocol(utils.EventEmitter):
         self.avctp_protocol.register_response_handler(
             AVRCP_PID, self._on_avctp_response
         )
-        l2cap_channel.on("close", self._on_avctp_channel_close)
+        l2cap_channel.on(l2cap_channel.EVENT_CLOSE, self._on_avctp_channel_close)
 
-        self.emit("start")
+        self.emit(self.EVENT_START)
 
     def _on_avctp_channel_close(self) -> None:
         logger.debug("AVCTP channel closed")
         self.avctp_protocol = None
 
-        self.emit("stop")
+        self.emit(self.EVENT_STOP)
 
     def _on_avctp_command(
         self, transaction_label: int, command: avc.CommandFrame
