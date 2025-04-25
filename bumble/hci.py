@@ -5825,12 +5825,18 @@ class HCI_LE_Advertising_Report_Event(HCI_LE_Meta_Event):
             return HCI_LE_Advertising_Report_Event.event_type_name(self.event_type)
 
         def to_string(self, indentation='', _=None):
+            def data_to_str(data):
+                try:
+                    return data.hex() + ': ' + str(AdvertisingData.from_bytes(data))
+                except Exception:
+                    return data.hex()
+
             return super().to_string(
                 indentation,
                 {
                     'event_type': HCI_LE_Advertising_Report_Event.event_type_name,
                     'address_type': Address.address_type_name,
-                    'data': lambda x: str(AdvertisingData.from_bytes(x)),
+                    'data': data_to_str,
                 },
             )
 
@@ -6055,12 +6061,18 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
 
         def to_string(self, indentation='', _=None):
             # pylint: disable=line-too-long
+            def data_to_str(data):
+                try:
+                    return data.hex() + ': ' + str(AdvertisingData.from_bytes(data))
+                except Exception:
+                    return data.hex()
+
             return super().to_string(
                 indentation,
                 {
                     'event_type': HCI_LE_Extended_Advertising_Report_Event.event_type_string,
                     'address_type': Address.address_type_name,
-                    'data': lambda x: str(AdvertisingData.from_bytes(x)),
+                    'data': data_to_str,
                 },
             )
 

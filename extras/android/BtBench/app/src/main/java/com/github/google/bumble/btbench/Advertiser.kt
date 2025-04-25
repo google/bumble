@@ -26,6 +26,7 @@ class Advertiser(private val bluetoothAdapter: BluetoothAdapter) : AdvertiseCall
 
     @SuppressLint("MissingPermission")
     fun stop() {
+        Log.info("stopping advertiser")
         bluetoothAdapter.bluetoothLeAdvertiser.stopAdvertising(this)
     }
 

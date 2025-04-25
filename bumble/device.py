@@ -3953,6 +3953,9 @@ class Device(utils.CompositeEventEmitter):
         return result.return_parameters.rssi
 
     async def get_connection_phy(self, connection: Connection) -> ConnectionPHY:
+        if not self.host.supports_command(hci.HCI_LE_READ_PHY_COMMAND):
+            return ConnectionPHY(hci.Phy.LE_1M, hci.Phy.LE_1M)
+
         result = await self.send_command(
             hci.HCI_LE_Read_PHY_Command(connection_handle=connection.handle),
             check_result=True,
