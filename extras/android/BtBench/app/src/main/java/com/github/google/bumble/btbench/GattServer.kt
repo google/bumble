@@ -26,6 +26,8 @@ import android.bluetooth.BluetoothGattService
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import java.io.IOException
 import java.util.concurrent.CountDownLatch
@@ -174,6 +176,7 @@ class GattServer(
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     override fun run() {
         viewModel.running = true
 

@@ -6,13 +6,14 @@ import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY
-import android.os.Build
+import androidx.annotation.RequiresApi
 import java.util.logging.Logger
 
 private val Log = Logger.getLogger("btbench.advertiser")
 
 class Advertiser(private val bluetoothAdapter: BluetoothAdapter) : AdvertiseCallback() {
     @SuppressLint("MissingPermission")
+    @RequiresApi(34)
     fun start() {
         val advertiseSettingsBuilder = AdvertiseSettings.Builder()
             .setAdvertiseMode(ADVERTISE_MODE_LOW_LATENCY)
