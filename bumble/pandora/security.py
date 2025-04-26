@@ -302,15 +302,15 @@ class SecurityService(SecurityServicer):
 
                 with contextlib.closing(bumble.utils.EventWatcher()) as watcher:
 
-                    @watcher.on(connection, 'pairing')
+                    @watcher.on(connection, connection.EVENT_PAIRING)
                     def on_pairing(*_: Any) -> None:
                         security_result.set_result('success')
 
-                    @watcher.on(connection, 'pairing_failure')
+                    @watcher.on(connection, connection.EVENT_PAIRING_FAILURE)
                     def on_pairing_failure(*_: Any) -> None:
                         security_result.set_result('pairing_failure')
 
-                    @watcher.on(connection, 'disconnection')
+                    @watcher.on(connection, connection.EVENT_DISCONNECTION)
                     def on_disconnection(*_: Any) -> None:
                         security_result.set_result('connection_died')
 

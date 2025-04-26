@@ -720,6 +720,14 @@ class HfProtocol(utils.EventEmitter):
                 vrec: VoiceRecognitionState
     """
 
+    EVENT_CODEC_NEGOTIATION = "codec_negotiation"
+    EVENT_AG_INDICATOR = "ag_indicator"
+    EVENT_SPEAKER_VOLUME = "speaker_volume"
+    EVENT_MICROPHONE_VOLUME = "microphone_volume"
+    EVENT_RING = "ring"
+    EVENT_CLI_NOTIFICATION = "cli_notification"
+    EVENT_VOICE_RECOGNITION = "voice_recognition"
+
     class HfLoopTermination(HfpProtocolError):
         """Termination signal for run() loop."""
 
@@ -777,7 +785,8 @@ class HfProtocol(utils.EventEmitter):
         self.dlc.sink = self._read_at
         # Stop the run() loop when L2CAP is closed.
         self.dlc.multiplexer.l2cap_channel.on(
-            'close', lambda: self.unsolicited_queue.put_nowait(None)
+            self.dlc.multiplexer.l2cap_channel.EVENT_CLOSE,
+            lambda: self.unsolicited_queue.put_nowait(None),
         )
 
     def supports_hf_feature(self, feature: HfFeature) -> bool:
@@ -1034,7 +1043,7 @@ class HfProtocol(utils.EventEmitter):
         # ID. The HF shall be ready to accept the synchronous connection
         # establishment as soon as it has sent the AT commands AT+BCS=<Codec ID>.
         self.active_codec = AudioCodec(codec_id)
-        self.emit('codec_negotiation', self.active_codec)
+        self.emit(self.EVENT_CODEC_NEGOTIATION, self.active_codec)
 
         logger.info("codec connection setup completed")
 
@@ -1095,7 +1104,7 @@ class HfProtocol(utils.EventEmitter):
         # CIEV is in 1-index, while ag_indicators is in 0-index.
         ag_indicator = self.ag_indicators[index - 1]
         ag_indicator.current_status = value
-        self.emit('ag_indicator', ag_indicator)
+        self.emit(self.EVENT_AG_INDICATOR, ag_indicator)
         logger.info(f"AG indicator updated: {ag_indicator.indicator}, {value}")
 
     async def handle_unsolicited(self):
@@ -1110,19 +1119,21 @@ class HfProtocol(utils.EventEmitter):
                 int(result.parameters[0]), int(result.parameters[1])
             )
         elif result.code == "+VGS":
-            self.emit('speaker_volume', int(result.parameters[0]))
+            self.emit(self.EVENT_SPEAKER_VOLUME, int(result.parameters[0]))
         elif result.code == "+VGM":
-            self.emit('microphone_volume', int(result.parameters[0]))
+            self.emit(self.EVENT_MICROPHONE_VOLUME, int(result.parameters[0]))
         elif result.code == "RING":
-            self.emit('ring')
+            self.emit(self.EVENT_RING)
         elif result.code == "+CLIP":
             self.emit(
-                'cli_notification', CallLineIdentification.parse_from(result.parameters)
+                self.EVENT_CLI_NOTIFICATION,
+                CallLineIdentification.parse_from(result.parameters),
             )
         elif result.code == "+BVRA":
             # TODO: Support Enhanced Voice Recognition.
             self.emit(
-                'voice_recognition', VoiceRecognitionState(int(result.parameters[0]))
+                self.EVENT_VOICE_RECOGNITION,
+                VoiceRecognitionState(int(result.parameters[0])),
             )
         else:
             logging.info(f"unhandled unsolicited response {result.code}")
@@ -1178,6 +1189,19 @@ class AgProtocol(utils.EventEmitter):
             Args:
                 volume: Int
     """
+
+    EVENT_SLC_COMPLETE = "slc_complete"
+    EVENT_SUPPORTED_AUDIO_CODECS = "supported_audio_codecs"
+    EVENT_CODEC_NEGOTIATION = "codec_negotiation"
+    EVENT_VOICE_RECOGNITION = "voice_recognition"
+    EVENT_CALL_HOLD = "call_hold"
+    EVENT_HF_INDICATOR = "hf_indicator"
+    EVENT_CODEC_CONNECTION_REQUEST = "codec_connection_request"
+    EVENT_ANSWER = "answer"
+    EVENT_DIAL = "dial"
+    EVENT_HANG_UP = "hang_up"
+    EVENT_SPEAKER_VOLUME = "speaker_volume"
+    EVENT_MICROPHONE_VOLUME = "microphone_volume"
 
     supported_hf_features: int
     supported_hf_indicators: Set[HfIndicator]
@@ -1371,7 +1395,7 @@ class AgProtocol(utils.EventEmitter):
 
     def _check_remained_slc_commands(self) -> None:
         if not self._remained_slc_setup_features:
-            self.emit('slc_complete')
+            self.emit(self.EVENT_SLC_COMPLETE)
 
     def _on_brsf(self, hf_features: bytes) -> None:
         self.supported_hf_features = int(hf_features)
@@ -1390,17 +1414,17 @@ class AgProtocol(utils.EventEmitter):
 
     def _on_bac(self, *args) -> None:
         self.supported_audio_codecs = [AudioCodec(int(value)) for value in args]
-        self.emit('supported_audio_codecs', self.supported_audio_codecs)
+        self.emit(self.EVENT_SUPPORTED_AUDIO_CODECS, self.supported_audio_codecs)
         self.send_ok()
 
     def _on_bcs(self, codec: bytes) -> None:
         self.active_codec = AudioCodec(int(codec))
         self.send_ok()
-        self.emit('codec_negotiation', self.active_codec)
+        self.emit(self.EVENT_CODEC_NEGOTIATION, self.active_codec)
 
     def _on_bvra(self, vrec: bytes) -> None:
         self.send_ok()
-        self.emit('voice_recognition', VoiceRecognitionState(int(vrec)))
+        self.emit(self.EVENT_VOICE_RECOGNITION, VoiceRecognitionState(int(vrec)))
 
     def _on_chld(self, operation_code: bytes) -> None:
         call_index: Optional[int] = None
@@ -1427,7 +1451,7 @@ class AgProtocol(utils.EventEmitter):
         # Real three-way calls have more complicated situations, but this is not a popular issue - let users to handle the remaining :)
 
         self.send_ok()
-        self.emit('call_hold', operation, call_index)
+        self.emit(self.EVENT_CALL_HOLD, operation, call_index)
 
     def _on_chld_test(self) -> None:
         if not self.supports_ag_feature(AgFeature.THREE_WAY_CALLING):
@@ -1553,7 +1577,7 @@ class AgProtocol(utils.EventEmitter):
             return
 
         self.hf_indicators[index].current_status = int(value_bytes)
-        self.emit('hf_indicator', self.hf_indicators[index])
+        self.emit(self.EVENT_HF_INDICATOR, self.hf_indicators[index])
         self.send_ok()
 
     def _on_bia(self, *args) -> None:
@@ -1562,21 +1586,21 @@ class AgProtocol(utils.EventEmitter):
         self.send_ok()
 
     def _on_bcc(self) -> None:
-        self.emit('codec_connection_request')
+        self.emit(self.EVENT_CODEC_CONNECTION_REQUEST)
         self.send_ok()
 
     def _on_a(self) -> None:
         """ATA handler."""
-        self.emit('answer')
+        self.emit(self.EVENT_ANSWER)
         self.send_ok()
 
     def _on_d(self, number: bytes) -> None:
         """ATD handler."""
-        self.emit('dial', number.decode())
+        self.emit(self.EVENT_DIAL, number.decode())
         self.send_ok()
 
     def _on_chup(self) -> None:
-        self.emit('hang_up')
+        self.emit(self.EVENT_HANG_UP)
         self.send_ok()
 
     def _on_clcc(self) -> None:
@@ -1602,11 +1626,11 @@ class AgProtocol(utils.EventEmitter):
         self.send_ok()
 
     def _on_vgs(self, level: bytes) -> None:
-        self.emit('speaker_volume', int(level))
+        self.emit(self.EVENT_SPEAKER_VOLUME, int(level))
         self.send_ok()
 
     def _on_vgm(self, level: bytes) -> None:
-        self.emit('microphone_volume', int(level))
+        self.emit(self.EVENT_MICROPHONE_VOLUME, int(level))
         self.send_ok()
 
 

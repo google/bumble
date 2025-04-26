@@ -276,6 +276,8 @@ class AseStateMachine(gatt.Characteristic):
         DISABLING        = 0x05
         RELEASING        = 0x06
 
+    EVENT_STATE_CHANGE = "state_change"
+
     cis_link: Optional[device.CisLink] = None
 
     # Additional parameters in CODEC_CONFIGURED State
@@ -329,8 +331,12 @@ class AseStateMachine(gatt.Characteristic):
             value=gatt.CharacteristicValue(read=self.on_read),
         )
 
-        self.service.device.on('cis_request', self.on_cis_request)
-        self.service.device.on('cis_establishment', self.on_cis_establishment)
+        self.service.device.on(
+            self.service.device.EVENT_CIS_REQUEST, self.on_cis_request
+        )
+        self.service.device.on(
+            self.service.device.EVENT_CIS_ESTABLISHMENT, self.on_cis_establishment
+        )
 
     def on_cis_request(
         self,
@@ -356,7 +362,7 @@ class AseStateMachine(gatt.Characteristic):
             and cis_link.cis_id == self.cis_id
             and self.state == self.State.ENABLING
         ):
-            cis_link.on('disconnection', self.on_cis_disconnection)
+            cis_link.on(cis_link.EVENT_DISCONNECTION, self.on_cis_disconnection)
 
             async def post_cis_established():
                 await cis_link.setup_data_path(direction=self.role)
@@ -525,7 +531,7 @@ class AseStateMachine(gatt.Characteristic):
     def state(self, new_state: State) -> None:
         logger.debug(f'{self} state change -> {colors.color(new_state.name, "cyan")}')
         self._state = new_state
-        self.emit('state_change')
+        self.emit(self.EVENT_STATE_CHANGE)
 
     @property
     def value(self):

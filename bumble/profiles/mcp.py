@@ -338,6 +338,12 @@ class MediaControlServiceProxy(
         'content_control_id': gatt.GATT_CONTENT_CONTROL_ID_CHARACTERISTIC,
     }
 
+    EVENT_MEDIA_STATE = "media_state"
+    EVENT_TRACK_CHANGED = "track_changed"
+    EVENT_TRACK_TITLE = "track_title"
+    EVENT_TRACK_DURATION = "track_duration"
+    EVENT_TRACK_POSITION = "track_position"
+
     media_player_name: Optional[gatt_client.CharacteristicProxy[bytes]] = None
     media_player_icon_object_id: Optional[gatt_client.CharacteristicProxy[bytes]] = None
     media_player_icon_url: Optional[gatt_client.CharacteristicProxy[bytes]] = None
@@ -432,20 +438,20 @@ class MediaControlServiceProxy(
         self.media_control_point_notifications.put_nowait(data)
 
     def _on_media_state(self, data: bytes) -> None:
-        self.emit('media_state', MediaState(data[0]))
+        self.emit(self.EVENT_MEDIA_STATE, MediaState(data[0]))
 
     def _on_track_changed(self, data: bytes) -> None:
         del data
-        self.emit('track_changed')
+        self.emit(self.EVENT_TRACK_CHANGED)
 
     def _on_track_title(self, data: bytes) -> None:
-        self.emit('track_title', data.decode("utf-8"))
+        self.emit(self.EVENT_TRACK_TITLE, data.decode("utf-8"))
 
     def _on_track_duration(self, data: bytes) -> None:
-        self.emit('track_duration', struct.unpack_from('<i', data)[0])
+        self.emit(self.EVENT_TRACK_DURATION, struct.unpack_from('<i', data)[0])
 
     def _on_track_position(self, data: bytes) -> None:
-        self.emit('track_position', struct.unpack_from('<i', data)[0])
+        self.emit(self.EVENT_TRACK_POSITION, struct.unpack_from('<i', data)[0])
 
 
 class GenericMediaControlServiceProxy(MediaControlServiceProxy):

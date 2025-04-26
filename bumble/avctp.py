@@ -166,8 +166,8 @@ class Protocol:
 
         # Register to receive PDUs from the channel
         l2cap_channel.sink = self.on_pdu
-        l2cap_channel.on("open", self.on_l2cap_channel_open)
-        l2cap_channel.on("close", self.on_l2cap_channel_close)
+        l2cap_channel.on(l2cap_channel.EVENT_OPEN, self.on_l2cap_channel_open)
+        l2cap_channel.on(l2cap_channel.EVENT_CLOSE, self.on_l2cap_channel_close)
 
     def on_l2cap_channel_open(self):
         logger.debug(color("<<< AVCTP channel open", "magenta"))

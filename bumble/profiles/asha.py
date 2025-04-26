@@ -88,6 +88,11 @@ class AudioStatus(utils.OpenIntEnum):
 class AshaService(gatt.TemplateService):
     UUID = gatt.GATT_ASHA_SERVICE
 
+    EVENT_STARTED = "started"
+    EVENT_STOPPED = "stopped"
+    EVENT_DISCONNECTED = "disconnected"
+    EVENT_VOLUME_CHANGED = "volume_changed"
+
     audio_sink: Optional[Callable[[bytes], Any]]
     active_codec: Optional[Codec] = None
     audio_type: Optional[AudioType] = None
@@ -211,14 +216,14 @@ class AshaService(gatt.TemplateService):
                 f'volume={self.volume}, '
                 f'other_state={self.other_state}'
             )
-            self.emit('started')
+            self.emit(self.EVENT_STARTED)
         elif opcode == OpCode.STOP:
             _logger.debug('### STOP')
             self.active_codec = None
             self.audio_type = None
             self.volume = None
             self.other_state = None
-            self.emit('stopped')
+            self.emit(self.EVENT_STOPPED)
         elif opcode == OpCode.STATUS:
             _logger.debug('### STATUS: %s', PeripheralStatus(value[1]).name)
 
@@ -231,7 +236,7 @@ class AshaService(gatt.TemplateService):
                 self.audio_type = None
                 self.volume = None
                 self.other_state = None
-                self.emit('disconnected')
+                self.emit(self.EVENT_DISCONNECTED)
 
             connection.once('disconnection', on_disconnection)
 
@@ -245,7 +250,7 @@ class AshaService(gatt.TemplateService):
     def _on_volume_write(self, connection: Optional[Connection], value: bytes) -> None:
         _logger.debug(f'--- VOLUME Write:{value[0]}')
         self.volume = value[0]
-        self.emit('volume_changed')
+        self.emit(self.EVENT_VOLUME_CHANGED)
 
     # Register an L2CAP CoC server
     def _on_connection(self, channel: l2cap.LeCreditBasedChannel) -> None:

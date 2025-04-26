@@ -724,12 +724,13 @@ class Session:
         self.is_responder = not self.is_initiator
 
         # Listen for connection events
-        connection.on('disconnection', self.on_disconnection)
+        connection.on(connection.EVENT_DISCONNECTION, self.on_disconnection)
         connection.on(
-            'connection_encryption_change', self.on_connection_encryption_change
+            connection.EVENT_CONNECTION_ENCRYPTION_CHANGE,
+            self.on_connection_encryption_change,
         )
         connection.on(
-            'connection_encryption_key_refresh',
+            connection.EVENT_CONNECTION_ENCRYPTION_KEY_REFRESH,
             self.on_connection_encryption_key_refresh,
         )
 
@@ -1310,12 +1311,15 @@ class Session:
         )
 
     def on_disconnection(self, _: int) -> None:
-        self.connection.remove_listener('disconnection', self.on_disconnection)
         self.connection.remove_listener(
-            'connection_encryption_change', self.on_connection_encryption_change
+            self.connection.EVENT_DISCONNECTION, self.on_disconnection
         )
         self.connection.remove_listener(
-            'connection_encryption_key_refresh',
+            self.connection.EVENT_CONNECTION_ENCRYPTION_CHANGE,
+            self.on_connection_encryption_change,
+        )
+        self.connection.remove_listener(
+            self.connection.EVENT_CONNECTION_ENCRYPTION_KEY_REFRESH,
             self.on_connection_encryption_key_refresh,
         )
         self.manager.on_session_end(self)
@@ -1962,7 +1966,7 @@ class Manager(utils.EventEmitter):
     def on_smp_security_request_command(
         self, connection: Connection, request: SMP_Security_Request_Command
     ) -> None:
-        connection.emit('security_request', request.auth_req)
+        connection.emit(connection.EVENT_SECURITY_REQUEST, request.auth_req)
 
     def on_smp_pdu(self, connection: Connection, pdu: bytes) -> None:
         # Parse the L2CAP payload into an SMP Command object

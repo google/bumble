@@ -202,6 +202,8 @@ class CharacteristicProxy(AttributeProxy[_T]):
     descriptors: List[DescriptorProxy]
     subscribers: Dict[Any, Callable[[_T], Any]]
 
+    EVENT_UPDATE = "update"
+
     def __init__(
         self,
         client: Client,
@@ -308,7 +310,7 @@ class Client:
         self.services = []
         self.cached_values = {}
 
-        connection.on('disconnection', self.on_disconnection)
+        connection.on(connection.EVENT_DISCONNECTION, self.on_disconnection)
 
     def send_gatt_pdu(self, pdu: bytes) -> None:
         self.connection.send_l2cap_pdu(ATT_CID, pdu)
@@ -1142,7 +1144,7 @@ class Client:
             if callable(subscriber):
                 subscriber(notification.attribute_value)
             else:
-                subscriber.emit('update', notification.attribute_value)
+                subscriber.emit(subscriber.EVENT_UPDATE, notification.attribute_value)
 
     def on_att_handle_value_indication(self, indication):
         # Call all subscribers
@@ -1157,7 +1159,7 @@ class Client:
             if callable(subscriber):
                 subscriber(indication.attribute_value)
             else:
-                subscriber.emit('update', indication.attribute_value)
+                subscriber.emit(subscriber.EVENT_UPDATE, indication.attribute_value)
 
         # Confirm that we received the indication
         self.send_confirmation(ATT_Handle_Value_Confirmation())

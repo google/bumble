@@ -266,13 +266,13 @@ class HearingAccessService(gatt.TemplateService):
         # associate the lowest index as the current active preset at startup
         self.active_preset_index = sorted(self.preset_records.keys())[0]
 
-        @device.on('connection')  # type: ignore
+        @device.on(device.EVENT_CONNECTION)
         def on_connection(connection: Connection) -> None:
-            @connection.on('disconnection')  # type: ignore
+            @connection.on(connection.EVENT_DISCONNECTION)
             def on_disconnection(_reason) -> None:
                 self.currently_connected_clients.remove(connection)
 
-            @connection.on('pairing')  # type: ignore
+            @connection.on(connection.EVENT_PAIRING)
             def on_pairing(*_: Any) -> None:
                 self.on_incoming_paired_connection(connection)
 
