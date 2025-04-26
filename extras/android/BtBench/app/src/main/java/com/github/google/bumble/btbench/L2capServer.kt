@@ -16,14 +16,9 @@ package com.github.google.bumble.btbench
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.le.AdvertiseCallback
-import android.bluetooth.le.AdvertiseData
-import android.bluetooth.le.AdvertiseSettings
-import android.bluetooth.le.AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY
 import android.os.Build
-import java.io.IOException
+import androidx.annotation.RequiresApi
 import java.util.logging.Logger
-import kotlin.concurrent.thread
 
 private val Log = Logger.getLogger("btbench.l2cap-server")
 
@@ -34,6 +29,7 @@ class L2capServer(
 ) : Mode {
     private var socketServer: SocketServer? = null
 
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     @SuppressLint("MissingPermission")
     override fun run() {
         // Advertise so that the peer can find us and connect.
