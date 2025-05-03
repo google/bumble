@@ -456,7 +456,6 @@ class Host(utils.EventEmitter):
                     hci.HCI_LE_READ_LOCAL_P_256_PUBLIC_KEY_COMPLETE_EVENT,
                     hci.HCI_LE_GENERATE_DHKEY_COMPLETE_EVENT,
                     hci.HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT,
-                    hci.HCI_LE_ENHANCED_CONNECTION_COMPLETE_V2_EVENT,
                     hci.HCI_LE_DIRECTED_ADVERTISING_REPORT_EVENT,
                     hci.HCI_LE_PHY_UPDATE_COMPLETE_EVENT,
                     hci.HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT,
