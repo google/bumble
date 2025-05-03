@@ -5976,6 +5976,33 @@ class HCI_LE_Enhanced_Connection_Complete_Event(HCI_LE_Meta_Event):
     [
         ('status', STATUS_SPEC),
         ('connection_handle', 2),
+        (
+            'role',
+            {'size': 1, 'mapper': lambda x: 'CENTRAL' if x == 0 else 'PERIPHERAL'},
+        ),
+        ('peer_address_type', Address.ADDRESS_TYPE_SPEC),
+        ('peer_address', Address.parse_address_preceded_by_type),
+        ('local_resolvable_private_address', Address.parse_random_address),
+        ('peer_resolvable_private_address', Address.parse_random_address),
+        ('connection_interval', 2),
+        ('peripheral_latency', 2),
+        ('supervision_timeout', 2),
+        ('central_clock_accuracy', 1),
+        ('advertising_handle', 1),
+        ('sync_handle', 2),
+    ]
+)
+class HCI_LE_Enhanced_Connection_Complete_V2_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.10 LE Enhanced Connection Complete Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event(
+    [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
         ('tx_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
         ('rx_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
     ]

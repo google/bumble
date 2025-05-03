@@ -61,7 +61,6 @@ from bumble.core import (
     BaseBumbleError,
     ConnectionParameterUpdateError,
     CommandTimeoutError,
-    ConnectionParameters,
     ConnectionPHY,
     InvalidArgumentError,
     InvalidOperationError,
@@ -484,7 +483,7 @@ class BIGInfoAdvertisement:
     sid: int
     num_bis: int
     nse: int
-    iso_interval: int
+    iso_interval: float
     bn: int
     pto: int
     irc: int
@@ -502,7 +501,7 @@ class BIGInfoAdvertisement:
             sid,
             report.num_bis,
             report.nse,
-            report.iso_interval,
+            report.iso_interval * 1.25,
             report.bn,
             report.pto,
             report.irc,
@@ -529,8 +528,8 @@ class AdvertisingParameters:
     advertising_event_properties: AdvertisingEventProperties = field(
         default_factory=AdvertisingEventProperties
     )
-    primary_advertising_interval_min: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
-    primary_advertising_interval_max: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
+    primary_advertising_interval_min: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
+    primary_advertising_interval_max: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
     primary_advertising_channel_map: (
         hci.HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap
     ) = (
@@ -554,8 +553,8 @@ class AdvertisingParameters:
 # -----------------------------------------------------------------------------
 @dataclass
 class PeriodicAdvertisingParameters:
-    periodic_advertising_interval_min: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
-    periodic_advertising_interval_max: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
+    periodic_advertising_interval_min: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
+    periodic_advertising_interval_max: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
     periodic_advertising_properties: (
         hci.HCI_LE_Set_Periodic_Advertising_Parameters_Command.Properties
     ) = field(
@@ -685,8 +684,12 @@ class AdvertisingSet(utils.EventEmitter):
         await self.device.send_command(
             hci.HCI_LE_Set_Periodic_Advertising_Parameters_Command(
                 advertising_handle=self.advertising_handle,
-                periodic_advertising_interval_min=advertising_parameters.periodic_advertising_interval_min,
-                periodic_advertising_interval_max=advertising_parameters.periodic_advertising_interval_max,
+                periodic_advertising_interval_min=int(
+                    advertising_parameters.periodic_advertising_interval_min / 1.25
+                ),
+                periodic_advertising_interval_max=int(
+                    advertising_parameters.periodic_advertising_interval_max / 1.25
+                ),
                 periodic_advertising_properties=advertising_parameters.periodic_advertising_properties,
             ),
             check_result=True,
@@ -826,7 +829,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
     filter_duplicates: bool
     status: int
     advertiser_phy: int
-    periodic_advertising_interval: int
+    periodic_advertising_interval: float  # Advertising interval, in milliseconds
     advertiser_clock_accuracy: int
 
     EVENT_STATE_CHANGE = "state_change"
@@ -950,7 +953,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
         if status == hci.HCI_SUCCESS:
             self.sync_handle = sync_handle
             self.advertiser_phy = advertiser_phy
-            self.periodic_advertising_interval = periodic_advertising_interval
+            self.periodic_advertising_interval = periodic_advertising_interval * 1.25
             self.advertiser_clock_accuracy = advertiser_clock_accuracy
             self.state = self.State.ESTABLISHED
             self.emit(self.EVENT_ESTABLISHMENT)
@@ -1055,7 +1058,7 @@ class Big(utils.EventEmitter):
     pto: int = 0
     irc: int = 0
     max_pdu: int = 0
-    iso_interval: int = 0
+    iso_interval: float = 0.0
     bis_links: Sequence[BisLink] = ()
 
     def __post_init__(self) -> None:
@@ -1116,7 +1119,7 @@ class BigSync(utils.EventEmitter):
     pto: int = 0
     irc: int = 0
     max_pdu: int = 0
-    iso_interval: int = 0
+    iso_interval: float = 0.0
     bis_links: Sequence[BisLink] = ()
 
     def __post_init__(self) -> None:
@@ -1197,11 +1200,11 @@ class ChannelSoundingProcedure:
     selected_tx_power: int
     subevent_len: int
     subevents_per_event: int
-    subevent_interval: int
+    subevent_interval: float  # milliseconds.
     event_interval: int
     procedure_interval: int
     procedure_count: int
-    max_procedure_len: int
+    max_procedure_len: float  # milliseconds.
 
 
 # -----------------------------------------------------------------------------
@@ -1226,9 +1229,8 @@ class Peer:
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
-        # Create a GATT client for the connection
-        self.gatt_client = gatt_client.Client(connection)
-        connection.gatt_client = self.gatt_client
+        # Shortcut to the connection's GATT client
+        self.gatt_client = connection.gatt_client
 
     @property
     def services(self) -> list[gatt_client.ServiceProxy]:
@@ -1586,7 +1588,7 @@ class Connection(utils.CompositeEventEmitter):
     encryption: int
     authenticated: bool
     sc: bool
-    link_key_type: int
+    link_key_type: Optional[int]
     gatt_client: gatt_client.Client
     pairing_peer_io_capability: Optional[int]
     pairing_peer_authentication_requirements: Optional[int]
@@ -1656,17 +1658,23 @@ class Connection(utils.CompositeEventEmitter):
         def on_connection_encryption_key_refresh(self):
             pass
 
+    @dataclass
+    class Parameters:
+        connection_interval: float  # Connection interval, in milliseconds. [LE only]
+        peripheral_latency: int  # Peripheral latency, in number of intervals. [LE only]
+        supervision_timeout: float  # Supervision timeout, in milliseconds.
+
     def __init__(
         self,
-        device,
-        handle,
-        transport,
-        self_address,
-        self_resolvable_address,
-        peer_address,
-        peer_resolvable_address,
-        role,
-        parameters,
+        device: Device,
+        handle: int,
+        transport: core.PhysicalTransport,
+        self_address: hci.Address,
+        self_resolvable_address: Optional[hci.Address],
+        peer_address: hci.Address,
+        peer_resolvable_address: Optional[hci.Address],
+        role: hci.Role,
+        parameters: Parameters,
     ):
         super().__init__()
         self.device = device
@@ -1685,7 +1693,7 @@ class Connection(utils.CompositeEventEmitter):
         self.link_key_type = None
         self.att_mtu = ATT_DEFAULT_MTU
         self.data_length = DEVICE_DEFAULT_DATA_LENGTH
-        self.gatt_client = None  # Per-connection client
+        self.gatt_client = gatt_client.Client(self)  # Per-connection client
         self.gatt_server = (
             device.gatt_server
         )  # By default, use the device's shared server
@@ -1812,12 +1820,22 @@ class Connection(utils.CompositeEventEmitter):
 
     async def update_parameters(
         self,
-        connection_interval_min,
-        connection_interval_max,
-        max_latency,
-        supervision_timeout,
+        connection_interval_min: float,
+        connection_interval_max: float,
+        max_latency: int,
+        supervision_timeout: float,
         use_l2cap=False,
-    ):
+    ) -> None:
+        """
+        Request an update of the connection parameters.
+
+        Args:
+          connection_interval_min: Minimum interval, in milliseconds.
+          connection_interval_max: Maximum interval, in milliseconds.
+          max_latency: Latency, in number of intervals.
+          supervision_timeout: Timeout, in milliseconds.
+          use_l2cap: Request the update via L2CAP.
+        """
         return await self.device.update_connection_parameters(
             self,
             connection_interval_min,
@@ -1904,8 +1922,8 @@ class DeviceConfiguration:
     address: hci.Address = hci.Address(DEVICE_DEFAULT_ADDRESS)
     class_of_device: int = DEVICE_DEFAULT_CLASS_OF_DEVICE
     scan_response_data: bytes = DEVICE_DEFAULT_SCAN_RESPONSE_DATA
-    advertising_interval_min: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
-    advertising_interval_max: int = DEVICE_DEFAULT_ADVERTISING_INTERVAL
+    advertising_interval_min: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
+    advertising_interval_max: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
     le_enabled: bool = True
     le_simultaneous_enabled: bool = False
     le_privacy_enabled: bool = False
@@ -2824,8 +2842,8 @@ class Device(utils.CompositeEventEmitter):
         auto_restart: bool = False,
         advertising_data: Optional[bytes] = None,
         scan_response_data: Optional[bytes] = None,
-        advertising_interval_min: Optional[int] = None,
-        advertising_interval_max: Optional[int] = None,
+        advertising_interval_min: Optional[float] = None,
+        advertising_interval_max: Optional[float] = None,
     ) -> None:
         """Start legacy advertising.
 
@@ -3980,19 +3998,38 @@ class Device(utils.CompositeEventEmitter):
 
     async def update_connection_parameters(
         self,
-        connection,
-        connection_interval_min,
-        connection_interval_max,
-        max_latency,
-        supervision_timeout,
-        min_ce_length=0,
-        max_ce_length=0,
-        use_l2cap=False,
+        connection: Connection,
+        connection_interval_min: float,
+        connection_interval_max: float,
+        max_latency: int,
+        supervision_timeout: float,
+        min_ce_length: float = 0.0,
+        max_ce_length: float = 0.0,
+        use_l2cap: bool = False,
     ) -> None:
         '''
+        Request an update of the connection parameters.
+
+        Args:
+          connection: The connection to update
+          connection_interval_min: Minimum interval, in milliseconds.
+          connection_interval_max: Maximum interval, in milliseconds.
+          max_latency: Latency, in number of intervals.
+          supervision_timeout: Timeout, in milliseconds.
+          min_ce_length: Minimum connection event length, in milliseconds.
+          max_ce_length: Maximum connection event length, in milliseconds.
+          use_l2cap: Request the update via L2CAP.
+
         NOTE: the name of the parameters may look odd, but it just follows the names
         used in the Bluetooth spec.
         '''
+
+        # Convert the input parameters
+        connection_interval_min = int(connection_interval_min / 1.25)
+        connection_interval_max = int(connection_interval_max / 1.25)
+        supervision_timeout = int(supervision_timeout / 10)
+        min_ce_length = int(min_ce_length / 0.625)
+        max_ce_length = int(max_ce_length / 0.625)
 
         if use_l2cap:
             if connection.role != hci.Role.PERIPHERAL:
@@ -4010,6 +4047,8 @@ class Device(utils.CompositeEventEmitter):
             )
             if l2cap_result != l2cap.L2CAP_CONNECTION_PARAMETERS_ACCEPTED_RESULT:
                 raise ConnectionParameterUpdateError(l2cap_result)
+
+            return
 
         result = await self.send_command(
             hci.HCI_LE_Connection_Update_Command(
@@ -5208,7 +5247,7 @@ class Device(utils.CompositeEventEmitter):
         big.pto = pto
         big.irc = irc
         big.max_pdu = max_pdu
-        big.iso_interval = iso_interval
+        big.iso_interval = iso_interval * 1.25
         big.state = Big.State.ACTIVE
 
         for bis_link in big.bis_links:
@@ -5257,7 +5296,7 @@ class Device(utils.CompositeEventEmitter):
         big_sync.pto = pto
         big_sync.irc = irc
         big_sync.max_pdu = max_pdu
-        big_sync.iso_interval = iso_interval
+        big_sync.iso_interval = iso_interval * 1.25
         big_sync.bis_links = [
             BisLink(handle=handle, big=big_sync) for handle in bis_handles
         ]
@@ -5314,7 +5353,7 @@ class Device(utils.CompositeEventEmitter):
         self_resolvable_address: Optional[hci.Address],
         peer_resolvable_address: Optional[hci.Address],
         role: hci.Role,
-        connection_parameters: ConnectionParameters,
+        connection_parameters: Optional[core.ConnectionParameters],
     ) -> None:
         # Convert all-zeros addresses into None.
         if self_resolvable_address == hci.Address.ANY_RANDOM:
@@ -5344,6 +5383,8 @@ class Device(utils.CompositeEventEmitter):
             self.emit(self.EVENT_CONNECTION, connection)
 
             return
+
+        assert connection_parameters is not None
 
         if peer_resolvable_address is None:
             # Resolve the peer address if we can
@@ -5400,7 +5441,11 @@ class Device(utils.CompositeEventEmitter):
             peer_address,
             peer_resolvable_address,
             role,
-            connection_parameters,
+            Connection.Parameters(
+                connection_parameters.connection_interval * 1.25,
+                connection_parameters.peripheral_latency,
+                connection_parameters.supervision_timeout * 10.0,
+            ),
         )
         self.connections[connection_handle] = connection
 
