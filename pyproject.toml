@@ -26,7 +26,7 @@ dependencies = [
     "prompt_toolkit >= 3.0.16; platform_system!='Emscripten'",
     "prettytable >= 3.6.0; platform_system!='Emscripten'",
     "protobuf >= 3.12.4; platform_system!='Emscripten'",
-    "pyee >= 8.2.2",
+    "pyee >= 13.0.0",
     "pyserial-asyncio >= 0.5; platform_system!='Emscripten'",
     "pyserial >= 3.5; platform_system!='Emscripten'",
     "pyusb >= 1.2; platform_system!='Emscripten'",
