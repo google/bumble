@@ -36,6 +36,8 @@ from bumble.core import (
 from bumble.gatt import (
     GATT_DEVICE_NAME_CHARACTERISTIC,
     GATT_GENERIC_ACCESS_SERVICE,
+    GATT_HEART_RATE_SERVICE,
+    GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
     Service,
     Characteristic,
     CharacteristicValue,
@@ -225,15 +227,6 @@ def read_with_error(connection):
     raise ATT_Error(ATT_INSUFFICIENT_AUTHENTICATION_ERROR)
 
 
-def write_with_error(connection, _value):
-    if not connection.is_encrypted:
-        raise ATT_Error(ATT_INSUFFICIENT_ENCRYPTION_ERROR)
-
-    if not AUTHENTICATION_ERROR_RETURNED[1]:
-        AUTHENTICATION_ERROR_RETURNED[1] = True
-        raise ATT_Error(ATT_INSUFFICIENT_AUTHENTICATION_ERROR)
-
-
 # -----------------------------------------------------------------------------
 def on_connection(connection, request):
     print(color(f'<<< Connection: {connection}', 'green'))
@@ -332,16 +325,13 @@ async def pair(
             device.le_enabled = True
             device.add_service(
                 Service(
-                    '50DB505C-8AC4-4738-8448-3B1D9CC09CC5',
+                    GATT_HEART_RATE_SERVICE,
                     [
                         Characteristic(
-                            '552957FB-CF1F-4A31-9535-E78847E1A714',
-                            Characteristic.Properties.READ
-                            | Characteristic.Properties.WRITE,
-                            Characteristic.READABLE | Characteristic.WRITEABLE,
-                            CharacteristicValue(
-                                read=read_with_error, write=write_with_error
-                            ),
+                            GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
+                            Characteristic.Properties.READ,
+                            Characteristic.READ_REQUIRES_AUTHENTICATION,
+                            bytes(1),
                         )
                     ],
                 )
@@ -437,7 +427,27 @@ async def pair(
 
         else:
             if mode == 'le':
-                # Advertise so that peers can find us and connect
+                # Advertise so that peers can find us and connect.
+                # Include the heart rate service UUID in the advertisement data
+                # so that devices like iPhones can show this device in their
+                # Bluetooth selector.
+                device.advertising_data = bytes(
+                    AdvertisingData(
+                        [
+                            (
+                                AdvertisingData.FLAGS,
+                                bytes(
+                                    [AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG]
+                                ),
+                            ),
+                            (AdvertisingData.COMPLETE_LOCAL_NAME, 'Bumble'.encode()),
+                            (
+                                AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+                                bytes(GATT_HEART_RATE_SERVICE),
+                            ),
+                        ]
+                    )
+                )
                 await device.start_advertising(auto_restart=True)
             else:
                 # Become discoverable and connectable
