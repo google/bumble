@@ -18,9 +18,12 @@
 import asyncio
 import os
 import logging
+import struct
+
 import click
 from prompt_toolkit.shortcuts import PromptSession
 
+from bumble.a2dp import make_audio_sink_service_sdp_records
 from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.transport import open_transport_or_link
@@ -30,8 +33,10 @@ from bumble.smp import error_name as smp_error_name
 from bumble.keys import JsonKeyStore
 from bumble.core import (
     AdvertisingData,
+    Appearance,
     ProtocolError,
     PhysicalTransport,
+    UUID,
 )
 from bumble.gatt import (
     GATT_DEVICE_NAME_CHARACTERISTIC,
@@ -40,8 +45,8 @@ from bumble.gatt import (
     GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
     Service,
     Characteristic,
-    CharacteristicValue,
 )
+from bumble.hci import OwnAddressType
 from bumble.att import (
     ATT_Error,
     ATT_INSUFFICIENT_AUTHENTICATION_ERROR,
@@ -195,7 +200,7 @@ class Delegate(PairingDelegate):
 
 # -----------------------------------------------------------------------------
 async def get_peer_name(peer, mode):
-    if mode == 'classic':
+    if peer.connection.transport == PhysicalTransport.BR_EDR:
         return await peer.request_name()
 
     # Try to get the peer name from GATT
@@ -225,6 +230,16 @@ def read_with_error(connection):
 
     AUTHENTICATION_ERROR_RETURNED[0] = True
     raise ATT_Error(ATT_INSUFFICIENT_AUTHENTICATION_ERROR)
+
+
+# -----------------------------------------------------------------------------
+def sdp_records():
+    service_record_handle = 0x00010001
+    return {
+        service_record_handle: make_audio_sink_service_sdp_records(
+            service_record_handle
+        )
+    }
 
 
 # -----------------------------------------------------------------------------
@@ -298,6 +313,7 @@ async def pair(
     mitm,
     bond,
     ctkd,
+    advertising_address,
     identity_address,
     linger,
     io,
@@ -306,6 +322,8 @@ async def pair(
     request,
     print_keys,
     keystore_file,
+    advertise_service_uuids,
+    advertise_appearance,
     device_config,
     hci_transport,
     address_or_name,
@@ -321,8 +339,7 @@ async def pair(
 
         # Expose a GATT characteristic that can be used to trigger pairing by
         # responding with an authentication error when read
-        if mode == 'le':
-            device.le_enabled = True
+        if mode in ('le', 'dual'):
             device.add_service(
                 Service(
                     GATT_HEART_RATE_SERVICE,
@@ -337,10 +354,18 @@ async def pair(
                 )
             )
 
-        # Select LE or Classic
-        if mode == 'classic':
+        # LE and Classic support
+        if mode in ('classic', 'dual'):
             device.classic_enabled = True
             device.classic_smp_enabled = ctkd
+        if mode in ('le', 'dual'):
+            device.le_enabled = True
+        if mode == 'dual':
+            device.le_simultaneous_enabled = True
+
+        # Setup SDP
+        if mode in ('classic', 'dual'):
+            device.sdp_service_records = sdp_records()
 
         # Get things going
         await device.power_on()
@@ -426,33 +451,109 @@ async def pair(
                     print(color(f'Pairing failed: {error}', 'red'))
 
         else:
-            if mode == 'le':
+            if mode in ('le', 'dual'):
                 # Advertise so that peers can find us and connect.
                 # Include the heart rate service UUID in the advertisement data
                 # so that devices like iPhones can show this device in their
                 # Bluetooth selector.
-                device.advertising_data = bytes(
-                    AdvertisingData(
-                        [
-                            (
-                                AdvertisingData.FLAGS,
-                                bytes(
-                                    [AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG]
-                                ),
-                            ),
-                            (AdvertisingData.COMPLETE_LOCAL_NAME, 'Bumble'.encode()),
-                            (
-                                AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                                bytes(GATT_HEART_RATE_SERVICE),
-                            ),
-                        ]
+                service_uuids_16 = []
+                service_uuids_32 = []
+                service_uuids_128 = []
+                if advertise_service_uuids:
+                    for uuid in advertise_service_uuids:
+                        uuid = uuid.replace("-", "")
+                        if len(uuid) == 4:
+                            service_uuids_16.append(UUID(uuid))
+                        elif len(uuid) == 8:
+                            service_uuids_32.append(UUID(uuid))
+                        elif len(uuid) == 32:
+                            service_uuids_128.append(UUID(uuid))
+                        else:
+                            print(color('Invalid UUID format', 'red'))
+                            return
+                else:
+                    service_uuids_16.append(GATT_HEART_RATE_SERVICE)
+
+                flags = AdvertisingData.Flags.LE_LIMITED_DISCOVERABLE_MODE
+                if mode == 'le':
+                    flags |= AdvertisingData.Flags.BR_EDR_NOT_SUPPORTED
+                if mode == 'dual':
+                    flags |= AdvertisingData.Flags.SIMULTANEOUS_LE_BR_EDR_CAPABLE
+
+                ad_structs = [
+                    (
+                        AdvertisingData.FLAGS,
+                        bytes([flags]),
+                    ),
+                    (AdvertisingData.COMPLETE_LOCAL_NAME, 'Bumble'.encode()),
+                ]
+                if service_uuids_16:
+                    ad_structs.append(
+                        (
+                            AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+                            b"".join(bytes(uuid) for uuid in service_uuids_16),
+                        )
                     )
+                if service_uuids_32:
+                    ad_structs.append(
+                        (
+                            AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS,
+                            b"".join(bytes(uuid) for uuid in service_uuids_32),
+                        )
+                    )
+                if service_uuids_128:
+                    ad_structs.append(
+                        (
+                            AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS,
+                            b"".join(bytes(uuid) for uuid in service_uuids_128),
+                        )
+                    )
+
+                if advertise_appearance:
+                    advertise_appearance = advertise_appearance.upper()
+                    try:
+                        advertise_appearance_int = int(advertise_appearance)
+                    except ValueError:
+                        category, subcategory = advertise_appearance.split('/')
+                        try:
+                            category_enum = Appearance.Category[category]
+                        except ValueError:
+                            print(
+                                color(f'Invalid appearance category {category}', 'red')
+                            )
+                            return
+                        subcategory_class = Appearance.SUBCATEGORY_CLASSES[
+                            category_enum
+                        ]
+                        try:
+                            subcategory_enum = subcategory_class[subcategory]
+                        except ValueError:
+                            print(color(f'Invalid subcategory {subcategory}', 'red'))
+                            return
+                        advertise_appearance_int = int(
+                            Appearance(category_enum, subcategory_enum)
+                        )
+                    ad_structs.append(
+                        (
+                            AdvertisingData.APPEARANCE,
+                            struct.pack('<H', advertise_appearance_int),
+                        )
+                    )
+                device.advertising_data = bytes(AdvertisingData(ad_structs))
+                await device.start_advertising(
+                    auto_restart=True,
+                    own_address_type=(
+                        OwnAddressType.PUBLIC
+                        if advertising_address == 'public'
+                        else OwnAddressType.RANDOM
+                    ),
                 )
-                await device.start_advertising(auto_restart=True)
-            else:
+
+            if mode in ('classic', 'dual'):
                 # Become discoverable and connectable
                 await device.set_discoverable(True)
                 await device.set_connectable(True)
+                print(color('Ready for connections on', 'blue'), device.public_address)
 
         # Run until the user asks to exit
         await Waiter.instance.wait_until_terminated()
@@ -472,7 +573,10 @@ class LogHandler(logging.Handler):
 # -----------------------------------------------------------------------------
 @click.command()
 @click.option(
-    '--mode', type=click.Choice(['le', 'classic']), default='le', show_default=True
+    '--mode',
+    type=click.Choice(['le', 'classic', 'dual']),
+    default='le',
+    show_default=True,
 )
 @click.option(
     '--sc',
@@ -493,6 +597,10 @@ class LogHandler(logging.Handler):
     default=True,
     help='Enable CTKD',
     show_default=True,
+)
+@click.option(
+    '--advertising-address',
+    type=click.Choice(['random', 'public']),
 )
 @click.option(
     '--identity-address',
@@ -522,8 +630,19 @@ class LogHandler(logging.Handler):
 @click.option('--print-keys', is_flag=True, help='Print the bond keys before pairing')
 @click.option(
     '--keystore-file',
-    metavar='<filename>',
+    metavar='FILENAME',
     help='File in which to store the pairing keys',
+)
+@click.option(
+    '--advertise-service-uuid',
+    metavar="UUID",
+    multiple=True,
+    help="Advertise a GATT service UUID (may be specified more than once)",
+)
+@click.option(
+    '--advertise-appearance',
+    metavar='APPEARANCE',
+    help='Advertise an Appearance ID (int value or string)',
 )
 @click.argument('device-config')
 @click.argument('hci_transport')
@@ -534,6 +653,7 @@ def main(
     mitm,
     bond,
     ctkd,
+    advertising_address,
     identity_address,
     linger,
     io,
@@ -542,6 +662,8 @@ def main(
     request,
     print_keys,
     keystore_file,
+    advertise_service_uuid,
+    advertise_appearance,
     device_config,
     hci_transport,
     address_or_name,
@@ -560,6 +682,7 @@ def main(
             mitm,
             bond,
             ctkd,
+            advertising_address,
             identity_address,
             linger,
             io,
@@ -568,6 +691,8 @@ def main(
             request,
             print_keys,
             keystore_file,
+            advertise_service_uuid,
+            advertise_appearance,
             device_config,
             hci_transport,
             address_or_name,

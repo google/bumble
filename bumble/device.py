@@ -1586,6 +1586,7 @@ class Connection(utils.CompositeEventEmitter):
     peer_le_features: Optional[hci.LeFeatureMask]
     role: hci.Role
     encryption: int
+    encryption_key_size: int
     authenticated: bool
     sc: bool
     link_key_type: Optional[int]
@@ -1688,6 +1689,7 @@ class Connection(utils.CompositeEventEmitter):
         self.role = role
         self.parameters = parameters
         self.encryption = 0
+        self.encryption_key_size = 0
         self.authenticated = False
         self.sc = False
         self.link_key_type = None
@@ -5057,6 +5059,15 @@ class Device(utils.CompositeEventEmitter):
     # [Classic only]
     @host_event_handler
     def on_link_key(self, bd_addr, link_key, key_type):
+        authenticated = key_type in (
+            hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE,
+            hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
+        )
+        pairing_keys = PairingKeys()
+        pairing_keys.link_key = PairingKeys.Key(
+            value=link_key, authenticated=authenticated
+        )
+
         # Store the keys in the key store
         if self.keystore:
             authenticated = key_type in (
@@ -5076,6 +5087,7 @@ class Device(utils.CompositeEventEmitter):
             bd_addr, transport=PhysicalTransport.BR_EDR
         ):
             connection.link_key_type = key_type
+            connection.emit('pairing', pairing_keys)
 
     def add_service(self, service):
         self.gatt_server.add_service(service)
@@ -5813,8 +5825,13 @@ class Device(utils.CompositeEventEmitter):
         pairing_config = self.pairing_config_factory(connection)
 
         # Show the passkey to the user
+<<<<<<< HEAD
         utils.cancel_on_event(
             connection, 'disconnection', pairing_config.delegate.display_number(passkey)
+=======
+        connection.abort_on(
+            'disconnection', pairing_config.delegate.display_number(passkey, digits=6)
+>>>>>>> fdf90c6 (add LE advertisement and HR service)
         )
 
     # [Classic only]
@@ -5950,13 +5967,17 @@ class Device(utils.CompositeEventEmitter):
 
     @host_event_handler
     @with_connection_from_handle
-    def on_connection_encryption_change(self, connection, encryption):
+    def on_connection_encryption_change(
+        self, connection, encryption, encryption_key_size
+    ):
         logger.debug(
             f'*** Connection Encryption Change: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}, '
-            f'encryption={encryption}'
+            f'encryption={encryption}, '
+            f'key_size={encryption_key_size}'
         )
         connection.encryption = encryption
+        connection.encryption_key_size = encryption_key_size
         if (
             not connection.authenticated
             and connection.transport == PhysicalTransport.BR_EDR

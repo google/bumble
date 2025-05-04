@@ -809,7 +809,7 @@ class Appearance:
         STICK_PC = 0x0F
 
     class WatchSubcategory(utils.OpenIntEnum):
-        GENENERIC_WATCH = 0x00
+        GENERIC_WATCH = 0x00
         SPORTS_WATCH = 0x01
         SMARTWATCH = 0x02
 
@@ -1127,7 +1127,7 @@ class Appearance:
         TURNTABLE = 0x05
         CD_PLAYER = 0x06
         DVD_PLAYER = 0x07
-        BLUERAY_PLAYER = 0x08
+        BLURAY_PLAYER = 0x08
         OPTICAL_DISC_PLAYER = 0x09
         SET_TOP_BOX = 0x0A
 
@@ -1350,6 +1350,12 @@ class AdvertisingData:
         ELECTRONIC_SHELF_LABEL                              = 0x34
         THREE_D_INFORMATION_DATA                            = 0x3D
         MANUFACTURER_SPECIFIC_DATA                          = 0xFF
+
+    class Flags(enum.IntFlag):
+        LE_LIMITED_DISCOVERABLE_MODE = 1 << 0
+        LE_GENERAL_DISCOVERABLE_MODE = 1 << 1
+        BR_EDR_NOT_SUPPORTED = 1 << 2
+        SIMULTANEOUS_LE_BR_EDR_CAPABLE = 1 << 3
 
     # For backward-compatibility
     FLAGS                                            = Type.FLAGS
