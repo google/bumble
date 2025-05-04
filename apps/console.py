@@ -335,9 +335,9 @@ class ConsoleApp:
             elif self.connected_peer:
                 connection = self.connected_peer.connection
                 connection_parameters = (
-                    f'{connection.parameters.connection_interval}/'
+                    f'{connection.parameters.connection_interval:.2f}/'
                     f'{connection.parameters.peripheral_latency}/'
-                    f'{connection.parameters.supervision_timeout}'
+                    f'{connection.parameters.supervision_timeout:.2f}'
                 )
                 if self.connection_phy is not None:
                     phy_state = (

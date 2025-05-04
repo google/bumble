@@ -121,9 +121,9 @@ def print_connection(connection):
 
         params.append(
             'Parameters='
-            f'{connection.parameters.connection_interval * 1.25:.2f}/'
+            f'{connection.parameters.connection_interval:.2f}/'
             f'{connection.parameters.peripheral_latency}/'
-            f'{connection.parameters.supervision_timeout * 10} '
+            f'{connection.parameters.supervision_timeout:.2f} '
         )
 
         params.append(f'MTU={connection.att_mtu}')
