@@ -1589,7 +1589,8 @@ class Connection(utils.CompositeEventEmitter):
     encryption_key_size: int
     authenticated: bool
     sc: bool
-    link_key_type: Optional[int]
+    link_key: Optional[bytes]  # [Classic only]
+    link_key_type: Optional[int]  # [Classic only]
     gatt_client: gatt_client.Client
     pairing_peer_io_capability: Optional[int]
     pairing_peer_authentication_requirements: Optional[int]
@@ -1629,6 +1630,7 @@ class Connection(utils.CompositeEventEmitter):
     EVENT_PAIRING = "pairing"
     EVENT_PAIRING_FAILURE = "pairing_failure"
     EVENT_SECURITY_REQUEST = "security_request"
+    EVENT_LINK_KEY = "link_key"
 
     @utils.composite_listener
     class Listener:
@@ -1692,6 +1694,7 @@ class Connection(utils.CompositeEventEmitter):
         self.encryption_key_size = 0
         self.authenticated = False
         self.sc = False
+        self.link_key = None
         self.link_key_type = None
         self.att_mtu = ATT_DEFAULT_MTU
         self.data_length = DEVICE_DEFAULT_DATA_LENGTH
@@ -5096,8 +5099,9 @@ class Device(utils.CompositeEventEmitter):
         if connection := self.find_connection_by_bd_addr(
             bd_addr, transport=PhysicalTransport.BR_EDR
         ):
+            connection.link_key = link_key
             connection.link_key_type = key_type
-            connection.emit('pairing', pairing_keys)
+            connection.emit(connection.EVENT_LINK_KEY)
 
     def add_service(self, service):
         self.gatt_server.add_service(service)

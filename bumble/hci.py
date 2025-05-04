@@ -29,13 +29,12 @@ from typing_extensions import Self
 from bumble import crypto
 from bumble.colors import color
 from bumble.core import (
-    PhysicalTransport,
     AdvertisingData,
     DeviceClass,
     InvalidArgumentError,
     InvalidPacketError,
-    ProtocolError,
     PhysicalTransport,
+    ProtocolError,
     bit_flags_to_strings,
     name_or_number,
     padded_bytes,

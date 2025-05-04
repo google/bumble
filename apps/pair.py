@@ -69,7 +69,7 @@ class Waiter:
         self.linger = linger
 
     def terminate(self):
-        if not self.linger:
+        if not self.linger and not self.done.done:
             self.done.set_result(None)
 
     async def wait_until_terminated(self):
@@ -247,15 +247,19 @@ def on_connection(connection, request):
     print(color(f'<<< Connection: {connection}', 'green'))
 
     # Listen for pairing events
-    connection.on('pairing_start', on_pairing_start)
-    connection.on('pairing', lambda keys: on_pairing(connection, keys))
+    connection.on(connection.EVENT_PAIRING_START, on_pairing_start)
+    connection.on(connection.EVENT_PAIRING, lambda keys: on_pairing(connection, keys))
     connection.on(
-        'pairing_failure', lambda reason: on_pairing_failure(connection, reason)
+        connection.EVENT_CLASSIC_PAIRING, lambda: on_classic_pairing(connection)
+    )
+    connection.on(
+        connection.EVENT_PAIRING_FAILURE,
+        lambda reason: on_pairing_failure(connection, reason),
     )
 
     # Listen for encryption changes
     connection.on(
-        'connection_encryption_change',
+        connection.EVENT_CONNECTION_ENCRYPTION_CHANGE,
         lambda: on_connection_encryption_change(connection),
     )
 
@@ -293,6 +297,20 @@ async def on_pairing(connection, keys):
     print(color('***-----------------------------------', 'cyan'))
     await asyncio.sleep(POST_PAIRING_DELAY)
     await connection.disconnect()
+    Waiter.instance.terminate()
+
+
+# -----------------------------------------------------------------------------
+@AsyncRunner.run_in_task()
+async def on_classic_pairing(connection):
+    print(color('***-----------------------------------', 'cyan'))
+    print(
+        color(
+            f'*** Paired [Classic]! (peer identity={connection.peer_address})', 'cyan'
+        )
+    )
+    print(color('***-----------------------------------', 'cyan'))
+    await asyncio.sleep(POST_PAIRING_DELAY)
     Waiter.instance.terminate()
 
 
