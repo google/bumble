@@ -25,74 +25,21 @@ from __future__ import annotations
 
 import logging
 import operator
-
 import secrets
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.asymmetric.ec import (
-    generate_private_key,
-    ECDH,
-    EllipticCurvePrivateKey,
-    EllipticCurvePublicNumbers,
-    EllipticCurvePrivateNumbers,
-    SECP256R1,
-)
-from cryptography.hazmat.primitives import cmac
-from typing import Tuple
+
+try:
+    from bumble._crypto.cryptography import EccKey, e, aes_cmac
+except ImportError:
+    logging.getLogger(__name__).debug(
+        "Unable to import cryptography, use built-in primitives."
+    )
+    from bumble._crypto.builtin import EccKey, e, aes_cmac  # type: ignore[assignment]
 
 
 # -----------------------------------------------------------------------------
 # Logging
 # -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
-
-
-# -----------------------------------------------------------------------------
-# Classes
-# -----------------------------------------------------------------------------
-class EccKey:
-    def __init__(self, private_key: EllipticCurvePrivateKey) -> None:
-        self.private_key = private_key
-
-    @classmethod
-    def generate(cls) -> EccKey:
-        private_key = generate_private_key(SECP256R1())
-        return cls(private_key)
-
-    @classmethod
-    def from_private_key_bytes(
-        cls, d_bytes: bytes, x_bytes: bytes, y_bytes: bytes
-    ) -> EccKey:
-        d = int.from_bytes(d_bytes, byteorder='big', signed=False)
-        x = int.from_bytes(x_bytes, byteorder='big', signed=False)
-        y = int.from_bytes(y_bytes, byteorder='big', signed=False)
-        private_key = EllipticCurvePrivateNumbers(
-            d, EllipticCurvePublicNumbers(x, y, SECP256R1())
-        ).private_key()
-        return cls(private_key)
-
-    @property
-    def x(self) -> bytes:
-        return (
-            self.private_key.public_key()
-            .public_numbers()
-            .x.to_bytes(32, byteorder='big')
-        )
-
-    @property
-    def y(self) -> bytes:
-        return (
-            self.private_key.public_key()
-            .public_numbers()
-            .y.to_bytes(32, byteorder='big')
-        )
-
-    def dh(self, public_key_x: bytes, public_key_y: bytes) -> bytes:
-        x = int.from_bytes(public_key_x, byteorder='big', signed=False)
-        y = int.from_bytes(public_key_y, byteorder='big', signed=False)
-        public_key = EllipticCurvePublicNumbers(x, y, SECP256R1()).public_key()
-        shared_key = self.private_key.exchange(ECDH(), public_key)
-
-        return shared_key
 
 
 # -----------------------------------------------------------------------------
@@ -130,19 +77,6 @@ def r() -> bytes:
     Generate 16 bytes of random data
     '''
     return secrets.token_bytes(16)
-
-
-# -----------------------------------------------------------------------------
-def e(key: bytes, data: bytes) -> bytes:
-    '''
-    AES-128 ECB, expecting byte-swapped inputs and producing a byte-swapped output.
-
-    See Bluetooth spec Vol 3, Part H - 2.2.1 Security function e
-    '''
-
-    cipher = Cipher(algorithms.AES(reverse(key)), modes.ECB())
-    encryptor = cipher.encryptor()
-    return reverse(encryptor.update(reverse(data)))
 
 
 # -----------------------------------------------------------------------------
@@ -188,18 +122,6 @@ def s1(k: bytes, r1: bytes, r2: bytes) -> bytes:
 
 
 # -----------------------------------------------------------------------------
-def aes_cmac(m: bytes, k: bytes) -> bytes:
-    '''
-    See Bluetooth spec, Vol 3, Part H - 2.2.5 FunctionAES-CMAC
-
-    NOTE: the input and output of this internal function are in big-endian byte order
-    '''
-    mac = cmac.CMAC(algorithms.AES(k))
-    mac.update(m)
-    return mac.finalize()
-
-
-# -----------------------------------------------------------------------------
 def f4(u: bytes, v: bytes, x: bytes, z: bytes) -> bytes:
     '''
     See Bluetooth spec, Vol 3, Part H - 2.2.6 LE Secure Connections Confirm Value
@@ -209,7 +131,7 @@ def f4(u: bytes, v: bytes, x: bytes, z: bytes) -> bytes:
 
 
 # -----------------------------------------------------------------------------
-def f5(w: bytes, n1: bytes, n2: bytes, a1: bytes, a2: bytes) -> Tuple[bytes, bytes]:
+def f5(w: bytes, n1: bytes, n2: bytes, a1: bytes, a2: bytes) -> tuple[bytes, bytes]:
     '''
     See Bluetooth spec, Vol 3, Part H - 2.2.7 LE Secure Connections Key Generation
     Function f5
