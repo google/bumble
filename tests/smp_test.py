@@ -21,17 +21,30 @@ from unittest import mock
 
 from bumble import smp
 from bumble import pairing
+from bumble import crypto
 from bumble.crypto import EccKey, aes_cmac, ah, c1, f4, f5, f6, g2, h6, h7, s1
 from bumble.pairing import OobData, OobSharedData, LeRole
 from bumble.hci import Address
 from bumble.core import AdvertisingData
 from bumble.device import Device
 
-from typing import Optional
+from typing import Optional, Any
+
 
 # -----------------------------------------------------------------------------
 # pylint: disable=invalid-name
 # -----------------------------------------------------------------------------
+@pytest.fixture(
+    scope="session", params=["bumble.crypto._builtin", "bumble.crypto._cryptography"]
+)
+def crypto_backend(request):
+    backend = pytest.importorskip(request.param)
+    with (
+        mock.patch.object(crypto, "e", backend.e),
+        mock.patch.object(crypto, "aes_cmac", backend.aes_cmac),
+        mock.patch.object(crypto, "EccKey", backend.EccKey),
+    ):
+        yield
 
 
 # -----------------------------------------------------------------------------
@@ -40,7 +53,7 @@ def reversed_hex(hex_str: str) -> bytes:
 
 
 # -----------------------------------------------------------------------------
-def test_ecc():
+def test_ecc(crypto_backend):
     key = EccKey.generate()
     x = key.x
     y = key.y
@@ -69,21 +82,17 @@ def test_ecc():
     )
     dhkey = 'ec0234a3 57c8ad05 341010a6 0a397d9b 99796b13 b4f866f1 868d34f3 73bfa698'
 
-    key_a = EccKey.from_private_key_bytes(
-        bytes.fromhex(private_A), bytes.fromhex(public_A_x), bytes.fromhex(public_A_y)
-    )
+    key_a = EccKey.from_private_key_bytes(bytes.fromhex(private_A))
     shared_key = key_a.dh(bytes.fromhex(public_B_x), bytes.fromhex(public_B_y))
     assert shared_key == bytes.fromhex(dhkey)
 
-    key_b = EccKey.from_private_key_bytes(
-        bytes.fromhex(private_B), bytes.fromhex(public_B_x), bytes.fromhex(public_B_y)
-    )
+    key_b = EccKey.from_private_key_bytes(bytes.fromhex(private_B))
     shared_key = key_b.dh(bytes.fromhex(public_A_x), bytes.fromhex(public_A_y))
     assert shared_key == bytes.fromhex(dhkey)
 
 
 # -----------------------------------------------------------------------------
-def test_c1():
+def test_c1(crypto_backend):
     k = bytes(16)
     r = reversed_hex('5783D52156AD6F0E6388274EC6702EE0')
     pres = reversed_hex('05000800000302')
@@ -97,7 +106,7 @@ def test_c1():
 
 
 # -----------------------------------------------------------------------------
-def test_s1():
+def test_s1(crypto_backend):
     k = bytes(16)
     r1 = reversed_hex('000F0E0D0C0B0A091122334455667788')
     r2 = reversed_hex('010203040506070899AABBCCDDEEFF00')
@@ -106,7 +115,7 @@ def test_s1():
 
 
 # -----------------------------------------------------------------------------
-def test_aes_cmac():
+def test_aes_cmac(crypto_backend):
     m = b''
     k = bytes.fromhex('2b7e1516 28aed2a6 abf71588 09cf4f3c')
     cmac = aes_cmac(m, k)
@@ -135,7 +144,7 @@ def test_aes_cmac():
 
 
 # -----------------------------------------------------------------------------
-def test_f4():
+def test_f4(crypto_backend):
     u = reversed_hex(
         '20b003d2 f297be2c 5e2c83a7 e9f9a5b9 eff49111 acf4fddb cc030148 0e359de6'
     )
@@ -149,7 +158,7 @@ def test_f4():
 
 
 # -----------------------------------------------------------------------------
-def test_f5():
+def test_f5(crypto_backend):
     w = reversed_hex(
         'ec0234a3 57c8ad05 341010a6 0a397d9b 99796b13 b4f866f1 868d34f3 73bfa698'
     )
@@ -163,7 +172,7 @@ def test_f5():
 
 
 # -----------------------------------------------------------------------------
-def test_f6():
+def test_f6(crypto_backend):
     n1 = reversed_hex('d5cb8454 d177733e ffffb2ec 712baeab')
     n2 = reversed_hex('a6e8e7cc 25a75f6e 216583f7 ff3dc4cf')
     mac_key = reversed_hex('2965f176 a1084a02 fd3f6a20 ce636e20')
@@ -176,7 +185,7 @@ def test_f6():
 
 
 # -----------------------------------------------------------------------------
-def test_g2():
+def test_g2(crypto_backend):
     u = reversed_hex(
         '20b003d2 f297be2c 5e2c83a7 e9f9a5b9 eff49111 acf4fddb cc030148 0e359de6'
     )
@@ -190,21 +199,21 @@ def test_g2():
 
 
 # -----------------------------------------------------------------------------
-def test_h6():
+def test_h6(crypto_backend):
     KEY = reversed_hex('ec0234a3 57c8ad05 341010a6 0a397d9b')
     KEY_ID = bytes.fromhex('6c656272')
     assert h6(KEY, KEY_ID) == reversed_hex('2d9ae102 e76dc91c e8d3a9e2 80b16399')
 
 
 # -----------------------------------------------------------------------------
-def test_h7():
+def test_h7(crypto_backend):
     KEY = reversed_hex('ec0234a3 57c8ad05 341010a6 0a397d9b')
     SALT = bytes.fromhex('00000000 00000000 00000000 746D7031')
     assert h7(SALT, KEY) == reversed_hex('fb173597 c6a3c0ec d2998c2a 75a57011')
 
 
 # -----------------------------------------------------------------------------
-def test_ah():
+def test_ah(crypto_backend):
     irk = reversed_hex('ec0234a3 57c8ad05 341010a6 0a397d9b')
     prand = reversed_hex('708194')
     value = ah(irk, prand)
@@ -213,7 +222,7 @@ def test_ah():
 
 
 # -----------------------------------------------------------------------------
-def test_oob_data():
+def test_oob_data(crypto_backend):
     oob_data = OobData(
         address=Address("F0:F1:F2:F3:F4:F5"),
         role=LeRole.BOTH_PERIPHERAL_PREFERRED,
@@ -237,7 +246,7 @@ def test_oob_data():
         (True, '287ad379 dca40253 0a39f1f4 3047b835'),
     ],
 )
-def test_ltk_to_link_key(ct2: bool, expected: str):
+def test_ltk_to_link_key(ct2: bool, expected: str, crypto_backend: Any):
     LTK = reversed_hex('368df9bc e3264b58 bd066c33 334fbf64')
     assert smp.Session.derive_link_key(LTK, ct2) == reversed_hex(expected)
 
@@ -250,7 +259,7 @@ def test_ltk_to_link_key(ct2: bool, expected: str):
         (True, 'e85e09eb 5eccb3e2 69418a13 3211bc79'),
     ],
 )
-def test_link_key_to_ltk(ct2: bool, expected: str):
+def test_link_key_to_ltk(ct2: bool, expected: str, crypto_backend: Any):
     LINK_KEY = reversed_hex('05040302 01000908 07060504 03020100')
     assert smp.Session.derive_ltk(LINK_KEY, ct2) == reversed_hex(expected)
 
@@ -291,6 +300,7 @@ async def test_send_identity_address_command(
     public_address: Address,
     random_address: Address,
     expected_identity_address: Address,
+    crypto_backend: Any,
 ):
     device = Device()
     device.public_address = public_address
@@ -304,19 +314,3 @@ async def test_send_identity_address_command(
     actual_command = mock_method.call_args.args[0]
     assert actual_command.addr_type == expected_identity_address.address_type
     assert actual_command.bd_addr == expected_identity_address
-
-
-# -----------------------------------------------------------------------------
-if __name__ == '__main__':
-    test_ecc()
-    test_c1()
-    test_s1()
-    test_aes_cmac()
-    test_f4()
-    test_f5()
-    test_f6()
-    test_g2()
-    test_h6()
-    test_h7()
-    test_ah()
-    test_oob_data()
