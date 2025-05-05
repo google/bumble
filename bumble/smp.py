@@ -1380,8 +1380,10 @@ class Session:
                 ediv=self.ltk_ediv,
                 rand=self.ltk_rand,
             )
+            if not self.peer_ltk:
+                logger.error("peer_ltk is None")
             peer_ltk_key = PairingKeys.Key(
-                value=self.peer_ltk,
+                value=self.peer_ltk or b'',
                 authenticated=authenticated,
                 ediv=self.peer_ediv,
                 rand=self.peer_rand,

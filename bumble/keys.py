@@ -22,14 +22,15 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import asyncio
+import dataclasses
 import logging
 import os
 import json
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Type, Any
 from typing_extensions import Self
 
 from bumble.colors import color
-from bumble.hci import Address
+from bumble import hci
 
 if TYPE_CHECKING:
     from bumble.device import Device
@@ -42,16 +43,17 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
+@dataclasses.dataclass
 class PairingKeys:
+    @dataclasses.dataclass
     class Key:
-        def __init__(self, value, authenticated=False, ediv=None, rand=None):
-            self.value = value
-            self.authenticated = authenticated
-            self.ediv = ediv
-            self.rand = rand
+        value: bytes
+        authenticated: bool = False
+        ediv: Optional[int] = None
+        rand: Optional[bytes] = None
 
         @classmethod
-        def from_dict(cls, key_dict):
+        def from_dict(cls, key_dict: dict[str, Any]) -> PairingKeys.Key:
             value = bytes.fromhex(key_dict['value'])
             authenticated = key_dict.get('authenticated', False)
             ediv = key_dict.get('ediv')
@@ -61,7 +63,7 @@ class PairingKeys:
 
             return cls(value, authenticated, ediv, rand)
 
-        def to_dict(self):
+        def to_dict(self) -> dict[str, Any]:
             key_dict = {'value': self.value.hex(), 'authenticated': self.authenticated}
             if self.ediv is not None:
                 key_dict['ediv'] = self.ediv
@@ -70,39 +72,42 @@ class PairingKeys:
 
             return key_dict
 
-    def __init__(self):
-        self.address_type = None
-        self.ltk = None
-        self.ltk_central = None
-        self.ltk_peripheral = None
-        self.irk = None
-        self.csrk = None
-        self.link_key = None  # Classic
+    address_type: Optional[hci.AddressType] = None
+    ltk: Optional[Key] = None
+    ltk_central: Optional[Key] = None
+    ltk_peripheral: Optional[Key] = None
+    irk: Optional[Key] = None
+    csrk: Optional[Key] = None
+    link_key: Optional[Key] = None  # Classic
+    link_key_type: Optional[int] = None  # Classic
 
-    @staticmethod
-    def key_from_dict(keys_dict, key_name):
+    @classmethod
+    def key_from_dict(cls, keys_dict: dict[str, Any], key_name: str) -> Optional[Key]:
         key_dict = keys_dict.get(key_name)
         if key_dict is None:
             return None
 
         return PairingKeys.Key.from_dict(key_dict)
 
-    @staticmethod
-    def from_dict(keys_dict):
-        keys = PairingKeys()
+    @classmethod
+    def from_dict(cls, keys_dict: dict[str, Any]) -> PairingKeys:
+        return PairingKeys(
+            address_type=(
+                hci.AddressType(t)
+                if (t := keys_dict.get('address_type')) is not None
+                else None
+            ),
+            ltk=PairingKeys.key_from_dict(keys_dict, 'ltk'),
+            ltk_central=PairingKeys.key_from_dict(keys_dict, 'ltk_central'),
+            ltk_peripheral=PairingKeys.key_from_dict(keys_dict, 'ltk_peripheral'),
+            irk=PairingKeys.key_from_dict(keys_dict, 'irk'),
+            csrk=PairingKeys.key_from_dict(keys_dict, 'csrk'),
+            link_key=PairingKeys.key_from_dict(keys_dict, 'link_key'),
+            link_key_type=keys_dict.get('link_key_type'),
+        )
 
-        keys.address_type = keys_dict.get('address_type')
-        keys.ltk = PairingKeys.key_from_dict(keys_dict, 'ltk')
-        keys.ltk_central = PairingKeys.key_from_dict(keys_dict, 'ltk_central')
-        keys.ltk_peripheral = PairingKeys.key_from_dict(keys_dict, 'ltk_peripheral')
-        keys.irk = PairingKeys.key_from_dict(keys_dict, 'irk')
-        keys.csrk = PairingKeys.key_from_dict(keys_dict, 'csrk')
-        keys.link_key = PairingKeys.key_from_dict(keys_dict, 'link_key')
-
-        return keys
-
-    def to_dict(self):
-        keys = {}
+    def to_dict(self) -> dict[str, Any]:
+        keys: dict[str, Any] = {}
 
         if self.address_type is not None:
             keys['address_type'] = self.address_type
@@ -125,9 +130,12 @@ class PairingKeys:
         if self.link_key is not None:
             keys['link_key'] = self.link_key.to_dict()
 
+        if self.link_key_type is not None:
+            keys['link_key_type'] = self.link_key_type
+
         return keys
 
-    def print(self, prefix=''):
+    def print(self, prefix: str = '') -> None:
         keys_dict = self.to_dict()
         for container_property, value in keys_dict.items():
             if isinstance(value, dict):
@@ -156,20 +164,28 @@ class KeyStore:
         all_keys = await self.get_all()
         await asyncio.gather(*(self.delete(name) for (name, _) in all_keys))
 
-    async def get_resolving_keys(self):
+    async def get_resolving_keys(self) -> list[tuple[bytes, hci.Address]]:
         all_keys = await self.get_all()
         resolving_keys = []
         for name, keys in all_keys:
             if keys.irk is not None:
-                if keys.address_type is None:
-                    address_type = Address.RANDOM_DEVICE_ADDRESS
-                else:
-                    address_type = keys.address_type
-                resolving_keys.append((keys.irk.value, Address(name, address_type)))
+                resolving_keys.append(
+                    (
+                        keys.irk.value,
+                        hci.Address(
+                            name,
+                            (
+                                keys.address_type
+                                if keys.address_type is not None
+                                else hci.Address.RANDOM_DEVICE_ADDRESS
+                            ),
+                        ),
+                    )
+                )
 
         return resolving_keys
 
-    async def print(self, prefix=''):
+    async def print(self, prefix: str = '') -> None:
         entries = await self.get_all()
         separator = ''
         for name, keys in entries:
@@ -177,8 +193,8 @@ class KeyStore:
             keys.print(prefix=prefix + '  ')
             separator = '\n'
 
-    @staticmethod
-    def create_for_device(device: Device) -> KeyStore:
+    @classmethod
+    def create_for_device(cls, device: Device) -> KeyStore:
         if device.config.keystore is None:
             return MemoryKeyStore()
 
@@ -266,9 +282,9 @@ class JsonKeyStore(KeyStore):
                     filename = params[0]
 
         # Use a namespace based on the device address
-        if device.public_address not in (Address.ANY, Address.ANY_RANDOM):
+        if device.public_address not in (hci.Address.ANY, hci.Address.ANY_RANDOM):
             namespace = str(device.public_address)
-        elif device.random_address != Address.ANY_RANDOM:
+        elif device.random_address != hci.Address.ANY_RANDOM:
             namespace = str(device.random_address)
         else:
             namespace = JsonKeyStore.DEFAULT_NAMESPACE
