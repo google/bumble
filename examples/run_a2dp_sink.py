@@ -33,12 +33,6 @@ from bumble.avdtp import (
 from bumble.a2dp import (
     make_audio_sink_service_sdp_records,
     A2DP_SBC_CODEC_TYPE,
-    SBC_MONO_CHANNEL_MODE,
-    SBC_DUAL_CHANNEL_MODE,
-    SBC_SNR_ALLOCATION_METHOD,
-    SBC_LOUDNESS_ALLOCATION_METHOD,
-    SBC_STEREO_CHANNEL_MODE,
-    SBC_JOINT_STEREO_CHANNEL_MODE,
     SbcMediaCodecInformation,
 )
 

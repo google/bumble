@@ -1586,9 +1586,10 @@ class Connection(utils.CompositeEventEmitter):
     peer_le_features: Optional[hci.LeFeatureMask]
     role: hci.Role
     encryption: int
+    encryption_key_size: int
     authenticated: bool
     sc: bool
-    link_key_type: Optional[int]
+    link_key_type: Optional[int]  # [Classic only]
     gatt_client: gatt_client.Client
     pairing_peer_io_capability: Optional[int]
     pairing_peer_authentication_requirements: Optional[int]
@@ -1688,6 +1689,7 @@ class Connection(utils.CompositeEventEmitter):
         self.role = role
         self.parameters = parameters
         self.encryption = 0
+        self.encryption_key_size = 0
         self.authenticated = False
         self.sc = False
         self.link_key_type = None
@@ -1809,7 +1811,7 @@ class Connection(utils.CompositeEventEmitter):
 
         try:
             await asyncio.wait_for(
-                utils.cancel_on_event(self.device, 'flush', abort), timeout
+                utils.cancel_on_event(self.device, Device.EVENT_FLUSH, abort), timeout
             )
         finally:
             self.remove_listener(self.EVENT_DISCONNECTION, abort.set_result)
@@ -3756,7 +3758,9 @@ class Device(utils.CompositeEventEmitter):
                 self.le_connecting = True
 
             if timeout is None:
-                return await utils.cancel_on_event(self, 'flush', pending_connection)
+                return await utils.cancel_on_event(
+                    self, Device.EVENT_FLUSH, pending_connection
+                )
 
             try:
                 return await asyncio.wait_for(
@@ -3774,7 +3778,7 @@ class Device(utils.CompositeEventEmitter):
 
                 try:
                     return await utils.cancel_on_event(
-                        self, 'flush', pending_connection
+                        self, Device.EVENT_FLUSH, pending_connection
                     )
                 except core.ConnectionError as error:
                     raise core.TimeoutError() from error
@@ -3831,7 +3835,9 @@ class Device(utils.CompositeEventEmitter):
 
         try:
             # Wait for a request or a completed connection
-            pending_request = utils.cancel_on_event(self, 'flush', pending_request_fut)
+            pending_request = utils.cancel_on_event(
+                self, Device.EVENT_FLUSH, pending_request_fut
+            )
             result = await (
                 asyncio.wait_for(pending_request, timeout)
                 if timeout
@@ -3893,7 +3899,9 @@ class Device(utils.CompositeEventEmitter):
             )
 
             # Wait for connection complete
-            return await utils.cancel_on_event(self, 'flush', pending_connection)
+            return await utils.cancel_on_event(
+                self, Device.EVENT_FLUSH, pending_connection
+            )
 
         finally:
             self.remove_listener(self.EVENT_CONNECTION, on_connection)
@@ -3969,7 +3977,9 @@ class Device(utils.CompositeEventEmitter):
 
             # Wait for the disconnection process to complete
             self.disconnecting = True
-            return await utils.cancel_on_event(self, 'flush', pending_disconnection)
+            return await utils.cancel_on_event(
+                self, Device.EVENT_FLUSH, pending_disconnection
+            )
         finally:
             connection.remove_listener(
                 connection.EVENT_DISCONNECTION, pending_disconnection.set_result
@@ -4193,7 +4203,7 @@ class Device(utils.CompositeEventEmitter):
             else:
                 return None
 
-            return await utils.cancel_on_event(self, 'flush', peer_address)
+            return await utils.cancel_on_event(self, Device.EVENT_FLUSH, peer_address)
         finally:
             if listener is not None:
                 self.remove_listener(event_name, listener)
@@ -4243,7 +4253,7 @@ class Device(utils.CompositeEventEmitter):
             if not self.scanning:
                 await self.start_scanning(filter_duplicates=True)
 
-            return await utils.cancel_on_event(self, 'flush', peer_address)
+            return await utils.cancel_on_event(self, Device.EVENT_FLUSH, peer_address)
         finally:
             if listener is not None:
                 self.remove_listener(event_name, listener)
@@ -4351,7 +4361,7 @@ class Device(utils.CompositeEventEmitter):
 
             # Wait for the authentication to complete
             await utils.cancel_on_event(
-                connection, 'disconnection', pending_authentication
+                connection, Connection.EVENT_DISCONNECTION, pending_authentication
             )
         finally:
             connection.remove_listener(
@@ -4439,7 +4449,9 @@ class Device(utils.CompositeEventEmitter):
                     raise hci.HCI_StatusError(result)
 
             # Wait for the result
-            await utils.cancel_on_event(connection, 'disconnection', pending_encryption)
+            await utils.cancel_on_event(
+                connection, Connection.EVENT_DISCONNECTION, pending_encryption
+            )
         finally:
             connection.remove_listener(
                 connection.EVENT_CONNECTION_ENCRYPTION_CHANGE, on_encryption_change
@@ -4484,7 +4496,7 @@ class Device(utils.CompositeEventEmitter):
                 )
                 raise hci.HCI_StatusError(result)
             await utils.cancel_on_event(
-                connection, 'disconnection', pending_role_change
+                connection, Connection.EVENT_DISCONNECTION, pending_role_change
             )
         finally:
             connection.remove_listener(connection.EVENT_ROLE_CHANGE, on_role_change)
@@ -4536,7 +4548,7 @@ class Device(utils.CompositeEventEmitter):
                 raise hci.HCI_StatusError(result)
 
             # Wait for the result
-            return await utils.cancel_on_event(self, 'flush', pending_name)
+            return await utils.cancel_on_event(self, Device.EVENT_FLUSH, pending_name)
         finally:
             self.remove_listener(self.EVENT_REMOTE_NAME, handler)
             self.remove_listener(self.EVENT_REMOTE_NAME_FAILURE, failure_handler)
@@ -5069,13 +5081,14 @@ class Device(utils.CompositeEventEmitter):
             )
 
             utils.cancel_on_event(
-                self, 'flush', self.update_keys(str(bd_addr), pairing_keys)
+                self, Device.EVENT_FLUSH, self.update_keys(str(bd_addr), pairing_keys)
             )
 
         if connection := self.find_connection_by_bd_addr(
             bd_addr, transport=PhysicalTransport.BR_EDR
         ):
             connection.link_key_type = key_type
+            connection.emit(connection.EVENT_LINK_KEY)
 
     def add_service(self, service):
         self.gatt_server.add_service(service)
@@ -5338,8 +5351,10 @@ class Device(utils.CompositeEventEmitter):
         # Setup auto-restart of the advertising set if needed.
         if advertising_set.auto_restart:
             connection.once(
-                'disconnection',
-                lambda _: utils.cancel_on_event(self, 'flush', advertising_set.start()),
+                Connection.EVENT_DISCONNECTION,
+                lambda _: utils.cancel_on_event(
+                    self, Device.EVENT_FLUSH, advertising_set.start()
+                ),
             )
 
         self.emit(self.EVENT_CONNECTION, connection)
@@ -5453,8 +5468,10 @@ class Device(utils.CompositeEventEmitter):
             if self.legacy_advertiser.auto_restart:
                 advertiser = self.legacy_advertiser
                 connection.once(
-                    'disconnection',
-                    lambda _: utils.cancel_on_event(self, 'flush', advertiser.start()),
+                    Connection.EVENT_DISCONNECTION,
+                    lambda _: utils.cancel_on_event(
+                        self, Device.EVENT_FLUSH, advertiser.start()
+                    ),
                 )
             else:
                 self.legacy_advertiser = None
@@ -5713,7 +5730,9 @@ class Device(utils.CompositeEventEmitter):
 
         async def reply() -> None:
             try:
-                if await utils.cancel_on_event(connection, 'disconnection', method()):
+                if await utils.cancel_on_event(
+                    connection, Connection.EVENT_DISCONNECTION, method()
+                ):
                     await self.host.send_command(
                         hci.HCI_User_Confirmation_Request_Reply_Command(
                             bd_addr=connection.peer_address
@@ -5741,7 +5760,9 @@ class Device(utils.CompositeEventEmitter):
         async def reply() -> None:
             try:
                 number = await utils.cancel_on_event(
-                    connection, 'disconnection', pairing_config.delegate.get_number()
+                    connection,
+                    Connection.EVENT_DISCONNECTION,
+                    pairing_config.delegate.get_number(),
                 )
                 if number is not None:
                     await self.host.send_command(
@@ -5775,7 +5796,9 @@ class Device(utils.CompositeEventEmitter):
             # Ask the user to enter a string
             async def get_pin_code():
                 pin_code = await utils.cancel_on_event(
-                    connection, 'disconnection', pairing_config.delegate.get_string(16)
+                    connection,
+                    Connection.EVENT_DISCONNECTION,
+                    pairing_config.delegate.get_string(16),
                 )
 
                 if pin_code is not None:
@@ -5814,7 +5837,9 @@ class Device(utils.CompositeEventEmitter):
 
         # Show the passkey to the user
         utils.cancel_on_event(
-            connection, 'disconnection', pairing_config.delegate.display_number(passkey)
+            connection,
+            Connection.EVENT_DISCONNECTION,
+            pairing_config.delegate.display_number(passkey, digits=6),
         )
 
     # [Classic only]
@@ -5950,13 +5975,17 @@ class Device(utils.CompositeEventEmitter):
 
     @host_event_handler
     @with_connection_from_handle
-    def on_connection_encryption_change(self, connection, encryption):
+    def on_connection_encryption_change(
+        self, connection, encryption, encryption_key_size
+    ):
         logger.debug(
             f'*** Connection Encryption Change: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}, '
-            f'encryption={encryption}'
+            f'encryption={encryption}, '
+            f'key_size={encryption_key_size}'
         )
         connection.encryption = encryption
+        connection.encryption_key_size = encryption_key_size
         if (
             not connection.authenticated
             and connection.transport == PhysicalTransport.BR_EDR

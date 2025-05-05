@@ -1256,6 +1256,7 @@ class Central(Connection.Listener):
             self.device.classic_enabled = self.classic
 
             # Set up a pairing config factory with minimal requirements.
+            self.device.config.keystore = "JsonKeyStore"
             self.device.pairing_config_factory = lambda _: PairingConfig(
                 sc=False, mitm=False, bonding=False
             )
@@ -1408,6 +1409,7 @@ class Peripheral(Device.Listener, Connection.Listener):
             self.device.classic_enabled = self.classic
 
             # Set up a pairing config factory with minimal requirements.
+            self.device.config.keystore = "JsonKeyStore"
             self.device.pairing_config_factory = lambda _: PairingConfig(
                 sc=False, mitm=False, bonding=False
             )
