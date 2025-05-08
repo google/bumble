@@ -33,7 +33,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install ".[build,test,development]"
+        python -m pip install ".[build,examples,test,development]"
     - name: Check
       run: |
         invoke project.pre-commit
