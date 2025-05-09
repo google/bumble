@@ -23,6 +23,7 @@ import functools
 import logging
 import secrets
 import struct
+from collections.abc import Sequence
 from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Union, ClassVar
 from typing_extensions import Self
 
@@ -2239,14 +2240,6 @@ class HCI_Command(HCI_Packet):
             cls.fields = fields
             cls.return_parameters_fields = return_parameters_fields
 
-            # Patch the __init__ method to fix the op_code
-            if fields is not None:
-
-                def init(self, parameters=None, **kwargs):
-                    return HCI_Command.__init__(self, cls.op_code, parameters, **kwargs)
-
-                cls.__init__ = init
-
             # Register a factory for this class
             HCI_Command.command_classes[cls.op_code] = cls
 
@@ -2277,16 +2270,19 @@ class HCI_Command(HCI_Packet):
         cls = HCI_Command.command_classes.get(op_code)
         if cls is None:
             # No class registered, just use a generic instance
-            return HCI_Command(op_code, parameters)
+            return HCI_Command(parameters, op_code=op_code)
 
         # Create a new instance
         if (fields := getattr(cls, 'fields', None)) is not None:
-            self = cls.__new__(cls)
-            HCI_Command.__init__(self, op_code, parameters)
-            HCI_Object.init_from_bytes(self, parameters, 0, fields)
-            return self
+            command = cls(parameters)
+            HCI_Object.init_from_bytes(command, parameters, 0, fields)
+            return command
 
-        return cls.from_parameters(parameters)  # type: ignore
+        return cls.from_parameters(parameters)
+
+    @classmethod
+    def from_parameters(cls, parameters: bytes) -> HCI_Command:
+        raise NotImplementedError
 
     @staticmethod
     def command_name(op_code):
@@ -2309,18 +2305,22 @@ class HCI_Command(HCI_Packet):
         return_parameters.fields = cls.return_parameters_fields
         return return_parameters
 
-    def __init__(self, op_code=-1, parameters=None, **kwargs):
-        # Since the legacy implementation relies on an __init__ injector, typing always
-        # complains that positional argument op_code is not passed, so here sets a
-        # default value to allow building derived HCI_Command without op_code.
-        assert op_code != -1
-        super().__init__(HCI_Command.command_name(op_code))
+    def __init__(
+        self,
+        parameters: Optional[bytes] = None,
+        *,
+        op_code: Optional[int] = None,
+        **kwargs,
+    ) -> None:
+        # op_code should be set in cls.
+        if op_code is not None:
+            self.op_code = op_code
+        super().__init__(HCI_Command.command_name(self.op_code))
         if (fields := getattr(self, 'fields', None)) and kwargs:
             HCI_Object.init_from_fields(self, fields, kwargs)
             if parameters is None:
                 parameters = HCI_Object.dict_to_bytes(kwargs, fields)
-        self.op_code = op_code
-        self.parameters = parameters
+        self.parameters = parameters or b''
 
     def __bytes__(self):
         parameters = b'' if self.parameters is None else self.parameters
@@ -4501,8 +4501,10 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
     EXTENDED_UNFILTERED_POLICY = 0x02
     EXTENDED_FILTERED_POLICY = 0x03
 
+    op_code = HCI_LE_SET_EXTENDED_SCAN_PARAMETERS_COMMAND
+
     @classmethod
-    def from_parameters(cls, parameters):
+    def from_parameters(cls, parameters: bytes) -> Self:
         own_address_type = parameters[0]
         scanning_filter_policy = parameters[1]
         scanning_phys = parameters[2]
@@ -4538,7 +4540,7 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
         scan_intervals,
         scan_windows,
     ):
-        super().__init__(HCI_LE_SET_EXTENDED_SCAN_PARAMETERS_COMMAND)
+        super().__init__()
         self.own_address_type = own_address_type
         self.scanning_filter_policy = scanning_filter_policy
         self.scanning_phys = scanning_phys
@@ -4613,7 +4615,7 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
     '''
 
     @classmethod
-    def from_parameters(cls, parameters):
+    def from_parameters(cls, parameters: bytes) -> Self:
         initiator_filter_policy = parameters[0]
         own_address_type = parameters[1]
         peer_address_type = parameters[2]
@@ -5512,6 +5514,7 @@ class HCI_Event(HCI_Packet):
     event_names: Dict[int, str] = {}
     event_classes: Dict[int, Type[HCI_Event]] = {}
     vendor_factories: list[Callable[[bytes], Optional[HCI_Event]]] = []
+    event_code: int = -1
 
     @staticmethod
     def event(fields=()):
@@ -5525,12 +5528,6 @@ class HCI_Event(HCI_Packet):
             if cls.event_code is None:
                 raise KeyError(f'event {cls.name} not found in event_names')
             cls.fields = fields
-
-            # Patch the __init__ method to fix the event_code
-            def init(self, parameters=None, **kwargs):
-                return HCI_Event.__init__(self, cls.event_code, parameters, **kwargs)
-
-            cls.__init__ = init
 
             # Register a factory for this class
             HCI_Event.event_classes[cls.event_code] = cls
@@ -5590,7 +5587,7 @@ class HCI_Event(HCI_Packet):
         if len(parameters) != length:
             raise InvalidPacketError('invalid packet length')
 
-        subclass: Any
+        subclass: Optional[type[HCI_Event]]
         if event_code == HCI_LE_META_EVENT:
             # We do this dispatch here and not in the subclass in order to avoid call
             # loops
@@ -5598,7 +5595,9 @@ class HCI_Event(HCI_Packet):
             subclass = HCI_LE_Meta_Event.subevent_classes.get(subevent_code)
             if subclass is None:
                 # No class registered, just use a generic class instance
-                return HCI_LE_Meta_Event(subevent_code, parameters)
+                return HCI_LE_Meta_Event(
+                    subevent_code=subevent_code, parameters=parameters
+                )
         elif event_code == HCI_VENDOR_EVENT:
             # Invoke all the registered factories to see if any of them can handle
             # the event
@@ -5613,31 +5612,36 @@ class HCI_Event(HCI_Packet):
             subclass = HCI_Event.event_classes.get(event_code)
             if subclass is None:
                 # No class registered, just use a generic class instance
-                return HCI_Event(event_code, parameters)
+                return HCI_Event(event_code=event_code, parameters=parameters)
 
         # Invoke the factory to create a new instance
-        return subclass.from_parameters(parameters)  # type: ignore
+        return subclass.from_parameters(parameters)
 
     @classmethod
-    def from_parameters(cls, parameters):
-        self = cls.__new__(cls)
-        HCI_Event.__init__(self, self.event_code, parameters)
+    def from_parameters(cls, parameters: bytes) -> Self:
+        self = cls(parameters)
         if fields := getattr(self, 'fields', None):
             HCI_Object.init_from_bytes(self, parameters, 0, fields)
         return self
 
-    def __init__(self, event_code=-1, parameters=None, **kwargs):
+    def __init__(
+        self,
+        parameters: Optional[bytes] = None,
+        *,
+        event_code: Optional[int] = None,
+        **kwargs,
+    ):
         # Since the legacy implementation relies on an __init__ injector, typing always
         # complains that positional argument event_code is not passed, so here sets a
         # default value to allow building derived HCI_Event without event_code.
-        assert event_code != -1
-        super().__init__(HCI_Event.event_name(event_code))
+        if event_code is not None:
+            self.event_code = event_code
+        super().__init__(HCI_Event.event_name(self.event_code))
         if (fields := getattr(self, 'fields', None)) and kwargs:
             HCI_Object.init_from_fields(self, fields, kwargs)
             if parameters is None:
                 parameters = HCI_Object.dict_to_bytes(kwargs, fields)
-        self.event_code = event_code
-        self.parameters = parameters
+        self.parameters = parameters or b''
 
     def __bytes__(self):
         parameters = b'' if self.parameters is None else self.parameters
@@ -5664,6 +5668,7 @@ class HCI_Extended_Event(HCI_Event):
 
     subevent_names: Dict[int, str] = {}
     subevent_classes: Dict[int, Type[HCI_Extended_Event]] = {}
+    subevent_code: int = -1
 
     @classmethod
     def event(cls, fields=()):
@@ -5677,14 +5682,6 @@ class HCI_Extended_Event(HCI_Event):
             if cls.subevent_code is None:
                 raise KeyError(f'subevent {cls.name} not found in subevent_names')
             cls.fields = fields
-
-            # Patch the __init__ method to fix the subevent_code
-            original_init = cls.__init__
-
-            def init(self, parameters=None, **kwargs):
-                return original_init(self, cls.subevent_code, parameters, **kwargs)
-
-            cls.__init__ = init
 
             # Register a factory for this class
             cls.subevent_classes[cls.subevent_code] = cls
@@ -5730,23 +5727,28 @@ class HCI_Extended_Event(HCI_Event):
     @classmethod
     def from_parameters(cls, parameters: bytes) -> HCI_Extended_Event:
         """Factory method for subclasses (the subevent code has already been parsed)"""
-        self = cls.__new__(cls)
-        HCI_Extended_Event.__init__(self, self.subevent_code, parameters)
-        if fields := getattr(self, 'fields', None):
-            HCI_Object.init_from_bytes(self, parameters, 1, fields)
-        return self
+        event = cls(parameters)
+        if fields := getattr(event, 'fields', None):
+            HCI_Object.init_from_bytes(event, parameters, 1, fields)
+        return event
 
-    def __init__(self, subevent_code=None, parameters=None, **kwargs):
-        assert subevent_code is not None
-        self.subevent_code = subevent_code
+    def __init__(
+        self,
+        parameters: Optional[bytes] = None,
+        *,
+        subevent_code: Optional[int] = None,
+        **kwargs,
+    ) -> None:
+        if subevent_code is not None:
+            self.subevent_code = subevent_code
         if parameters is None and (fields := getattr(self, 'fields', None)) and kwargs:
-            parameters = bytes([subevent_code]) + HCI_Object.dict_to_bytes(
+            parameters = bytes([self.subevent_code]) + HCI_Object.dict_to_bytes(
                 kwargs, fields
             )
-        super().__init__(self.event_code, parameters, **kwargs)
+        super().__init__(parameters, **kwargs)
 
         # Override the name in order to adopt the subevent name instead
-        self.name = self.subevent_name(subevent_code)
+        self.name = self.subevent_name(self.subevent_code)
 
 
 # -----------------------------------------------------------------------------
@@ -5859,7 +5861,7 @@ class HCI_LE_Advertising_Report_Event(HCI_LE_Meta_Event):
         return name_or_number(cls.EVENT_TYPE_NAMES, event_type)
 
     @classmethod
-    def from_parameters(cls, parameters):
+    def from_parameters(cls, parameters: bytes) -> Self:
         num_reports = parameters[1]
         reports = []
         offset = 2
@@ -5878,7 +5880,7 @@ class HCI_LE_Advertising_Report_Event(HCI_LE_Meta_Event):
             [bytes(report) for report in reports]
         )
 
-        super().__init__(self.subevent_code, parameters)
+        super().__init__(parameters)
 
     def __str__(self):
         reports = '\n'.join(
@@ -6146,9 +6148,9 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
         return f'0x{event_type:04X} [{",".join(event_type_flags)}]{legacy_info_string}'
 
     @classmethod
-    def from_parameters(cls, parameters):
+    def from_parameters(cls, parameters: bytes) -> Self:
         num_reports = parameters[1]
-        reports = []
+        reports: list[HCI_LE_Extended_Advertising_Report_Event.Report] = []
         offset = 2
         for _ in range(num_reports):
             report = cls.Report.from_parameters(parameters, offset)
@@ -6157,7 +6159,9 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
 
         return cls(reports)
 
-    def __init__(self, reports):
+    def __init__(
+        self, reports: Sequence[HCI_LE_Extended_Advertising_Report_Event.Report]
+    ):
         self.reports = reports[:]
 
         # Serialize the fields
@@ -6165,7 +6169,7 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
             [HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT, len(reports)]
         ) + b''.join([bytes(report) for report in reports])
 
-        super().__init__(self.subevent_code, parameters)
+        super().__init__(parameters)
 
     def __str__(self):
         reports = '\n'.join(
@@ -6808,50 +6812,27 @@ class HCI_Inquiry_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.registered
+@HCI_Event.event(
+    [
+        [
+            ('bd_addr', Address.parse_address),
+            ('page_scan_repetition_mode', 1),
+            ('reserved', 1),
+            ('reserved', 1),
+            ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
+            ('clock_offset', 2),
+        ]
+    ]
+)
 class HCI_Inquiry_Result_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.2 Inquiry Result Event
     '''
 
-    RESPONSE_FIELDS = [
-        ('bd_addr', Address.parse_address),
-        ('page_scan_repetition_mode', 1),
-        ('reserved', 1),
-        ('reserved', 1),
-        ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
-        ('clock_offset', 2),
-    ]
-
-    @staticmethod
-    def from_parameters(parameters):
-        num_responses = parameters[0]
-        responses = []
-        offset = 1
-        for _ in range(num_responses):
-            response = HCI_Object.from_bytes(
-                parameters, offset, HCI_Inquiry_Result_Event.RESPONSE_FIELDS
-            )
-            offset += 14
-            responses.append(response)
-
-        return HCI_Inquiry_Result_Event(responses)
-
-    def __init__(self, responses):
-        self.responses = responses[:]
-
-        # Serialize the fields
-        parameters = bytes([HCI_INQUIRY_RESULT_EVENT, len(responses)]) + b''.join(
-            [bytes(response) for response in responses]
-        )
-
-        super().__init__(HCI_INQUIRY_RESULT_EVENT, parameters)
-
-    def __str__(self):
-        responses = '\n'.join(
-            [response.to_string(indentation='  ') for response in self.responses]
-        )
-        return f'{color("HCI_INQUIRY_RESULT_EVENT", "magenta")}:\n{responses}'
+    bd_addr: list[Address]
+    page_scan_repetition_mode: list[int]
+    class_of_device: list[int]
+    clock_offset: list[int]
 
 
 # -----------------------------------------------------------------------------
@@ -7099,29 +7080,28 @@ class HCI_Command_Complete_Event(HCI_Event):
 
     @staticmethod
     def from_parameters(parameters):
-        self = HCI_Command_Complete_Event.__new__(HCI_Command_Complete_Event)
-        HCI_Event.__init__(self, self.event_code, parameters)
+        event = HCI_Command_Complete_Event(parameters)
         HCI_Object.init_from_bytes(
-            self, parameters, 0, HCI_Command_Complete_Event.fields
+            event, parameters, 0, HCI_Command_Complete_Event.fields
         )
 
         # Parse the return parameters
         if (
-            isinstance(self.return_parameters, bytes)
-            and len(self.return_parameters) == 1
+            isinstance(event.return_parameters, bytes)
+            and len(event.return_parameters) == 1
         ):
             # All commands with 1-byte return parameters return a 'status' field,
             # convert it to an integer
-            self.return_parameters = self.return_parameters[0]
+            event.return_parameters = event.return_parameters[0]
         else:
-            cls = HCI_Command.command_classes.get(self.command_opcode)
+            cls = HCI_Command.command_classes.get(event.command_opcode)
             if cls:
                 # Try to parse the return parameters bytes into an object.
-                return_parameters = cls.parse_return_parameters(self.return_parameters)
+                return_parameters = cls.parse_return_parameters(event.return_parameters)
                 if return_parameters is not None:
-                    self.return_parameters = return_parameters
+                    event.return_parameters = return_parameters
 
-        return self
+        return event
 
     def __str__(self):
         return f'{color(self.name, "magenta")}:\n' + HCI_Object.format_fields(
@@ -7174,56 +7154,21 @@ class HCI_Role_Change_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.registered
+@HCI_Event.event(
+    [
+        [
+            ('connection_handles', 2),
+            ('num_completed_packets', 2),
+        ]
+    ]
+)
 class HCI_Number_Of_Completed_Packets_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.19 Number Of Completed Packets Event
     '''
 
-    @classmethod
-    def from_parameters(cls, parameters):
-        self = cls.__new__(cls)
-        self.parameters = parameters
-        num_handles = parameters[0]
-        self.connection_handles = []
-        self.num_completed_packets = []
-        for i in range(num_handles):
-            self.connection_handles.append(
-                struct.unpack_from('<H', parameters, 1 + i * 4)[0]
-            )
-            self.num_completed_packets.append(
-                struct.unpack_from('<H', parameters, 1 + i * 4 + 2)[0]
-            )
-
-        return self
-
-    def __init__(self, connection_handle_and_completed_packets_list):
-        self.connection_handles = []
-        self.num_completed_packets = []
-        parameters = bytes([len(connection_handle_and_completed_packets_list)])
-        for handle, completed_packets in connection_handle_and_completed_packets_list:
-            self.connection_handles.append(handle)
-            self.num_completed_packets.append(completed_packets)
-            parameters += struct.pack('<H', handle)
-            parameters += struct.pack('<H', completed_packets)
-        super().__init__(HCI_NUMBER_OF_COMPLETED_PACKETS_EVENT, parameters)
-
-    def __str__(self):
-        lines = [
-            color(self.name, 'magenta') + ':',
-            color('  number_of_handles:        ', 'cyan')
-            + f'{len(self.connection_handles)}',
-        ]
-        for i, connection_handle in enumerate(self.connection_handles):
-            lines.append(
-                color(f'  connection_handle[{i}]:     ', 'cyan')
-                + f'{connection_handle}'
-            )
-            lines.append(
-                color(f'  num_completed_packets[{i}]: ', 'cyan')
-                + f'{self.num_completed_packets[i]}'
-            )
-        return '\n'.join(lines)
+    connection_handles: list[int]
+    num_completed_packets: list[int]
 
 
 # -----------------------------------------------------------------------------
@@ -7326,50 +7271,28 @@ class HCI_Page_Scan_Repetition_Mode_Change_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.registered
+@HCI_Event.event(
+    [
+        [
+            ('bd_addr', Address.parse_address),
+            ('page_scan_repetition_mode', 1),
+            ('reserved', 1),
+            ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
+            ('clock_offset', 2),
+            ('rssi', -1),
+        ]
+    ]
+)
 class HCI_Inquiry_Result_With_RSSI_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.33 Inquiry Result with RSSI Event
     '''
 
-    RESPONSE_FIELDS = [
-        ('bd_addr', Address.parse_address),
-        ('page_scan_repetition_mode', 1),
-        ('reserved', 1),
-        ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
-        ('clock_offset', 2),
-        ('rssi', -1),
-    ]
-
-    @staticmethod
-    def from_parameters(parameters):
-        num_responses = parameters[0]
-        responses = []
-        offset = 1
-        for _ in range(num_responses):
-            response = HCI_Object.from_bytes(
-                parameters, offset, HCI_Inquiry_Result_With_RSSI_Event.RESPONSE_FIELDS
-            )
-            offset += 14
-            responses.append(response)
-
-        return HCI_Inquiry_Result_With_RSSI_Event(responses)
-
-    def __init__(self, responses):
-        self.responses = responses[:]
-
-        # Serialize the fields
-        parameters = bytes(
-            [HCI_INQUIRY_RESULT_WITH_RSSI_EVENT, len(responses)]
-        ) + b''.join([bytes(response) for response in responses])
-
-        super().__init__(HCI_INQUIRY_RESULT_WITH_RSSI_EVENT, parameters)
-
-    def __str__(self):
-        responses = '\n'.join(
-            [response.to_string(indentation='  ') for response in self.responses]
-        )
-        return f'{color("HCI_INQUIRY_RESULT_WITH_RSSI_EVENT", "magenta")}:\n{responses}'
+    bd_addr: list[Address]
+    page_scan_repetition_mode: list[int]
+    class_of_device: list[int]
+    clock_offset: list[int]
+    rssi: list[int]
 
 
 # -----------------------------------------------------------------------------
