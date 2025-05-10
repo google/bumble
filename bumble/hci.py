@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import collections
 import dataclasses
 import enum
@@ -23,7 +24,19 @@ import functools
 import logging
 import secrets
 import struct
-from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Union, ClassVar
+from collections.abc import Sequence
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Type,
+    Union,
+    ClassVar,
+    Annotated,
+)
 from typing_extensions import Self
 
 from bumble import crypto
@@ -1944,6 +1957,25 @@ class HCI_Object:
     def __str__(self):
         return self.to_string()
 
+    @classmethod
+    def fields_from_dataclass(cls, obj: Any) -> list[Any]:
+        stacks: list[list[Any]] = [[]]
+        for field in dataclasses.fields(obj):
+            field_type = field.type
+            # When __future__.annotations is imported, annotations are considered str
+            # during runtime, so we need to eval them.
+            if isinstance(field_type, str):
+                field_type = eval(field_type)
+            if not (metadata := getattr(field_type, "__metadata__", None)):
+                continue
+            if len(metadata) > 1 and metadata[1] == '[':
+                stacks.append([])
+            stacks[-1].append((field.name, metadata[0]))
+            if len(metadata) > 1 and metadata[1] == ']':
+                top = stacks.pop()
+                stacks[-1].append(top)
+        return stacks[-1]
+
 
 # -----------------------------------------------------------------------------
 # Bluetooth Address
@@ -2279,6 +2311,12 @@ class HCI_Command(HCI_Packet):
             # No class registered, just use a generic instance
             return HCI_Command(op_code, parameters)
 
+        if dataclasses.is_dataclass(cls):
+            values = HCI_Object.dict_from_bytes(
+                parameters, 0, HCI_Object.fields_from_dataclass(cls)
+            )
+            return cls(**values)
+
         # Create a new instance
         if (fields := getattr(cls, 'fields', None)) is not None:
             self = cls.__new__(cls)
@@ -2323,6 +2361,10 @@ class HCI_Command(HCI_Packet):
         self.parameters = parameters
 
     def __bytes__(self):
+        if not hasattr(self, "parameters") and dataclasses.is_dataclass(self):
+            self.parameters = HCI_Object.dict_to_bytes(
+                self.__dict__, HCI_Object.fields_from_dataclass(self)
+            )
         parameters = b'' if self.parameters is None else self.parameters
         return (
             struct.pack('<BHB', HCI_COMMAND_PACKET, self.op_code, len(parameters))
@@ -2330,6 +2372,10 @@ class HCI_Command(HCI_Packet):
         )
 
     def __str__(self):
+        if not hasattr(self, "parameters") and dataclasses.is_dataclass(self):
+            self.parameters = HCI_Object.dict_to_bytes(
+                self.__dict__, HCI_Object.fields_from_dataclass(self)
+            )
         result = color(self.name, 'green')
         if fields := getattr(self, 'fields', None):
             result += ':\n' + HCI_Object.format_fields(self.__dict__, fields, '  ')
@@ -2338,26 +2384,40 @@ class HCI_Command(HCI_Packet):
                 result += f': {self.parameters.hex()}'
         return result
 
+    @classmethod
+    def registered(cls, clazz):
+        clazz.name = clazz.__name__.upper()
+        if (
+            op_code := getattr(clazz, "op_code", None)
+            or key_with_value(HCI_Command.command_names, clazz.name)
+        ) is None:
+            raise InvalidArgumentError("opcode is not provided")
+        clazz.op_code = op_code
+        HCI_Command.command_classes[op_code] = clazz
+        return clazz
+
 
 HCI_Command.register_commands(globals())
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
-    [
-        ('lap', {'size': 3, 'mapper': HCI_Constant.inquiry_lap_name}),
-        ('inquiry_length', 1),
-        ('num_responses', 1),
-    ]
-)
+@HCI_Command.registered
+@dataclasses.dataclass
 class HCI_Inquiry_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.1 Inquiry Command
     '''
 
+    op_code: int = dataclasses.field(default=HCI_INQUIRY_COMMAND, init=False)
+
+    lap: Annotated[int, {'size': 3, 'mapper': HCI_Constant.inquiry_lap_name}]
+    inquiry_length: Annotated[int, 1]
+    num_responses: Annotated[int, 1]
+
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command()
+@HCI_Command.registered
+@dataclasses.dataclass
 class HCI_Inquiry_Cancel_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.2 Inquiry Cancel Command
@@ -2395,17 +2455,19 @@ class HCI_Disconnect_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
-    fields=[('bd_addr', Address.parse_address)],
-    return_parameters_fields=[
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ],
-)
+@HCI_Command.registered
+@dataclasses.dataclass
 class HCI_Create_Connection_Cancel_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.7 Create Connection Cancel Command
     '''
+
+    bd_addr: Annotated[Address, Address.parse_address]
+
+    return_parameters_fields = [
+        ('status', STATUS_SPEC),
+        ('bd_addr', Address.parse_address),
+    ]
 
 
 # -----------------------------------------------------------------------------
@@ -4968,52 +5030,34 @@ class HCI_LE_Set_Default_Periodic_Advertising_Sync_Transfer_Parameters_Command(
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
-    fields=[
-        ('cig_id', 1),
-        ('sdu_interval_c_to_p', 3),
-        ('sdu_interval_p_to_c', 3),
-        ('worst_case_sca', 1),
-        ('packing', 1),
-        ('framing', 1),
-        ('max_transport_latency_c_to_p', 2),
-        ('max_transport_latency_p_to_c', 2),
-        [
-            ('cis_id', 1),
-            ('max_sdu_c_to_p', 2),
-            ('max_sdu_p_to_c', 2),
-            ('phy_c_to_p', 1),
-            ('phy_p_to_c', 1),
-            ('rtn_c_to_p', 1),
-            ('rtn_p_to_c', 1),
-        ],
-    ],
-    return_parameters_fields=[
-        ('status', STATUS_SPEC),
-        ('cig_id', 1),
-        [('connection_handle', 2)],
-    ],
-)
+@HCI_Command.registered
+@dataclasses.dataclass
 class HCI_LE_Set_CIG_Parameters_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.97 LE Set CIG Parameters Command
     '''
 
-    cig_id: int
-    sdu_interval_c_to_p: int
-    sdu_interval_p_to_c: int
-    worst_case_sca: int
-    packing: int
-    framing: int
-    max_transport_latency_c_to_p: int
-    max_transport_latency_p_to_c: int
-    cis_id: List[int]
-    max_sdu_c_to_p: List[int]
-    max_sdu_p_to_c: List[int]
-    phy_c_to_p: List[int]
-    phy_p_to_c: List[int]
-    rtn_c_to_p: List[int]
-    rtn_p_to_c: List[int]
+    cig_id: Annotated[int, 1]
+    sdu_interval_c_to_p: Annotated[int, 3]
+    sdu_interval_p_to_c: Annotated[int, 3]
+    worst_case_sca: Annotated[int, 1]
+    packing: Annotated[int, 1]
+    framing: Annotated[int, 1]
+    max_transport_latency_c_to_p: Annotated[int, 2]
+    max_transport_latency_p_to_c: Annotated[int, 2]
+    cis_id: Annotated[Sequence[int], 1, '[']
+    max_sdu_c_to_p: Annotated[Sequence[int], 2]
+    max_sdu_p_to_c: Annotated[Sequence[int], 2]
+    phy_c_to_p: Annotated[Sequence[int], 1]
+    phy_p_to_c: Annotated[Sequence[int], 1]
+    rtn_c_to_p: Annotated[Sequence[int], 1]
+    rtn_p_to_c: Annotated[Sequence[int], 1, ']']
+
+    return_parameters_fields = [
+        ('status', STATUS_SPEC),
+        ('cig_id', 1),
+        [('connection_handle', 2)],
+    ]
 
 
 # -----------------------------------------------------------------------------
@@ -5557,17 +5601,17 @@ class HCI_Event(HCI_Packet):
     def register_events(symbols: Dict[str, Any]) -> None:
         HCI_Event.event_names.update(HCI_Event.event_map(symbols))
 
-    @staticmethod
-    def registered(event_class):
-        event_class.name = event_class.__name__.upper()
-        event_class.event_code = key_with_value(HCI_Event.event_names, event_class.name)
-        if event_class.event_code is None:
-            raise KeyError(f'event {event_class.name} not found in event_names')
-
-        # Register a factory for this class
-        HCI_Event.event_classes[event_class.event_code] = event_class
-
-        return event_class
+    @classmethod
+    def registered(cls, clazz):
+        clazz.name = clazz.__name__.upper()
+        if (
+            event_code := getattr(clazz, "event_code", None)
+            or key_with_value(HCI_Event.event_names, clazz.name)
+        ) is None:
+            raise InvalidArgumentError("event_code is not provided")
+        clazz.event_code = event_code
+        HCI_Event.event_classes[event_code] = clazz
+        return clazz
 
     @classmethod
     def add_vendor_factory(
@@ -5595,6 +5639,7 @@ class HCI_Event(HCI_Packet):
             # We do this dispatch here and not in the subclass in order to avoid call
             # loops
             subevent_code = parameters[0]
+            offset = 1
             subclass = HCI_LE_Meta_Event.subevent_classes.get(subevent_code)
             if subclass is None:
                 # No class registered, just use a generic class instance
@@ -5611,9 +5656,17 @@ class HCI_Event(HCI_Packet):
             return HCI_Vendor_Event(data=parameters)
         else:
             subclass = HCI_Event.event_classes.get(event_code)
+            offset = 0
             if subclass is None:
                 # No class registered, just use a generic class instance
                 return HCI_Event(event_code, parameters)
+
+        if dataclasses.is_dataclass(cls):
+            return cls(
+                **HCI_Object.dict_from_bytes(
+                    parameters, offset, HCI_Object.fields_from_dataclass(cls)
+                )
+            )
 
         # Invoke the factory to create a new instance
         return subclass.from_parameters(parameters)  # type: ignore
@@ -5640,6 +5693,10 @@ class HCI_Event(HCI_Packet):
         self.parameters = parameters
 
     def __bytes__(self):
+        if self.parameters is None and dataclasses.is_dataclass(self):
+            self.parameters = HCI_Object.dict_to_bytes(
+                self.__dict__, HCI_Object.fields_from_dataclass(self)
+            )
         parameters = b'' if self.parameters is None else self.parameters
         return bytes([HCI_EVENT_PACKET, self.event_code, len(parameters)]) + parameters
 
@@ -7611,11 +7668,15 @@ class HCI_Keypress_Notification_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address), ('host_supported_features', 8)])
+@HCI_Event.registered
+@dataclasses.dataclass
 class HCI_Remote_Host_Supported_Features_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.50 Remote Host Supported Features Notification Event
     '''
+
+    bd_addr: Annotated[Address, Address.parse_address]
+    host_supported_features: Annotated[int, 8]
 
 
 # -----------------------------------------------------------------------------

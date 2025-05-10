@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 import struct
 
+from bumble import hci
 from bumble.hci import (
     HCI_DISCONNECT_COMMAND,
     HCI_LE_1M_PHY_BIT,
@@ -559,6 +560,28 @@ def test_HCI_Read_Local_Supported_Codecs_V2_Command_Complete():
         HCI_Read_Local_Supported_Codecs_V2_Command.Transport.BR_EDR_SCO,
         HCI_Read_Local_Supported_Codecs_V2_Command.Transport.LE_CIS,
     ]
+
+
+# -----------------------------------------------------------------------------
+def test_HCI_LE_Set_CIG_Parameters_Command():
+    command = hci.HCI_LE_Set_CIG_Parameters_Command(
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        [9, 10],
+        [11, 12],
+        [13, 14],
+        [15, 16],
+        [17, 18],
+        [19, 20],
+        [21, 22],
+    )
+    basic_check(command)
 
 
 # -----------------------------------------------------------------------------
