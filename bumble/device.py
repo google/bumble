@@ -1628,6 +1628,7 @@ class Connection(utils.CompositeEventEmitter):
     EVENT_PAIRING = "pairing"
     EVENT_PAIRING_FAILURE = "pairing_failure"
     EVENT_SECURITY_REQUEST = "security_request"
+    EVENT_LINK_KEY = "link_key"
 
     @utils.composite_listener
     class Listener:
@@ -5066,7 +5067,7 @@ class Device(utils.CompositeEventEmitter):
 
     # [Classic only]
     @host_event_handler
-    def on_link_key(self, bd_addr, link_key, key_type):
+    def on_link_key(self, bd_addr: hci.Address, link_key: bytes, key_type: int) -> None:
         # Store the keys in the key store
         if self.keystore:
             authenticated = key_type in (
