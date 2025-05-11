@@ -188,17 +188,16 @@ HCI_RTK_DROP_FIRMWARE_COMMAND = hci_vendor_command_op_code(0x66)
 HCI_Command.register_commands(globals())
 
 
-@HCI_Command.command(return_parameters_fields=[("status", STATUS_SPEC), ("version", 1)])
+@HCI_Command.command()
 class HCI_RTK_Read_ROM_Version_Command(HCI_Command):
-    pass
+    return_parameters_fields = [("status", STATUS_SPEC), ("version", 1)]
 
 
 @HCI_Command.command(
     fields=[("index", 1), ("payload", RTK_FRAGMENT_LENGTH)],
-    return_parameters_fields=[("status", STATUS_SPEC), ("index", 1)],
 )
 class HCI_RTK_Download_Command(HCI_Command):
-    pass
+    return_parameters_fields = [("status", STATUS_SPEC), ("index", 1)]
 
 
 @HCI_Command.command()

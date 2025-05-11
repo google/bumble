@@ -94,23 +94,23 @@ hci.HCI_Command.register_commands(globals())
     fields=[
         ("param0", 1),
     ],
-    return_parameters_fields=[
-        ("status", hci.STATUS_SPEC),
-        ("tlv", "*"),
-    ],
 )
 class HCI_Intel_Read_Version_Command(hci.HCI_Command):
-    pass
+
+    return_parameters_fields = [
+        ("status", hci.STATUS_SPEC),
+        ("tlv", "*"),
+    ]
 
 
 @hci.HCI_Command.command(
     fields=[("data_type", 1), ("data", "*")],
-    return_parameters_fields=[
-        ("status", 1),
-    ],
 )
 class Hci_Intel_Secure_Send_Command(hci.HCI_Command):
-    pass
+
+    return_parameters_fields = [
+        ("status", 1),
+    ]
 
 
 @hci.HCI_Command.command(
@@ -121,23 +121,22 @@ class Hci_Intel_Secure_Send_Command(hci.HCI_Command):
         ("boot_option", 1),
         ("boot_address", 4),
     ],
-    return_parameters_fields=[
-        ("data", "*"),
-    ],
 )
 class HCI_Intel_Reset_Command(hci.HCI_Command):
-    pass
+    return_parameters_fields = [
+        ("data", "*"),
+    ]
 
 
 @hci.HCI_Command.command(
     fields=[("data", "*")],
-    return_parameters_fields=[
-        ("status", hci.STATUS_SPEC),
-        ("params", "*"),
-    ],
 )
 class Hci_Intel_Write_Device_Config_Command(hci.HCI_Command):
-    pass
+
+    return_parameters_fields = [
+        ("status", hci.STATUS_SPEC),
+        ("params", "*"),
+    ]
 
 
 # -----------------------------------------------------------------------------

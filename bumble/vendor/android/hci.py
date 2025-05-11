@@ -54,8 +54,13 @@ HCI_Command.register_commands(globals())
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
-    return_parameters_fields=[
+@HCI_Command.command()
+class HCI_LE_Get_Vendor_Capabilities_Command(HCI_Command):
+    # pylint: disable=line-too-long
+    '''
+    See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#vendor-specific-capabilities
+    '''
+    return_parameters_fields = [
         ('status', STATUS_SPEC),
         ('max_advt_instances', 1),
         ('offloaded_resolution_of_private_address', 1),
@@ -73,12 +78,6 @@ HCI_Command.register_commands(globals())
         ('bluetooth_quality_report_support', 1),
         ('dynamic_audio_buffer_support', 4),
     ]
-)
-class HCI_LE_Get_Vendor_Capabilities_Command(HCI_Command):
-    # pylint: disable=line-too-long
-    '''
-    See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#vendor-specific-capabilities
-    '''
 
     @classmethod
     def parse_return_parameters(cls, parameters):
@@ -115,17 +114,6 @@ class HCI_LE_Get_Vendor_Capabilities_Command(HCI_Command):
         ),
         ('payload', '*'),
     ],
-    return_parameters_fields=[
-        ('status', STATUS_SPEC),
-        (
-            'opcode',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_LE_APCF_Command.opcode_name(x),
-            },
-        ),
-        ('payload', '*'),
-    ],
 )
 class HCI_LE_APCF_Command(HCI_Command):
     # pylint: disable=line-too-long
@@ -135,6 +123,17 @@ class HCI_LE_APCF_Command(HCI_Command):
     NOTE: the subcommand-specific payloads are left as opaque byte arrays in this
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
+    return_parameters_fields = [
+        ('status', STATUS_SPEC),
+        (
+            'opcode',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_LE_APCF_Command.opcode_name(x),
+            },
+        ),
+        ('payload', '*'),
+    ]
 
     # APCF Subcommands
     # TODO: use the OpenIntEnum class (when upcoming PR is merged)
@@ -170,36 +169,24 @@ class HCI_LE_APCF_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
-    return_parameters_fields=[
-        ('status', STATUS_SPEC),
-        ('total_tx_time_ms', 4),
-        ('total_rx_time_ms', 4),
-        ('total_idle_time_ms', 4),
-        ('total_energy_used', 4),
-    ],
-)
+@HCI_Command.command()
 class HCI_Get_Controller_Activity_Energy_Info_Command(HCI_Command):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#le_get_controller_activity_energy_info
     '''
+    return_parameters_fields = [
+        ('status', STATUS_SPEC),
+        ('total_tx_time_ms', 4),
+        ('total_rx_time_ms', 4),
+        ('total_idle_time_ms', 4),
+        ('total_energy_used', 4),
+    ]
 
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
     fields=[
-        (
-            'opcode',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_A2DP_Hardware_Offload_Command.opcode_name(x),
-            },
-        ),
-        ('payload', '*'),
-    ],
-    return_parameters_fields=[
-        ('status', STATUS_SPEC),
         (
             'opcode',
             {
@@ -218,6 +205,17 @@ class HCI_A2DP_Hardware_Offload_Command(HCI_Command):
     NOTE: the subcommand-specific payloads are left as opaque byte arrays in this
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
+    return_parameters_fields = [
+        ('status', STATUS_SPEC),
+        (
+            'opcode',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_A2DP_Hardware_Offload_Command.opcode_name(x),
+            },
+        ),
+        ('payload', '*'),
+    ]
 
     # A2DP Hardware Offload Subcommands
     # TODO: use the OpenIntEnum class (when upcoming PR is merged)
@@ -246,17 +244,6 @@ class HCI_A2DP_Hardware_Offload_Command(HCI_Command):
         ),
         ('payload', '*'),
     ],
-    return_parameters_fields=[
-        ('status', STATUS_SPEC),
-        (
-            'opcode',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_Dynamic_Audio_Buffer_Command.opcode_name(x),
-            },
-        ),
-        ('payload', '*'),
-    ],
 )
 class HCI_Dynamic_Audio_Buffer_Command(HCI_Command):
     # pylint: disable=line-too-long
@@ -266,6 +253,17 @@ class HCI_Dynamic_Audio_Buffer_Command(HCI_Command):
     NOTE: the subcommand-specific payloads are left as opaque byte arrays in this
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
+    return_parameters_fields = [
+        ('status', STATUS_SPEC),
+        (
+            'opcode',
+            {
+                'size': 1,
+                'mapper': lambda x: HCI_Dynamic_Audio_Buffer_Command.opcode_name(x),
+            },
+        ),
+        ('payload', '*'),
+    ]
 
     # Dynamic Audio Buffer Subcommands
     # TODO: use the OpenIntEnum class (when upcoming PR is merged)

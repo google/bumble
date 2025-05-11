@@ -51,12 +51,6 @@ class TX_Power_Level_Command:
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
     fields=[('handle_type', 1), ('connection_handle', 2), ('tx_power_level', -1)],
-    return_parameters_fields=[
-        ('status', STATUS_SPEC),
-        ('handle_type', 1),
-        ('connection_handle', 2),
-        ('selected_tx_power_level', -1),
-    ],
 )
 class HCI_Write_Tx_Power_Level_Command(HCI_Command, TX_Power_Level_Command):
     '''
@@ -67,16 +61,17 @@ class HCI_Write_Tx_Power_Level_Command(HCI_Command, TX_Power_Level_Command):
     TX_POWER_HANDLE_TYPE_SCAN should be zero.
     '''
 
+    return_parameters_fields = [
+        ('status', STATUS_SPEC),
+        ('handle_type', 1),
+        ('connection_handle', 2),
+        ('selected_tx_power_level', -1),
+    ]
+
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command(
     fields=[('handle_type', 1), ('connection_handle', 2)],
-    return_parameters_fields=[
-        ('status', STATUS_SPEC),
-        ('handle_type', 1),
-        ('connection_handle', 2),
-        ('tx_power_level', -1),
-    ],
 )
 class HCI_Read_Tx_Power_Level_Command(HCI_Command, TX_Power_Level_Command):
     '''
@@ -86,3 +81,10 @@ class HCI_Read_Tx_Power_Level_Command(HCI_Command, TX_Power_Level_Command):
     Power level is in dB. Connection handle for TX_POWER_HANDLE_TYPE_ADV and
     TX_POWER_HANDLE_TYPE_SCAN should be zero.
     '''
+
+    return_parameters_fields = [
+        ('status', STATUS_SPEC),
+        ('handle_type', 1),
+        ('connection_handle', 2),
+        ('tx_power_level', -1),
+    ]
