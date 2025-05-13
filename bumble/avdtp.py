@@ -471,6 +471,9 @@ class ServiceCapabilities:
         while payload:
             service_category = payload[0]
             length_of_service_capabilities = payload[1]
+            if not length_of_service_capabilities:
+                # Empty Service Capabilities
+                break
             service_capabilities_bytes = payload[2 : 2 + length_of_service_capabilities]
             capabilities.append(
                 ServiceCapabilities.create(service_category, service_capabilities_bytes)
