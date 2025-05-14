@@ -144,7 +144,7 @@ OPUS_MAX_FRAMES_IN_RTP_PAYLOAD = 15
 
 
 # -----------------------------------------------------------------------------
-def flags_to_list(flags: bool, values: list) -> list:
+def flags_to_list(flags: bool, values: list[int]) -> list[int]:
     result = []
     for i, value in enumerate(values):
         if flags & (1 << (len(values) - i - 1)):
@@ -153,7 +153,7 @@ def flags_to_list(flags: bool, values: list) -> list:
 
 
 # -----------------------------------------------------------------------------
-def make_audio_source_service_sdp_records(service_record_handle: int, version: tuple=(1, 3))-> list:
+def make_audio_source_service_sdp_records(service_record_handle: int, version: tuple[int ,int]=(1, 3))-> list[ServiceAttribute]:
     # pylint: disable=import-outside-toplevel
     from bumble.avdtp import AVDTP_PSM
 
@@ -207,7 +207,7 @@ def make_audio_source_service_sdp_records(service_record_handle: int, version: t
 
 
 # -----------------------------------------------------------------------------
-def make_audio_sink_service_sdp_records(service_record_handle: int, version: tuple=(1, 3)) -> list:
+def make_audio_sink_service_sdp_records(service_record_handle: int, version: tuple[int ,int]=(1, 3)) -> list[ServiceAttribute]:
     # pylint: disable=import-outside-toplevel
     from bumble.avdtp import AVDTP_PSM
 
