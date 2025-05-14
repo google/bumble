@@ -35,7 +35,7 @@ from typing import Optional, Any
 # pylint: disable=invalid-name
 # -----------------------------------------------------------------------------
 @pytest.fixture(
-    scope="session", params=["bumble.crypto._builtin", "bumble.crypto._cryptography"]
+    scope="session", params=["bumble.crypto.builtin", "bumble.crypto.cryptography"]
 )
 def crypto_backend(request):
     backend = pytest.importorskip(request.param)
