@@ -16,12 +16,13 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from __future__ import annotations
-
+import dataclasses
 import enum
+import functools
 import logging
 import struct
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, Annotated, TypeVar
+from collections.abc import Sequence
 
 from bumble import utils
 from bumble import colors
@@ -48,11 +49,11 @@ class ASE_Operation:
     See Audio Stream Control Service - 5 ASE Control operations.
     '''
 
-    classes: Dict[int, Type[ASE_Operation]] = {}
+    classes: Dict[int, Type["ASE_Operation"]] = {}
     op_code: int
     name: str
     fields: Optional[Sequence[Any]] = None
-    ase_id: List[int]
+    ase_id: Sequence[int]
 
     class Opcode(enum.IntEnum):
         # fmt: off
@@ -66,50 +67,33 @@ class ASE_Operation:
         RELEASE              = 0x08
 
     @staticmethod
-    def from_bytes(pdu: bytes) -> ASE_Operation:
+    def from_bytes(pdu: bytes) -> "ASE_Operation":
         op_code = pdu[0]
 
-        cls = ASE_Operation.classes.get(op_code)
-        if cls is None:
-            instance = ASE_Operation(pdu)
-            instance.name = ASE_Operation.Opcode(op_code).name
-            instance.op_code = op_code
-            return instance
-        self = cls.__new__(cls)
-        ASE_Operation.__init__(self, pdu)
-        if self.fields is not None:
-            self.init_from_bytes(pdu, 1)
-        return self
+        cls = ASE_Operation.classes[op_code]
+        return cls(**hci.HCI_Object.dict_from_bytes(pdu, offset=1, fields=cls.fields))
 
-    @staticmethod
-    def subclass(fields):
-        def inner(cls: Type[ASE_Operation]):
-            try:
-                operation = ASE_Operation.Opcode[cls.__name__[4:].upper()]
-                cls.name = operation.name
-                cls.op_code = operation
-            except:
-                raise KeyError(f'PDU name {cls.name} not found in Ase_Operation.Opcode')
-            cls.fields = fields
+    _OP = TypeVar("_OP", bound="ASE_Operation")
 
-            # Register a factory for this class
-            ASE_Operation.classes[cls.op_code] = cls
+    @classmethod
+    def subclass(cls, clazz: type[_OP]) -> type[_OP]:
+        try:
+            operation = ASE_Operation.Opcode[clazz.__name__[4:].upper()]
+            clazz.name = operation.name
+            clazz.op_code = operation
+        except:
+            raise KeyError(f'PDU name {clazz.name} not found in Ase_Operation.Opcode')
+        clazz.fields = hci.HCI_Object.fields_from_dataclass(clazz)
+        # Register a factory for this class
+        ASE_Operation.classes[clazz.op_code] = clazz
 
-            return cls
+        return clazz
 
-        return inner
-
-    def __init__(self, pdu: Optional[bytes] = None, **kwargs) -> None:
-        if self.fields is not None and kwargs:
-            hci.HCI_Object.init_from_fields(self, self.fields, kwargs)
-        if pdu is None:
-            pdu = bytes([self.op_code]) + hci.HCI_Object.dict_to_bytes(
-                kwargs, self.fields
-            )
-        self.pdu = pdu
-
-    def init_from_bytes(self, pdu: bytes, offset: int):
-        return hci.HCI_Object.init_from_bytes(self, pdu, offset, self.fields)
+    @functools.cached_property
+    def pdu(self) -> bytes:
+        return bytes([self.op_code]) + hci.HCI_Object.dict_to_bytes(
+            self.__dict__, self.fields
+        )
 
     def __bytes__(self) -> bytes:
         return self.pdu
@@ -124,104 +108,99 @@ class ASE_Operation:
         return result
 
 
-@ASE_Operation.subclass(
-    [
-        [
-            ('ase_id', 1),
-            ('target_latency', 1),
-            ('target_phy', 1),
-            ('codec_id', hci.CodingFormat.parse_from_bytes),
-            ('codec_specific_configuration', 'v'),
-        ],
-    ]
-)
+@ASE_Operation.subclass
+@dataclasses.dataclass
 class ASE_Config_Codec(ASE_Operation):
     '''
     See Audio Stream Control Service 5.1 - Config Codec Operation
     '''
 
-    target_latency: List[int]
-    target_phy: List[int]
-    codec_id: List[hci.CodingFormat]
-    codec_specific_configuration: List[bytes]
+    ase_id: Annotated[Sequence[int], 1, '[']
+    target_latency: Annotated[Sequence[int], 1]
+    target_phy: Annotated[Sequence[int], 1]
+    codec_id: Annotated[Sequence[hci.CodingFormat], hci.CodingFormat.parse_from_bytes]
+    codec_specific_configuration: Annotated[Sequence[bytes], 'v', ']']
 
 
-@ASE_Operation.subclass(
-    [
-        [
-            ('ase_id', 1),
-            ('cig_id', 1),
-            ('cis_id', 1),
-            ('sdu_interval', 3),
-            ('framing', 1),
-            ('phy', 1),
-            ('max_sdu', 2),
-            ('retransmission_number', 1),
-            ('max_transport_latency', 2),
-            ('presentation_delay', 3),
-        ],
-    ]
-)
+@ASE_Operation.subclass
+@dataclasses.dataclass
 class ASE_Config_QOS(ASE_Operation):
     '''
     See Audio Stream Control Service 5.2 - Config Qos Operation
     '''
 
-    cig_id: List[int]
-    cis_id: List[int]
-    sdu_interval: List[int]
-    framing: List[int]
-    phy: List[int]
-    max_sdu: List[int]
-    retransmission_number: List[int]
-    max_transport_latency: List[int]
-    presentation_delay: List[int]
+    ase_id: Annotated[Sequence[int], 1, '[']
+    cig_id: Annotated[Sequence[int], 1]
+    cis_id: Annotated[Sequence[int], 1]
+    sdu_interval: Annotated[Sequence[int], 3]
+    framing: Annotated[Sequence[int], 1]
+    phy: Annotated[Sequence[int], 1]
+    max_sdu: Annotated[Sequence[int], 2]
+    retransmission_number: Annotated[Sequence[int], 1]
+    max_transport_latency: Annotated[Sequence[int], 2]
+    presentation_delay: Annotated[Sequence[int], 3, ']']
 
 
-@ASE_Operation.subclass([[('ase_id', 1), ('metadata', 'v')]])
+@ASE_Operation.subclass
+@dataclasses.dataclass
 class ASE_Enable(ASE_Operation):
     '''
     See Audio Stream Control Service 5.3 - Enable Operation
     '''
 
-    metadata: bytes
+    ase_id: Annotated[Sequence[int], 1, '[']
+    metadata: Annotated[Sequence[bytes], 'v', ']']
 
 
-@ASE_Operation.subclass([[('ase_id', 1)]])
+@ASE_Operation.subclass
+@dataclasses.dataclass
 class ASE_Receiver_Start_Ready(ASE_Operation):
     '''
     See Audio Stream Control Service 5.4 - Receiver Start Ready Operation
     '''
 
+    ase_id: Annotated[Sequence[int], 1, '[]']
 
-@ASE_Operation.subclass([[('ase_id', 1)]])
+
+@ASE_Operation.subclass
+@dataclasses.dataclass
 class ASE_Disable(ASE_Operation):
     '''
     See Audio Stream Control Service 5.5 - Disable Operation
     '''
 
+    ase_id: Annotated[Sequence[int], 1, '[]']
 
-@ASE_Operation.subclass([[('ase_id', 1)]])
+
+@ASE_Operation.subclass
+@dataclasses.dataclass
 class ASE_Receiver_Stop_Ready(ASE_Operation):
     '''
     See Audio Stream Control Service 5.6 - Receiver Stop Ready Operation
     '''
 
+    ase_id: Annotated[Sequence[int], 1, '[]']
 
-@ASE_Operation.subclass([[('ase_id', 1), ('metadata', 'v')]])
+
+@ASE_Operation.subclass
+@dataclasses.dataclass
 class ASE_Update_Metadata(ASE_Operation):
     '''
     See Audio Stream Control Service 5.7 - Update Metadata Operation
     '''
 
-    metadata: List[bytes]
+    ase_id: Annotated[Sequence[int], 1, '[']
+    metadata: Annotated[Sequence[bytes], 'v', ']']
 
 
-@ASE_Operation.subclass([[('ase_id', 1)]])
+@ASE_Operation.subclass
+@dataclasses.dataclass
 class ASE_Release(ASE_Operation):
     '''
     See Audio Stream Control Service 5.8 - Release Operation
     '''
+
+    ase_id: Annotated[Sequence[int], 1, '[]']
 
 
 class AseResponseCode(enum.IntEnum):
@@ -310,7 +289,7 @@ class AseStateMachine(gatt.Characteristic):
         self,
         role: AudioRole,
         ase_id: int,
-        service: AudioStreamControlService,
+        service: "AudioStreamControlService",
     ) -> None:
         self.service = service
         self.ase_id = ase_id
