@@ -1932,6 +1932,21 @@ class HCI_Object:
             for field_name, field_value in field_strings
         )
 
+    @classmethod
+    def fields_from_dataclass(cls, obj: Any) -> list[Any]:
+        stack: list[list[Any]] = [[]]
+        for field in dataclasses.fields(obj):
+            # Fields without metadata should be ignored.
+            if not (metadata := getattr(field.type, "__metadata__", None)):
+                continue
+            if len(metadata) > 1 and '[' in metadata[1]:
+                stack.append([])
+            stack[-1].append((field.name, metadata[0]))
+            if len(metadata) > 1 and ']' in metadata[1]:
+                top = stack.pop()
+                stack[-1].append(top)
+        return stack[0]
+
     def __init__(self, fields, **kwargs):
         self.fields = fields
         self.init_from_fields(self, fields, kwargs)
