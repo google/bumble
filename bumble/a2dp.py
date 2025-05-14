@@ -22,7 +22,7 @@ import dataclasses
 import enum
 import logging
 import struct
-from typing import Awaitable, Callable, List, Tuple
+from typing import Awaitable, Callable
 from typing_extensions import ClassVar, Self
 
 
@@ -144,16 +144,7 @@ OPUS_MAX_FRAMES_IN_RTP_PAYLOAD = 15
 
 
 # -----------------------------------------------------------------------------
-def flags_to_list(flags: bool, values: List[int]) -> List[int]:
-    result = []
-    for i, value in enumerate(values):
-        if flags & (1 << (len(values) - i - 1)):
-            result.append(value)
-    return result
-
-
-# -----------------------------------------------------------------------------
-def make_audio_source_service_sdp_records(service_record_handle: int, version: Tuple[int ,int]=(1, 3))-> List[ServiceAttribute]:
+def make_audio_source_service_sdp_records(service_record_handle: int, version: tuple[int ,int]=(1, 3))-> list[ServiceAttribute]:
     # pylint: disable=import-outside-toplevel
     from bumble.avdtp import AVDTP_PSM
 
@@ -207,7 +198,7 @@ def make_audio_source_service_sdp_records(service_record_handle: int, version: T
 
 
 # -----------------------------------------------------------------------------
-def make_audio_sink_service_sdp_records(service_record_handle: int, version: Tuple[int ,int]=(1, 3)) -> List[ServiceAttribute]:
+def make_audio_sink_service_sdp_records(service_record_handle: int, version: tuple[int ,int]=(1, 3)) ->list[ServiceAttribute]:
     # pylint: disable=import-outside-toplevel
     from bumble.avdtp import AVDTP_PSM
 
