@@ -168,7 +168,13 @@ def is_bluetooth_hci(device):
 # -----------------------------------------------------------------------------
 @click.command()
 @click.option('--verbose', is_flag=True, default=False, help='Print more details')
-def main(verbose):
+@click.option(
+    '--interactive',
+    is_flag=True,
+    default=False,
+    help='Detech a device by unplugging / replugging it in',
+)
+def main(verbose, interactive):
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
 
     load_libusb()
@@ -176,7 +182,20 @@ def main(verbose):
         bluetooth_device_count = 0
         devices = {}
 
-        for device in context.getDeviceIterator(skip_on_error=True):
+        if interactive:
+            input("Unplug your device and press the enter key!")
+            devices_without = set(context.getDeviceIterator(skip_on_error=True))
+            input("Plug in your device and press the enter key!")
+            devices_with = set(context.getDeviceIterator(skip_on_error=True))
+            device_iterator = devices_with - devices_without
+            print()
+            if not device_iterator:
+                print("No differences detected, try again!")
+                return
+        else:
+            device_iterator = context.getDeviceIterator(skip_on_error=True)
+
+        for device in device_iterator:
             device_class = device.getDeviceClass()
             device_subclass = device.getDeviceSubClass()
             device_protocol = device.getDeviceProtocol()
