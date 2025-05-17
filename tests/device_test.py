@@ -19,6 +19,7 @@ import asyncio
 import functools
 import logging
 import os
+from unittest import mock
 import pytest
 
 from bumble.core import (
@@ -33,6 +34,8 @@ from bumble.device import (
     PeriodicAdvertisingParameters,
 )
 from bumble.host import DataPacketQueue, Host
+from bumble import device
+from bumble import hci
 from bumble.hci import (
     HCI_ACCEPT_CONNECTION_REQUEST_COMMAND,
     HCI_COMMAND_STATUS_PENDING,
@@ -628,6 +631,73 @@ def test_gatt_services_with_gas_and_gatt():
     assert (
         device.gatt_server.attributes[12].uuid == gatt.GATT_DATABASE_HASH_CHARACTERISTIC
     )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_inquiry_result():
+    d = (await TwoDevices.create_with_connection())[0]
+    m = mock.Mock()
+    d.on(d.EVENT_INQUIRY_RESULT, m)
+    d.host.on_packet(
+        bytes(
+            hci.HCI_Extended_Inquiry_Result_Event(
+                num_responses=1,
+                bd_addr=hci.Address("00:11:22:33:44:55/P"),
+                page_scan_repetition_mode=2,
+                reserved=0,
+                class_of_device=3,
+                clock_offset=4,
+                rssi=5,
+                extended_inquiry_response=b"6789",
+            )
+        )
+    )
+    m.assert_called_with(hci.Address("00:11:22:33:44:55/P"), 3, mock.ANY, 5)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_extended_inquiry_result():
+    d = (await TwoDevices.create_with_connection())[0]
+    m = mock.Mock()
+    d.on(d.EVENT_INQUIRY_RESULT, m)
+    d.host.on_packet(
+        bytes(
+            hci.HCI_Extended_Inquiry_Result_Event(
+                num_responses=1,
+                bd_addr=hci.Address("00:11:22:33:44:55/P"),
+                page_scan_repetition_mode=2,
+                reserved=0,
+                class_of_device=3,
+                clock_offset=4,
+                rssi=5,
+                extended_inquiry_response=b"6789",
+            )
+        )
+    )
+    m.assert_called_with(hci.Address("00:11:22:33:44:55/P"), 3, mock.ANY, 5)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_inquiry_result_with_rssi():
+    d = (await TwoDevices.create_with_connection())[0]
+    m = mock.Mock()
+    d.on(d.EVENT_INQUIRY_RESULT, m)
+    d.host.on_packet(
+        bytes(
+            hci.HCI_Inquiry_Result_With_RSSI_Event(
+                bd_addr=[hci.Address("00:11:22:33:44:55/P")],
+                page_scan_repetition_mode=[2],
+                reserved=[0],
+                class_of_device=[3],
+                clock_offset=[4],
+                rssi=[5],
+            )
+        )
+    )
+    m.assert_called_with(hci.Address("00:11:22:33:44:55/P"), 3, mock.ANY, 5)
 
 
 # -----------------------------------------------------------------------------
