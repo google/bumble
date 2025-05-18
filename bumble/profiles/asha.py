@@ -200,7 +200,7 @@ class AshaService(gatt.TemplateService):
 
     # Handler for audio control commands
     async def _on_audio_control_point_write(
-        self, connection: Optional[Connection], value: bytes
+        self, connection: Connection, value: bytes
     ) -> None:
         _logger.debug(f'--- AUDIO CONTROL POINT Write:{value.hex()}')
         opcode = value[0]
@@ -247,7 +247,7 @@ class AshaService(gatt.TemplateService):
             )
 
     # Handler for volume control
-    def _on_volume_write(self, connection: Optional[Connection], value: bytes) -> None:
+    def _on_volume_write(self, connection: Connection, value: bytes) -> None:
         _logger.debug(f'--- VOLUME Write:{value[0]}')
         self.volume = value[0]
         self.emit(self.EVENT_VOLUME_CHANGED)

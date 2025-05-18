@@ -335,9 +335,8 @@ class HearingAccessService(gatt.TemplateService):
 
         utils.cancel_on_event(connection, 'disconnection', on_connection_async())
 
-    def _on_read_active_preset_index(
-        self, __connection__: Optional[Connection]
-    ) -> bytes:
+    def _on_read_active_preset_index(self, connection: Connection) -> bytes:
+        del connection  # Unused
         return bytes([self.active_preset_index])
 
     # TODO this need to be triggered when device is unbonded
@@ -345,18 +344,13 @@ class HearingAccessService(gatt.TemplateService):
         self.preset_changed_operations_history_per_device.pop(addr)
 
     async def _on_write_hearing_aid_preset_control_point(
-        self, connection: Optional[Connection], value: bytes
+        self, connection: Connection, value: bytes
     ):
-        assert connection
-
         opcode = HearingAidPresetControlPointOpcode(value[0])
         handler = getattr(self, '_on_' + opcode.name.lower())
         await handler(connection, value)
 
-    async def _on_read_presets_request(
-        self, connection: Optional[Connection], value: bytes
-    ):
-        assert connection
+    async def _on_read_presets_request(self, connection: Connection, value: bytes):
         if connection.att_mtu < 49:  # 2.5. GATT sub-procedure requirements
             logging.warning(f'HAS require MTU >= 49: {connection}')
 
@@ -471,10 +465,7 @@ class HearingAccessService(gatt.TemplateService):
         for connection in self.currently_connected_clients:
             await self._preset_changed_operation(connection)
 
-    async def _on_write_preset_name(
-        self, connection: Optional[Connection], value: bytes
-    ):
-        assert connection
+    async def _on_write_preset_name(self, connection: Connection, value: bytes):
 
         if self.read_presets_request_in_progress:
             raise att.ATT_Error(att.ErrorCode.PROCEDURE_ALREADY_IN_PROGRESS)
@@ -522,10 +513,7 @@ class HearingAccessService(gatt.TemplateService):
         for connection in self.currently_connected_clients:
             await self.notify_active_preset_for_connection(connection)
 
-    async def set_active_preset(
-        self, connection: Optional[Connection], value: bytes
-    ) -> None:
-        assert connection
+    async def set_active_preset(self, connection: Connection, value: bytes) -> None:
         index = value[1]
         preset = self.preset_records.get(index, None)
         if (
@@ -542,16 +530,11 @@ class HearingAccessService(gatt.TemplateService):
         self.active_preset_index = index
         await self.notify_active_preset()
 
-    async def _on_set_active_preset(
-        self, connection: Optional[Connection], value: bytes
-    ):
+    async def _on_set_active_preset(self, connection: Connection, value: bytes):
         await self.set_active_preset(connection, value)
 
-    async def set_next_or_previous_preset(
-        self, connection: Optional[Connection], is_previous
-    ):
+    async def set_next_or_previous_preset(self, connection: Connection, is_previous):
         '''Set the next or the previous preset as active'''
-        assert connection
 
         if self.active_preset_index == 0x00:
             raise att.ATT_Error(ErrorCode.PRESET_OPERATION_NOT_POSSIBLE)
@@ -581,17 +564,17 @@ class HearingAccessService(gatt.TemplateService):
         await self.notify_active_preset()
 
     async def _on_set_next_preset(
-        self, connection: Optional[Connection], __value__: bytes
+        self, connection: Connection, __value__: bytes
     ) -> None:
         await self.set_next_or_previous_preset(connection, False)
 
     async def _on_set_previous_preset(
-        self, connection: Optional[Connection], __value__: bytes
+        self, connection: Connection, __value__: bytes
     ) -> None:
         await self.set_next_or_previous_preset(connection, True)
 
     async def _on_set_active_preset_synchronized_locally(
-        self, connection: Optional[Connection], value: bytes
+        self, connection: Connection, value: bytes
     ):
         if (
             self.server_features.preset_synchronization_support
@@ -602,7 +585,7 @@ class HearingAccessService(gatt.TemplateService):
         # TODO (low priority) inform other server of the change
 
     async def _on_set_next_preset_synchronized_locally(
-        self, connection: Optional[Connection], __value__: bytes
+        self, connection: Connection, __value__: bytes
     ):
         if (
             self.server_features.preset_synchronization_support
@@ -613,7 +596,7 @@ class HearingAccessService(gatt.TemplateService):
         # TODO (low priority) inform other server of the change
 
     async def _on_set_previous_preset_synchronized_locally(
-        self, connection: Optional[Connection], __value__: bytes
+        self, connection: Connection, __value__: bytes
     ):
         if (
             self.server_features.preset_synchronization_support

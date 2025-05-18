@@ -146,14 +146,12 @@ class VolumeControlService(gatt.TemplateService):
             included_services=list(included_services),
         )
 
-    def _on_read_volume_state(self, _connection: Optional[device.Connection]) -> bytes:
+    def _on_read_volume_state(self, _connection: device.Connection) -> bytes:
         return bytes(VolumeState(self.volume_setting, self.muted, self.change_counter))
 
     def _on_write_volume_control_point(
-        self, connection: Optional[device.Connection], value: bytes
+        self, connection: device.Connection, value: bytes
     ) -> None:
-        assert connection
-
         opcode = VolumeControlPointOpcode(value[0])
         change_counter = value[1]
 

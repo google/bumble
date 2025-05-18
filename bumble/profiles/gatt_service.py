@@ -127,9 +127,7 @@ class GenericAttributeProfileService(gatt.TemplateService):
 
         return b''
 
-    def get_database_hash(self, connection: device.Connection | None) -> bytes:
-        assert connection
-
+    def get_database_hash(self, connection: device.Connection) -> bytes:
         m = b''.join(
             [
                 self.get_attribute_data(attribute)

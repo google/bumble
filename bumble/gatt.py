@@ -579,11 +579,7 @@ class Descriptor(Attribute):
         if isinstance(self.value, bytes):
             value_str = self.value.hex()
         elif isinstance(self.value, CharacteristicValue):
-            value = self.value.read(None)
-            if isinstance(value, bytes):
-                value_str = value.hex()
-            else:
-                value_str = '<async>'
+            value_str = '<dynamic>'
         else:
             value_str = '<...>'
         return (

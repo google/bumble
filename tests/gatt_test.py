@@ -136,9 +136,9 @@ async def test_characteristic_encoding():
         Characteristic.READABLE,
         123,
     )
-    x = await c.read_value(None)
+    x = await c.read_value(Mock())
     assert x == bytes([123])
-    await c.write_value(None, bytes([122]))
+    await c.write_value(Mock(), bytes([122]))
     assert c.value == 122
 
     class FooProxy(CharacteristicProxy):
@@ -334,7 +334,7 @@ async def test_CharacteristicAdapter() -> None:
     )
 
     v = bytes([3, 4, 5])
-    await c.write_value(None, v)
+    await c.write_value(Mock(), v)
     assert c.value == v
 
     # Simple delegated adapter
@@ -342,11 +342,11 @@ async def test_CharacteristicAdapter() -> None:
         c, lambda x: bytes(reversed(x)), lambda x: bytes(reversed(x))
     )
 
-    delegated_value = await delegated.read_value(None)
+    delegated_value = await delegated.read_value(Mock())
     assert delegated_value == bytes(reversed(v))
 
     delegated_value2 = bytes([3, 4, 5])
-    await delegated.write_value(None, delegated_value2)
+    await delegated.write_value(Mock(), delegated_value2)
     assert delegated.value == bytes(reversed(delegated_value2))
 
     # Packed adapter with single element format
@@ -355,10 +355,10 @@ async def test_CharacteristicAdapter() -> None:
     c.value = packed_value_ref
     packed = PackedCharacteristicAdapter(c, '>H')
 
-    packed_value_read = await packed.read_value(None)
+    packed_value_read = await packed.read_value(Mock())
     assert packed_value_read == packed_value_bytes
     c.value = b''
-    await packed.write_value(None, packed_value_bytes)
+    await packed.write_value(Mock(), packed_value_bytes)
     assert packed.value == packed_value_ref
 
     # Packed adapter with multi-element format
@@ -368,10 +368,10 @@ async def test_CharacteristicAdapter() -> None:
     c.value = (v1, v2)
     packed_multi = PackedCharacteristicAdapter(c, '>HH')
 
-    packed_multi_read_value = await packed_multi.read_value(None)
+    packed_multi_read_value = await packed_multi.read_value(Mock())
     assert packed_multi_read_value == packed_multi_value_bytes
     packed_multi.value = b''
-    await packed_multi.write_value(None, packed_multi_value_bytes)
+    await packed_multi.write_value(Mock(), packed_multi_value_bytes)
     assert packed_multi.value == (v1, v2)
 
     # Mapped adapter
@@ -382,10 +382,10 @@ async def test_CharacteristicAdapter() -> None:
     c.value = mapped
     packed_mapped = MappedCharacteristicAdapter(c, '>HH', ('v1', 'v2'))
 
-    packed_mapped_read_value = await packed_mapped.read_value(None)
+    packed_mapped_read_value = await packed_mapped.read_value(Mock())
     assert packed_mapped_read_value == packed_mapped_value_bytes
     c.value = b''
-    await packed_mapped.write_value(None, packed_mapped_value_bytes)
+    await packed_mapped.write_value(Mock(), packed_mapped_value_bytes)
     assert packed_mapped.value == mapped
 
     # UTF-8 adapter
@@ -394,10 +394,10 @@ async def test_CharacteristicAdapter() -> None:
     c.value = string_value
     string_c = UTF8CharacteristicAdapter(c)
 
-    string_read_value = await string_c.read_value(None)
+    string_read_value = await string_c.read_value(Mock())
     assert string_read_value == string_value_bytes
     c.value = b''
-    await string_c.write_value(None, string_value_bytes)
+    await string_c.write_value(Mock(), string_value_bytes)
     assert string_c.value == string_value
 
     # Class adapter
@@ -419,10 +419,10 @@ async def test_CharacteristicAdapter() -> None:
     c.value = class_value
     class_c = SerializableCharacteristicAdapter(c, BlaBla)
 
-    class_read_value = await class_c.read_value(None)
+    class_read_value = await class_c.read_value(Mock())
     assert class_read_value == class_value_bytes
     class_c.value = b''
-    await class_c.write_value(None, class_value_bytes)
+    await class_c.write_value(Mock(), class_value_bytes)
     assert isinstance(class_c.value, BlaBla)
     assert class_c.value.a == class_value.a
     assert class_c.value.b == class_value.b
@@ -436,10 +436,10 @@ async def test_CharacteristicAdapter() -> None:
     enum_value_bytes = int(enum_value).to_bytes(3, 'big')
     c.value = enum_value
     enum_c = EnumCharacteristicAdapter(c, MyEnum, 3, 'big')
-    enum_read_value = await enum_c.read_value(None)
+    enum_read_value = await enum_c.read_value(Mock())
     assert enum_read_value == enum_value_bytes
     enum_c.value = b''
-    await enum_c.write_value(None, enum_value_bytes)
+    await enum_c.write_value(Mock(), enum_value_bytes)
     assert isinstance(enum_c.value, MyEnum)
     assert enum_c.value == enum_value
 
@@ -1254,7 +1254,7 @@ Characteristic(handle=0x0005, end=0x0005, uuid=UUID-16:2A01 (Appearance), READ)
 Service(handle=0x0006, end=0x000D, uuid=UUID-16:1801 (Generic Attribute))
 CharacteristicDeclaration(handle=0x0007, value_handle=0x0008, uuid=UUID-16:2A05 (Service Changed), INDICATE)
 Characteristic(handle=0x0008, end=0x0009, uuid=UUID-16:2A05 (Service Changed), INDICATE)
-Descriptor(handle=0x0009, type=UUID-16:2902 (Client Characteristic Configuration), value=0000)
+Descriptor(handle=0x0009, type=UUID-16:2902 (Client Characteristic Configuration), value=<dynamic>)
 CharacteristicDeclaration(handle=0x000A, value_handle=0x000B, uuid=UUID-16:2B29 (Client Supported Features), READ|WRITE)
 Characteristic(handle=0x000B, end=0x000B, uuid=UUID-16:2B29 (Client Supported Features), READ|WRITE)
 CharacteristicDeclaration(handle=0x000C, value_handle=0x000D, uuid=UUID-16:2B2A (Database Hash), READ)
@@ -1262,7 +1262,7 @@ Characteristic(handle=0x000D, end=0x000D, uuid=UUID-16:2B2A (Database Hash), REA
 Service(handle=0x000E, end=0x0011, uuid=3A657F47-D34F-46B3-B1EC-698E29B6B829)
 CharacteristicDeclaration(handle=0x000F, value_handle=0x0010, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, READ|WRITE|NOTIFY)
 Characteristic(handle=0x0010, end=0x0011, uuid=FDB159DB-036C-49E3-B3DB-6325AC750806, READ|WRITE|NOTIFY)
-Descriptor(handle=0x0011, type=UUID-16:2902 (Client Characteristic Configuration), value=0000)"""
+Descriptor(handle=0x0011, type=UUID-16:2902 (Client Characteristic Configuration), value=<dynamic>)"""
     )
 
 
