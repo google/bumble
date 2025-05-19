@@ -315,11 +315,8 @@ class Server(utils.EventEmitter):
             self.add_service(service)
 
     def read_cccd(
-        self, connection: Optional[Connection], characteristic: Characteristic
+        self, connection: Connection, characteristic: Characteristic
     ) -> bytes:
-        if connection is None:
-            return bytes([0, 0])
-
         subscribers = self.subscribers.get(connection.handle)
         cccd = None
         if subscribers:

@@ -198,8 +198,7 @@ class AudioInputControlPoint:
     audio_input_state: AudioInputState
     gain_settings_properties: GainSettingsProperties
 
-    async def on_write(self, connection: Optional[Connection], value: bytes) -> None:
-        assert connection
+    async def on_write(self, connection: Connection, value: bytes) -> None:
 
         opcode = AudioInputControlPointOpCode(value[0])
 
@@ -320,11 +319,10 @@ class AudioInputDescription:
     audio_input_description: str = "Bluetooth"
     attribute: Optional[Attribute] = None
 
-    def on_read(self, _connection: Optional[Connection]) -> str:
+    def on_read(self, _connection: Connection) -> str:
         return self.audio_input_description
 
-    async def on_write(self, connection: Optional[Connection], value: str) -> None:
-        assert connection
+    async def on_write(self, connection: Connection, value: str) -> None:
         assert self.attribute
 
         self.audio_input_description = value

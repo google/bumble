@@ -86,7 +86,7 @@ class VolumeOffsetState:
         assert self.attribute is not None
         await connection.device.notify_subscribers(attribute=self.attribute)
 
-    def on_read(self, _connection: Optional[Connection]) -> bytes:
+    def on_read(self, _connection: Connection) -> bytes:
         return bytes(self)
 
 
@@ -103,11 +103,10 @@ class VocsAudioLocation:
         audio_location = AudioLocation(struct.unpack('<I', data)[0])
         return cls(audio_location)
 
-    def on_read(self, _connection: Optional[Connection]) -> bytes:
+    def on_read(self, _connection: Connection) -> bytes:
         return bytes(self)
 
-    async def on_write(self, connection: Optional[Connection], value: bytes) -> None:
-        assert connection
+    async def on_write(self, connection: Connection, value: bytes) -> None:
         assert self.attribute
 
         self.audio_location = AudioLocation(int.from_bytes(value, 'little'))
@@ -118,8 +117,7 @@ class VocsAudioLocation:
 class VolumeOffsetControlPoint:
     volume_offset_state: VolumeOffsetState
 
-    async def on_write(self, connection: Optional[Connection], value: bytes) -> None:
-        assert connection
+    async def on_write(self, connection: Connection, value: bytes) -> None:
 
         opcode = value[0]
         if opcode != SetVolumeOffsetOpCode.SET_VOLUME_OFFSET:
@@ -159,11 +157,10 @@ class AudioOutputDescription:
     def __bytes__(self) -> bytes:
         return self.audio_output_description.encode('utf-8')
 
-    def on_read(self, _connection: Optional[Connection]) -> bytes:
+    def on_read(self, _connection: Connection) -> bytes:
         return bytes(self)
 
-    async def on_write(self, connection: Optional[Connection], value: bytes) -> None:
-        assert connection
+    async def on_write(self, connection: Connection, value: bytes) -> None:
         assert self.attribute
 
         self.audio_output_description = value.decode('utf-8')

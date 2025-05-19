@@ -590,7 +590,7 @@ class AseStateMachine(gatt.Characteristic):
         # Readonly. Do nothing in the setter.
         pass
 
-    def on_read(self, _: Optional[device.Connection]) -> bytes:
+    def on_read(self, _: device.Connection) -> bytes:
         return self.value
 
     def __str__(self) -> str:

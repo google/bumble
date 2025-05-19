@@ -770,27 +770,25 @@ class AttributeValue(Generic[_T]):
     def __init__(
         self,
         read: Union[
-            Callable[[Optional[Connection]], _T],
-            Callable[[Optional[Connection]], Awaitable[_T]],
+            Callable[[Connection], _T],
+            Callable[[Connection], Awaitable[_T]],
             None,
         ] = None,
         write: Union[
-            Callable[[Optional[Connection], _T], None],
-            Callable[[Optional[Connection], _T], Awaitable[None]],
+            Callable[[Connection, _T], None],
+            Callable[[Connection, _T], Awaitable[None]],
             None,
         ] = None,
     ):
         self._read = read
         self._write = write
 
-    def read(self, connection: Optional[Connection]) -> Union[_T, Awaitable[_T]]:
+    def read(self, connection: Connection) -> Union[_T, Awaitable[_T]]:
         if self._read is None:
             raise InvalidOperationError('AttributeValue has no read function')
         return self._read(connection)
 
-    def write(
-        self, connection: Optional[Connection], value: _T
-    ) -> Union[Awaitable[None], None]:
+    def write(self, connection: Connection, value: _T) -> Union[Awaitable[None], None]:
         if self._write is None:
             raise InvalidOperationError('AttributeValue has no write function')
         return self._write(connection, value)
@@ -871,7 +869,7 @@ class Attribute(utils.EventEmitter, Generic[_T]):
     def decode_value(self, value: bytes) -> _T:
         return value  # type: ignore
 
-    async def read_value(self, connection: Optional[Connection]) -> bytes:
+    async def read_value(self, connection: Connection) -> bytes:
         if (
             (self.permissions & self.READ_REQUIRES_ENCRYPTION)
             and connection is not None
@@ -913,7 +911,7 @@ class Attribute(utils.EventEmitter, Generic[_T]):
 
         return b'' if value is None else self.encode_value(value)
 
-    async def write_value(self, connection: Optional[Connection], value: bytes) -> None:
+    async def write_value(self, connection: Connection, value: bytes) -> None:
         if (
             (self.permissions & self.WRITE_REQUIRES_ENCRYPTION)
             and connection is not None

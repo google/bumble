@@ -287,11 +287,8 @@ class MediaControlService(gatt.TemplateService):
         )
 
     async def on_media_control_point(
-        self, connection: Optional[device.Connection], data: bytes
+        self, connection: device.Connection, data: bytes
     ) -> None:
-        if not connection:
-            raise core.InvalidStateError()
-
         opcode = MediaControlPointOpcode(data[0])
 
         await connection.device.notify_subscriber(

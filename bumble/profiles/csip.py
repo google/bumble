@@ -164,12 +164,10 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
 
         super().__init__(characteristics)
 
-    async def on_sirk_read(self, connection: Optional[device.Connection]) -> bytes:
+    async def on_sirk_read(self, connection: device.Connection) -> bytes:
         if self.set_identity_resolving_key_type == SirkType.PLAINTEXT:
             sirk_bytes = self.set_identity_resolving_key
         else:
-            assert connection
-
             if connection.transport == core.PhysicalTransport.LE:
                 key = await connection.device.get_long_term_key(
                     connection_handle=connection.handle, rand=b'', ediv=0
