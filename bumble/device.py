@@ -99,9 +99,9 @@ logger = logging.getLogger(__name__)
 # fmt: off
 # pylint: disable=line-too-long
 
-DEVICE_MIN_SCAN_INTERVAL                      = 25
+DEVICE_MIN_SCAN_INTERVAL                      = 2.5
 DEVICE_MAX_SCAN_INTERVAL                      = 10240
-DEVICE_MIN_SCAN_WINDOW                        = 25
+DEVICE_MIN_SCAN_WINDOW                        = 2.5
 DEVICE_MAX_SCAN_WINDOW                        = 10240
 DEVICE_MIN_LE_RSSI                            = -127
 DEVICE_MAX_LE_RSSI                            = 20
