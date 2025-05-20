@@ -1464,7 +1464,7 @@ class _IsoLink:
             check_result=True,
         )
 
-    async def remove_data_path(self, direction: _IsoLink.Direction) -> int:
+    async def remove_data_path(self, directions: Iterable[_IsoLink.Direction]) -> int:
         """Remove a data path with controller on given direction.
 
         Args:
@@ -1476,7 +1476,9 @@ class _IsoLink:
         response = await self.device.send_command(
             hci.HCI_LE_Remove_ISO_Data_Path_Command(
                 connection_handle=self.handle,
-                data_path_direction=direction,
+                data_path_direction=sum(
+                    1 << direction for direction in set(directions)
+                ),
             ),
             check_result=False,
         )

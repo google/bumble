@@ -516,7 +516,7 @@ class AseStateMachine(gatt.Characteristic):
 
         async def remove_cis_async():
             if self.cis_link:
-                await self.cis_link.remove_data_path(self.role)
+                await self.cis_link.remove_data_path([self.role])
             self.state = self.State.IDLE
             await self.service.device.notify_subscribers(self, self.value)
 
