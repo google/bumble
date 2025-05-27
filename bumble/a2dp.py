@@ -479,6 +479,14 @@ class OpusMediaCodecInformation(VendorSpecificMediaCodecInformation):
     class SamplingFrequency(enum.IntFlag):
         SF_48000 = 1 << 0
 
+        @classmethod
+        def from_int(
+            cls, sampling_frequency: int
+        ) -> OpusMediaCodecInformation.SamplingFrequency:
+            if sampling_frequency != 48000:
+                raise ValueError("no such sampling frequency")
+            return cls.SF_48000
+
     VENDOR_ID: ClassVar[int] = 0x000000E0
     CODEC_ID: ClassVar[int] = 0x0001
 

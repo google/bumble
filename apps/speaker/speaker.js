@@ -7,17 +7,19 @@ let connectionText;
 let codecText;
 let packetsReceivedText;
 let bytesReceivedText;
+let bitrateText;
 let streamStateText;
 let connectionStateText;
 let controlsDiv;
 let audioOnButton;
-let mediaSource;
-let sourceBuffer;
-let audioElement;
+let audioDecoder;
+let audioCodec;
 let audioContext;
 let audioAnalyzer;
 let audioFrequencyBinCount;
 let audioFrequencyData;
+let nextAudioStartPosition = 0;
+let audioStartTime = 0;
 let packetsReceived = 0;
 let bytesReceived = 0;
 let audioState = "stopped";
@@ -29,20 +31,17 @@ let bandwidthCanvas;
 let bandwidthCanvasContext;
 let bandwidthBinCount;
 let bandwidthBins = [];
+let bitrateSamples = [];
 
 const FFT_WIDTH = 800;
 const FFT_HEIGHT = 256;
 const BANDWIDTH_WIDTH = 500;
 const BANDWIDTH_HEIGHT = 100;
-
-function hexToBytes(hex) {
-    return Uint8Array.from(hex.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)));
-}
+const BITRATE_WINDOW = 30;
 
 function init() {
     initUI();
-    initMediaSource();
-    initAudioElement();
+    initAudioContext();
     initAnalyzer();
 
     connect();
@@ -56,6 +55,7 @@ function initUI() {
     codecText = document.getElementById("codecText");
     packetsReceivedText = document.getElementById("packetsReceivedText");
     bytesReceivedText = document.getElementById("bytesReceivedText");
+    bitrateText = document.getElementById("bitrate");
     streamStateText = document.getElementById("streamStateText");
     connectionStateText = document.getElementById("connectionStateText");
     audioSupportMessageText = document.getElementById("audioSupportMessageText");
@@ -67,17 +67,9 @@ function initUI() {
     requestAnimationFrame(onAnimationFrame);
 }
 
-function initMediaSource() {
-    mediaSource = new MediaSource();
-    mediaSource.onsourceopen = onMediaSourceOpen;
-    mediaSource.onsourceclose = onMediaSourceClose;
-    mediaSource.onsourceended = onMediaSourceEnd;
-}
-
-function initAudioElement() {
-    audioElement = document.getElementById("audio");
-    audioElement.src = URL.createObjectURL(mediaSource);
-    // audioElement.controls = true;
+function initAudioContext() {
+    audioContext = new AudioContext();
+    audioContext.onstatechange = () => console.log("AudioContext state:", audioContext.state);
 }
 
 function initAnalyzer() {
@@ -94,24 +86,16 @@ function initAnalyzer() {
     bandwidthCanvasContext = bandwidthCanvas.getContext('2d');
     bandwidthCanvasContext.fillStyle = "rgb(255, 255, 255)";
     bandwidthCanvasContext.fillRect(0, 0, BANDWIDTH_WIDTH, BANDWIDTH_HEIGHT);
-}
-
-function startAnalyzer() {
-    // FFT
-    if (audioElement.captureStream !== undefined) {
-        audioContext = new AudioContext();
-        audioAnalyzer = audioContext.createAnalyser();
-        audioAnalyzer.fftSize = 128;
-        audioFrequencyBinCount = audioAnalyzer.frequencyBinCount;
-        audioFrequencyData = new Uint8Array(audioFrequencyBinCount);
-        const stream = audioElement.captureStream();
-        const source = audioContext.createMediaStreamSource(stream);
-        source.connect(audioAnalyzer);
-    }
-
-    // Bandwidth
     bandwidthBinCount = BANDWIDTH_WIDTH / 2;
     bandwidthBins = [];
+    bitrateSamples = [];
+
+    audioAnalyzer = audioContext.createAnalyser();
+    audioAnalyzer.fftSize = 128;
+    audioFrequencyBinCount = audioAnalyzer.frequencyBinCount;
+    audioFrequencyData = new Uint8Array(audioFrequencyBinCount);
+
+    audioAnalyzer.connect(audioContext.destination)
 }
 
 function setConnectionText(message) {
@@ -148,7 +132,8 @@ function onAnimationFrame() {
     bandwidthCanvasContext.fillRect(0, 0, BANDWIDTH_WIDTH, BANDWIDTH_HEIGHT);
     bandwidthCanvasContext.fillStyle = `rgb(100, 100, 100)`;
     for (let t = 0; t < bandwidthBins.length; t++) {
-        const lineHeight = (bandwidthBins[t] / 1000) * BANDWIDTH_HEIGHT;
+        const bytesReceived = bandwidthBins[t]
+        const lineHeight = (bytesReceived / 1000) * BANDWIDTH_HEIGHT;
         bandwidthCanvasContext.fillRect(t * 2, BANDWIDTH_HEIGHT - lineHeight, 2, lineHeight);
     }
 
@@ -156,28 +141,14 @@ function onAnimationFrame() {
     requestAnimationFrame(onAnimationFrame);
 }
 
-function onMediaSourceOpen() {
-    console.log(this.readyState);
-    sourceBuffer = mediaSource.addSourceBuffer("audio/aac");
-}
-
-function onMediaSourceClose() {
-    console.log(this.readyState);
-}
-
-function onMediaSourceEnd() {
-    console.log(this.readyState);
-}
-
 async function startAudio() {
     try {
         console.log("starting audio...");
         audioOnButton.disabled = true;
         audioState = "starting";
-        await audioElement.play();
+        audioContext.resume();
         console.log("audio started");
         audioState = "playing";
-        startAnalyzer();
     } catch(error) {
         console.error(`play failed: ${error}`);
         audioState = "stopped";
@@ -185,12 +156,47 @@ async function startAudio() {
     }
 }
 
-function onAudioPacket(packet) {
-    if (audioState != "stopped") {
-        // Queue the audio packet.
-        sourceBuffer.appendBuffer(packet);
+function onDecodedAudio(audioData) {
+    const bufferSource = audioContext.createBufferSource()
+
+    const now = audioContext.currentTime;
+    let nextAudioStartTime = audioStartTime + (nextAudioStartPosition / audioData.sampleRate);
+    if (nextAudioStartTime < now) {
+        console.log("starting new audio time base")
+        audioStartTime = now;
+        nextAudioStartTime = now;
+        nextAudioStartPosition = 0;
+    } else {
+        console.log(`audio buffer scheduled in ${nextAudioStartTime - now}`)
     }
 
+    const audioBuffer = audioContext.createBuffer(
+        audioData.numberOfChannels,
+        audioData.numberOfFrames,
+        audioData.sampleRate
+    );
+
+    for (let channel = 0; channel < audioData.numberOfChannels; channel++) {
+        audioData.copyTo(
+            audioBuffer.getChannelData(channel),
+            {
+                planeIndex: channel,
+                format: "f32-planar"
+            }
+        )
+    }
+
+    bufferSource.buffer = audioBuffer;
+    bufferSource.connect(audioAnalyzer)
+    bufferSource.start(nextAudioStartTime);
+    nextAudioStartPosition += audioData.numberOfFrames;
+}
+
+function onCodecError(error) {
+    console.log("Codec error:", error)
+}
+
+async function onAudioPacket(packet) {
     packetsReceived += 1;
     packetsReceivedText.innerText = packetsReceived;
     bytesReceived += packet.byteLength;
@@ -200,6 +206,48 @@ function onAudioPacket(packet) {
     if (bandwidthBins.length > bandwidthBinCount) {
         bandwidthBins.shift();
     }
+    bitrateSamples[bitrateSamples.length] = {ts: Date.now(), bytes: packet.byteLength}
+    if (bitrateSamples.length > BITRATE_WINDOW) {
+        bitrateSamples.shift();
+    }
+    if (bitrateSamples.length >= 2) {
+        const windowBytes = bitrateSamples.reduce((accumulator, x) => accumulator + x.bytes, 0) - bitrateSamples[0].bytes;
+        const elapsed = bitrateSamples[bitrateSamples.length-1].ts - bitrateSamples[0].ts;
+        const bitrate = Math.floor(8 * windowBytes / elapsed)
+        bitrateText.innerText = `${bitrate} kb/s`
+    }
+
+    if (audioState == "stopped") {
+        return;
+    }
+
+    if (audioDecoder === undefined) {
+        let audioConfig;
+        if (audioCodec == 'aac') {
+            audioConfig = {
+                codec: 'mp4a.40.2',
+                sampleRate: 44100, // ignored
+                numberOfChannels: 2, // ignored
+            }
+        } else if (audioCodec == 'opus') {
+            audioConfig = {
+                codec: 'opus',
+                sampleRate: 48000, // ignored
+                numberOfChannels: 2, // ignored
+            }
+        }
+        audioDecoder = new AudioDecoder({ output: onDecodedAudio, error: onCodecError });
+        audioDecoder.configure(audioConfig)
+    }
+
+    const encodedAudio = new EncodedAudioChunk({
+        type: "key",
+        data: packet,
+        timestamp: 0,
+        transfer: [packet],
+    });
+
+    audioDecoder.decode(encodedAudio);
 }
 
 function onChannelOpen() {
@@ -249,16 +297,19 @@ function onChannelMessage(message) {
     }
 }
 
-function onHelloMessage(params) {
+async function onHelloMessage(params) {
     codecText.innerText = params.codec;
-    if (params.codec != "aac") {
-        audioOnButton.disabled = true;
-        audioSupportMessageText.innerText = "Only AAC can be played, audio will be disabled";
-        audioSupportMessageText.style.display = "inline-block";
-    } else {
+
+    if (params.codec == "aac" || params.codec == "opus") {
+        audioCodec = params.codec
         audioSupportMessageText.innerText = "";
         audioSupportMessageText.style.display = "none";
+    } else {
+        audioOnButton.disabled = true;
+        audioSupportMessageText.innerText = "Only AAC and Opus can be played, audio will be disabled";
+        audioSupportMessageText.style.display = "inline-block";
     }
+
     if (params.streamState) {
         setStreamState(params.streamState);
     }

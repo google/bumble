@@ -50,8 +50,10 @@ from bumble.a2dp import (
     make_audio_sink_service_sdp_records,
     A2DP_SBC_CODEC_TYPE,
     A2DP_MPEG_2_4_AAC_CODEC_TYPE,
+    A2DP_NON_A2DP_CODEC_TYPE,
     SbcMediaCodecInformation,
     AacMediaCodecInformation,
+    OpusMediaCodecInformation,
 )
 from bumble.utils import AsyncRunner
 from bumble.codecs import AacAudioRtpPacket
@@ -78,6 +80,8 @@ class AudioExtractor:
             return AacAudioExtractor()
         if codec == 'sbc':
             return SbcAudioExtractor()
+        if codec == 'opus':
+            return OpusAudioExtractor()
 
     def extract_audio(self, packet: MediaPacket) -> bytes:
         raise NotImplementedError()
@@ -99,6 +103,13 @@ class SbcAudioExtractor:
         # number_of_frames = header & 0x0F
 
         # TODO: support fragmented payloads
+        return packet.payload[1:]
+
+
+# -----------------------------------------------------------------------------
+class OpusAudioExtractor:
+    def extract_audio(self, packet: MediaPacket) -> bytes:
+        # TODO: parse fields
         return packet.payload[1:]
 
 
@@ -235,7 +246,7 @@ class FfplayOutput(QueuedOutput):
         await super().start()
 
         self.subprocess = await asyncio.create_subprocess_shell(
-            f'ffplay -f {self.codec} pipe:0',
+            f'ffplay -probesize 32 -f {self.codec} pipe:0',
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -399,10 +410,24 @@ class Speaker:
         STARTED = 2
         SUSPENDED = 3
 
-    def __init__(self, device_config, transport, codec, discover, outputs, ui_port):
+    def __init__(
+        self,
+        device_config,
+        transport,
+        codec,
+        sampling_frequencies,
+        bitrate,
+        vbr,
+        discover,
+        outputs,
+        ui_port,
+    ):
         self.device_config = device_config
         self.transport = transport
         self.codec = codec
+        self.sampling_frequencies = sampling_frequencies
+        self.bitrate = bitrate
+        self.vbr = vbr
         self.discover = discover
         self.ui_port = ui_port
         self.device = None
@@ -438,32 +463,56 @@ class Speaker:
         if self.codec == 'sbc':
             return self.sbc_codec_capabilities()
 
+        if self.codec == 'opus':
+            return self.opus_codec_capabilities()
+
         raise RuntimeError('unsupported codec')
 
     def aac_codec_capabilities(self) -> MediaCodecCapabilities:
+        supported_sampling_frequencies = AacMediaCodecInformation.SamplingFrequency(0)
+        for sampling_frequency in self.sampling_frequencies or [
+            8000,
+            11025,
+            12000,
+            16000,
+            22050,
+            24000,
+            32000,
+            44100,
+            48000,
+        ]:
+            supported_sampling_frequencies |= (
+                AacMediaCodecInformation.SamplingFrequency.from_int(sampling_frequency)
+            )
         return MediaCodecCapabilities(
             media_type=AVDTP_AUDIO_MEDIA_TYPE,
             media_codec_type=A2DP_MPEG_2_4_AAC_CODEC_TYPE,
             media_codec_information=AacMediaCodecInformation(
                 object_type=AacMediaCodecInformation.ObjectType.MPEG_2_AAC_LC,
-                sampling_frequency=AacMediaCodecInformation.SamplingFrequency.SF_48000
-                | AacMediaCodecInformation.SamplingFrequency.SF_44100,
+                sampling_frequency=supported_sampling_frequencies,
                 channels=AacMediaCodecInformation.Channels.MONO
                 | AacMediaCodecInformation.Channels.STEREO,
-                vbr=1,
-                bitrate=256000,
+                vbr=1 if self.vbr else 0,
+                bitrate=self.bitrate or 256000,
             ),
         )
 
     def sbc_codec_capabilities(self) -> MediaCodecCapabilities:
+        supported_sampling_frequencies = SbcMediaCodecInformation.SamplingFrequency(0)
+        for sampling_frequency in self.sampling_frequencies or [
+            16000,
+            32000,
+            44100,
+            48000,
+        ]:
+            supported_sampling_frequencies |= (
+                SbcMediaCodecInformation.SamplingFrequency.from_int(sampling_frequency)
+            )
         return MediaCodecCapabilities(
             media_type=AVDTP_AUDIO_MEDIA_TYPE,
             media_codec_type=A2DP_SBC_CODEC_TYPE,
             media_codec_information=SbcMediaCodecInformation(
-                sampling_frequency=SbcMediaCodecInformation.SamplingFrequency.SF_48000
-                | SbcMediaCodecInformation.SamplingFrequency.SF_44100
-                | SbcMediaCodecInformation.SamplingFrequency.SF_32000
-                | SbcMediaCodecInformation.SamplingFrequency.SF_16000,
+                sampling_frequency=supported_sampling_frequencies,
                 channel_mode=SbcMediaCodecInformation.ChannelMode.MONO
                 | SbcMediaCodecInformation.ChannelMode.DUAL_CHANNEL
                 | SbcMediaCodecInformation.ChannelMode.STEREO
@@ -478,6 +527,25 @@ class Speaker:
                 | SbcMediaCodecInformation.AllocationMethod.SNR,
                 minimum_bitpool_value=2,
                 maximum_bitpool_value=53,
+            ),
+        )
+
+    def opus_codec_capabilities(self) -> MediaCodecCapabilities:
+        supported_sampling_frequencies = OpusMediaCodecInformation.SamplingFrequency(0)
+        for sampling_frequency in self.sampling_frequencies or [48000]:
+            supported_sampling_frequencies |= (
+                OpusMediaCodecInformation.SamplingFrequency.from_int(sampling_frequency)
+            )
+        return MediaCodecCapabilities(
+            media_type=AVDTP_AUDIO_MEDIA_TYPE,
+            media_codec_type=A2DP_NON_A2DP_CODEC_TYPE,
+            media_codec_information=OpusMediaCodecInformation(
+                frame_size=OpusMediaCodecInformation.FrameSize.FS_10MS
+                | OpusMediaCodecInformation.FrameSize.FS_20MS,
+                channel_mode=OpusMediaCodecInformation.ChannelMode.MONO
+                | OpusMediaCodecInformation.ChannelMode.STEREO
+                | OpusMediaCodecInformation.ChannelMode.DUAL_MONO,
+                sampling_frequency=supported_sampling_frequencies,
             ),
         )
 
@@ -675,7 +743,26 @@ def speaker_cli(ctx, device_config):
 
 @click.command()
 @click.option(
-    '--codec', type=click.Choice(['sbc', 'aac']), default='aac', show_default=True
+    '--codec',
+    type=click.Choice(['sbc', 'aac', 'opus']),
+    default='aac',
+    show_default=True,
+)
+@click.option(
+    '--sampling-frequency',
+    metavar='SAMPLING-FREQUENCY',
+    type=int,
+    multiple=True,
+    help='Enable a sampling frequency (may be specified more than once)',
+)
+@click.option(
+    '--bitrate',
+    metavar='BITRATE',
+    type=int,
+    help='Supported bitrate (AAC only)',
+)
+@click.option(
+    '--vbr/--no-vbr', is_flag=True, default=True, help='Enable VBR (AAC only)'
 )
 @click.option(
     '--discover', is_flag=True, help='Discover remote endpoints once connected'
@@ -706,7 +793,16 @@ def speaker_cli(ctx, device_config):
 @click.option('--device-config', metavar='FILENAME', help='Device configuration file')
 @click.argument('transport')
 def speaker(
-    transport, codec, connect_address, discover, output, ui_port, device_config
+    transport,
+    codec,
+    sampling_frequency,
+    bitrate,
+    vbr,
+    connect_address,
+    discover,
+    output,
+    ui_port,
+    device_config,
 ):
     """Run the speaker."""
 
@@ -721,15 +817,27 @@ def speaker(
             output = list(filter(lambda x: x != '@ffplay', output))
 
     asyncio.run(
-        Speaker(device_config, transport, codec, discover, output, ui_port).run(
-            connect_address
-        )
+        Speaker(
+            device_config,
+            transport,
+            codec,
+            sampling_frequency,
+            bitrate,
+            vbr,
+            discover,
+            output,
+            ui_port,
+        ).run(connect_address)
     )
 
 
 # -----------------------------------------------------------------------------
 def main():
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
+    logging.basicConfig(
+        level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper(),
+        format="[%(asctime)s.%(msecs)03d] %(levelname)s:%(name)s:%(message)s",
+        datefmt="%H:%M:%S",
+    )
     speaker()
 
 
