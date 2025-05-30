@@ -63,7 +63,7 @@ class HeartRateService(TemplateService):
     class HeartRateMeasurement:
         def __init__(
             self,
-            heart_rate,
+            heart_rate: int,
             sensor_contact_detected=None,
             energy_expended=None,
             rr_intervals=None,
@@ -87,7 +87,7 @@ class HeartRateService(TemplateService):
             self.rr_intervals = rr_intervals
 
         @classmethod
-        def from_bytes(cls, data):
+        def from_bytes(cls, data: bytes):
             flags = data[0]
             offset = 1
 
@@ -181,7 +181,9 @@ class HeartRateService(TemplateService):
 
         if reset_energy_expended:
 
-            def write_heart_rate_control_point_value(connection, value):
+            def write_heart_rate_control_point_value(
+                connection: int, value: int
+            ) -> None:
                 if value == self.RESET_ENERGY_EXPENDED:
                     if reset_energy_expended is not None:
                         reset_energy_expended(connection)
