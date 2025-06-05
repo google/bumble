@@ -431,12 +431,7 @@ async def test_ascs():
     )
 
     # Release
-    await ascs_client.ase_control_point.write_value(
-        ASE_Release(
-            ase_id=[1, 2],
-            metadata=[b'foo', b'bar'],
-        )
-    )
+    await ascs_client.ase_control_point.write_value(ASE_Release(ase_id=[1, 2]))
     assert (await notifications[1].get())[:2] == bytes(
         [1, AseStateMachine.State.RELEASING]
     )
