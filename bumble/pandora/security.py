@@ -57,7 +57,7 @@ from pandora.security_pb2 import (
     WaitSecurityRequest,
     WaitSecurityResponse,
 )
-from typing import Any, AsyncGenerator, AsyncIterator, Callable, Dict, Optional, Union
+from typing import Any, AsyncGenerator, AsyncIterator, Callable, Optional, Union
 
 
 class PairingDelegate(BasePairingDelegate):
@@ -457,7 +457,7 @@ class SecurityService(SecurityServicer):
             if self.need_pairing(connection, level):
                 pair_task = asyncio.create_task(connection.pair())
 
-        listeners: Dict[str, Callable[..., Union[None, Awaitable[None]]]] = {
+        listeners: dict[str, Callable[..., Union[None, Awaitable[None]]]] = {
             'disconnection': set_failure('connection_died'),
             'pairing_failure': set_failure('pairing_failure'),
             'connection_authentication_failure': set_failure('authentication_failure'),

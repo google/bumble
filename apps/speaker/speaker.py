@@ -25,7 +25,7 @@ import os
 import logging
 import pathlib
 import subprocess
-from typing import Dict, List, Optional
+from typing import Optional
 import weakref
 
 import click
@@ -448,7 +448,7 @@ class Speaker:
         # Create an HTTP server for the UI
         self.ui_server = UiServer(speaker=self, port=ui_port)
 
-    def sdp_records(self) -> Dict[int, List[ServiceAttribute]]:
+    def sdp_records(self) -> dict[int, list[ServiceAttribute]]:
         service_record_handle = 0x00010001
         return {
             service_record_handle: make_audio_sink_service_sdp_records(

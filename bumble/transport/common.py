@@ -21,7 +21,7 @@ import struct
 import asyncio
 import logging
 import io
-from typing import Any, ContextManager, Tuple, Optional, Protocol, Dict
+from typing import Any, ContextManager, Optional, Protocol
 
 from bumble import core
 from bumble import hci
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # Information needed to parse HCI packets with a generic parser:
 # For each packet type, the info represents:
 # (length-size, length-offset, unpack-type)
-HCI_PACKET_INFO: Dict[int, Tuple[int, int, str]] = {
+HCI_PACKET_INFO: dict[int, tuple[int, int, str]] = {
     hci.HCI_COMMAND_PACKET: (1, 2, 'B'),
     hci.HCI_ACL_DATA_PACKET: (2, 2, 'H'),
     hci.HCI_SYNCHRONOUS_DATA_PACKET: (1, 2, 'B'),
@@ -108,8 +108,8 @@ class PacketParser:
     NEED_BODY = 2
 
     sink: Optional[TransportSink]
-    extended_packet_info: Dict[int, Tuple[int, int, str]]
-    packet_info: Optional[Tuple[int, int, str]] = None
+    extended_packet_info: dict[int, tuple[int, int, str]]
+    packet_info: Optional[tuple[int, int, str]] = None
 
     def __init__(self, sink: Optional[TransportSink] = None) -> None:
         self.sink = sink

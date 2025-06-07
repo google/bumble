@@ -29,9 +29,7 @@ from typing import (
     Any,
     AsyncGenerator,
     Coroutine,
-    Deque,
     Optional,
-    Tuple,
 )
 
 import click
@@ -131,7 +129,7 @@ class BroadcastScanner(bumble.utils.EventEmitter):
         basic_audio_announcement: Optional[bap.BasicAudioAnnouncement] = None
         appearance: Optional[core.Appearance] = None
         biginfo: Optional[bumble.device.BIGInfoAdvertisement] = None
-        manufacturer_data: Optional[Tuple[str, bytes]] = None
+        manufacturer_data: Optional[tuple[str, bytes]] = None
 
         def __post_init__(self) -> None:
             super().__init__()
@@ -748,7 +746,9 @@ async def run_receive(
             sample_rate_hz=sampling_frequency.hz,
             num_channels=num_bis,
         )
-        lc3_queues: list[Deque[bytes]] = [collections.deque() for i in range(num_bis)]
+        lc3_queues: list[collections.deque[bytes]] = [
+            collections.deque() for i in range(num_bis)
+        ]
         packet_stats = [0, 0]
 
         audio_output = await audio_io.create_audio_output(output)
@@ -764,7 +764,7 @@ async def run_receive(
                 )
             )
 
-            def sink(queue: Deque[bytes], packet: hci.HCI_IsoDataPacket):
+            def sink(queue: collections.deque[bytes], packet: hci.HCI_IsoDataPacket):
                 # TODO: re-assemble fragments and detect errors
                 queue.append(packet.iso_sdu_fragment)
 

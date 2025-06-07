@@ -32,7 +32,7 @@ from bumble.sdp import (
     DataElement,
     ServiceAttribute,
 )
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 # Default rootcanal HCI TCP address
@@ -49,13 +49,13 @@ class PandoraDevice:
 
     # Bumble device instance & configuration.
     device: Device
-    config: Dict[str, Any]
+    config: dict[str, Any]
 
     # HCI transport name & instance.
     _hci_name: str
     _hci: Optional[transport.Transport]  # type: ignore[name-defined]
 
-    def __init__(self, config: Dict[str, Any]) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.device = _make_device(config)
         self._hci_name = config.get(
@@ -95,14 +95,14 @@ class PandoraDevice:
         await self.close()
         await self.open()
 
-    def info(self) -> Optional[Dict[str, str]]:
+    def info(self) -> Optional[dict[str, str]]:
         return {
             'public_bd_address': str(self.device.public_address),
             'random_address': str(self.device.random_address),
         }
 
 
-def _make_device(config: Dict[str, Any]) -> Device:
+def _make_device(config: dict[str, Any]) -> Device:
     """Initialize an idle Bumble device instance."""
 
     # initialize bumble device.
@@ -117,7 +117,7 @@ def _make_device(config: Dict[str, Any]) -> Device:
 
 
 # TODO(b/267540823): remove when Pandora A2dp is supported
-def _make_sdp_records(rfcomm_channel: int) -> Dict[int, List[ServiceAttribute]]:
+def _make_sdp_records(rfcomm_channel: int) -> dict[int, list[ServiceAttribute]]:
     return {
         0x00010001: [
             ServiceAttribute(

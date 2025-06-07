@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import datetime
+import importlib
 import logging
 import os
 import struct
@@ -154,9 +155,10 @@ class Printer:
 def main(format, vendor, filename):
     for vendor_name in vendor:
         if vendor_name == 'android':
-            import bumble.vendor.android.hci
+            # Prevent being deleted by linter.
+            importlib.import_module('bumble.vendor.android.hci')
         elif vendor_name == 'zephyr':
-            import bumble.vendor.zephyr.hci
+            importlib.import_module('bumble.vendor.zephyr.hci')
 
     input = open(filename, 'rb')
     if format == 'h4':

@@ -32,10 +32,6 @@ from typing import (
     Awaitable,
     Callable,
     Generic,
-    Dict,
-    List,
-    Optional,
-    Type,
     TypeVar,
     Union,
     TYPE_CHECKING,
@@ -251,7 +247,7 @@ class ATT_PDU:
     See Bluetooth spec @ Vol 3, Part F - 3.3 ATTRIBUTE PDU
     '''
 
-    pdu_classes: Dict[int, Type[ATT_PDU]] = {}
+    pdu_classes: dict[int, type[ATT_PDU]] = {}
     op_code = 0
     name: str
 
@@ -818,7 +814,7 @@ class Attribute(utils.EventEmitter, Generic[_T]):
                 # The check for `p.name is not None` here is needed because for InFlag
                 # enums, the .name property can be None, when the enum value is 0,
                 # so the type hint for .name is Optional[str].
-                enum_list: List[str] = [p.name for p in cls if p.name is not None]
+                enum_list: list[str] = [p.name for p in cls if p.name is not None]
                 enum_list_str = ",".join(enum_list)
                 raise TypeError(
                     f"Attribute::permissions error:\nExpected a string containing any of the keys, separated by commas: {enum_list_str}\nGot: {permissions_str}"

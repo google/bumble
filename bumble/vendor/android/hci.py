@@ -16,7 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import struct
-from typing import Dict, Optional, Type
+from typing import Optional
 
 from bumble.hci import (
     name_or_number,
@@ -283,7 +283,7 @@ class HCI_Dynamic_Audio_Buffer_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 class HCI_Android_Vendor_Event(HCI_Extended_Event):
     event_code: int = HCI_VENDOR_EVENT
-    subevent_classes: Dict[int, Type[HCI_Extended_Event]] = {}
+    subevent_classes: dict[int, type[HCI_Extended_Event]] = {}
 
     @classmethod
     def subclass_from_parameters(

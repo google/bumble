@@ -19,7 +19,6 @@ import asyncio
 import sys
 import os
 import logging
-from bumble.colors import color
 from bumble.hci import Address
 from bumble.device import Device
 from bumble.transport import open_transport_or_link

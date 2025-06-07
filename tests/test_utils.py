@@ -16,7 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-from typing import List, Optional, Type
+from typing import Optional
 from typing_extensions import Self
 
 from bumble.controller import Controller
@@ -29,7 +29,7 @@ from bumble.hci import Address
 
 # -----------------------------------------------------------------------------
 class TwoDevices:
-    connections: List[Optional[Connection]]
+    connections: list[Optional[Connection]]
 
     def __init__(self) -> None:
         self.connections = [None, None]
@@ -83,7 +83,7 @@ class TwoDevices:
         return self.devices[index]
 
     @classmethod
-    async def create_with_connection(cls: Type[Self]) -> Self:
+    async def create_with_connection(cls: type[Self]) -> Self:
         devices = cls()
         await devices.setup_connection()
         return devices

@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import pytest
-import functools
 import pytest_asyncio
 import logging
 import sys

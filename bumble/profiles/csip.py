@@ -19,7 +19,7 @@
 from __future__ import annotations
 import enum
 import struct
-from typing import Optional, Tuple
+from typing import Optional
 
 from bumble import core
 from bumble import crypto
@@ -228,7 +228,7 @@ class CoordinatedSetIdentificationProxy(gatt_client.ProfileServiceProxy):
         ):
             self.set_member_rank = characteristics[0]
 
-    async def read_set_identity_resolving_key(self) -> Tuple[SirkType, bytes]:
+    async def read_set_identity_resolving_key(self) -> tuple[SirkType, bytes]:
         '''Reads SIRK and decrypts if encrypted.'''
         response = await self.set_identity_resolving_key.read_value()
         if len(response) != SET_IDENTITY_RESOLVING_KEY_LENGTH + 1:

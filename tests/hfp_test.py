@@ -21,7 +21,7 @@ import os
 import pytest
 import pytest_asyncio
 
-from typing import Tuple, Optional
+from typing import Optional
 
 from .test_utils import TwoDevices
 from bumble import core
@@ -194,7 +194,7 @@ async def test_slc_with_minimal_features():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_slc(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+async def test_slc(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
 
     assert hf.supported_ag_features == ag.supported_ag_features
@@ -207,7 +207,7 @@ async def test_slc(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_ag_indicator(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+async def test_ag_indicator(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
 
     future = asyncio.get_running_loop().create_future()
@@ -222,7 +222,7 @@ async def test_ag_indicator(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtoco
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_hf_indicator(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+async def test_hf_indicator(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
 
     future = asyncio.get_running_loop().create_future()
@@ -237,7 +237,7 @@ async def test_hf_indicator(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtoco
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_codec_negotiation(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]
 ):
     hf, ag = hfp_connections
 
@@ -254,7 +254,7 @@ async def test_codec_negotiation(
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_dial(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+async def test_dial(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
     NUMBER = 'ATD123456789'
 
@@ -268,7 +268,7 @@ async def test_dial(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_answer(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+async def test_answer(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
 
     future = asyncio.get_running_loop().create_future()
@@ -281,7 +281,7 @@ async def test_answer(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_reject_incoming_call(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]
 ):
     hf, ag = hfp_connections
 
@@ -294,7 +294,7 @@ async def test_reject_incoming_call(
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_terminate_call(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+async def test_terminate_call(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
 
     future = asyncio.get_running_loop().create_future()
@@ -307,7 +307,7 @@ async def test_terminate_call(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProto
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_query_calls_without_calls(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]
 ):
     hf, ag = hfp_connections
 
@@ -317,7 +317,7 @@ async def test_query_calls_without_calls(
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_query_calls_with_calls(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]
 ):
     hf, ag = hfp_connections
     ag.calls.append(
@@ -347,7 +347,7 @@ async def test_query_calls_with_calls(
     ),
 )
 async def test_hold_call_without_call_index(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol],
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol],
     operation: hfp.CallHoldOperation,
 ):
     hf, ag = hfp_connections
@@ -369,7 +369,7 @@ async def test_hold_call_without_call_index(
     ),
 )
 async def test_hold_call_with_call_index(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol],
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol],
     operation: hfp.CallHoldOperation,
 ):
     hf, ag = hfp_connections
@@ -393,7 +393,7 @@ async def test_hold_call_with_call_index(
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_ring(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+async def test_ring(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
     ring_future = asyncio.get_running_loop().create_future()
     hf.on("ring", lambda: ring_future.set_result(None))
@@ -405,7 +405,7 @@ async def test_ring(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_speaker_volume(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+async def test_speaker_volume(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
     speaker_volume_future = asyncio.get_running_loop().create_future()
     hf.on("speaker_volume", speaker_volume_future.set_result)
@@ -418,7 +418,7 @@ async def test_speaker_volume(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProto
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_microphone_volume(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]
 ):
     hf, ag = hfp_connections
     microphone_volume_future = asyncio.get_running_loop().create_future()
@@ -431,7 +431,7 @@ async def test_microphone_volume(
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_cli_notification(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]):
+async def test_cli_notification(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
     cli_notification_future = asyncio.get_running_loop().create_future()
     hf.on("cli_notification", cli_notification_future.set_result)
@@ -448,7 +448,7 @@ async def test_cli_notification(hfp_connections: Tuple[hfp.HfProtocol, hfp.AgPro
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_voice_recognition_from_hf(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]
 ):
     hf, ag = hfp_connections
     voice_recognition_future = asyncio.get_running_loop().create_future()
@@ -462,7 +462,7 @@ async def test_voice_recognition_from_hf(
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_voice_recognition_from_ag(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]
 ):
     hf, ag = hfp_connections
     voice_recognition_future = asyncio.get_running_loop().create_future()
@@ -572,7 +572,7 @@ async def test_sco_setup():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_hf_batched_response(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]
 ):
     hf, ag = hfp_connections
 
@@ -584,7 +584,7 @@ async def test_hf_batched_response(
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_ag_batched_commands(
-    hfp_connections: Tuple[hfp.HfProtocol, hfp.AgProtocol]
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]
 ):
     hf, ag = hfp_connections
 

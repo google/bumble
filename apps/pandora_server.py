@@ -4,7 +4,7 @@ import logging
 import json
 
 from bumble.pandora import PandoraDevice, Config, serve
-from typing import Dict, Any
+from typing import Any
 
 BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300
@@ -39,7 +39,7 @@ def main(grpc_port: int, rootcanal_port: int, transport: str, config: str) -> No
     asyncio.run(serve(device, config=server_config, port=grpc_port))
 
 
-def retrieve_config(config: str) -> Dict[str, Any]:
+def retrieve_config(config: str) -> dict[str, Any]:
     if not config:
         return {}
 

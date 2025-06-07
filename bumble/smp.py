@@ -33,11 +33,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Dict,
-    List,
     Optional,
-    Tuple,
-    Type,
     cast,
 )
 
@@ -210,7 +206,7 @@ class SMP_Command:
     See Bluetooth spec @ Vol 3, Part H - 3 SECURITY MANAGER PROTOCOL
     '''
 
-    smp_classes: Dict[int, Type[SMP_Command]] = {}
+    smp_classes: dict[int, type[SMP_Command]] = {}
     fields: Any
     code = 0
     name = ''
@@ -254,7 +250,7 @@ class SMP_Command:
 
     @staticmethod
     def key_distribution_str(value: int) -> str:
-        key_types: List[str] = []
+        key_types: list[str] = []
         if value & SMP_ENC_KEY_DISTRIBUTION_FLAG:
             key_types.append('ENC')
         if value & SMP_ID_KEY_DISTRIBUTION_FLAG:
@@ -706,7 +702,7 @@ class Session:
         self.peer_identity_resolving_key = None
         self.peer_bd_addr: Optional[Address] = None
         self.peer_signature_key = None
-        self.peer_expected_distributions: List[Type[SMP_Command]] = []
+        self.peer_expected_distributions: list[type[SMP_Command]] = []
         self.dh_key = b''
         self.confirm_value = None
         self.passkey: Optional[int] = None
@@ -814,7 +810,7 @@ class Session:
             self.tk = bytes(16)
 
     @property
-    def pkx(self) -> Tuple[bytes, bytes]:
+    def pkx(self) -> tuple[bytes, bytes]:
         return (self.ecc_key.x[::-1], self.peer_public_key_x)
 
     @property
@@ -826,7 +822,7 @@ class Session:
         return self.pkx[0 if self.is_responder else 1]
 
     @property
-    def nx(self) -> Tuple[bytes, bytes]:
+    def nx(self) -> tuple[bytes, bytes]:
         assert self.peer_random_value
         return (self.r, self.peer_random_value)
 
@@ -1269,7 +1265,7 @@ class Session:
             f'{[c.__name__ for c in self.peer_expected_distributions]}'
         )
 
-    def check_key_distribution(self, command_class: Type[SMP_Command]) -> None:
+    def check_key_distribution(self, command_class: type[SMP_Command]) -> None:
         # First, check that the connection is encrypted
         if not self.connection.is_encrypted:
             logger.warning(
@@ -1938,9 +1934,9 @@ class Manager(utils.EventEmitter):
     '''
 
     device: Device
-    sessions: Dict[int, Session]
+    sessions: dict[int, Session]
     pairing_config_factory: Callable[[Connection], PairingConfig]
-    session_proxy: Type[Session]
+    session_proxy: type[Session]
     _ecc_key: Optional[crypto.EccKey]
 
     def __init__(

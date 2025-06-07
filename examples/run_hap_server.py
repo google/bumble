@@ -22,7 +22,6 @@ import os
 
 from bumble.core import AdvertisingData
 from bumble.device import Device
-from bumble import att
 from bumble.profiles.hap import (
     HearingAccessService,
     HearingAidFeatures,

@@ -28,7 +28,7 @@ import os
 import pathlib
 import platform
 import struct
-from typing import Any, Deque, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from bumble import core
 from bumble.drivers import common
@@ -348,7 +348,7 @@ class Driver(common.Driver):
     def __init__(self, host: Host) -> None:
         self.host = host
         self.max_in_flight_firmware_load_commands = 1
-        self.pending_firmware_load_commands: Deque[hci.HCI_Command] = (
+        self.pending_firmware_load_commands: collections.deque[hci.HCI_Command] = (
             collections.deque()
         )
         self.can_send_firmware_load_command = asyncio.Event()

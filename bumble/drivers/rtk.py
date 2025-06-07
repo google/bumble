@@ -29,7 +29,6 @@ import os
 import pathlib
 import platform
 import struct
-from typing import Tuple
 import weakref
 
 
@@ -294,7 +293,7 @@ class Driver(common.Driver):
     @dataclass
     class DriverInfo:
         rom: int
-        hci: Tuple[int, int]
+        hci: tuple[int, int]
         config_needed: bool
         has_rom_version: bool
         has_msft_ext: bool = False

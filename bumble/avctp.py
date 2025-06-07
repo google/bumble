@@ -19,7 +19,7 @@ from __future__ import annotations
 from enum import IntEnum
 import logging
 import struct
-from typing import Callable, cast, Dict, Optional
+from typing import Callable, cast, Optional
 
 from bumble.colors import color
 from bumble import avc
@@ -146,9 +146,9 @@ class MessageAssembler:
 # -----------------------------------------------------------------------------
 class Protocol:
     CommandHandler = Callable[[int, avc.CommandFrame], None]
-    command_handlers: Dict[int, CommandHandler]  # Command handlers, by PID
+    command_handlers: dict[int, CommandHandler]  # Command handlers, by PID
     ResponseHandler = Callable[[int, Optional[avc.ResponseFrame]], None]
-    response_handlers: Dict[int, ResponseHandler]  # Response handlers, by PID
+    response_handlers: dict[int, ResponseHandler]  # Response handlers, by PID
     next_transaction_label: int
     message_assembler: MessageAssembler
 

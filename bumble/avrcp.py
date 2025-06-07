@@ -26,14 +26,11 @@ from typing import (
     Awaitable,
     Callable,
     cast,
-    Dict,
     Iterable,
     List,
     Optional,
     Sequence,
     SupportsBytes,
-    Tuple,
-    Type,
     TypeVar,
     Union,
 )
@@ -84,10 +81,10 @@ AVRCP_BLUETOOTH_SIG_COMPANY_ID = 0x001958
 # -----------------------------------------------------------------------------
 def make_controller_service_sdp_records(
     service_record_handle: int,
-    avctp_version: Tuple[int, int] = (1, 4),
-    avrcp_version: Tuple[int, int] = (1, 6),
+    avctp_version: tuple[int, int] = (1, 4),
+    avrcp_version: tuple[int, int] = (1, 6),
     supported_features: int = 1,
-) -> List[ServiceAttribute]:
+) -> list[ServiceAttribute]:
     # TODO: support a way to compute the supported features from a feature list
     avctp_version_int = avctp_version[0] << 8 | avctp_version[1]
     avrcp_version_int = avrcp_version[0] << 8 | avrcp_version[1]
@@ -152,10 +149,10 @@ def make_controller_service_sdp_records(
 # -----------------------------------------------------------------------------
 def make_target_service_sdp_records(
     service_record_handle: int,
-    avctp_version: Tuple[int, int] = (1, 4),
-    avrcp_version: Tuple[int, int] = (1, 6),
+    avctp_version: tuple[int, int] = (1, 4),
+    avrcp_version: tuple[int, int] = (1, 6),
     supported_features: int = 0x23,
-) -> List[ServiceAttribute]:
+) -> list[ServiceAttribute]:
     # TODO: support a way to compute the supported features from a feature list
     avctp_version_int = avctp_version[0] << 8 | avctp_version[1]
     avrcp_version_int = avrcp_version[0] << 8 | avrcp_version[1]
@@ -291,7 +288,7 @@ class Command:
     pdu_id: Protocol.PduId
     parameter: bytes
 
-    def to_string(self, properties: Dict[str, str]) -> str:
+    def to_string(self, properties: dict[str, str]) -> str:
         properties_str = ",".join(
             [f"{name}={value}" for name, value in properties.items()]
         )
@@ -337,7 +334,7 @@ class GetPlayStatusCommand(Command):
 # -----------------------------------------------------------------------------
 class GetElementAttributesCommand(Command):
     identifier: int
-    attribute_ids: List[MediaAttributeId]
+    attribute_ids: list[MediaAttributeId]
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> GetElementAttributesCommand:
@@ -409,7 +406,7 @@ class Response:
     pdu_id: Protocol.PduId
     parameter: bytes
 
-    def to_string(self, properties: Dict[str, str]) -> str:
+    def to_string(self, properties: dict[str, str]) -> str:
         properties_str = ",".join(
             [f"{name}={value}" for name, value in properties.items()]
         )
@@ -454,7 +451,7 @@ class NotImplementedResponse(Response):
 # -----------------------------------------------------------------------------
 class GetCapabilitiesResponse(Response):
     capability_id: GetCapabilitiesCommand.CapabilityId
-    capabilities: List[Union[SupportsBytes, bytes]]
+    capabilities: list[Union[SupportsBytes, bytes]]
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> GetCapabilitiesResponse:
@@ -467,7 +464,7 @@ class GetCapabilitiesResponse(Response):
         capability_id = GetCapabilitiesCommand.CapabilityId(pdu[0])
         capability_count = pdu[1]
 
-        capabilities: List[Union[SupportsBytes, bytes]]
+        capabilities: list[Union[SupportsBytes, bytes]]
         if capability_id == GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED:
             capabilities = [EventId(pdu[2 + x]) for x in range(capability_count)]
         else:
@@ -540,13 +537,13 @@ class GetPlayStatusResponse(Response):
 
 # -----------------------------------------------------------------------------
 class GetElementAttributesResponse(Response):
-    attributes: List[MediaAttribute]
+    attributes: list[MediaAttribute]
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> GetElementAttributesResponse:
         num_attributes = pdu[0]
         offset = 1
-        attributes: List[MediaAttribute] = []
+        attributes: list[MediaAttribute] = []
         for _ in range(num_attributes):
             (
                 attribute_id_int,
@@ -817,7 +814,7 @@ class PlayerApplicationSettingChangedEvent(Event):
         attribute_id: ApplicationSetting.AttributeId
         value_id: utils.OpenIntEnum
 
-    player_application_settings: List[Setting]
+    player_application_settings: list[Setting]
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> PlayerApplicationSettingChangedEvent:
@@ -939,7 +936,7 @@ class VolumeChangedEvent(Event):
 
 
 # -----------------------------------------------------------------------------
-EVENT_SUBCLASSES: Dict[EventId, Type[Event]] = {
+EVENT_SUBCLASSES: dict[EventId, type[Event]] = {
     EventId.PLAYBACK_STATUS_CHANGED: PlaybackStatusChangedEvent,
     EventId.PLAYBACK_POS_CHANGED: PlaybackPositionChangedEvent,
     EventId.TRACK_CHANGED: TrackChangedEvent,
@@ -967,14 +964,14 @@ class Delegate:
         def __init__(self, status_code: Protocol.StatusCode) -> None:
             self.status_code = status_code
 
-    supported_events: List[EventId]
+    supported_events: list[EventId]
     volume: int
 
     def __init__(self, supported_events: Iterable[EventId] = ()) -> None:
         self.supported_events = list(supported_events)
         self.volume = 0
 
-    async def get_supported_events(self) -> List[EventId]:
+    async def get_supported_events(self) -> list[EventId]:
         return self.supported_events
 
     async def set_absolute_volume(self, volume: int) -> None:
@@ -1124,8 +1121,8 @@ class Protocol(utils.EventEmitter):
     receive_response_state: Optional[ReceiveResponseState]
     avctp_protocol: Optional[avctp.Protocol]
     free_commands: asyncio.Queue
-    pending_commands: Dict[int, PendingCommand]  # Pending commands, by label
-    notification_listeners: Dict[EventId, NotificationListener]
+    pending_commands: dict[int, PendingCommand]  # Pending commands, by label
+    notification_listeners: dict[EventId, NotificationListener]
 
     @staticmethod
     def _check_vendor_dependent_frame(
@@ -1190,7 +1187,7 @@ class Protocol(utils.EventEmitter):
 
     @staticmethod
     def _check_response(
-        response_context: ResponseContext, expected_type: Type[_R]
+        response_context: ResponseContext, expected_type: type[_R]
     ) -> _R:
         if isinstance(response_context, Protocol.FinalResponse):
             if (
@@ -1230,7 +1227,7 @@ class Protocol(utils.EventEmitter):
 
         utils.AsyncRunner.spawn(call())
 
-    async def get_supported_events(self) -> List[EventId]:
+    async def get_supported_events(self) -> list[EventId]:
         """Get the list of events supported by the connected peer."""
         response_context = await self.send_avrcp_command(
             avc.CommandFrame.CommandType.STATUS,
@@ -1253,7 +1250,7 @@ class Protocol(utils.EventEmitter):
 
     async def get_element_attributes(
         self, element_identifier: int, attribute_ids: Sequence[MediaAttributeId]
-    ) -> List[MediaAttribute]:
+    ) -> list[MediaAttribute]:
         """Get element attributes from the connected peer."""
         response_context = await self.send_avrcp_command(
             avc.CommandFrame.CommandType.STATUS,
@@ -1335,7 +1332,7 @@ class Protocol(utils.EventEmitter):
 
     async def monitor_player_application_settings(
         self,
-    ) -> AsyncIterator[List[PlayerApplicationSettingChangedEvent.Setting]]:
+    ) -> AsyncIterator[list[PlayerApplicationSettingChangedEvent.Setting]]:
         """Monitor Player Application Setting changes from the connected peer."""
         async for event in self.monitor_events(
             EventId.PLAYER_APPLICATION_SETTING_CHANGED, 0

@@ -26,10 +26,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Deque,
-    Dict,
     Optional,
-    Set,
     cast,
     TYPE_CHECKING,
 )
@@ -89,7 +86,9 @@ class DataPacketQueue(utils.EventEmitter):
             int
         )  # Number of packets in flight per connection
         self._send = send
-        self._packets: Deque[tuple[hci.HCI_Packet, int]] = collections.deque()
+        self._packets: collections.deque[tuple[hci.HCI_Packet, int]] = (
+            collections.deque()
+        )
         self._queued = 0
         self._completed = 0
 
@@ -234,16 +233,16 @@ class IsoLink:
 
 # -----------------------------------------------------------------------------
 class Host(utils.EventEmitter):
-    connections: Dict[int, Connection]
-    cis_links: Dict[int, IsoLink]
-    bis_links: Dict[int, IsoLink]
-    sco_links: Dict[int, ScoLink]
+    connections: dict[int, Connection]
+    cis_links: dict[int, IsoLink]
+    bis_links: dict[int, IsoLink]
+    sco_links: dict[int, ScoLink]
     bigs: dict[int, set[int]]
     acl_packet_queue: Optional[DataPacketQueue] = None
     le_acl_packet_queue: Optional[DataPacketQueue] = None
     iso_packet_queue: Optional[DataPacketQueue] = None
     hci_sink: Optional[TransportSink] = None
-    hci_metadata: Dict[str, Any]
+    hci_metadata: dict[str, Any]
     long_term_key_provider: Optional[
         Callable[[int, bytes, int], Awaitable[Optional[bytes]]]
     ]
@@ -813,7 +812,7 @@ class Host(utils.EventEmitter):
         ) != 0
 
     @property
-    def supported_commands(self) -> Set[int]:
+    def supported_commands(self) -> set[int]:
         return set(
             op_code
             for op_code, mask in hci.HCI_SUPPORTED_COMMANDS_MASKS.items()

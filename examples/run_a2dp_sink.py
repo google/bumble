@@ -19,7 +19,7 @@ import asyncio
 import sys
 import os
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from bumble.device import Device
 from bumble.transport import open_transport_or_link
@@ -36,7 +36,7 @@ from bumble.a2dp import (
     SbcMediaCodecInformation,
 )
 
-Context: Dict[Any, Any] = {'output': None}
+Context: dict[Any, Any] = {'output': None}
 
 
 # -----------------------------------------------------------------------------

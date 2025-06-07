@@ -28,7 +28,6 @@ from typing import (
     Iterable,
     Literal,
     Optional,
-    Type,
     TypeVar,
 )
 
@@ -270,7 +269,7 @@ class SerializableCharacteristicAdapter(CharacteristicAdapter[_T2]):
     `to_bytes` and `__bytes__` methods, respectively.
     '''
 
-    def __init__(self, characteristic: Characteristic, cls: Type[_T2]) -> None:
+    def __init__(self, characteristic: Characteristic, cls: type[_T2]) -> None:
         super().__init__(characteristic)
         self.cls = cls
 
@@ -289,7 +288,7 @@ class SerializableCharacteristicProxyAdapter(CharacteristicProxyAdapter[_T2]):
     '''
 
     def __init__(
-        self, characteristic_proxy: CharacteristicProxy, cls: Type[_T2]
+        self, characteristic_proxy: CharacteristicProxy, cls: type[_T2]
     ) -> None:
         super().__init__(characteristic_proxy)
         self.cls = cls
@@ -311,7 +310,7 @@ class EnumCharacteristicAdapter(CharacteristicAdapter[_T3]):
     def __init__(
         self,
         characteristic: Characteristic,
-        cls: Type[_T3],
+        cls: type[_T3],
         length: int,
         byteorder: Literal['little', 'big'] = 'little',
     ):
@@ -347,7 +346,7 @@ class EnumCharacteristicProxyAdapter(CharacteristicProxyAdapter[_T3]):
     def __init__(
         self,
         characteristic_proxy: CharacteristicProxy,
-        cls: Type[_T3],
+        cls: type[_T3],
         length: int,
         byteorder: Literal['little', 'big'] = 'little',
     ):

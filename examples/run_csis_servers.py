@@ -25,8 +25,6 @@ from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.hci import (
     Address,
-    OwnAddressType,
-    HCI_LE_Set_Extended_Advertising_Parameters_Command,
 )
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType

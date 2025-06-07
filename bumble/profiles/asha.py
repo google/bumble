@@ -19,7 +19,7 @@
 import enum
 import struct
 import logging
-from typing import List, Optional, Callable, Union, Any
+from typing import Optional, Callable, Union, Any
 
 from bumble import l2cap
 from bumble import utils
@@ -103,7 +103,7 @@ class AshaService(gatt.TemplateService):
     def __init__(
         self,
         capability: int,
-        hisyncid: Union[List[int], bytes],
+        hisyncid: Union[list[int], bytes],
         device: Device,
         psm: int = 0,
         audio_sink: Optional[Callable[[bytes], Any]] = None,

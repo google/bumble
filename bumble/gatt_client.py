@@ -31,15 +31,10 @@ from datetime import datetime
 from typing import (
     Any,
     Callable,
-    Dict,
     Generic,
     Iterable,
-    List,
     Optional,
-    Set,
-    Tuple,
     Union,
-    Type,
     TypeVar,
     TYPE_CHECKING,
 )
@@ -149,8 +144,8 @@ class AttributeProxy(utils.EventEmitter, Generic[_T]):
 
 class ServiceProxy(AttributeProxy):
     uuid: UUID
-    characteristics: List[CharacteristicProxy[bytes]]
-    included_services: List[ServiceProxy]
+    characteristics: list[CharacteristicProxy[bytes]]
+    included_services: list[ServiceProxy]
 
     @staticmethod
     def from_client(service_class, client: Client, service_uuid: UUID):
@@ -199,8 +194,8 @@ class ServiceProxy(AttributeProxy):
 
 class CharacteristicProxy(AttributeProxy[_T]):
     properties: Characteristic.Properties
-    descriptors: List[DescriptorProxy]
-    subscribers: Dict[Any, Callable[[_T], Any]]
+    descriptors: list[DescriptorProxy]
+    subscribers: dict[Any, Callable[[_T], Any]]
 
     EVENT_UPDATE = "update"
 
@@ -277,7 +272,7 @@ class ProfileServiceProxy:
     Base class for profile-specific service proxies
     '''
 
-    SERVICE_CLASS: Type[TemplateService]
+    SERVICE_CLASS: type[TemplateService]
 
     @classmethod
     def from_client(cls, client: Client) -> Optional[ProfileServiceProxy]:
@@ -288,13 +283,13 @@ class ProfileServiceProxy:
 # GATT Client
 # -----------------------------------------------------------------------------
 class Client:
-    services: List[ServiceProxy]
-    cached_values: Dict[int, Tuple[datetime, bytes]]
-    notification_subscribers: Dict[
-        int, Set[Union[CharacteristicProxy, Callable[[bytes], Any]]]
+    services: list[ServiceProxy]
+    cached_values: dict[int, tuple[datetime, bytes]]
+    notification_subscribers: dict[
+        int, set[Union[CharacteristicProxy, Callable[[bytes], Any]]]
     ]
-    indication_subscribers: Dict[
-        int, Set[Union[CharacteristicProxy, Callable[[bytes], Any]]]
+    indication_subscribers: dict[
+        int, set[Union[CharacteristicProxy, Callable[[bytes], Any]]]
     ]
     pending_response: Optional[asyncio.futures.Future[ATT_PDU]]
     pending_request: Optional[ATT_PDU]
@@ -379,12 +374,12 @@ class Client:
 
         return self.connection.att_mtu
 
-    def get_services_by_uuid(self, uuid: UUID) -> List[ServiceProxy]:
+    def get_services_by_uuid(self, uuid: UUID) -> list[ServiceProxy]:
         return [service for service in self.services if service.uuid == uuid]
 
     def get_characteristics_by_uuid(
         self, uuid: UUID, service: Optional[ServiceProxy] = None
-    ) -> List[CharacteristicProxy[bytes]]:
+    ) -> list[CharacteristicProxy[bytes]]:
         services = [service] if service else self.services
         return [
             c
@@ -395,8 +390,8 @@ class Client:
     def get_attribute_grouping(self, attribute_handle: int) -> Optional[
         Union[
             ServiceProxy,
-            Tuple[ServiceProxy, CharacteristicProxy],
-            Tuple[ServiceProxy, CharacteristicProxy, DescriptorProxy],
+            tuple[ServiceProxy, CharacteristicProxy],
+            tuple[ServiceProxy, CharacteristicProxy, DescriptorProxy],
         ]
     ]:
         """
@@ -429,7 +424,7 @@ class Client:
         if not already_known:
             self.services.append(service)
 
-    async def discover_services(self, uuids: Iterable[UUID] = ()) -> List[ServiceProxy]:
+    async def discover_services(self, uuids: Iterable[UUID] = ()) -> list[ServiceProxy]:
         '''
         See Vol 3, Part G - 4.4.1 Discover All Primary Services
         '''
@@ -501,7 +496,7 @@ class Client:
 
         return services
 
-    async def discover_service(self, uuid: Union[str, UUID]) -> List[ServiceProxy]:
+    async def discover_service(self, uuid: Union[str, UUID]) -> list[ServiceProxy]:
         '''
         See Vol 3, Part G - 4.4.2 Discover Primary Service by Service UUID
         '''
@@ -572,7 +567,7 @@ class Client:
 
     async def discover_included_services(
         self, service: ServiceProxy
-    ) -> List[ServiceProxy]:
+    ) -> list[ServiceProxy]:
         '''
         See Vol 3, Part G - 4.5.1 Find Included Services
         '''
@@ -580,7 +575,7 @@ class Client:
         starting_handle = service.handle
         ending_handle = service.end_group_handle
 
-        included_services: List[ServiceProxy] = []
+        included_services: list[ServiceProxy] = []
         while starting_handle <= ending_handle:
             response = await self.send_request(
                 ATT_Read_By_Type_Request(
@@ -636,7 +631,7 @@ class Client:
 
     async def discover_characteristics(
         self, uuids, service: Optional[ServiceProxy]
-    ) -> List[CharacteristicProxy[bytes]]:
+    ) -> list[CharacteristicProxy[bytes]]:
         '''
         See Vol 3, Part G - 4.6.1 Discover All Characteristics of a Service and 4.6.2
         Discover Characteristics by UUID
@@ -649,12 +644,12 @@ class Client:
         services = [service] if service else self.services
 
         # Perform characteristic discovery for each service
-        discovered_characteristics: List[CharacteristicProxy[bytes]] = []
+        discovered_characteristics: list[CharacteristicProxy[bytes]] = []
         for service in services:
             starting_handle = service.handle
             ending_handle = service.end_group_handle
 
-            characteristics: List[CharacteristicProxy[bytes]] = []
+            characteristics: list[CharacteristicProxy[bytes]] = []
             while starting_handle <= ending_handle:
                 response = await self.send_request(
                     ATT_Read_By_Type_Request(
@@ -725,7 +720,7 @@ class Client:
         characteristic: Optional[CharacteristicProxy] = None,
         start_handle: Optional[int] = None,
         end_handle: Optional[int] = None,
-    ) -> List[DescriptorProxy]:
+    ) -> list[DescriptorProxy]:
         '''
         See Vol 3, Part G - 4.7.1 Discover All Characteristic Descriptors
         '''
@@ -738,7 +733,7 @@ class Client:
         else:
             return []
 
-        descriptors: List[DescriptorProxy] = []
+        descriptors: list[DescriptorProxy] = []
         while starting_handle <= ending_handle:
             response = await self.send_request(
                 ATT_Find_Information_Request(
@@ -787,7 +782,7 @@ class Client:
 
         return descriptors
 
-    async def discover_attributes(self) -> List[AttributeProxy[bytes]]:
+    async def discover_attributes(self) -> list[AttributeProxy[bytes]]:
         '''
         Discover all attributes, regardless of type
         '''
@@ -1002,7 +997,7 @@ class Client:
 
     async def read_characteristics_by_uuid(
         self, uuid: UUID, service: Optional[ServiceProxy]
-    ) -> List[bytes]:
+    ) -> list[bytes]:
         '''
         See Vol 3, Part G - 4.8.2 Read Using Characteristic UUID
         '''

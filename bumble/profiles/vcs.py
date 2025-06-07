@@ -20,7 +20,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 
-from typing import Optional, Sequence
+from typing import Sequence
 
 from bumble import att
 from bumble import utils

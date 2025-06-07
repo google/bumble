@@ -51,7 +51,7 @@ from pandora.l2cap_pb2 import (  # pytype: disable=pyi-error
     WaitDisconnectionRequest,
     WaitDisconnectionResponse,
 )
-from typing import AsyncGenerator, Dict, Optional, Union
+from typing import AsyncGenerator, Optional, Union
 from dataclasses import dataclass
 
 L2capChannel = Union[ClassicChannel, LeCreditBasedChannel]
@@ -70,7 +70,7 @@ class L2CAPService(L2CAPServicer):
         )
         self.device = device
         self.config = config
-        self.channels: Dict[bytes, ChannelContext] = {}
+        self.channels: dict[bytes, ChannelContext] = {}
 
     def register_event(self, l2cap_channel: L2capChannel) -> ChannelContext:
         close_future = asyncio.get_running_loop().create_future()

@@ -25,7 +25,6 @@ from bumble.device import Device, Peer
 from bumble.transport import open_transport
 from bumble.profiles.ancs import (
     AncsClient,
-    AppAttribute,
     AppAttributeId,
     EventFlags,
     EventId,

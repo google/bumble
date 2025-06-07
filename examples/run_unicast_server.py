@@ -25,8 +25,6 @@ import io
 import struct
 import secrets
 
-from typing import Dict
-
 from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.hci import (
@@ -73,7 +71,7 @@ def _sink_pac_record() -> PacRecord:
     )
 
 
-file_outputs: Dict[AseStateMachine, io.BufferedWriter] = {}
+file_outputs: dict[AseStateMachine, io.BufferedWriter] = {}
 
 
 # -----------------------------------------------------------------------------
