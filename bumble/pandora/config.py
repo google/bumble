@@ -15,7 +15,7 @@
 from __future__ import annotations
 from bumble.pairing import PairingConfig, PairingDelegate
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
 
 
 @dataclass
@@ -32,7 +32,7 @@ class Config:
         PairingDelegate.DEFAULT_KEY_DISTRIBUTION
     )
 
-    def load_from_dict(self, config: Dict[str, Any]) -> None:
+    def load_from_dict(self, config: dict[str, Any]) -> None:
         io_capability_name: str = config.get(
             'io_capability', 'no_output_no_input'
         ).upper()

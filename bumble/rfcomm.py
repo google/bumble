@@ -22,7 +22,7 @@ import asyncio
 import collections
 import dataclasses
 import enum
-from typing import Callable, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Callable, Optional, Union, TYPE_CHECKING
 from typing_extensions import Self
 
 
@@ -123,7 +123,7 @@ RFCOMM_DYNAMIC_CHANNEL_NUMBER_END   = 30
 # -----------------------------------------------------------------------------
 def make_service_sdp_records(
     service_record_handle: int, channel: int, uuid: Optional[UUID] = None
-) -> List[sdp.ServiceAttribute]:
+) -> list[sdp.ServiceAttribute]:
     """
     Create SDP records for an RFComm service given a channel number and an
     optional UUID. A Service Class Attribute is included only if the UUID is not None.
@@ -169,7 +169,7 @@ def make_service_sdp_records(
 
 
 # -----------------------------------------------------------------------------
-async def find_rfcomm_channels(connection: Connection) -> Dict[int, List[UUID]]:
+async def find_rfcomm_channels(connection: Connection) -> dict[int, list[UUID]]:
     """Searches all RFCOMM channels and their associated UUID from SDP service records.
 
     Args:
@@ -188,7 +188,7 @@ async def find_rfcomm_channels(connection: Connection) -> Dict[int, List[UUID]]:
             ],
         )
         for attribute_lists in search_result:
-            service_classes: List[UUID] = []
+            service_classes: list[UUID] = []
             channel: Optional[int] = None
             for attribute in attribute_lists:
                 # The layout is [[L2CAP_PROTOCOL], [RFCOMM_PROTOCOL, RFCOMM_CHANNEL]].
@@ -275,7 +275,7 @@ class RFCOMM_Frame:
             self.fcs = compute_fcs(bytes([self.address, self.control]) + self.length)
 
     @staticmethod
-    def parse_mcc(data) -> Tuple[int, bool, bytes]:
+    def parse_mcc(data) -> tuple[int, bool, bytes]:
         mcc_type = data[0] >> 2
         c_r = bool((data[0] >> 1) & 1)
         length = data[1]
@@ -771,8 +771,8 @@ class Multiplexer(utils.EventEmitter):
     connection_result: Optional[asyncio.Future]
     disconnection_result: Optional[asyncio.Future]
     open_result: Optional[asyncio.Future]
-    acceptor: Optional[Callable[[int], Optional[Tuple[int, int]]]]
-    dlcs: Dict[int, DLC]
+    acceptor: Optional[Callable[[int], Optional[tuple[int, int]]]]
+    dlcs: dict[int, DLC]
 
     def __init__(self, l2cap_channel: l2cap.ClassicChannel, role: Role) -> None:
         super().__init__()
@@ -1088,8 +1088,8 @@ class Server(utils.EventEmitter):
     ) -> None:
         super().__init__()
         self.device = device
-        self.acceptors: Dict[int, Callable[[DLC], None]] = {}
-        self.dlc_configs: Dict[int, Tuple[int, int]] = {}
+        self.acceptors: dict[int, Callable[[DLC], None]] = {}
+        self.dlc_configs: dict[int, tuple[int, int]] = {}
 
         # Register ourselves with the L2CAP channel manager
         self.l2cap_server = device.create_l2cap_server(
@@ -1144,7 +1144,7 @@ class Server(utils.EventEmitter):
         # Notify
         self.emit(self.EVENT_START, multiplexer)
 
-    def accept_dlc(self, channel_number: int) -> Optional[Tuple[int, int]]:
+    def accept_dlc(self, channel_number: int) -> Optional[tuple[int, int]]:
         return self.dlc_configs.get(channel_number)
 
     def on_dlc(self, dlc: DLC) -> None:

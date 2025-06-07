@@ -63,7 +63,7 @@ from bumble.hci import (
     HCI_Packet,
     HCI_Role_Change_Event,
 )
-from typing import Optional, Union, Dict, Any, TYPE_CHECKING
+from typing import Optional, Union, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bumble.link import LocalLink
@@ -132,17 +132,17 @@ class Controller:
         self.hci_sink = None
         self.link = link
 
-        self.central_connections: Dict[Address, Connection] = (
+        self.central_connections: dict[Address, Connection] = (
             {}
         )  # Connections where this controller is the central
-        self.peripheral_connections: Dict[Address, Connection] = (
+        self.peripheral_connections: dict[Address, Connection] = (
             {}
         )  # Connections where this controller is the peripheral
-        self.classic_connections: Dict[Address, Connection] = (
+        self.classic_connections: dict[Address, Connection] = (
             {}
         )  # Connections in BR/EDR
-        self.central_cis_links: Dict[int, CisLink] = {}  # CIS links by handle
-        self.peripheral_cis_links: Dict[int, CisLink] = {}  # CIS links by handle
+        self.central_cis_links: dict[int, CisLink] = {}  # CIS links by handle
+        self.peripheral_cis_links: dict[int, CisLink] = {}  # CIS links by handle
 
         self.hci_version = HCI_VERSION_BLUETOOTH_CORE_5_0
         self.hci_revision = 0

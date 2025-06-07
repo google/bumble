@@ -73,7 +73,6 @@ from pandora.host_pb2 import (
     ConnectResponse,
     DataTypes,
     DisconnectRequest,
-    DiscoverabilityMode,
     InquiryResponse,
     PrimaryPhy,
     ReadLocalAddressResponse,
@@ -86,9 +85,9 @@ from pandora.host_pb2 import (
     WaitConnectionResponse,
     WaitDisconnectionRequest,
 )
-from typing import AsyncGenerator, Dict, List, Optional, Set, Tuple, cast
+from typing import AsyncGenerator, Optional, cast
 
-PRIMARY_PHY_MAP: Dict[int, PrimaryPhy] = {
+PRIMARY_PHY_MAP: dict[int, PrimaryPhy] = {
     # Default value reported by Bumble for legacy Advertising reports.
     # FIXME(uael): `None` might be a better value, but Bumble need to change accordingly.
     0: PRIMARY_1M,
@@ -96,26 +95,26 @@ PRIMARY_PHY_MAP: Dict[int, PrimaryPhy] = {
     3: PRIMARY_CODED,
 }
 
-SECONDARY_PHY_MAP: Dict[int, SecondaryPhy] = {
+SECONDARY_PHY_MAP: dict[int, SecondaryPhy] = {
     0: SECONDARY_NONE,
     1: SECONDARY_1M,
     2: SECONDARY_2M,
     3: SECONDARY_CODED,
 }
 
-PRIMARY_PHY_TO_BUMBLE_PHY_MAP: Dict[PrimaryPhy, Phy] = {
+PRIMARY_PHY_TO_BUMBLE_PHY_MAP: dict[PrimaryPhy, Phy] = {
     PRIMARY_1M: Phy.LE_1M,
     PRIMARY_CODED: Phy.LE_CODED,
 }
 
-SECONDARY_PHY_TO_BUMBLE_PHY_MAP: Dict[SecondaryPhy, Phy] = {
+SECONDARY_PHY_TO_BUMBLE_PHY_MAP: dict[SecondaryPhy, Phy] = {
     SECONDARY_NONE: Phy.LE_1M,
     SECONDARY_1M: Phy.LE_1M,
     SECONDARY_2M: Phy.LE_2M,
     SECONDARY_CODED: Phy.LE_CODED,
 }
 
-OWN_ADDRESS_MAP: Dict[host_pb2.OwnAddressType, OwnAddressType] = {
+OWN_ADDRESS_MAP: dict[host_pb2.OwnAddressType, OwnAddressType] = {
     host_pb2.PUBLIC: OwnAddressType.PUBLIC,
     host_pb2.RANDOM: OwnAddressType.RANDOM,
     host_pb2.RESOLVABLE_OR_PUBLIC: OwnAddressType.RESOLVABLE_OR_PUBLIC,
@@ -124,7 +123,7 @@ OWN_ADDRESS_MAP: Dict[host_pb2.OwnAddressType, OwnAddressType] = {
 
 
 class HostService(HostServicer):
-    waited_connections: Set[int]
+    waited_connections: set[int]
 
     def __init__(
         self, grpc_server: grpc.aio.Server, device: Device, config: Config
@@ -618,7 +617,7 @@ class HostService(HostServicer):
         self.log.debug('Inquiry')
 
         inquiry_queue: asyncio.Queue[
-            Optional[Tuple[Address, int, AdvertisingData, int]]
+            Optional[tuple[Address, int, AdvertisingData, int]]
         ] = asyncio.Queue()
         complete_handler = self.device.on(
             self.device.EVENT_INQUIRY_COMPLETE, lambda: inquiry_queue.put_nowait(None)
@@ -670,10 +669,10 @@ class HostService(HostServicer):
         return empty_pb2.Empty()
 
     def unpack_data_types(self, dt: DataTypes) -> AdvertisingData:
-        ad_structures: List[Tuple[int, bytes]] = []
+        ad_structures: list[tuple[int, bytes]] = []
 
-        uuids: List[str]
-        datas: Dict[str, bytes]
+        uuids: list[str]
+        datas: dict[str, bytes]
 
         def uuid128_from_str(uuid: str) -> bytes:
             """Decode a 128-bit uuid encoded as XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
@@ -887,50 +886,50 @@ class HostService(HostServicer):
 
     def pack_data_types(self, ad: AdvertisingData) -> DataTypes:
         dt = DataTypes()
-        uuids: List[UUID]
+        uuids: list[UUID]
         s: str
         i: int
-        ij: Tuple[int, int]
-        uuid_data: Tuple[UUID, bytes]
+        ij: tuple[int, int]
+        uuid_data: tuple[UUID, bytes]
         data: bytes
 
         if uuids := cast(
-            List[UUID],
+            list[UUID],
             ad.get(AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS),
         ):
             dt.incomplete_service_class_uuids16.extend(
                 list(map(lambda x: x.to_hex_str('-'), uuids))
             )
         if uuids := cast(
-            List[UUID],
+            list[UUID],
             ad.get(AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS),
         ):
             dt.complete_service_class_uuids16.extend(
                 list(map(lambda x: x.to_hex_str('-'), uuids))
             )
         if uuids := cast(
-            List[UUID],
+            list[UUID],
             ad.get(AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS),
         ):
             dt.incomplete_service_class_uuids32.extend(
                 list(map(lambda x: x.to_hex_str('-'), uuids))
             )
         if uuids := cast(
-            List[UUID],
+            list[UUID],
             ad.get(AdvertisingData.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS),
         ):
             dt.complete_service_class_uuids32.extend(
                 list(map(lambda x: x.to_hex_str('-'), uuids))
             )
         if uuids := cast(
-            List[UUID],
+            list[UUID],
             ad.get(AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS),
         ):
             dt.incomplete_service_class_uuids128.extend(
                 list(map(lambda x: x.to_hex_str('-'), uuids))
             )
         if uuids := cast(
-            List[UUID],
+            list[UUID],
             ad.get(AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS),
         ):
             dt.complete_service_class_uuids128.extend(
@@ -945,42 +944,42 @@ class HostService(HostServicer):
         if i := cast(int, ad.get(AdvertisingData.CLASS_OF_DEVICE)):
             dt.class_of_device = i
         if ij := cast(
-            Tuple[int, int],
+            tuple[int, int],
             ad.get(AdvertisingData.PERIPHERAL_CONNECTION_INTERVAL_RANGE),
         ):
             dt.peripheral_connection_interval_min = ij[0]
             dt.peripheral_connection_interval_max = ij[1]
         if uuids := cast(
-            List[UUID],
+            list[UUID],
             ad.get(AdvertisingData.LIST_OF_16_BIT_SERVICE_SOLICITATION_UUIDS),
         ):
             dt.service_solicitation_uuids16.extend(
                 list(map(lambda x: x.to_hex_str('-'), uuids))
             )
         if uuids := cast(
-            List[UUID],
+            list[UUID],
             ad.get(AdvertisingData.LIST_OF_32_BIT_SERVICE_SOLICITATION_UUIDS),
         ):
             dt.service_solicitation_uuids32.extend(
                 list(map(lambda x: x.to_hex_str('-'), uuids))
             )
         if uuids := cast(
-            List[UUID],
+            list[UUID],
             ad.get(AdvertisingData.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS),
         ):
             dt.service_solicitation_uuids128.extend(
                 list(map(lambda x: x.to_hex_str('-'), uuids))
             )
         if uuid_data := cast(
-            Tuple[UUID, bytes], ad.get(AdvertisingData.SERVICE_DATA_16_BIT_UUID)
+            tuple[UUID, bytes], ad.get(AdvertisingData.SERVICE_DATA_16_BIT_UUID)
         ):
             dt.service_data_uuid16[uuid_data[0].to_hex_str('-')] = uuid_data[1]
         if uuid_data := cast(
-            Tuple[UUID, bytes], ad.get(AdvertisingData.SERVICE_DATA_32_BIT_UUID)
+            tuple[UUID, bytes], ad.get(AdvertisingData.SERVICE_DATA_32_BIT_UUID)
         ):
             dt.service_data_uuid32[uuid_data[0].to_hex_str('-')] = uuid_data[1]
         if uuid_data := cast(
-            Tuple[UUID, bytes], ad.get(AdvertisingData.SERVICE_DATA_128_BIT_UUID)
+            tuple[UUID, bytes], ad.get(AdvertisingData.SERVICE_DATA_128_BIT_UUID)
         ):
             dt.service_data_uuid128[uuid_data[0].to_hex_str('-')] = uuid_data[1]
         if data := cast(bytes, ad.get(AdvertisingData.PUBLIC_TARGET_ADDRESS, raw=True)):

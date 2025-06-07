@@ -45,7 +45,7 @@ __all__ = [
 
 
 # Add servicers hooks.
-_SERVICERS_HOOKS: List[Callable[[PandoraDevice, Config, grpc.aio.Server], None]] = []
+_SERVICERS_HOOKS: list[Callable[[PandoraDevice, Config, grpc.aio.Server], None]] = []
 
 
 def register_servicer_hook(

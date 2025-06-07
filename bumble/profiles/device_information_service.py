@@ -17,7 +17,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import struct
-from typing import Optional, Tuple
+from typing import Optional
 
 from bumble.gatt import (
     GATT_DEVICE_INFORMATION_SERVICE,
@@ -60,7 +60,7 @@ class DeviceInformationService(TemplateService):
         hardware_revision: Optional[str] = None,
         firmware_revision: Optional[str] = None,
         software_revision: Optional[str] = None,
-        system_id: Optional[Tuple[int, int]] = None,  # (OUI, Manufacturer ID)
+        system_id: Optional[tuple[int, int]] = None,  # (OUI, Manufacturer ID)
         ieee_regulatory_certification_data_list: Optional[bytes] = None,
         # TODO: pnp_id
     ):

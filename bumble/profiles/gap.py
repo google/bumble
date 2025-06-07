@@ -19,7 +19,7 @@
 # -----------------------------------------------------------------------------
 import logging
 import struct
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 from bumble.core import Appearance
 from bumble.gatt import (
@@ -54,7 +54,7 @@ class GenericAccessService(TemplateService):
     appearance_characteristic: Characteristic[bytes]
 
     def __init__(
-        self, device_name: str, appearance: Union[Appearance, Tuple[int, int], int] = 0
+        self, device_name: str, appearance: Union[Appearance, tuple[int, int], int] = 0
     ):
         if isinstance(appearance, int):
             appearance_int = appearance

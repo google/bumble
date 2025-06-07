@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Union
+from typing import Union
 
 from bumble import core
 
@@ -21,7 +21,7 @@ class AtParsingError(core.InvalidPacketError):
     """Error raised when parsing AT commands fails."""
 
 
-def tokenize_parameters(buffer: bytes) -> List[bytes]:
+def tokenize_parameters(buffer: bytes) -> list[bytes]:
     """Split input parameters into tokens.
     Removes space characters outside of double quote blocks:
     T-rec-V-25 - 5.2.1 Command line general format: "Space characters (IA5 2/0)
@@ -63,12 +63,12 @@ def tokenize_parameters(buffer: bytes) -> List[bytes]:
     return [bytes(token) for token in tokens if len(token) > 0]
 
 
-def parse_parameters(buffer: bytes) -> List[Union[bytes, list]]:
+def parse_parameters(buffer: bytes) -> list[Union[bytes, list]]:
     """Parse the parameters using the comma and parenthesis separators.
     Raises AtParsingError in case of invalid input string."""
 
     tokens = tokenize_parameters(buffer)
-    accumulator: List[list] = [[]]
+    accumulator: list[list] = [[]]
     current: Union[bytes, list] = bytes()
 
     for token in tokens:

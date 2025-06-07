@@ -26,7 +26,7 @@ import dataclasses
 import logging
 import os
 import json
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Type, Any
+from typing import TYPE_CHECKING, Optional, Any
 from typing_extensions import Self
 
 from bumble.colors import color
@@ -157,7 +157,7 @@ class KeyStore:
     async def get(self, _name: str) -> Optional[PairingKeys]:
         return None
 
-    async def get_all(self) -> List[Tuple[str, PairingKeys]]:
+    async def get_all(self) -> list[tuple[str, PairingKeys]]:
         return []
 
     async def delete_all(self) -> None:
@@ -272,7 +272,7 @@ class JsonKeyStore(KeyStore):
 
     @classmethod
     def from_device(
-        cls: Type[Self], device: Device, filename: Optional[str] = None
+        cls: type[Self], device: Device, filename: Optional[str] = None
     ) -> Self:
         if not filename:
             # Extract the filename from the config if there is one
@@ -356,7 +356,7 @@ class JsonKeyStore(KeyStore):
 
 # -----------------------------------------------------------------------------
 class MemoryKeyStore(KeyStore):
-    all_keys: Dict[str, PairingKeys]
+    all_keys: dict[str, PairingKeys]
 
     def __init__(self) -> None:
         self.all_keys = {}
@@ -371,5 +371,5 @@ class MemoryKeyStore(KeyStore):
     async def get(self, name: str) -> Optional[PairingKeys]:
         return self.all_keys.get(name)
 
-    async def get_all(self) -> List[Tuple[str, PairingKeys]]:
+    async def get_all(self) -> list[tuple[str, PairingKeys]]:
         return list(self.all_keys.items())

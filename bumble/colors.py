@@ -13,7 +13,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 from functools import partial
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 
 class ColorError(ValueError):
@@ -65,7 +65,7 @@ def color(
     bg: Optional[ColorSpec] = None,
     style: Optional[str] = None,
 ) -> str:
-    codes: List[ColorSpec] = []
+    codes: list[ColorSpec] = []
 
     if fg:
         codes.append(_color_code(fg, 30))

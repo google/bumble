@@ -18,7 +18,6 @@
 from __future__ import annotations
 import enum
 import logging
-from typing import Dict, List
 
 from bumble.core import PhysicalTransport, CommandTimeoutError
 from bumble.device import Device, DeviceConfiguration
@@ -101,7 +100,7 @@ class Speaker:
         self.stream_state = Speaker.StreamState.IDLE
         self.audio_extractor = AudioExtractor.create(codec)
 
-    def sdp_records(self) -> Dict[int, List[ServiceAttribute]]:
+    def sdp_records(self) -> dict[int, list[ServiceAttribute]]:
         service_record_handle = 0x00010001
         return {
             service_record_handle: make_audio_sink_service_sdp_records(

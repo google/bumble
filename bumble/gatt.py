@@ -27,7 +27,7 @@ import enum
 import functools
 import logging
 import struct
-from typing import Iterable, List, Optional, Sequence, TypeVar, Union
+from typing import Iterable, Optional, Sequence, TypeVar, Union
 
 from bumble.colors import color
 from bumble.core import BaseBumbleError, UUID
@@ -350,8 +350,8 @@ class Service(Attribute):
     '''
 
     uuid: UUID
-    characteristics: List[Characteristic]
-    included_services: List[Service]
+    characteristics: list[Characteristic]
+    included_services: list[Service]
 
     def __init__(
         self,
@@ -474,7 +474,7 @@ class Characteristic(Attribute[_T]):
                 # The check for `p.name is not None` here is needed because for InFlag
                 # enums, the .name property can be None, when the enum value is 0,
                 # so the type hint for .name is Optional[str].
-                enum_list: List[str] = [p.name for p in cls if p.name is not None]
+                enum_list: list[str] = [p.name for p in cls if p.name is not None]
                 enum_list_str = ",".join(enum_list)
                 raise TypeError(
                     f"Characteristic.Properties::from_string() error:\nExpected a string containing any of the keys, separated by , or |: {enum_list_str}\nGot: {properties_str}"

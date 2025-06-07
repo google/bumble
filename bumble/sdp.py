@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import struct
-from typing import Iterable, NewType, Optional, Union, Sequence, Type, TYPE_CHECKING
+from typing import Iterable, NewType, Optional, Union, Sequence, TYPE_CHECKING
 from typing_extensions import Self
 
 from bumble import core, l2cap
@@ -547,7 +547,7 @@ class SDP_PDU:
         SDP_SERVICE_ATTRIBUTE_REQUEST: SDP_SERVICE_ATTRIBUTE_RESPONSE,
         SDP_SERVICE_SEARCH_ATTRIBUTE_REQUEST: SDP_SERVICE_SEARCH_ATTRIBUTE_RESPONSE,
     }
-    sdp_pdu_classes: dict[int, Type[SDP_PDU]] = {}
+    sdp_pdu_classes: dict[int, type[SDP_PDU]] = {}
     name = None
     pdu_id = 0
 

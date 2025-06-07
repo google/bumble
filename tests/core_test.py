@@ -15,7 +15,6 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from enum import IntEnum
 
 from bumble.core import AdvertisingData, Appearance, UUID, get_dict_key_by_value
 

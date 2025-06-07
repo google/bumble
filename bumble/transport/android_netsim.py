@@ -22,7 +22,7 @@ import os
 import pathlib
 import platform
 import sys
-from typing import Dict, Optional
+from typing import Optional
 
 import grpc.aio
 
@@ -143,7 +143,7 @@ def publish_grpc_port(grpc_port: int, instance_number: int) -> bool:
 
 # -----------------------------------------------------------------------------
 async def open_android_netsim_controller_transport(
-    server_host: Optional[str], server_port: int, options: Dict[str, str]
+    server_host: Optional[str], server_port: int, options: dict[str, str]
 ) -> Transport:
     if not server_port:
         raise TransportSpecError('invalid port')
@@ -288,7 +288,7 @@ async def open_android_netsim_controller_transport(
 async def open_android_netsim_host_transport_with_address(
     server_host: Optional[str],
     server_port: int,
-    options: Optional[Dict[str, str]] = None,
+    options: Optional[dict[str, str]] = None,
 ):
     if server_host == '_' or not server_host:
         server_host = 'localhost'
@@ -313,7 +313,7 @@ async def open_android_netsim_host_transport_with_address(
 
 # -----------------------------------------------------------------------------
 async def open_android_netsim_host_transport_with_channel(
-    channel, options: Optional[Dict[str, str]] = None
+    channel, options: Optional[dict[str, str]] = None
 ):
     # Wrapper for I/O operations
     class HciDevice:
@@ -451,7 +451,7 @@ async def open_android_netsim_transport(spec: Optional[str]) -> Transport:
         port = 0
         params_offset = 0
 
-    options: Dict[str, str] = {}
+    options: dict[str, str] = {}
     for param in params[params_offset:]:
         if '=' not in param:
             raise TransportSpecError('invalid parameter, expected <name>=<value>')
