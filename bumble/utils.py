@@ -27,11 +27,8 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    List,
     Optional,
     Protocol,
-    Set,
-    Tuple,
     TypeVar,
     Union,
     overload,
@@ -156,7 +153,7 @@ class EventWatcher:
     ```
     '''
 
-    handlers: List[Tuple[pyee.EventEmitter, str, Callable[..., Any]]]
+    handlers: list[tuple[pyee.EventEmitter, str, Callable[..., Any]]]
 
     def __init__(self) -> None:
         self.handlers = []
@@ -329,7 +326,7 @@ class AsyncRunner:
     default_queue = WorkQueue()
 
     # Shared set of running tasks
-    running_tasks: Set[Awaitable] = set()
+    running_tasks: set[Awaitable] = set()
 
     @staticmethod
     def run_in_task(queue=None):

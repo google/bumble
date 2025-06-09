@@ -29,7 +29,7 @@ from bumble import gatt
 from bumble import gatt_client
 from bumble import utils
 
-from typing import Type, Optional, ClassVar, Dict, TYPE_CHECKING
+from typing import Optional, ClassVar, TYPE_CHECKING
 from typing_extensions import Self
 
 # -----------------------------------------------------------------------------
@@ -167,7 +167,7 @@ class ObjectId(int):
     '''See Media Control Service 4.4.2. Object ID field.'''
 
     @classmethod
-    def create_from_bytes(cls: Type[Self], data: bytes) -> Self:
+    def create_from_bytes(cls: type[Self], data: bytes) -> Self:
         return cls(int.from_bytes(data, byteorder='little', signed=False))
 
     def __bytes__(self) -> bytes:
@@ -182,7 +182,7 @@ class GroupObjectType:
     object_id: ObjectId
 
     @classmethod
-    def from_bytes(cls: Type[Self], data: bytes) -> Self:
+    def from_bytes(cls: type[Self], data: bytes) -> Self:
         return cls(
             object_type=ObjectType(data[0]),
             object_id=ObjectId.create_from_bytes(data[1:]),
@@ -310,7 +310,7 @@ class MediaControlServiceProxy(
 ):
     SERVICE_CLASS = MediaControlService
 
-    _CHARACTERISTICS: ClassVar[Dict[str, core.UUID]] = {
+    _CHARACTERISTICS: ClassVar[dict[str, core.UUID]] = {
         'media_player_name': gatt.GATT_MEDIA_PLAYER_NAME_CHARACTERISTIC,
         'media_player_icon_object_id': gatt.GATT_MEDIA_PLAYER_ICON_OBJECT_ID_CHARACTERISTIC,
         'media_player_icon_url': gatt.GATT_MEDIA_PLAYER_ICON_URL_CHARACTERISTIC,

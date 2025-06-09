@@ -19,7 +19,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import struct
-from typing import Any, List, Type
+from typing import Any
 from typing_extensions import Self
 
 from bumble.profiles import bap
@@ -108,13 +108,13 @@ class Metadata:
             return self.data
 
         @classmethod
-        def from_bytes(cls: Type[Self], data: bytes) -> Self:
+        def from_bytes(cls: type[Self], data: bytes) -> Self:
             return cls(tag=Metadata.Tag(data[0]), data=data[1:])
 
         def __bytes__(self) -> bytes:
             return bytes([len(self.data) + 1, self.tag]) + self.data
 
-    entries: List[Entry] = dataclasses.field(default_factory=list)
+    entries: list[Entry] = dataclasses.field(default_factory=list)
 
     def pretty_print(self, indent: str) -> str:
         """Convenience method to generate a string with one key-value pair per line."""
@@ -140,7 +140,7 @@ class Metadata:
         )
 
     @classmethod
-    def from_bytes(cls: Type[Self], data: bytes) -> Self:
+    def from_bytes(cls: type[Self], data: bytes) -> Self:
         entries = []
         offset = 0
         length = len(data)

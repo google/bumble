@@ -18,7 +18,7 @@
 from __future__ import annotations
 import enum
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 from bumble.hci import (
     Address,
@@ -205,7 +205,7 @@ class PairingDelegate:
     # [LE only]
     async def key_distribution_response(
         self, peer_initiator_key_distribution: int, peer_responder_key_distribution: int
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         Return the key distribution response in an SMP protocol context.
 

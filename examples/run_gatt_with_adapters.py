@@ -25,7 +25,7 @@ import os
 import random
 import struct
 import sys
-from typing import Any, List, Union
+from typing import Any, Union
 
 from bumble.device import Device, Peer
 from bumble import transport
@@ -342,7 +342,7 @@ async def server(device: Device) -> None:
         byteorder='big',
     )
 
-    characteristics: List[gatt.Characteristic] = [
+    characteristics: list[gatt.Characteristic] = [
         c1,
         c2,
         c3,

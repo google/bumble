@@ -24,15 +24,10 @@ import struct
 
 from collections import deque
 from typing import (
-    Dict,
-    Type,
-    List,
     Optional,
-    Tuple,
     Callable,
     Any,
     Union,
-    Deque,
     Iterable,
     SupportsBytes,
     TYPE_CHECKING,
@@ -242,7 +237,7 @@ class L2CAP_Control_Frame:
     See Bluetooth spec @ Vol 3, Part A - 4 SIGNALING PACKET FORMATS
     '''
 
-    classes: Dict[int, Type[L2CAP_Control_Frame]] = {}
+    classes: dict[int, type[L2CAP_Control_Frame]] = {}
     code = 0
     name: str
 
@@ -276,7 +271,7 @@ class L2CAP_Control_Frame:
         return name_or_number(L2CAP_CONTROL_FRAME_NAMES, code)
 
     @staticmethod
-    def decode_configuration_options(data: bytes) -> List[Tuple[int, bytes]]:
+    def decode_configuration_options(data: bytes) -> list[tuple[int, bytes]]:
         options = []
         while len(data) >= 2:
             value_type = data[0]
@@ -288,7 +283,7 @@ class L2CAP_Control_Frame:
         return options
 
     @staticmethod
-    def encode_configuration_options(options: List[Tuple[int, bytes]]) -> bytes:
+    def encode_configuration_options(options: list[tuple[int, bytes]]) -> bytes:
         return b''.join(
             [bytes([option[0], len(option[1])]) + option[1] for option in options]
         )
@@ -400,7 +395,7 @@ class L2CAP_Connection_Request(L2CAP_Control_Frame):
     source_cid: int
 
     @staticmethod
-    def parse_psm(data: bytes, offset: int = 0) -> Tuple[int, int]:
+    def parse_psm(data: bytes, offset: int = 0) -> tuple[int, int]:
         psm_length = 2
         psm = data[offset] | data[offset + 1] << 8
 
@@ -1041,7 +1036,7 @@ class LeCreditBasedChannel(utils.EventEmitter):
         DISCONNECTED = 4
         CONNECTION_ERROR = 5
 
-    out_queue: Deque[bytes]
+    out_queue: deque[bytes]
     connection_result: Optional[asyncio.Future[LeCreditBasedChannel]]
     disconnection_result: Optional[asyncio.Future[None]]
     in_sdu: Optional[bytes]
@@ -1445,13 +1440,13 @@ class LeCreditBasedChannelServer(utils.EventEmitter):
 
 # -----------------------------------------------------------------------------
 class ChannelManager:
-    identifiers: Dict[int, int]
-    channels: Dict[int, Dict[int, Union[ClassicChannel, LeCreditBasedChannel]]]
-    servers: Dict[int, ClassicChannelServer]
-    le_coc_channels: Dict[int, Dict[int, LeCreditBasedChannel]]
-    le_coc_servers: Dict[int, LeCreditBasedChannelServer]
-    le_coc_requests: Dict[int, L2CAP_LE_Credit_Based_Connection_Request]
-    fixed_channels: Dict[int, Optional[Callable[[int, bytes], Any]]]
+    identifiers: dict[int, int]
+    channels: dict[int, dict[int, Union[ClassicChannel, LeCreditBasedChannel]]]
+    servers: dict[int, ClassicChannelServer]
+    le_coc_channels: dict[int, dict[int, LeCreditBasedChannel]]
+    le_coc_servers: dict[int, LeCreditBasedChannelServer]
+    le_coc_requests: dict[int, L2CAP_LE_Credit_Based_Connection_Request]
+    fixed_channels: dict[int, Optional[Callable[[int, bytes], Any]]]
     _host: Optional[Host]
     connection_parameters_update_response: Optional[asyncio.Future[int]]
 

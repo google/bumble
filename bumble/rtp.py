@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 import struct
-from typing import List
 
 
 # -----------------------------------------------------------------------------
@@ -60,7 +59,7 @@ class MediaPacket:
         sequence_number: int,
         timestamp: int,
         ssrc: int,
-        csrc_list: List[int],
+        csrc_list: list[int],
         payload_type: int,
         payload: bytes,
     ) -> None:

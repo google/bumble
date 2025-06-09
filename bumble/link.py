@@ -36,7 +36,7 @@ from bumble.hci import (
 )
 from bumble import controller
 
-from typing import Optional, Set
+from typing import Optional
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -65,7 +65,7 @@ class LocalLink:
     Link bus for controllers to communicate with each other
     '''
 
-    controllers: Set[controller.Controller]
+    controllers: set[controller.Controller]
 
     def __init__(self):
         self.controllers = set()

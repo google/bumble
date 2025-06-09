@@ -20,7 +20,7 @@ import asyncio
 import functools
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Optional, Union
 
 from bumble import att, gatt, gatt_adapters, gatt_client
 from bumble.core import InvalidArgumentError, InvalidStateError
@@ -228,25 +228,25 @@ class HearingAccessService(gatt.TemplateService):
     hearing_aid_preset_control_point: gatt.Characteristic[bytes]
     active_preset_index_characteristic: gatt.Characteristic[bytes]
     active_preset_index: int
-    active_preset_index_per_device: Dict[Address, int]
+    active_preset_index_per_device: dict[Address, int]
 
     device: Device
 
     server_features: HearingAidFeatures
-    preset_records: Dict[int, PresetRecord]  # key is the preset index
+    preset_records: dict[int, PresetRecord]  # key is the preset index
     read_presets_request_in_progress: bool
 
     other_server_in_binaural_set: Optional[HearingAccessService] = None
 
-    preset_changed_operations_history_per_device: Dict[
-        Address, List[PresetChangedOperation]
+    preset_changed_operations_history_per_device: dict[
+        Address, list[PresetChangedOperation]
     ]
 
     # Keep an updated list of connected client to send notification to
-    currently_connected_clients: Set[Connection]
+    currently_connected_clients: set[Connection]
 
     def __init__(
-        self, device: Device, features: HearingAidFeatures, presets: List[PresetRecord]
+        self, device: Device, features: HearingAidFeatures, presets: list[PresetRecord]
     ) -> None:
         self.active_preset_index_per_device = {}
         self.read_presets_request_in_progress = False
@@ -381,7 +381,7 @@ class HearingAccessService(gatt.TemplateService):
         utils.AsyncRunner.spawn(self._read_preset_response(connection, presets))
 
     async def _read_preset_response(
-        self, connection: Connection, presets: List[PresetRecord]
+        self, connection: Connection, presets: list[PresetRecord]
     ):
         # If the ATT bearer is terminated before all notifications or indications are sent, then the server shall consider the Read Presets Request operation aborted and shall not either continue or restart the operation when the client reconnects.
         try:

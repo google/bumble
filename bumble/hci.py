@@ -23,7 +23,7 @@ import functools
 import logging
 import secrets
 import struct
-from typing import Any, Callable, Dict, Iterable, List, Optional, Type, Union, ClassVar
+from typing import Any, Callable, Iterable, Optional, Union, ClassVar
 from typing_extensions import Self
 
 from bumble import crypto
@@ -2269,8 +2269,8 @@ class HCI_Command(HCI_Packet):
     '''
 
     hci_packet_type = HCI_COMMAND_PACKET
-    command_names: Dict[int, str] = {}
-    command_classes: Dict[int, Type[HCI_Command]] = {}
+    command_names: dict[int, str] = {}
+    command_classes: dict[int, type[HCI_Command]] = {}
     op_code: int
 
     @staticmethod
@@ -2303,7 +2303,7 @@ class HCI_Command(HCI_Packet):
         return inner
 
     @staticmethod
-    def command_map(symbols: Dict[str, Any]) -> Dict[int, str]:
+    def command_map(symbols: dict[str, Any]) -> dict[int, str]:
         return {
             command_code: command_name
             for (command_name, command_code) in symbols.items()
@@ -2311,7 +2311,7 @@ class HCI_Command(HCI_Packet):
         }
 
     @classmethod
-    def register_commands(cls, symbols: Dict[str, Any]) -> None:
+    def register_commands(cls, symbols: dict[str, Any]) -> None:
         cls.command_names.update(cls.command_map(symbols))
 
     @staticmethod
@@ -5055,13 +5055,13 @@ class HCI_LE_Set_CIG_Parameters_Command(HCI_Command):
     framing: int
     max_transport_latency_c_to_p: int
     max_transport_latency_p_to_c: int
-    cis_id: List[int]
-    max_sdu_c_to_p: List[int]
-    max_sdu_p_to_c: List[int]
-    phy_c_to_p: List[int]
-    phy_p_to_c: List[int]
-    rtn_c_to_p: List[int]
-    rtn_p_to_c: List[int]
+    cis_id: list[int]
+    max_sdu_c_to_p: list[int]
+    max_sdu_p_to_c: list[int]
+    phy_c_to_p: list[int]
+    phy_p_to_c: list[int]
+    rtn_c_to_p: list[int]
+    rtn_p_to_c: list[int]
 
 
 # -----------------------------------------------------------------------------
@@ -5078,8 +5078,8 @@ class HCI_LE_Create_CIS_Command(HCI_Command):
     See Bluetooth spec @ 7.8.99 LE Create CIS command
     '''
 
-    cis_connection_handle: List[int]
-    acl_connection_handle: List[int]
+    cis_connection_handle: list[int]
+    acl_connection_handle: list[int]
 
 
 # -----------------------------------------------------------------------------
@@ -5198,7 +5198,7 @@ class HCI_LE_BIG_Create_Sync_Command(HCI_Command):
     broadcast_code: int
     mse: int
     big_sync_timeout: int
-    bis: List[int]
+    bis: list[int]
 
 
 # -----------------------------------------------------------------------------
@@ -5557,8 +5557,8 @@ class HCI_Event(HCI_Packet):
     '''
 
     hci_packet_type = HCI_EVENT_PACKET
-    event_names: Dict[int, str] = {}
-    event_classes: Dict[int, Type[HCI_Event]] = {}
+    event_names: dict[int, str] = {}
+    event_classes: dict[int, type[HCI_Event]] = {}
     vendor_factories: list[Callable[[bytes], Optional[HCI_Event]]] = []
 
     @staticmethod
@@ -5588,7 +5588,7 @@ class HCI_Event(HCI_Packet):
         return inner
 
     @staticmethod
-    def event_map(symbols: Dict[str, Any]) -> Dict[int, str]:
+    def event_map(symbols: dict[str, Any]) -> dict[int, str]:
         return {
             event_code: event_name
             for (event_name, event_code) in symbols.items()
@@ -5602,7 +5602,7 @@ class HCI_Event(HCI_Packet):
         return name_or_number(HCI_Event.event_names, event_code)
 
     @staticmethod
-    def register_events(symbols: Dict[str, Any]) -> None:
+    def register_events(symbols: dict[str, Any]) -> None:
         HCI_Event.event_names.update(HCI_Event.event_map(symbols))
 
     @staticmethod
@@ -5710,8 +5710,8 @@ class HCI_Extended_Event(HCI_Event):
     HCI_Event subclass for events that have a subevent code.
     '''
 
-    subevent_names: Dict[int, str] = {}
-    subevent_classes: Dict[int, Type[HCI_Extended_Event]] = {}
+    subevent_names: dict[int, str] = {}
+    subevent_classes: dict[int, type[HCI_Extended_Event]] = {}
 
     @classmethod
     def event(cls, fields=()):
@@ -5750,7 +5750,7 @@ class HCI_Extended_Event(HCI_Event):
         return f'{cls.__name__.upper()}[0x{subevent_code:02X}]'
 
     @staticmethod
-    def subevent_map(symbols: Dict[str, Any]) -> Dict[int, str]:
+    def subevent_map(symbols: dict[str, Any]) -> dict[int, str]:
         return {
             subevent_code: subevent_name
             for (subevent_name, subevent_code) in symbols.items()
@@ -5758,7 +5758,7 @@ class HCI_Extended_Event(HCI_Event):
         }
 
     @classmethod
-    def register_subevents(cls, symbols: Dict[str, Any]) -> None:
+    def register_subevents(cls, symbols: dict[str, Any]) -> None:
         cls.subevent_names.update(cls.subevent_map(symbols))
 
     @classmethod
@@ -5807,7 +5807,7 @@ class HCI_LE_Meta_Event(HCI_Extended_Event):
     subevent_classes = {}
 
     @staticmethod
-    def subevent_map(symbols: Dict[str, Any]) -> Dict[int, str]:
+    def subevent_map(symbols: dict[str, Any]) -> dict[int, str]:
         return {
             subevent_code: subevent_name
             for (subevent_name, subevent_code) in symbols.items()

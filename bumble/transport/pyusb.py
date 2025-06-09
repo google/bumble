@@ -23,7 +23,7 @@ import time
 import usb.core
 import usb.util
 
-from typing import Optional, Set
+from typing import Optional
 from usb.core import Device as UsbDevice
 from usb.core import USBError
 from usb.util import CTRL_TYPE_CLASS, CTRL_RECIPIENT_OTHER
@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Global
 # -----------------------------------------------------------------------------
-devices_in_use: Set[int] = set()
+devices_in_use: set[int] = set()
 
 
 # -----------------------------------------------------------------------------

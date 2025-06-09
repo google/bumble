@@ -22,9 +22,9 @@ import logging
 from bumble.device import Device
 from bumble.hci import Address, AddressType
 from google.protobuf.message import Message  # pytype: disable=pyi-error
-from typing import Any, Dict, Generator, MutableMapping, Optional, Tuple
+from typing import Any, Generator, MutableMapping, Optional
 
-ADDRESS_TYPES: Dict[str, AddressType] = {
+ADDRESS_TYPES: dict[str, AddressType] = {
     "public": Address.PUBLIC_DEVICE_ADDRESS,
     "random": Address.RANDOM_DEVICE_ADDRESS,
     "public_identity": Address.PUBLIC_IDENTITY_ADDRESS,
@@ -43,7 +43,7 @@ class BumbleServerLoggerAdapter(logging.LoggerAdapter):  # type: ignore
 
     def process(
         self, msg: str, kwargs: MutableMapping[str, Any]
-    ) -> Tuple[str, MutableMapping[str, Any]]:
+    ) -> tuple[str, MutableMapping[str, Any]]:
         assert self.extra
         service_name = self.extra['service_name']
         assert isinstance(service_name, str)
