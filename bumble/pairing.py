@@ -222,6 +222,14 @@ class PairingDelegate:
             ),
         )
 
+    async def generate_passkey(self) -> int:
+        """
+        Return a passkey value between 0 and 999999 (inclusive).
+        """
+
+        # By default, generate a random passkey.
+        return secrets.randbelow(1000000)
+
 
 # -----------------------------------------------------------------------------
 class PairingConfig:
