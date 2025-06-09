@@ -18,6 +18,7 @@
 from __future__ import annotations
 import enum
 from dataclasses import dataclass
+import secrets
 from typing import Optional
 
 from bumble.hci import (
