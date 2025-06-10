@@ -27,6 +27,7 @@ from bumble import core
 from bumble import hci
 from bumble.device import Connection, Device, ChannelSoundingCapabilities
 from bumble.transport import open_transport_or_link
+from bumble.profiles import rap
 
 # From https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Bluetooth/system/gd/hci/distance_measurement_manager.cc.
 CS_TONE_ANTENNA_CONFIG_MAPPING_TABLE = [
@@ -86,11 +87,37 @@ async def main() -> None:
         )
         await device.power_on()
         assert (local_cs_capabilities := device.cs_capabilities)
+        ras = rap.RangingService(
+            device=device, ras_features=rap.RasFeatures.REAL_TIME_RANGING_DATA
+        )
+        device.add_service(ras)
 
         if len(sys.argv) == 3:
+            advertising_data = bytes(
+                core.AdvertisingData(
+                    [
+                        (
+                            core.AdvertisingData.COMPLETE_LOCAL_NAME,
+                            bytes(device.name, 'utf-8'),
+                        ),
+                        (
+                            core.AdvertisingData.FLAGS,
+                            bytes(
+                                [core.AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG]
+                            ),
+                        ),
+                        (
+                            core.AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+                            bytes(ras.uuid),
+                        ),
+                    ]
+                )
+            )
             print('<<< Start Advertising')
             await device.start_advertising(
-                own_address_type=hci.OwnAddressType.RANDOM, auto_restart=True
+                own_address_type=hci.OwnAddressType.RANDOM,
+                auto_restart=True,
+                advertising_data=advertising_data,
             )
 
             def on_cs_capabilities(
