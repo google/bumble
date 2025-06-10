@@ -108,7 +108,9 @@ class Connection:
     def on_hci_acl_data_packet(self, packet):
         self.assembler.feed_packet(packet)
         self.controller.send_hci_packet(
-            HCI_Number_Of_Completed_Packets_Event([(self.handle, 1)])
+            HCI_Number_Of_Completed_Packets_Event(
+                connection_handles=[self.handle], num_completed_packets=[1]
+            )
         )
 
     def on_acl_pdu(self, data):

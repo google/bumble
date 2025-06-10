@@ -1519,13 +1519,15 @@ class Host(utils.EventEmitter):
         self.emit('inquiry_complete')
 
     def on_hci_inquiry_result_with_rssi_event(self, event):
-        for response in event.responses:
+        for bd_addr, class_of_device, rssi in zip(
+            event.bd_addr, event.class_of_device, event.rssi
+        ):
             self.emit(
                 'inquiry_result',
-                response.bd_addr,
-                response.class_of_device,
+                bd_addr,
+                class_of_device,
                 b'',
-                response.rssi,
+                rssi,
             )
 
     def on_hci_extended_inquiry_result_event(self, event):

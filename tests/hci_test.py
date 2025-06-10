@@ -15,8 +15,12 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+import inspect
 import struct
 
+import pytest
+
+from bumble import hci
 from bumble.hci import (
     HCI_DISCONNECT_COMMAND,
     HCI_LE_1M_PHY_BIT,
@@ -91,10 +95,10 @@ def basic_check(x):
 
 # -----------------------------------------------------------------------------
 def test_HCI_Event():
-    event = HCI_Event(0xF9)
+    event = HCI_Event(event_code=0xF9)
     basic_check(event)
 
-    event = HCI_Event(0xF8, bytes.fromhex('AABBCC'))
+    event = HCI_Event(event_code=0xF8, parameters=bytes.fromhex('AABBCC'))
     basic_check(event)
 
 
@@ -212,7 +216,10 @@ def test_HCI_Command_Status_Event():
 
 # -----------------------------------------------------------------------------
 def test_HCI_Number_Of_Completed_Packets_Event():
-    event = HCI_Number_Of_Completed_Packets_Event([(1, 2), (3, 4)])
+    event = HCI_Number_Of_Completed_Packets_Event(
+        connection_handles=(1, 2),
+        num_completed_packets=(3, 4),
+    )
     basic_check(event)
 
 
@@ -227,7 +234,9 @@ def test_HCI_Vendor_Event():
 
     class HCI_Custom_Event(HCI_Event):
         def __init__(self, blabla):
-            super().__init__(HCI_VENDOR_EVENT, parameters=struct.pack("<I", blabla))
+            super().__init__(
+                event_code=HCI_VENDOR_EVENT, parameters=struct.pack("<I", blabla)
+            )
             self.name = 'HCI_CUSTOM_EVENT'
             self.blabla = blabla
 
@@ -253,11 +262,61 @@ def test_HCI_Vendor_Event():
 
 # -----------------------------------------------------------------------------
 def test_HCI_Command():
-    command = HCI_Command(0x5566)
+    command = HCI_Command(op_code=0x5566)
     basic_check(command)
 
-    command = HCI_Command(0x5566, bytes.fromhex('AABBCC'))
+    command = HCI_Command(op_code=0x5566, parameters=bytes.fromhex('AABBCC'))
     basic_check(command)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "clazz,",
+    [
+        clazz[1]
+        for clazz in inspect.getmembers(hci)
+        if isinstance(clazz[1], type)
+        and issubclass(clazz[1], hci.HCI_Command)
+        and clazz[1] is not hci.HCI_Command
+    ],
+)
+def test_hci_command_subclasses_op_code(clazz: type[hci.HCI_Command]):
+    assert clazz.op_code > 0
+    assert isinstance(clazz.name, str)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "clazz,",
+    [
+        clazz[1]
+        for clazz in inspect.getmembers(hci)
+        if isinstance(clazz[1], type)
+        and clazz[1] is not hci.HCI_Event
+        and issubclass(clazz[1], hci.HCI_Event)
+        and not issubclass(clazz[1], hci.HCI_Extended_Event)
+    ],
+)
+def test_hci_event_subclasses_event_code(clazz: type[hci.HCI_Event]):
+    assert clazz.event_code > 0
+    assert isinstance(clazz.name, str)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "clazz,",
+    [
+        clazz[1]
+        for clazz in inspect.getmembers(hci)
+        if isinstance(clazz[1], type)
+        and issubclass(clazz[1], hci.HCI_Extended_Event)
+        and clazz[1] not in (hci.HCI_Extended_Event, hci.HCI_LE_Meta_Event)
+    ],
+)
+def test_hci_extended_event_subclasses_event_code(clazz: type[hci.HCI_Extended_Event]):
+    assert clazz.event_code > 0
+    assert clazz.subevent_code > 0
+    assert isinstance(clazz.name, str)
 
 
 # -----------------------------------------------------------------------------
