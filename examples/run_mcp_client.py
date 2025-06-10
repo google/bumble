@@ -170,7 +170,7 @@ async def main() -> None:
                     mcp.on('track_position', on_track_position)
                     await mcp.subscribe_characteristics()
 
-            utils.cancel_on_event(connection, 'disconnection', on_connection_async())
+            connection.cancel_on_disconnection(on_connection_async())
 
         device.on('connection', on_connection)
 

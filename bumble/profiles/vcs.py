@@ -161,10 +161,8 @@ class VolumeControlService(gatt.TemplateService):
         handler = getattr(self, '_on_' + opcode.name.lower())
         if handler(*value[2:]):
             self.change_counter = (self.change_counter + 1) % 256
-            utils.cancel_on_event(
-                connection,
-                'disconnection',
-                connection.device.notify_subscribers(attribute=self.volume_state),
+            connection.cancel_on_disconnection(
+                connection.device.notify_subscribers(attribute=self.volume_state)
             )
             self.emit(self.EVENT_VOLUME_STATE_CHANGE)
 

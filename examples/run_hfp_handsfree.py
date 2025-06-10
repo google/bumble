@@ -61,14 +61,12 @@ def on_dlc(dlc: rfcomm.DLC, configuration: hfp.HfConfiguration):
             else:
                 raise RuntimeError("unknown active codec")
 
-            utils.cancel_on_event(
-                connection,
-                'disconnection',
+            connection.cancel_on_disconnection(
                 connection.device.send_command(
                     hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(
                         bd_addr=connection.peer_address, **esco_parameters.asdict()
                     )
-                ),
+                )
             )
 
     handler = functools.partial(on_sco_request, protocol=hf_protocol)
