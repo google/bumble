@@ -1885,7 +1885,7 @@ class Connection(utils.CompositeEventEmitter):
     def data_packet_queue(self) -> DataPacketQueue | None:
         return self.device.host.get_data_packet_queue(self.handle)
 
-    def cancel_on_disconnection(self, awaitable: Awaitable) -> Awaitable[_T]:
+    def cancel_on_disconnection(self, awaitable: Awaitable[_T]) -> Awaitable[_T]:
         """
         Helper method to call `utils.cancel_on_event` for the 'disconnection' event
         """
