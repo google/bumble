@@ -486,8 +486,8 @@ async def test_cis():
         _cig_id: int,
         _cis_id: int,
     ):
-        utils.cancel_on_event(
-            acl_connection, 'disconnection', devices[1].accept_cis_request(cis_handle)
+        acl_connection.cancel_on_disconnection(
+            devices[1].accept_cis_request(cis_handle)
         )
         peripheral_cis_futures[cis_handle] = asyncio.get_running_loop().create_future()
 

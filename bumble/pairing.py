@@ -18,6 +18,7 @@
 from __future__ import annotations
 import enum
 from dataclasses import dataclass
+import secrets
 from typing import Optional
 
 from bumble.hci import (
@@ -221,6 +222,14 @@ class PairingDelegate:
                 peer_responder_key_distribution & self.local_responder_key_distribution
             ),
         )
+
+    async def generate_passkey(self) -> int:
+        """
+        Return a passkey value between 0 and 999999 (inclusive).
+        """
+
+        # By default, generate a random passkey.
+        return secrets.randbelow(1000000)
 
 
 # -----------------------------------------------------------------------------

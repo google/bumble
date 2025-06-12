@@ -818,9 +818,7 @@ class ClassicChannel(utils.EventEmitter):
 
         # Wait for the connection to succeed or fail
         try:
-            return await utils.cancel_on_event(
-                self.connection, 'disconnection', self.connection_result
-            )
+            return await self.connection.cancel_on_disconnection(self.connection_result)
         finally:
             self.connection_result = None
 

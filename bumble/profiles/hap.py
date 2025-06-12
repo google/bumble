@@ -335,7 +335,7 @@ class HearingAccessService(gatt.TemplateService):
             # Update the active preset index if needed
             await self.notify_active_preset_for_connection(connection)
 
-        utils.cancel_on_event(connection, 'disconnection', on_connection_async())
+        connection.cancel_on_disconnection(on_connection_async())
 
     def _on_read_active_preset_index(self, connection: Connection) -> bytes:
         del connection  # Unused

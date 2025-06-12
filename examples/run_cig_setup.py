@@ -75,9 +75,7 @@ async def main() -> None:
     def on_cis_request(
         connection: Connection, cis_handle: int, _cig_id: int, _cis_id: int
     ):
-        utils.cancel_on_event(
-            connection, 'disconnection', devices[0].accept_cis_request(cis_handle)
-        )
+        connection.cancel_on_disconnection(devices[0].accept_cis_request(cis_handle))
 
     devices[0].on('cis_request', on_cis_request)
 

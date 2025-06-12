@@ -35,6 +35,7 @@ import secrets
 import sys
 from typing import (
     Any,
+    Awaitable,
     Callable,
     ClassVar,
     Optional,
@@ -84,6 +85,7 @@ from bumble.profiles import gatt_service
 if TYPE_CHECKING:
     from bumble.transport.common import TransportSource, TransportSink
 
+_T = TypeVar('_T')
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -1882,6 +1884,12 @@ class Connection(utils.CompositeEventEmitter):
     @property
     def data_packet_queue(self) -> DataPacketQueue | None:
         return self.device.host.get_data_packet_queue(self.handle)
+
+    def cancel_on_disconnection(self, awaitable: Awaitable[_T]) -> Awaitable[_T]:
+        """
+        Helper method to call `utils.cancel_on_event` for the 'disconnection' event
+        """
+        return utils.cancel_on_event(self, self.EVENT_DISCONNECTION, awaitable)
 
     async def __aenter__(self):
         return self
@@ -4358,9 +4366,7 @@ class Device(utils.CompositeEventEmitter):
                 raise hci.HCI_StatusError(result)
 
             # Wait for the authentication to complete
-            await utils.cancel_on_event(
-                connection, Connection.EVENT_DISCONNECTION, pending_authentication
-            )
+            await connection.cancel_on_disconnection(pending_authentication)
         finally:
             connection.remove_listener(
                 connection.EVENT_CONNECTION_AUTHENTICATION, on_authentication
@@ -4447,9 +4453,7 @@ class Device(utils.CompositeEventEmitter):
                     raise hci.HCI_StatusError(result)
 
             # Wait for the result
-            await utils.cancel_on_event(
-                connection, Connection.EVENT_DISCONNECTION, pending_encryption
-            )
+            await connection.cancel_on_disconnection(pending_encryption)
         finally:
             connection.remove_listener(
                 connection.EVENT_CONNECTION_ENCRYPTION_CHANGE, on_encryption_change
@@ -4493,9 +4497,7 @@ class Device(utils.CompositeEventEmitter):
                     f'{hci.HCI_Constant.error_name(result.status)}'
                 )
                 raise hci.HCI_StatusError(result)
-            await utils.cancel_on_event(
-                connection, Connection.EVENT_DISCONNECTION, pending_role_change
-            )
+            await connection.cancel_on_disconnection(pending_role_change)
         finally:
             connection.remove_listener(connection.EVENT_ROLE_CHANGE, on_role_change)
             connection.remove_listener(
@@ -5727,9 +5729,7 @@ class Device(utils.CompositeEventEmitter):
 
         async def reply() -> None:
             try:
-                if await utils.cancel_on_event(
-                    connection, Connection.EVENT_DISCONNECTION, method()
-                ):
+                if await connection.cancel_on_disconnection(method()):
                     await self.host.send_command(
                         hci.HCI_User_Confirmation_Request_Reply_Command(
                             bd_addr=connection.peer_address
@@ -5756,10 +5756,8 @@ class Device(utils.CompositeEventEmitter):
 
         async def reply() -> None:
             try:
-                number = await utils.cancel_on_event(
-                    connection,
-                    Connection.EVENT_DISCONNECTION,
-                    pairing_config.delegate.get_number(),
+                number = await connection.cancel_on_disconnection(
+                    pairing_config.delegate.get_number()
                 )
                 if number is not None:
                     await self.host.send_command(
@@ -5792,10 +5790,8 @@ class Device(utils.CompositeEventEmitter):
         if io_capability == hci.HCI_KEYBOARD_ONLY_IO_CAPABILITY:
             # Ask the user to enter a string
             async def get_pin_code():
-                pin_code = await utils.cancel_on_event(
-                    connection,
-                    Connection.EVENT_DISCONNECTION,
-                    pairing_config.delegate.get_string(16),
+                pin_code = await connection.cancel_on_disconnection(
+                    pairing_config.delegate.get_string(16)
                 )
 
                 if pin_code is not None:
@@ -5833,10 +5829,8 @@ class Device(utils.CompositeEventEmitter):
         pairing_config = self.pairing_config_factory(connection)
 
         # Show the passkey to the user
-        utils.cancel_on_event(
-            connection,
-            Connection.EVENT_DISCONNECTION,
-            pairing_config.delegate.display_number(passkey, digits=6),
+        connection.cancel_on_disconnection(
+            pairing_config.delegate.display_number(passkey, digits=6)
         )
 
     # [Classic only]
