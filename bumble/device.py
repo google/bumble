@@ -201,25 +201,35 @@ class Advertisement:
 # -----------------------------------------------------------------------------
 class LegacyAdvertisement(Advertisement):
     @classmethod
-    def from_advertising_report(cls, report):
+    def from_advertising_report(
+        cls, report: hci.HCI_LE_Advertising_Report_Event.Report
+    ) -> Self:
         return cls(
             address=report.address,
             rssi=report.rssi,
             is_legacy=True,
-            is_connectable=report.event_type
-            in (
-                hci.HCI_LE_Advertising_Report_Event.ADV_IND,
-                hci.HCI_LE_Advertising_Report_Event.ADV_DIRECT_IND,
+            is_connectable=(
+                report.event_type
+                in (
+                    hci.HCI_LE_Advertising_Report_Event.EventType.ADV_IND,
+                    hci.HCI_LE_Advertising_Report_Event.EventType.ADV_DIRECT_IND,
+                )
             ),
-            is_directed=report.event_type
-            == hci.HCI_LE_Advertising_Report_Event.ADV_DIRECT_IND,
-            is_scannable=report.event_type
-            in (
-                hci.HCI_LE_Advertising_Report_Event.ADV_IND,
-                hci.HCI_LE_Advertising_Report_Event.ADV_SCAN_IND,
+            is_directed=(
+                report.event_type
+                == hci.HCI_LE_Advertising_Report_Event.EventType.ADV_DIRECT_IND
             ),
-            is_scan_response=report.event_type
-            == hci.HCI_LE_Advertising_Report_Event.SCAN_RSP,
+            is_scannable=(
+                report.event_type
+                in (
+                    hci.HCI_LE_Advertising_Report_Event.EventType.ADV_IND,
+                    hci.HCI_LE_Advertising_Report_Event.EventType.ADV_SCAN_IND,
+                )
+            ),
+            is_scan_response=(
+                report.event_type
+                == hci.HCI_LE_Advertising_Report_Event.EventType.SCAN_RSP
+            ),
             data_bytes=report.data,
         )
 
@@ -227,18 +237,20 @@ class LegacyAdvertisement(Advertisement):
 # -----------------------------------------------------------------------------
 class ExtendedAdvertisement(Advertisement):
     @classmethod
-    def from_advertising_report(cls, report):
+    def from_advertising_report(
+        cls, report: hci.HCI_LE_Extended_Advertising_Report_Event.Report
+    ) -> Self:
         # fmt: off
         # pylint: disable=line-too-long
         return cls(
             address          = report.address,
             rssi             = report.rssi,
-            is_legacy        = report.event_type & (1 << hci.HCI_LE_Extended_Advertising_Report_Event.LEGACY_ADVERTISING_PDU_USED) != 0,
+            is_legacy        = (report.event_type & hci.HCI_LE_Extended_Advertising_Report_Event.EventType.LEGACY_ADVERTISING_PDU_USED) != 0,
             is_anonymous     = report.address.address_type == hci.HCI_LE_Extended_Advertising_Report_Event.ANONYMOUS_ADDRESS_TYPE,
-            is_connectable   = report.event_type & (1 << hci.HCI_LE_Extended_Advertising_Report_Event.CONNECTABLE_ADVERTISING) != 0,
-            is_directed      = report.event_type & (1 << hci.HCI_LE_Extended_Advertising_Report_Event.DIRECTED_ADVERTISING) != 0,
-            is_scannable     = report.event_type & (1 << hci.HCI_LE_Extended_Advertising_Report_Event.SCANNABLE_ADVERTISING) != 0,
-            is_scan_response = report.event_type & (1 << hci.HCI_LE_Extended_Advertising_Report_Event.SCAN_RESPONSE) != 0,
+            is_connectable   = (report.event_type & hci.HCI_LE_Extended_Advertising_Report_Event.EventType.CONNECTABLE_ADVERTISING) != 0,
+            is_directed      = (report.event_type & hci.HCI_LE_Extended_Advertising_Report_Event.EventType.DIRECTED_ADVERTISING) != 0,
+            is_scannable     = (report.event_type & hci.HCI_LE_Extended_Advertising_Report_Event.EventType.SCANNABLE_ADVERTISING) != 0,
+            is_scan_response = (report.event_type & hci.HCI_LE_Extended_Advertising_Report_Event.EventType.SCAN_RESPONSE) != 0,
             is_complete      = (report.event_type >> 5 & 3)  == hci.HCI_LE_Extended_Advertising_Report_Event.DATA_COMPLETE,
             is_truncated     = (report.event_type >> 5 & 3)  == hci.HCI_LE_Extended_Advertising_Report_Event.DATA_INCOMPLETE_TRUNCATED_NO_MORE_TO_COME,
             primary_phy      = report.primary_phy,

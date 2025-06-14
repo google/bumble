@@ -18,19 +18,19 @@
 from __future__ import annotations
 import collections
 import dataclasses
+from dataclasses import field
 import enum
 import functools
 import logging
 import secrets
 import struct
 from collections.abc import Sequence
-from typing import Any, Callable, Iterable, Optional, Union, TypeVar, ClassVar
+from typing import Any, Callable, Iterable, Optional, Union, TypeVar, ClassVar, cast
 from typing_extensions import Self
 
 from bumble import crypto
 from bumble.colors import color
 from bumble.core import (
-    AdvertisingData,
     DeviceClass,
     InvalidArgumentError,
     InvalidPacketError,
@@ -1744,9 +1744,11 @@ class HCI_Object:
 
         raise InvalidArgumentError(f'unknown field type {field_type}')
 
-    @staticmethod
-    def dict_from_bytes(data, offset, fields):
-        result = collections.OrderedDict()
+    @classmethod
+    def dict_and_offset_from_bytes(
+        cls, data: bytes, offset: int, fields: Fields
+    ) -> tuple[int, collections.OrderedDict[str, Any]]:
+        result = collections.OrderedDict[str, Any]()
         for field in fields:
             if isinstance(field, list):
                 # This is an array field, starting with a 1-byte item count.
@@ -1766,11 +1768,18 @@ class HCI_Object:
                 continue
 
             field_name, field_type = field
-            field_value, field_size = HCI_Object.parse_field(data, offset, field_type)
+            assert isinstance(field_name, str)
+            field_value, field_size = HCI_Object.parse_field(
+                data, offset, cast(FieldSpec, field_type)
+            )
             result[field_name] = field_value
             offset += field_size
 
-        return result
+        return (offset, result)
+
+    @staticmethod
+    def dict_from_bytes(data, offset, fields):
+        return HCI_Object.dict_and_offset_from_bytes(data, offset, fields)[1]
 
     @staticmethod
     def serialize_field(field_value: Any, field_type: FieldSpec) -> bytes:
@@ -1993,6 +2002,19 @@ class HCI_Object:
 
     def __str__(self):
         return self.to_string()
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_Dataclass_Object(HCI_Object):
+    def __post_init__(self) -> None:
+        self.fields = HCI_Object.fields_from_dataclass(self)
+
+    @classmethod
+    def parse_from_bytes(cls, data: bytes, offset: int) -> tuple[int, Self]:
+        fields = HCI_Object.fields_from_dataclass(cls)
+        offset, kwargs = HCI_Object.dict_and_offset_from_bytes(data, offset, fields)
+        return offset, cls(**kwargs)
 
 
 # -----------------------------------------------------------------------------
@@ -2276,6 +2298,7 @@ class HCI_Command(HCI_Packet):
     op_code: int = -1
     fields: Fields = ()
     return_parameters_fields: Fields = ()
+    parameters: bytes = b''
 
     @staticmethod
     def command(
@@ -2301,6 +2324,15 @@ class HCI_Command(HCI_Packet):
             return cls
 
         return inner
+
+    @classmethod
+    def dataclass_command(cls, subclass):
+        # TODO: Move this to __post_init__ when all packets become dataclasses.
+        subclass.parameters = functools.cached_property(
+            lambda self: HCI_Object.dict_to_bytes(self.__dict__, self.fields)
+        )
+        subclass.parameters.__set_name__(subclass, 'parameters')
+        return HCI_Command.command(HCI_Object.fields_from_dataclass(subclass))(subclass)
 
     @staticmethod
     def command_map(symbols: dict[str, Any]) -> dict[int, str]:
@@ -2331,9 +2363,9 @@ class HCI_Command(HCI_Packet):
 
     @classmethod
     def from_parameters(cls, parameters: bytes) -> HCI_Command:
-        command = cls(parameters)
-        HCI_Object.init_from_bytes(command, parameters, 0, cls.fields)
-        return command
+        if dataclasses.is_dataclass(cls):
+            return cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
+        return cls(parameters, **HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
 
     @staticmethod
     def command_name(op_code):
@@ -2373,7 +2405,7 @@ class HCI_Command(HCI_Packet):
                 parameters = HCI_Object.dict_to_bytes(kwargs, self.fields)
         self.parameters = parameters or b''
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         parameters = b'' if self.parameters is None else self.parameters
         return (
             struct.pack('<BHB', HCI_COMMAND_PACKET, self.op_code, len(parameters))
@@ -2394,17 +2426,18 @@ HCI_Command.register_commands(globals())
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
-    [
-        ('lap', {'size': 3, 'mapper': HCI_Constant.inquiry_lap_name}),
-        ('inquiry_length', 1),
-        ('num_responses', 1),
-    ]
-)
+@HCI_Command.dataclass_command
+@dataclasses.dataclass
 class HCI_Inquiry_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.1.1 Inquiry Command
     '''
+
+    lap: int = field(
+        metadata=metadata({'size': 3, 'mapper': HCI_Constant.inquiry_lap_name})
+    )
+    inquiry_length: int = field(metadata=metadata(1))
+    num_responses: int = field(metadata=metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -5594,6 +5627,7 @@ class HCI_Event(HCI_Packet):
     vendor_factories: list[Callable[[bytes], Optional[HCI_Event]]] = []
     event_code: int = -1
     fields: Fields = ()
+    parameters: bytes = b''
 
     @staticmethod
     def event(fields: Optional[Fields] = ()):
@@ -5617,6 +5651,15 @@ class HCI_Event(HCI_Packet):
             return cls
 
         return inner
+
+    @classmethod
+    def dataclass_event(cls, subclass):
+        # TODO: Move this to __post_init__ when all packets become dataclasses.
+        subclass.parameters = functools.cached_property(
+            lambda self: HCI_Object.dict_to_bytes(self.__dict__, self.fields)
+        )
+        subclass.parameters.__set_name__(subclass, 'parameters')
+        return HCI_Event.event(HCI_Object.fields_from_dataclass(subclass))(subclass)
 
     @staticmethod
     def event_map(symbols: dict[str, Any]) -> dict[int, str]:
@@ -5701,10 +5744,9 @@ class HCI_Event(HCI_Packet):
 
     @classmethod
     def from_parameters(cls, parameters: bytes) -> Self:
-        self = cls(parameters)
-        if self.fields:
-            HCI_Object.init_from_bytes(self, parameters, 0, self.fields)
-        return self
+        if dataclasses.is_dataclass(cls):
+            return cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
+        return cls(parameters, **HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
 
     def __init__(
         self,
@@ -5722,7 +5764,7 @@ class HCI_Event(HCI_Packet):
                 parameters = HCI_Object.dict_to_bytes(kwargs, self.fields)
         self.parameters = parameters or b''
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         parameters = b'' if self.parameters is None else self.parameters
         return bytes([HCI_EVENT_PACKET, self.event_code, len(parameters)]) + parameters
 
@@ -5757,20 +5799,34 @@ class HCI_Extended_Event(HCI_Event):
 
         ExtendedEvent = TypeVar("ExtendedEvent", bound=HCI_Extended_Event)
 
-        def inner(cls: type[ExtendedEvent]) -> type[ExtendedEvent]:
-            cls.name = cls.__name__.upper()
-            cls.subevent_code = key_with_value(cls.subevent_names, cls.name)
-            if cls.subevent_code is None:
-                raise KeyError(f'subevent {cls.name} not found in subevent_names')
+        def inner(subclass: type[ExtendedEvent]) -> type[ExtendedEvent]:
+            subclass.name = subclass.__name__.upper()
+            subclass.subevent_code = key_with_value(
+                subclass.subevent_names, subclass.name
+            )
+            if subclass.subevent_code is None:
+                raise KeyError(f'subevent {subclass.name} not found in subevent_names')
             if fields is not None:
-                cls.fields = fields
+                subclass.fields = fields
 
             # Register a factory for this class
-            cls.subevent_classes[cls.subevent_code] = cls
+            cls.subevent_classes[subclass.subevent_code] = subclass
 
-            return cls
+            return subclass
 
         return inner
+
+    @classmethod
+    def dataclass_event(cls, subclass):
+        # TODO: Move this to __post_init__ when all packets become dataclasses.
+        subclass.parameters = functools.cached_property(
+            lambda self: (
+                bytes([self.subevent_code])
+                + HCI_Object.dict_to_bytes(self.__dict__, self.fields)
+            )
+        )
+        subclass.parameters.__set_name__(subclass, 'parameters')
+        return cls.event(HCI_Object.fields_from_dataclass(subclass))(subclass)
 
     @classmethod
     def subevent_name(cls, subevent_code):
@@ -5809,10 +5865,9 @@ class HCI_Extended_Event(HCI_Event):
     @classmethod
     def from_parameters(cls, parameters: bytes) -> HCI_Extended_Event:
         """Factory method for subclasses (the subevent code has already been parsed)"""
-        event = cls(parameters)
-        if event.fields:
-            HCI_Object.init_from_bytes(event, parameters, 1, event.fields)
-        return event
+        if dataclasses.is_dataclass(cls):
+            return cls(**HCI_Object.dict_from_bytes(parameters, 1, cls.fields))
+        return cls(parameters, **HCI_Object.dict_from_bytes(parameters, 1, cls.fields))
 
     def __init__(
         self,
@@ -5878,97 +5933,42 @@ class HCI_LE_Connection_Complete_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.dataclass_event
+@dataclasses.dataclass
 class HCI_LE_Advertising_Report_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.2 LE Advertising Report Event
     '''
 
-    subevent_code = HCI_LE_ADVERTISING_REPORT_EVENT
-    name = 'HCI_LE_ADVERTISING_REPORT_EVENT'
+    class EventType(utils.OpenIntEnum):
+        ADV_IND = 0x00
+        ADV_DIRECT_IND = 0x01
+        ADV_SCAN_IND = 0x02
+        ADV_NONCONN_IND = 0x03
+        SCAN_RSP = 0x04
 
-    # Event Types
-    ADV_IND = 0x00
-    ADV_DIRECT_IND = 0x01
-    ADV_SCAN_IND = 0x02
-    ADV_NONCONN_IND = 0x03
-    SCAN_RSP = 0x04
-
-    EVENT_TYPE_NAMES = {
-        ADV_IND: 'ADV_IND',  # Connectable and scannable undirected advertising
-        ADV_DIRECT_IND: 'ADV_DIRECT_IND',  # Connectable directed advertising
-        ADV_SCAN_IND: 'ADV_SCAN_IND',  # Scannable undirected advertising
-        ADV_NONCONN_IND: 'ADV_NONCONN_IND',  # Non connectable undirected advertising
-        SCAN_RSP: 'SCAN_RSP',  # Scan Response
-    }
-
-    class Report(HCI_Object):
-        FIELDS = [
-            ('event_type', 1),
-            ('address_type', Address.ADDRESS_TYPE_SPEC),
-            ('address', Address.parse_address_preceded_by_type),
-            ('data', 'v'),
-            ('rssi', -1),
-        ]
-
-        @classmethod
-        def from_parameters(cls, parameters, offset):
-            return cls.from_bytes(parameters, offset, cls.FIELDS)
-
-        def event_type_string(self):
-            return HCI_LE_Advertising_Report_Event.event_type_name(self.event_type)
-
-        def to_string(self, indentation='', _=None):
-            def data_to_str(data):
-                try:
-                    return data.hex() + ': ' + str(AdvertisingData.from_bytes(data))
-                except Exception:
-                    return data.hex()
-
-            return super().to_string(
-                indentation,
+    @dataclasses.dataclass
+    class Report(HCI_Dataclass_Object):
+        event_type: int = field(
+            metadata=metadata(
                 {
-                    'event_type': HCI_LE_Advertising_Report_Event.event_type_name,
-                    'address_type': Address.address_type_name,
-                    'data': data_to_str,
-                },
+                    'size': 1,
+                    'mapper': lambda x: HCI_LE_Advertising_Report_Event.EventType(
+                        x
+                    ).name,
+                }
             )
-
-    @classmethod
-    def event_type_name(cls, event_type):
-        return name_or_number(cls.EVENT_TYPE_NAMES, event_type)
-
-    @classmethod
-    def from_parameters(cls, parameters: bytes) -> Self:
-        num_reports = parameters[1]
-        reports = []
-        offset = 2
-        for _ in range(num_reports):
-            report = cls.Report.from_parameters(parameters, offset)
-            offset += 10 + len(report.data)
-            reports.append(report)
-
-        return cls(reports)
-
-    def __init__(self, reports):
-        self.reports = reports[:]
-
-        # Serialize the fields
-        parameters = bytes([HCI_LE_ADVERTISING_REPORT_EVENT, len(reports)]) + b''.join(
-            [bytes(report) for report in reports]
         )
-
-        super().__init__(parameters)
-
-    def __str__(self):
-        reports = '\n'.join(
-            [f'{i}:\n{report.to_string("  ")}' for i, report in enumerate(self.reports)]
+        address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
+        address: Address = field(
+            metadata=metadata(Address.parse_address_preceded_by_type)
         )
-        return f'{color(self.subevent_name(self.subevent_code), "magenta")}:\n{reports}'
+        data: bytes = field(metadata=metadata('v'))
+        rssi: int = field(metadata=metadata(-1))
 
-
-HCI_LE_Meta_Event.subevent_classes[HCI_LE_ADVERTISING_REPORT_EVENT] = (
-    HCI_LE_Advertising_Report_Event
-)
+    reports: Sequence[Report] = field(
+        metadata=metadata(Report.parse_from_bytes, list_begin=True, list_end=True)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -6107,40 +6107,31 @@ class HCI_LE_PHY_Update_Complete_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.dataclass_event
+@dataclasses.dataclass
 class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.13 LE Extended Advertising Report Event
     '''
 
-    subevent_code = HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT
-    name = 'HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT'
-
-    # Event types flags
-    CONNECTABLE_ADVERTISING = 0
-    SCANNABLE_ADVERTISING = 1
-    DIRECTED_ADVERTISING = 2
-    SCAN_RESPONSE = 3
-    LEGACY_ADVERTISING_PDU_USED = 4
+    class EventType(enum.IntFlag):
+        CONNECTABLE_ADVERTISING = 1 << 0
+        SCANNABLE_ADVERTISING = 1 << 1
+        DIRECTED_ADVERTISING = 1 << 2
+        SCAN_RESPONSE = 1 << 3
+        LEGACY_ADVERTISING_PDU_USED = 1 << 4
 
     DATA_COMPLETE = 0x00
     DATA_INCOMPLETE_MORE_TO_COME = 0x01
     DATA_INCOMPLETE_TRUNCATED_NO_MORE_TO_COME = 0x02
 
-    EVENT_TYPE_FLAG_NAMES = (
-        'CONNECTABLE_ADVERTISING',
-        'SCANNABLE_ADVERTISING',
-        'DIRECTED_ADVERTISING',
-        'SCAN_RESPONSE',
-        'LEGACY_ADVERTISING_PDU_USED',
-    )
-
     LEGACY_PDU_TYPE_MAP = {
-        0b0011: HCI_LE_Advertising_Report_Event.ADV_IND,
-        0b0101: HCI_LE_Advertising_Report_Event.ADV_DIRECT_IND,
-        0b0010: HCI_LE_Advertising_Report_Event.ADV_SCAN_IND,
-        0b0000: HCI_LE_Advertising_Report_Event.ADV_NONCONN_IND,
-        0b1011: HCI_LE_Advertising_Report_Event.SCAN_RSP,
-        0b1010: HCI_LE_Advertising_Report_Event.SCAN_RSP,
+        0b0011: HCI_LE_Advertising_Report_Event.EventType.ADV_IND,
+        0b0101: HCI_LE_Advertising_Report_Event.EventType.ADV_DIRECT_IND,
+        0b0010: HCI_LE_Advertising_Report_Event.EventType.ADV_SCAN_IND,
+        0b0000: HCI_LE_Advertising_Report_Event.EventType.ADV_NONCONN_IND,
+        0b1011: HCI_LE_Advertising_Report_Event.EventType.SCAN_RSP,
+        0b1010: HCI_LE_Advertising_Report_Event.EventType.SCAN_RSP,
     }
 
     NO_ADI_FIELD_PROVIDED = 0xFF
@@ -6149,110 +6140,41 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
     ANONYMOUS_ADDRESS_TYPE = 0xFF
     UNRESOLVED_RESOLVABLE_ADDRESS_TYPE = 0xFE
 
-    class Report(HCI_Object):
-        FIELDS = [
-            ('event_type', 2),
-            ('address_type', Address.ADDRESS_TYPE_SPEC),
-            ('address', Address.parse_address_preceded_by_type),
-            ('primary_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
-            ('secondary_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
-            ('advertising_sid', 1),
-            ('tx_power', 1),
-            ('rssi', -1),
-            ('periodic_advertising_interval', 2),
-            ('direct_address_type', Address.ADDRESS_TYPE_SPEC),
-            ('direct_address', Address.parse_address_preceded_by_type),
-            ('data', 'v'),
-        ]
-
-        @classmethod
-        def from_parameters(cls, parameters, offset):
-            return cls.from_bytes(parameters, offset, cls.FIELDS)
-
-        def event_type_string(self):
-            return HCI_LE_Extended_Advertising_Report_Event.event_type_string(
-                self.event_type
-            )
-
-        def to_string(self, indentation='', _=None):
-            # pylint: disable=line-too-long
-            def data_to_str(data):
-                try:
-                    return data.hex() + ': ' + str(AdvertisingData.from_bytes(data))
-                except Exception:
-                    return data.hex()
-
-            return super().to_string(
-                indentation,
+    @dataclasses.dataclass
+    class Report(HCI_Dataclass_Object):
+        event_type: int = field(
+            metadata=metadata(
                 {
-                    'event_type': HCI_LE_Extended_Advertising_Report_Event.event_type_string,
-                    'address_type': Address.address_type_name,
-                    'data': data_to_str,
-                },
+                    'size': 2,
+                    'mapper': lambda x: HCI_LE_Extended_Advertising_Report_Event.EventType(
+                        x
+                    ).name,
+                }
             )
-
-    @staticmethod
-    def event_type_string(event_type):
-        event_type_flags = bit_flags_to_strings(
-            event_type & 0x1F,
-            HCI_LE_Extended_Advertising_Report_Event.EVENT_TYPE_FLAG_NAMES,
         )
-        event_type_flags.append(
-            ('COMPLETE', 'INCOMPLETE+', 'INCOMPLETE#', '?')[(event_type >> 5) & 3]
+        address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
+        address: Address = field(
+            metadata=metadata(Address.parse_address_preceded_by_type)
         )
-
-        if event_type & (
-            1 << HCI_LE_Extended_Advertising_Report_Event.LEGACY_ADVERTISING_PDU_USED
-        ):
-            legacy_pdu_type = (
-                HCI_LE_Extended_Advertising_Report_Event.LEGACY_PDU_TYPE_MAP.get(
-                    event_type & 0x0F
-                )
-            )
-            if legacy_pdu_type is not None:
-                # pylint: disable=line-too-long
-                legacy_info_string = f'({HCI_LE_Advertising_Report_Event.event_type_name(legacy_pdu_type)})'
-            else:
-                legacy_info_string = ''
-        else:
-            legacy_info_string = ''
-
-        return f'0x{event_type:04X} [{",".join(event_type_flags)}]{legacy_info_string}'
-
-    @classmethod
-    def from_parameters(cls, parameters: bytes) -> Self:
-        num_reports = parameters[1]
-        reports: list[HCI_LE_Extended_Advertising_Report_Event.Report] = []
-        offset = 2
-        for _ in range(num_reports):
-            report = cls.Report.from_parameters(parameters, offset)
-            offset += 24 + len(report.data)
-            reports.append(report)
-
-        return cls(reports)
-
-    def __init__(
-        self, reports: Sequence[HCI_LE_Extended_Advertising_Report_Event.Report]
-    ):
-        self.reports = reports[:]
-
-        # Serialize the fields
-        parameters = bytes(
-            [HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT, len(reports)]
-        ) + b''.join([bytes(report) for report in reports])
-
-        super().__init__(parameters)
-
-    def __str__(self):
-        reports = '\n'.join(
-            [f'{i}:\n{report.to_string("  ")}' for i, report in enumerate(self.reports)]
+        primary_phy: int = field(
+            metadata=metadata({'size': 1, 'mapper': HCI_Constant.le_phy_name})
         )
-        return f'{color(self.subevent_name(self.subevent_code), "magenta")}:\n{reports}'
+        secondary_phy: int = field(
+            metadata=metadata({'size': 1, 'mapper': HCI_Constant.le_phy_name})
+        )
+        advertising_sid: int = field(metadata=metadata(1))
+        tx_power: int = field(metadata=metadata(1))
+        rssi: int = field(metadata=metadata(-1))
+        periodic_advertising_interval: int = field(metadata=metadata(2))
+        direct_address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
+        direct_address: int = field(
+            metadata=metadata(Address.parse_address_preceded_by_type)
+        )
+        data: bytes = field(metadata=metadata('v'))
 
-
-HCI_LE_Meta_Event.subevent_classes[HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT] = (
-    HCI_LE_Extended_Advertising_Report_Event
-)
+    reports: Sequence[Report] = field(
+        metadata=metadata(Report.parse_from_bytes, list_begin=True, list_end=True)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -6876,11 +6798,14 @@ class HCI_LE_CS_Test_End_Complete_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('status', STATUS_SPEC)])
+@HCI_Event.dataclass_event
+@dataclasses.dataclass
 class HCI_Inquiry_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.1 Inquiry Complete Event
     '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
 
 
 # -----------------------------------------------------------------------------

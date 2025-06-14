@@ -1126,11 +1126,19 @@ class Host(utils.EventEmitter):
         else:
             self.emit('connection_phy_update_failure', connection.handle, event.status)
 
-    def on_hci_le_advertising_report_event(self, event):
+    def on_hci_le_advertising_report_event(
+        self,
+        event: (
+            hci.HCI_LE_Advertising_Report_Event
+            | hci.HCI_LE_Extended_Advertising_Report_Event
+        ),
+    ):
         for report in event.reports:
             self.emit('advertising_report', report)
 
-    def on_hci_le_extended_advertising_report_event(self, event):
+    def on_hci_le_extended_advertising_report_event(
+        self, event: hci.HCI_LE_Extended_Advertising_Report_Event
+    ):
         self.on_hci_le_advertising_report_event(event)
 
     def on_hci_le_advertising_set_terminated_event(self, event):
