@@ -544,15 +544,14 @@ class Controller:
         acl_packet = HCI_AclDataPacket(connection.handle, 2, 0, len(data), data)
         self.send_hci_packet(acl_packet)
 
-    def on_link_advertising_data(self, sender_address, data):
+    def on_link_advertising_data(self, sender_address: Address, data: bytes):
         # Ignore if we're not scanning
         if self.le_scan_enable == 0:
             return
 
         # Send a scan report
         report = HCI_LE_Advertising_Report_Event.Report(
-            HCI_LE_Advertising_Report_Event.Report.FIELDS,
-            event_type=HCI_LE_Advertising_Report_Event.ADV_IND,
+            event_type=HCI_LE_Advertising_Report_Event.EventType.ADV_IND,
             address_type=sender_address.address_type,
             address=sender_address,
             data=data,
@@ -562,8 +561,7 @@ class Controller:
 
         # Simulate a scan response
         report = HCI_LE_Advertising_Report_Event.Report(
-            HCI_LE_Advertising_Report_Event.Report.FIELDS,
-            event_type=HCI_LE_Advertising_Report_Event.SCAN_RSP,
+            event_type=HCI_LE_Advertising_Report_Event.EventType.SCAN_RSP,
             address_type=sender_address.address_type,
             address=sender_address,
             data=data,
