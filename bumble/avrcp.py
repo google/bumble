@@ -50,19 +50,10 @@ from bumble.sdp import (
     ServiceAttribute,
 )
 from bumble import utils
-from bumble.core import (
-    InvalidArgumentError,
-    ProtocolError,
-    BT_L2CAP_PROTOCOL_ID,
-    BT_AVCTP_PROTOCOL_ID,
-    BT_AV_REMOTE_CONTROL_SERVICE,
-    BT_AV_REMOTE_CONTROL_CONTROLLER_SERVICE,
-    BT_AV_REMOTE_CONTROL_TARGET_SERVICE,
-)
+from bumble import core
 from bumble import l2cap
 from bumble import avc
 from bumble import avctp
-from bumble import utils
 
 
 # -----------------------------------------------------------------------------
@@ -102,8 +93,8 @@ def make_controller_service_sdp_records(
             SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
             DataElement.sequence(
                 [
-                    DataElement.uuid(BT_AV_REMOTE_CONTROL_SERVICE),
-                    DataElement.uuid(BT_AV_REMOTE_CONTROL_CONTROLLER_SERVICE),
+                    DataElement.uuid(core.BT_AV_REMOTE_CONTROL_SERVICE),
+                    DataElement.uuid(core.BT_AV_REMOTE_CONTROL_CONTROLLER_SERVICE),
                 ]
             ),
         ),
@@ -113,13 +104,13 @@ def make_controller_service_sdp_records(
                 [
                     DataElement.sequence(
                         [
-                            DataElement.uuid(BT_L2CAP_PROTOCOL_ID),
+                            DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
                             DataElement.unsigned_integer_16(avctp.AVCTP_PSM),
                         ]
                     ),
                     DataElement.sequence(
                         [
-                            DataElement.uuid(BT_AVCTP_PROTOCOL_ID),
+                            DataElement.uuid(core.BT_AVCTP_PROTOCOL_ID),
                             DataElement.unsigned_integer_16(avctp_version_int),
                         ]
                     ),
@@ -132,7 +123,7 @@ def make_controller_service_sdp_records(
                 [
                     DataElement.sequence(
                         [
-                            DataElement.uuid(BT_AV_REMOTE_CONTROL_SERVICE),
+                            DataElement.uuid(core.BT_AV_REMOTE_CONTROL_SERVICE),
                             DataElement.unsigned_integer_16(avrcp_version_int),
                         ]
                     ),
@@ -170,7 +161,7 @@ def make_target_service_sdp_records(
             SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
             DataElement.sequence(
                 [
-                    DataElement.uuid(BT_AV_REMOTE_CONTROL_TARGET_SERVICE),
+                    DataElement.uuid(core.BT_AV_REMOTE_CONTROL_TARGET_SERVICE),
                 ]
             ),
         ),
@@ -180,13 +171,13 @@ def make_target_service_sdp_records(
                 [
                     DataElement.sequence(
                         [
-                            DataElement.uuid(BT_L2CAP_PROTOCOL_ID),
+                            DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
                             DataElement.unsigned_integer_16(avctp.AVCTP_PSM),
                         ]
                     ),
                     DataElement.sequence(
                         [
-                            DataElement.uuid(BT_AVCTP_PROTOCOL_ID),
+                            DataElement.uuid(core.BT_AVCTP_PROTOCOL_ID),
                             DataElement.unsigned_integer_16(avctp_version_int),
                         ]
                     ),
@@ -199,7 +190,7 @@ def make_target_service_sdp_records(
                 [
                     DataElement.sequence(
                         [
-                            DataElement.uuid(BT_AV_REMOTE_CONTROL_SERVICE),
+                            DataElement.uuid(core.BT_AV_REMOTE_CONTROL_SERVICE),
                             DataElement.unsigned_integer_16(avrcp_version_int),
                         ]
                     ),
@@ -1208,7 +1199,7 @@ class Protocol(utils.EventEmitter):
     def _delegate_command(
         self, transaction_label: int, command: Command, method: Awaitable
     ) -> None:
-        async def call():
+        async def call() -> None:
             try:
                 await method
             except Delegate.Error as error:
@@ -1412,7 +1403,7 @@ class Protocol(utils.EventEmitter):
     def notify_track_changed(self, identifier: bytes) -> None:
         """Notify the connected peer of a Track change."""
         if len(identifier) != 8:
-            raise InvalidArgumentError("identifier must be 8 bytes")
+            raise core.InvalidArgumentError("identifier must be 8 bytes")
         self.notify_event(TrackChangedEvent(identifier))
 
     def notify_playback_position_changed(self, position: int) -> None:
@@ -1679,7 +1670,7 @@ class Protocol(utils.EventEmitter):
             else:
                 logger.debug("unexpected PDU ID")
                 pending_command.response.set_exception(
-                    ProtocolError(
+                    core.ProtocolError(
                         error_code=None,
                         error_namespace="avrcp",
                         details="unexpected PDU ID",
@@ -1688,7 +1679,7 @@ class Protocol(utils.EventEmitter):
         else:
             logger.debug("unexpected response code")
             pending_command.response.set_exception(
-                ProtocolError(
+                core.ProtocolError(
                     error_code=None,
                     error_namespace="avrcp",
                     details="unexpected response code",
@@ -1866,12 +1857,12 @@ class Protocol(utils.EventEmitter):
     ) -> None:
         logger.debug(f"<<< AVRCP command PDU: {command}")
 
-        async def get_supported_events():
+        async def get_supported_events() -> None:
             if (
                 command.capability_id
                 != GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED
             ):
-                raise Protocol.InvalidParameterError
+                raise core.InvalidArgumentError()
 
             supported_events = await self.delegate.get_supported_events()
             self.send_avrcp_response(
@@ -1887,7 +1878,7 @@ class Protocol(utils.EventEmitter):
     ) -> None:
         logger.debug(f"<<< AVRCP command PDU: {command}")
 
-        async def set_absolute_volume():
+        async def set_absolute_volume() -> None:
             await self.delegate.set_absolute_volume(command.volume)
             effective_volume = await self.delegate.get_absolute_volume()
             self.send_avrcp_response(
@@ -1903,7 +1894,7 @@ class Protocol(utils.EventEmitter):
     ) -> None:
         logger.debug(f"<<< AVRCP command PDU: {command}")
 
-        async def register_notification():
+        async def register_notification() -> None:
             # Check if the event is supported.
             supported_events = await self.delegate.get_supported_events()
             if command.event_id not in supported_events:
