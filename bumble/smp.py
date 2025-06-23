@@ -762,7 +762,9 @@ class Session:
 
         # OOB
         self.oob_data_flag = (
-            1 if pairing_config.oob and pairing_config.oob.peer_data else 0
+            1
+            if pairing_config.oob and (not self.sc or pairing_config.oob.peer_data)
+            else 0
         )
 
         # Set up addresses
