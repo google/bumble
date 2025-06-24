@@ -15,21 +15,12 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+import dataclasses
+from dataclasses import field
 import struct
 from typing import Optional
 
-from bumble.hci import (
-    name_or_number,
-    hci_vendor_command_op_code,
-    Address,
-    HCI_Constant,
-    HCI_Object,
-    HCI_Command,
-    HCI_Event,
-    HCI_Extended_Event,
-    HCI_VENDOR_EVENT,
-    STATUS_SPEC,
-)
+from bumble import hci
 
 
 # -----------------------------------------------------------------------------
@@ -41,27 +32,27 @@ from bumble.hci import (
 #
 # pylint: disable-next=line-too-long
 # See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#chip-capabilities-and-configuration
-HCI_LE_GET_VENDOR_CAPABILITIES_COMMAND = hci_vendor_command_op_code(0x153)
-HCI_LE_APCF_COMMAND = hci_vendor_command_op_code(0x157)
-HCI_GET_CONTROLLER_ACTIVITY_ENERGY_INFO_COMMAND = hci_vendor_command_op_code(0x159)
-HCI_A2DP_HARDWARE_OFFLOAD_COMMAND = hci_vendor_command_op_code(0x15D)
-HCI_BLUETOOTH_QUALITY_REPORT_COMMAND = hci_vendor_command_op_code(0x15E)
-HCI_DYNAMIC_AUDIO_BUFFER_COMMAND = hci_vendor_command_op_code(0x15F)
+HCI_LE_GET_VENDOR_CAPABILITIES_COMMAND = hci.hci_vendor_command_op_code(0x153)
+HCI_LE_APCF_COMMAND = hci.hci_vendor_command_op_code(0x157)
+HCI_GET_CONTROLLER_ACTIVITY_ENERGY_INFO_COMMAND = hci.hci_vendor_command_op_code(0x159)
+HCI_A2DP_HARDWARE_OFFLOAD_COMMAND = hci.hci_vendor_command_op_code(0x15D)
+HCI_BLUETOOTH_QUALITY_REPORT_COMMAND = hci.hci_vendor_command_op_code(0x15E)
+HCI_DYNAMIC_AUDIO_BUFFER_COMMAND = hci.hci_vendor_command_op_code(0x15F)
 
 HCI_BLUETOOTH_QUALITY_REPORT_EVENT = 0x58
 
-HCI_Command.register_commands(globals())
+hci.HCI_Command.register_commands(globals())
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command()
-class HCI_LE_Get_Vendor_Capabilities_Command(HCI_Command):
+@hci.HCI_Command.command()
+class HCI_LE_Get_Vendor_Capabilities_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#vendor-specific-capabilities
     '''
     return_parameters_fields = [
-        ('status', STATUS_SPEC),
+        ('status', hci.STATUS_SPEC),
         ('max_advt_instances', 1),
         ('offloaded_resolution_of_private_address', 1),
         ('total_scan_results_storage', 2),
@@ -85,13 +76,13 @@ class HCI_LE_Get_Vendor_Capabilities_Command(HCI_Command):
         # there are no more bytes to parse, and leave un-signal parameters set to
         # None (older versions)
         nones = {field: None for field, _ in cls.return_parameters_fields}
-        return_parameters = HCI_Object(cls.return_parameters_fields, **nones)
+        return_parameters = hci.HCI_Object(cls.return_parameters_fields, **nones)
 
         try:
             offset = 0
             for field in cls.return_parameters_fields:
                 field_name, field_type = field
-                field_value, field_size = HCI_Object.parse_field(
+                field_value, field_size = hci.HCI_Object.parse_field(
                     parameters, offset, field_type
                 )
                 setattr(return_parameters, field_name, field_value)
@@ -103,7 +94,7 @@ class HCI_LE_Get_Vendor_Capabilities_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
+@hci.HCI_Command.command(
     fields=[
         (
             'opcode',
@@ -115,7 +106,7 @@ class HCI_LE_Get_Vendor_Capabilities_Command(HCI_Command):
         ('payload', '*'),
     ],
 )
-class HCI_LE_APCF_Command(HCI_Command):
+class HCI_LE_APCF_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#le_apcf_command
@@ -124,7 +115,7 @@ class HCI_LE_APCF_Command(HCI_Command):
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
     return_parameters_fields = [
-        ('status', STATUS_SPEC),
+        ('status', hci.STATUS_SPEC),
         (
             'opcode',
             {
@@ -165,18 +156,18 @@ class HCI_LE_APCF_Command(HCI_Command):
 
     @classmethod
     def opcode_name(cls, opcode):
-        return name_or_number(cls.OPCODE_NAMES, opcode)
+        return hci.name_or_number(cls.OPCODE_NAMES, opcode)
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command()
-class HCI_Get_Controller_Activity_Energy_Info_Command(HCI_Command):
+@hci.HCI_Command.command()
+class HCI_Get_Controller_Activity_Energy_Info_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#le_get_controller_activity_energy_info
     '''
     return_parameters_fields = [
-        ('status', STATUS_SPEC),
+        ('status', hci.STATUS_SPEC),
         ('total_tx_time_ms', 4),
         ('total_rx_time_ms', 4),
         ('total_idle_time_ms', 4),
@@ -185,7 +176,7 @@ class HCI_Get_Controller_Activity_Energy_Info_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
+@hci.HCI_Command.command(
     fields=[
         (
             'opcode',
@@ -197,7 +188,7 @@ class HCI_Get_Controller_Activity_Energy_Info_Command(HCI_Command):
         ('payload', '*'),
     ],
 )
-class HCI_A2DP_Hardware_Offload_Command(HCI_Command):
+class HCI_A2DP_Hardware_Offload_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#a2dp-hardware-offload-support
@@ -206,7 +197,7 @@ class HCI_A2DP_Hardware_Offload_Command(HCI_Command):
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
     return_parameters_fields = [
-        ('status', STATUS_SPEC),
+        ('status', hci.STATUS_SPEC),
         (
             'opcode',
             {
@@ -229,11 +220,11 @@ class HCI_A2DP_Hardware_Offload_Command(HCI_Command):
 
     @classmethod
     def opcode_name(cls, opcode):
-        return name_or_number(cls.OPCODE_NAMES, opcode)
+        return hci.name_or_number(cls.OPCODE_NAMES, opcode)
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
+@hci.HCI_Command.command(
     fields=[
         (
             'opcode',
@@ -245,7 +236,7 @@ class HCI_A2DP_Hardware_Offload_Command(HCI_Command):
         ('payload', '*'),
     ],
 )
-class HCI_Dynamic_Audio_Buffer_Command(HCI_Command):
+class HCI_Dynamic_Audio_Buffer_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#dynamic-audio-buffer-command
@@ -254,7 +245,7 @@ class HCI_Dynamic_Audio_Buffer_Command(HCI_Command):
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
     return_parameters_fields = [
-        ('status', STATUS_SPEC),
+        ('status', hci.STATUS_SPEC),
         (
             'opcode',
             {
@@ -275,18 +266,18 @@ class HCI_Dynamic_Audio_Buffer_Command(HCI_Command):
 
     @classmethod
     def opcode_name(cls, opcode):
-        return name_or_number(cls.OPCODE_NAMES, opcode)
+        return hci.name_or_number(cls.OPCODE_NAMES, opcode)
 
 
 # -----------------------------------------------------------------------------
-class HCI_Android_Vendor_Event(HCI_Extended_Event):
-    event_code: int = HCI_VENDOR_EVENT
-    subevent_classes: dict[int, type[HCI_Extended_Event]] = {}
+class HCI_Android_Vendor_Event(hci.HCI_Extended_Event):
+    event_code: int = hci.HCI_VENDOR_EVENT
+    subevent_classes: dict[int, type[hci.HCI_Extended_Event]] = {}
 
     @classmethod
     def subclass_from_parameters(
         cls, parameters: bytes
-    ) -> Optional[HCI_Extended_Event]:
+    ) -> Optional[hci.HCI_Extended_Event]:
         subevent_code = parameters[0]
         if subevent_code == HCI_BLUETOOTH_QUALITY_REPORT_EVENT:
             quality_report_id = parameters[1]
@@ -297,45 +288,43 @@ class HCI_Android_Vendor_Event(HCI_Extended_Event):
 
 
 HCI_Android_Vendor_Event.register_subevents(globals())
-HCI_Event.add_vendor_factory(HCI_Android_Vendor_Event.subclass_from_parameters)
+hci.HCI_Event.add_vendor_factory(HCI_Android_Vendor_Event.subclass_from_parameters)
 
 
 # -----------------------------------------------------------------------------
-@HCI_Extended_Event.event(
-    fields=[
-        ('quality_report_id', 1),
-        ('packet_types', 1),
-        ('connection_handle', 2),
-        ('connection_role', {'size': 1, 'mapper': HCI_Constant.role_name}),
-        ('tx_power_level', -1),
-        ('rssi', -1),
-        ('snr', 1),
-        ('unused_afh_channel_count', 1),
-        ('afh_select_unideal_channel_count', 1),
-        ('lsto', 2),
-        ('connection_piconet_clock', 4),
-        ('retransmission_count', 4),
-        ('no_rx_count', 4),
-        ('nak_count', 4),
-        ('last_tx_ack_timestamp', 4),
-        ('flow_off_count', 4),
-        ('last_flow_on_timestamp', 4),
-        ('buffer_overflow_bytes', 4),
-        ('buffer_underflow_bytes', 4),
-        ('bdaddr', Address.parse_address),
-        ('cal_failed_item_count', 1),
-        ('tx_total_packets', 4),
-        ('tx_unacked_packets', 4),
-        ('tx_flushed_packets', 4),
-        ('tx_last_subevent_packets', 4),
-        ('crc_error_packets', 4),
-        ('rx_duplicate_packets', 4),
-        ('rx_unreceived_packets', 4),
-        ('vendor_specific_parameters', '*'),
-    ]
-)
+@hci.HCI_Extended_Event.event
+@dataclasses.dataclass
 class HCI_Bluetooth_Quality_Report_Event(HCI_Android_Vendor_Event):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#bluetooth-quality-report-sub-event
     '''
+    quality_report_id: int = field(metadata=hci.metadata(1))
+    packet_types: int = field(metadata=hci.metadata(1))
+    connection_handle: int = field(metadata=hci.metadata(2))
+    connection_role: int = field(metadata=hci.Role.type_metadata(1))
+    tx_power_level: int = field(metadata=hci.metadata(-1))
+    rssi: int = field(metadata=hci.metadata(-1))
+    snr: int = field(metadata=hci.metadata(1))
+    unused_afh_channel_count: int = field(metadata=hci.metadata(1))
+    afh_select_unideal_channel_count: int = field(metadata=hci.metadata(1))
+    lsto: int = field(metadata=hci.metadata(2))
+    connection_piconet_clock: int = field(metadata=hci.metadata(4))
+    retransmission_count: int = field(metadata=hci.metadata(4))
+    no_rx_count: int = field(metadata=hci.metadata(4))
+    nak_count: int = field(metadata=hci.metadata(4))
+    last_tx_ack_timestamp: int = field(metadata=hci.metadata(4))
+    flow_off_count: int = field(metadata=hci.metadata(4))
+    last_flow_on_timestamp: int = field(metadata=hci.metadata(4))
+    buffer_overflow_bytes: int = field(metadata=hci.metadata(4))
+    buffer_underflow_bytes: int = field(metadata=hci.metadata(4))
+    bdaddr: hci.Address = field(metadata=hci.metadata(hci.Address.parse_address))
+    cal_failed_item_count: int = field(metadata=hci.metadata(1))
+    tx_total_packets: int = field(metadata=hci.metadata(4))
+    tx_unacked_packets: int = field(metadata=hci.metadata(4))
+    tx_flushed_packets: int = field(metadata=hci.metadata(4))
+    tx_last_subevent_packets: int = field(metadata=hci.metadata(4))
+    crc_error_packets: int = field(metadata=hci.metadata(4))
+    rx_duplicate_packets: int = field(metadata=hci.metadata(4))
+    rx_unreceived_packets: int = field(metadata=hci.metadata(4))
+    vendor_specific_parameters: bytes = field(metadata=hci.metadata('*'))
