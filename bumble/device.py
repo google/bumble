@@ -5084,8 +5084,8 @@ class Device(utils.CompositeEventEmitter):
         # Store the keys in the key store
         if self.keystore:
             authenticated = key_type in (
-                hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE,
-                hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
+                hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192,
+                hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256,
             )
             pairing_keys = PairingKeys(
                 link_key=PairingKeys.Key(value=link_key, authenticated=authenticated),
@@ -5532,8 +5532,8 @@ class Device(utils.CompositeEventEmitter):
 
         # Handle SCO request.
         if link_type in (
-            hci.HCI_Connection_Complete_Event.SCO_LINK_TYPE,
-            hci.HCI_Connection_Complete_Event.ESCO_LINK_TYPE,
+            hci.HCI_Connection_Complete_Event.LinkType.SCO,
+            hci.HCI_Connection_Complete_Event.LinkType.ESCO,
         ):
             if connection := self.find_connection_by_bd_addr(
                 bd_addr, transport=PhysicalTransport.BR_EDR
@@ -5641,7 +5641,7 @@ class Device(utils.CompositeEventEmitter):
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
-    def on_authentication_io_capability_request(self, connection):
+    def on_authentication_io_capability_request(self, connection: Connection):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
 
@@ -5649,13 +5649,13 @@ class Device(utils.CompositeEventEmitter):
         authentication_requirements = (
             # No Bonding
             (
-                hci.HCI_MITM_NOT_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
-                hci.HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS,
+                hci.AuthenticationRequirements.MITM_NOT_REQUIRED_NO_BONDING,
+                hci.AuthenticationRequirements.MITM_REQUIRED_NO_BONDING,
             ),
             # General Bonding
             (
-                hci.HCI_MITM_NOT_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
-                hci.HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS,
+                hci.AuthenticationRequirements.MITM_NOT_REQUIRED_GENERAL_BONDING,
+                hci.AuthenticationRequirements.MITM_REQUIRED_GENERAL_BONDING,
             ),
         )[1 if pairing_config.bonding else 0][1 if pairing_config.mitm else 0]
 
@@ -5710,30 +5710,30 @@ class Device(utils.CompositeEventEmitter):
             raise UnreachableError()
 
         # See Bluetooth spec @ Vol 3, Part C 5.2.2.6
-        methods = {
-            hci.HCI_DISPLAY_ONLY_IO_CAPABILITY: {
-                hci.HCI_DISPLAY_ONLY_IO_CAPABILITY: display_auto_confirm,
-                hci.HCI_DISPLAY_YES_NO_IO_CAPABILITY: display_confirm,
-                hci.HCI_KEYBOARD_ONLY_IO_CAPABILITY: na,
-                hci.HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: auto_confirm,
+        methods: dict[int, dict[int, Callable[[], Awaitable[bool]]]] = {
+            hci.IoCapability.DISPLAY_ONLY: {
+                hci.IoCapability.DISPLAY_ONLY: display_auto_confirm,
+                hci.IoCapability.DISPLAY_YES_NO: display_confirm,
+                hci.IoCapability.KEYBOARD_ONLY: na,
+                hci.IoCapability.NO_INPUT_NO_OUTPUT: auto_confirm,
             },
-            hci.HCI_DISPLAY_YES_NO_IO_CAPABILITY: {
-                hci.HCI_DISPLAY_ONLY_IO_CAPABILITY: display_auto_confirm,
-                hci.HCI_DISPLAY_YES_NO_IO_CAPABILITY: display_confirm,
-                hci.HCI_KEYBOARD_ONLY_IO_CAPABILITY: na,
-                hci.HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: auto_confirm,
+            hci.IoCapability.DISPLAY_YES_NO: {
+                hci.IoCapability.DISPLAY_ONLY: display_auto_confirm,
+                hci.IoCapability.DISPLAY_YES_NO: display_confirm,
+                hci.IoCapability.KEYBOARD_ONLY: na,
+                hci.IoCapability.NO_INPUT_NO_OUTPUT: auto_confirm,
             },
-            hci.HCI_KEYBOARD_ONLY_IO_CAPABILITY: {
-                hci.HCI_DISPLAY_ONLY_IO_CAPABILITY: na,
-                hci.HCI_DISPLAY_YES_NO_IO_CAPABILITY: na,
-                hci.HCI_KEYBOARD_ONLY_IO_CAPABILITY: na,
-                hci.HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: auto_confirm,
+            hci.IoCapability.KEYBOARD_ONLY: {
+                hci.IoCapability.DISPLAY_ONLY: na,
+                hci.IoCapability.DISPLAY_YES_NO: na,
+                hci.IoCapability.KEYBOARD_ONLY: na,
+                hci.IoCapability.NO_INPUT_NO_OUTPUT: auto_confirm,
             },
-            hci.HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: {
-                hci.HCI_DISPLAY_ONLY_IO_CAPABILITY: confirm,
-                hci.HCI_DISPLAY_YES_NO_IO_CAPABILITY: confirm,
-                hci.HCI_KEYBOARD_ONLY_IO_CAPABILITY: auto_confirm,
-                hci.HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: auto_confirm,
+            hci.IoCapability.NO_INPUT_NO_OUTPUT: {
+                hci.IoCapability.DISPLAY_ONLY: confirm,
+                hci.IoCapability.DISPLAY_YES_NO: confirm,
+                hci.IoCapability.KEYBOARD_ONLY: auto_confirm,
+                hci.IoCapability.NO_INPUT_NO_OUTPUT: auto_confirm,
             },
         }
 
@@ -5799,7 +5799,7 @@ class Device(utils.CompositeEventEmitter):
         io_capability = pairing_config.delegate.classic_io_capability
 
         # Respond
-        if io_capability == hci.HCI_KEYBOARD_ONLY_IO_CAPABILITY:
+        if io_capability == hci.IoCapability.KEYBOARD_ONLY:
             # Ask the user to enter a string
             async def get_pin_code():
                 pin_code = await connection.cancel_on_disconnection(
@@ -5979,7 +5979,7 @@ class Device(utils.CompositeEventEmitter):
     @host_event_handler
     @with_connection_from_handle
     def on_connection_encryption_change(
-        self, connection, encryption, encryption_key_size
+        self, connection: Connection, encryption: int, encryption_key_size: int
     ):
         logger.debug(
             f'*** Connection Encryption Change: [0x{connection.handle:04X}] '
@@ -5992,14 +5992,14 @@ class Device(utils.CompositeEventEmitter):
         if (
             not connection.authenticated
             and connection.transport == PhysicalTransport.BR_EDR
-            and encryption == hci.HCI_Encryption_Change_Event.AES_CCM
+            and encryption == hci.HCI_Encryption_Change_Event.Enabled.AES_CCM
         ):
             connection.authenticated = True
             connection.sc = True
         if (
             not connection.authenticated
             and connection.transport == PhysicalTransport.LE
-            and encryption == hci.HCI_Encryption_Change_Event.E0_OR_AES_CCM
+            and encryption == hci.HCI_Encryption_Change_Event.Enabled.E0_OR_AES_CCM
         ):
             connection.authenticated = True
             connection.sc = True

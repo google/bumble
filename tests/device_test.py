@@ -125,7 +125,7 @@ async def test_device_connect_parallel():
             HCI_Connection_Request_Event(
                 bd_addr=d0.public_address,
                 class_of_device=0,
-                link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                link_type=HCI_Connection_Complete_Event.LinkType.ACL,
             )
         )
 
@@ -145,7 +145,7 @@ async def test_device_connect_parallel():
             HCI_Connection_Request_Event(
                 bd_addr=d0.public_address,
                 class_of_device=0,
-                link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                link_type=HCI_Connection_Complete_Event.LinkType.ACL,
             )
         )
 
@@ -168,7 +168,7 @@ async def test_device_connect_parallel():
                 status=HCI_SUCCESS,
                 connection_handle=0x100,
                 bd_addr=d0.public_address,
-                link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                link_type=HCI_Connection_Complete_Event.LinkType.ACL,
                 encryption_enabled=True,
             )
         )
@@ -178,7 +178,7 @@ async def test_device_connect_parallel():
                 status=HCI_SUCCESS,
                 connection_handle=0x100,
                 bd_addr=d1.public_address,
-                link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                link_type=HCI_Connection_Complete_Event.LinkType.ACL,
                 encryption_enabled=True,
             )
         )
@@ -202,7 +202,7 @@ async def test_device_connect_parallel():
                 status=HCI_SUCCESS,
                 connection_handle=0x101,
                 bd_addr=d0.public_address,
-                link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                link_type=HCI_Connection_Complete_Event.LinkType.ACL,
                 encryption_enabled=True,
             )
         )
@@ -212,7 +212,7 @@ async def test_device_connect_parallel():
                 status=HCI_SUCCESS,
                 connection_handle=0x101,
                 bd_addr=d2.public_address,
-                link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                link_type=HCI_Connection_Complete_Event.LinkType.ACL,
                 encryption_enabled=True,
             )
         )

@@ -835,8 +835,8 @@ class Host(utils.EventEmitter):
     def on_packet(self, packet: bytes) -> None:
         try:
             hci_packet = hci.HCI_Packet.from_bytes(packet)
-        except Exception as error:
-            logger.warning(f'!!! error parsing packet from bytes: {error}')
+        except Exception:
+            logger.exception('!!! error parsing packet from bytes')
             return
 
         if self.ready or (
@@ -1392,7 +1392,7 @@ class Host(utils.EventEmitter):
                 event.status,
             )
 
-    def on_hci_encryption_change_event(self, event):
+    def on_hci_encryption_change_event(self, event: hci.HCI_Encryption_Change_Event):
         # Notify the client
         if event.status == hci.HCI_SUCCESS:
             self.emit(
@@ -1406,7 +1406,9 @@ class Host(utils.EventEmitter):
                 'connection_encryption_failure', event.connection_handle, event.status
             )
 
-    def on_hci_encryption_change_v2_event(self, event):
+    def on_hci_encryption_change_v2_event(
+        self, event: hci.HCI_Encryption_Change_V2_Event
+    ):
         # Notify the client
         if event.status == hci.HCI_SUCCESS:
             self.emit(

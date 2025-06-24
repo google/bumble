@@ -880,57 +880,32 @@ HCI_R1_PAGE_SCAN_REPETITION_MODE = 0x01
 HCI_R2_PAGE_SCAN_REPETITION_MODE = 0x02
 
 # IO Capability
-HCI_DISPLAY_ONLY_IO_CAPABILITY       = 0x00
-HCI_DISPLAY_YES_NO_IO_CAPABILITY     = 0x01
-HCI_KEYBOARD_ONLY_IO_CAPABILITY      = 0x02
-HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY = 0x03
-
-HCI_IO_CAPABILITY_NAMES = {
-    HCI_DISPLAY_ONLY_IO_CAPABILITY:       'HCI_DISPLAY_ONLY_IO_CAPABILITY',
-    HCI_DISPLAY_YES_NO_IO_CAPABILITY:     'HCI_DISPLAY_YES_NO_IO_CAPABILITY',
-    HCI_KEYBOARD_ONLY_IO_CAPABILITY:      'HCI_KEYBOARD_ONLY_IO_CAPABILITY',
-    HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: 'HCI_NO_INPUT_NO_OUTPUT_IO_CAPABILITY'
-}
+class IoCapability(SpecableEnum):
+    DISPLAY_ONLY       = 0x00
+    DISPLAY_YES_NO     = 0x01
+    KEYBOARD_ONLY      = 0x02
+    NO_INPUT_NO_OUTPUT = 0x03
 
 # Authentication Requirements
-HCI_MITM_NOT_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS        = 0x00
-HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS            = 0x01
-HCI_MITM_NOT_REQUIRED_DEDICATED_BONDING_AUTHENTICATION_REQUIREMENTS = 0x02
-HCI_MITM_REQUIRED_DEDICATED_BONDING_AUTHENTICATION_REQUIREMENTS     = 0x03
-HCI_MITM_NOT_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS   = 0x04
-HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS       = 0x05
-
-HCI_AUTHENTICATION_REQUIREMENTS_NAMES = {
-    HCI_MITM_NOT_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS:        'HCI_MITM_NOT_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS',
-    HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS:            'HCI_MITM_REQUIRED_NO_BONDING_AUTHENTICATION_REQUIREMENTS',
-    HCI_MITM_NOT_REQUIRED_DEDICATED_BONDING_AUTHENTICATION_REQUIREMENTS: 'HCI_MITM_NOT_REQUIRED_DEDICATED_BONDING_AUTHENTICATION_REQUIREMENTS',
-    HCI_MITM_REQUIRED_DEDICATED_BONDING_AUTHENTICATION_REQUIREMENTS:     'HCI_MITM_REQUIRED_DEDICATED_BONDING_AUTHENTICATION_REQUIREMENTS',
-    HCI_MITM_NOT_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS:   'HCI_MITM_NOT_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS',
-    HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS:       'HCI_MITM_REQUIRED_GENERAL_BONDING_AUTHENTICATION_REQUIREMENTS'
-}
+class AuthenticationRequirements(SpecableEnum):
+    MITM_NOT_REQUIRED_NO_BONDING        = 0x00
+    MITM_REQUIRED_NO_BONDING            = 0x01
+    MITM_NOT_REQUIRED_DEDICATED_BONDING = 0x02
+    MITM_REQUIRED_DEDICATED_BONDING     = 0x03
+    MITM_NOT_REQUIRED_GENERAL_BONDING   = 0x04
+    MITM_REQUIRED_GENERAL_BONDING       = 0x05
 
 # Link Key Types
-HCI_COMBINATION_KEY_TYPE                                      = 0X00
-HCI_LOCAL_UNIT_KEY_TYPE                                       = 0X01
-HCI_REMOTE_UNIT_KEY_TYPE                                      = 0X02
-HCI_DEBUG_COMBINATION_KEY_TYPE                                = 0X03
-HCI_UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE = 0X04
-HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE   = 0X05
-HCI_CHANGED_COMBINATION_KEY_TYPE                              = 0X06
-HCI_UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE = 0X07
-HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE   = 0X08
-
-HCI_LINK_TYPE_NAMES = {
-    HCI_COMBINATION_KEY_TYPE:                                      'HCI_COMBINATION_KEY_TYPE',
-    HCI_LOCAL_UNIT_KEY_TYPE:                                       'HCI_LOCAL_UNIT_KEY_TYPE',
-    HCI_REMOTE_UNIT_KEY_TYPE:                                      'HCI_REMOTE_UNIT_KEY_TYPE',
-    HCI_DEBUG_COMBINATION_KEY_TYPE:                                'HCI_DEBUG_COMBINATION_KEY_TYPE',
-    HCI_UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE: 'HCI_UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE',
-    HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE:   'HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE',
-    HCI_CHANGED_COMBINATION_KEY_TYPE:                              'HCI_CHANGED_COMBINATION_KEY_TYPE',
-    HCI_UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE: 'HCI_UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE',
-    HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE:   'HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE'
-}
+class LinkKeyType(SpecableEnum):
+    COMBINATION_KEY                                      = 0X00
+    LOCAL_UNIT_KEY                                       = 0X01
+    REMOTE_UNIT_KEY                                      = 0X02
+    DEBUG_COMBINATION_KEY                                = 0X03
+    UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192 = 0X04
+    AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192   = 0X05
+    CHANGED_COMBINATION_KEY                              = 0X06
+    UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256 = 0X07
+    AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256   = 0X08
 
 # Address types
 class AddressType(SpecableEnum):
@@ -1578,6 +1553,7 @@ CS_SYNC_PHY_SPEC = {'size': 1, 'mapper': lambda x: CsSyncPhy(x).name}
 CS_SYNC_PHY_SUPPORTED_SPEC = {'size': 1, 'mapper': lambda x: CsSyncPhySupported(x).name}
 RTT_TYPE_SPEC = {'size': 1, 'mapper': lambda x: RttType(x).name}
 CS_SNR_SPEC = {'size': 1, 'mapper': lambda x: CsSnr(x).name}
+COD_SPEC = {'size': 3, 'mapper': map_class_of_device}
 
 
 class CodecID(SpecableEnum):
@@ -1643,18 +1619,16 @@ class HCI_Constant:
         return HCI_INQUIRY_LAP_NAMES.get(lap, f'0x{lap:06X}')
 
     @staticmethod
-    def io_capability_name(io_capability):
-        return HCI_IO_CAPABILITY_NAMES.get(io_capability, f'0x{io_capability:02X}')
+    def io_capability_name(io_capability: int) -> str:
+        return IoCapability(io_capability).name
 
     @staticmethod
-    def authentication_requirements_name(authentication_requirements):
-        return HCI_AUTHENTICATION_REQUIREMENTS_NAMES.get(
-            authentication_requirements, f'0x{authentication_requirements:02X}'
-        )
+    def authentication_requirements_name(authentication_requirements: int) -> str:
+        return AuthenticationRequirements(authentication_requirements).name
 
     @staticmethod
-    def link_key_type_name(link_key_type):
-        return HCI_LINK_TYPE_NAMES.get(link_key_type, f'0x{link_key_type:02X}')
+    def link_key_type_name(link_key_type: int) -> str:
+        return LinkKeyType(link_key_type).name
 
 
 # -----------------------------------------------------------------------------
@@ -2666,11 +2640,11 @@ class HCI_Reject_Synchronous_Connection_Request_Command(HCI_Command):
 @HCI_Command.command(
     fields=[
         ('bd_addr', Address.parse_address),
-        ('io_capability', {'size': 1, 'mapper': HCI_Constant.io_capability_name}),
+        ('io_capability', IoCapability.type_spec(1)),
         ('oob_data_present', 1),
         (
             'authentication_requirements',
-            {'size': 1, 'mapper': HCI_Constant.authentication_requirements_name},
+            AuthenticationRequirements.type_spec(1),
         ),
     ],
 )
@@ -3267,12 +3241,12 @@ class HCI_Read_Class_Of_Device_Command(HCI_Command):
 
     return_parameters_fields = [
         ('status', STATUS_SPEC),
-        ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
+        ('class_of_device', COD_SPEC),
     ]
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command([('class_of_device', {'size': 3, 'mapper': map_class_of_device})])
+@HCI_Command.command([('class_of_device', COD_SPEC)])
 class HCI_Write_Class_Of_Device_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.26 Write Class of Device Command
@@ -4232,8 +4206,8 @@ class HCI_LE_Read_PHY_Command(HCI_Command):
     return_parameters_fields = [
         ('status', STATUS_SPEC),
         ('connection_handle', 2),
-        ('tx_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
-        ('rx_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('tx_phy', Phy.type_spec(1)),
+        ('rx_phy', Phy.type_spec(1)),
     ]
 
 
@@ -4367,9 +4341,9 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
         ('peer_address', Address.parse_address_preceded_by_type),
         ('advertising_filter_policy', 1),
         ('advertising_tx_power', 1),
-        ('primary_advertising_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('primary_advertising_phy', Phy.type_spec(1)),
         ('secondary_advertising_max_skip', 1),
-        ('secondary_advertising_phy', {'size': 1, 'mapper': HCI_Constant.le_phy_name}),
+        ('secondary_advertising_phy', Phy.type_spec(1)),
         ('advertising_sid', 1),
         ('scan_request_notification_enable', 1),
     ],
@@ -5630,39 +5604,25 @@ class HCI_Event(HCI_Packet):
     vendor_factories: list[Callable[[bytes], Optional[HCI_Event]]] = []
     event_code: int = -1
     fields: Fields = ()
-    parameters: bytes = b''
+    _parameters: bytes = b''
 
-    @staticmethod
-    def event(fields: Optional[Fields] = ()):
+    _Event = TypeVar("_Event", bound="HCI_Event")
+
+    @classmethod
+    def event(cls, subclass: type[_Event]) -> type[_Event]:
         '''
         Decorator used to declare and register subclasses
         '''
 
-        Event = TypeVar("Event", bound=HCI_Event)
+        subclass.name = subclass.__name__.upper()
+        subclass.event_code = key_with_value(subclass.event_names, subclass.name)
+        subclass.fields = HCI_Object.fields_from_dataclass(subclass)
+        if subclass.event_code is None:
+            raise KeyError(f'event {subclass.name} not found in event_names')
 
-        def inner(cls: type[Event]) -> type[Event]:
-            cls.name = cls.__name__.upper()
-            cls.event_code = key_with_value(cls.event_names, cls.name)
-            if cls.event_code is None:
-                raise KeyError(f'event {cls.name} not found in event_names')
-            if fields is not None:
-                cls.fields = fields
-
-            # Register a factory for this class
-            HCI_Event.event_classes[cls.event_code] = cls
-
-            return cls
-
-        return inner
-
-    @classmethod
-    def dataclass_event(cls, subclass):
-        # TODO: Move this to __post_init__ when all packets become dataclasses.
-        subclass.parameters = functools.cached_property(
-            lambda self: HCI_Object.dict_to_bytes(self.__dict__, self.fields)
-        )
-        subclass.parameters.__set_name__(subclass, 'parameters')
-        return HCI_Event.event(HCI_Object.fields_from_dataclass(subclass))(subclass)
+        # Register a factory for this class
+        cls.event_classes[subclass.event_code] = subclass
+        return subclass
 
     @staticmethod
     def event_map(symbols: dict[str, Any]) -> dict[int, str]:
@@ -5747,9 +5707,9 @@ class HCI_Event(HCI_Packet):
 
     @classmethod
     def from_parameters(cls, parameters: bytes) -> Self:
-        if dataclasses.is_dataclass(cls):
-            return cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
-        return cls(parameters, **HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
+        event = cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
+        event.parameters = parameters
+        return event
 
     def __init__(
         self,
@@ -5767,8 +5727,18 @@ class HCI_Event(HCI_Packet):
                 parameters = HCI_Object.dict_to_bytes(kwargs, self.fields)
         self.parameters = parameters or b''
 
+    @property
+    def parameters(self) -> bytes:
+        if not self._parameters:
+            self._parameters = HCI_Object.dict_to_bytes(self.__dict__, self.fields)
+        return self._parameters
+
+    @parameters.setter
+    def parameters(self, parameters: bytes):
+        self._parameters = parameters
+
     def __bytes__(self) -> bytes:
-        parameters = b'' if self.parameters is None else self.parameters
+        parameters = self.parameters
         return bytes([HCI_EVENT_PACKET, self.event_code, len(parameters)]) + parameters
 
     def __str__(self):
@@ -6152,12 +6122,8 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
         address: Address = field(
             metadata=metadata(Address.parse_address_preceded_by_type)
         )
-        primary_phy: int = field(
-            metadata=metadata({'size': 1, 'mapper': HCI_Constant.le_phy_name})
-        )
-        secondary_phy: int = field(
-            metadata=metadata({'size': 1, 'mapper': HCI_Constant.le_phy_name})
-        )
+        primary_phy: int = field(metadata=metadata(Phy.type_spec(1)))
+        secondary_phy: int = field(metadata=metadata(Phy.type_spec(1)))
         advertising_sid: int = field(metadata=metadata(1))
         tx_power: int = field(metadata=metadata(1))
         rssi: int = field(metadata=metadata(-1))
@@ -6663,7 +6629,7 @@ class HCI_LE_CS_Test_End_Complete_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.dataclass_event
+@HCI_Event.event
 @dataclasses.dataclass
 class HCI_Inquiry_Complete_Event(HCI_Event):
     '''
@@ -6674,231 +6640,163 @@ class HCI_Inquiry_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        [
-            ('bd_addr', Address.parse_address),
-            ('page_scan_repetition_mode', 1),
-            ('reserved', 1),
-            ('reserved', 1),
-            ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
-            ('clock_offset', 2),
-        ]
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Inquiry_Result_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.2 Inquiry Result Event
     '''
 
-    bd_addr: list[Address]
-    page_scan_repetition_mode: list[int]
-    class_of_device: list[int]
-    clock_offset: list[int]
+    bd_addr: Sequence[Address] = field(
+        metadata=metadata(Address.parse_address, list_begin=True)
+    )
+    page_scan_repetition_mode: Sequence[int] = field(metadata=metadata(1))
+    reserved_0: Sequence[int] = field(metadata=metadata(1))
+    reserved_1: Sequence[int] = field(metadata=metadata(1))
+    class_of_device: Sequence[int] = field(metadata=metadata(COD_SPEC))
+    clock_offset: Sequence[int] = field(metadata=metadata(2, list_end=True))
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('bd_addr', Address.parse_address),
-        (
-            'link_type',
-            {
-                'size': 1,
-                # pylint: disable-next=unnecessary-lambda
-                'mapper': lambda x: HCI_Connection_Complete_Event.link_type_name(x),
-            },
-        ),
-        ('encryption_enabled', 1),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Connection_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.3 Connection Complete Event
     '''
 
-    SCO_LINK_TYPE = 0x00
-    ACL_LINK_TYPE = 0x01
-    ESCO_LINK_TYPE = 0x02
+    class LinkType(SpecableEnum):
+        SCO = 0x00
+        ACL = 0x01
+        ESCO = 0x02
 
-    LINK_TYPE_NAMES = {
-        SCO_LINK_TYPE: 'SCO',
-        ACL_LINK_TYPE: 'ACL',
-        ESCO_LINK_TYPE: 'eSCO',
-    }
-
-    @staticmethod
-    def link_type_name(link_type):
-        return name_or_number(HCI_Connection_Complete_Event.LINK_TYPE_NAMES, link_type)
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    link_type: int = field(metadata=LinkType.type_metadata(1))
+    encryption_enabled: int = field(metadata=metadata(1))
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('bd_addr', Address.parse_address),
-        ('class_of_device', 3),
-        (
-            'link_type',
-            {
-                'size': 1,
-                # pylint: disable-next=unnecessary-lambda
-                'mapper': lambda x: HCI_Connection_Complete_Event.link_type_name(x),
-            },
-        ),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Connection_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.4 Connection Request Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    class_of_device: int = field(metadata=metadata(3))
+    link_type: int = field(
+        metadata=HCI_Connection_Complete_Event.LinkType.type_metadata(1)
+    )
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('reason', {'size': 1, 'mapper': HCI_Constant.error_name}),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Disconnection_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.5 Disconnection Complete Event
     '''
 
-    status: int
-    connection_handle: int
-    reason: int
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    reason: int = field(metadata=metadata(STATUS_SPEC))
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('status', STATUS_SPEC), ('connection_handle', 2)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Authentication_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.6 Authentication Complete Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-        ('remote_name', {'size': 248, 'mapper': map_null_terminated_utf8_string}),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Remote_Name_Request_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.7 Remote Name Request Complete Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    remote_name: int = field(
+        metadata=metadata({'size': 248, 'mapper': map_null_terminated_utf8_string})
+    )
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        (
-            'encryption_enabled',
-            {
-                'size': 1,
-                # pylint: disable-next=unnecessary-lambda
-                'mapper': lambda x: HCI_Encryption_Change_Event.encryption_enabled_name(
-                    x
-                ),
-            },
-        ),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Encryption_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.8 Encryption Change Event
     '''
 
-    OFF = 0x00
-    E0_OR_AES_CCM = 0x01
-    AES_CCM = 0x02
+    class Enabled(SpecableEnum):
+        OFF = 0x00
+        E0_OR_AES_CCM = 0x01
+        AES_CCM = 0x02
 
-    ENCRYPTION_ENABLED_NAMES = {
-        OFF: 'OFF',
-        E0_OR_AES_CCM: 'E0_OR_AES_CCM',
-        AES_CCM: 'AES_CCM',
-    }
-
-    @staticmethod
-    def encryption_enabled_name(encryption_enabled):
-        return name_or_number(
-            HCI_Encryption_Change_Event.ENCRYPTION_ENABLED_NAMES, encryption_enabled
-        )
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    encryption_enabled: int = field(metadata=Enabled.type_metadata(1))
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        (
-            'encryption_enabled',
-            {
-                'size': 1,
-                # pylint: disable-next=unnecessary-lambda
-                'mapper': lambda x: HCI_Encryption_Change_Event.encryption_enabled_name(
-                    x
-                ),
-            },
-        ),
-        ('encryption_key_size', 1),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Encryption_Change_V2_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.8 Encryption Change Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    encryption_enabled: int = field(
+        metadata=HCI_Encryption_Change_Event.Enabled.type_metadata(1)
+    )
+    encryption_key_size: int = field(metadata=metadata(1))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [('status', STATUS_SPEC), ('connection_handle', 2), ('lmp_features', 8)]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Read_Remote_Supported_Features_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.11 Read Remote Supported Features Complete Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    lmp_features: bytes = field(metadata=metadata(8))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('version', 1),
-        ('manufacturer_name', 2),
-        ('subversion', 2),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Read_Remote_Version_Information_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.12 Read Remote Version Information Complete Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    version: int = field(metadata=metadata(1))
+    manufacturer_name: int = field(metadata=metadata(2))
+    subversion: int = field(metadata=metadata(2))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('unused', 1),
-        (
-            'service_type',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_QOS_Setup_Complete_Event.ServiceType(x).name,
-            },
-        ),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_QOS_Setup_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.13 QoS Setup Complete Event
@@ -6909,23 +6807,25 @@ class HCI_QOS_Setup_Complete_Event(HCI_Event):
         BEST_EFFORT_AVAILABLE = 0x01
         GUARANTEED_AVAILABLE = 0x02
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    unused: int = field(metadata=metadata(1))
+    service_type: int = field(metadata=ServiceType.type_metadata(1))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('num_hci_command_packets', 1),
-        ('command_opcode', {'size': 2, 'mapper': HCI_Command.command_name}),
-        ('return_parameters', '*'),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Command_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.14 Command Complete Event
     '''
 
-    num_hci_command_packets: int
-    command_opcode: int
-    return_parameters = b''
+    num_hci_command_packets: int = field(metadata=metadata(1))
+    command_opcode: int = field(
+        metadata=metadata({'size': 2, 'mapper': HCI_Command.command_name})
+    )
+    return_parameters: Union[bytes, HCI_Object, int] = field(metadata=metadata("*"))
 
     def map_return_parameters(self, return_parameters):
         '''Map simple 'status' return parameters to their named constant form'''
@@ -6940,13 +6840,10 @@ class HCI_Command_Complete_Event(HCI_Event):
 
         return return_parameters
 
-    @staticmethod
-    def from_parameters(parameters):
-        event = HCI_Command_Complete_Event(parameters)
-        HCI_Object.init_from_bytes(
-            event, parameters, 0, HCI_Command_Complete_Event.fields
-        )
-
+    @classmethod
+    def from_parameters(cls, parameters: bytes) -> Self:
+        event = cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
+        event.parameters = parameters
         # Parse the return parameters
         if (
             isinstance(event.return_parameters, bytes)
@@ -6956,10 +6853,12 @@ class HCI_Command_Complete_Event(HCI_Event):
             # convert it to an integer
             event.return_parameters = event.return_parameters[0]
         else:
-            cls = HCI_Command.command_classes.get(event.command_opcode)
-            if cls:
+            subclass = HCI_Command.command_classes.get(event.command_opcode)
+            if subclass:
                 # Try to parse the return parameters bytes into an object.
-                return_parameters = cls.parse_return_parameters(event.return_parameters)
+                return_parameters = subclass.parse_return_parameters(
+                    event.return_parameters
+                )
                 if return_parameters is not None:
                     event.return_parameters = return_parameters
 
@@ -6975,17 +6874,8 @@ class HCI_Command_Complete_Event(HCI_Event):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        (
-            'status',
-            # pylint: disable-next=unnecessary-lambda
-            {'size': 1, 'mapper': lambda x: HCI_Command_Status_Event.status_name(x)},
-        ),
-        ('num_hci_command_packets', 1),
-        ('command_opcode', {'size': 2, 'mapper': HCI_Command.command_name}),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Command_Status_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.15 Command Complete Event
@@ -7000,415 +6890,411 @@ class HCI_Command_Status_Event(HCI_Event):
 
         return HCI_Constant.error_name(status)
 
+    status: int = field(
+        metadata=metadata(
+            {'size': 1, 'mapper': lambda x: HCI_Command_Status_Event.status_name(x)}
+        )
+    )
+    num_hci_command_packets: int = field(metadata=metadata(1))
+    command_opcode: int = field(
+        metadata=metadata({'size': 2, 'mapper': HCI_Command.command_name})
+    )
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-        ('new_role', {'size': 1, 'mapper': HCI_Constant.role_name}),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Role_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.18 Role Change Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    new_role: int = field(metadata=Role.type_metadata(1))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        [
-            ('connection_handles', 2),
-            ('num_completed_packets', 2),
-        ]
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Number_Of_Completed_Packets_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.19 Number Of Completed Packets Event
     '''
 
-    connection_handles: list[int]
-    num_completed_packets: list[int]
+    connection_handles: Sequence[int] = field(metadata=metadata(2, list_begin=True))
+    num_completed_packets: Sequence[int] = field(metadata=metadata(2, list_end=True))
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        (
-            'current_mode',
-            # pylint: disable-next=unnecessary-lambda
-            {'size': 1, 'mapper': lambda x: HCI_Mode_Change_Event.mode_name(x)},
-        ),
-        ('interval', 2),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Mode_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.20 Mode Change Event
     '''
 
-    ACTIVE_MODE = 0x00
-    HOLD_MODE = 0x01
-    SNIFF_MODE = 0x02
+    class Mode(SpecableEnum):
+        ACTIVE = 0x00
+        HOLD = 0x01
+        SNIFF = 0x02
 
-    MODE_NAMES = {
-        ACTIVE_MODE: 'ACTIVE_MODE',
-        HOLD_MODE: 'HOLD_MODE',
-        SNIFF_MODE: 'SNIFF_MODE',
-    }
-
-    @staticmethod
-    def mode_name(mode):
-        return name_or_number(HCI_Mode_Change_Event.MODE_NAMES, mode)
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    current_mode: int = field(metadata=Mode.type_metadata(1))
+    interval: int = field(metadata=metadata(2))
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_PIN_Code_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.22 PIN Code Request Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Link_Key_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.24 7.7.23 Link Key Request Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('bd_addr', Address.parse_address),
-        ('link_key', 16),
-        ('key_type', {'size': 1, 'mapper': HCI_Constant.link_key_type_name}),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Link_Key_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.24 Link Key Notification Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    link_key: bytes = field(metadata=metadata(16))
+    key_type: int = field(metadata=LinkKeyType.type_metadata(1))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('connection_handle', 2), ('lmp_max_slots', 1)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Max_Slots_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.27 Max Slots Change Event
     '''
 
+    connection_handle: int = field(metadata=metadata(2))
+    lmp_max_slots: int = field(metadata=metadata(1))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [('status', STATUS_SPEC), ('connection_handle', 2), ('clock_offset', 2)]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Read_Clock_Offset_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.28 Read Clock Offset Complete Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    clock_offset: int = field(metadata=metadata(2))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [('status', STATUS_SPEC), ('connection_handle', 2), ('packet_type', 2)]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Connection_Packet_Type_Changed_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.29 Connection Packet Type Changed Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    packet_type: int = field(metadata=metadata(2))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address), ('page_scan_repetition_mode', 1)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Page_Scan_Repetition_Mode_Change_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.31 Page Scan Repetition Mode Change Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    page_scan_repetition_mode: int = field(metadata=metadata(1))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        [
-            ('bd_addr', Address.parse_address),
-            ('page_scan_repetition_mode', 1),
-            ('reserved', 1),
-            ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
-            ('clock_offset', 2),
-            ('rssi', -1),
-        ]
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Inquiry_Result_With_RSSI_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.33 Inquiry Result with RSSI Event
     '''
 
-    bd_addr: list[Address]
-    page_scan_repetition_mode: list[int]
-    class_of_device: list[int]
-    clock_offset: list[int]
-    rssi: list[int]
+    bd_addr: Sequence[Address] = field(
+        metadata=metadata(Address.parse_address, list_begin=True)
+    )
+    page_scan_repetition_mode: Sequence[int] = field(metadata=metadata(1))
+    reserved: Sequence[int] = field(metadata=metadata(1))
+    class_of_device: Sequence[int] = field(metadata=metadata(COD_SPEC))
+    clock_offset: Sequence[int] = field(metadata=metadata(2))
+    rssi: Sequence[int] = field(metadata=metadata(-1, list_end=True))
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('page_number', 1),
-        ('maximum_page_number', 1),
-        ('extended_lmp_features', 8),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Read_Remote_Extended_Features_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.34 Read Remote Extended Features Complete Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    page_number: int = field(metadata=metadata(1))
+    maximum_page_number: int = field(metadata=metadata(1))
+    extended_lmp_features: bytes = field(metadata=metadata(8))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    # pylint: disable=line-too-long
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('bd_addr', Address.parse_address),
-        (
-            'link_type',
-            {
-                'size': 1,
-                # pylint: disable-next=unnecessary-lambda
-                'mapper': lambda x: HCI_Synchronous_Connection_Complete_Event.link_type_name(
-                    x
-                ),
-            },
-        ),
-        ('transmission_interval', 1),
-        ('retransmission_window', 1),
-        ('rx_packet_length', 2),
-        ('tx_packet_length', 2),
-        (
-            'air_mode',
-            {
-                'size': 1,
-                # pylint: disable-next=unnecessary-lambda
-                'mapper': lambda x: HCI_Synchronous_Connection_Complete_Event.air_mode_name(
-                    x
-                ),
-            },
-        ),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Synchronous_Connection_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.35 Synchronous Connection Complete Event
     '''
 
-    SCO_CONNECTION_LINK_TYPE = 0x00
-    ESCO_CONNECTION_LINK_TYPE = 0x02
+    class LinkType(SpecableEnum):
+        SCO = 0x00
+        ESCO = 0x02
 
-    LINK_TYPE_NAMES = {
-        SCO_CONNECTION_LINK_TYPE: 'SCO',
-        ESCO_CONNECTION_LINK_TYPE: 'eSCO',
-    }
+    class AirMode(SpecableEnum):
+        U_LAW_LOG = 0x00
+        A_LAW_LOG_AIR_MORE = 0x01
+        CVSD = 0x02
+        TRANSPARENT_DATA = 0x03
 
-    U_LAW_LOG_AIR_MODE = 0x00
-    A_LAW_LOG_AIR_MORE = 0x01
-    CVSD_AIR_MODE = 0x02
-    TRANSPARENT_DATA_AIR_MODE = 0x03
-
-    AIR_MODE_NAMES = {
-        U_LAW_LOG_AIR_MODE: 'u-law log',
-        A_LAW_LOG_AIR_MORE: 'A-law log',
-        CVSD_AIR_MODE: 'CVSD',
-        TRANSPARENT_DATA_AIR_MODE: 'Transparent Data',
-    }
-
-    @staticmethod
-    def link_type_name(link_type):
-        return name_or_number(
-            HCI_Synchronous_Connection_Complete_Event.LINK_TYPE_NAMES, link_type
-        )
-
-    @staticmethod
-    def air_mode_name(air_mode):
-        return name_or_number(
-            HCI_Synchronous_Connection_Complete_Event.AIR_MODE_NAMES, air_mode
-        )
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    link_type: int = field(metadata=LinkType.type_metadata(1))
+    transmission_interval: int = field(metadata=metadata(1))
+    retransmission_window: int = field(metadata=metadata(1))
+    rx_packet_length: int = field(metadata=metadata(2))
+    tx_packet_length: int = field(metadata=metadata(2))
+    air_mode: int = field(metadata=AirMode.type_metadata(1))
 
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('transmission_interval', 1),
-        ('retransmission_window', 1),
-        ('rx_packet_length', 2),
-        ('tx_packet_length', 2),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Synchronous_Connection_Changed_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.36 Synchronous Connection Changed Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    transmission_interval: int = field(metadata=metadata(1))
+    retransmission_window: int = field(metadata=metadata(1))
+    rx_packet_length: int = field(metadata=metadata(2))
+    tx_packet_length: int = field(metadata=metadata(2))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('max_tx_latency', 2),
-        ('max_rx_latency', 2),
-        ('min_remote_timeout', 2),
-        ('min_local_timeout', 2),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Sniff_Subrating_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.37 Sniff Subrating Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    max_tx_latency: int = field(metadata=metadata(2))
+    max_rx_latency: int = field(metadata=metadata(2))
+    min_remote_timeout: int = field(metadata=metadata(2))
+    min_local_timeout: int = field(metadata=metadata(2))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('num_responses', 1),
-        ('bd_addr', Address.parse_address),
-        ('page_scan_repetition_mode', 1),
-        ('reserved', 1),
-        ('class_of_device', {'size': 3, 'mapper': map_class_of_device}),
-        ('clock_offset', 2),
-        ('rssi', -1),
-        ('extended_inquiry_response', 240),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Extended_Inquiry_Result_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.38 Extended Inquiry Result Event
     '''
 
+    num_responses: int = field(metadata=metadata(1))
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    page_scan_repetition_mode: int = field(metadata=metadata(1))
+    reserved: int = field(metadata=metadata(1))
+    class_of_device: int = field(metadata=metadata(COD_SPEC))
+    clock_offset: int = field(metadata=metadata(2))
+    rssi: int = field(metadata=metadata(-1))
+    extended_inquiry_response: bytes = field(metadata=metadata(240))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('status', STATUS_SPEC), ('connection_handle', 2)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Encryption_Key_Refresh_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.39 Encryption Key Refresh Complete Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_IO_Capability_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.40 IO Capability Request Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event(
-    [
-        ('bd_addr', Address.parse_address),
-        ('io_capability', {'size': 1, 'mapper': HCI_Constant.io_capability_name}),
-        ('oob_data_present', 1),
-        (
-            'authentication_requirements',
-            {'size': 1, 'mapper': HCI_Constant.authentication_requirements_name},
-        ),
-    ]
-)
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_IO_Capability_Response_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.41 IO Capability Response Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    io_capability: int = field(metadata=IoCapability.type_metadata(1))
+    oob_data_present: int = field(metadata=metadata(1))
+    authentication_requirements: int = field(
+        metadata=AuthenticationRequirements.type_metadata(1)
+    )
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address), ('numeric_value', 4)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_User_Confirmation_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.42 User Confirmation Request Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    numeric_value: int = field(metadata=metadata(4))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_User_Passkey_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.43 User Passkey Request Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Remote_OOB_Data_Request_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.44 Remote OOB Data Request Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('status', STATUS_SPEC), ('bd_addr', Address.parse_address)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Simple_Pairing_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.45 Simple Pairing Complete Event
     '''
 
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('connection_handle', 2), ('link_supervision_timeout', 2)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Link_Supervision_Timeout_Changed_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.46 Link Supervision Timeout Changed Event
     '''
 
+    connection_handle: int = field(metadata=metadata(2))
+    link_supervision_timeout: int = field(metadata=metadata(2))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('handle', 2)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Enhanced_Flush_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.47 Enhanced Flush Complete Event
     '''
 
+    handle: int = field(metadata=metadata(2))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address), ('passkey', 4)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_User_Passkey_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.48 User Passkey Notification Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    passkey: int = field(metadata=metadata(4))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address), ('notification_type', 1)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Keypress_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.49 Keypress Notification Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    notification_type: int = field(metadata=metadata(1))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('bd_addr', Address.parse_address), ('host_supported_features', 8)])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Remote_Host_Supported_Features_Notification_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.50 Remote Host Supported Features Notification Event
     '''
 
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    host_supported_features: bytes = field(metadata=metadata(8))
+
 
 # -----------------------------------------------------------------------------
-@HCI_Event.event([('data', "*")])
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Vendor_Event(HCI_Event):
     '''
     See Bluetooth spec @ 5.4.4 HCI Event packet
     '''
+
+    data: bytes = field(metadata=metadata("*"))
 
 
 # -----------------------------------------------------------------------------

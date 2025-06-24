@@ -244,16 +244,16 @@ class SecurityService(SecurityServicer):
                 and connection.authenticated
                 and link_key_type
                 in (
-                    hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192_TYPE,
-                    hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE,
+                    hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_192,
+                    hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256,
                 )
             )
         if level == LEVEL4:
             return (
-                connection.encryption == hci.HCI_Encryption_Change_Event.AES_CCM
+                connection.encryption == hci.HCI_Encryption_Change_Event.Enabled.AES_CCM
                 and connection.authenticated
                 and link_key_type
-                == hci.HCI_AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256_TYPE
+                == hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256
             )
         raise InvalidArgumentError(f"Unexpected level {level}")
 

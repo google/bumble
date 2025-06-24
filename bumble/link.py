@@ -274,7 +274,7 @@ class LocalLink:
 
         responder_controller.on_classic_connection_request(
             initiator_controller.public_address,
-            HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+            HCI_Connection_Complete_Event.LinkType.ACL,
         )
 
     def classic_accept_connection(
