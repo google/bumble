@@ -46,7 +46,7 @@ def on_dlc(dlc: rfcomm.DLC, configuration: hfp.HfConfiguration):
 
     def on_sco_request(connection: Connection, link_type: int, protocol: HfProtocol):
         if connection == protocol.dlc.multiplexer.l2cap_channel.connection:
-            if link_type == hci.HCI_Connection_Complete_Event.SCO_LINK_TYPE:
+            if link_type == hci.HCI_Connection_Complete_Event.LinkType.SCO:
                 esco_parameters = hfp.ESCO_PARAMETERS[
                     hfp.DefaultCodecParameters.SCO_CVSD_D1
                 ]

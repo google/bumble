@@ -394,7 +394,7 @@ class Controller:
                 peer_address=peer_address,
                 link=self.link,
                 transport=PhysicalTransport.LE,
-                link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                link_type=HCI_Connection_Complete_Event.LinkType.ACL,
             )
             self.peripheral_connections[peer_address] = connection
             logger.debug(f'New PERIPHERAL connection handle: 0x{connection_handle:04X}')
@@ -454,7 +454,7 @@ class Controller:
                     peer_address=peer_address,
                     link=self.link,
                     transport=PhysicalTransport.LE,
-                    link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                    link_type=HCI_Connection_Complete_Event.LinkType.ACL,
                 )
                 self.central_connections[peer_address] = connection
                 logger.debug(
@@ -695,7 +695,7 @@ class Controller:
                     peer_address=peer_address,
                     link=self.link,
                     transport=PhysicalTransport.BR_EDR,
-                    link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                    link_type=HCI_Connection_Complete_Event.LinkType.ACL,
                 )
                 self.classic_connections[peer_address] = connection
                 logger.debug(
@@ -709,7 +709,7 @@ class Controller:
                     connection_handle=connection_handle,
                     bd_addr=peer_address,
                     encryption_enabled=False,
-                    link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                    link_type=HCI_Connection_Complete_Event.LinkType.ACL,
                 )
             )
         else:
@@ -720,7 +720,7 @@ class Controller:
                     connection_handle=0,
                     bd_addr=peer_address,
                     encryption_enabled=False,
-                    link_type=HCI_Connection_Complete_Event.ACL_LINK_TYPE,
+                    link_type=HCI_Connection_Complete_Event.LinkType.ACL,
                 )
             )
 
@@ -945,7 +945,7 @@ class Controller:
             )
         )
         self.link.classic_sco_connect(
-            self, connection.peer_address, HCI_Connection_Complete_Event.ESCO_LINK_TYPE
+            self, connection.peer_address, HCI_Connection_Complete_Event.LinkType.ESCO
         )
 
     def on_hci_enhanced_accept_synchronous_connection_request_command(self, command):
@@ -974,7 +974,7 @@ class Controller:
             )
         )
         self.link.classic_accept_sco_connection(
-            self, connection.peer_address, HCI_Connection_Complete_Event.ESCO_LINK_TYPE
+            self, connection.peer_address, HCI_Connection_Complete_Event.LinkType.ESCO
         )
 
     def on_hci_switch_role_command(self, command):
