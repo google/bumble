@@ -45,7 +45,8 @@ hci.HCI_Command.register_commands(globals())
 
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command()
+@hci.HCI_Command.command
+@dataclasses.dataclass
 class HCI_LE_Get_Vendor_Capabilities_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
@@ -94,18 +95,8 @@ class HCI_LE_Get_Vendor_Capabilities_Command(hci.HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command(
-    fields=[
-        (
-            'opcode',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_LE_APCF_Command.opcode_name(x),
-            },
-        ),
-        ('payload', '*'),
-    ],
-)
+@hci.HCI_Command.command
+@dataclasses.dataclass
 class HCI_LE_APCF_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
@@ -114,53 +105,34 @@ class HCI_LE_APCF_Command(hci.HCI_Command):
     NOTE: the subcommand-specific payloads are left as opaque byte arrays in this
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
+
+    # APCF Subcommands
+    class Opcode(hci.SpecableEnum):
+        ENABLE = 0x00
+        SET_FILTERING_PARAMETERS = 0x01
+        BROADCASTER_ADDRESS = 0x02
+        SERVICE_UUID = 0x03
+        SERVICE_SOLICITATION_UUID = 0x04
+        LOCAL_NAME = 0x05
+        MANUFACTURER_DATA = 0x06
+        SERVICE_DATA = 0x07
+        TRANSPORT_DISCOVERY_SERVICE = 0x08
+        AD_TYPE_FILTER = 0x09
+        READ_EXTENDED_FEATURES = 0xFF
+
+    opcode: int = dataclasses.field(metadata=Opcode.type_metadata(1))
+    payload: bytes = dataclasses.field(metadata=hci.metadata("*"))
+
     return_parameters_fields = [
         ('status', hci.STATUS_SPEC),
-        (
-            'opcode',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_LE_APCF_Command.opcode_name(x),
-            },
-        ),
+        ('opcode', Opcode.type_spec(1)),
         ('payload', '*'),
     ]
 
-    # APCF Subcommands
-    # TODO: use the OpenIntEnum class (when upcoming PR is merged)
-    APCF_ENABLE = 0x00
-    APCF_SET_FILTERING_PARAMETERS = 0x01
-    APCF_BROADCASTER_ADDRESS = 0x02
-    APCF_SERVICE_UUID = 0x03
-    APCF_SERVICE_SOLICITATION_UUID = 0x04
-    APCF_LOCAL_NAME = 0x05
-    APCF_MANUFACTURER_DATA = 0x06
-    APCF_SERVICE_DATA = 0x07
-    APCF_TRANSPORT_DISCOVERY_SERVICE = 0x08
-    APCF_AD_TYPE_FILTER = 0x09
-    APCF_READ_EXTENDED_FEATURES = 0xFF
-
-    OPCODE_NAMES = {
-        APCF_ENABLE: 'APCF_ENABLE',
-        APCF_SET_FILTERING_PARAMETERS: 'APCF_SET_FILTERING_PARAMETERS',
-        APCF_BROADCASTER_ADDRESS: 'APCF_BROADCASTER_ADDRESS',
-        APCF_SERVICE_UUID: 'APCF_SERVICE_UUID',
-        APCF_SERVICE_SOLICITATION_UUID: 'APCF_SERVICE_SOLICITATION_UUID',
-        APCF_LOCAL_NAME: 'APCF_LOCAL_NAME',
-        APCF_MANUFACTURER_DATA: 'APCF_MANUFACTURER_DATA',
-        APCF_SERVICE_DATA: 'APCF_SERVICE_DATA',
-        APCF_TRANSPORT_DISCOVERY_SERVICE: 'APCF_TRANSPORT_DISCOVERY_SERVICE',
-        APCF_AD_TYPE_FILTER: 'APCF_AD_TYPE_FILTER',
-        APCF_READ_EXTENDED_FEATURES: 'APCF_READ_EXTENDED_FEATURES',
-    }
-
-    @classmethod
-    def opcode_name(cls, opcode):
-        return hci.name_or_number(cls.OPCODE_NAMES, opcode)
-
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command()
+@hci.HCI_Command.command
+@dataclasses.dataclass
 class HCI_Get_Controller_Activity_Energy_Info_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
@@ -176,18 +148,8 @@ class HCI_Get_Controller_Activity_Energy_Info_Command(hci.HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command(
-    fields=[
-        (
-            'opcode',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_A2DP_Hardware_Offload_Command.opcode_name(x),
-            },
-        ),
-        ('payload', '*'),
-    ],
-)
+@hci.HCI_Command.command
+@dataclasses.dataclass
 class HCI_A2DP_Hardware_Offload_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
@@ -196,46 +158,25 @@ class HCI_A2DP_Hardware_Offload_Command(hci.HCI_Command):
     NOTE: the subcommand-specific payloads are left as opaque byte arrays in this
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
+
+    # A2DP Hardware Offload Subcommands
+    class Opcode(hci.SpecableEnum):
+        START_A2DP_OFFLOAD = 0x01
+        STOP_A2DP_OFFLOAD = 0x02
+
+    opcode: int = dataclasses.field(metadata=Opcode.type_metadata(1))
+    payload: bytes = dataclasses.field(metadata=hci.metadata("*"))
+
     return_parameters_fields = [
         ('status', hci.STATUS_SPEC),
-        (
-            'opcode',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_A2DP_Hardware_Offload_Command.opcode_name(x),
-            },
-        ),
+        ('opcode', Opcode.type_spec(1)),
         ('payload', '*'),
     ]
 
-    # A2DP Hardware Offload Subcommands
-    # TODO: use the OpenIntEnum class (when upcoming PR is merged)
-    START_A2DP_OFFLOAD = 0x01
-    STOP_A2DP_OFFLOAD = 0x02
-
-    OPCODE_NAMES = {
-        START_A2DP_OFFLOAD: 'START_A2DP_OFFLOAD',
-        STOP_A2DP_OFFLOAD: 'STOP_A2DP_OFFLOAD',
-    }
-
-    @classmethod
-    def opcode_name(cls, opcode):
-        return hci.name_or_number(cls.OPCODE_NAMES, opcode)
-
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command(
-    fields=[
-        (
-            'opcode',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_Dynamic_Audio_Buffer_Command.opcode_name(x),
-            },
-        ),
-        ('payload', '*'),
-    ],
-)
+@hci.HCI_Command.command
+@dataclasses.dataclass
 class HCI_Dynamic_Audio_Buffer_Command(hci.HCI_Command):
     # pylint: disable=line-too-long
     '''
@@ -244,29 +185,19 @@ class HCI_Dynamic_Audio_Buffer_Command(hci.HCI_Command):
     NOTE: the subcommand-specific payloads are left as opaque byte arrays in this
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
-    return_parameters_fields = [
-        ('status', hci.STATUS_SPEC),
-        (
-            'opcode',
-            {
-                'size': 1,
-                'mapper': lambda x: HCI_Dynamic_Audio_Buffer_Command.opcode_name(x),
-            },
-        ),
-        ('payload', '*'),
-    ]
 
     # Dynamic Audio Buffer Subcommands
-    # TODO: use the OpenIntEnum class (when upcoming PR is merged)
-    GET_AUDIO_BUFFER_TIME_CAPABILITY = 0x01
+    class Opcode(hci.SpecableEnum):
+        GET_AUDIO_BUFFER_TIME_CAPABILITY = 0x01
 
-    OPCODE_NAMES = {
-        GET_AUDIO_BUFFER_TIME_CAPABILITY: 'GET_AUDIO_BUFFER_TIME_CAPABILITY',
-    }
+    opcode: int = dataclasses.field(metadata=Opcode.type_metadata(1))
+    payload: bytes = dataclasses.field(metadata=hci.metadata("*"))
 
-    @classmethod
-    def opcode_name(cls, opcode):
-        return hci.name_or_number(cls.OPCODE_NAMES, opcode)
+    return_parameters_fields = [
+        ('status', hci.STATUS_SPEC),
+        ('opcode', Opcode.type_spec(1)),
+        ('payload', '*'),
+    ]
 
 
 # -----------------------------------------------------------------------------
