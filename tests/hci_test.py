@@ -371,7 +371,7 @@ def test_HCI_LE_Set_Advertising_Parameters_Command():
     command = hci.HCI_LE_Set_Advertising_Parameters_Command(
         advertising_interval_min=20,
         advertising_interval_max=30,
-        advertising_type=hci.HCI_LE_Set_Advertising_Parameters_Command.ADV_NONCONN_IND,
+        advertising_type=hci.HCI_LE_Set_Advertising_Parameters_Command.AdvertisingType.ADV_NONCONN_IND,
         own_address_type=hci.Address.PUBLIC_DEVICE_ADDRESS,
         peer_address_type=hci.Address.RANDOM_DEVICE_ADDRESS,
         peer_address=hci.Address('00:11:22:33:44:55'),

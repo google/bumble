@@ -15,11 +15,9 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from bumble.hci import (
-    hci_vendor_command_op_code,
-    HCI_Command,
-    STATUS_SPEC,
-)
+import dataclasses
+
+from bumble import hci
 
 
 # -----------------------------------------------------------------------------
@@ -31,10 +29,10 @@ from bumble.hci import (
 #
 # pylint: disable-next=line-too-long
 # See https://github.com/zephyrproject-rtos/zephyr/blob/main/include/zephyr/bluetooth/hci_vs.h
-HCI_WRITE_TX_POWER_LEVEL_COMMAND = hci_vendor_command_op_code(0x000E)
-HCI_READ_TX_POWER_LEVEL_COMMAND = hci_vendor_command_op_code(0x000F)
+HCI_WRITE_TX_POWER_LEVEL_COMMAND = hci.hci_vendor_command_op_code(0x000E)
+HCI_READ_TX_POWER_LEVEL_COMMAND = hci.hci_vendor_command_op_code(0x000F)
 
-HCI_Command.register_commands(globals())
+hci.HCI_Command.register_commands(globals())
 
 
 # -----------------------------------------------------------------------------
@@ -49,10 +47,9 @@ class TX_Power_Level_Command:
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
-    fields=[('handle_type', 1), ('connection_handle', 2), ('tx_power_level', -1)],
-)
-class HCI_Write_Tx_Power_Level_Command(HCI_Command, TX_Power_Level_Command):
+@hci.HCI_Command.command
+@dataclasses.dataclass
+class HCI_Write_Tx_Power_Level_Command(hci.HCI_Command, TX_Power_Level_Command):
     '''
     Write TX power level. See BT_HCI_OP_VS_WRITE_TX_POWER_LEVEL in
     https://github.com/zephyrproject-rtos/zephyr/blob/main/include/zephyr/bluetooth/hci_vs.h
@@ -61,8 +58,12 @@ class HCI_Write_Tx_Power_Level_Command(HCI_Command, TX_Power_Level_Command):
     TX_POWER_HANDLE_TYPE_SCAN should be zero.
     '''
 
+    handle_type: int = dataclasses.field(metadata=hci.metadata(1))
+    connection_handle: int = dataclasses.field(metadata=hci.metadata(2))
+    tx_power_level: int = dataclasses.field(metadata=hci.metadata(-1))
+
     return_parameters_fields = [
-        ('status', STATUS_SPEC),
+        ('status', hci.STATUS_SPEC),
         ('handle_type', 1),
         ('connection_handle', 2),
         ('selected_tx_power_level', -1),
@@ -70,10 +71,9 @@ class HCI_Write_Tx_Power_Level_Command(HCI_Command, TX_Power_Level_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command(
-    fields=[('handle_type', 1), ('connection_handle', 2)],
-)
-class HCI_Read_Tx_Power_Level_Command(HCI_Command, TX_Power_Level_Command):
+@hci.HCI_Command.command
+@dataclasses.dataclass
+class HCI_Read_Tx_Power_Level_Command(hci.HCI_Command, TX_Power_Level_Command):
     '''
     Read TX power level. See BT_HCI_OP_VS_READ_TX_POWER_LEVEL in
     https://github.com/zephyrproject-rtos/zephyr/blob/main/include/zephyr/bluetooth/hci_vs.h
@@ -82,8 +82,11 @@ class HCI_Read_Tx_Power_Level_Command(HCI_Command, TX_Power_Level_Command):
     TX_POWER_HANDLE_TYPE_SCAN should be zero.
     '''
 
+    handle_type: int = dataclasses.field(metadata=hci.metadata(1))
+    connection_handle: int = dataclasses.field(metadata=hci.metadata(2))
+
     return_parameters_fields = [
-        ('status', STATUS_SPEC),
+        ('status', hci.STATUS_SPEC),
         ('handle_type', 1),
         ('connection_handle', 2),
         ('tx_power_level', -1),
