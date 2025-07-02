@@ -163,7 +163,7 @@ impl CommonDataType {
     /// Apply type-specific human-oriented formatting to data, if any is applicable
     pub fn format_data(&self, data: &[u8]) -> Option<String> {
         match self {
-            Self::Flags => Some(Flags::matching(data).map(|f| format!("{:?}", f)).join(",")),
+            Self::Flags => Some(Flags::matching(data).map(|f| format!("{f:?}")).join(",")),
             Self::CompleteListOf16BitServiceClassUuids
             | Self::IncompleteListOf16BitServiceClassUuids
             | Self::ListOf16BitServiceSolicitationUuids => {
@@ -174,8 +174,8 @@ impl CommonDataType {
                             .map(|uuid| {
                                 SERVICE_IDS
                                     .get(&uuid)
-                                    .map(|name| format!("{:?} ({name})", uuid))
-                                    .unwrap_or_else(|| format!("{:?}", uuid))
+                                    .map(|name| format!("{uuid:?} ({name})"))
+                                    .unwrap_or_else(|| format!("{uuid:?}"))
                             })
                             .join(", ")
                     })
@@ -185,14 +185,14 @@ impl CommonDataType {
             | Self::IncompleteListOf32BitServiceClassUuids
             | Self::ListOf32BitServiceSolicitationUuids => {
                 combinator::complete(multi::many0(Uuid32::parse))(data)
-                    .map(|(_res, uuids)| uuids.into_iter().map(|u| format!("{:?}", u)).join(", "))
+                    .map(|(_res, uuids)| uuids.into_iter().map(|u| format!("{u:?}")).join(", "))
                     .ok()
             }
             Self::CompleteListOf128BitServiceClassUuids
             | Self::IncompleteListOf128BitServiceClassUuids
             | Self::ListOf128BitServiceSolicitationUuids => {
                 combinator::complete(multi::many0(Uuid128::parse_le))(data)
-                    .map(|(_res, uuids)| uuids.into_iter().map(|u| format!("{:?}", u)).join(", "))
+                    .map(|(_res, uuids)| uuids.into_iter().map(|u| format!("{u:?}")).join(", "))
                     .ok()
             }
             Self::ServiceData16BitUuid => Uuid16::parse_le(data)
@@ -201,8 +201,8 @@ impl CommonDataType {
                         "service={:?}, data={}",
                         SERVICE_IDS
                             .get(&uuid)
-                            .map(|name| format!("{:?} ({name})", uuid))
-                            .unwrap_or_else(|| format!("{:?}", uuid)),
+                            .map(|name| format!("{uuid:?} ({name})"))
+                            .unwrap_or_else(|| format!("{uuid:?}")),
                         hex::encode_upper(rem)
                     )
                 })
@@ -214,7 +214,7 @@ impl CommonDataType {
                 .map(|(rem, uuid)| format!("service={:?}, data={}", uuid, hex::encode_upper(rem)))
                 .ok(),
             Self::ShortenedLocalName | Self::CompleteLocalName => {
-                std::str::from_utf8(data).ok().map(|s| format!("\"{}\"", s))
+                std::str::from_utf8(data).ok().map(|s| format!("\"{s}\""))
             }
             Self::TxPowerLevel => {
                 let (_, tx) =
@@ -230,7 +230,7 @@ impl CommonDataType {
                     COMPANY_IDS
                         .get(&id)
                         .map(|s| s.to_string())
-                        .unwrap_or_else(|| format!("{:?}", id)),
+                        .unwrap_or_else(|| format!("{id:?}")),
                     hex::encode_upper(rem)
                 ))
             }

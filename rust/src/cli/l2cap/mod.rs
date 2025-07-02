@@ -158,7 +158,7 @@ async fn proxy_tcp_rx_to_l2cap_tx(
                 }
             }
             Err(e) => {
-                println!("{}", format!("!!! TCP connection lost: {}", e).red());
+                println!("{}", format!("!!! TCP connection lost: {e}").red());
                 if let Some(mut channel) = l2cap_channel.lock().await.take() {
                     let _ = channel.disconnect().await.map_err(|e| {
                         eprintln!("Failed to call disconnect on l2cap channel: {e}");

@@ -100,7 +100,7 @@ pub(crate) fn probe(verbose: bool) -> anyhow::Result<()> {
                 .map(|serials| serials.contains(s))
                 .unwrap_or(false)
             {
-                transport_names.push(format!("{}/{}", basic_transport_name, s))
+                transport_names.push(format!("{basic_transport_name}/{s}"))
             }
         }
 
@@ -310,7 +310,7 @@ impl ClassInfo {
             self.sub_class,
             self.protocol,
             self.protocol_name()
-                .map(|s| format!(" [{}]", s))
+                .map(|s| format!(" [{s}]"))
                 .unwrap_or_default()
         )
     }
