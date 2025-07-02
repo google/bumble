@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # -----------------------------------------------------------------------------
-# GATT - Generic Attribute Profile
+# GATT - Generic att.Attribute Profile
 # Server
 #
 # See Bluetooth spec @ Vol 3, Part G
@@ -35,35 +35,9 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from bumble import att
 from bumble.colors import color
 from bumble.core import UUID
-from bumble.att import (
-    ATT_ATTRIBUTE_NOT_FOUND_ERROR,
-    ATT_ATTRIBUTE_NOT_LONG_ERROR,
-    ATT_CID,
-    ATT_DEFAULT_MTU,
-    ATT_INVALID_ATTRIBUTE_LENGTH_ERROR,
-    ATT_INVALID_HANDLE_ERROR,
-    ATT_INVALID_OFFSET_ERROR,
-    ATT_REQUEST_NOT_SUPPORTED_ERROR,
-    ATT_REQUESTS,
-    ATT_PDU,
-    ATT_UNLIKELY_ERROR_ERROR,
-    ATT_UNSUPPORTED_GROUP_TYPE_ERROR,
-    ATT_Error,
-    ATT_Error_Response,
-    ATT_Exchange_MTU_Response,
-    ATT_Find_By_Type_Value_Response,
-    ATT_Find_Information_Response,
-    ATT_Handle_Value_Indication,
-    ATT_Handle_Value_Notification,
-    ATT_Read_Blob_Response,
-    ATT_Read_By_Group_Type_Response,
-    ATT_Read_By_Type_Response,
-    ATT_Read_Response,
-    ATT_Write_Response,
-    Attribute,
-)
 from bumble.gatt import (
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
@@ -99,9 +73,9 @@ GATT_SERVER_DEFAULT_MAX_MTU = 517
 # GATT Server
 # -----------------------------------------------------------------------------
 class Server(utils.EventEmitter):
-    attributes: list[Attribute]
+    attributes: list[att.Attribute]
     services: list[Service]
-    attributes_by_handle: dict[int, Attribute]
+    attributes_by_handle: dict[int, att.Attribute]
     subscribers: dict[int, dict[int, bytes]]
     indication_semaphores: defaultdict[int, asyncio.Semaphore]
     pending_confirmations: defaultdict[int, Optional[asyncio.futures.Future]]
@@ -112,7 +86,7 @@ class Server(utils.EventEmitter):
         super().__init__()
         self.device = device
         self.services = []
-        self.attributes = []  # Attributes, ordered by increasing handle values
+        self.attributes = []  # att.Attributes, ordered by increasing handle values
         self.attributes_by_handle = {}  # Map for fast attribute access by handle
         self.max_mtu = (
             GATT_SERVER_DEFAULT_MAX_MTU  # The max MTU we're willing to negotiate
@@ -127,12 +101,12 @@ class Server(utils.EventEmitter):
         return "\n".join(map(str, self.attributes))
 
     def send_gatt_pdu(self, connection_handle: int, pdu: bytes) -> None:
-        self.device.send_l2cap_pdu(connection_handle, ATT_CID, pdu)
+        self.device.send_l2cap_pdu(connection_handle, att.ATT_CID, pdu)
 
     def next_handle(self) -> int:
         return 1 + len(self.attributes)
 
-    def get_advertising_service_data(self) -> dict[Attribute, bytes]:
+    def get_advertising_service_data(self) -> dict[att.Attribute, bytes]:
         return {
             attribute: data
             for attribute in self.attributes
@@ -140,7 +114,7 @@ class Server(utils.EventEmitter):
             and (data := attribute.get_advertising_data())
         }
 
-    def get_attribute(self, handle: int) -> Optional[Attribute]:
+    def get_attribute(self, handle: int) -> Optional[att.Attribute]:
         attribute = self.attributes_by_handle.get(handle)
         if attribute:
             return attribute
@@ -231,7 +205,7 @@ class Server(utils.EventEmitter):
             None,
         )
 
-    def add_attribute(self, attribute: Attribute) -> None:
+    def add_attribute(self, attribute: att.Attribute) -> None:
         # Assign a handle to this attribute
         attribute.handle = self.next_handle()
         attribute.end_group_handle = (
@@ -286,7 +260,7 @@ class Server(utils.EventEmitter):
                     # pylint: disable=line-too-long
                     Descriptor(
                         GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
-                        Attribute.READABLE | Attribute.WRITEABLE,
+                        att.Attribute.READABLE | att.Attribute.WRITEABLE,
                         CharacteristicValue(
                             read=lambda connection, characteristic=characteristic: self.read_cccd(
                                 connection, characteristic
@@ -355,7 +329,7 @@ class Server(utils.EventEmitter):
             indicate_enabled,
         )
 
-    def send_response(self, connection: Connection, response: ATT_PDU) -> None:
+    def send_response(self, connection: Connection, response: att.ATT_PDU) -> None:
         logger.debug(
             f'GATT Response from server: [0x{connection.handle:04X}] {response}'
         )
@@ -364,7 +338,7 @@ class Server(utils.EventEmitter):
     async def notify_subscriber(
         self,
         connection: Connection,
-        attribute: Attribute,
+        attribute: att.Attribute,
         value: Optional[bytes] = None,
         force: bool = False,
     ) -> None:
@@ -396,7 +370,7 @@ class Server(utils.EventEmitter):
             value = value[: connection.att_mtu - 3]
 
         # Notify
-        notification = ATT_Handle_Value_Notification(
+        notification = att.ATT_Handle_Value_Notification(
             attribute_handle=attribute.handle, attribute_value=value
         )
         logger.debug(
@@ -407,7 +381,7 @@ class Server(utils.EventEmitter):
     async def indicate_subscriber(
         self,
         connection: Connection,
-        attribute: Attribute,
+        attribute: att.Attribute,
         value: Optional[bytes] = None,
         force: bool = False,
     ) -> None:
@@ -439,7 +413,7 @@ class Server(utils.EventEmitter):
             value = value[: connection.att_mtu - 3]
 
         # Indicate
-        indication = ATT_Handle_Value_Indication(
+        indication = att.ATT_Handle_Value_Indication(
             attribute_handle=attribute.handle, attribute_value=value
         )
         logger.debug(
@@ -467,7 +441,7 @@ class Server(utils.EventEmitter):
     async def _notify_or_indicate_subscribers(
         self,
         indicate: bool,
-        attribute: Attribute,
+        attribute: att.Attribute,
         value: Optional[bytes] = None,
         force: bool = False,
     ) -> None:
@@ -494,7 +468,7 @@ class Server(utils.EventEmitter):
 
     async def notify_subscribers(
         self,
-        attribute: Attribute,
+        attribute: att.Attribute,
         value: Optional[bytes] = None,
         force: bool = False,
     ):
@@ -504,7 +478,7 @@ class Server(utils.EventEmitter):
 
     async def indicate_subscribers(
         self,
-        attribute: Attribute,
+        attribute: att.Attribute,
         value: Optional[bytes] = None,
         force: bool = False,
     ):
@@ -518,16 +492,16 @@ class Server(utils.EventEmitter):
         if connection.handle in self.pending_confirmations:
             del self.pending_confirmations[connection.handle]
 
-    def on_gatt_pdu(self, connection: Connection, att_pdu: ATT_PDU) -> None:
+    def on_gatt_pdu(self, connection: Connection, att_pdu: att.ATT_PDU) -> None:
         logger.debug(f'GATT Request to server: [0x{connection.handle:04X}] {att_pdu}')
         handler_name = f'on_{att_pdu.name.lower()}'
         handler = getattr(self, handler_name, None)
         if handler is not None:
             try:
                 handler(connection, att_pdu)
-            except ATT_Error as error:
+            except att.ATT_Error as error:
                 logger.debug(f'normal exception returned by handler: {error}')
-                response = ATT_Error_Response(
+                response = att.ATT_Error_Response(
                     request_opcode_in_error=att_pdu.op_code,
                     attribute_handle_in_error=error.att_handle,
                     error_code=error.error_code,
@@ -535,16 +509,16 @@ class Server(utils.EventEmitter):
                 self.send_response(connection, response)
             except Exception as error:
                 logger.warning(f'{color("!!! Exception in handler:", "red")} {error}')
-                response = ATT_Error_Response(
+                response = att.ATT_Error_Response(
                     request_opcode_in_error=att_pdu.op_code,
                     attribute_handle_in_error=0x0000,
-                    error_code=ATT_UNLIKELY_ERROR_ERROR,
+                    error_code=att.ATT_UNLIKELY_ERROR_ERROR,
                 )
                 self.send_response(connection, response)
                 raise error
         else:
             # No specific handler registered
-            if att_pdu.op_code in ATT_REQUESTS:
+            if att_pdu.op_code in att.ATT_REQUESTS:
                 # Invoke the generic handler
                 self.on_att_request(connection, att_pdu)
             else:
@@ -560,7 +534,7 @@ class Server(utils.EventEmitter):
     #######################################################
     # ATT handlers
     #######################################################
-    def on_att_request(self, connection: Connection, pdu: ATT_PDU) -> None:
+    def on_att_request(self, connection: Connection, pdu: att.ATT_PDU) -> None:
         '''
         Handler for requests without a more specific handler
         '''
@@ -570,23 +544,25 @@ class Server(utils.EventEmitter):
             )
             + str(pdu)
         )
-        response = ATT_Error_Response(
+        response = att.ATT_Error_Response(
             request_opcode_in_error=pdu.op_code,
             attribute_handle_in_error=0x0000,
-            error_code=ATT_REQUEST_NOT_SUPPORTED_ERROR,
+            error_code=att.ATT_REQUEST_NOT_SUPPORTED_ERROR,
         )
         self.send_response(connection, response)
 
-    def on_att_exchange_mtu_request(self, connection, request):
+    def on_att_exchange_mtu_request(
+        self, connection: Connection, request: att.ATT_Exchange_MTU_Request
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.2.1 Exchange MTU Request
         '''
         self.send_response(
-            connection, ATT_Exchange_MTU_Response(server_rx_mtu=self.max_mtu)
+            connection, att.ATT_Exchange_MTU_Response(server_rx_mtu=self.max_mtu)
         )
 
         # Compute the final MTU
-        if request.client_rx_mtu >= ATT_DEFAULT_MTU:
+        if request.client_rx_mtu >= att.ATT_DEFAULT_MTU:
             mtu = min(self.max_mtu, request.client_rx_mtu)
 
             # Notify the device
@@ -594,11 +570,14 @@ class Server(utils.EventEmitter):
         else:
             logger.warning('invalid client_rx_mtu received, MTU not changed')
 
-    def on_att_find_information_request(self, connection, request):
+    def on_att_find_information_request(
+        self, connection: Connection, request: att.ATT_Find_Information_Request
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.3.1 Find Information Request
         '''
 
+        response: att.ATT_PDU
         # Check the request parameters
         if (
             request.starting_handle == 0
@@ -606,17 +585,17 @@ class Server(utils.EventEmitter):
         ):
             self.send_response(
                 connection,
-                ATT_Error_Response(
+                att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
                     attribute_handle_in_error=request.starting_handle,
-                    error_code=ATT_INVALID_HANDLE_ERROR,
+                    error_code=att.ATT_INVALID_HANDLE_ERROR,
                 ),
             )
             return
 
         # Build list of returned attributes
         pdu_space_available = connection.att_mtu - 2
-        attributes = []
+        attributes: list[att.Attribute] = []
         uuid_size = 0
         for attribute in (
             attribute
@@ -646,21 +625,23 @@ class Server(utils.EventEmitter):
                 struct.pack('<H', attribute.handle) + attribute.type.to_pdu_bytes()
                 for attribute in attributes
             ]
-            response = ATT_Find_Information_Response(
+            response = att.ATT_Find_Information_Response(
                 format=1 if len(attributes[0].type.to_pdu_bytes()) == 2 else 2,
                 information_data=b''.join(information_data_list),
             )
         else:
-            response = ATT_Error_Response(
+            response = att.ATT_Error_Response(
                 request_opcode_in_error=request.op_code,
                 attribute_handle_in_error=request.starting_handle,
-                error_code=ATT_ATTRIBUTE_NOT_FOUND_ERROR,
+                error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
             )
 
         self.send_response(connection, response)
 
     @utils.AsyncRunner.run_in_task()
-    async def on_att_find_by_type_value_request(self, connection, request):
+    async def on_att_find_by_type_value_request(
+        self, connection: Connection, request: att.ATT_Find_By_Type_Value_Request
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.3.3 Find By Type Value Request
         '''
@@ -668,6 +649,7 @@ class Server(utils.EventEmitter):
         # Build list of returned attributes
         pdu_space_available = connection.att_mtu - 2
         attributes = []
+        response: att.ATT_PDU
         async for attribute in (
             attribute
             for attribute in self.attributes
@@ -700,33 +682,35 @@ class Server(utils.EventEmitter):
                 handles_information_list.append(
                     struct.pack('<HH', attribute.handle, group_end_handle)
                 )
-            response = ATT_Find_By_Type_Value_Response(
+            response = att.ATT_Find_By_Type_Value_Response(
                 handles_information_list=b''.join(handles_information_list)
             )
         else:
-            response = ATT_Error_Response(
+            response = att.ATT_Error_Response(
                 request_opcode_in_error=request.op_code,
                 attribute_handle_in_error=request.starting_handle,
-                error_code=ATT_ATTRIBUTE_NOT_FOUND_ERROR,
+                error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
             )
 
         self.send_response(connection, response)
 
     @utils.AsyncRunner.run_in_task()
-    async def on_att_read_by_type_request(self, connection, request):
+    async def on_att_read_by_type_request(
+        self, connection: Connection, request: att.ATT_Read_By_Type_Request
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.1 Read By Type Request
         '''
 
         pdu_space_available = connection.att_mtu - 2
 
-        response = ATT_Error_Response(
+        response: att.ATT_PDU = att.ATT_Error_Response(
             request_opcode_in_error=request.op_code,
             attribute_handle_in_error=request.starting_handle,
-            error_code=ATT_ATTRIBUTE_NOT_FOUND_ERROR,
+            error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
         )
 
-        attributes = []
+        attributes: list[tuple[int, bytes]] = []
         for attribute in (
             attribute
             for attribute in self.attributes
@@ -737,11 +721,11 @@ class Server(utils.EventEmitter):
         ):
             try:
                 attribute_value = await attribute.read_value(connection)
-            except ATT_Error as error:
+            except att.ATT_Error as error:
                 # If the first attribute is unreadable, return an error
                 # Otherwise return attributes up to this point
                 if not attributes:
-                    response = ATT_Error_Response(
+                    response = att.ATT_Error_Response(
                         request_opcode_in_error=request.op_code,
                         attribute_handle_in_error=attribute.handle,
                         error_code=error.error_code,
@@ -770,7 +754,7 @@ class Server(utils.EventEmitter):
             attribute_data_list = [
                 struct.pack('<H', handle) + value for handle, value in attributes
             ]
-            response = ATT_Read_By_Type_Response(
+            response = att.ATT_Read_By_Type_Response(
                 length=entry_size, attribute_data_list=b''.join(attribute_data_list)
             )
         else:
@@ -779,95 +763,104 @@ class Server(utils.EventEmitter):
         self.send_response(connection, response)
 
     @utils.AsyncRunner.run_in_task()
-    async def on_att_read_request(self, connection, request):
+    async def on_att_read_request(
+        self, connection: Connection, request: att.ATT_Read_Request
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.3 Read Request
         '''
 
+        response: att.ATT_PDU
         if attribute := self.get_attribute(request.attribute_handle):
             try:
                 value = await attribute.read_value(connection)
-            except ATT_Error as error:
-                response = ATT_Error_Response(
+            except att.ATT_Error as error:
+                response = att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
                     attribute_handle_in_error=request.attribute_handle,
                     error_code=error.error_code,
                 )
             else:
                 value_size = min(connection.att_mtu - 1, len(value))
-                response = ATT_Read_Response(attribute_value=value[:value_size])
+                response = att.ATT_Read_Response(attribute_value=value[:value_size])
         else:
-            response = ATT_Error_Response(
+            response = att.ATT_Error_Response(
                 request_opcode_in_error=request.op_code,
                 attribute_handle_in_error=request.attribute_handle,
-                error_code=ATT_INVALID_HANDLE_ERROR,
+                error_code=att.ATT_INVALID_HANDLE_ERROR,
             )
         self.send_response(connection, response)
 
     @utils.AsyncRunner.run_in_task()
-    async def on_att_read_blob_request(self, connection, request):
+    async def on_att_read_blob_request(
+        self, connection: Connection, request: att.ATT_Read_Blob_Request
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.5 Read Blob Request
         '''
 
+        response: att.ATT_PDU
         if attribute := self.get_attribute(request.attribute_handle):
             try:
                 value = await attribute.read_value(connection)
-            except ATT_Error as error:
-                response = ATT_Error_Response(
+            except att.ATT_Error as error:
+                response = att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
                     attribute_handle_in_error=request.attribute_handle,
                     error_code=error.error_code,
                 )
             else:
                 if request.value_offset > len(value):
-                    response = ATT_Error_Response(
+                    response = att.ATT_Error_Response(
                         request_opcode_in_error=request.op_code,
                         attribute_handle_in_error=request.attribute_handle,
-                        error_code=ATT_INVALID_OFFSET_ERROR,
+                        error_code=att.ATT_INVALID_OFFSET_ERROR,
                     )
                 elif len(value) <= connection.att_mtu - 1:
-                    response = ATT_Error_Response(
+                    response = att.ATT_Error_Response(
                         request_opcode_in_error=request.op_code,
                         attribute_handle_in_error=request.attribute_handle,
-                        error_code=ATT_ATTRIBUTE_NOT_LONG_ERROR,
+                        error_code=att.ATT_ATTRIBUTE_NOT_LONG_ERROR,
                     )
                 else:
                     part_size = min(
                         connection.att_mtu - 1, len(value) - request.value_offset
                     )
-                    response = ATT_Read_Blob_Response(
+                    response = att.ATT_Read_Blob_Response(
                         part_attribute_value=value[
                             request.value_offset : request.value_offset + part_size
                         ]
                     )
         else:
-            response = ATT_Error_Response(
+            response = att.ATT_Error_Response(
                 request_opcode_in_error=request.op_code,
                 attribute_handle_in_error=request.attribute_handle,
-                error_code=ATT_INVALID_HANDLE_ERROR,
+                error_code=att.ATT_INVALID_HANDLE_ERROR,
             )
         self.send_response(connection, response)
 
     @utils.AsyncRunner.run_in_task()
-    async def on_att_read_by_group_type_request(self, connection, request):
+    async def on_att_read_by_group_type_request(
+        self, connection: Connection, request: att.ATT_Read_By_Group_Type_Request
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.9 Read by Group Type Request
         '''
+        response: att.ATT_PDU
         if request.attribute_group_type not in (
             GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
             GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
         ):
-            response = ATT_Error_Response(
+            response = att.ATT_Error_Response(
                 request_opcode_in_error=request.op_code,
                 attribute_handle_in_error=request.starting_handle,
-                error_code=ATT_UNSUPPORTED_GROUP_TYPE_ERROR,
+                error_code=att.ATT_UNSUPPORTED_GROUP_TYPE_ERROR,
             )
             self.send_response(connection, response)
             return
 
         pdu_space_available = connection.att_mtu - 2
-        attributes = []
+        attributes: list[tuple[int, int, bytes]] = []
         for attribute in (
             attribute
             for attribute in self.attributes
@@ -904,21 +897,23 @@ class Server(utils.EventEmitter):
                 struct.pack('<HH', handle, end_group_handle) + value
                 for handle, end_group_handle, value in attributes
             ]
-            response = ATT_Read_By_Group_Type_Response(
+            response = att.ATT_Read_By_Group_Type_Response(
                 length=len(attribute_data_list[0]),
                 attribute_data_list=b''.join(attribute_data_list),
             )
         else:
-            response = ATT_Error_Response(
+            response = att.ATT_Error_Response(
                 request_opcode_in_error=request.op_code,
                 attribute_handle_in_error=request.starting_handle,
-                error_code=ATT_ATTRIBUTE_NOT_FOUND_ERROR,
+                error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
             )
 
         self.send_response(connection, response)
 
     @utils.AsyncRunner.run_in_task()
-    async def on_att_write_request(self, connection, request):
+    async def on_att_write_request(
+        self, connection: Connection, request: att.ATT_Write_Request
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.5.1 Write Request
         '''
@@ -928,10 +923,10 @@ class Server(utils.EventEmitter):
         if attribute is None:
             self.send_response(
                 connection,
-                ATT_Error_Response(
+                att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
                     attribute_handle_in_error=request.attribute_handle,
-                    error_code=ATT_INVALID_HANDLE_ERROR,
+                    error_code=att.ATT_INVALID_HANDLE_ERROR,
                 ),
             )
             return
@@ -942,30 +937,33 @@ class Server(utils.EventEmitter):
         if len(request.attribute_value) > GATT_MAX_ATTRIBUTE_VALUE_SIZE:
             self.send_response(
                 connection,
-                ATT_Error_Response(
+                att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
                     attribute_handle_in_error=request.attribute_handle,
-                    error_code=ATT_INVALID_ATTRIBUTE_LENGTH_ERROR,
+                    error_code=att.ATT_INVALID_ATTRIBUTE_LENGTH_ERROR,
                 ),
             )
             return
 
+        response: att.ATT_PDU
         try:
             # Accept the value
             await attribute.write_value(connection, request.attribute_value)
-        except ATT_Error as error:
-            response = ATT_Error_Response(
+        except att.ATT_Error as error:
+            response = att.ATT_Error_Response(
                 request_opcode_in_error=request.op_code,
                 attribute_handle_in_error=request.attribute_handle,
                 error_code=error.error_code,
             )
         else:
             # Done
-            response = ATT_Write_Response()
+            response = att.ATT_Write_Response()
         self.send_response(connection, response)
 
     @utils.AsyncRunner.run_in_task()
-    async def on_att_write_command(self, connection, request):
+    async def on_att_write_command(
+        self, connection: Connection, request: att.ATT_Write_Command
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.5.3 Write Command
         '''
@@ -987,15 +985,22 @@ class Server(utils.EventEmitter):
         except Exception as error:
             logger.exception(f'!!! ignoring exception: {error}')
 
-    def on_att_handle_value_confirmation(self, connection, _confirmation):
+    def on_att_handle_value_confirmation(
+        self,
+        connection: Connection,
+        confirmation: att.ATT_Handle_Value_Confirmation,
+    ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.7.3 Handle Value Confirmation
         '''
-        if self.pending_confirmations[connection.handle] is None:
+        del confirmation  # Unused.
+        if (
+            pending_confirmation := self.pending_confirmations[connection.handle]
+        ) is None:
             # Not expected!
             logger.warning(
                 '!!! unexpected confirmation, there is no pending indication'
             )
             return
 
-        self.pending_confirmations[connection.handle].set_result(None)
+        pending_confirmation.set_result(None)
