@@ -83,7 +83,7 @@ pub async fn start(args: &Args, device: &mut Device) -> PyResult<()> {
         connection.on_disconnection(|_py, reason| {
             let disconnection_info = match HciConstant::error_name(reason) {
                 Ok(info_string) => info_string,
-                Err(py_err) => format!("failed to get disconnection error name ({})", py_err),
+                Err(py_err) => format!("failed to get disconnection error name ({py_err})"),
             };
             println!(
                 "{} {}",

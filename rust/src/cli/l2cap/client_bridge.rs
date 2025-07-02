@@ -56,7 +56,7 @@ pub async fn start(args: &Args, device: &mut Device) -> PyResult<()> {
     ble_connection.on_disconnection(|_py, reason| {
         let disconnection_info = match HciConstant::error_name(reason) {
             Ok(info_string) => info_string,
-            Err(py_err) => format!("failed to get disconnection error name ({})", py_err),
+            Err(py_err) => format!("failed to get disconnection error name ({py_err})"),
         };
         println!(
             "{} {}",
@@ -114,10 +114,10 @@ async fn proxy_data_between_tcp_and_l2cap(
     mtu: Option<u16>,
     mps: Option<u16>,
 ) -> PyResult<()> {
-    println!("{}", format!("<<< TCP connection from {}", addr).magenta());
+    println!("{}", format!("<<< TCP connection from {addr}").magenta());
     println!(
         "{}",
-        format!(">>> Opening L2CAP channel on PSM = {}", psm).yellow()
+        format!(">>> Opening L2CAP channel on PSM = {psm}").yellow()
     );
 
     let mut l2cap_channel = match ble_connection

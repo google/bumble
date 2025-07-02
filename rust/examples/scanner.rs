@@ -127,7 +127,7 @@ async fn main() -> PyResult<()> {
             } else {
                 matching
                     .iter()
-                    .map(|t| format!("{}", t))
+                    .map(|t| format!("{t}"))
                     .join(" / ")
                     .blue()
                     .to_string()
@@ -148,7 +148,7 @@ async fn main() -> PyResult<()> {
                 .next()
                 .unwrap_or_else(|| format!("0x{}", hex::encode_upper(&data)));
 
-            println!("  [{}]: {}", code_str, data_str)
+            println!("  [{code_str}]: {data_str}")
         });
 
         Ok(())
