@@ -194,7 +194,11 @@ class Loopback:
 )
 @click.argument('transport')
 def main(packet_size, packet_count, transport):
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
+    logging.basicConfig(
+        level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper(),
+        format="[%(asctime)s.%(msecs)03d] %(levelname)s:%(name)s:%(message)s",
+        datefmt="%H:%M:%S",
+    )
 
     loopback = Loopback(packet_size, packet_count, transport)
     asyncio.run(loopback.run())

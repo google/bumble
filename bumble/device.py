@@ -139,6 +139,9 @@ DEVICE_DEFAULT_ADVERTISING_TX_POWER           = (
 DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_SKIP = 0
 DEVICE_DEFAULT_PERIODIC_ADVERTISING_SYNC_TIMEOUT = 5.0
 DEVICE_DEFAULT_LE_RPA_TIMEOUT                 = 15 * 60 # 15 minutes (in seconds)
+DEVICE_DEFAULT_ISO_CIS_MAX_SDU                = 251
+DEVICE_DEFAULT_ISO_CIS_RTN                    = 10
+DEVICE_DEFAULT_ISO_CIS_MAX_TRANSPORT_LATENCY  = 100
 
 # fmt: on
 # pylint: enable=line-too-long
@@ -489,7 +492,18 @@ class PeriodicAdvertisement:
 
 # -----------------------------------------------------------------------------
 @dataclass
-class BIGInfoAdvertisement:
+class BigInfoAdvertisement:
+    class Framing(utils.OpenIntEnum):
+        # fmt: off
+        UNFRAMED                = 0X00
+        FRAMED_SEGMENTABLE_MODE = 0X01
+        FRAMED_UNSEGMENTED_MODE = 0X02
+
+    class Encryption(utils.OpenIntEnum):
+        # fmt: off
+        UNENCRYPTED = 0x00
+        ENCRYPTED   = 0x01
+
     address: hci.Address
     sid: int
     num_bis: int
@@ -502,8 +516,8 @@ class BIGInfoAdvertisement:
     sdu_interval: int
     max_sdu: int
     phy: hci.Phy
-    framed: bool
-    encrypted: bool
+    framing: Framing
+    encryption: Encryption
 
     @classmethod
     def from_report(cls, address: hci.Address, sid: int, report) -> Self:
@@ -520,8 +534,8 @@ class BIGInfoAdvertisement:
             report.sdu_interval,
             report.max_sdu,
             hci.Phy(report.phy),
-            report.framing != 0,
-            report.encryption != 0,
+            cls.Framing(report.framing),
+            cls.Encryption(report.encryption),
         )
 
 
@@ -1013,7 +1027,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
     def on_biginfo_advertising_report(self, report) -> None:
         self.emit(
             self.EVENT_BIGINFO_ADVERTISEMENT,
-            BIGInfoAdvertisement.from_report(self.advertiser_address, self.sid, report),
+            BigInfoAdvertisement.from_report(self.advertiser_address, self.sid, report),
         )
 
     def __str__(self) -> str:
@@ -1031,14 +1045,24 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
 # -----------------------------------------------------------------------------
 @dataclass
 class BigParameters:
+    class Packing(utils.OpenIntEnum):
+        # fmt: off
+        SEQUENTIAL = 0x00
+        INTERLEAVED = 0x01
+
+    class Framing(utils.OpenIntEnum):
+        # fmt: off
+        UNFRAMED = 0x00
+        FRAMED   = 0x01
+
     num_bis: int
-    sdu_interval: int
+    sdu_interval: int  # SDU interval, in microseconds
     max_sdu: int
-    max_transport_latency: int
+    max_transport_latency: int  # Max transport latency, in milliseconds
     rtn: int
     phy: hci.PhyBit = hci.PhyBit.LE_2M
-    packing: int = 0
-    framing: int = 0
+    packing: Packing = Packing.SEQUENTIAL
+    framing: Framing = Framing.UNFRAMED
     broadcast_code: bytes | None = None
 
 
@@ -1061,15 +1085,15 @@ class Big(utils.EventEmitter):
     state: State = State.PENDING
 
     # Attributes provided by BIG Create Complete event
-    big_sync_delay: int = 0
-    transport_latency_big: int = 0
-    phy: int = 0
+    big_sync_delay: int = 0  # Sync delay, in microseconds
+    transport_latency_big: int = 0  # Transport latency, in microseconds
+    phy: hci.Phy = hci.Phy.LE_1M
     nse: int = 0
     bn: int = 0
     pto: int = 0
     irc: int = 0
     max_pdu: int = 0
-    iso_interval: float = 0.0
+    iso_interval: float = 0.0  # ISO interval, in milliseconds
     bis_links: Sequence[BisLink] = ()
 
     def __post_init__(self) -> None:
@@ -1499,9 +1523,73 @@ class _IsoLink:
         """Write an ISO SDU."""
         self.device.host.send_iso_sdu(connection_handle=self.handle, sdu=sdu)
 
+    async def get_tx_time_stamp(self) -> tuple[int, int, int]:
+        response = await self.device.host.send_command(
+            hci.HCI_LE_Read_ISO_TX_Sync_Command(connection_handle=self.handle),
+            check_result=True,
+        )
+        return (
+            response.return_parameters.packet_sequence_number,
+            response.return_parameters.tx_time_stamp,
+            response.return_parameters.time_offset,
+        )
+
     @property
     def data_packet_queue(self) -> DataPacketQueue | None:
         return self.device.host.get_data_packet_queue(self.handle)
+
+    async def drain(self) -> None:
+        if data_packet_queue := self.data_packet_queue:
+            await data_packet_queue.drain(self.handle)
+
+
+# -----------------------------------------------------------------------------
+@dataclass
+class CigParameters:
+    class WorstCaseSca(utils.OpenIntEnum):
+        # fmt: off
+        SCA_251_TO_500_PPM = 0x00
+        SCA_151_TO_250_PPM = 0x01
+        SCA_101_TO_150_PPM = 0x02
+        SCA_76_TO_100_PPM  = 0x03
+        SCA_51_TO_75_PPM   = 0x04
+        SCA_31_TO_50_PPM   = 0x05
+        SCA_21_TO_30_PPM   = 0x06
+        SCA_0_TO_20_PPM    = 0x07
+
+    class Packing(utils.OpenIntEnum):
+        # fmt: off
+        SEQUENTIAL = 0x00
+        INTERLEAVED = 0x01
+
+    class Framing(utils.OpenIntEnum):
+        # fmt: off
+        UNFRAMED = 0x00
+        FRAMED   = 0x01
+
+    @dataclass
+    class CisParameters:
+        cis_id: int
+        max_sdu_c_to_p: int = DEVICE_DEFAULT_ISO_CIS_MAX_SDU
+        max_sdu_p_to_c: int = DEVICE_DEFAULT_ISO_CIS_MAX_SDU
+        phy_c_to_p: hci.PhyBit = hci.PhyBit.LE_2M
+        phy_p_to_c: hci.PhyBit = hci.PhyBit.LE_2M
+        rtn_c_to_p: int = DEVICE_DEFAULT_ISO_CIS_RTN  # Number of C->P retransmissions
+        rtn_p_to_c: int = DEVICE_DEFAULT_ISO_CIS_RTN  # Number of P->C retransmissions
+
+    cig_id: int
+    cis_parameters: list[CisParameters]
+    sdu_interval_c_to_p: int  # C->P SDU interval, in microseconds
+    sdu_interval_p_to_c: int  # P->C SDU interval, in microseconds
+    worst_case_sca: WorstCaseSca = WorstCaseSca.SCA_251_TO_500_PPM
+    packing: Packing = Packing.SEQUENTIAL
+    framing: Framing = Framing.UNFRAMED
+    max_transport_latency_c_to_p: int = (
+        DEVICE_DEFAULT_ISO_CIS_MAX_TRANSPORT_LATENCY  # Max C->P transport latency, in milliseconds
+    )
+    max_transport_latency_p_to_c: int = (
+        DEVICE_DEFAULT_ISO_CIS_MAX_TRANSPORT_LATENCY  # Max C->P transport latency, in milliseconds
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -1516,6 +1604,20 @@ class CisLink(utils.EventEmitter, _IsoLink):
     handle: int  # CIS handle assigned by Controller (in LE_Set_CIG_Parameters Complete or LE_CIS_Request events)
     cis_id: int  # CIS ID assigned by Central device
     cig_id: int  # CIG ID assigned by Central device
+    cig_sync_delay: int = 0  # CIG sync delay, in microseconds
+    cis_sync_delay: int = 0  # CIS sync delay, in microseconds
+    transport_latency_c_to_p: int = 0  # C->P transport latency, in microseconds
+    transport_latency_p_to_c: int = 0  # P->C transport latency, in microseconds
+    phy_c_to_p: Optional[hci.Phy] = None
+    phy_p_to_c: Optional[hci.Phy] = None
+    nse: int = 0
+    bn_c_to_p: int = 0
+    bn_p_to_c: int = 0
+    ft_c_to_p: int = 0
+    ft_p_to_c: int = 0
+    max_pdu_c_to_p: int = 0
+    max_pdu_p_to_c: int = 0
+    iso_interval: float = 0.0  # ISO interval, in milliseconds
     state: State = State.PENDING
     sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
 
@@ -1598,6 +1700,7 @@ class Connection(utils.CompositeEventEmitter):
     peer_resolvable_address: Optional[hci.Address]
     peer_le_features: Optional[hci.LeFeatureMask]
     role: hci.Role
+    parameters: Parameters
     encryption: int
     encryption_key_size: int
     authenticated: bool
@@ -1642,6 +1745,9 @@ class Connection(utils.CompositeEventEmitter):
     EVENT_PAIRING_FAILURE = "pairing_failure"
     EVENT_SECURITY_REQUEST = "security_request"
     EVENT_LINK_KEY = "link_key"
+    EVENT_CIS_REQUEST = "cis_request"
+    EVENT_CIS_ESTABLISHMENT = "cis_establishment"
+    EVENT_CIS_ESTABLISHMENT_FAILURE = "cis_establishment_failure"
 
     @utils.composite_listener
     class Listener:
@@ -4569,48 +4675,39 @@ class Device(utils.CompositeEventEmitter):
     @utils.experimental('Only for testing.')
     async def setup_cig(
         self,
-        cig_id: int,
-        cis_id: Sequence[int],
-        sdu_interval: tuple[int, int],
-        framing: int,
-        max_sdu: tuple[int, int],
-        retransmission_number: int,
-        max_transport_latency: tuple[int, int],
+        parameters: CigParameters,
     ) -> list[int]:
         """Sends hci.HCI_LE_Set_CIG_Parameters_Command.
 
         Args:
-            cig_id: CIG_ID.
-            cis_id: CID ID list.
-            sdu_interval: SDU intervals of (Central->Peripheral, Peripheral->Cental).
-            framing: Un-framing(0) or Framing(1).
-            max_sdu: Max SDU counts of (Central->Peripheral, Peripheral->Cental).
-            retransmission_number: retransmission_number.
-            max_transport_latency: Max transport latencies of
-                                   (Central->Peripheral, Peripheral->Cental).
+            parameters: CIG parameters.
 
         Returns:
             List of created CIS handles corresponding to the same order of [cid_id].
         """
-        num_cis = len(cis_id)
+        num_cis = len(parameters.cis_parameters)
 
         response = await self.send_command(
             hci.HCI_LE_Set_CIG_Parameters_Command(
-                cig_id=cig_id,
-                sdu_interval_c_to_p=sdu_interval[0],
-                sdu_interval_p_to_c=sdu_interval[1],
-                worst_case_sca=0x00,  # 251-500 ppm
-                packing=0x00,  # Sequential
-                framing=framing,
-                max_transport_latency_c_to_p=max_transport_latency[0],
-                max_transport_latency_p_to_c=max_transport_latency[1],
-                cis_id=cis_id,
-                max_sdu_c_to_p=[max_sdu[0]] * num_cis,
-                max_sdu_p_to_c=[max_sdu[1]] * num_cis,
-                phy_c_to_p=[hci.HCI_LE_2M_PHY] * num_cis,
-                phy_p_to_c=[hci.HCI_LE_2M_PHY] * num_cis,
-                rtn_c_to_p=[retransmission_number] * num_cis,
-                rtn_p_to_c=[retransmission_number] * num_cis,
+                cig_id=parameters.cig_id,
+                sdu_interval_c_to_p=parameters.sdu_interval_c_to_p,
+                sdu_interval_p_to_c=parameters.sdu_interval_p_to_c,
+                worst_case_sca=parameters.worst_case_sca,
+                packing=int(parameters.packing),
+                framing=int(parameters.framing),
+                max_transport_latency_c_to_p=parameters.max_transport_latency_c_to_p,
+                max_transport_latency_p_to_c=parameters.max_transport_latency_p_to_c,
+                cis_id=[cis.cis_id for cis in parameters.cis_parameters],
+                max_sdu_c_to_p=[
+                    cis.max_sdu_c_to_p for cis in parameters.cis_parameters
+                ],
+                max_sdu_p_to_c=[
+                    cis.max_sdu_p_to_c for cis in parameters.cis_parameters
+                ],
+                phy_c_to_p=[cis.phy_c_to_p for cis in parameters.cis_parameters],
+                phy_p_to_c=[cis.phy_p_to_c for cis in parameters.cis_parameters],
+                rtn_c_to_p=[cis.rtn_c_to_p for cis in parameters.cis_parameters],
+                rtn_p_to_c=[cis.rtn_p_to_c for cis in parameters.cis_parameters],
             ),
             check_result=True,
         )
@@ -4618,19 +4715,17 @@ class Device(utils.CompositeEventEmitter):
         # Ideally, we should manage CIG lifecycle, but they are not useful for Unicast
         # Server, so here it only provides a basic functionality for testing.
         cis_handles = response.return_parameters.connection_handle[:]
-        for id, cis_handle in zip(cis_id, cis_handles):
-            self._pending_cis[cis_handle] = (id, cig_id)
+        for cis, cis_handle in zip(parameters.cis_parameters, cis_handles):
+            self._pending_cis[cis_handle] = (cis.cis_id, parameters.cig_id)
 
         return cis_handles
 
     # [LE only]
     @utils.experimental('Only for testing.')
     async def create_cis(
-        self, cis_acl_pairs: Sequence[tuple[int, int]]
+        self, cis_acl_pairs: Sequence[tuple[int, Connection]]
     ) -> list[CisLink]:
-        for cis_handle, acl_handle in cis_acl_pairs:
-            acl_connection = self.lookup_connection(acl_handle)
-            assert acl_connection
+        for cis_handle, acl_connection in cis_acl_pairs:
             cis_id, cig_id = self._pending_cis.pop(cis_handle)
             self.cis_links[cis_handle] = CisLink(
                 device=self,
@@ -4650,8 +4745,8 @@ class Device(utils.CompositeEventEmitter):
                 if pending_future := pending_cis_establishments.get(cis_link.handle):
                     pending_future.set_result(cis_link)
 
-            def on_cis_establishment_failure(cis_handle: int, status: int) -> None:
-                if pending_future := pending_cis_establishments.get(cis_handle):
+            def on_cis_establishment_failure(cis_link: CisLink, status: int) -> None:
+                if pending_future := pending_cis_establishments.get(cis_link.handle):
                     pending_future.set_exception(hci.HCI_Error(status))
 
             watcher.on(self, self.EVENT_CIS_ESTABLISHMENT, on_cis_establishment)
@@ -4661,7 +4756,7 @@ class Device(utils.CompositeEventEmitter):
             await self.send_command(
                 hci.HCI_LE_Create_CIS_Command(
                     cis_connection_handle=[p[0] for p in cis_acl_pairs],
-                    acl_connection_handle=[p[1] for p in cis_acl_pairs],
+                    acl_connection_handle=[p[1].handle for p in cis_acl_pairs],
                 ),
                 check_result=True,
             )
@@ -4670,26 +4765,21 @@ class Device(utils.CompositeEventEmitter):
 
     # [LE only]
     @utils.experimental('Only for testing.')
-    async def accept_cis_request(self, handle: int) -> CisLink:
+    async def accept_cis_request(self, cis_link: CisLink) -> None:
         """[LE Only] Accepts an incoming CIS request.
 
-        When the specified CIS handle is already created, this method returns the
-        existed CIS link object immediately.
+        This method returns when the CIS is established, or raises an exception if
+        the CIS establishment fails.
 
         Args:
             handle: CIS handle to accept.
-
-        Returns:
-            CIS link object on the given handle.
         """
-        if not (cis_link := self.cis_links.get(handle)):
-            raise InvalidStateError(f'No pending CIS request of handle {handle}')
 
         # There might be multiple ASE sharing a CIS channel.
         # If one of them has accepted the request, the others should just leverage it.
         async with self._cis_lock:
             if cis_link.state == CisLink.State.ESTABLISHED:
-                return cis_link
+                return
 
             with closing(utils.EventWatcher()) as watcher:
                 pending_establishment = asyncio.get_running_loop().create_future()
@@ -4708,26 +4798,24 @@ class Device(utils.CompositeEventEmitter):
                 )
 
                 await self.send_command(
-                    hci.HCI_LE_Accept_CIS_Request_Command(connection_handle=handle),
+                    hci.HCI_LE_Accept_CIS_Request_Command(
+                        connection_handle=cis_link.handle
+                    ),
                     check_result=True,
                 )
 
                 await pending_establishment
-                return cis_link
-
-        # Mypy believes this is reachable when context is an ExitStack.
-        raise UnreachableError()
 
     # [LE only]
     @utils.experimental('Only for testing.')
     async def reject_cis_request(
         self,
-        handle: int,
+        cis_link: CisLink,
         reason: int = hci.HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     ) -> None:
         await self.send_command(
             hci.HCI_LE_Reject_CIS_Request_Command(
-                connection_handle=handle, reason=reason
+                connection_handle=cis_link.handle, reason=reason
             ),
             check_result=True,
         )
@@ -5265,7 +5353,7 @@ class Device(utils.CompositeEventEmitter):
         big.bis_links = [BisLink(handle=handle, big=big) for handle in bis_handles]
         big.big_sync_delay = big_sync_delay
         big.transport_latency_big = transport_latency_big
-        big.phy = phy
+        big.phy = hci.Phy(phy)
         big.nse = nse
         big.bn = bn
         big.pto = pto
@@ -5929,23 +6017,62 @@ class Device(utils.CompositeEventEmitter):
             f'cis_id=[0x{cis_id:02X}] ***'
         )
         # LE_CIS_Established event doesn't provide info, so we must store them here.
-        self.cis_links[cis_handle] = CisLink(
+        cis_link = CisLink(
             device=self,
             acl_connection=acl_connection,
             handle=cis_handle,
             cig_id=cig_id,
             cis_id=cis_id,
         )
-        self.emit(self.EVENT_CIS_REQUEST, acl_connection, cis_handle, cig_id, cis_id)
+        self.cis_links[cis_handle] = cis_link
+        acl_connection.emit(acl_connection.EVENT_CIS_REQUEST, cis_link)
+        self.emit(self.EVENT_CIS_REQUEST, cis_link)
 
     # [LE only]
     @host_event_handler
     @utils.experimental('Only for testing')
-    def on_cis_establishment(self, cis_handle: int) -> None:
+    def on_cis_establishment(
+        self,
+        cis_handle: int,
+        cig_sync_delay: int,
+        cis_sync_delay: int,
+        transport_latency_c_to_p: int,
+        transport_latency_p_to_c: int,
+        phy_c_to_p: int,
+        phy_p_to_c: int,
+        nse: int,
+        bn_c_to_p: int,
+        bn_p_to_c: int,
+        ft_c_to_p: int,
+        ft_p_to_c: int,
+        max_pdu_c_to_p: int,
+        max_pdu_p_to_c: int,
+        iso_interval: int,
+    ) -> None:
+        if cis_handle not in self.cis_links:
+            logger.warning("CIS link not found")
+            return
+
         cis_link = self.cis_links[cis_handle]
         cis_link.state = CisLink.State.ESTABLISHED
 
         assert cis_link.acl_connection
+
+        # Update the CIS
+        cis_link.cig_sync_delay = cig_sync_delay
+        cis_link.cis_sync_delay = cis_sync_delay
+        cis_link.transport_latency_c_to_p = transport_latency_c_to_p
+        cis_link.transport_latency_p_to_c = transport_latency_p_to_c
+        cis_link.phy_c_to_p = hci.Phy(phy_c_to_p)
+        cis_link.phy_p_to_c = hci.Phy(phy_p_to_c)
+        cis_link.nse = nse
+        cis_link.bn_c_to_p = bn_c_to_p
+        cis_link.bn_p_to_c = bn_p_to_c
+        cis_link.ft_c_to_p = ft_c_to_p
+        cis_link.ft_p_to_c = ft_p_to_c
+        cis_link.max_pdu_c_to_p = max_pdu_c_to_p
+        cis_link.max_pdu_p_to_c = max_pdu_p_to_c
+        cis_link.iso_interval = iso_interval * 1.25
 
         logger.debug(
             f'*** CIS Establishment '
@@ -5956,16 +6083,27 @@ class Device(utils.CompositeEventEmitter):
         )
 
         cis_link.emit(cis_link.EVENT_ESTABLISHMENT)
+        cis_link.acl_connection.emit(
+            cis_link.acl_connection.EVENT_CIS_ESTABLISHMENT, cis_link
+        )
         self.emit(self.EVENT_CIS_ESTABLISHMENT, cis_link)
 
     # [LE only]
     @host_event_handler
     @utils.experimental('Only for testing')
     def on_cis_establishment_failure(self, cis_handle: int, status: int) -> None:
+        if (cis_link := self.cis_links.pop(cis_handle, None)) is None:
+            logger.warning("CIS link not found")
+            return
+
         logger.debug(f'*** CIS Establishment Failure: cis=[0x{cis_handle:04X}] ***')
-        if cis_link := self.cis_links.pop(cis_handle):
-            cis_link.emit(cis_link.EVENT_ESTABLISHMENT_FAILURE, status)
-        self.emit(self.EVENT_CIS_ESTABLISHMENT_FAILURE, cis_handle, status)
+        cis_link.emit(cis_link.EVENT_ESTABLISHMENT_FAILURE, status)
+        cis_link.acl_connection.emit(
+            cis_link.acl_connection.EVENT_CIS_ESTABLISHMENT_FAILURE,
+            cis_link,
+            status,
+        )
+        self.emit(self.EVENT_CIS_ESTABLISHMENT_FAILURE, cis_link, status)
 
     # [LE only]
     @host_event_handler
@@ -6026,13 +6164,19 @@ class Device(utils.CompositeEventEmitter):
 
     @host_event_handler
     @with_connection_from_handle
-    def on_connection_parameters_update(self, connection, connection_parameters):
+    def on_connection_parameters_update(
+        self, connection: Connection, connection_parameters: core.ConnectionParameters
+    ):
         logger.debug(
             f'*** Connection Parameters Update: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}, '
             f'{connection_parameters}'
         )
-        connection.parameters = connection_parameters
+        connection.parameters = Connection.Parameters(
+            connection_parameters.connection_interval * 1.25,
+            connection_parameters.peripheral_latency,
+            connection_parameters.supervision_timeout * 10.0,
+        )
         connection.emit(connection.EVENT_CONNECTION_PARAMETERS_UPDATE)
 
     @host_event_handler

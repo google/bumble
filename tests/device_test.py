@@ -29,6 +29,8 @@ from bumble.core import (
 from bumble.device import (
     AdvertisingEventProperties,
     AdvertisingParameters,
+    CigParameters,
+    CisLink,
     Connection,
     Device,
     PeriodicAdvertisingParameters,
@@ -480,16 +482,13 @@ async def test_cis():
 
     peripheral_cis_futures = {}
 
-    def on_cis_request(
-        acl_connection: Connection,
-        cis_handle: int,
-        _cig_id: int,
-        _cis_id: int,
-    ):
-        acl_connection.cancel_on_disconnection(
-            devices[1].accept_cis_request(cis_handle)
+    def on_cis_request(cis_link: CisLink):
+        cis_link.acl_connection.cancel_on_disconnection(
+            devices[1].accept_cis_request(cis_link),
         )
-        peripheral_cis_futures[cis_handle] = asyncio.get_running_loop().create_future()
+        peripheral_cis_futures[cis_link.handle] = (
+            asyncio.get_running_loop().create_future()
+        )
 
     devices[1].on('cis_request', on_cis_request)
     devices[1].on(
@@ -498,19 +497,21 @@ async def test_cis():
     )
 
     cis_handles = await devices[0].setup_cig(
-        cig_id=1,
-        cis_id=[2, 3],
-        sdu_interval=(0, 0),
-        framing=0,
-        max_sdu=(0, 0),
-        retransmission_number=0,
-        max_transport_latency=(0, 0),
+        CigParameters(
+            cig_id=1,
+            cis_parameters=[
+                CigParameters.CisParameters(cis_id=2),
+                CigParameters.CisParameters(cis_id=3),
+            ],
+            sdu_interval_c_to_p=0,
+            sdu_interval_p_to_c=0,
+        ),
     )
     assert len(cis_handles) == 2
     cis_links = await devices[0].create_cis(
         [
-            (cis_handles[0], devices.connections[0].handle),
-            (cis_handles[1], devices.connections[0].handle),
+            (cis_handles[0], devices.connections[0]),
+            (cis_handles[1], devices.connections[0]),
         ]
     )
     await asyncio.gather(*peripheral_cis_futures.values())
@@ -528,32 +529,27 @@ async def test_cis_setup_failure():
 
     cis_requests = asyncio.Queue()
 
-    def on_cis_request(
-        acl_connection: Connection,
-        cis_handle: int,
-        cig_id: int,
-        cis_id: int,
-    ):
-        del acl_connection, cig_id, cis_id
-        cis_requests.put_nowait(cis_handle)
+    def on_cis_request(cis_link: CisLink):
+        cis_requests.put_nowait(cis_link)
 
     devices[1].on('cis_request', on_cis_request)
 
     cis_handles = await devices[0].setup_cig(
-        cig_id=1,
-        cis_id=[2],
-        sdu_interval=(0, 0),
-        framing=0,
-        max_sdu=(0, 0),
-        retransmission_number=0,
-        max_transport_latency=(0, 0),
+        CigParameters(
+            cig_id=1,
+            cis_parameters=[
+                CigParameters.CisParameters(cis_id=2),
+            ],
+            sdu_interval_c_to_p=0,
+            sdu_interval_p_to_c=0,
+        ),
     )
     assert len(cis_handles) == 1
 
     cis_create_task = asyncio.create_task(
         devices[0].create_cis(
             [
-                (cis_handles[0], devices.connections[0].handle),
+                (cis_handles[0], devices.connections[0]),
             ]
         )
     )

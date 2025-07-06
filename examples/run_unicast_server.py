@@ -77,7 +77,7 @@ file_outputs: dict[AseStateMachine, io.BufferedWriter] = {}
 # -----------------------------------------------------------------------------
 async def main() -> None:
     if len(sys.argv) < 3:
-        print('Usage: run_cig_setup.py <config-file>' '<transport-spec-for-device>')
+        print('Usage: run_cig_setup.py <config-file> <transport-spec-for-device>')
         return
 
     print('<<< connecting to HCI...')
@@ -149,12 +149,9 @@ async def main() -> None:
             sdu += pdu.iso_sdu_fragment
             file_outputs[ase].write(sdu)
 
-        def on_ase_state_change(
-            state: AseStateMachine.State,
-            ase: AseStateMachine,
-        ) -> None:
-            if state != AseStateMachine.State.STREAMING:
-                if file_output := file_outputs.pop(ase):
+        def on_ase_state_change(ase: AseStateMachine) -> None:
+            if ase.state != AseStateMachine.State.STREAMING:
+                if file_output := file_outputs.pop(ase, None):
                     file_output.close()
             else:
                 file_output = open(f'{datetime.datetime.now().isoformat()}.lc3', 'wb')

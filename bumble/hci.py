@@ -5092,6 +5092,25 @@ class HCI_LE_Set_Default_Periodic_Advertising_Sync_Transfer_Parameters_Command(
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
+class HCI_LE_Read_ISO_TX_Sync_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.96 LE Read ISO TX Sync command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+
+    return_parameters_fields = [
+        ('status', STATUS_SPEC),
+        ('connection_handle', 2),
+        ('packet_sequence_number', 2),
+        ('tx_time_stamp', 4),
+        ('time_offset', 3),
+    ]
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
 class HCI_LE_Set_CIG_Parameters_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.97 LE Set CIG Parameters Command
@@ -7381,6 +7400,9 @@ class HCI_IsoDataPacket(HCI_Packet):
     iso_sdu_length: Optional[int] = None
     packet_status_flag: Optional[int] = None
 
+    def __post_init__(self) -> None:
+        self.ts_flag = self.time_stamp is not None
+
     @staticmethod
     def from_bytes(packet: bytes) -> HCI_IsoDataPacket:
         time_stamp: Optional[int] = None
@@ -7446,14 +7468,25 @@ class HCI_IsoDataPacket(HCI_Packet):
         return struct.pack(fmt, *args) + self.iso_sdu_fragment
 
     def __str__(self) -> str:
-        return (
+        result = (
             f'{color("ISO", "blue")}: '
             f'handle=0x{self.connection_handle:04x}, '
             f'pb={self.pb_flag}, '
-            f'ps={self.packet_status_flag}, '
-            f'data_total_length={self.data_total_length}, '
-            f'sdu_fragment={self.iso_sdu_fragment.hex()}'
+            f'data_total_length={self.data_total_length}'
         )
+
+        if self.ts_flag:
+            result += f', time_stamp={self.time_stamp}'
+
+        if self.pb_flag in (0b00, 0b10):
+            result += (
+                ', '
+                f'packet_sequence_number={self.packet_sequence_number}, '
+                f'ps={self.packet_status_flag}, '
+                f'sdu_fragment={self.iso_sdu_fragment.hex()}'
+            )
+
+        return result
 
 
 # -----------------------------------------------------------------------------

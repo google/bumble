@@ -337,7 +337,12 @@ class Speaker:
                         ),
                         (
                             AdvertisingData.FLAGS,
-                            bytes([AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG]),
+                            bytes(
+                                [
+                                    AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
+                                    | AdvertisingData.BR_EDR_NOT_SUPPORTED_FLAG
+                                ]
+                            ),
                         ),
                         (
                             AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,

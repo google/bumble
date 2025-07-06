@@ -343,22 +343,16 @@ class AseStateMachine(gatt.Characteristic):
             self.service.device.EVENT_CIS_ESTABLISHMENT, self.on_cis_establishment
         )
 
-    def on_cis_request(
-        self,
-        acl_connection: device.Connection,
-        cis_handle: int,
-        cig_id: int,
-        cis_id: int,
-    ) -> None:
+    def on_cis_request(self, cis_link: device.CisLink) -> None:
         if (
-            cig_id == self.cig_id
-            and cis_id == self.cis_id
+            cis_link.cig_id == self.cig_id
+            and cis_link.cis_id == self.cis_id
             and self.state == self.State.ENABLING
         ):
             utils.cancel_on_event(
-                acl_connection,
+                cis_link.acl_connection,
                 'flush',
-                self.service.device.accept_cis_request(cis_handle),
+                self.service.device.accept_cis_request(cis_link),
             )
 
     def on_cis_establishment(self, cis_link: device.CisLink) -> None:

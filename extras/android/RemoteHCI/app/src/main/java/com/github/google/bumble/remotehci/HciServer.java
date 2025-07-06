@@ -12,7 +12,7 @@ import java.net.Socket;
 
 public class HciServer {
     private static final String TAG = "HciServer";
-    private static final int BUFFER_SIZE = 1024;
+    private static final int BUFFER_SIZE = 8192;
     private final int mPort;
     private final Listener mListener;
     private OutputStream mOutputStream;
