@@ -36,7 +36,15 @@ from bumble.core import (
     CommandTimeoutError,
 )
 from bumble.colors import color
-from bumble.device import Connection, ConnectionParametersPreferences, Device, Peer
+from bumble.core import ConnectionPHY
+from bumble.device import (
+    CigParameters,
+    CisLink,
+    Connection,
+    ConnectionParametersPreferences,
+    Device,
+    Peer,
+)
 from bumble.gatt import Characteristic, CharacteristicValue, Service
 from bumble.hci import (
     HCI_LE_1M_PHY,
@@ -46,6 +54,7 @@ from bumble.hci import (
     HCI_Constant,
     HCI_Error,
     HCI_StatusError,
+    HCI_IsoDataPacket,
 )
 from bumble.sdp import (
     SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
@@ -83,10 +92,20 @@ SPEED_TX_UUID = 'E789C754-41A1-45F4-A948-A0A1A90DBA53'
 SPEED_RX_UUID = '016A2CC7-E14B-4819-935F-1F56EAE4098D'
 
 DEFAULT_RFCOMM_UUID = 'E6D55659-C8B4-4B85-96BB-B1143AF6D3AE'
+
 DEFAULT_L2CAP_PSM = 128
 DEFAULT_L2CAP_MAX_CREDITS = 128
 DEFAULT_L2CAP_MTU = 1024
 DEFAULT_L2CAP_MPS = 1024
+
+DEFAULT_ISO_MAX_SDU_C_TO_P = 251
+DEFAULT_ISO_MAX_SDU_P_TO_C = 251
+DEFAULT_ISO_SDU_INTERVAL_C_TO_P = 10000
+DEFAULT_ISO_SDU_INTERVAL_P_TO_C = 10000
+DEFAULT_ISO_MAX_TRANSPORT_LATENCY_C_TO_P = 35
+DEFAULT_ISO_MAX_TRANSPORT_LATENCY_P_TO_C = 35
+DEFAULT_ISO_RTN_C_TO_P = 3
+DEFAULT_ISO_RTN_P_TO_C = 3
 
 DEFAULT_LINGER_TIME = 1.0
 DEFAULT_POST_CONNECTION_WAIT_TIME = 1.0
@@ -104,14 +123,14 @@ def le_phy_name(phy_id):
     )
 
 
-def print_connection_phy(phy):
+def print_connection_phy(phy: ConnectionPHY) -> None:
     logging.info(
         color('@@@ PHY: ', 'yellow') + f'TX:{le_phy_name(phy.tx_phy)}/'
         f'RX:{le_phy_name(phy.rx_phy)}'
     )
 
 
-def print_connection(connection):
+def print_connection(connection: Connection) -> None:
     params = []
     if connection.transport == PhysicalTransport.LE:
         params.append(
@@ -134,6 +153,34 @@ def print_connection(connection):
         params.append(f'Role={HCI_Constant.role_name(connection.role)}')
 
     logging.info(color('@@@ Connection: ', 'yellow') + ' '.join(params))
+
+
+def print_cis_link(cis_link: CisLink) -> None:
+    logging.info(color("@@@ CIS established", "green"))
+    logging.info(color('@@@   ISO interval: ', 'green') + f"{cis_link.iso_interval}ms")
+    logging.info(color('@@@   NSE:          ', 'green') + f"{cis_link.nse}")
+    logging.info(color('@@@   Central->Peripheral:', 'green'))
+    if cis_link.phy_c_to_p is not None:
+        logging.info(
+            color('@@@     PHY:     ', 'green') + f"{cis_link.phy_c_to_p.name}"
+        )
+    logging.info(
+        color('@@@     Latency: ', 'green') + f"{cis_link.transport_latency_c_to_p}µs"
+    )
+    logging.info(color('@@@     BN:      ', 'green') + f"{cis_link.bn_c_to_p}")
+    logging.info(color('@@@     FT:      ', 'green') + f"{cis_link.ft_c_to_p}")
+    logging.info(color('@@@     Max PDU: ', 'green') + f"{cis_link.max_pdu_c_to_p}")
+    logging.info(color('@@@   Peripheral->Central:', 'green'))
+    if cis_link.phy_p_to_c is not None:
+        logging.info(
+            color('@@@     PHY:     ', 'green') + f"{cis_link.phy_p_to_c.name}"
+        )
+    logging.info(
+        color('@@@     Latency: ', 'green') + f"{cis_link.transport_latency_p_to_c}µs"
+    )
+    logging.info(color('@@@     BN:      ', 'green') + f"{cis_link.bn_p_to_c}")
+    logging.info(color('@@@     FT:      ', 'green') + f"{cis_link.ft_p_to_c}")
+    logging.info(color('@@@     Max PDU: ', 'green') + f"{cis_link.max_pdu_p_to_c}")
 
 
 def make_sdp_records(channel):
@@ -461,7 +508,8 @@ class Sender:
                 self.bytes_sent += len(packet)
                 await self.packet_io.send_packet(packet)
 
-            await self.done.wait()
+            if self.packet_io.can_receive():
+                await self.done.wait()
 
             run_counter = f'[{run + 1} of {self.repeat + 1}]' if self.repeat else ''
             logging.info(color(f'=== {run_counter} Done!', 'magenta'))
@@ -490,6 +538,9 @@ class Sender:
                 )
             )
             self.done.set()
+
+    def is_sender(self):
+        return True
 
 
 # -----------------------------------------------------------------------------
@@ -538,7 +589,8 @@ class Receiver:
             logging.info(
                 color(
                     f'!!! Unexpected packet, expected {self.expected_packet_index} '
-                    f'but received {packet.sequence}'
+                    f'but received {packet.sequence}',
+                    'red',
                 )
             )
 
@@ -580,6 +632,9 @@ class Receiver:
     async def run(self):
         await self.done.wait()
         logging.info(color('=== Done!', 'magenta'))
+
+    def is_sender(self):
+        return False
 
 
 # -----------------------------------------------------------------------------
@@ -716,13 +771,17 @@ class Ping:
                     color(
                         f'!!! Unexpected packet, '
                         f'expected {self.next_expected_packet_index} '
-                        f'but received {packet.sequence}'
+                        f'but received {packet.sequence}',
+                        'red',
                     )
                 )
 
         if packet.flags & Packet.PacketFlags.LAST:
             self.done.set()
             return
+
+    def is_sender(self):
+        return True
 
 
 # -----------------------------------------------------------------------------
@@ -768,7 +827,8 @@ class Pong:
             logging.info(
                 color(
                     f'!!! Unexpected packet, expected {self.expected_packet_index} '
-                    f'but received {packet.sequence}'
+                    f'but received {packet.sequence}',
+                    'red',
                 )
             )
 
@@ -789,6 +849,9 @@ class Pong:
     async def run(self):
         await self.done.wait()
         logging.info(color('=== Done!', 'magenta'))
+
+    def is_sender(self):
+        return False
 
 
 # -----------------------------------------------------------------------------
@@ -952,6 +1015,9 @@ class StreamedPacketIO:
 
         # pylint: disable-next=not-callable
         self.io_sink(struct.pack('>H', len(packet)) + packet)
+
+    def can_receive(self):
+        return True
 
 
 # -----------------------------------------------------------------------------
@@ -1225,6 +1291,96 @@ class RfcommServer(StreamedPacketIO):
 
 
 # -----------------------------------------------------------------------------
+# IsoClient
+# -----------------------------------------------------------------------------
+class IsoClient(StreamedPacketIO):
+    def __init__(
+        self,
+        device: Device,
+    ) -> None:
+        super().__init__()
+        self.device = device
+        self.ready = asyncio.Event()
+        self.cis_link: Optional[CisLink] = None
+
+    async def on_connection(
+        self, connection: Connection, cis_link: CisLink, sender: bool
+    ) -> None:
+        connection.on(connection.EVENT_DISCONNECTION, self.on_disconnection)
+        self.cis_link = cis_link
+        self.io_sink = cis_link.write
+        await cis_link.setup_data_path(
+            cis_link.Direction.HOST_TO_CONTROLLER
+            if sender
+            else cis_link.Direction.CONTROLLER_TO_HOST
+        )
+        cis_link.sink = self.on_iso_packet
+        self.ready.set()
+
+    def on_iso_packet(self, iso_packet: HCI_IsoDataPacket) -> None:
+        self.on_packet(iso_packet.iso_sdu_fragment)
+
+    def on_disconnection(self, _):
+        pass
+
+    async def drain(self):
+        if self.cis_link is None:
+            return
+        await self.cis_link.drain()
+
+    def can_receive(self):
+        return False
+
+
+# -----------------------------------------------------------------------------
+# IsoServer
+# -----------------------------------------------------------------------------
+class IsoServer(StreamedPacketIO):
+    def __init__(
+        self,
+        device: Device,
+    ):
+        super().__init__()
+        self.device = device
+        self.cis_link: Optional[CisLink] = None
+        self.ready = asyncio.Event()
+
+        logging.info(
+            color(
+                '### Listening for ISO connection',
+                'yellow',
+            )
+        )
+
+    async def on_connection(
+        self, connection: Connection, cis_link: CisLink, sender: bool
+    ) -> None:
+        connection.on(connection.EVENT_DISCONNECTION, self.on_disconnection)
+        self.io_sink = cis_link.write
+        await cis_link.setup_data_path(
+            cis_link.Direction.HOST_TO_CONTROLLER
+            if sender
+            else cis_link.Direction.CONTROLLER_TO_HOST
+        )
+        cis_link.sink = self.on_iso_packet
+        self.ready.set()
+
+    def on_iso_packet(self, iso_packet: HCI_IsoDataPacket) -> None:
+        self.on_packet(iso_packet.iso_sdu_fragment)
+
+    def on_disconnection(self, _):
+        pass
+
+    async def drain(self):
+        if self.cis_link is None:
+            return
+        await self.cis_link.drain()
+
+    def can_receive(self):
+        return False
+
+
+# -----------------------------------------------------------------------------
 # Central
 # -----------------------------------------------------------------------------
 class Central(Connection.Listener):
@@ -1232,13 +1388,22 @@ class Central(Connection.Listener):
         self,
         transport,
         peripheral_address,
-        classic,
         scenario_factory,
         mode_factory,
         connection_interval,
         phy,
         authenticate,
         encrypt,
+        iso,
+        iso_sdu_interval_c_to_p,
+        iso_sdu_interval_p_to_c,
+        iso_max_sdu_c_to_p,
+        iso_max_sdu_p_to_c,
+        iso_max_transport_latency_c_to_p,
+        iso_max_transport_latency_p_to_c,
+        iso_rtn_c_to_p,
+        iso_rtn_p_to_c,
+        classic,
         extended_data_length,
         role_switch,
         le_scan,
@@ -1250,6 +1415,15 @@ class Central(Connection.Listener):
         self.transport = transport
         self.peripheral_address = peripheral_address
         self.classic = classic
+        self.iso = iso
+        self.iso_sdu_interval_c_to_p = iso_sdu_interval_c_to_p
+        self.iso_sdu_interval_p_to_c = iso_sdu_interval_p_to_c
+        self.iso_max_sdu_c_to_p = iso_max_sdu_c_to_p
+        self.iso_max_sdu_p_to_c = iso_max_sdu_p_to_c
+        self.iso_max_transport_latency_c_to_p = iso_max_transport_latency_c_to_p
+        self.iso_max_transport_latency_p_to_c = iso_max_transport_latency_p_to_c
+        self.iso_rtn_c_to_p = iso_rtn_c_to_p
+        self.iso_rtn_p_to_c = iso_rtn_p_to_c
         self.scenario_factory = scenario_factory
         self.mode_factory = mode_factory
         self.authenticate = authenticate
@@ -1308,6 +1482,13 @@ class Central(Connection.Listener):
             )
             mode = self.mode_factory(self.device)
             scenario = self.scenario_factory(mode)
+            self.device.classic_enabled = self.classic
+            self.device.cis_enabled = self.iso
+
+            # Set up a pairing config factory with minimal requirements.
+            self.device.pairing_config_factory = lambda _: PairingConfig(
+                sc=False, mitm=False, bonding=False
+            )
 
             await pre_power_on(self.device, self.classic)
             await self.device.power_on()
@@ -1392,7 +1573,72 @@ class Central(Connection.Listener):
                         )
                     )
 
-            await mode.on_connection(self.connection)
+            # Setup ISO streams.
+            if self.iso:
+                if scenario.is_sender():
+                    sdu_interval_c_to_p = (
+                        self.iso_sdu_interval_c_to_p or DEFAULT_ISO_SDU_INTERVAL_C_TO_P
+                    )
+                    sdu_interval_p_to_c = self.iso_sdu_interval_p_to_c or 0
+                    max_transport_latency_c_to_p = (
+                        self.iso_max_transport_latency_c_to_p
+                        or DEFAULT_ISO_MAX_TRANSPORT_LATENCY_C_TO_P
+                    )
+                    max_transport_latency_p_to_c = (
+                        self.iso_max_transport_latency_p_to_c or 0
+                    )
+                    max_sdu_c_to_p = (
+                        self.iso_max_sdu_c_to_p or DEFAULT_ISO_MAX_SDU_C_TO_P
+                    )
+                    max_sdu_p_to_c = self.iso_max_sdu_p_to_c or 0
+                    rtn_c_to_p = self.iso_rtn_c_to_p or DEFAULT_ISO_RTN_C_TO_P
+                    rtn_p_to_c = self.iso_rtn_p_to_c or 0
+                else:
+                    sdu_interval_p_to_c = (
+                        self.iso_sdu_interval_p_to_c or DEFAULT_ISO_SDU_INTERVAL_P_TO_C
+                    )
+                    sdu_interval_c_to_p = self.iso_sdu_interval_c_to_p or 0
+                    max_transport_latency_p_to_c = (
+                        self.iso_max_transport_latency_p_to_c
+                        or DEFAULT_ISO_MAX_TRANSPORT_LATENCY_P_TO_C
+                    )
+                    max_transport_latency_c_to_p = (
+                        self.iso_max_transport_latency_c_to_p or 0
+                    )
+                    max_sdu_p_to_c = (
+                        self.iso_max_sdu_p_to_c or DEFAULT_ISO_MAX_SDU_P_TO_C
+                    )
+                    max_sdu_c_to_p = self.iso_max_sdu_c_to_p or 0
+                    rtn_p_to_c = self.iso_rtn_p_to_c or DEFAULT_ISO_RTN_P_TO_C
+                    rtn_c_to_p = self.iso_rtn_c_to_p or 0
+                cis_handles = await self.device.setup_cig(
+                    CigParameters(
+                        cig_id=1,
+                        sdu_interval_c_to_p=sdu_interval_c_to_p,
+                        sdu_interval_p_to_c=sdu_interval_p_to_c,
+                        max_transport_latency_c_to_p=max_transport_latency_c_to_p,
+                        max_transport_latency_p_to_c=max_transport_latency_p_to_c,
+                        cis_parameters=[
+                            CigParameters.CisParameters(
+                                cis_id=2,
+                                max_sdu_c_to_p=max_sdu_c_to_p,
+                                max_sdu_p_to_c=max_sdu_p_to_c,
+                                rtn_c_to_p=rtn_c_to_p,
+                                rtn_p_to_c=rtn_p_to_c,
+                            )
+                        ],
+                    )
+                )
+                cis_link = (
+                    await self.device.create_cis([(cis_handles[0], self.connection)])
+                )[0]
+                print_cis_link(cis_link)
+
+                await mode.on_connection(
+                    self.connection, cis_link, scenario.is_sender()
+                )
+            else:
+                await mode.on_connection(self.connection)
 
             await scenario.run()
             await asyncio.sleep(DEFAULT_LINGER_TIME)
@@ -1428,6 +1674,7 @@ class Peripheral(Device.Listener, Connection.Listener):
         scenario_factory,
         mode_factory,
         classic,
+        iso,
         extended_data_length,
         role_switch,
         le_scan,
@@ -1437,6 +1684,7 @@ class Peripheral(Device.Listener, Connection.Listener):
     ):
         self.transport = transport
         self.classic = classic
+        self.iso = iso
         self.scenario_factory = scenario_factory
         self.mode_factory = mode_factory
         self.extended_data_length = extended_data_length
@@ -1470,6 +1718,13 @@ class Peripheral(Device.Listener, Connection.Listener):
             self.device.listener = self
             self.mode = self.mode_factory(self.device)
             self.scenario = self.scenario_factory(self.mode)
+            self.device.classic_enabled = self.classic
+            self.device.cis_enabled = self.iso
+
+            # Set up a pairing config factory with minimal requirements.
+            self.device.pairing_config_factory = lambda _: PairingConfig(
+                sc=False, mitm=False, bonding=False
+            )
 
             await pre_power_on(self.device, self.classic)
             await self.device.power_on()
@@ -1501,7 +1756,21 @@ class Peripheral(Device.Listener, Connection.Listener):
             logging.info(color('### Connected', 'cyan'))
             print_connection(self.connection)
 
-            await self.mode.on_connection(self.connection)
+            if self.iso:
+
+                async def on_cis_request(cis_link: CisLink) -> None:
+                    logging.info(color("@@@ Accepting CIS", "green"))
+                    await self.device.accept_cis_request(cis_link)
+                    print_cis_link(cis_link)
+
+                    await self.mode.on_connection(
+                        self.connection, cis_link, self.scenario.is_sender()
+                    )
+
+                self.connection.on(self.connection.EVENT_CIS_REQUEST, on_cis_request)
+            else:
+                await self.mode.on_connection(self.connection)
+
             await self.scenario.run()
             await asyncio.sleep(DEFAULT_LINGER_TIME)
 
@@ -1613,6 +1882,12 @@ def create_mode_factory(ctx, default_mode):
                 credits_threshold=ctx.obj['rfcomm_credits_threshold'],
             )
 
+        if mode == 'iso-server':
+            return IsoServer(device)
+
+        if mode == 'iso-client':
+            return IsoClient(device)
+
         raise ValueError('invalid mode')
 
     return create_mode
@@ -1640,6 +1915,9 @@ def create_scenario_factory(ctx, default_scenario):
             return Receiver(packet_io, ctx.obj['linger'])
 
         if scenario == 'ping':
+            if isinstance(packet_io, (IsoClient, IsoServer)):
+                raise ValueError('ping not supported with ISO')
+
             return Ping(
                 packet_io,
                 start_delay=ctx.obj['start_delay'],
@@ -1651,6 +1929,9 @@ def create_scenario_factory(ctx, default_scenario):
             )
 
         if scenario == 'pong':
+            if isinstance(packet_io, (IsoClient, IsoServer)):
+                raise ValueError('pong not supported with ISO')
+
             return Pong(packet_io, ctx.obj['linger'])
 
         raise ValueError('invalid scenario')
@@ -1674,6 +1955,8 @@ def create_scenario_factory(ctx, default_scenario):
             'l2cap-server',
             'rfcomm-client',
             'rfcomm-server',
+            'iso-client',
+            'iso-server',
         ]
     ),
 )
@@ -1896,6 +2179,7 @@ def bench(
     ctx.obj['classic_page_scan'] = classic_page_scan
     ctx.obj['classic_inquiry_scan'] = classic_inquiry_scan
     ctx.obj['classic'] = mode in ('rfcomm-client', 'rfcomm-server')
+    ctx.obj['iso'] = mode in ('iso-client', 'iso-server')
 
 
 @bench.command()
@@ -1917,26 +2201,88 @@ def bench(
 @click.option('--phy', type=click.Choice(['1m', '2m', 'coded']), help='PHY to use')
 @click.option('--authenticate', is_flag=True, help='Authenticate (RFComm only)')
 @click.option('--encrypt', is_flag=True, help='Encrypt the connection (RFComm only)')
+@click.option(
+    '--iso-sdu-interval-c-to-p',
+    type=int,
+    help='ISO SDU central -> peripheral (microseconds)',
+)
+@click.option(
+    '--iso-sdu-interval-p-to-c',
+    type=int,
+    help='ISO SDU interval peripheral -> central (microseconds)',
+)
+@click.option(
+    '--iso-max-sdu-c-to-p',
+    type=int,
+    help='ISO max SDU central -> peripheral',
+)
+@click.option(
+    '--iso-max-sdu-p-to-c',
+    type=int,
+    help='ISO max SDU peripheral -> central',
+)
+@click.option(
+    '--iso-max-transport-latency-c-to-p',
+    type=int,
+    help='ISO max transport latency central -> peripheral (milliseconds)',
+)
+@click.option(
+    '--iso-max-transport-latency-p-to-c',
+    type=int,
+    help='ISO max transport latency peripheral -> central (milliseconds)',
+)
+@click.option(
+    '--iso-rtn-c-to-p',
+    type=int,
+    help='ISO RTN central -> peripheral (integer count)',
+)
+@click.option(
+    '--iso-rtn-p-to-c',
+    type=int,
+    help='ISO RTN peripheral -> central (integer count)',
+)
 @click.pass_context
 def central(
-    ctx, transport, peripheral_address, connection_interval, phy, authenticate, encrypt
+    ctx,
+    transport,
+    peripheral_address,
+    connection_interval,
+    phy,
+    authenticate,
+    encrypt,
+    iso_sdu_interval_c_to_p,
+    iso_sdu_interval_p_to_c,
+    iso_max_sdu_c_to_p,
+    iso_max_sdu_p_to_c,
+    iso_max_transport_latency_c_to_p,
+    iso_max_transport_latency_p_to_c,
+    iso_rtn_c_to_p,
+    iso_rtn_p_to_c,
 ):
     """Run as a central (initiates the connection)"""
     scenario_factory = create_scenario_factory(ctx, 'send')
     mode_factory = create_mode_factory(ctx, 'gatt-client')
-    classic = ctx.obj['classic']
 
     async def run_central():
         await Central(
             transport,
             peripheral_address,
-            classic,
             scenario_factory,
             mode_factory,
             connection_interval,
             phy,
             authenticate,
             encrypt or authenticate,
+            ctx.obj['iso'],
+            iso_sdu_interval_c_to_p,
+            iso_sdu_interval_p_to_c,
+            iso_max_sdu_c_to_p,
+            iso_max_sdu_p_to_c,
+            iso_max_transport_latency_c_to_p,
+            iso_max_transport_latency_p_to_c,
+            iso_rtn_c_to_p,
+            iso_rtn_p_to_c,
+            ctx.obj['classic'],
             ctx.obj['extended_data_length'],
             ctx.obj['role_switch'],
             ctx.obj['le_scan'],
@@ -1962,6 +2308,7 @@ def peripheral(ctx, transport):
             scenario_factory,
             mode_factory,
             ctx.obj['classic'],
+            ctx.obj['iso'],
             ctx.obj['extended_data_length'],
             ctx.obj['role_switch'],
             ctx.obj['le_scan'],

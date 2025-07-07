@@ -39,7 +39,6 @@ from bumble import drivers
 from bumble import hci
 from bumble.core import (
     PhysicalTransport,
-    PhysicalTransport,
     ConnectionPHY,
     ConnectionParameters,
 )
@@ -72,6 +71,11 @@ class DataPacketQueue(utils.EventEmitter):
 
     max_packet_size: int
 
+    class PerConnectionState:
+        def __init__(self) -> None:
+            self.in_flight = 0
+            self.drained = asyncio.Event()
+
     def __init__(
         self,
         max_packet_size: int,
@@ -82,9 +86,12 @@ class DataPacketQueue(utils.EventEmitter):
         self.max_packet_size = max_packet_size
         self.max_in_flight = max_in_flight
         self._in_flight = 0  # Total number of packets in flight across all connections
-        self._in_flight_per_connection: dict[int, int] = collections.defaultdict(
-            int
-        )  # Number of packets in flight per connection
+        self._connection_state: dict[int, DataPacketQueue.PerConnectionState] = (
+            collections.defaultdict(DataPacketQueue.PerConnectionState)
+        )
+        self._drained_per_connection: dict[int, asyncio.Event] = (
+            collections.defaultdict(asyncio.Event)
+        )
         self._send = send
         self._packets: collections.deque[tuple[hci.HCI_Packet, int]] = (
             collections.deque()
@@ -136,36 +143,40 @@ class DataPacketQueue(utils.EventEmitter):
             self._completed += flushed_count
             self._packets = collections.deque(packets_to_keep)
 
-        if connection_handle in self._in_flight_per_connection:
-            in_flight = self._in_flight_per_connection[connection_handle]
+        if connection_state := self._connection_state.pop(connection_handle, None):
+            in_flight = connection_state.in_flight
             self._completed += in_flight
             self._in_flight -= in_flight
-            del self._in_flight_per_connection[connection_handle]
+            connection_state.drained.set()
 
     def _check_queue(self) -> None:
         while self._packets and self._in_flight < self.max_in_flight:
             packet, connection_handle = self._packets.pop()
             self._send(packet)
             self._in_flight += 1
-            self._in_flight_per_connection[connection_handle] += 1
+            connection_state = self._connection_state[connection_handle]
+            connection_state.in_flight += 1
+            connection_state.drained.clear()
 
     def on_packets_completed(self, packet_count: int, connection_handle: int) -> None:
         """Mark one or more packets associated with a connection as completed."""
-        if connection_handle not in self._in_flight_per_connection:
+        if connection_handle not in self._connection_state:
             logger.warning(
                 f'received completion for unknown connection {connection_handle}'
             )
             return
 
-        in_flight_for_connection = self._in_flight_per_connection[connection_handle]
-        if packet_count <= in_flight_for_connection:
-            self._in_flight_per_connection[connection_handle] -= packet_count
+        connection_state = self._connection_state[connection_handle]
+        if packet_count <= connection_state.in_flight:
+            connection_state.in_flight -= packet_count
         else:
             logger.warning(
                 f'{packet_count} completed for {connection_handle} '
-                f'but only {in_flight_for_connection} in flight'
+                f'but only {connection_state.in_flight} in flight'
             )
-            self._in_flight_per_connection[connection_handle] = 0
+            connection_state.in_flight = 0
+        if connection_state.in_flight == 0:
+            connection_state.drained.set()
 
         if packet_count <= self._in_flight:
             self._in_flight -= packet_count
@@ -179,6 +190,13 @@ class DataPacketQueue(utils.EventEmitter):
 
         self._check_queue()
         self.emit('flow')
+
+    async def drain(self, connection_handle: int) -> None:
+        """Wait until there are no pending packets for a connection."""
+        if not (connection_state := self._connection_state.get(connection_handle)):
+            raise ValueError('no such connection')
+
+        await connection_state.drained.wait()
 
 
 # -----------------------------------------------------------------------------
@@ -1269,7 +1287,24 @@ class Host(utils.EventEmitter):
             self.cis_links[event.connection_handle] = IsoLink(
                 handle=event.connection_handle, packet_queue=self.iso_packet_queue
             )
-            self.emit('cis_establishment', event.connection_handle)
+            self.emit(
+                'cis_establishment',
+                event.connection_handle,
+                event.cig_sync_delay,
+                event.cis_sync_delay,
+                event.transport_latency_c_to_p,
+                event.transport_latency_p_to_c,
+                event.phy_c_to_p,
+                event.phy_p_to_c,
+                event.nse,
+                event.bn_c_to_p,
+                event.bn_p_to_c,
+                event.ft_c_to_p,
+                event.ft_p_to_c,
+                event.max_pdu_c_to_p,
+                event.max_pdu_p_to_c,
+                event.iso_interval,
+            )
         else:
             self.emit(
                 'cis_establishment_failure', event.connection_handle, event.status
@@ -1372,6 +1407,10 @@ class Host(utils.EventEmitter):
             self.emit('role_change_failure', event.bd_addr, event.status)
 
     def on_hci_le_data_length_change_event(self, event):
+        if (connection := self.connections.get(event.connection_handle)) is None:
+            logger.warning('!!! DATA LENGTH CHANGE: unknown handle')
+            return
+
         self.emit(
             'connection_data_length_change',
             event.connection_handle,

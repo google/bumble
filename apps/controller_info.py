@@ -242,7 +242,9 @@ async def get_codecs_info(host: Host) -> None:
 
 
 # -----------------------------------------------------------------------------
-async def async_main(latency_probes, transport):
+async def async_main(
+    latency_probes, latency_probe_interval, latency_probe_command, transport
+):
     print('<<< connecting to HCI...')
     async with await open_transport_or_link(transport) as (hci_source, hci_sink):
         print('<<< connected')
@@ -251,19 +253,32 @@ async def async_main(latency_probes, transport):
         await host.reset()
 
         # Measure the latency if requested
+        # (we add an extra probe at the start, that we ignore, just to ensure that
+        # the transport is primed)
         latencies = []
         if latency_probes:
-            for _ in range(latency_probes):
+            if latency_probe_command:
+                probe_hci_command = HCI_Command.from_bytes(
+                    bytes.fromhex(latency_probe_command)
+                )
+            else:
+                probe_hci_command = HCI_Read_Local_Version_Information_Command()
+
+            for iteration in range(1 + latency_probes):
+                if latency_probe_interval:
+                    await asyncio.sleep(latency_probe_interval / 1000)
                 start = time.time()
-                await host.send_command(HCI_Read_Local_Version_Information_Command())
-                latencies.append(1000 * (time.time() - start))
+                await host.send_command(probe_hci_command)
+                if iteration:
+                    latencies.append(1000 * (time.time() - start))
             print(
                 color('HCI Command Latency:', 'yellow'),
                 (
                     f'min={min(latencies):.2f}, '
                     f'max={max(latencies):.2f}, '
-                    f'average={sum(latencies)/len(latencies):.2f}'
+                    f'average={sum(latencies)/len(latencies):.2f},'
                 ),
+                [f'{latency:.4}' for latency in latencies],
                 '\n',
             )
 
@@ -311,10 +326,32 @@ async def async_main(latency_probes, transport):
     type=int,
     help='Send N commands to measure HCI transport latency statistics',
 )
+@click.option(
+    '--latency-probe-interval',
+    metavar='INTERVAL',
+    type=int,
+    help='Interval between latency probes (milliseconds)',
+)
+@click.option(
+    '--latency-probe-command',
+    metavar='COMMAND_HEX',
+    help=(
+        'Probe command (HCI Command packet bytes, in hex. Use 0177FC00 for'
+        ' a loopback test with the HCI remote proxy app)'
+    ),
+)
 @click.argument('transport')
-def main(latency_probes, transport):
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
-    asyncio.run(async_main(latency_probes, transport))
+def main(latency_probes, latency_probe_interval, latency_probe_command, transport):
+    logging.basicConfig(
+        level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper(),
+        format="[%(asctime)s.%(msecs)03d] %(levelname)s:%(name)s:%(message)s",
+        datefmt="%H:%M:%S",
+    )
+    asyncio.run(
+        async_main(
+            latency_probes, latency_probe_interval, latency_probe_command, transport
+        )
+    )
 
 
 # -----------------------------------------------------------------------------

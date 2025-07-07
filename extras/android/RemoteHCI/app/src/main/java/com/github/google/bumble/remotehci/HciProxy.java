@@ -1,5 +1,7 @@
 package com.github.google.bumble.remotehci;
 
+import static com.github.google.bumble.remotehci.HciPacket.Type.COMMAND;
+
 import android.os.RemoteException;
 import android.util.Log;
 
@@ -15,6 +17,10 @@ public class HciProxy {
     private int mEventPacketsSent;
     private int mAclPacketsSent;
     private int mScoPacketsSent;
+
+    private static final byte[] LOOPBACK_COMMAND_COMPLETE_EVENT = {
+        0x0E, 0x04, 0x01, 0x77, (byte)0xFC, 0x00
+    };
 
     HciProxy(int port, Listener listener) throws HalException {
         this.mListener = listener;
@@ -84,6 +90,14 @@ public class HciProxy {
 
             @Override
             public void onPacket(HciPacket.Type type, byte[] packet) {
+                // Short-circuit a local response when a special latency-testing packet
+                // is received.
+                if (type == COMMAND && packet[0] == (byte)0x77 && packet[1] == (byte)0xFC) {
+                    Log.d(TAG, "LOOPBACK");
+                    mServer.sendPacket(HciPacket.Type.EVENT, LOOPBACK_COMMAND_COMPLETE_EVENT);
+                    return;
+                }
+
                 Log.d(TAG, String.format("HOST->CONTROLLER: type=%s, size=%d", type, packet.length));
                 hciHal.sendPacket(type, packet);
 

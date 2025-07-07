@@ -128,7 +128,7 @@ class BroadcastScanner(bumble.utils.EventEmitter):
         broadcast_audio_announcement: Optional[bap.BroadcastAudioAnnouncement] = None
         basic_audio_announcement: Optional[bap.BasicAudioAnnouncement] = None
         appearance: Optional[core.Appearance] = None
-        biginfo: Optional[bumble.device.BIGInfoAdvertisement] = None
+        biginfo: Optional[bumble.device.BigInfoAdvertisement] = None
         manufacturer_data: Optional[tuple[str, bytes]] = None
 
         def __post_init__(self) -> None:
@@ -255,8 +255,10 @@ class BroadcastScanner(bumble.utils.EventEmitter):
                 print(color('    SDU Interval: ', 'magenta'), self.biginfo.sdu_interval)
                 print(color('    Max SDU:      ', 'magenta'), self.biginfo.max_sdu)
                 print(color('    PHY:          ', 'magenta'), self.biginfo.phy.name)
-                print(color('    Framed:       ', 'magenta'), self.biginfo.framed)
-                print(color('    Encrypted:    ', 'magenta'), self.biginfo.encrypted)
+                print(color('    Framing:      ', 'magenta'), self.biginfo.framing.name)
+                print(
+                    color('    Encryption:   ', 'magenta'), self.biginfo.encryption.name
+                )
 
         def on_sync_establishment(self) -> None:
             self.emit('sync_establishment')
@@ -286,7 +288,7 @@ class BroadcastScanner(bumble.utils.EventEmitter):
             self.emit('change')
 
         def on_biginfo_advertisement(
-            self, advertisement: bumble.device.BIGInfoAdvertisement
+            self, advertisement: bumble.device.BigInfoAdvertisement
         ) -> None:
             self.biginfo = advertisement
             self.emit('change')
