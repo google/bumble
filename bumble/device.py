@@ -1710,6 +1710,8 @@ class Connection(utils.CompositeEventEmitter):
     pairing_peer_authentication_requirements: Optional[int]
     cs_configs: dict[int, ChannelSoundingConfig]  # Config ID to Configuration
     cs_procedures: dict[int, ChannelSoundingProcedure]  # Config ID to Procedures
+    current_mode: int = hci.HCI_Mode_Change_Event.Mode.ACTIVE
+    interval: int = 0  # ms
 
     EVENT_CONNECTION_ATT_MTU_UPDATE = "connection_att_mtu_update"
     EVENT_DISCONNECTION = "disconnection"
@@ -1736,6 +1738,8 @@ class Connection(utils.CompositeEventEmitter):
     EVENT_CHANNEL_SOUNDING_CONFIG_REMOVED = "channel_sounding_config_removed"
     EVENT_CHANNEL_SOUNDING_PROCEDURE_FAILURE = "channel_sounding_procedure_failure"
     EVENT_CHANNEL_SOUNDING_PROCEDURE = "channel_sounding_procedure"
+    EVENT_MODE_CHANGE = "mode_change"
+    EVENT_MODE_CHANGE_FAILURE = "mode_change_failure"
     EVENT_ROLE_CHANGE = "role_change"
     EVENT_ROLE_CHANGE_FAILURE = "role_change_failure"
     EVENT_CLASSIC_PAIRING = "classic_pairing"
@@ -5876,6 +5880,19 @@ class Device(utils.CompositeEventEmitter):
             )
 
         utils.AsyncRunner.spawn(reply())
+
+    # [Classic only]
+    @host_event_handler
+    @with_connection_from_handle
+    def on_mode_change(
+        self, connection: Connection, status: int, current_mode: int, interval: int
+    ):
+        if status == hci.HCI_SUCCESS:
+            connection.classic_mode = current_mode
+            connection.classic_interval = interval
+            connection.emit(connection.EVENT_MODE_CHANGE)
+        else:
+            connection.emit(connection.EVENT_MODE_CHANGE_FAILURE)
 
     # [Classic only]
     @host_event_handler
