@@ -5879,6 +5879,19 @@ class Device(utils.CompositeEventEmitter):
 
     # [Classic only]
     @host_event_handler
+    @with_connection_from_handle
+    def on_mode_change(
+        self, connection: Connection, status: int, current_mode: int, interval: int
+    ):
+        if status == hci.HCI_SUCCESS:
+            connection.classic_mode = current_mode
+            connection.classic_interval = interval
+            connection.emit(connection.EVENT_MODE_CHANGE)
+        else:
+            connection.emit(connection.EVENT_MODE_CHANGE_FAILURE)
+
+    # [Classic only]
+    @host_event_handler
     @with_connection_from_address
     def on_pin_code_request(self, connection):
         # Classic legacy pairing
