@@ -4990,7 +4990,9 @@ class HCI_LE_Set_Privacy_Mode_Command(HCI_Command):
         NETWORK_PRIVACY_MODE = 0x00
         DEVICE_PRIVACY_MODE = 0x01
 
-    peer_identity_address_type: int = field(metadata=Address.ADDRESS_TYPE_SPEC)
+    peer_identity_address_type: int = field(
+        metadata=metadata(Address.ADDRESS_TYPE_SPEC)
+    )
     peer_identity_address: Address = field(
         metadata=metadata(Address.parse_address_preceded_by_type)
     )
