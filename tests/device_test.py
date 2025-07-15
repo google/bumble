@@ -581,8 +581,12 @@ async def test_enter_and_exit_sniff_mode():
     devices = TwoDevices()
     await devices.setup_connection()
 
-    m = mock.Mock()
-    devices.connections[0].on(Connection.EVENT_MODE_CHANGE, m)
+    q = asyncio.Queue()
+
+    def on_mode_change():
+        q.put_nowait(lambda: None)
+
+    devices.connections[0].on(Connection.EVENT_MODE_CHANGE, on_mode_change)
 
     await devices[0].send_command(
         hci.HCI_Sniff_Mode_Command(
@@ -594,7 +598,7 @@ async def test_enter_and_exit_sniff_mode():
         ),
     )
 
-    m.assert_called_once()
+    await asyncio.wait_for(q.get(), _TIMEOUT)
     assert devices.connections[0].classic_mode == hci.HCI_Mode_Change_Event.Mode.SNIFF
     assert devices.connections[0].classic_interval == 2
 
@@ -602,6 +606,7 @@ async def test_enter_and_exit_sniff_mode():
         hci.HCI_Exit_Sniff_Mode_Command(connection_handle=devices.connections[0].handle)
     )
 
+    await asyncio.wait_for(q.get(), _TIMEOUT)
     assert devices.connections[0].classic_mode == hci.HCI_Mode_Change_Event.Mode.ACTIVE
     assert devices.connections[0].classic_interval == 2
 
