@@ -27,7 +27,7 @@ from bumble.colors import color
 from bumble.core import (
     PhysicalTransport,
 )
-
+from bumble import hci
 from bumble.hci import (
     HCI_ACL_DATA_PACKET,
     HCI_COMMAND_DISALLOWED_ERROR,
@@ -977,7 +977,68 @@ class Controller:
             self, connection.peer_address, HCI_Connection_Complete_Event.LinkType.ESCO
         )
 
-    def on_hci_switch_role_command(self, command):
+    def on_hci_sniff_mode_command(self, command: hci.HCI_Sniff_Mode_Command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.2.2 Sniff Mode command
+        '''
+        if self.link is None:
+            self.send_hci_packet(
+                hci.HCI_Command_Status_Event(
+                    status=hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                )
+            )
+            return
+
+        self.send_hci_packet(
+            hci.HCI_Command_Status_Event(
+                status=HCI_SUCCESS,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
+        self.send_hci_packet(
+            hci.HCI_Mode_Change_Event(
+                status=HCI_SUCCESS,
+                connection_handle=command.connection_handle,
+                current_mode=hci.HCI_Mode_Change_Event.Mode.SNIFF,
+                interval=2,
+            )
+        )
+
+    def on_hci_exit_sniff_mode_command(self, command: hci.HCI_Exit_Sniff_Mode_Command):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.2.3 Exit Sniff Mode command
+        '''
+
+        if self.link is None:
+            self.send_hci_packet(
+                hci.HCI_Command_Status_Event(
+                    status=hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                )
+            )
+            return
+
+        self.send_hci_packet(
+            hci.HCI_Command_Status_Event(
+                status=HCI_SUCCESS,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
+        self.send_hci_packet(
+            hci.HCI_Mode_Change_Event(
+                status=HCI_SUCCESS,
+                connection_handle=command.connection_handle,
+                current_mode=hci.HCI_Mode_Change_Event.Mode.ACTIVE,
+                interval=2,
+            )
+        )
+
+    def on_hci_switch_role_command(self, command: hci.HCI_Switch_Role_Command):
         '''
         See Bluetooth spec Vol 4, Part E - 7.2.8 Switch Role command
         '''

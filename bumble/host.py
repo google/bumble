@@ -1392,6 +1392,15 @@ class Host(utils.EventEmitter):
     def on_hci_synchronous_connection_changed_event(self, event):
         pass
 
+    def on_hci_mode_change_event(self, event: hci.HCI_Mode_Change_Event):
+        self.emit(
+            'mode_change',
+            event.connection_handle,
+            event.status,
+            event.current_mode,
+            event.interval,
+        )
+
     def on_hci_role_change_event(self, event):
         if event.status == hci.HCI_SUCCESS:
             logger.debug(
