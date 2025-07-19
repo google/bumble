@@ -238,6 +238,15 @@ def test_HCI_Command():
     command = hci.HCI_Command(op_code=0x5566, parameters=bytes.fromhex('AABBCC'))
     basic_check(command)
 
+    @hci.HCI_Command.command
+    class CustomCommand(hci.HCI_Command):
+        op_code = 0x7788
+        name = 'Custom Command'
+
+    basic_check(CustomCommand())
+    assert CustomCommand().op_code == 0x7788
+    assert CustomCommand().name == 'Custom Command'
+
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
