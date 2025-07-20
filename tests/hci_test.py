@@ -240,6 +240,51 @@ def test_HCI_Command():
 
 
 # -----------------------------------------------------------------------------
+def test_custom_command():
+    @hci.HCI_Command.command
+    class CustomCommand(hci.HCI_Command):
+        op_code = 0x7788
+        name = 'Custom Command'
+
+    command = CustomCommand()
+    basic_check(command)
+    parsed = hci.HCI_Packet.from_bytes(bytes(command))
+    assert isinstance(parsed, CustomCommand)
+    assert parsed.op_code == 0x7788
+    assert parsed.name == 'Custom Command'
+
+
+# -----------------------------------------------------------------------------
+def test_custom_event():
+    @hci.HCI_Event.event
+    class CustomEvent(hci.HCI_Event):
+        event_code = 0x99
+        name = 'Custom Event'
+
+    event = CustomEvent()
+    basic_check(event)
+    parsed = hci.HCI_Packet.from_bytes(bytes(event))
+    assert isinstance(parsed, CustomEvent)
+    assert parsed.event_code == 0x99
+    assert parsed.name == 'Custom Event'
+
+
+# -----------------------------------------------------------------------------
+def test_custom_le_meta_event():
+    @hci.HCI_LE_Meta_Event.event
+    class CustomEvent(hci.HCI_LE_Meta_Event):
+        subevent_code = 0xFF
+        name = 'Custom Extended Event'
+
+    event = CustomEvent()
+    basic_check(event)
+    parsed = hci.HCI_Packet.from_bytes(bytes(event))
+    assert isinstance(parsed, CustomEvent)
+    assert parsed.subevent_code == 0xFF
+    assert parsed.name == 'Custom Extended Event'
+
+
+# -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "clazz,",
     [
