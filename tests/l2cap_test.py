@@ -68,11 +68,13 @@ def test_helpers():
     assert offset == 4
     assert psm == 0x242311
 
-    rq = L2CAP_Connection_Request(psm=0x01, source_cid=0x44)
+    rq = L2CAP_Connection_Request(psm=0x01, source_cid=0x44, identifier=0x88)
     brq = bytes(rq)
     srq = L2CAP_Connection_Request.from_bytes(brq)
+    assert isinstance(srq, L2CAP_Connection_Request)
     assert srq.psm == rq.psm
     assert srq.source_cid == rq.source_cid
+    assert srq.identifier == rq.identifier
 
 
 # -----------------------------------------------------------------------------

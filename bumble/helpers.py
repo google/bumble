@@ -34,9 +34,8 @@ from bumble.att import ATT_CID, ATT_PDU
 from bumble.smp import SMP_CID, SMP_Command
 from bumble.core import name_or_number
 from bumble.l2cap import (
+    CommandCode,
     L2CAP_PDU,
-    L2CAP_CONNECTION_REQUEST,
-    L2CAP_CONNECTION_RESPONSE,
     L2CAP_SIGNALING_CID,
     L2CAP_LE_SIGNALING_CID,
     L2CAP_Control_Frame,
@@ -106,14 +105,14 @@ class PacketTracer:
                 self.analyzer.emit(control_frame)
 
                 # Check if this signals a new channel
-                if control_frame.code == L2CAP_CONNECTION_REQUEST:
+                if control_frame.code == CommandCode.L2CAP_CONNECTION_REQUEST:
                     connection_request = cast(L2CAP_Connection_Request, control_frame)
                     self.psms[connection_request.source_cid] = connection_request.psm
-                elif control_frame.code == L2CAP_CONNECTION_RESPONSE:
+                elif control_frame.code == CommandCode.L2CAP_CONNECTION_RESPONSE:
                     connection_response = cast(L2CAP_Connection_Response, control_frame)
                     if (
                         connection_response.result
-                        == L2CAP_Connection_Response.CONNECTION_SUCCESSFUL
+                        == L2CAP_Connection_Response.Result.CONNECTION_SUCCESSFUL
                     ):
                         if self.peer and (
                             psm := self.peer.psms.get(connection_response.source_cid)
