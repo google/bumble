@@ -29,7 +29,7 @@ from bumble.link import LocalLink
 from bumble.device import Device, Peer
 from bumble.host import Host
 from bumble.gatt import Service, Characteristic
-from bumble.transport import AsyncPipeSink
+from bumble.transport.common import AsyncPipeSink
 from bumble.pairing import PairingConfig, PairingDelegate
 from bumble.smp import (
     SMP_PAIRING_NOT_SUPPORTED_ERROR,

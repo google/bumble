@@ -46,14 +46,14 @@ async def async_main():
         return
 
     print('>>> connecting to HCI...')
-    async with await transport.open_transport_or_link(sys.argv[1]) as (
+    async with await transport.open_transport(sys.argv[1]) as (
         hci_host_source,
         hci_host_sink,
     ):
         print('>>> connected')
 
         print('>>> connecting to HCI...')
-        async with await transport.open_transport_or_link(sys.argv[2]) as (
+        async with await transport.open_transport(sys.argv[2]) as (
             hci_controller_source,
             hci_controller_sink,
         ):

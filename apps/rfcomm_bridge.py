@@ -406,7 +406,7 @@ class ClientBridge:
 # -----------------------------------------------------------------------------
 async def run(device_config, hci_transport, bridge):
     print("<<< connecting to HCI...")
-    async with await transport.open_transport_or_link(hci_transport) as (
+    async with await transport.open_transport(hci_transport) as (
         hci_source,
         hci_sink,
     ):

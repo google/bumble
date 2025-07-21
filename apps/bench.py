@@ -65,7 +65,7 @@ from bumble.sdp import (
     DataElement,
     ServiceAttribute,
 )
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 import bumble.rfcomm
 import bumble.core
 from bumble.utils import AsyncRunner
@@ -1470,7 +1470,7 @@ class Central(Connection.Listener):
 
     async def run(self):
         logging.info(color('>>> Connecting to HCI...', 'green'))
-        async with await open_transport_or_link(self.transport) as (
+        async with await open_transport(self.transport) as (
             hci_source,
             hci_sink,
         ):
@@ -1705,7 +1705,7 @@ class Peripheral(Device.Listener, Connection.Listener):
 
     async def run(self):
         logging.info(color('>>> Connecting to HCI...', 'green'))
-        async with await open_transport_or_link(self.transport) as (
+        async with await open_transport(self.transport) as (
             hci_source,
             hci_sink,
         ):

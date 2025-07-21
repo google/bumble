@@ -20,9 +20,9 @@ import logging
 import os
 from typing import Optional
 
+from bumble import utils
 from bumble.transport.common import (
     Transport,
-    AsyncPipeSink,
     SnoopingTransport,
     TransportSpecError,
 )
@@ -195,6 +195,7 @@ async def _open_transport(scheme: str, spec: Optional[str]) -> Transport:
 
 
 # -----------------------------------------------------------------------------
+@utils.deprecated("RemoteLink has been removed. Use open_transport instead.")
 async def open_transport_or_link(name: str) -> Transport:
     """
     Open a transport or a link relay.
@@ -205,21 +206,6 @@ async def open_transport_or_link(name: str) -> Transport:
         When the name starts with "link-relay:", open a link relay (see RemoteLink
         for details on what the arguments are).
         For other namespaces, see `open_transport`.
-
     """
-    if name.startswith('link-relay:'):
-        logger.warning('Link Relay has been deprecated.')
-        from bumble.controller import Controller
-        from bumble.link import RemoteLink  # lazy import
-
-        link = RemoteLink(name[11:])
-        await link.wait_until_connected()
-        controller = Controller('remote', link=link)  # type:ignore[arg-type]
-
-        class LinkTransport(Transport):
-            async def close(self):
-                link.close()
-
-        return _wrap_transport(LinkTransport(controller, AsyncPipeSink(controller)))
 
     return await open_transport(name)

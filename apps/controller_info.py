@@ -58,7 +58,7 @@ from bumble.hci import (
     HCI_Read_Local_Version_Information_Command,
 )
 from bumble.host import Host
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------
@@ -246,7 +246,7 @@ async def async_main(
     latency_probes, latency_probe_interval, latency_probe_command, transport
 ):
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(transport) as (hci_source, hci_sink):
+    async with await open_transport(transport) as (hci_source, hci_sink):
         print('<<< connected')
 
         host = Host(hci_source, hci_sink)

@@ -29,7 +29,7 @@ from bumble.hci import (
     LoopbackMode,
 )
 from bumble.host import Host
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 import click
 
 
@@ -88,7 +88,7 @@ class Loopback:
     async def run(self):
         """Run a loopback throughput test"""
         print(color('>>> Connecting to HCI...', 'green'))
-        async with await open_transport_or_link(self.transport) as (
+        async with await open_transport(self.transport) as (
             hci_source,
             hci_sink,
         ):

@@ -29,7 +29,7 @@ from bumble import utils
 from bumble import rfcomm
 from bumble import hci
 from bumble.device import Device, Connection
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble import hfp
 from bumble.hfp import HfProtocol
 
@@ -94,7 +94,7 @@ async def main() -> None:
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Hands-Free profile configuration.

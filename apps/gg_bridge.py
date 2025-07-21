@@ -27,7 +27,7 @@ from bumble.device import Device, Peer
 from bumble.core import AdvertisingData
 from bumble.gatt import Service, Characteristic, CharacteristicValue
 from bumble.utils import AsyncRunner
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.hci import HCI_Constant
 
 
@@ -325,7 +325,7 @@ async def run(
     receive_port,
 ):
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(hci_transport) as (hci_source, hci_sink):
+    async with await open_transport(hci_transport) as (hci_source, hci_sink):
         print('<<< connected')
 
         # Instantiate a bridge object

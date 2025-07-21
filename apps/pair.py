@@ -26,7 +26,7 @@ from prompt_toolkit.shortcuts import PromptSession
 from bumble.a2dp import make_audio_sink_service_sdp_records
 from bumble.colors import color
 from bumble.device import Device, Peer
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.pairing import OobData, PairingDelegate, PairingConfig
 from bumble.smp import OobContext, OobLegacyContext
 from bumble.smp import error_name as smp_error_name
@@ -349,7 +349,7 @@ async def pair(
     Waiter.instance = Waiter(linger=linger)
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(hci_transport) as (hci_source, hci_sink):
+    async with await open_transport(hci_transport) as (hci_source, hci_sink):
         print('<<< connected')
 
         # Create a device to manage the host

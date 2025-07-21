@@ -64,7 +64,7 @@ from bumble.device import (
     Peer,
 )
 from bumble.utils import AsyncRunner
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.gatt import Characteristic, Service, CharacteristicDeclaration, Descriptor
 from bumble.gatt_client import CharacteristicProxy
 from bumble.hci import (
@@ -291,7 +291,7 @@ class ConsoleApp:
     async def run_async(self, device_config, transport):
         rssi_monitoring_task = asyncio.create_task(self.rssi_monitor_loop())
 
-        async with await open_transport_or_link(transport) as (hci_source, hci_sink):
+        async with await open_transport(transport) as (hci_source, hci_sink):
             if device_config:
                 self.device = Device.from_config_file_with_hci(
                     device_config, hci_source, hci_sink

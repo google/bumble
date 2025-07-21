@@ -24,7 +24,7 @@ import bumble.core
 from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.gatt import show_services
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------
@@ -60,7 +60,7 @@ async def dump_gatt_db(peer, done):
 
 # -----------------------------------------------------------------------------
 async def async_main(device_config, encrypt, transport, address_or_name):
-    async with await open_transport_or_link(transport) as (hci_source, hci_sink):
+    async with await open_transport(transport) as (hci_source, hci_sink):
 
         # Create a device
         if device_config:

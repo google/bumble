@@ -22,7 +22,7 @@ import logging
 from bumble.colors import color
 from bumble.device import Device
 from bumble.hci import Address
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.core import DeviceClass
 
 
@@ -60,7 +60,7 @@ async def main() -> None:
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[1]) as hci_transport:
+    async with await open_transport(sys.argv[1]) as hci_transport:
         print('<<< connected')
 
         device = Device.with_hci(

@@ -13,4 +13,3 @@ These include:
   * [Golden Gate Bridge](gg_bridge.md) - Bridge between GATT and UDP to use with the Golden Gate "stack tool".
   * [Show](show.md) - Parse a file with HCI packets and print the details of each packet in a human readable form.
   * [Speaker](speaker.md) - Virtual Bluetooth speaker, with a command line and browser-based UI.
-  * [Link Relay](link_relay.md) - WebSocket relay for virtual RemoteLink instances to communicate with each other.

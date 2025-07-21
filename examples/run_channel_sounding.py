@@ -26,7 +26,7 @@ import functools
 from bumble import core
 from bumble import hci
 from bumble.device import Connection, Device, ChannelSoundingCapabilities
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 
 # From https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Bluetooth/system/gd/hci/distance_measurement_manager.cc.
 CS_TONE_ANTENNA_CONFIG_MAPPING_TABLE = [
@@ -78,7 +78,7 @@ async def main() -> None:
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         device = Device.from_config_file_with_hci(

@@ -24,7 +24,7 @@ import websockets
 import struct
 
 from bumble.device import Device
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.core import (
     PhysicalTransport,
     BT_L2CAP_PROTOCOL_ID,
@@ -597,7 +597,7 @@ async def main() -> None:
         asyncio.create_task(handle_virtual_cable_unplug())
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device

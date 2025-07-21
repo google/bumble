@@ -25,7 +25,7 @@ from bumble.hci import (
     OwnAddressType,
 )
 
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------
@@ -40,7 +40,7 @@ async def main() -> None:
 
     print('<<< connecting to HCI...')
     hci_transports = await asyncio.gather(
-        open_transport_or_link(sys.argv[2]), open_transport_or_link(sys.argv[3])
+        open_transport(sys.argv[2]), open_transport(sys.argv[3])
     )
     print('<<< connected')
 
