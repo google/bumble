@@ -22,7 +22,7 @@ import click
 
 from bumble.colors import color
 from bumble.device import Device
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.keys import JsonKeyStore
 from bumble.smp import AddressResolver
 from bumble.device import Advertisement
@@ -127,7 +127,7 @@ async def scan(
     transport,
 ):
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(transport) as (hci_source, hci_sink):
+    async with await open_transport(transport) as (hci_source, hci_sink):
         print('<<< connected')
 
         if device_config:

@@ -54,7 +54,7 @@ from bumble.gatt_adapters import (
     EnumCharacteristicAdapter,
     EnumCharacteristicProxyAdapter,
 )
-from bumble.transport import AsyncPipeSink
+from bumble.transport.common import AsyncPipeSink
 from bumble.core import UUID
 from bumble.att import (
     Attribute,

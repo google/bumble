@@ -57,7 +57,6 @@ nav:
     - Pair: apps_and_tools/pair.md
     - Unbond: apps_and_tools/unbond.md
     - USB Probe: apps_and_tools/usb_probe.md
-    - Link Relay: apps_and_tools/link_relay.md
   - Hardware:
     - hardware/index.md
   - Platforms:

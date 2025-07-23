@@ -22,7 +22,7 @@ import unittest
 
 from bumble.controller import Controller
 from bumble.host import Host, DataPacketQueue
-from bumble.transport import AsyncPipeSink
+from bumble.transport.common import AsyncPipeSink
 from bumble.hci import HCI_AclDataPacket
 
 # -----------------------------------------------------------------------------

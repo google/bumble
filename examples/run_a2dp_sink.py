@@ -22,7 +22,7 @@ import logging
 from typing import Any
 
 from bumble.device import Device
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.core import PhysicalTransport
 from bumble.avdtp import (
     AVDTP_AUDIO_MEDIA_TYPE,
@@ -112,7 +112,7 @@ async def main() -> None:
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         with open(sys.argv[3], 'wb') as sbc_file:

@@ -50,7 +50,7 @@ def do_parse(firmware_path):
 
 # -----------------------------------------------------------------------------
 async def do_load(usb_transport, force):
-    async with await transport.open_transport_or_link(usb_transport) as (
+    async with await transport.open_transport(usb_transport) as (
         hci_source,
         hci_sink,
     ):
@@ -69,7 +69,7 @@ async def do_load(usb_transport, force):
 
 # -----------------------------------------------------------------------------
 async def do_drop(usb_transport):
-    async with await transport.open_transport_or_link(usb_transport) as (
+    async with await transport.open_transport(usb_transport) as (
         hci_source,
         hci_sink,
     ):

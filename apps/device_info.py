@@ -32,7 +32,7 @@ from bumble.profiles.gap import GenericAccessServiceProxy
 from bumble.profiles.pacs import PublishedAudioCapabilitiesServiceProxy
 from bumble.profiles.tmap import TelephonyAndMediaAudioServiceProxy
 from bumble.profiles.vcs import VolumeControlServiceProxy
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------
@@ -215,7 +215,7 @@ async def show_device_info(peer, done: Optional[asyncio.Future]) -> None:
 
 # -----------------------------------------------------------------------------
 async def async_main(device_config, encrypt, transport, address_or_name):
-    async with await open_transport_or_link(transport) as (hci_source, hci_sink):
+    async with await open_transport(transport) as (hci_source, hci_sink):
 
         # Create a device
         if device_config:

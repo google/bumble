@@ -32,7 +32,7 @@ from bumble.device import Device
 from bumble.host import Host
 from bumble.controller import Controller
 from bumble.link import LocalLink
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------
@@ -49,7 +49,7 @@ async def main() -> None:
         return
 
     print('>>> connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[3]) as hci_transport:
+    async with await open_transport(sys.argv[3]) as hci_transport:
         print('>>> connected')
 
         # Create a local link

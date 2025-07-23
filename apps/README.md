@@ -12,9 +12,6 @@ Apps
 ## `show.py`
 Parse a file with HCI packets and print the details of each packet in a human readable form
 
-## `link_relay.py`
-Simple WebSocket relay for virtual RemoteLink instances to communicate with each other through.
-
 ## `hci_bridge.py`
 This app acts as a simple bridge between two HCI transports, with a host on one side and
 a controller on the other. All the HCI packets bridged between the two are printed on the console

@@ -25,7 +25,7 @@ from bumble.core import PhysicalTransport
 from bumble.link import LocalLink
 from bumble.device import Device
 from bumble.host import Host
-from bumble.transport import AsyncPipeSink
+from bumble.transport.common import AsyncPipeSink
 from bumble.avdtp import (
     AVDTP_IDLE_STATE,
     AVDTP_STREAMING_STATE,

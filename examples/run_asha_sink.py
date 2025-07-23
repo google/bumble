@@ -27,7 +27,7 @@ from bumble import decoder
 from bumble import gatt
 from bumble.core import AdvertisingData
 from bumble.device import Device, AdvertisingParameters
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.profiles import asha
 
 ws_connection: Optional[websockets.WebSocketServerProtocol] = None
@@ -50,7 +50,7 @@ async def main() -> None:
         print('example: python run_asha_sink.py device1.json usb:0')
         return
 
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         device = Device.from_config_file_with_hci(
             sys.argv[1], hci_transport.source, hci_transport.sink
         )

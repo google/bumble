@@ -22,7 +22,7 @@ import click
 
 from bumble import l2cap
 from bumble.colors import color
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.device import Device
 from bumble.utils import FlowControlAsyncPipe
 from bumble.hci import HCI_Constant
@@ -258,7 +258,7 @@ class ClientBridge:
 # -----------------------------------------------------------------------------
 async def run(device_config, hci_transport, bridge):
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(hci_transport) as (hci_source, hci_sink):
+    async with await open_transport(hci_transport) as (hci_source, hci_sink):
         print('<<< connected')
 
         device = Device.from_config_file_with_hci(device_config, hci_source, hci_sink)

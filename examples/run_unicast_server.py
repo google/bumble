@@ -45,7 +45,7 @@ from bumble.profiles.bap import (
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
 from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 
 
 def _sink_pac_record() -> PacRecord:
@@ -81,7 +81,7 @@ async def main() -> None:
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         device = Device.from_config_file_with_hci(

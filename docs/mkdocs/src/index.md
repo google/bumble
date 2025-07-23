@@ -56,13 +56,6 @@ Included in the project are two types of Link interface implementations:
 The LocalLink implementation is a simple object used by an application that instantiates
 more than one Controller objects and connects them in-memory and in-process.
 
-#### Remote Link
-The RemoteLink implementation communicates with other virtual controllers over a WebSocket.
-Multiple instances of RemoteLink objects communicate with each other through a simple
-WebSocket relay that can host any number of virtual 'rooms', where each 'room' is
-a set of controllers that can communicate between themselves.
-The `link_relay` app is where this relay is implemented.
-
 ## Host
 The Host component connects to a controller over an HCI interface. It is responsible to sending commands and ACL data to the controller and receiving back events and ACL data.
 

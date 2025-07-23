@@ -22,7 +22,7 @@ import logging
 from bumble.colors import color
 
 from bumble.device import Device
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.core import PhysicalTransport, BT_L2CAP_PROTOCOL_ID, CommandTimeoutError
 from bumble.sdp import (
     Client as SDP_Client,
@@ -42,7 +42,7 @@ async def main() -> None:
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device

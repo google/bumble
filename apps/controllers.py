@@ -22,7 +22,7 @@ import os
 
 from bumble.controller import Controller
 from bumble.link import LocalLink
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------
@@ -42,7 +42,7 @@ async def async_main():
     transports = []
     controllers = []
     for index, transport_name in enumerate(sys.argv[1:]):
-        transport = await open_transport_or_link(transport_name)
+        transport = await open_transport(transport_name)
         transports.append(transport)
         controller = Controller(
             f'C{index}',

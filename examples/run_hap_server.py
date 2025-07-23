@@ -33,7 +33,7 @@ from bumble.profiles.hap import (
     PresetRecord,
 )
 
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 
 server_features = HearingAidFeatures(
     HearingAidType.MONAURAL_HEARING_AID,
@@ -56,7 +56,7 @@ async def main() -> None:
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         device = Device.from_config_file_with_hci(

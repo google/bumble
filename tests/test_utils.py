@@ -23,7 +23,7 @@ from bumble.controller import Controller
 from bumble.link import LocalLink
 from bumble.device import Device, Connection
 from bumble.host import Host
-from bumble.transport import AsyncPipeSink
+from bumble.transport.common import AsyncPipeSink
 from bumble.hci import Address
 
 

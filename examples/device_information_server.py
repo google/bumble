@@ -23,7 +23,7 @@ import struct
 
 from bumble.core import AdvertisingData
 from bumble.device import Device
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.profiles.device_information_service import DeviceInformationService
 
 
@@ -34,7 +34,7 @@ async def main() -> None:
         print('example: python device_info_server.py device1.json usb:0')
         return
 
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         device = Device.from_config_file_with_hci(
             sys.argv[1], hci_transport.source, hci_transport.sink
         )

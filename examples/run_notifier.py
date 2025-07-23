@@ -22,7 +22,7 @@ import random
 import logging
 
 from bumble.device import Device, Connection
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.gatt import Service, Characteristic
 
 
@@ -64,7 +64,7 @@ async def main() -> None:
         return
 
     print('<<< connecting to HCI...')
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         print('<<< connected')
 
         # Create a device to manage the host

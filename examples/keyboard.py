@@ -27,7 +27,7 @@ from bumble.colors import color
 from bumble.core import AdvertisingData
 from bumble.device import Device, Connection, Peer
 from bumble.utils import AsyncRunner
-from bumble.transport import open_transport_or_link
+from bumble.transport import open_transport
 from bumble.gatt import (
     Descriptor,
     Service,
@@ -434,7 +434,7 @@ async def main() -> None:
         )
         return
 
-    async with await open_transport_or_link(sys.argv[2]) as hci_transport:
+    async with await open_transport(sys.argv[2]) as hci_transport:
         # Create a device to manage the host
         device = Device.from_config_file_with_hci(
             sys.argv[1], hci_transport.source, hci_transport.sink
