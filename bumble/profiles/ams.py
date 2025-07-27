@@ -212,7 +212,7 @@ class AmsClient(utils.EventEmitter):
 
     supported_commands: set[RemoteCommandId]
     player_name: str = ""
-    player_playback_info: PlaybackInfo
+    player_playback_info: PlaybackInfo = PlaybackInfo(PlaybackState.PAUSED, 0.0, 0.0)
     player_volume: float = 1.0
     queue_count: int = 0
     queue_index: int = 0
@@ -276,6 +276,48 @@ class AmsClient(utils.EventEmitter):
         await self._ams_proxy.remote_command.write_value(
             bytes([command]), with_response=True
         )
+
+    async def play(self) -> None:
+        await self.command(RemoteCommandId.PLAY)
+
+    async def pause(self) -> None:
+        await self.command(RemoteCommandId.PAUSE)
+
+    async def toggle_play_pause(self) -> None:
+        await self.command(RemoteCommandId.TOGGLE_PLAY_PAUSE)
+
+    async def next_track(self) -> None:
+        await self.command(RemoteCommandId.NEXT_TRACK)
+
+    async def previous_track(self) -> None:
+        await self.command(RemoteCommandId.PREVIOUS_TRACK)
+
+    async def volume_up(self) -> None:
+        await self.command(RemoteCommandId.VOLUME_UP)
+
+    async def volume_down(self) -> None:
+        await self.command(RemoteCommandId.VOLUME_DOWN)
+
+    async def advance_repeat_mode(self) -> None:
+        await self.command(RemoteCommandId.ADVANCE_REPEAT_MODE)
+
+    async def advance_shuffle_mode(self) -> None:
+        await self.command(RemoteCommandId.ADVANCE_SHUFFLE_MODE)
+
+    async def skip_forward(self) -> None:
+        await self.command(RemoteCommandId.SKIP_FORWARD)
+
+    async def skip_backward(self) -> None:
+        await self.command(RemoteCommandId.SKIP_BACKWARD)
+
+    async def like_track(self) -> None:
+        await self.command(RemoteCommandId.LIKE_TRACK)
+
+    async def dislike_track(self) -> None:
+        await self.command(RemoteCommandId.DISLIKE_TRACK)
+
+    async def bookmark_track(self) -> None:
+        await self.command(RemoteCommandId.BOOKMARK_TRACK)
 
     def _on_remote_command_notification(self, data: bytes) -> None:
         supported_commands = [RemoteCommandId(command) for command in data]
