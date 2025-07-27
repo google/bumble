@@ -17,13 +17,12 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import sys
-import os
-import logging
 import struct
 import json
-import websockets
-from bumble.colors import color
 
+import websockets
+
+from bumble.colors import color
 from bumble.core import AdvertisingData
 from bumble.device import Device, Connection, Peer
 from bumble.utils import AsyncRunner
@@ -45,6 +44,8 @@ from bumble.gatt import (
     GATT_HID_CONTROL_POINT_CHARACTERISTIC,
     GATT_REPORT_REFERENCE_DESCRIPTOR,
 )
+import bumble.logging
+
 
 # -----------------------------------------------------------------------------
 
@@ -450,5 +451,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

@@ -17,8 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import sys
-import os
-import logging
 
 from bumble.device import Device, Connection
 from bumble.transport import open_transport
@@ -32,6 +30,7 @@ from bumble.gatt import (
     GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
     GATT_DEVICE_INFORMATION_SERVICE,
 )
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -152,5 +151,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

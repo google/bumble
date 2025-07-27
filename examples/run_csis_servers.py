@@ -16,9 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import logging
 import sys
-import os
 import secrets
 
 from bumble.core import AdvertisingData
@@ -28,8 +26,8 @@ from bumble.hci import (
 )
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
-
 from bumble.transport import open_transport
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -101,5 +99,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

@@ -19,8 +19,8 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-import os
 import logging
+
 import websockets
 
 from bumble.device import Device
@@ -31,6 +31,7 @@ from bumble import avrcp
 from bumble import avdtp
 from bumble import a2dp
 from bumble import utils
+import bumble.logging
 
 
 logger = logging.getLogger(__name__)
@@ -409,5 +410,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

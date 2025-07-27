@@ -17,11 +17,10 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import sys
-import os
 import logging
-import websockets
-
 from typing import Optional
+
+import websockets
 
 from bumble import decoder
 from bumble import gatt
@@ -29,6 +28,8 @@ from bumble.core import AdvertisingData
 from bumble.device import Device, AdvertisingParameters
 from bumble.transport import open_transport
 from bumble.profiles import asha
+import bumble.logging
+
 
 ws_connection: Optional[websockets.WebSocketServerProtocol] = None
 g722_decoder = decoder.G722Decoder()
@@ -111,9 +112,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(
-    level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper(),
-    format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-)
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

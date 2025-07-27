@@ -18,15 +18,15 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import sys
-import os
 import functools
 
 from bumble import core
 from bumble import hci
 from bumble.device import Connection, Device, ChannelSoundingCapabilities
 from bumble.transport import open_transport
+import bumble.logging
+
 
 # From https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Bluetooth/system/gd/hci/distance_measurement_manager.cc.
 CS_TONE_ANTENNA_CONFIG_MAPPING_TABLE = [
@@ -150,5 +150,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

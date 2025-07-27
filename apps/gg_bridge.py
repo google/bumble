@@ -16,9 +16,8 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import os
 import struct
-import logging
+
 import click
 
 from bumble import l2cap
@@ -29,6 +28,7 @@ from bumble.gatt import Service, Characteristic, CharacteristicValue
 from bumble.utils import AsyncRunner
 from bumble.transport import open_transport
 from bumble.hci import HCI_Constant
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -383,6 +383,7 @@ def main(
     receive_host,
     receive_port,
 ):
+    bumble.logging.setup_basic_logging('WARNING')
     asyncio.run(
         run(
             hci_transport,
@@ -397,6 +398,5 @@ def main(
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
 if __name__ == '__main__':
     main()

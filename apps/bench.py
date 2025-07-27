@@ -19,7 +19,6 @@ import asyncio
 import dataclasses
 import enum
 import logging
-import os
 import statistics
 import struct
 import time
@@ -70,6 +69,7 @@ import bumble.rfcomm
 import bumble.core
 from bumble.utils import AsyncRunner
 from bumble.pairing import PairingConfig
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -2321,11 +2321,7 @@ def peripheral(ctx, transport):
 
 
 def main():
-    logging.basicConfig(
-        level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper(),
-        format="[%(asctime)s.%(msecs)03d] %(levelname)s:%(name)s:%(message)s",
-        datefmt="%H:%M:%S",
-    )
+    bumble.logging.setup_basic_logging('INFO')
     bench()
 
 

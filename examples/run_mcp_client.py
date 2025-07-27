@@ -16,13 +16,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import logging
 import sys
-import os
-import websockets
 import json
+from typing import Optional
 
-from bumble import utils
+import websockets
+
 from bumble.core import AdvertisingData
 from bumble.device import (
     Device,
@@ -53,8 +52,7 @@ from bumble.profiles.mcp import (
 )
 from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.transport import open_transport
-
-from typing import Optional
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -191,5 +189,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

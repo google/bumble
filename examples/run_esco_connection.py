@@ -16,15 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import logging
 import sys
-import os
+
 from bumble.core import PhysicalTransport
 from bumble.device import Device, ScoLink
 from bumble.hci import HCI_Enhanced_Setup_Synchronous_Connection_Command
 from bumble.hfp import DefaultCodecParameters, ESCO_PARAMETERS
-
 from bumble.transport import open_transport
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -83,5 +82,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

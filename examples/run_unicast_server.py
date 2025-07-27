@@ -18,9 +18,7 @@
 import asyncio
 import datetime
 import functools
-import logging
 import sys
-import os
 import io
 import struct
 import secrets
@@ -46,6 +44,7 @@ from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
 from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.transport import open_transport
+import bumble.logging
 
 
 def _sink_pac_record() -> PacRecord:
@@ -200,5 +199,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

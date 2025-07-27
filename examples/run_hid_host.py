@@ -17,8 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import sys
-import os
-import logging
 
 from bumble.colors import color
 
@@ -41,6 +39,7 @@ from bumble.sdp import (
     SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
     SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
 )
+import bumble.logging
 from hid_report_parser import ReportParser
 
 # -----------------------------------------------------------------------------
@@ -565,6 +564,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

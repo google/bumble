@@ -16,15 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import logging
 import sys
-import os
 import struct
 
 from bumble.core import AdvertisingData
 from bumble.device import AdvertisingType, Device
 from bumble.hci import Address
 from bumble.transport import open_transport
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -72,5 +71,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

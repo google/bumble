@@ -15,14 +15,13 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-import logging
 import asyncio
 import sys
-import os
 
 from bumble.controller import Controller
 from bumble.link import LocalLink
 from bumble.transport import open_transport
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -62,7 +61,7 @@ async def async_main():
 
 # -----------------------------------------------------------------------------
 def main():
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    bumble.logging.setup_basic_logging()
     asyncio.run(async_main())
 
 

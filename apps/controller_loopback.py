@@ -16,10 +16,11 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import logging
-import os
 import time
 from typing import Optional
+
+import click
+
 from bumble.colors import color
 from bumble.hci import (
     HCI_READ_LOOPBACK_MODE_COMMAND,
@@ -30,7 +31,7 @@ from bumble.hci import (
 )
 from bumble.host import Host
 from bumble.transport import open_transport
-import click
+import bumble.logging
 
 
 class Loopback:
@@ -194,12 +195,7 @@ class Loopback:
 )
 @click.argument('transport')
 def main(packet_size, packet_count, transport):
-    logging.basicConfig(
-        level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper(),
-        format="[%(asctime)s.%(msecs)03d] %(levelname)s:%(name)s:%(message)s",
-        datefmt="%H:%M:%S",
-    )
-
+    bumble.logging.setup_basic_logging()
     loopback = Loopback(packet_size, packet_count, transport)
     asyncio.run(loopback.run())
 

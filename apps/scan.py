@@ -16,8 +16,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import os
-import logging
 import click
 
 from bumble.colors import color
@@ -27,6 +25,7 @@ from bumble.keys import JsonKeyStore
 from bumble.smp import AddressResolver
 from bumble.device import Advertisement
 from bumble.hci import Address, HCI_Constant, HCI_LE_1M_PHY, HCI_LE_CODED_PHY
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -237,7 +236,7 @@ def main(
     device_config,
     transport,
 ):
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
+    bumble.logging.setup_basic_logging('WARNING')
     asyncio.run(
         scan(
             min_rssi,

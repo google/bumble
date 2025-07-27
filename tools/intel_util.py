@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import logging
 import asyncio
-import os
 from typing import Any, Optional
 
 import click
@@ -26,6 +25,8 @@ from bumble.colors import color
 from bumble import transport
 from bumble.drivers import intel
 from bumble.host import Host
+import bumble.logging
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -107,7 +108,7 @@ async def do_bootloader(usb_transport: str, force: bool) -> None:
 # -----------------------------------------------------------------------------
 @click.group()
 def main():
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    bumble.logging.setup_basic_logging()
 
 
 @main.command

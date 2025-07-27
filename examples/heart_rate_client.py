@@ -17,13 +17,13 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import sys
-import os
-import logging
+
 from bumble.colors import color
 from bumble.device import Device
 from bumble.hci import Address
 from bumble.transport import open_transport
 from bumble.profiles.heart_rate_service import HeartRateServiceProxy
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -76,5 +76,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

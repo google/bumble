@@ -18,20 +18,20 @@
 import asyncio
 import contextlib
 import sys
-import os
-import logging
 import json
-import websockets
 import functools
 from typing import Optional
 
-from bumble import utils
+import websockets
+
 from bumble import rfcomm
 from bumble import hci
 from bumble.device import Device, Connection
 from bumble.transport import open_transport
 from bumble import hfp
 from bumble.hfp import HfProtocol
+import bumble.logging
+
 
 ws: Optional[websockets.WebSocketServerProtocol] = None
 hf_protocol: Optional[HfProtocol] = None
@@ -175,5 +175,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

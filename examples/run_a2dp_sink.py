@@ -17,8 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import sys
-import os
-import logging
 from typing import Any
 
 from bumble.device import Device
@@ -35,6 +33,8 @@ from bumble.a2dp import (
     A2DP_SBC_CODEC_TYPE,
     SbcMediaCodecInformation,
 )
+import bumble.logging
+
 
 Context: dict[Any, Any] = {'output': None}
 
@@ -166,5 +166,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

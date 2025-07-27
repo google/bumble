@@ -18,7 +18,6 @@
 import datetime
 import importlib
 import logging
-import os
 import struct
 
 import click
@@ -27,6 +26,7 @@ from bumble.colors import color
 from bumble import hci
 from bumble.transport.common import PacketReader
 from bumble.helpers import PacketTracer
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -188,5 +188,5 @@ def main(format, vendor, filename):
 
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper())
+    bumble.logging.setup_basic_logging('WARNING')
     main()  # pylint: disable=no-value-for-parameter
