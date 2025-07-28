@@ -20,9 +20,7 @@ import time
 import math
 import random
 import struct
-import logging
 import asyncio
-import os
 
 from bumble.core import AdvertisingData
 from bumble.device import Device
@@ -30,6 +28,7 @@ from bumble.transport import open_transport
 from bumble.profiles.device_information_service import DeviceInformationService
 from bumble.profiles.heart_rate_service import HeartRateService
 from bumble.utils import AsyncRunner
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -128,5 +127,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

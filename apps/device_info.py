@@ -16,8 +16,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import os
-import logging
 from typing import Callable, Iterable, Optional
 
 import click
@@ -33,6 +31,7 @@ from bumble.profiles.pacs import PublishedAudioCapabilitiesServiceProxy
 from bumble.profiles.tmap import TelephonyAndMediaAudioServiceProxy
 from bumble.profiles.vcs import VolumeControlServiceProxy
 from bumble.transport import open_transport
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -267,7 +266,7 @@ def main(device_config, encrypt, transport, address_or_name):
     Dump the GATT database on a remote device. If ADDRESS_OR_NAME is not specified,
     wait for an incoming connection.
     """
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    bumble.logging.setup_basic_logging()
     asyncio.run(async_main(device_config, encrypt, transport, address_or_name))
 
 

@@ -16,8 +16,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import os
-import logging
 import time
 
 import click
@@ -59,6 +57,7 @@ from bumble.hci import (
 )
 from bumble.host import Host
 from bumble.transport import open_transport
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -342,11 +341,7 @@ async def async_main(
 )
 @click.argument('transport')
 def main(latency_probes, latency_probe_interval, latency_probe_command, transport):
-    logging.basicConfig(
-        level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper(),
-        format="[%(asctime)s.%(msecs)03d] %(levelname)s:%(name)s:%(message)s",
-        datefmt="%H:%M:%S",
-    )
+    bumble.logging.setup_basic_logging()
     asyncio.run(
         async_main(
             latency_probes, latency_probe_interval, latency_probe_command, transport

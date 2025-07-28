@@ -15,15 +15,16 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-import logging
 import asyncio
-import os
+import logging
 
 import click
 
 from bumble import transport
 from bumble.host import Host
 from bumble.drivers import rtk
+import bumble.logging
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -112,7 +113,7 @@ async def do_info(usb_transport, force):
 # -----------------------------------------------------------------------------
 @click.group()
 def main():
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    bumble.logging.setup_basic_logging()
 
 
 @main.command

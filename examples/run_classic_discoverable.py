@@ -17,8 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import sys
-import os
-import logging
 
 from bumble.device import Device
 from bumble.transport import open_transport
@@ -38,6 +36,8 @@ from bumble.core import (
     BT_AVDTP_PROTOCOL_ID,
     BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
 )
+import bumble.logging
+
 
 # -----------------------------------------------------------------------------
 SDP_SERVICE_RECORDS = {
@@ -117,5 +117,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

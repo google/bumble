@@ -23,7 +23,6 @@ import contextlib
 import dataclasses
 import functools
 import logging
-import os
 import struct
 from typing import (
     Any,
@@ -54,6 +53,8 @@ from bumble.profiles import bass
 import bumble.device
 import bumble.transport
 import bumble.utils
+import bumble.logging
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -1235,7 +1236,7 @@ def transmit(
 
 
 def main():
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    bumble.logging.setup_basic_logging()
     auracast()
 
 

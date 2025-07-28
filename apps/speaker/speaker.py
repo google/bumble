@@ -21,7 +21,6 @@ import asyncio.subprocess
 from importlib import resources
 import enum
 import json
-import os
 import logging
 import pathlib
 import subprocess
@@ -58,6 +57,7 @@ from bumble.a2dp import (
 from bumble.utils import AsyncRunner
 from bumble.codecs import AacAudioRtpPacket
 from bumble.rtp import MediaPacket
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -833,11 +833,7 @@ def speaker(
 
 # -----------------------------------------------------------------------------
 def main():
-    logging.basicConfig(
-        level=os.environ.get('BUMBLE_LOGLEVEL', 'WARNING').upper(),
-        format="[%(asctime)s.%(msecs)03d] %(levelname)s:%(name)s:%(message)s",
-        datefmt="%H:%M:%S",
-    )
+    bumble.logging.setup_basic_logging('WARNING')
     speaker()
 
 

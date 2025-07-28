@@ -18,7 +18,6 @@
 import asyncio
 import json
 import sys
-import os
 import io
 import logging
 from typing import Iterable, Optional
@@ -30,6 +29,7 @@ from bumble.device import Device, ScoLink
 from bumble.transport import open_transport
 from bumble.core import PhysicalTransport
 from bumble import hci, rfcomm, hfp
+import bumble.logging
 
 
 logger = logging.getLogger(__name__)
@@ -286,5 +286,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

@@ -16,12 +16,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import logging
 import sys
-import os
 import secrets
-import websockets
 import json
+from typing import Optional
+
+import websockets
 
 from bumble.core import AdvertisingData
 from bumble.device import Device, AdvertisingParameters, AdvertisingEventProperties
@@ -43,10 +43,8 @@ from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
 from bumble.profiles.vcs import VolumeControlService
-
 from bumble.transport import open_transport
-
-from typing import Optional
+import bumble.logging
 
 
 def dumps_volume_state(volume_setting: int, muted: int, change_counter: int) -> str:
@@ -186,5 +184,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'DEBUG').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

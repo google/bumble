@@ -20,8 +20,6 @@ import asyncio
 import dataclasses
 import functools
 import enum
-import logging
-import os
 import random
 import struct
 import sys
@@ -34,6 +32,7 @@ from bumble import gatt_adapters
 from bumble import gatt_client
 from bumble import hci
 from bumble import core
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -432,5 +431,5 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+bumble.logging.setup_basic_logging('DEBUG')
 asyncio.run(main())

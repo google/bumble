@@ -16,13 +16,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import os
-import logging
 import click
 
 from bumble.device import Device
 from bumble.keys import JsonKeyStore
 from bumble.transport import open_transport
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -68,7 +67,7 @@ def main(keystore_file, hci_transport, device_config, address):
     instantiated.
     If no address is passed, the existing pairing keys for all addresses are printed.
     """
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    bumble.logging.setup_basic_logging()
 
     if not keystore_file and not hci_transport:
         print('either --keystore-file or --hci-transport must be specified.')

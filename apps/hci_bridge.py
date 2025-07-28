@@ -17,11 +17,12 @@
 # -----------------------------------------------------------------------------
 import logging
 import asyncio
-import os
 import sys
 
 from bumble import hci, transport
 from bumble.bridge import HCI_Bridge
+import bumble.logging
+
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -100,7 +101,7 @@ async def async_main():
 
 # -----------------------------------------------------------------------------
 def main():
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
+    bumble.logging.setup_basic_logging()
     asyncio.run(async_main())
 
 
