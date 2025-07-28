@@ -159,29 +159,29 @@ class LocalLink:
         asyncio.get_running_loop().call_soon(self.on_connection_complete)
 
     def on_disconnection_complete(
-        self, central_address, peripheral_address, disconnect_command
+        self, initiating_address, target_address, disconnect_command
     ):
         # Find the controller that initiated the disconnection
-        if not (central_controller := self.find_controller(central_address)):
+        if not (initiating_controller := self.find_controller(initiating_address)):
             logger.warning('!!! Initiating controller not found')
             return
 
         # Disconnect from the first controller with a matching address
-        if peripheral_controller := self.find_controller(peripheral_address):
-            peripheral_controller.on_link_central_disconnected(
-                central_address, disconnect_command.reason
+        if target_controller := self.find_controller(target_address):
+            target_controller.on_link_disconnected(
+                initiating_address, disconnect_command.reason
             )
 
-        central_controller.on_link_peripheral_disconnection_complete(
+        initiating_controller.on_link_disconnection_complete(
             disconnect_command, HCI_SUCCESS
         )
 
-    def disconnect(self, central_address, peripheral_address, disconnect_command):
+    def disconnect(self, initiating_address, target_address, disconnect_command):
         logger.debug(
-            f'$$$ DISCONNECTION {central_address} -> '
-            f'{peripheral_address}: reason = {disconnect_command.reason}'
+            f'$$$ DISCONNECTION {initiating_address} -> '
+            f'{target_address}: reason = {disconnect_command.reason}'
         )
-        args = [central_address, peripheral_address, disconnect_command]
+        args = [initiating_address, target_address, disconnect_command]
         asyncio.get_running_loop().call_soon(self.on_disconnection_complete, *args)
 
     # pylint: disable=too-many-arguments
