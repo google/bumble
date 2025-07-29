@@ -213,7 +213,7 @@ class L2CAP_Control_Frame:
     fields: ClassVar[hci.Fields] = ()
     code: int = dataclasses.field(default=0, init=False)
     name: str = dataclasses.field(default='', init=False)
-    _data: Optional[bytes] = dataclasses.field(default=None, init=False)
+    _payload: Optional[bytes] = dataclasses.field(default=None, init=False)
 
     identifier: int
 
@@ -223,7 +223,8 @@ class L2CAP_Control_Frame:
 
         subclass = L2CAP_Control_Frame.classes.get(code)
         if subclass is None:
-            instance = L2CAP_Control_Frame(pdu)
+            instance = L2CAP_Control_Frame(identifier=identifier)
+            instance.payload = pdu[4:]
             instance.code = CommandCode(code)
             instance.name = instance.code.name
             return instance
@@ -232,11 +233,11 @@ class L2CAP_Control_Frame:
             identifier=identifier,
         )
         frame.identifier = identifier
-        frame.data = pdu[4:]
-        if length != len(pdu):
+        frame.payload = pdu[4:]
+        if length != len(frame.payload):
             logger.warning(
                 color(
-                    f'!!! length mismatch: expected {len(pdu) - 4} but got {length}',
+                    f'!!! length mismatch: expected {length} but got {len(frame.payload)}',
                     'red',
                 )
             )
@@ -273,34 +274,20 @@ class L2CAP_Control_Frame:
 
         return subclass
 
-    def __init__(self, pdu: Optional[bytes] = None, **kwargs) -> None:
-        self.identifier = kwargs.get('identifier', 0)
-        if self.fields:
-            if kwargs:
-                hci.HCI_Object.init_from_fields(self, self.fields, kwargs)
-            if pdu is None:
-                data = hci.HCI_Object.dict_to_bytes(kwargs, self.fields)
-                pdu = (
-                    bytes([self.code, self.identifier])
-                    + struct.pack('<H', len(data))
-                    + data
-                )
-        self.data = pdu[4:] if pdu else b''
-
     @property
-    def data(self) -> bytes:
-        if self._data is None:
-            self._data = hci.HCI_Object.dict_to_bytes(self.__dict__, self.fields)
-        return self._data
+    def payload(self) -> bytes:
+        if self._payload is None:
+            self._payload = hci.HCI_Object.dict_to_bytes(self.__dict__, self.fields)
+        return self._payload
 
-    @data.setter
-    def data(self, parameters: bytes) -> None:
-        self._data = parameters
+    @payload.setter
+    def payload(self, payload: bytes) -> None:
+        self._payload = payload
 
     def __bytes__(self) -> bytes:
         return (
-            struct.pack('<BBH', self.code, self.identifier, len(self.data) + 4)
-            + self.data
+            struct.pack('<BBH', self.code, self.identifier, len(self.payload))
+            + self.payload
         )
 
     def __str__(self) -> str:
@@ -308,8 +295,8 @@ class L2CAP_Control_Frame:
         if fields := getattr(self, 'fields', None):
             result += ':\n' + hci.HCI_Object.format_fields(self.__dict__, fields, '  ')
         else:
-            if len(self.data) > 1:
-                result += f': {self.data.hex()}'
+            if len(self.payload) > 1:
+                result += f': {self.payload.hex()}'
         return result
 
 
