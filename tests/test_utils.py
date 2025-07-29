@@ -25,6 +25,7 @@ from bumble.device import Device, Connection
 from bumble.host import Host
 from bumble.transport.common import AsyncPipeSink
 from bumble.hci import Address
+from bumble.keys import PairingKeys
 
 
 # -----------------------------------------------------------------------------
@@ -51,16 +52,6 @@ class TwoDevices:
             ),
         ]
 
-        self.paired = [None, None]
-
-    def on_connection(self, which, connection):
-        self.connections[which] = connection
-
-    def on_paired(self, which, keys):
-        self.paired[which] = keys
-
-    async def setup_connection(self) -> None:
-        # Attach listeners
         self.devices[0].on(
             'connection', lambda connection: self.on_connection(0, connection)
         )
@@ -68,6 +59,22 @@ class TwoDevices:
             'connection', lambda connection: self.on_connection(1, connection)
         )
 
+        self.paired = [
+            asyncio.get_event_loop().create_future(),
+            asyncio.get_event_loop().create_future(),
+        ]
+
+    def on_connection(self, which, connection):
+        self.connections[which] = connection
+        connection.on('disconnection', lambda code: self.on_disconnection(which))
+
+    def on_disconnection(self, which):
+        self.connections[which] = None
+
+    def on_paired(self, which: int, keys: PairingKeys) -> None:
+        self.paired[which].set_result(keys)
+
+    async def setup_connection(self) -> None:
         # Start
         await self.devices[0].power_on()
         await self.devices[1].power_on()

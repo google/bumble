@@ -370,6 +370,12 @@ class Controller:
                 return connection
         return None
 
+    def find_peripheral_connection_by_handle(self, handle):
+        for connection in self.peripheral_connections.values():
+            if connection.handle == handle:
+                return connection
+        return None
+
     def find_classic_connection_by_handle(self, handle):
         for connection in self.classic_connections.values():
             if connection.handle == handle:
@@ -414,7 +420,7 @@ class Controller:
             )
         )
 
-    def on_link_central_disconnected(self, peer_address, reason):
+    def on_link_disconnected(self, peer_address, reason):
         '''
         Called when an active disconnection occurs from a peer
         '''
@@ -431,6 +437,17 @@ class Controller:
 
             # Remove the connection
             del self.peripheral_connections[peer_address]
+        elif connection := self.central_connections.get(peer_address):
+            self.send_hci_packet(
+                HCI_Disconnection_Complete_Event(
+                    status=HCI_SUCCESS,
+                    connection_handle=connection.handle,
+                    reason=reason,
+                )
+            )
+
+            # Remove the connection
+            del self.central_connections[peer_address]
         else:
             logger.warning(f'!!! No peripheral connection found for {peer_address}')
 
@@ -479,7 +496,7 @@ class Controller:
             )
         )
 
-    def on_link_peripheral_disconnection_complete(self, disconnection_command, status):
+    def on_link_disconnection_complete(self, disconnection_command, status):
         '''
         Called when a disconnection has been completed
         '''
@@ -499,26 +516,11 @@ class Controller:
         ):
             logger.debug(f'CENTRAL Connection removed: {connection}')
             del self.central_connections[connection.peer_address]
-
-    def on_link_peripheral_disconnected(self, peer_address):
-        '''
-        Called when a connection to a peripheral is broken
-        '''
-
-        # Send a disconnection complete event
-        if connection := self.central_connections.get(peer_address):
-            self.send_hci_packet(
-                HCI_Disconnection_Complete_Event(
-                    status=HCI_SUCCESS,
-                    connection_handle=connection.handle,
-                    reason=HCI_CONNECTION_TIMEOUT_ERROR,
-                )
-            )
-
-            # Remove the connection
-            del self.central_connections[peer_address]
-        else:
-            logger.warning(f'!!! No central connection found for {peer_address}')
+        elif connection := self.find_peripheral_connection_by_handle(
+            disconnection_command.connection_handle
+        ):
+            logger.debug(f'PERIPHERAL Connection removed: {connection}')
+            del self.peripheral_connections[connection.peer_address]
 
     def on_link_encrypted(self, peer_address, _rand, _ediv, _ltk):
         # For now, just setup the encryption without asking the host
@@ -877,6 +879,14 @@ class Controller:
             else:
                 # Remove the connection
                 del self.central_connections[connection.peer_address]
+        elif connection := self.find_peripheral_connection_by_handle(handle):
+            if self.link:
+                self.link.disconnect(
+                    self.random_address, connection.peer_address, command
+                )
+            else:
+                # Remove the connection
+                del self.peripheral_connections[connection.peer_address]
         elif connection := self.find_classic_connection_by_handle(handle):
             if self.link:
                 self.link.classic_disconnect(
