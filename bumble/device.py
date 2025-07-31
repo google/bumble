@@ -1752,6 +1752,8 @@ class Connection(utils.CompositeEventEmitter):
     EVENT_CIS_REQUEST = "cis_request"
     EVENT_CIS_ESTABLISHMENT = "cis_establishment"
     EVENT_CIS_ESTABLISHMENT_FAILURE = "cis_establishment_failure"
+    EVENT_LE_SUBRATE_CHANGE = "le_subrate_change"
+    EVENT_LE_SUBRATE_CHANGE_FAILURE = "le_subrate_change_failure"
 
     @utils.composite_listener
     class Listener:
@@ -1787,6 +1789,8 @@ class Connection(utils.CompositeEventEmitter):
         connection_interval: float  # Connection interval, in milliseconds. [LE only]
         peripheral_latency: int  # Peripheral latency, in number of intervals. [LE only]
         supervision_timeout: float  # Supervision timeout, in milliseconds.
+        subrate_factor: int = 1
+        continuation_number: int = 0
 
     def __init__(
         self,
@@ -2058,6 +2062,7 @@ class DeviceConfiguration:
     le_simultaneous_enabled: bool = False
     le_privacy_enabled: bool = False
     le_rpa_timeout: int = DEVICE_DEFAULT_LE_RPA_TIMEOUT
+    le_subrate_enabled: bool = True
     classic_enabled: bool = False
     classic_sc_enabled: bool = True
     classic_ssp_enabled: bool = True
@@ -2410,6 +2415,7 @@ class Device(utils.CompositeEventEmitter):
         self.le_privacy_enabled = config.le_privacy_enabled
         self.le_rpa_timeout = config.le_rpa_timeout
         self.le_rpa_periodic_update_task: Optional[asyncio.Task] = None
+        self.le_subrate_enabled = config.le_subrate_enabled
         self.classic_enabled = config.classic_enabled
         self.cis_enabled = config.cis_enabled
         self.classic_sc_enabled = config.classic_sc_enabled
@@ -6225,6 +6231,22 @@ class Device(utils.CompositeEventEmitter):
             f'error={error}'
         )
         connection.emit(connection.EVENT_CONNECTION_PHY_UPDATE_FAILURE, error)
+
+    @host_event_handler
+    @with_connection_from_handle
+    def on_le_subrate_change(
+        self,
+        connection: Connection,
+        subrate_factor: int,
+        peripheral_latency: int,
+        continuation_number: int,
+        supervision_timeout: int,
+    ):
+        connection.parameters.subrate_factor = subrate_factor
+        connection.parameters.peripheral_latency = peripheral_latency
+        connection.parameters.continuation_number = continuation_number
+        connection.parameters.supervision_timeout = supervision_timeout * 10
+        connection.emit(connection.EVENT_LE_SUBRATE_CHANGE)
 
     @host_event_handler
     @with_connection_from_handle

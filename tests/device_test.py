@@ -613,6 +613,37 @@ async def test_enter_and_exit_sniff_mode():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_le_request_subrate():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    q = asyncio.Queue()
+
+    def on_le_subrate_change():
+        q.put_nowait(lambda: None)
+
+    devices.connections[0].on(Connection.EVENT_LE_SUBRATE_CHANGE, on_le_subrate_change)
+
+    await devices[0].send_command(
+        hci.HCI_LE_Subrate_Request_Command(
+            connection_handle=devices.connections[0].handle,
+            subrate_min=2,
+            subrate_max=2,
+            max_latency=2,
+            continuation_number=1,
+            supervision_timeout=2,
+        )
+    )
+
+    await asyncio.wait_for(q.get(), _TIMEOUT)
+    assert devices.connections[0].parameters.subrate_factor == 2
+    assert devices.connections[0].parameters.peripheral_latency == 2
+    assert devices.connections[0].parameters.continuation_number == 1
+    assert devices.connections[0].parameters.supervision_timeout == 20
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_power_on_default_static_address_should_not_be_any():
     devices = TwoDevices()
     devices[0].static_address = devices[0].random_address = Address.ANY_RANDOM
