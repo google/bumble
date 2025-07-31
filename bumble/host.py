@@ -1645,5 +1645,15 @@ class Host(utils.EventEmitter):
     def on_hci_le_cs_subevent_result_continue_event(self, event):
         self.emit('cs_subevent_result_continue', event)
 
+    def on_hci_le_subrate_change_event(self, event: hci.HCI_LE_Subrate_Change_Event):
+        self.emit(
+            'le_subrate_change',
+            event.connection_handle,
+            event.subrate_factor,
+            event.peripheral_latency,
+            event.continuation_number,
+            event.supervision_timeout,
+        )
+
     def on_hci_vendor_event(self, event):
         self.emit('vendor_event', event)
