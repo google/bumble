@@ -7,6 +7,7 @@ name = "bumble"
 dynamic = ["version"]
 description = "Bluetooth Stack for Apps, Emulation, Test and Experimentation"
 readme = "README.md"
+license = "Apache-2.0"
 authors = [{ name = "Google", email = "bumble-dev@google.com" }]
 requires-python = ">=3.9"
 dependencies = [
