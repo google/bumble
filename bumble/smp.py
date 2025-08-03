@@ -946,7 +946,9 @@ class Session:
             self.tk = self.passkey.to_bytes(16, byteorder='little')
             logger.debug(f'TK from passkey = {self.tk.hex()}')
 
-        await self.pairing_config.delegate.display_number(self.passkey, digits=6)
+        self.connection.cancel_on_disconnection(
+            self.pairing_config.delegate.display_number(self.passkey, digits=6)
+        )
 
     def input_passkey(self, next_steps: Optional[Callable[[], None]] = None) -> None:
         # Prompt the user for the passkey displayed on the peer
