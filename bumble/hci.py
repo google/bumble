@@ -6499,7 +6499,7 @@ class HCI_LE_Subrate_Change_Event(HCI_LE_Meta_Event):
     See Bluetooth spec @ 7.7.65.35 LE Subrate Change event
     '''
 
-    status: int = field(metadata=metadata(1))
+    status: int = field(metadata=metadata(STATUS_SPEC))
     connection_handle: int = field(metadata=metadata(2))
     subrate_factor: int = field(metadata=metadata(2))
     peripheral_latency: int = field(metadata=metadata(2))

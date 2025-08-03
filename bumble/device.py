@@ -1789,8 +1789,12 @@ class Connection(utils.CompositeEventEmitter):
         connection_interval: float  # Connection interval, in milliseconds. [LE only]
         peripheral_latency: int  # Peripheral latency, in number of intervals. [LE only]
         supervision_timeout: float  # Supervision timeout, in milliseconds.
-        subrate_factor: int = 1
-        continuation_number: int = 0
+        subrate_factor: int = (
+            1  # See Bluetooth spec Vol 6, Part B - 4.5.1 Connection events
+        )
+        continuation_number: int = (
+            0  # See Bluetooth spec Vol 6, Part B - 4.5.1 Connection events
+        )
 
     def __init__(
         self,
@@ -6242,10 +6246,13 @@ class Device(utils.CompositeEventEmitter):
         continuation_number: int,
         supervision_timeout: int,
     ):
-        connection.parameters.subrate_factor = subrate_factor
-        connection.parameters.peripheral_latency = peripheral_latency
-        connection.parameters.continuation_number = continuation_number
-        connection.parameters.supervision_timeout = supervision_timeout * 10
+        connection.parameters = Connection.Parameters(
+            connection.parameters.connection_interval,
+            peripheral_latency,
+            supervision_timeout * 10.0,
+            subrate_factor,
+            continuation_number,
+        )
         connection.emit(connection.EVENT_LE_SUBRATE_CHANGE)
 
     @host_event_handler
