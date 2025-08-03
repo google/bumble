@@ -94,15 +94,17 @@
         "ycursor"
     ],
     "[python]": {
-        "editor.rulers": [88]
+        "editor.rulers": [88],
+        "editor.defaultFormatter": "ms-python.black-formatter"
     },
-    "python.formatting.provider": "black",
-    "pylint.importStrategy": "useBundled",
     "python.testing.pytestArgs": [
         "."
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "python.terminal.launchArgs": [
+
+    ]
 }
