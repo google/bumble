@@ -1571,11 +1571,12 @@ class Session:
         if self.pairing_method == PairingMethod.CTKD_OVER_CLASSIC:
             # Authentication is already done in SMP, so remote shall start keys distribution immediately
             return
-        elif self.sc:
+
+        if self.sc:
+            self.send_public_key_command()
+
             if self.pairing_method == PairingMethod.PASSKEY:
                 self.display_or_input_passkey()
-
-            self.send_public_key_command()
         else:
             if self.pairing_method == PairingMethod.PASSKEY:
                 self.display_or_input_passkey(self.send_pairing_confirm_command)
@@ -1848,10 +1849,10 @@ class Session:
             elif self.pairing_method == PairingMethod.PASSKEY:
                 self.send_pairing_confirm_command()
         else:
+            # Send our public key back to the initiator
+            self.send_public_key_command()
 
             def next_steps() -> None:
-                # Send our public key back to the initiator
-                self.send_public_key_command()
 
                 if self.pairing_method in (
                     PairingMethod.JUST_WORKS,
