@@ -7,6 +7,10 @@ on:
     branches: [ main ]
     paths:
       - 'extras/android/BtBench/**'
+  workflow_dispatch:
+    branches: [main]
+    paths:
+      - 'extras/android/BtBench/**'
 
 permissions:
   contents: read
