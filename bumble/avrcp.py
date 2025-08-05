@@ -1117,7 +1117,7 @@ class Protocol(utils.EventEmitter):
 
     @staticmethod
     def _check_vendor_dependent_frame(
-        frame: Union[avc.VendorDependentCommandFrame, avc.VendorDependentResponseFrame],
+        frame: Union[avc.VendorDependentCommandFrame, avc.VendorDependentResponseFrame]
     ) -> bool:
         if frame.company_id != AVRCP_BLUETOOTH_SIG_COMPANY_ID:
             logger.debug("unsupported company id, ignoring")

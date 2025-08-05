@@ -44,7 +44,7 @@ test = [
     "coverage >= 6.4",
 ]
 development = [
-    "black ~= 25.1",
+    "black == 24.3",
     "bt-test-interfaces >= 0.0.6",
     "grpcio-tools >= 1.62.1",
     "invoke >= 1.7.3",
