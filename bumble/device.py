@@ -2066,7 +2066,7 @@ class DeviceConfiguration:
     le_simultaneous_enabled: bool = False
     le_privacy_enabled: bool = False
     le_rpa_timeout: int = DEVICE_DEFAULT_LE_RPA_TIMEOUT
-    le_subrate_enabled: bool = True
+    le_subrate_enabled: bool = False
     classic_enabled: bool = False
     classic_sc_enabled: bool = True
     classic_ssp_enabled: bool = True
@@ -2794,6 +2794,15 @@ class Device(utils.CompositeEventEmitter):
                 await self.send_command(
                     hci.HCI_LE_Set_Host_Feature_Command(
                         bit_number=hci.LeFeature.CONNECTED_ISOCHRONOUS_STREAM,
+                        bit_value=1,
+                    ),
+                    check_result=True,
+                )
+
+            if self.le_subrate_enabled:
+                await self.send_command(
+                    hci.HCI_LE_Set_Host_Feature_Command(
+                        bit_number=hci.LeFeature.CONNECTION_SUBRATING_HOST_SUPPORT,
                         bit_value=1,
                     ),
                     check_result=True,

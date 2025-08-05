@@ -1855,3 +1855,11 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.110 LE Remove ISO Data Path Command
         '''
         return struct.pack('<BH', HCI_SUCCESS, command.connection_handle)
+
+    def on_hci_le_set_host_feature_command(
+        self, _command: hci.HCI_LE_Set_Host_Feature_Command
+    ):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.115 LE Set Host Feature command
+        '''
+        return bytes([HCI_SUCCESS])
