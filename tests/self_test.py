@@ -322,7 +322,9 @@ async def test_self_smp(io_caps, sc, mitm, key_dist):
                 return 0
             else:
                 if (
-                    self.peer_delegate.io_capability
+                    self.io_capability
+                    == PairingDelegate.IoCapability.KEYBOARD_INPUT_ONLY
+                    and self.peer_delegate.io_capability
                     == PairingDelegate.IoCapability.KEYBOARD_INPUT_ONLY
                 ):
                     peer_number = 6789
