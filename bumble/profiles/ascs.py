@@ -452,6 +452,16 @@ class AseStateMachine(gatt.Characteristic):
 
         self.metadata = le_audio.Metadata.from_bytes(metadata)
         self.state = self.State.ENABLING
+        # CIS could be established before enable.
+        if cis_link := next(
+            (
+                cis_link
+                for cis_link in self.service.device.cis_links.values()
+                if cis_link.cig_id == self.cig_id and cis_link.cis_id == self.cis_id
+            ),
+            None,
+        ):
+            self.on_cis_establishment(cis_link)
 
         return (AseResponseCode.SUCCESS, AseReasonCode.NONE)
 
