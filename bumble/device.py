@@ -6208,11 +6208,23 @@ class Device(utils.CompositeEventEmitter):
             f'{connection.peer_address} as {connection.role_name}, '
             f'{connection_parameters}'
         )
-        connection.parameters = Connection.Parameters(
-            connection_parameters.connection_interval * 1.25,
-            connection_parameters.peripheral_latency,
-            connection_parameters.supervision_timeout * 10.0,
-        )
+        if (
+            connection.parameters.connection_interval
+            != connection_parameters.connection_interval * 1.25
+        ):
+            connection.parameters = Connection.Parameters(
+                connection_parameters.connection_interval * 1.25,
+                connection_parameters.peripheral_latency,
+                connection_parameters.supervision_timeout * 10.0,
+            )
+        else:
+            connection.parameters = Connection.Parameters(
+                connection_parameters.connection_interval * 1.25,
+                connection_parameters.peripheral_latency,
+                connection_parameters.supervision_timeout * 10.0,
+                connection.parameters.subrate_factor,
+                connection.parameters.continuation_number,
+            )
         connection.emit(connection.EVENT_CONNECTION_PARAMETERS_UPDATE)
 
     @host_event_handler
