@@ -1269,6 +1269,56 @@ class Controller:
         )
         return bytes([HCI_SUCCESS]) + bd_addr
 
+    def on_hci_le_set_default_subrate_command(
+        self, command: hci.HCI_LE_Set_Default_Subrate_Command
+    ):
+        '''
+        See Bluetooth spec Vol 6, Part E - 7.8.123 LE Set Event Mask Command
+        '''
+
+        if (
+            command.subrate_max * (command.max_latency) > 500
+            or command.subrate_max < command.subrate_min
+            or command.continuation_number >= command.subrate_max
+        ):
+            return bytes([HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
+
+        return bytes([HCI_SUCCESS])
+
+    def on_hci_le_subrate_request_command(
+        self, command: hci.HCI_LE_Subrate_Request_Command
+    ):
+        '''
+        See Bluetooth spec Vol 6, Part E - 7.8.124 LE Subrate Request command
+        '''
+        if (
+            command.subrate_max * (command.max_latency) > 500
+            or command.continuation_number < command.continuation_number
+            or command.subrate_max < command.subrate_min
+            or command.continuation_number >= command.subrate_max
+        ):
+            return bytes([HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
+
+        self.send_hci_packet(
+            hci.HCI_Command_Status_Event(
+                status=hci.HCI_SUCCESS,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
+
+        self.send_hci_packet(
+            hci.HCI_LE_Subrate_Change_Event(
+                status=hci.HCI_SUCCESS,
+                connection_handle=command.connection_handle,
+                subrate_factor=2,
+                peripheral_latency=2,
+                continuation_number=command.continuation_number,
+                supervision_timeout=command.supervision_timeout,
+            )
+        )
+        return None
+
     def on_hci_le_set_event_mask_command(self, command):
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.1 LE Set Event Mask Command
@@ -1815,3 +1865,11 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.110 LE Remove ISO Data Path Command
         '''
         return struct.pack('<BH', HCI_SUCCESS, command.connection_handle)
+
+    def on_hci_le_set_host_feature_command(
+        self, _command: hci.HCI_LE_Set_Host_Feature_Command
+    ):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.115 LE Set Host Feature command
+        '''
+        return bytes([HCI_SUCCESS])

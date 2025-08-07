@@ -5318,6 +5318,37 @@ class HCI_LE_Set_Host_Feature_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
+class HCI_LE_Set_Default_Subrate_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.123 LE Set Default Subrate command
+    '''
+
+    subrate_min: int = field(metadata=metadata(2))
+    subrate_max: int = field(metadata=metadata(2))
+    max_latency: int = field(metadata=metadata(2))
+    continuation_number: int = field(metadata=metadata(2))
+    supervision_timeout: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Subrate_Request_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.124 LE Subrate Request command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    subrate_min: int = field(metadata=metadata(2))
+    subrate_max: int = field(metadata=metadata(2))
+    max_latency: int = field(metadata=metadata(2))
+    continuation_number: int = field(metadata=metadata(2))
+    supervision_timeout: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
 class HCI_LE_CS_Read_Local_Supported_Capabilities_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.130 LE CS Read Local Supported Capabilities command
@@ -6458,6 +6489,22 @@ class HCI_LE_BIGInfo_Advertising_Report_Event(HCI_LE_Meta_Event):
     phy: int = field(metadata=Phy.type_metadata(1))
     framing: int = field(metadata=metadata(1))
     encryption: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Subrate_Change_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.35 LE Subrate Change event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    subrate_factor: int = field(metadata=metadata(2))
+    peripheral_latency: int = field(metadata=metadata(2))
+    continuation_number: int = field(metadata=metadata(2))
+    supervision_timeout: int = field(metadata=metadata(2))
 
 
 # -----------------------------------------------------------------------------
