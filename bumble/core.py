@@ -17,9 +17,20 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
+import dataclasses
 import enum
+import math
 import struct
-from typing import cast, overload, Literal, Union, Optional
+from typing import (
+    cast,
+    overload,
+    Any,
+    ClassVar,
+    Literal,
+    Union,
+    Optional,
+    TYPE_CHECKING,
+)
 from typing_extensions import Self
 
 from bumble.company_ids import COMPANY_IDENTIFIERS
@@ -727,9 +738,387 @@ class DeviceClass:
 
 
 # -----------------------------------------------------------------------------
-# Appearance
+# Classes representing "Data Types" defined in
+# "Supplement to the Bluetooth Core Specification", Part A
 # -----------------------------------------------------------------------------
-class Appearance:
+# TODO: use ABC, figure out multiple base classes with metaclasses
+class DataType:
+    @classmethod
+    def from_bytes(cls: Self, data: bytes) -> Self:
+        raise NotImplementedError()
+
+    def __bytes__(self) -> bytes:
+        raise NotImplementedError()
+
+
+@dataclasses.dataclass
+class ListOfServiceUUIDs(DataType):
+    """Base class for complete or incomplete lists of UUIDs."""
+
+    _uuid_size: ClassVar[int] = 0
+    uuids: list[UUID]
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> ListOfServiceUUIDs:
+        return cls(
+            [
+                UUID.from_bytes(data[x : x + cls._uuid_size])
+                for x in range(0, len(data), cls._uuid_size)
+            ]
+        )
+
+    def __post_init__(self) -> None:
+        for uuid in self.uuids:
+            if len(uuid.uuid_bytes) != self._uuid_size:
+                raise TypeError("incompatible UUID type")
+
+    def __bytes__(self) -> bytes:
+        return b"".join(bytes(uuid) for uuid in self.uuids)
+
+
+class IncompleteListOf16BitServiceUUIDs(ListOfServiceUUIDs):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.1 SERVICE OR SERVICE CLASS UUID
+    """
+
+    _uuid_size = 2
+
+
+class CompleteListOf16BitServiceUUIDs(ListOfServiceUUIDs):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.1 SERVICE OR SERVICE CLASS UUID
+    """
+
+    _uuid_size = 2
+
+
+class IncompleteListOf32BitServiceUUIDs(ListOfServiceUUIDs):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.1 SERVICE OR SERVICE CLASS UUID
+    """
+
+    _uuid_size = 4
+
+
+class CompleteListOf32BitServiceUUIDs(ListOfServiceUUIDs):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.1 SERVICE OR SERVICE CLASS UUID
+    """
+
+    _uuid_size = 4
+
+
+class IncompleteListOf128BitServiceUUIDs(ListOfServiceUUIDs):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.1 SERVICE OR SERVICE CLASS UUID
+    """
+
+    _uuid_size = 16
+
+
+class CompleteListOf128BitServiceUUIDs(ListOfServiceUUIDs):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.1 SERVICE OR SERVICE CLASS UUID
+    """
+
+    _uuid_size = 16
+
+
+class LocalName(str, DataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.2 LOCAL NAME
+    """
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
+        return cls(data.decode("utf-8"))
+
+    def __bytes__(self):
+        return self.encode("utf-8")
+
+
+class CompleteLocalName(LocalName):
+    pass
+
+
+class ShortenedLocalName(LocalName):
+    pass
+
+
+class Flags(DataType, enum.IntFlag):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.3 FLAGS
+    """
+
+    LE_LIMITED_DISCOVERABLE_MODE = 1 << 0
+    LE_GENERAL_DISCOVERABLE_MODE = 1 << 1
+    BR_EDR_NOT_SUPPORTED = 1 << 2
+    SIMULTANEOUS_LE_BR_EDR_CAPABLE = 1 << 3
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Flags:
+        return Flags(int.from_bytes(data, byteorder="little"))
+
+    def __bytes__(self) -> bytes:
+        bytes_length = 1 if self == 0 else math.ceil(self.bit_length() / 8)
+        return self.to_bytes(length=bytes_length, byteorder="little")
+
+
+@dataclasses.dataclass
+class ManufacturerSpecificData(DataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.4 MANUFACTURER SPECIFIC DATA
+    """
+
+    company_identifier: int
+    data: bytes
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Flags:
+        company_identifier = int.from_bytes(data[:2], "little")
+        return cls(company_identifier, data[2:])
+
+    def __bytes__(self) -> bytes:
+        return self.company_identifier.to_bytes(2, "little") + self.data
+
+
+class FixedSizeIntDataType(int, DataType):
+    _fixed_size: int = 0
+    _signed: bool = False
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
+        if len(data) != cls._fixed_size:
+            raise ValueError(f"data must be {cls._fixed_size} byte")
+        return cls(int.from_bytes(data, byteorder="little", signed=cls._signed))
+
+    def __bytes__(self) -> bytes:
+        return self.to_bytes(
+            length=self._fixed_size, byteorder="little", signed=self._signed
+        )
+
+
+class TxPowerLevel(FixedSizeIntDataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.5 TX POWER LEVEL
+    """
+
+    _fixed_size = 1
+    _signed = True
+
+
+class FixedSizeBytesDataType(bytes, DataType):
+    _fixed_size: int = 0
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
+        if len(data) != cls._fixed_size:
+            raise ValueError(f"data must be {cls._fixed_size} bytes")
+        return cls(data)
+
+    def __bytes__(self) -> bytes:
+        return self
+
+
+class ClassOfDevice(FixedSizeIntDataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.6 SECURE SIMPLE PAIRING OUT OF BAND (OOB)
+    """
+
+    _fixed_size = 3
+
+
+class SecureSimplePairingHashC192(FixedSizeBytesDataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.6 SECURE SIMPLE PAIRING OUT OF BAND (OOB)
+    """
+
+    _fixed_size = 16
+
+
+class SecureSimplePairingRandomizerR192(FixedSizeBytesDataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.6 SECURE SIMPLE PAIRING OUT OF BAND (OOB)
+    """
+
+    _fixed_size = 16
+
+
+class SecureSimplePairingHashC256(FixedSizeBytesDataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.6 SECURE SIMPLE PAIRING OUT OF BAND (OOB)
+    """
+
+    _fixed_size = 16
+
+
+class SecureSimplePairingRandomizerR256(FixedSizeBytesDataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.6 SECURE SIMPLE PAIRING OUT OF BAND (OOB)
+    """
+
+    _fixed_size = 16
+
+
+class LESecureConnectionsConfirmationValue(FixedSizeBytesDataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.6 SECURE SIMPLE PAIRING OUT OF BAND (OOB)
+    """
+
+    _fixed_size = 16
+
+
+class LESecureConnectionsRandomValue(FixedSizeBytesDataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.6 SECURE SIMPLE PAIRING OUT OF BAND (OOB)
+    """
+
+    _fixed_size = 16
+
+
+class SecurityManagerOutOfBandFlag(DataType, enum.IntFlag):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.7 SECURITY MANAGER OUT OF BAND (OOB)
+    """
+
+    OOB_FLAGS_FIELD = 1 << 0
+    LE_SUPPORTED = 1 << 1
+    ADDRESS_TYPE = 1 << 3
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> SecurityManagerOutOfBandFlag:
+        if len(data) != 1:
+            raise ValueError("data must be 1 byte")
+        return SecurityManagerOutOfBandFlag(data[0])
+
+    def __bytes__(self) -> bytes:
+        return bytes([self])
+
+
+class SecurityManagerTKValue(FixedSizeBytesDataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.8 SECURITY MANAGER TK VALUE
+    """
+
+    _fixed_size = 16
+
+
+@dataclasses.dataclass
+class PeripheralConnectionIntervalRange(DataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.9 PERIPHERAL CONNECTION INTERVAL RANGE
+    """
+
+    connection_interval_min: int
+    connection_interval_max: int
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> PeripheralConnectionIntervalRange:
+        return cls(*struct.unpack("<HH", data))
+
+    def __bytes__(self) -> bytes:
+        return struct.pack(
+            "<HH", self.connection_interval_min, self.connection_interval_max
+        )
+
+
+class ListOf16BitServiceSolicitationUUIDs(ListOfServiceUUIDs):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.10 SERVICE SOLICITATION
+    """
+
+    _uuid_size = 2
+
+
+class ListOf32BitServiceSolicitationUUIDs(ListOfServiceUUIDs):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.10 SERVICE SOLICITATION
+    """
+
+    _uuid_size = 4
+
+
+class ListOf128BitServiceSolicitationUUIDs(ListOfServiceUUIDs):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.10 SERVICE SOLICITATION
+    """
+
+    _uuid_size = 16
+
+
+@dataclasses.dataclass
+class ServiceData(DataType):
+    """Base class for complete or incomplete lists of UUIDs."""
+
+    _uuid_size: ClassVar[int] = 0
+    service_uuid: UUID
+    data: bytes
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Flags:
+        service_uuid = UUID.from_bytes(data[: cls._uuid_size])
+        return cls(service_uuid, data[cls._uuid_size :])
+
+    def __bytes__(self) -> bytes:
+        return self.service_uuid.to_bytes() + self.data
+
+
+class ServiceData16BitUUID(ServiceData):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.11 SERVICE DATA
+    """
+
+    _uuid_size = 2
+
+
+class ServiceData32BitUUID(ServiceData):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.11 SERVICE DATA
+    """
+
+    _uuid_size = 4
+
+
+class ServiceData128BitUUID(ServiceData):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.11 SERVICE DATA
+    """
+
+    _uuid_size = 16
+
+
+class Appearance(DataType):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.12 APPEARANCE
+    """
+
     class Category(utils.OpenIntEnum):
         UNKNOWN = 0x0000
         PHONE = 0x0001
@@ -1255,6 +1644,10 @@ class Appearance:
         category = cls.Category(appearance >> 6)
         return cls(category, appearance & 0x3F)
 
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        return cls.from_int(int.from_bytes(data, byteorder="little"))
+
     def __init__(self, category: Category, subcategory: int) -> None:
         self.category = category
         if subcategory_class := self.SUBCATEGORY_CLASSES.get(category):
@@ -1264,6 +1657,9 @@ class Appearance:
 
     def __int__(self) -> int:
         return self.category << 6 | self.subcategory
+
+    def __bytes__(self) -> bytes:
+        return int(self).to_bytes(2, byteorder="little")
 
     def __repr__(self) -> str:
         return (
@@ -1275,6 +1671,13 @@ class Appearance:
 
     def __str__(self) -> str:
         return f'{self.category.name}/{self.subcategory.name}'
+
+    def __eq__(self, value: Any) -> bool:
+        return (
+            isinstance(value, Appearance)
+            and self.category == value.category
+            and self.subcategory == value.subcategory
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -1351,11 +1754,7 @@ class AdvertisingData:
         THREE_D_INFORMATION_DATA                            = 0x3D
         MANUFACTURER_SPECIFIC_DATA                          = 0xFF
 
-    class Flags(enum.IntFlag):
-        LE_LIMITED_DISCOVERABLE_MODE = 1 << 0
-        LE_GENERAL_DISCOVERABLE_MODE = 1 << 1
-        BR_EDR_NOT_SUPPORTED = 1 << 2
-        SIMULTANEOUS_LE_BR_EDR_CAPABLE = 1 << 3
+    Flags = Flags # backward compatibility
 
     # For backward-compatibility
     FLAGS                                            = Type.FLAGS

@@ -2135,6 +2135,7 @@ class Address:
             if len(address) == 12 + 5:
                 # Form with ':' separators
                 address = address.replace(':', '')
+
             self.address_bytes = bytes(reversed(bytes.fromhex(address)))
 
         if len(self.address_bytes) != 6:
@@ -2207,6 +2208,38 @@ class Address:
 Address.NIL = Address(b"\xff\xff\xff\xff\xff\xff", Address.PUBLIC_DEVICE_ADDRESS)
 Address.ANY = Address(b"\x00\x00\x00\x00\x00\x00", Address.PUBLIC_DEVICE_ADDRESS)
 Address.ANY_RANDOM = Address(b"\x00\x00\x00\x00\x00\x00", Address.RANDOM_DEVICE_ADDRESS)
+
+
+# -----------------------------------------------------------------------------
+class PublicTargetAddress(Address):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.13 PUBLIC TARGET ADDRESS
+    """
+
+    def __init__(self, address: Address) -> None:
+        self.address_bytes = address.address_bytes
+        self.address_type = Address.PUBLIC_DEVICE_ADDRESS
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> PublicTargetAddress:
+        return cls(Address(data))
+
+
+# -----------------------------------------------------------------------------
+class RandomTargetAddress(Address):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.14 RANDOM TARGET ADDRESS
+    """
+
+    def __init__(self, address: Address) -> None:
+        self.address_bytes = address.address_bytes
+        self.address_type = Address.RANDOM_DEVICE_ADDRESS
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> RandomTargetAddress:
+        return cls(Address(data))
 
 
 # -----------------------------------------------------------------------------
