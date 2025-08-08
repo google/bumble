@@ -43,7 +43,8 @@ LINUX_KERNEL_GIT_SOURCE = "https://git.kernel.org/pub/scm/linux/kernel/git/firmw
 # -----------------------------------------------------------------------------
 def download_file(base_url, name):
     url = f"{base_url}/{name}"
-    with urllib.request.urlopen(url) as file:
+    request = urllib.request.Request(url, data=None, headers={"User-Agent": "Bumble"})
+    with urllib.request.urlopen(request) as file:
         data = file.read()
         print(f"Downloaded {name}: {len(data)} bytes")
         return data
