@@ -25,6 +25,7 @@ import click
 from bumble.colors import color
 from bumble.drivers import rtk
 from bumble.tools import rtk_util
+import bumble.logging
 
 
 # -----------------------------------------------------------------------------
@@ -58,7 +59,9 @@ def download_file(base_url, name, remove_suffix):
         name = name.replace(".bin", "")
 
     url = f"{base_url}/{name}"
-    with urllib.request.urlopen(url) as file:
+    logger.debug(f"downloading {url}")
+    request = urllib.request.Request(url, data=None, headers={"User-Agent": "Bumble"})
+    with urllib.request.urlopen(request) as file:
         data = file.read()
         print(f"Downloaded {name}: {len(data)} bytes")
         return data
@@ -84,6 +87,7 @@ def download_file(base_url, name, remove_suffix):
 @click.option("--parse", is_flag=True, help="Parse the FW image after saving")
 def main(output_dir, source, single, force, parse):
     """Download RTK firmware images and configs."""
+    bumble.logging.setup_basic_logging()
 
     # Check that the output dir exists
     if output_dir == '':

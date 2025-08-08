@@ -489,6 +489,21 @@ class Driver(common.Driver):
 
         return True
 
+    @staticmethod
+    async def get_loaded_firmware_version(host):
+        response = await host.send_command(HCI_RTK_Read_ROM_Version_Command())
+
+        if response.return_parameters.status != hci.HCI_SUCCESS:
+            return None
+
+        response = await host.send_command(
+            hci.HCI_Read_Local_Version_Information_Command(), check_result=True
+        )
+        return (
+            response.return_parameters.hci_subversion << 16
+            | response.return_parameters.lmp_subversion
+        )
+
     @classmethod
     async def driver_info_for_host(cls, host):
         try:
@@ -592,7 +607,7 @@ class Driver(common.Driver):
             )
             if response.return_parameters.status != hci.HCI_SUCCESS:
                 logger.warning("can't get ROM version")
-                return
+                return None
             rom_version = response.return_parameters.version
             logger.debug(f"ROM version before download: {rom_version:04X}")
         else:
@@ -600,13 +615,14 @@ class Driver(common.Driver):
 
         firmware = Firmware(self.firmware)
         logger.debug(f"firmware: project_id=0x{firmware.project_id:04X}")
+        logger.debug(f"firmware: version=0x{firmware.version:04X}")
         for patch in firmware.patches:
             if patch[0] == rom_version + 1:
                 logger.debug(f"using patch {patch[0]}")
                 break
         else:
             logger.warning("no valid patch found for rom version {rom_version}")
-            return
+            return None
 
         # Append the config if there is one.
         if self.config:
@@ -642,7 +658,9 @@ class Driver(common.Driver):
             logger.warning("can't get ROM version")
         else:
             rom_version = response.return_parameters.version
-            logger.debug(f"ROM version after download: {rom_version:04X}")
+            logger.debug(f"ROM version after download: {rom_version:02X}")
+
+        return firmware.version
 
     async def download_firmware(self):
         if self.driver_info.rom == RTK_ROM_LMP_8723A:
