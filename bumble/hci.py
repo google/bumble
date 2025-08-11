@@ -5257,7 +5257,7 @@ class HCI_LE_BIG_Terminate_Sync_Command(HCI_Command):
 
     return_parameters_fields = [
         ('status', STATUS_SPEC),
-        ('big_handle', 2),
+        ('big_handle', 1),
     ]
 
 
