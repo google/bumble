@@ -74,6 +74,7 @@ from bumble.keys import (
 )
 from bumble import hci
 from bumble import pairing
+from bumble import gatt
 from bumble import gatt_client
 from bumble import gatt_server
 from bumble import smp
@@ -5241,10 +5242,10 @@ class Device(utils.CompositeEventEmitter):
         ):
             connection.emit(connection.EVENT_LINK_KEY)
 
-    def add_service(self, service: gatt_server.Service):
+    def add_service(self, service: gatt.Service):
         self.gatt_server.add_service(service)
 
-    def add_services(self, services: Iterable[gatt_server.Service]):
+    def add_services(self, services: Iterable[gatt.Service]):
         self.gatt_server.add_services(services)
 
     def add_default_services(
