@@ -1166,14 +1166,11 @@ class BigSync(utils.EventEmitter):
             logger.error('BIG Sync %d is not active.', self.big_handle)
             return
 
-        with closing(utils.EventWatcher()) as watcher:
-            terminated = asyncio.Event()
-            watcher.once(self, BigSync.Event.TERMINATION, lambda _: terminated.set())
-            await self.device.send_command(
-                hci.HCI_LE_BIG_Terminate_Sync_Command(big_handle=self.big_handle),
-                check_result=True,
-            )
-            await terminated.wait()
+        await self.device.send_command(
+            hci.HCI_LE_BIG_Terminate_Sync_Command(big_handle=self.big_handle),
+            check_result=True,
+        )
+        self.state = BigSync.State.TERMINATED
 
 
 # -----------------------------------------------------------------------------
