@@ -2631,7 +2631,7 @@ class Device(utils.CompositeEventEmitter):
     def register_l2cap_channel_server(
         self,
         psm: int,
-        server: Callable[[LeCreditBasedChannel], Any],
+        server: Callable[[l2cap.LeCreditBasedChannel], Any],
         max_credits: int = DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
         mtu: int = DEVICE_DEFAULT_L2CAP_COC_MTU,
         mps: int = DEVICE_DEFAULT_L2CAP_COC_MPS,
@@ -5241,10 +5241,10 @@ class Device(utils.CompositeEventEmitter):
         ):
             connection.emit(connection.EVENT_LINK_KEY)
 
-    def add_service(self, service: gatt_server.Server):
+    def add_service(self, service: gatt_server.Service):
         self.gatt_server.add_service(service)
 
-    def add_services(self, services: Iterable[gatt_server.Server]):
+    def add_services(self, services: Iterable[gatt_server.Service]):
         self.gatt_server.add_services(services)
 
     def add_default_services(
