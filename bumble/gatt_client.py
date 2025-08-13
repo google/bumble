@@ -42,27 +42,7 @@ from typing import (
 
 from bumble.colors import color
 from bumble.hci import HCI_Constant
-from bumble.att import (
-    ATT_ATTRIBUTE_NOT_FOUND_ERROR,
-    ATT_ATTRIBUTE_NOT_LONG_ERROR,
-    ATT_CID,
-    ATT_DEFAULT_MTU,
-    ATT_ERROR_RESPONSE,
-    ATT_INVALID_OFFSET_ERROR,
-    ATT_PDU,
-    ATT_RESPONSES,
-    ATT_Exchange_MTU_Request,
-    ATT_Find_By_Type_Value_Request,
-    ATT_Find_Information_Request,
-    ATT_Handle_Value_Confirmation,
-    ATT_Read_Blob_Request,
-    ATT_Read_By_Group_Type_Request,
-    ATT_Read_By_Type_Request,
-    ATT_Read_Request,
-    ATT_Write_Command,
-    ATT_Write_Request,
-    ATT_Error,
-)
+from bumble import att
 from bumble import utils
 from bumble import core
 from bumble.core import UUID, InvalidStateError
@@ -291,8 +271,8 @@ class Client:
     indication_subscribers: dict[
         int, set[Union[CharacteristicProxy, Callable[[bytes], Any]]]
     ]
-    pending_response: Optional[asyncio.futures.Future[ATT_PDU]]
-    pending_request: Optional[ATT_PDU]
+    pending_response: Optional[asyncio.futures.Future[att.ATT_PDU]]
+    pending_request: Optional[att.ATT_PDU]
 
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
@@ -308,15 +288,15 @@ class Client:
         connection.on(connection.EVENT_DISCONNECTION, self.on_disconnection)
 
     def send_gatt_pdu(self, pdu: bytes) -> None:
-        self.connection.send_l2cap_pdu(ATT_CID, pdu)
+        self.connection.send_l2cap_pdu(att.ATT_CID, pdu)
 
-    async def send_command(self, command: ATT_PDU) -> None:
+    async def send_command(self, command: att.ATT_PDU) -> None:
         logger.debug(
             f'GATT Command from client: [0x{self.connection.handle:04X}] {command}'
         )
         self.send_gatt_pdu(bytes(command))
 
-    async def send_request(self, request: ATT_PDU):
+    async def send_request(self, request: att.ATT_PDU):
         logger.debug(
             f'GATT Request from client: [0x{self.connection.handle:04X}] {request}'
         )
@@ -345,7 +325,9 @@ class Client:
 
         return response
 
-    def send_confirmation(self, confirmation: ATT_Handle_Value_Confirmation) -> None:
+    def send_confirmation(
+        self, confirmation: att.ATT_Handle_Value_Confirmation
+    ) -> None:
         logger.debug(
             f'GATT Confirmation from client: [0x{self.connection.handle:04X}] '
             f'{confirmation}'
@@ -354,8 +336,8 @@ class Client:
 
     async def request_mtu(self, mtu: int) -> int:
         # Check the range
-        if mtu < ATT_DEFAULT_MTU:
-            raise core.InvalidArgumentError(f'MTU must be >= {ATT_DEFAULT_MTU}')
+        if mtu < att.ATT_DEFAULT_MTU:
+            raise core.InvalidArgumentError(f'MTU must be >= {att.ATT_DEFAULT_MTU}')
         if mtu > 0xFFFF:
             raise core.InvalidArgumentError('MTU must be <= 0xFFFF')
 
@@ -365,9 +347,11 @@ class Client:
 
         # Send the request
         self.mtu_exchange_done = True
-        response = await self.send_request(ATT_Exchange_MTU_Request(client_rx_mtu=mtu))
-        if response.op_code == ATT_ERROR_RESPONSE:
-            raise ATT_Error(error_code=response.error_code, message=response)
+        response = await self.send_request(
+            att.ATT_Exchange_MTU_Request(client_rx_mtu=mtu)
+        )
+        if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+            raise att.ATT_Error(error_code=response.error_code, message=response)
 
         # Compute the final MTU
         self.connection.att_mtu = min(mtu, response.server_rx_mtu)
@@ -432,7 +416,7 @@ class Client:
         services = []
         while starting_handle < 0xFFFF:
             response = await self.send_request(
-                ATT_Read_By_Group_Type_Request(
+                att.ATT_Read_By_Group_Type_Request(
                     starting_handle=starting_handle,
                     ending_handle=0xFFFF,
                     attribute_group_type=GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
@@ -443,14 +427,14 @@ class Client:
                 return []
 
             # Check if we reached the end of the iteration
-            if response.op_code == ATT_ERROR_RESPONSE:
-                if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
+            if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+                if response.error_code != att.ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
                         '!!! unexpected error while discovering services: '
                         f'{HCI_Constant.error_name(response.error_code)}'
                     )
-                    raise ATT_Error(
+                    raise att.ATT_Error(
                         error_code=response.error_code,
                         message='Unexpected error while discovering services',
                     )
@@ -509,7 +493,7 @@ class Client:
         services = []
         while starting_handle < 0xFFFF:
             response = await self.send_request(
-                ATT_Find_By_Type_Value_Request(
+                att.ATT_Find_By_Type_Value_Request(
                     starting_handle=starting_handle,
                     ending_handle=0xFFFF,
                     attribute_type=GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
@@ -521,8 +505,8 @@ class Client:
                 return []
 
             # Check if we reached the end of the iteration
-            if response.op_code == ATT_ERROR_RESPONSE:
-                if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
+            if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+                if response.error_code != att.ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
                         '!!! unexpected error while discovering services: '
@@ -578,7 +562,7 @@ class Client:
         included_services: list[ServiceProxy] = []
         while starting_handle <= ending_handle:
             response = await self.send_request(
-                ATT_Read_By_Type_Request(
+                att.ATT_Read_By_Type_Request(
                     starting_handle=starting_handle,
                     ending_handle=ending_handle,
                     attribute_type=GATT_INCLUDE_ATTRIBUTE_TYPE,
@@ -589,14 +573,14 @@ class Client:
                 return []
 
             # Check if we reached the end of the iteration
-            if response.op_code == ATT_ERROR_RESPONSE:
-                if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
+            if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+                if response.error_code != att.ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
                         '!!! unexpected error while discovering included services: '
                         f'{HCI_Constant.error_name(response.error_code)}'
                     )
-                    raise ATT_Error(
+                    raise att.ATT_Error(
                         error_code=response.error_code,
                         message='Unexpected error while discovering included services',
                     )
@@ -652,7 +636,7 @@ class Client:
             characteristics: list[CharacteristicProxy[bytes]] = []
             while starting_handle <= ending_handle:
                 response = await self.send_request(
-                    ATT_Read_By_Type_Request(
+                    att.ATT_Read_By_Type_Request(
                         starting_handle=starting_handle,
                         ending_handle=ending_handle,
                         attribute_type=GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
@@ -663,14 +647,14 @@ class Client:
                     return []
 
                 # Check if we reached the end of the iteration
-                if response.op_code == ATT_ERROR_RESPONSE:
-                    if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
+                if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+                    if response.error_code != att.ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                         # Unexpected end
                         logger.warning(
                             '!!! unexpected error while discovering characteristics: '
                             f'{HCI_Constant.error_name(response.error_code)}'
                         )
-                        raise ATT_Error(
+                        raise att.ATT_Error(
                             error_code=response.error_code,
                             message='Unexpected error while discovering characteristics',
                         )
@@ -736,7 +720,7 @@ class Client:
         descriptors: list[DescriptorProxy] = []
         while starting_handle <= ending_handle:
             response = await self.send_request(
-                ATT_Find_Information_Request(
+                att.ATT_Find_Information_Request(
                     starting_handle=starting_handle, ending_handle=ending_handle
                 )
             )
@@ -745,8 +729,8 @@ class Client:
                 return []
 
             # Check if we reached the end of the iteration
-            if response.op_code == ATT_ERROR_RESPONSE:
-                if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
+            if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+                if response.error_code != att.ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
                         '!!! unexpected error while discovering descriptors: '
@@ -791,7 +775,7 @@ class Client:
         attributes = []
         while True:
             response = await self.send_request(
-                ATT_Find_Information_Request(
+                att.ATT_Find_Information_Request(
                     starting_handle=starting_handle, ending_handle=ending_handle
                 )
             )
@@ -799,8 +783,8 @@ class Client:
                 return []
 
             # Check if we reached the end of the iteration
-            if response.op_code == ATT_ERROR_RESPONSE:
-                if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
+            if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+                if response.error_code != att.ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
                         '!!! unexpected error while discovering attributes: '
@@ -954,12 +938,12 @@ class Client:
         # Send a request to read
         attribute_handle = attribute if isinstance(attribute, int) else attribute.handle
         response = await self.send_request(
-            ATT_Read_Request(attribute_handle=attribute_handle)
+            att.ATT_Read_Request(attribute_handle=attribute_handle)
         )
         if response is None:
             raise TimeoutError('read timeout')
-        if response.op_code == ATT_ERROR_RESPONSE:
-            raise ATT_Error(error_code=response.error_code, message=response)
+        if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+            raise att.ATT_Error(error_code=response.error_code, message=response)
 
         # If the value is the max size for the MTU, try to read more unless the caller
         # specifically asked not to do that
@@ -969,19 +953,21 @@ class Client:
             offset = len(attribute_value)
             while True:
                 response = await self.send_request(
-                    ATT_Read_Blob_Request(
+                    att.ATT_Read_Blob_Request(
                         attribute_handle=attribute_handle, value_offset=offset
                     )
                 )
                 if response is None:
                     raise TimeoutError('read timeout')
-                if response.op_code == ATT_ERROR_RESPONSE:
+                if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
                     if response.error_code in (
-                        ATT_ATTRIBUTE_NOT_LONG_ERROR,
-                        ATT_INVALID_OFFSET_ERROR,
+                        att.ATT_ATTRIBUTE_NOT_LONG_ERROR,
+                        att.ATT_INVALID_OFFSET_ERROR,
                     ):
                         break
-                    raise ATT_Error(error_code=response.error_code, message=response)
+                    raise att.ATT_Error(
+                        error_code=response.error_code, message=response
+                    )
 
                 part = response.part_attribute_value
                 attribute_value += part
@@ -1012,7 +998,7 @@ class Client:
         characteristics_values = []
         while starting_handle <= ending_handle:
             response = await self.send_request(
-                ATT_Read_By_Type_Request(
+                att.ATT_Read_By_Type_Request(
                     starting_handle=starting_handle,
                     ending_handle=ending_handle,
                     attribute_type=uuid,
@@ -1023,8 +1009,8 @@ class Client:
                 return []
 
             # Check if we reached the end of the iteration
-            if response.op_code == ATT_ERROR_RESPONSE:
-                if response.error_code != ATT_ATTRIBUTE_NOT_FOUND_ERROR:
+            if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+                if response.error_code != att.ATT_ATTRIBUTE_NOT_FOUND_ERROR:
                     # Unexpected end
                     logger.warning(
                         '!!! unexpected error while reading characteristics: '
@@ -1069,15 +1055,15 @@ class Client:
         attribute_handle = attribute if isinstance(attribute, int) else attribute.handle
         if with_response:
             response = await self.send_request(
-                ATT_Write_Request(
+                att.ATT_Write_Request(
                     attribute_handle=attribute_handle, attribute_value=value
                 )
             )
-            if response.op_code == ATT_ERROR_RESPONSE:
-                raise ATT_Error(error_code=response.error_code, message=response)
+            if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+                raise att.ATT_Error(error_code=response.error_code, message=response)
         else:
             await self.send_command(
-                ATT_Write_Command(
+                att.ATT_Write_Command(
                     attribute_handle=attribute_handle, attribute_value=value
                 )
             )
@@ -1086,11 +1072,11 @@ class Client:
         if self.pending_response and not self.pending_response.done():
             self.pending_response.cancel()
 
-    def on_gatt_pdu(self, att_pdu: ATT_PDU) -> None:
+    def on_gatt_pdu(self, att_pdu: att.ATT_PDU) -> None:
         logger.debug(
             f'GATT Response to client: [0x{self.connection.handle:04X}] {att_pdu}'
         )
-        if att_pdu.op_code in ATT_RESPONSES:
+        if att_pdu.op_code in att.ATT_RESPONSES:
             if self.pending_request is None:
                 # Not expected!
                 logger.warning('!!! unexpected response, there is no pending request')
@@ -1098,7 +1084,7 @@ class Client:
 
             # The response should match the pending request unless it is
             # an error response
-            if att_pdu.op_code != ATT_ERROR_RESPONSE:
+            if att_pdu.op_code != att.Opcode.ATT_ERROR_RESPONSE:
                 expected_response_name = self.pending_request.name.replace(
                     '_REQUEST', '_RESPONSE'
                 )
@@ -1126,7 +1112,9 @@ class Client:
                     + str(att_pdu)
                 )
 
-    def on_att_handle_value_notification(self, notification):
+    def on_att_handle_value_notification(
+        self, notification: att.ATT_Handle_Value_Notification
+    ):
         # Call all subscribers
         subscribers = self.notification_subscribers.get(
             notification.attribute_handle, set()
@@ -1141,7 +1129,9 @@ class Client:
             else:
                 subscriber.emit(subscriber.EVENT_UPDATE, notification.attribute_value)
 
-    def on_att_handle_value_indication(self, indication):
+    def on_att_handle_value_indication(
+        self, indication: att.ATT_Handle_Value_Indication
+    ):
         # Call all subscribers
         subscribers = self.indication_subscribers.get(
             indication.attribute_handle, set()
@@ -1157,7 +1147,7 @@ class Client:
                 subscriber.emit(subscriber.EVENT_UPDATE, indication.attribute_value)
 
         # Confirm that we received the indication
-        self.send_confirmation(ATT_Handle_Value_Confirmation())
+        self.send_confirmation(att.ATT_Handle_Value_Confirmation())
 
     def cache_value(self, attribute_handle: int, value: bytes) -> None:
         self.cached_values[attribute_handle] = (
