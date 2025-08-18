@@ -507,15 +507,15 @@ class Server(utils.EventEmitter):
                     error_code=error.error_code,
                 )
                 self.send_response(connection, response)
-            except Exception as error:
-                logger.warning(f'{color("!!! Exception in handler:", "red")} {error}')
+            except Exception:
+                logger.exception(color("!!! Exception in handler:", "red"))
                 response = att.ATT_Error_Response(
                     request_opcode_in_error=att_pdu.op_code,
                     attribute_handle_in_error=0x0000,
                     error_code=att.ATT_UNLIKELY_ERROR_ERROR,
                 )
                 self.send_response(connection, response)
-                raise error
+                raise
         else:
             # No specific handler registered
             if att_pdu.op_code in att.ATT_REQUESTS:
@@ -982,8 +982,8 @@ class Server(utils.EventEmitter):
         # Accept the value
         try:
             await attribute.write_value(connection, request.attribute_value)
-        except Exception as error:
-            logger.exception(f'!!! ignoring exception: {error}')
+        except Exception:
+            logger.exception('!!! ignoring exception')
 
     def on_att_handle_value_confirmation(
         self,

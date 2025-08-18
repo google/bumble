@@ -137,8 +137,8 @@ class MessageAssembler:
                 self.pid,
                 self.payload,
             )
-        except Exception as error:
-            logger.exception(color(f"!!! exception in callback: {error}", "red"))
+        except Exception:
+            logger.exception(color("!!! exception in callback", "red"))
 
         self.reset()
 

@@ -292,9 +292,9 @@ async def open_usb_transport(spec: str) -> Transport:
                 if self.sink:
                     try:
                         self.sink.on_packet(packet)
-                    except Exception as error:
+                    except Exception:
                         logger.exception(
-                            color(f'!!! Exception in sink.on_packet: {error}', 'red')
+                            color('!!! Exception in sink.on_packet', 'red')
                         )
 
         def close(self):

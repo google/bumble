@@ -48,8 +48,8 @@ def _wrap_transport(transport: Transport) -> Transport:
             return SnoopingTransport.create_with(
                 transport, create_snooper(snooper_spec)
             )
-        except Exception as exc:
-            logger.warning(f'Exception while creating snooper: {exc}')
+        except Exception:
+            logger.exception('Exception while creating snooper')
 
     return transport
 

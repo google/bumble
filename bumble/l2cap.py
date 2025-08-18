@@ -1695,8 +1695,8 @@ class ChannelManager:
         if handler:
             try:
                 handler(connection, cid, control_frame)
-            except Exception as error:
-                logger.warning(f'{color("!!! Exception in handler:", "red")} {error}')
+            except Exception:
+                logger.exception(color("!!! Exception in handler:", "red"))
                 self.send_control_frame(
                     connection,
                     cid,
@@ -1706,7 +1706,7 @@ class ChannelManager:
                         data=b'',
                     ),
                 )
-                raise error
+                raise
         else:
             logger.error(color('Channel Manager command not handled???', 'red'))
             self.send_control_frame(
@@ -2192,8 +2192,8 @@ class ChannelManager:
         # Connect
         try:
             await channel.connect()
-        except Exception as error:
-            logger.warning(f'connection failed: {error}')
+        except Exception:
+            logger.exception('connection failed')
             del connection_channels[source_cid]
             raise
 
