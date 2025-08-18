@@ -54,3 +54,69 @@ async def open_unix_client_transport(spec: str) -> Transport:
     packet_sink = StreamPacketSink(unix_transport)
 
     return Transport(packet_source, packet_sink)
+
+
+# -----------------------------------------------------------------------------
+async def open_unix_server_transport(spec: str) -> Transport:
+    '''Open a UNIX socket server transport.
+
+    The parameter is the path of unix socket. For abstract socket, the first character
+    needs to be '@'.
+
+    Example:
+        * /tmp/hci.socket
+        * @hci_socket
+    '''
+    # For abstract socket, the first character should be null character.
+    if spec.startswith('@'):
+        spec = '\0' + spec[1:]
+
+    class UnixServerTransport(Transport):
+        def __init__(self, source, sink, server):
+            self.server = server
+            super().__init__(source, sink)
+
+        async def close(self):
+            await super().close()
+
+    class UnixServerProtocol(asyncio.BaseProtocol):
+        def __init__(self, packet_source, packet_sink):
+            self.packet_source = packet_source
+            self.packet_sink = packet_sink
+
+        # Called when a new connection is established
+        def connection_made(self, transport):
+            peer_name = transport.get_extra_info('peer_name')
+            logger.debug('connection from %s', peer_name)
+            self.packet_sink.transport = transport
+
+        # Called when the client is disconnected
+        def connection_lost(self, error):
+            logger.debug('connection lost: %s', error)
+            self.packet_sink.transport = None
+
+        def eof_received(self):
+            logger.debug('connection end')
+            self.packet_sink.transport = None
+
+        # Called when data is received on the socket
+        def data_received(self, data):
+            self.packet_source.data_received(data)
+
+    class UnixServerPacketSink:
+        def __init__(self):
+            self.transport = None
+
+        def on_packet(self, packet):
+            if self.transport:
+                self.transport.write(packet)
+            else:
+                logger.debug('no client, dropping packet')
+
+    packet_source = StreamPacketSource()
+    packet_sink = UnixServerPacketSink()
+    server = await asyncio.get_running_loop().create_unix_server(
+        lambda: UnixServerProtocol(packet_source, packet_sink), spec
+    )
+
+    return UnixServerTransport(packet_source, packet_sink, server)

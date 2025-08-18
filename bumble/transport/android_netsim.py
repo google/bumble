@@ -443,7 +443,7 @@ async def open_android_netsim_transport(spec: Optional[str]) -> Transport:
     params = spec.split(',') if spec else []
     if params and ':' in params[0]:
         # Explicit <host>:<port>
-        host, port_str = params[0].split(':')
+        host, port_str = params[0].rsplit(':', maxsplit=1)
         port = int(port_str)
         params_offset = 1
     else:

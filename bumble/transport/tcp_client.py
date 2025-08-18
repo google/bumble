@@ -41,7 +41,7 @@ async def open_tcp_client_transport(spec: str) -> Transport:
             logger.debug(f'connection lost: {exc}')
             self.on_transport_lost()
 
-    remote_host, remote_port = spec.split(':')
+    remote_host, remote_port = spec.rsplit(':', maxsplit=1)
     tcp_transport, packet_source = await asyncio.get_running_loop().create_connection(
         TcpPacketSource,
         host=remote_host,
