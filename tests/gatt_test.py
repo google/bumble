@@ -58,7 +58,7 @@ from bumble.transport.common import AsyncPipeSink
 from bumble.core import UUID
 from bumble.att import (
     Attribute,
-    ATT_EXCHANGE_MTU_REQUEST,
+    Opcode,
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     ATT_PDU,
     ATT_Error,
@@ -103,7 +103,7 @@ def test_UUID():
 # -----------------------------------------------------------------------------
 def test_ATT_Error_Response():
     pdu = ATT_Error_Response(
-        request_opcode_in_error=ATT_EXCHANGE_MTU_REQUEST,
+        request_opcode_in_error=Opcode.ATT_EXCHANGE_MTU_REQUEST,
         attribute_handle_in_error=0x0000,
         error_code=ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     )

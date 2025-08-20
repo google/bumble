@@ -317,10 +317,8 @@ class AsyncRunner:
                 item = await self.queue.get()
                 try:
                     await item
-                except Exception as error:
-                    logger.warning(
-                        f'{color("!!! Exception in work queue:", "red")} {error}'
-                    )
+                except Exception:
+                    logger.exception(color("!!! Exception in work queue", "red"))
 
     # Shared default queue
     default_queue = WorkQueue()

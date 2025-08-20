@@ -230,8 +230,8 @@ class SoundDeviceAudioOutput(ThreadedAudioOutput):
 
         try:
             self._stream.write(pcm_samples)
-        except Exception as error:
-            print(f'Sound device error: {error}')
+        except Exception:
+            logger.exception('Sound device error')
             raise
 
     def _close(self):
