@@ -882,8 +882,8 @@ class Session:
                 if response:
                     next_steps()
                     return
-            except Exception as error:
-                logger.warning(f'exception while confirm: {error}')
+            except Exception:
+                logger.exception('exception while confirm')
 
             self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
 
@@ -901,8 +901,8 @@ class Session:
                 if response:
                     next_steps()
                     return
-            except Exception as error:
-                logger.warning(f'exception while prompting: {error}')
+            except Exception:
+                logger.exception('exception while prompting')
 
             self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
 
@@ -919,8 +919,8 @@ class Session:
                     return
                 logger.debug(f'user input: {passkey}')
                 next_steps(passkey)
-            except Exception as error:
-                logger.warning(f'exception while prompting: {error}')
+            except Exception:
+                logger.exception('exception while prompting')
                 self.send_pairing_failed(SMP_PASSKEY_ENTRY_FAILED_ERROR)
 
         self.connection.cancel_on_disconnection(prompt())
@@ -968,8 +968,8 @@ class Session:
 
             try:
                 self.connection.cancel_on_disconnection(display_passkey())
-            except Exception as error:
-                logger.warning(f'exception while displaying passkey: {error}')
+            except Exception:
+                logger.exception('exception while displaying passkey')
         else:
             self.input_passkey(next_steps)
 
@@ -1414,8 +1414,8 @@ class Session:
         if handler is not None:
             try:
                 handler(command)
-            except Exception as error:
-                logger.exception(f'{color("!!! Exception in handler:", "red")} {error}')
+            except Exception:
+                logger.exception(color("!!! Exception in handler:", "red"))
                 response = SMP_Pairing_Failed_Command(
                     reason=SMP_UNSPECIFIED_REASON_ERROR
                 )
@@ -1436,8 +1436,8 @@ class Session:
         # Check if the request should proceed
         try:
             accepted = await self.pairing_config.delegate.accept()
-        except Exception as error:
-            logger.warning(f'exception while accepting: {error}')
+        except Exception:
+            logger.exception('exception while accepting')
             accepted = False
         if not accepted:
             logger.debug('pairing rejected by delegate')

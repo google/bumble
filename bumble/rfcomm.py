@@ -1047,8 +1047,8 @@ class Client:
             self.l2cap_channel = await self.connection.create_l2cap_channel(
                 spec=l2cap.ClassicChannelSpec(psm=RFCOMM_PSM, mtu=self.l2cap_mtu)
             )
-        except ProtocolError as error:
-            logger.warning(f'L2CAP connection failed: {error}')
+        except ProtocolError:
+            logger.exception('L2CAP connection failed')
             raise
 
         assert self.l2cap_channel is not None

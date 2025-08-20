@@ -707,11 +707,9 @@ class Host(utils.EventEmitter):
                         raise hci.HCI_Error(status)
 
                 return response
-            except Exception as error:
-                logger.exception(
-                    f'{color("!!! Exception while sending command:", "red")} {error}'
-                )
-                raise error
+            except Exception:
+                logger.exception(color("!!! Exception while sending command:", "red"))
+                raise
             finally:
                 self.pending_command = None
                 self.pending_response = None

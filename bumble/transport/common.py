@@ -90,8 +90,8 @@ class PacketPump:
             try:
                 # Deliver the packet to the sink
                 self.sink.on_packet(await self.reader.next_packet())
-            except Exception as error:
-                logger.warning(f'!!! {error}')
+            except Exception:
+                logger.exception('!!!')
 
 
 # -----------------------------------------------------------------------------
@@ -158,10 +158,8 @@ class PacketParser:
                     if self.sink:
                         try:
                             self.sink.on_packet(bytes(self.packet))
-                        except Exception as error:
-                            logger.exception(
-                                color(f'!!! Exception in on_packet: {error}', 'red')
-                            )
+                        except Exception:
+                            logger.exception(color('!!! Exception in on_packet', 'red'))
                     self.reset()
 
     def set_packet_sink(self, sink: TransportSink) -> None:
@@ -378,7 +376,7 @@ class PumpedPacketSource(ParserSource):
                         self.terminated.set_result(None)
                     break
                 except Exception as error:
-                    logger.warning(f'exception while waiting for packet: {error}')
+                    logger.exception('exception while waiting for packet')
                     if not self.terminated.done():
                         self.terminated.set_exception(error)
                     break
@@ -409,8 +407,8 @@ class PumpedPacketSink:
                 except asyncio.CancelledError:
                     logger.debug('sink pump task done')
                     break
-                except Exception as error:
-                    logger.warning(f'exception while sending packet: {error}')
+                except Exception:
+                    logger.exception('exception while sending packet')
                     break
 
         self.pump_task = asyncio.create_task(pump_packets())

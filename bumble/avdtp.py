@@ -434,8 +434,8 @@ class MessageAssembler:
         )
         try:
             self.callback(self.transaction_label, message)
-        except Exception as error:
-            logger.exception(color(f'!!! exception in callback: {error}', 'red'))
+        except Exception:
+            logger.exception(color('!!! exception in callback', 'red'))
 
         self.reset()
 
@@ -1400,10 +1400,8 @@ class Protocol(utils.EventEmitter):
                 try:
                     response = handler(message)
                     self.send_message(transaction_label, response)
-                except Exception as error:
-                    logger.warning(
-                        f'{color("!!! Exception in handler:", "red")} {error}'
-                    )
+                except Exception:
+                    logger.exception(color("!!! Exception in handler:", "red"))
             else:
                 logger.warning('unhandled command')
         else:

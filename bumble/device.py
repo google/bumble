@@ -3242,8 +3242,8 @@ class Device(utils.CompositeEventEmitter):
                     else 0
                 )
                 await advertising_set.start(duration=duration)
-            except Exception as error:
-                logger.exception(f'failed to start advertising set: {error}')
+            except Exception:
+                logger.exception('failed to start advertising set')
                 await advertising_set.remove()
                 raise
 
@@ -4607,8 +4607,8 @@ class Device(utils.CompositeEventEmitter):
         try:
             await self.keystore.update(address, keys)
             await self.refresh_resolving_list()
-        except Exception as error:
-            logger.warning(f'!!! error while storing keys: {error}')
+        except Exception:
+            logger.exception('!!! error while storing keys')
         else:
             self.emit(self.EVENT_KEY_STORE_UPDATE)
 
@@ -5856,8 +5856,8 @@ class Device(utils.CompositeEventEmitter):
                         )
                     )
                     return
-            except Exception as error:
-                logger.warning(f'exception while confirming: {error}')
+            except Exception:
+                logger.exception('exception while confirming')
 
             await self.host.send_command(
                 hci.HCI_User_Confirmation_Request_Negative_Reply_Command(
@@ -5886,8 +5886,8 @@ class Device(utils.CompositeEventEmitter):
                         )
                     )
                     return
-            except Exception as error:
-                logger.warning(f'exception while asking for pass-key: {error}')
+            except Exception:
+                logger.exception('exception while asking for pass-key')
 
             await self.host.send_command(
                 hci.HCI_User_Passkey_Request_Negative_Reply_Command(

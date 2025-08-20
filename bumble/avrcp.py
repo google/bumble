@@ -267,8 +267,8 @@ class PduAssembler:
         assert self.pdu_id is not None
         try:
             self.callback(self.pdu_id, self.parameter)
-        except Exception as error:
-            logger.exception(color(f'!!! exception in callback: {error}', 'red'))
+        except Exception:
+            logger.exception(color('!!! exception in callback', 'red'))
 
         self.reset()
 
