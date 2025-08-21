@@ -18,25 +18,25 @@
 import asyncio
 import sys
 
-from bumble.colors import color
-from bumble.device import Device
-from bumble.transport import open_transport
-from bumble.core import PhysicalTransport
-from bumble.avdtp import (
-    find_avdtp_service_with_connection,
-    AVDTP_AUDIO_MEDIA_TYPE,
-    MediaCodecCapabilities,
-    MediaPacketPump,
-    Protocol,
-    Listener,
-)
+import bumble.logging
 from bumble.a2dp import (
-    make_audio_source_service_sdp_records,
     A2DP_SBC_CODEC_TYPE,
     SbcMediaCodecInformation,
     SbcPacketSource,
+    make_audio_source_service_sdp_records,
 )
-import bumble.logging
+from bumble.avdtp import (
+    AVDTP_AUDIO_MEDIA_TYPE,
+    Listener,
+    MediaCodecCapabilities,
+    MediaPacketPump,
+    Protocol,
+    find_avdtp_service_with_connection,
+)
+from bumble.colors import color
+from bumble.core import PhysicalTransport
+from bumble.device import Device
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

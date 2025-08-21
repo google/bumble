@@ -19,12 +19,12 @@ from __future__ import annotations
 
 import enum
 import struct
-from typing import cast, overload, Literal, Union, Optional
+from typing import Literal, Optional, Union, cast, overload
+
 from typing_extensions import Self
 
-from bumble.company_ids import COMPANY_IDENTIFIERS
 from bumble import utils
-
+from bumble.company_ids import COMPANY_IDENTIFIERS
 
 # -----------------------------------------------------------------------------
 # Constants

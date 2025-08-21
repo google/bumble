@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import collections
 import enum
@@ -33,10 +34,10 @@ from typing import (
     Union,
     overload,
 )
-from typing_extensions import Self
 
 import pyee
 import pyee.asyncio
+from typing_extensions import Self
 
 from bumble.colors import color
 

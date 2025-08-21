@@ -16,21 +16,21 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import sys
-import os
 import logging
-from bumble.colors import color
+import os
+import sys
 
+from bumble.colors import color
 from bumble.device import Device, Peer
-from bumble.transport import open_transport
 from bumble.profiles.ams import (
     AmsClient,
     EntityId,
     PlayerAttributeId,
     QueueAttributeId,
-    TrackAttributeId,
     RemoteCommandId,
+    TrackAttributeId,
 )
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

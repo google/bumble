@@ -16,15 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-from enum import IntEnum
+
 import logging
 import struct
-from typing import Callable, cast, Optional
+from enum import IntEnum
+from typing import Callable, Optional, cast
 
+from bumble import avc, core, l2cap
 from bumble.colors import color
-from bumble import avc
-from bumble import core
-from bumble import l2cap
 
 # -----------------------------------------------------------------------------
 # Logging

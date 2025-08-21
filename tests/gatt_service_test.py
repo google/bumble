@@ -16,13 +16,13 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import pytest
 
-from . import test_utils
-
-from bumble import device
-from bumble import gatt
+from bumble import device, gatt
 from bumble.profiles import gatt_service
+
+from . import test_utils
 
 
 # -----------------------------------------------------------------------------

@@ -17,18 +17,13 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import dataclasses
 import logging
 import struct
 from typing import ClassVar, Optional, Sequence
 
-from bumble import core
-from bumble import device
-from bumble import gatt
-from bumble import gatt_adapters
-from bumble import gatt_client
-from bumble import hci
-from bumble import utils
+from bumble import core, device, gatt, gatt_adapters, gatt_client, hci, utils
 
 # -----------------------------------------------------------------------------
 # Logging

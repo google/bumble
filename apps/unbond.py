@@ -16,12 +16,13 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+
 import click
 
+import bumble.logging
 from bumble.device import Device
 from bumble.keys import JsonKeyStore
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

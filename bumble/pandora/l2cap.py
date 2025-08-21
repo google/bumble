@@ -12,31 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
+
 import asyncio
-import grpc
 import json
 import logging
+from asyncio import Future
+from asyncio import Queue as AsyncQueue
+from dataclasses import dataclass
+from typing import AsyncGenerator, Optional, Union
 
-from asyncio import Queue as AsyncQueue, Future
-
-from bumble.pandora import utils
-from bumble.pandora.config import Config
-from bumble.core import OutOfResourcesError, InvalidArgumentError
-from bumble.device import Device
-from bumble.l2cap import (
-    ClassicChannel,
-    ClassicChannelServer,
-    ClassicChannelSpec,
-    LeCreditBasedChannel,
-    LeCreditBasedChannelServer,
-    LeCreditBasedChannelSpec,
-)
+import grpc
 from google.protobuf import any_pb2, empty_pb2  # pytype: disable=pyi-error
 from pandora.l2cap_grpc_aio import L2CAPServicer  # pytype: disable=pyi-error
-from pandora.l2cap_pb2 import (  # pytype: disable=pyi-error
-    COMMAND_NOT_UNDERSTOOD,
-    INVALID_CID_IN_REQUEST,
-    Channel as PandoraChannel,
+from pandora.l2cap_pb2 import COMMAND_NOT_UNDERSTOOD, INVALID_CID_IN_REQUEST
+from pandora.l2cap_pb2 import Channel as PandoraChannel  # pytype: disable=pyi-error
+from pandora.l2cap_pb2 import (
     ConnectRequest,
     ConnectResponse,
     CreditBasedChannelRequest,
@@ -51,8 +41,19 @@ from pandora.l2cap_pb2 import (  # pytype: disable=pyi-error
     WaitDisconnectionRequest,
     WaitDisconnectionResponse,
 )
-from typing import AsyncGenerator, Optional, Union
-from dataclasses import dataclass
+
+from bumble.core import InvalidArgumentError, OutOfResourcesError
+from bumble.device import Device
+from bumble.l2cap import (
+    ClassicChannel,
+    ClassicChannelServer,
+    ClassicChannelSpec,
+    LeCreditBasedChannel,
+    LeCreditBasedChannelServer,
+    LeCreditBasedChannelSpec,
+)
+from bumble.pandora import utils
+from bumble.pandora.config import Config
 
 L2capChannel = Union[ClassicChannel, LeCreditBasedChannel]
 

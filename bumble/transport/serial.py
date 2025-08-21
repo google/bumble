@@ -17,9 +17,10 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import logging
+
 import serial_asyncio
 
-from bumble.transport.common import Transport, StreamPacketSource, StreamPacketSink
+from bumble.transport.common import StreamPacketSink, StreamPacketSource, Transport
 
 # -----------------------------------------------------------------------------
 # Logging

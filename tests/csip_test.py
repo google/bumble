@@ -16,14 +16,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import os
-import pytest
-import struct
 import logging
+import os
+import struct
 from unittest import mock
+
+import pytest
 
 from bumble import device
 from bumble.profiles import csip
+
 from .test_utils import TwoDevices
 
 # -----------------------------------------------------------------------------

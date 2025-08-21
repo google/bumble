@@ -16,17 +16,15 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import collections
+import ctypes
 import logging
-import struct
 import os
 import socket
-import ctypes
-import collections
-
+import struct
 from typing import Optional
 
-from bumble.transport.common import Transport, ParserSource
-
+from bumble.transport.common import ParserSource, Transport
 
 # -----------------------------------------------------------------------------
 # Logging

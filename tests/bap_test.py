@@ -17,45 +17,45 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import functools
-import pytest
 import logging
+
+import pytest
 
 from bumble import device
 from bumble.hci import CodecID, CodingFormat
 from bumble.profiles.ascs import (
-    AudioStreamControlService,
-    AudioStreamControlServiceProxy,
-    AseStateMachine,
-    ASE_Operation,
     ASE_Config_Codec,
     ASE_Config_QOS,
     ASE_Disable,
     ASE_Enable,
+    ASE_Operation,
     ASE_Receiver_Start_Ready,
     ASE_Receiver_Stop_Ready,
     ASE_Release,
     ASE_Update_Metadata,
+    AseStateMachine,
+    AudioStreamControlService,
+    AudioStreamControlServiceProxy,
 )
 from bumble.profiles.bap import (
     AudioLocation,
     BasicAudioAnnouncement,
     BroadcastAudioAnnouncement,
-    SupportedFrameDuration,
-    SupportedSamplingFrequency,
-    SamplingFrequency,
-    FrameDuration,
     CodecSpecificCapabilities,
     CodecSpecificConfiguration,
     ContextType,
+    FrameDuration,
+    SamplingFrequency,
+    SupportedFrameDuration,
+    SupportedSamplingFrequency,
 )
+from bumble.profiles.le_audio import Metadata
 from bumble.profiles.pacs import (
     PacRecord,
     PublishedAudioCapabilitiesService,
     PublishedAudioCapabilitiesServiceProxy,
 )
-from bumble.profiles.le_audio import Metadata
 from tests.test_utils import TwoDevices, async_barrier
-
 
 # -----------------------------------------------------------------------------
 # Logging

@@ -17,37 +17,36 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
 import dataclasses
 import enum
 import logging
 import struct
+from collections.abc import AsyncGenerator
 from typing import Awaitable, Callable
-from typing_extensions import ClassVar, Self
 
+from typing_extensions import ClassVar, Self
 
 from bumble.codecs import AacAudioRtpPacket
 from bumble.company_ids import COMPANY_IDENTIFIERS
-from bumble.sdp import (
-    DataElement,
-    ServiceAttribute,
-    SDP_PUBLIC_BROWSE_ROOT,
-    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-)
 from bumble.core import (
-    BT_L2CAP_PROTOCOL_ID,
-    BT_AUDIO_SOURCE_SERVICE,
-    BT_AUDIO_SINK_SERVICE,
-    BT_AVDTP_PROTOCOL_ID,
     BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
+    BT_AUDIO_SINK_SERVICE,
+    BT_AUDIO_SOURCE_SERVICE,
+    BT_AVDTP_PROTOCOL_ID,
+    BT_L2CAP_PROTOCOL_ID,
     name_or_number,
 )
 from bumble.rtp import MediaPacket
-
+from bumble.sdp import (
+    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_PUBLIC_BROWSE_ROOT,
+    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+    DataElement,
+    ServiceAttribute,
+)
 
 # -----------------------------------------------------------------------------
 # Logging

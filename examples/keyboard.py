@@ -16,36 +16,35 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import sys
-import struct
 import json
+import struct
+import sys
 
 import websockets
 
+import bumble.logging
 from bumble.colors import color
 from bumble.core import AdvertisingData
-from bumble.device import Device, Connection, Peer
-from bumble.utils import AsyncRunner
-from bumble.transport import open_transport
+from bumble.device import Connection, Device, Peer
 from bumble.gatt import (
-    Descriptor,
-    Service,
-    Characteristic,
-    CharacteristicValue,
-    GATT_DEVICE_INFORMATION_SERVICE,
-    GATT_HUMAN_INTERFACE_DEVICE_SERVICE,
-    GATT_BATTERY_SERVICE,
     GATT_BATTERY_LEVEL_CHARACTERISTIC,
+    GATT_BATTERY_SERVICE,
+    GATT_DEVICE_INFORMATION_SERVICE,
+    GATT_HID_CONTROL_POINT_CHARACTERISTIC,
+    GATT_HID_INFORMATION_CHARACTERISTIC,
+    GATT_HUMAN_INTERFACE_DEVICE_SERVICE,
     GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
+    GATT_PROTOCOL_MODE_CHARACTERISTIC,
     GATT_REPORT_CHARACTERISTIC,
     GATT_REPORT_MAP_CHARACTERISTIC,
-    GATT_PROTOCOL_MODE_CHARACTERISTIC,
-    GATT_HID_INFORMATION_CHARACTERISTIC,
-    GATT_HID_CONTROL_POINT_CHARACTERISTIC,
     GATT_REPORT_REFERENCE_DESCRIPTOR,
+    Characteristic,
+    CharacteristicValue,
+    Descriptor,
+    Service,
 )
-import bumble.logging
-
+from bumble.transport import open_transport
+from bumble.utils import AsyncRunner
 
 # -----------------------------------------------------------------------------
 

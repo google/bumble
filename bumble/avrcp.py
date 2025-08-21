@@ -16,16 +16,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
-from dataclasses import dataclass
 import enum
 import logging
 import struct
+from dataclasses import dataclass
 from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
-    cast,
     Iterable,
     List,
     Optional,
@@ -33,28 +33,23 @@ from typing import (
     SupportsBytes,
     TypeVar,
     Union,
+    cast,
 )
 
-
+from bumble import avc, avctp, core, l2cap, utils
 from bumble.colors import color
-from bumble.device import Device, Connection
+from bumble.device import Connection, Device
 from bumble.sdp import (
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-    SDP_PUBLIC_BROWSE_ROOT,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_PUBLIC_BROWSE_ROOT,
+    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
     SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID,
     DataElement,
     ServiceAttribute,
 )
-from bumble import utils
-from bumble import core
-from bumble import l2cap
-from bumble import avc
-from bumble import avctp
-
 
 # -----------------------------------------------------------------------------
 # Logging

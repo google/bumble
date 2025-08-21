@@ -16,31 +16,25 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
-import time
-import logging
 import enum
+import logging
+import time
 import warnings
 from typing import (
     Any,
-    Awaitable,
-    Optional,
-    Callable,
     AsyncGenerator,
+    Awaitable,
+    Callable,
     Iterable,
-    Union,
+    Optional,
     SupportsBytes,
+    Union,
     cast,
 )
 
-
-from bumble.core import (
-    BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
-    InvalidStateError,
-    ProtocolError,
-    InvalidArgumentError,
-    name_or_number,
-)
+from bumble import device, l2cap, sdp, utils
 from bumble.a2dp import (
     A2DP_CODEC_TYPE_NAMES,
     A2DP_MPEG_2_4_AAC_CODEC_TYPE,
@@ -51,10 +45,15 @@ from bumble.a2dp import (
     SbcMediaCodecInformation,
     VendorSpecificMediaCodecInformation,
 )
-from bumble.rtp import MediaPacket
-from bumble import sdp, device, l2cap, utils
 from bumble.colors import color
-
+from bumble.core import (
+    BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
+    InvalidArgumentError,
+    InvalidStateError,
+    ProtocolError,
+    name_or_number,
+)
+from bumble.rtp import MediaPacket
 
 # -----------------------------------------------------------------------------
 # Logging

@@ -18,29 +18,26 @@
 import asyncio
 import sys
 
-from bumble.colors import color
+from hid_report_parser import ReportParser
 
+import bumble.logging
+from bumble.colors import color
+from bumble.core import BT_HUMAN_INTERFACE_DEVICE_SERVICE, PhysicalTransport
 from bumble.device import Device
-from bumble.transport import open_transport
-from bumble.core import (
-    BT_HUMAN_INTERFACE_DEVICE_SERVICE,
-    PhysicalTransport,
-)
 from bumble.hci import Address
 from bumble.hid import Host, Message
 from bumble.sdp import (
-    Client as SDP_Client,
+    SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_ALL_ATTRIBUTES_RANGE,
+    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+    SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_ALL_ATTRIBUTES_RANGE,
-    SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID,
-    SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
 )
-import bumble.logging
-from hid_report_parser import ReportParser
+from bumble.sdp import Client as SDP_Client
+from bumble.transport import open_transport
 
 # -----------------------------------------------------------------------------
 # SDP attributes for Bluetooth HID devices

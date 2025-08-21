@@ -16,18 +16,18 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
-import logging
-import threading
 import ctypes
+import logging
 import platform
+import threading
 
 import usb1
 
-from bumble.transport.common import Transport, BaseSource, TransportInitError
 from bumble import hci
 from bumble.colors import color
-
+from bumble.transport.common import BaseSource, Transport, TransportInitError
 
 # -----------------------------------------------------------------------------
 # Logging

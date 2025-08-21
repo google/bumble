@@ -17,33 +17,30 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-import logging
 import asyncio
 import collections
 import dataclasses
 import enum
-from typing import Callable, Optional, Union, TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, Callable, Optional, Union
+
 from typing_extensions import Self
 
-
-from bumble import core
-from bumble import l2cap
-from bumble import sdp
-from bumble import utils
+from bumble import core, l2cap, sdp, utils
 from bumble.colors import color
 from bumble.core import (
-    UUID,
-    BT_RFCOMM_PROTOCOL_ID,
-    PhysicalTransport,
     BT_L2CAP_PROTOCOL_ID,
+    BT_RFCOMM_PROTOCOL_ID,
+    UUID,
     InvalidArgumentError,
-    InvalidStateError,
     InvalidPacketError,
+    InvalidStateError,
+    PhysicalTransport,
     ProtocolError,
 )
 
 if TYPE_CHECKING:
-    from bumble.device import Device, Connection
+    from bumble.device import Connection, Device
 
 # -----------------------------------------------------------------------------
 # Logging

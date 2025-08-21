@@ -17,16 +17,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import enum
 import struct
 from typing import Optional
 
-from bumble import core
-from bumble import crypto
-from bumble import device
-from bumble import gatt
-from bumble import gatt_client
-
+from bumble import core, crypto, device, gatt, gatt_client
 
 # -----------------------------------------------------------------------------
 # Constants

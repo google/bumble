@@ -16,23 +16,19 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import json
-import sys
 import logging
+import sys
 
 import websockets
 
+import bumble.logging
+from bumble import a2dp, avc, avdtp, avrcp, utils
+from bumble.core import PhysicalTransport
 from bumble.device import Device
 from bumble.transport import open_transport
-from bumble.core import PhysicalTransport
-from bumble import avc
-from bumble import avrcp
-from bumble import avdtp
-from bumble import a2dp
-from bumble import utils
-import bumble.logging
-
 
 logger = logging.getLogger(__name__)
 

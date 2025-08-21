@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-import asyncio
 import sys
 
+import bumble.logging
 from bumble import hci, transport
 from bumble.bridge import HCI_Bridge
-import bumble.logging
-
 
 # -----------------------------------------------------------------------------
 # Logging

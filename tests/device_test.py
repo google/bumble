@@ -20,12 +20,11 @@ import functools
 import logging
 import os
 from unittest import mock
+
 import pytest
 
-from bumble.core import (
-    PhysicalTransport,
-    ConnectionParameters,
-)
+from bumble import device, gatt, hci, utils
+from bumble.core import ConnectionParameters, PhysicalTransport
 from bumble.device import (
     AdvertisingEventProperties,
     AdvertisingParameters,
@@ -35,27 +34,23 @@ from bumble.device import (
     Device,
     PeriodicAdvertisingParameters,
 )
-from bumble.host import DataPacketQueue, Host
-from bumble import device
-from bumble import hci
 from bumble.hci import (
     HCI_ACCEPT_CONNECTION_REQUEST_COMMAND,
     HCI_COMMAND_STATUS_PENDING,
+    HCI_CONNECTION_FAILED_TO_BE_ESTABLISHED_ERROR,
     HCI_CREATE_CONNECTION_COMMAND,
     HCI_SUCCESS,
-    HCI_CONNECTION_FAILED_TO_BE_ESTABLISHED_ERROR,
     Address,
-    OwnAddressType,
-    Role,
     HCI_Command_Complete_Event,
     HCI_Command_Status_Event,
     HCI_Connection_Complete_Event,
     HCI_Connection_Request_Event,
     HCI_Error,
     HCI_Packet,
+    OwnAddressType,
+    Role,
 )
-from bumble import utils
-from bumble import gatt
+from bumble.host import DataPacketQueue, Host
 
 from .test_utils import TwoDevices, async_barrier
 

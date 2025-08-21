@@ -39,7 +39,6 @@ def test_import():
         transport,
         utils,
     )
-
     from bumble.profiles import (
         ascs,
         bap,

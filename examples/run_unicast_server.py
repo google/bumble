@@ -18,33 +18,29 @@
 import asyncio
 import datetime
 import functools
-import sys
 import io
-import struct
 import secrets
+import struct
+import sys
 
+import bumble.logging
 from bumble.core import AdvertisingData
 from bumble.device import Device
-from bumble.hci import (
-    CodecID,
-    CodingFormat,
-    HCI_IsoDataPacket,
-)
+from bumble.hci import CodecID, CodingFormat, HCI_IsoDataPacket
 from bumble.profiles.ascs import AseStateMachine, AudioStreamControlService
 from bumble.profiles.bap import (
-    UnicastServerAdvertisingData,
-    CodecSpecificConfiguration,
-    CodecSpecificCapabilities,
-    ContextType,
     AudioLocation,
-    SupportedSamplingFrequency,
+    CodecSpecificCapabilities,
+    CodecSpecificConfiguration,
+    ContextType,
     SupportedFrameDuration,
+    SupportedSamplingFrequency,
+    UnicastServerAdvertisingData,
 )
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
 from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.transport import open_transport
-import bumble.logging
 
 
 def _sink_pac_record() -> PacRecord:

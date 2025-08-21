@@ -18,20 +18,17 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-from collections.abc import Sequence
 import dataclasses
 import enum
-import struct
 import functools
 import logging
+import struct
+from collections.abc import Sequence
+
 from typing_extensions import Self
 
-from bumble import core
-from bumble import hci
-from bumble import gatt
-from bumble import utils
+from bumble import core, gatt, hci, utils
 from bumble.profiles import le_audio
-
 
 # -----------------------------------------------------------------------------
 # Logging

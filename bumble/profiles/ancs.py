@@ -20,6 +20,7 @@ Apple Notification Center Service (ANCS).
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import dataclasses
 import datetime
@@ -28,21 +29,19 @@ import logging
 import struct
 from typing import Optional, Sequence, Union
 
-
+from bumble import utils
 from bumble.att import ATT_Error
 from bumble.device import Peer
 from bumble.gatt import (
-    Characteristic,
-    GATT_ANCS_SERVICE,
-    GATT_ANCS_NOTIFICATION_SOURCE_CHARACTERISTIC,
     GATT_ANCS_CONTROL_POINT_CHARACTERISTIC,
     GATT_ANCS_DATA_SOURCE_CHARACTERISTIC,
+    GATT_ANCS_NOTIFICATION_SOURCE_CHARACTERISTIC,
+    GATT_ANCS_SERVICE,
+    Characteristic,
     TemplateService,
 )
-from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
 from bumble.gatt_adapters import SerializableCharacteristicProxyAdapter
-from bumble import utils
-
+from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
 
 # -----------------------------------------------------------------------------
 # Constants

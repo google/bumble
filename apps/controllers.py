@@ -18,10 +18,10 @@
 import asyncio
 import sys
 
+import bumble.logging
 from bumble.controller import Controller
 from bumble.link import LocalLink
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

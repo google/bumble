@@ -17,16 +17,13 @@
 # Imports
 # -----------------------------------------------------------------------------
 import enum
-import struct
 import logging
-from typing import Optional, Callable, Union, Any
+import struct
+from typing import Any, Callable, Optional, Union
 
-from bumble import l2cap
-from bumble import utils
-from bumble import gatt
-from bumble import gatt_client
+from bumble import gatt, gatt_client, l2cap, utils
 from bumble.core import AdvertisingData
-from bumble.device import Device, Connection
+from bumble.device import Connection, Device
 
 # -----------------------------------------------------------------------------
 # Logging

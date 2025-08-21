@@ -16,30 +16,30 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import enum
 import logging
 
-from bumble.core import PhysicalTransport, CommandTimeoutError
-from bumble.device import Device, DeviceConfiguration
-from bumble.pairing import PairingConfig
-from bumble.sdp import ServiceAttribute
+from bumble.a2dp import (
+    A2DP_MPEG_2_4_AAC_CODEC_TYPE,
+    A2DP_SBC_CODEC_TYPE,
+    AacMediaCodecInformation,
+    SbcMediaCodecInformation,
+    make_audio_sink_service_sdp_records,
+)
 from bumble.avdtp import (
     AVDTP_AUDIO_MEDIA_TYPE,
     Listener,
     MediaCodecCapabilities,
     Protocol,
 )
-from bumble.a2dp import (
-    make_audio_sink_service_sdp_records,
-    A2DP_SBC_CODEC_TYPE,
-    A2DP_MPEG_2_4_AAC_CODEC_TYPE,
-    SbcMediaCodecInformation,
-    AacMediaCodecInformation,
-)
 from bumble.codecs import AacAudioRtpPacket
+from bumble.core import CommandTimeoutError, PhysicalTransport
+from bumble.device import Device, DeviceConfiguration
 from bumble.hci import HCI_Reset_Command
+from bumble.pairing import PairingConfig
 from bumble.rtp import MediaPacket
-
+from bumble.sdp import ServiceAttribute
 
 # -----------------------------------------------------------------------------
 # Logging

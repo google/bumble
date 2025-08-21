@@ -16,24 +16,22 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import collections
-from collections.abc import Iterable, Sequence
-from contextlib import (
-    asynccontextmanager,
-    AsyncExitStack,
-    closing,
-)
 import copy
-from dataclasses import dataclass, field
-from enum import Enum, IntEnum
 import functools
 import itertools
 import json
 import logging
 import secrets
 import sys
+from collections.abc import Iterable, Sequence
+from contextlib import AsyncExitStack, asynccontextmanager, closing
+from dataclasses import dataclass, field
+from enum import Enum, IntEnum
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -43,47 +41,35 @@ from typing import (
     Union,
     cast,
     overload,
-    TYPE_CHECKING,
 )
+
 from typing_extensions import Self
 
-
-from bumble.colors import color
+from bumble import core, gatt_client, gatt_server, hci, l2cap, pairing, sdp, smp, utils
 from bumble.att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
-from bumble.gatt import Attribute, Characteristic, Descriptor, Service
-from bumble.host import DataPacketQueue, Host
-from bumble.profiles.gap import GenericAccessService
+from bumble.colors import color
 from bumble.core import (
-    PhysicalTransport,
     AdvertisingData,
     BaseBumbleError,
-    ConnectionParameterUpdateError,
     CommandTimeoutError,
+    ConnectionParameterUpdateError,
     ConnectionPHY,
     InvalidArgumentError,
     InvalidOperationError,
     InvalidStateError,
     NotSupportedError,
     OutOfResourcesError,
+    PhysicalTransport,
     UnreachableError,
 )
-from bumble import utils
-from bumble.keys import (
-    KeyStore,
-    PairingKeys,
-)
-from bumble import hci
-from bumble import pairing
-from bumble import gatt_client
-from bumble import gatt_server
-from bumble import smp
-from bumble import sdp
-from bumble import l2cap
-from bumble import core
+from bumble.gatt import Attribute, Characteristic, Descriptor, Service
+from bumble.host import DataPacketQueue, Host
+from bumble.keys import KeyStore, PairingKeys
 from bumble.profiles import gatt_service
+from bumble.profiles.gap import GenericAccessService
 
 if TYPE_CHECKING:
-    from bumble.transport.common import TransportSource, TransportSink
+    from bumble.transport.common import TransportSink, TransportSource
 
 _T = TypeVar('_T')
 

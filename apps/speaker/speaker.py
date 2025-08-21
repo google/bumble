@@ -16,49 +16,49 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import asyncio.subprocess
-from importlib import resources
 import enum
 import json
 import logging
 import pathlib
 import subprocess
-from typing import Optional
 import weakref
+from importlib import resources
+from typing import Optional
 
-import click
 import aiohttp
+import click
 from aiohttp import web
 
 import bumble
-from bumble.colors import color
-from bumble.core import PhysicalTransport, CommandTimeoutError
-from bumble.device import Connection, Device, DeviceConfiguration
-from bumble.hci import HCI_StatusError
-from bumble.pairing import PairingConfig
-from bumble.sdp import ServiceAttribute
-from bumble.transport import open_transport
+import bumble.logging
+from bumble.a2dp import (
+    A2DP_MPEG_2_4_AAC_CODEC_TYPE,
+    A2DP_NON_A2DP_CODEC_TYPE,
+    A2DP_SBC_CODEC_TYPE,
+    AacMediaCodecInformation,
+    OpusMediaCodecInformation,
+    SbcMediaCodecInformation,
+    make_audio_sink_service_sdp_records,
+)
 from bumble.avdtp import (
     AVDTP_AUDIO_MEDIA_TYPE,
     Listener,
     MediaCodecCapabilities,
     Protocol,
 )
-from bumble.a2dp import (
-    make_audio_sink_service_sdp_records,
-    A2DP_SBC_CODEC_TYPE,
-    A2DP_MPEG_2_4_AAC_CODEC_TYPE,
-    A2DP_NON_A2DP_CODEC_TYPE,
-    SbcMediaCodecInformation,
-    AacMediaCodecInformation,
-    OpusMediaCodecInformation,
-)
-from bumble.utils import AsyncRunner
 from bumble.codecs import AacAudioRtpPacket
+from bumble.colors import color
+from bumble.core import CommandTimeoutError, PhysicalTransport
+from bumble.device import Connection, Device, DeviceConfiguration
+from bumble.hci import HCI_StatusError
+from bumble.pairing import PairingConfig
 from bumble.rtp import MediaPacket
-import bumble.logging
-
+from bumble.sdp import ServiceAttribute
+from bumble.transport import open_transport
+from bumble.utils import AsyncRunner
 
 # -----------------------------------------------------------------------------
 # Logging

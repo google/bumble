@@ -18,21 +18,20 @@
 import asyncio
 import sys
 
+import bumble.logging
 from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.profiles.hap import (
+    DynamicPresets,
     HearingAccessService,
     HearingAidFeatures,
     HearingAidType,
-    PresetSynchronizationSupport,
     IndependentPresets,
-    DynamicPresets,
-    WritablePresetsSupport,
     PresetRecord,
+    PresetSynchronizationSupport,
+    WritablePresetsSupport,
 )
 from bumble.transport import open_transport
-import bumble.logging
-
 
 server_features = HearingAidFeatures(
     HearingAidType.MONAURAL_HEARING_AID,

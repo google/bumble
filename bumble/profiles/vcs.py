@@ -17,18 +17,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import dataclasses
 import enum
-
 from typing import Sequence
 
-from bumble import att
-from bumble import utils
-from bumble import device
-from bumble import gatt
-from bumble import gatt_adapters
-from bumble import gatt_client
-
+from bumble import att, device, gatt, gatt_adapters, gatt_client, utils
 
 # -----------------------------------------------------------------------------
 # Constants

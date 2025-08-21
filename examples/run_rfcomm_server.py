@@ -18,13 +18,12 @@
 import asyncio
 import sys
 
+import bumble.logging
 from bumble.core import UUID
 from bumble.device import Device
+from bumble.rfcomm import Server, make_service_sdp_records
 from bumble.transport import open_transport
-from bumble.rfcomm import Server
 from bumble.utils import AsyncRunner
-from bumble.rfcomm import make_service_sdp_records
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

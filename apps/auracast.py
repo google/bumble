@@ -24,12 +24,7 @@ import dataclasses
 import functools
 import logging
 import struct
-from typing import (
-    Any,
-    AsyncGenerator,
-    Coroutine,
-    Optional,
-)
+from typing import Any, AsyncGenerator, Coroutine, Optional
 
 import click
 
@@ -40,21 +35,14 @@ except ImportError as e:
         "Try `python -m pip install \"git+https://github.com/google/liblc3.git\"`."
     ) from e
 
-from bumble.audio import io as audio_io
-from bumble.colors import color
-from bumble import company_ids
-from bumble import core
-from bumble import gatt
-from bumble import hci
-from bumble.profiles import bap
-from bumble.profiles import le_audio
-from bumble.profiles import pbp
-from bumble.profiles import bass
 import bumble.device
+import bumble.logging
 import bumble.transport
 import bumble.utils
-import bumble.logging
-
+from bumble import company_ids, core, gatt, hci
+from bumble.audio import io as audio_io
+from bumble.colors import color
+from bumble.profiles import bap, bass, le_audio, pbp
 
 # -----------------------------------------------------------------------------
 # Logging

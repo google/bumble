@@ -23,11 +23,11 @@ from typing import Optional, Union
 
 from bumble.core import Appearance
 from bumble.gatt import (
-    TemplateService,
-    Characteristic,
-    GATT_GENERIC_ACCESS_SERVICE,
-    GATT_DEVICE_NAME_CHARACTERISTIC,
     GATT_APPEARANCE_CHARACTERISTIC,
+    GATT_DEVICE_NAME_CHARACTERISTIC,
+    GATT_GENERIC_ACCESS_SERVICE,
+    Characteristic,
+    TemplateService,
 )
 from bumble.gatt_adapters import (
     DelegatedCharacteristicProxyAdapter,

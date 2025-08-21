@@ -21,17 +21,17 @@ from typing import Optional
 
 import click
 
+import bumble.logging
 from bumble.colors import color
 from bumble.hci import (
     HCI_READ_LOOPBACK_MODE_COMMAND,
-    HCI_Read_Loopback_Mode_Command,
     HCI_WRITE_LOOPBACK_MODE_COMMAND,
+    HCI_Read_Loopback_Mode_Command,
     HCI_Write_Loopback_Mode_Command,
     LoopbackMode,
 )
 from bumble.host import Host
 from bumble.transport import open_transport
-import bumble.logging
 
 
 class Loopback:

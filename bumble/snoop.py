@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
+import logging
+import os
+import struct
+
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 from contextlib import contextmanager
 from enum import IntEnum
-import logging
-import struct
-import datetime
 from typing import BinaryIO, Generator
-import os
 
 from bumble import core
 from bumble.hci import HCI_COMMAND_PACKET, HCI_EVENT_PACKET
-
 
 # -----------------------------------------------------------------------------
 # Logging

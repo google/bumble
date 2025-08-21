@@ -16,13 +16,13 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import sys
 import random
+import sys
 
-from bumble.device import Device, Connection
-from bumble.transport import open_transport
-from bumble.gatt import Service, Characteristic
 import bumble.logging
+from bumble.device import Connection, Device
+from bumble.gatt import Characteristic, Service
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

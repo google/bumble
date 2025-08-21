@@ -18,26 +18,25 @@
 import asyncio
 import sys
 
-from bumble.colors import color
-from bumble.device import Device
-from bumble.transport import open_transport
-from bumble.core import (
-    PhysicalTransport,
-    BT_AVDTP_PROTOCOL_ID,
-    BT_AUDIO_SINK_SERVICE,
-    BT_L2CAP_PROTOCOL_ID,
-)
-from bumble.avdtp import Protocol as AVDTP_Protocol
+import bumble.logging
 from bumble.a2dp import make_audio_source_service_sdp_records
+from bumble.avdtp import Protocol as AVDTP_Protocol
+from bumble.colors import color
+from bumble.core import (
+    BT_AUDIO_SINK_SERVICE,
+    BT_AVDTP_PROTOCOL_ID,
+    BT_L2CAP_PROTOCOL_ID,
+    PhysicalTransport,
+)
+from bumble.device import Device
 from bumble.sdp import (
-    Client as SDP_Client,
-    ServiceAttribute,
-    DataElement,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
 )
-import bumble.logging
+from bumble.sdp import Client as SDP_Client
+from bumble.sdp import DataElement, ServiceAttribute
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

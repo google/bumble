@@ -16,14 +16,15 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-import unittest.mock
-import pytest
 import unittest
+import unittest.mock
+
+import pytest
 
 from bumble.controller import Controller
-from bumble.host import Host, DataPacketQueue
-from bumble.transport.common import AsyncPipeSink
 from bumble.hci import HCI_AclDataPacket
+from bumble.host import DataPacketQueue, Host
+from bumble.transport.common import AsyncPipeSink
 
 # -----------------------------------------------------------------------------
 # Logging

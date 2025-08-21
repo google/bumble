@@ -18,26 +18,20 @@
 import asyncio
 import sys
 
-from bumble.colors import color
-
 import bumble.core
+import bumble.logging
+from bumble.colors import color
+from bumble.core import BT_L2CAP_PROTOCOL_ID, BT_RFCOMM_PROTOCOL_ID, PhysicalTransport
 from bumble.device import Device
-from bumble.transport import open_transport
-from bumble.core import (
-    BT_L2CAP_PROTOCOL_ID,
-    BT_RFCOMM_PROTOCOL_ID,
-    PhysicalTransport,
-)
 from bumble.rfcomm import Client
 from bumble.sdp import (
-    Client as SDP_Client,
-    DataElement,
-    ServiceAttribute,
+    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
 )
-import bumble.logging
+from bumble.sdp import Client as SDP_Client
+from bumble.sdp import DataElement, ServiceAttribute
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

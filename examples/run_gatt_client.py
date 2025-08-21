@@ -17,14 +17,14 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import sys
-from bumble.colors import color
 
+import bumble.logging
+from bumble.colors import color
 from bumble.core import ProtocolError
 from bumble.device import Device, Peer
 from bumble.gatt import show_services
 from bumble.transport import open_transport
 from bumble.utils import AsyncRunner
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

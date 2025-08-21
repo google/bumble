@@ -18,26 +18,25 @@
 import asyncio
 import sys
 
+import bumble.logging
+from bumble.core import (
+    BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
+    BT_AUDIO_SINK_SERVICE,
+    BT_AVDTP_PROTOCOL_ID,
+    BT_L2CAP_PROTOCOL_ID,
+)
 from bumble.device import Device
-from bumble.transport import open_transport
 from bumble.sdp import (
+    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_PUBLIC_BROWSE_ROOT,
+    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
     DataElement,
     ServiceAttribute,
-    SDP_PUBLIC_BROWSE_ROOT,
-    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
 )
-from bumble.core import (
-    BT_AUDIO_SINK_SERVICE,
-    BT_L2CAP_PROTOCOL_ID,
-    BT_AVDTP_PROTOCOL_ID,
-    BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
-)
-import bumble.logging
-
+from bumble.transport import open_transport
 
 # -----------------------------------------------------------------------------
 SDP_SERVICE_RECORDS = {

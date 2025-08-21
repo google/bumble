@@ -24,9 +24,9 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
+import copy
 import dataclasses
 import functools
-import copy
 import secrets
 import struct
 from typing import Optional

@@ -13,24 +13,14 @@
 # limitations under the License.
 
 from __future__ import annotations
+
 import asyncio
 import contextlib
-from collections.abc import Awaitable
-import grpc
 import logging
+from collections.abc import Awaitable
+from typing import Any, AsyncGenerator, AsyncIterator, Callable, Optional, Union
 
-from bumble.pandora import utils
-from bumble.pandora.config import Config
-from bumble import hci
-from bumble.core import (
-    PhysicalTransport,
-    ProtocolError,
-    InvalidArgumentError,
-)
-import bumble.utils
-from bumble.device import Connection as BumbleConnection, Device
-from bumble.hci import HCI_Error, Role
-from bumble.pairing import PairingConfig, PairingDelegate as BasePairingDelegate
+import grpc
 from google.protobuf import any_pb2  # pytype: disable=pyi-error
 from google.protobuf import empty_pb2  # pytype: disable=pyi-error
 from google.protobuf import wrappers_pb2  # pytype: disable=pyi-error
@@ -57,7 +47,17 @@ from pandora.security_pb2 import (
     WaitSecurityRequest,
     WaitSecurityResponse,
 )
-from typing import Any, AsyncGenerator, AsyncIterator, Callable, Optional, Union
+
+import bumble.utils
+from bumble import hci
+from bumble.core import InvalidArgumentError, PhysicalTransport, ProtocolError
+from bumble.device import Connection as BumbleConnection
+from bumble.device import Device
+from bumble.hci import HCI_Error, Role
+from bumble.pairing import PairingConfig
+from bumble.pairing import PairingDelegate as BasePairingDelegate
+from bumble.pandora import utils
+from bumble.pandora.config import Config
 
 
 class PairingDelegate(BasePairingDelegate):

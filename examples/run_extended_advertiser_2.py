@@ -18,11 +18,11 @@
 import asyncio
 import sys
 
-from bumble.device import AdvertisingParameters, AdvertisingEventProperties, Device
-from bumble.hci import Address
-from bumble.core import AdvertisingData
-from bumble.transport import open_transport
 import bumble.logging
+from bumble.core import AdvertisingData
+from bumble.device import AdvertisingEventProperties, AdvertisingParameters, Device
+from bumble.hci import Address
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

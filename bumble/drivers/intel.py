@@ -20,6 +20,7 @@ Loosely based on the Fuchsia OS implementation.
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import collections
 import dataclasses
@@ -28,12 +29,10 @@ import os
 import pathlib
 import platform
 import struct
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
-from bumble import core
+from bumble import core, hci, utils
 from bumble.drivers import common
-from bumble import hci
-from bumble import utils
 
 if TYPE_CHECKING:
     from bumble.host import Host

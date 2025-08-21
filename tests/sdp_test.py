@@ -18,19 +18,21 @@
 import asyncio
 import logging
 import os
+
 import pytest
 
-from bumble.core import UUID, BT_L2CAP_PROTOCOL_ID
+from bumble.core import BT_L2CAP_PROTOCOL_ID, UUID
 from bumble.sdp import (
-    DataElement,
-    ServiceAttribute,
-    Client,
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
     SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_PUBLIC_BROWSE_ROOT,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+    Client,
+    DataElement,
+    ServiceAttribute,
 )
+
 from .test_utils import TwoDevices
 
 # -----------------------------------------------------------------------------

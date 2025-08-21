@@ -21,16 +21,18 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import dataclasses
+import json
 import logging
 import os
-import json
-from typing import TYPE_CHECKING, Optional, Any
+from typing import TYPE_CHECKING, Any, Optional
+
 from typing_extensions import Self
 
-from bumble.colors import color
 from bumble import hci
+from bumble.colors import color
 
 if TYPE_CHECKING:
     from bumble.device import Device

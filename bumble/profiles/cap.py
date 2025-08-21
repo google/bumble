@@ -18,8 +18,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-from bumble import gatt
-from bumble import gatt_client
+from bumble import gatt, gatt_client
 from bumble.profiles import csip
 
 

@@ -19,25 +19,23 @@ import asyncio
 import itertools
 import logging
 import os
-import pytest
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from bumble.core import PhysicalTransport
+import pytest
+
+from bumble.core import PhysicalTransport, ProtocolError
 from bumble.device import Peer
-from bumble.gatt import Service, Characteristic
+from bumble.gatt import Characteristic, Service
+from bumble.hci import Role
 from bumble.pairing import PairingConfig, PairingDelegate
 from bumble.smp import (
-    SMP_PAIRING_NOT_SUPPORTED_ERROR,
     SMP_CONFIRM_VALUE_FAILED_ERROR,
+    SMP_PAIRING_NOT_SUPPORTED_ERROR,
     OobContext,
     OobLegacyContext,
 )
-from bumble.core import ProtocolError
-from bumble.hci import Role
 
 from .test_utils import TwoDevices
-
 
 # -----------------------------------------------------------------------------
 # Logging

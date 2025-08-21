@@ -16,40 +16,36 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import sys
 import json
 import struct
+import sys
 
 import websockets
 
-from bumble.device import Device
-from bumble.transport import open_transport
+import bumble.logging
 from bumble.core import (
-    PhysicalTransport,
-    BT_L2CAP_PROTOCOL_ID,
-    BT_HUMAN_INTERFACE_DEVICE_SERVICE,
     BT_HIDP_PROTOCOL_ID,
+    BT_HUMAN_INTERFACE_DEVICE_SERVICE,
+    BT_L2CAP_PROTOCOL_ID,
+    PhysicalTransport,
 )
-from bumble.hid import (
-    Device as HID_Device,
-    HID_CONTROL_PSM,
-    HID_INTERRUPT_PSM,
-    Message,
-)
+from bumble.device import Device
+from bumble.hid import HID_CONTROL_PSM, HID_INTERRUPT_PSM
+from bumble.hid import Device as HID_Device
+from bumble.hid import Message
 from bumble.sdp import (
+    SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+    SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID,
+    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+    SDP_PUBLIC_BROWSE_ROOT,
+    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
     DataElement,
     ServiceAttribute,
-    SDP_PUBLIC_BROWSE_ROOT,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID,
-    SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
 )
-import bumble.logging
-
+from bumble.transport import open_transport
 
 # -----------------------------------------------------------------------------
 # SDP attributes for Bluetooth HID devices

@@ -18,12 +18,12 @@
 import asyncio
 import sys
 
+import bumble.logging
 from bumble.core import PhysicalTransport
 from bumble.device import Device, ScoLink
 from bumble.hci import HCI_Enhanced_Setup_Synchronous_Connection_Command
-from bumble.hfp import DefaultCodecParameters, ESCO_PARAMETERS
+from bumble.hfp import ESCO_PARAMETERS, DefaultCodecParameters
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

@@ -19,13 +19,13 @@ import asyncio
 
 import click
 
+import bumble.logging
 from bumble import l2cap
 from bumble.colors import color
-from bumble.transport import open_transport
 from bumble.device import Device
-from bumble.utils import FlowControlAsyncPipe
 from bumble.hci import HCI_Constant
-import bumble.logging
+from bumble.transport import open_transport
+from bumble.utils import FlowControlAsyncPipe
 
 
 # -----------------------------------------------------------------------------

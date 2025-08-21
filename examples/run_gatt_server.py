@@ -18,19 +18,19 @@
 import asyncio
 import sys
 
-from bumble.device import Device, Connection
-from bumble.transport import open_transport
-from bumble.att import ATT_Error, ATT_INSUFFICIENT_ENCRYPTION_ERROR
+import bumble.logging
+from bumble.att import ATT_INSUFFICIENT_ENCRYPTION_ERROR, ATT_Error
+from bumble.device import Connection, Device
 from bumble.gatt import (
-    Service,
+    GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR,
+    GATT_DEVICE_INFORMATION_SERVICE,
+    GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
     Characteristic,
     CharacteristicValue,
     Descriptor,
-    GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR,
-    GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
-    GATT_DEVICE_INFORMATION_SERVICE,
+    Service,
 )
-import bumble.logging
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

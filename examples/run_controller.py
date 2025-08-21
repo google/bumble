@@ -18,6 +18,9 @@
 import asyncio
 import sys
 
+import bumble.logging
+from bumble.controller import Controller
+from bumble.device import Device
 from bumble.gatt import (
     GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR,
     GATT_DEVICE_INFORMATION_SERVICE,
@@ -26,12 +29,9 @@ from bumble.gatt import (
     Descriptor,
     Service,
 )
-from bumble.device import Device
 from bumble.host import Host
-from bumble.controller import Controller
 from bumble.link import LocalLink
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

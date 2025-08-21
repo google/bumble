@@ -20,22 +20,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-import struct
-from typing import (
-    Any,
-    Callable,
-    Generic,
-    Iterable,
-    Literal,
-    Optional,
-    TypeVar,
-)
 
+import struct
+from typing import Any, Callable, Generic, Iterable, Literal, Optional, TypeVar
+
+from bumble import utils
 from bumble.core import InvalidOperationError
 from bumble.gatt import Characteristic
 from bumble.gatt_client import CharacteristicProxy
-from bumble import utils
-
 
 # -----------------------------------------------------------------------------
 # Typing

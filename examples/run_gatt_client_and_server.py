@@ -17,23 +17,23 @@
 # -----------------------------------------------------------------------------
 import asyncio
 
+import bumble.logging
 from bumble.colors import color
-from bumble.core import ProtocolError
 from bumble.controller import Controller
+from bumble.core import ProtocolError
 from bumble.device import Device, Peer
+from bumble.gatt import (
+    GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR,
+    GATT_DEVICE_INFORMATION_SERVICE,
+    GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
+    Characteristic,
+    Descriptor,
+    Service,
+)
+from bumble.gatt_client import show_services
 from bumble.hci import Address
 from bumble.host import Host
 from bumble.link import LocalLink
-from bumble.gatt import (
-    Service,
-    Characteristic,
-    Descriptor,
-    GATT_CHARACTERISTIC_USER_DESCRIPTION_DESCRIPTOR,
-    GATT_MANUFACTURER_NAME_STRING_CHARACTERISTIC,
-    GATT_DEVICE_INFORMATION_SERVICE,
-)
-from bumble.gatt_client import show_services
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

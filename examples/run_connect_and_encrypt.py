@@ -18,9 +18,9 @@
 import asyncio
 import sys
 
+import bumble.logging
 from bumble.device import Device
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

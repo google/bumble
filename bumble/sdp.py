@@ -16,24 +16,26 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import logging
 import struct
-from typing import Iterable, NewType, Optional, Union, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, NewType, Optional, Sequence, Union
+
 from typing_extensions import Self
 
 from bumble import core, l2cap
 from bumble.colors import color
 from bumble.core import (
-    InvalidStateError,
     InvalidArgumentError,
     InvalidPacketError,
+    InvalidStateError,
     ProtocolError,
 )
-from bumble.hci import HCI_Object, name_or_number, key_with_value
+from bumble.hci import HCI_Object, key_with_value, name_or_number
 
 if TYPE_CHECKING:
-    from bumble.device import Device, Connection
+    from bumble.device import Connection, Device
 
 # -----------------------------------------------------------------------------
 # Logging

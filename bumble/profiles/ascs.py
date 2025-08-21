@@ -18,22 +18,17 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import enum
 import functools
 import logging
 import struct
-from typing import Any, Optional, Union, TypeVar
 from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any, Optional, TypeVar, Union
 
-from bumble import utils
-from bumble import colors
-from bumble.profiles.bap import CodecSpecificConfiguration
+from bumble import colors, device, gatt, gatt_client, hci, utils
 from bumble.profiles import le_audio
-from bumble import device
-from bumble import gatt
-from bumble import gatt_client
-from bumble import hci
+from bumble.profiles.bap import CodecSpecificConfiguration
 
 # -----------------------------------------------------------------------------
 # Logging

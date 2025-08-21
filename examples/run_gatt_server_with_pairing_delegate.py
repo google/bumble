@@ -18,14 +18,11 @@
 import asyncio
 import sys
 
-from bumble.device import Device
-from bumble.transport import open_transport
-from bumble.gatt import (
-    Service,
-    Characteristic,
-)
-from bumble.pairing import PairingConfig, PairingDelegate
 import bumble.logging
+from bumble.device import Device
+from bumble.gatt import Characteristic, Service
+from bumble.pairing import PairingConfig, PairingDelegate
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

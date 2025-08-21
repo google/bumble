@@ -23,15 +23,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import enum
 import functools
 import logging
 import struct
 from typing import Iterable, Optional, Sequence, TypeVar, Union
 
-from bumble.colors import color
-from bumble.core import BaseBumbleError, UUID
 from bumble.att import Attribute, AttributeValue
+from bumble.colors import color
+from bumble.core import UUID, BaseBumbleError
 
 # -----------------------------------------------------------------------------
 # Typing

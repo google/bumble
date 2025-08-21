@@ -1,10 +1,11 @@
 import asyncio
-import click
-import logging
 import json
-
-from bumble.pandora import PandoraDevice, Config, serve
+import logging
 from typing import Any
+
+import click
+
+from bumble.pandora import Config, PandoraDevice, serve
 
 BUMBLE_SERVER_GRPC_PORT = 7999
 ROOTCANAL_PORT_CUTTLEFISH = 7300

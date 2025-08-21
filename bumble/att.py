@@ -30,22 +30,20 @@ import functools
 import inspect
 import struct
 from typing import (
+    TYPE_CHECKING,
     Awaitable,
     Callable,
+    ClassVar,
     Generic,
+    Optional,
     TypeVar,
     Union,
-    ClassVar,
-    Optional,
-    TYPE_CHECKING,
 )
 
-
-from bumble import hci
-from bumble import utils
+from bumble import hci, utils
+from bumble.colors import color
 from bumble.core import UUID, InvalidOperationError, ProtocolError
 from bumble.hci import HCI_Object
-from bumble.colors import color
 
 # -----------------------------------------------------------------------------
 # Typing

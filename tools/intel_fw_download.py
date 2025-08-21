@@ -17,14 +17,13 @@
 # -----------------------------------------------------------------------------
 import logging
 import pathlib
-import urllib.request
 import urllib.error
+import urllib.request
 
 import click
 
 from bumble.colors import color
 from bumble.drivers import intel
-
 
 # -----------------------------------------------------------------------------
 # Logging

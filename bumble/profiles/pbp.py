@@ -16,8 +16,10 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import dataclasses
 import enum
+
 from typing_extensions import Self
 
 from bumble.profiles import le_audio

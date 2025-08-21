@@ -20,14 +20,7 @@ import struct
 
 import pytest
 
-from bumble import core
-from bumble import device
-from bumble import host
-from bumble import controller
-from bumble import link
-from bumble import avc
-from bumble import avrcp
-from bumble import avctp
+from bumble import avc, avctp, avrcp, controller, core, device, host, link
 from bumble.transport import common
 
 

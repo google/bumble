@@ -16,19 +16,17 @@
 # Imports
 # -----------------------------------------------------------------------------
 
-import pytest
+from typing import Any, Optional
 from unittest import mock
 
-from bumble import smp
-from bumble import pairing
-from bumble import crypto
-from bumble.crypto import EccKey, aes_cmac, ah, c1, f4, f5, f6, g2, h6, h7, s1
-from bumble.pairing import OobData, OobSharedData, LeRole
-from bumble.hci import Address
-from bumble.core import AdvertisingData
-from bumble.device import Device
+import pytest
 
-from typing import Optional, Any
+from bumble import crypto, pairing, smp
+from bumble.core import AdvertisingData
+from bumble.crypto import EccKey, aes_cmac, ah, c1, f4, f5, f6, g2, h6, h7, s1
+from bumble.device import Device
+from bumble.hci import Address
+from bumble.pairing import LeRole, OobData, OobSharedData
 
 
 # -----------------------------------------------------------------------------

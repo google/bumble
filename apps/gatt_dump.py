@@ -20,11 +20,11 @@ import asyncio
 import click
 
 import bumble.core
+import bumble.logging
 from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.gatt import show_services
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

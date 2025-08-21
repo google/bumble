@@ -16,18 +16,17 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-import contextlib
-import struct
+
 import asyncio
-import logging
+import contextlib
 import io
+import logging
+import struct
 from typing import Any, ContextManager, Optional, Protocol
 
-from bumble import core
-from bumble import hci
+from bumble import core, hci
 from bumble.colors import color
 from bumble.snoop import Snooper
-
 
 # -----------------------------------------------------------------------------
 # Logging

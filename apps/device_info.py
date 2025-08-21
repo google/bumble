@@ -20,18 +20,18 @@ from typing import Callable, Iterable, Optional
 
 import click
 
-from bumble.core import ProtocolError
+import bumble.logging
 from bumble.colors import color
+from bumble.core import ProtocolError
 from bumble.device import Device, Peer
 from bumble.gatt import Service
-from bumble.profiles.device_information_service import DeviceInformationServiceProxy
 from bumble.profiles.battery_service import BatteryServiceProxy
+from bumble.profiles.device_information_service import DeviceInformationServiceProxy
 from bumble.profiles.gap import GenericAccessServiceProxy
 from bumble.profiles.pacs import PublishedAudioCapabilitiesServiceProxy
 from bumble.profiles.tmap import TelephonyAndMediaAudioServiceProxy
 from bumble.profiles.vcs import VolumeControlServiceProxy
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

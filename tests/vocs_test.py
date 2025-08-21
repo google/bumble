@@ -13,31 +13,29 @@
 # limitations under the License.
 
 
+import struct
+
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 import pytest
 import pytest_asyncio
-import struct
 
 from bumble import device
-
 from bumble.att import ATT_Error
-
+from bumble.profiles.bap import AudioLocation
+from bumble.profiles.vcs import VolumeControlService, VolumeControlServiceProxy
 from bumble.profiles.vocs import (
-    VolumeOffsetControlService,
-    ErrorCode,
-    MIN_VOLUME_OFFSET,
     MAX_VOLUME_OFFSET,
+    MIN_VOLUME_OFFSET,
+    ErrorCode,
     SetVolumeOffsetOpCode,
+    VolumeOffsetControlService,
     VolumeOffsetControlServiceProxy,
     VolumeOffsetState,
 )
-from bumble.profiles.vcs import VolumeControlService, VolumeControlServiceProxy
-from bumble.profiles.bap import AudioLocation
 
 from .test_utils import TwoDevices
-
 
 # -----------------------------------------------------------------------------
 # Tests

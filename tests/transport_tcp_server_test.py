@@ -14,9 +14,10 @@
 
 import asyncio
 import os
-import pytest
 import socket
 from unittest import mock
+
+import pytest
 
 from bumble.transport.tcp_server import (
     open_tcp_server_transport,

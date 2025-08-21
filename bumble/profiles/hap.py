@@ -16,16 +16,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import functools
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 from typing import Any, Optional, Union
 
-from bumble import att, gatt, gatt_adapters, gatt_client
+from bumble import att, gatt, gatt_adapters, gatt_client, utils
 from bumble.core import InvalidArgumentError, InvalidStateError
-from bumble.device import Device, Connection
-from bumble import utils
+from bumble.device import Connection, Device
 from bumble.hci import Address
 
 

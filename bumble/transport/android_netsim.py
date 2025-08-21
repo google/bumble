@@ -29,28 +29,27 @@ import grpc.aio
 import bumble
 from bumble.transport.common import (
     ParserSource,
-    PumpedTransport,
-    PumpedPacketSource,
     PumpedPacketSink,
+    PumpedPacketSource,
+    PumpedTransport,
     Transport,
-    TransportSpecError,
     TransportInitError,
+    TransportSpecError,
 )
 
 # pylint: disable=no-name-in-module
-from bumble.transport.grpc_protobuf.netsim.packet_streamer_pb2_grpc import (
-    PacketStreamerStub,
-    PacketStreamerServicer,
-    add_PacketStreamerServicer_to_server,
-)
+from bumble.transport.grpc_protobuf.netsim.common_pb2 import ChipKind
+from bumble.transport.grpc_protobuf.netsim.hci_packet_pb2 import HCIPacket
 from bumble.transport.grpc_protobuf.netsim.packet_streamer_pb2 import (
     PacketRequest,
     PacketResponse,
 )
-from bumble.transport.grpc_protobuf.netsim.hci_packet_pb2 import HCIPacket
+from bumble.transport.grpc_protobuf.netsim.packet_streamer_pb2_grpc import (
+    PacketStreamerServicer,
+    PacketStreamerStub,
+    add_PacketStreamerServicer_to_server,
+)
 from bumble.transport.grpc_protobuf.netsim.startup_pb2 import Chip, ChipInfo, DeviceInfo
-from bumble.transport.grpc_protobuf.netsim.common_pb2 import ChipKind
-
 
 # -----------------------------------------------------------------------------
 # Logging

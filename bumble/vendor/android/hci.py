@@ -16,12 +16,11 @@
 # Imports
 # -----------------------------------------------------------------------------
 import dataclasses
-from dataclasses import field
 import struct
+from dataclasses import field
 from typing import Optional
 
 from bumble import hci
-
 
 # -----------------------------------------------------------------------------
 # Constants

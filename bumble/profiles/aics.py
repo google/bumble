@@ -18,26 +18,27 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import logging
 import struct
-
 from dataclasses import dataclass
 from typing import Optional
 
-from bumble.device import Connection
+from bumble import utils
 from bumble.att import ATT_Error
+from bumble.device import Connection
 from bumble.gatt import (
+    GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
+    GATT_AUDIO_INPUT_CONTROL_SERVICE,
+    GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
+    GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
+    GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC,
+    GATT_AUDIO_INPUT_TYPE_CHARACTERISTIC,
+    GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
     Attribute,
     Characteristic,
-    TemplateService,
     CharacteristicValue,
-    GATT_AUDIO_INPUT_CONTROL_SERVICE,
-    GATT_AUDIO_INPUT_STATE_CHARACTERISTIC,
-    GATT_GAIN_SETTINGS_ATTRIBUTE_CHARACTERISTIC,
-    GATT_AUDIO_INPUT_TYPE_CHARACTERISTIC,
-    GATT_AUDIO_INPUT_STATUS_CHARACTERISTIC,
-    GATT_AUDIO_INPUT_CONTROL_POINT_CHARACTERISTIC,
-    GATT_AUDIO_INPUT_DESCRIPTION_CHARACTERISTIC,
+    TemplateService,
 )
 from bumble.gatt_adapters import (
     CharacteristicProxy,
@@ -48,7 +49,6 @@ from bumble.gatt_adapters import (
     UTF8CharacteristicProxyAdapter,
 )
 from bumble.gatt_client import ProfileServiceProxy, ServiceProxy
-from bumble import utils
 
 # -----------------------------------------------------------------------------
 # Logging

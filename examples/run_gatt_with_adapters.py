@@ -16,24 +16,19 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import dataclasses
-import functools
 import enum
+import functools
 import random
 import struct
 import sys
 from typing import Any, Union
 
-from bumble.device import Device, Peer
-from bumble import transport
-from bumble import gatt
-from bumble import gatt_adapters
-from bumble import gatt_client
-from bumble import hci
-from bumble import core
 import bumble.logging
-
+from bumble import core, gatt, gatt_adapters, gatt_client, hci, transport
+from bumble.device import Device, Peer
 
 # -----------------------------------------------------------------------------
 SERVICE_UUID = core.UUID("50DB505C-8AC4-4738-8448-3B1D9CC09CC5")

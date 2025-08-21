@@ -16,21 +16,19 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-from dataclasses import dataclass
-import logging
-import enum
-import struct
 
+import enum
+import logging
+import struct
 from abc import ABC, abstractmethod
-from typing import Optional, Callable
+from dataclasses import dataclass
+from typing import Callable, Optional
+
 from typing_extensions import override
 
-from bumble import l2cap
-from bumble import device
-from bumble import utils
+from bumble import device, l2cap, utils
 from bumble.core import InvalidStateError, ProtocolError
 from bumble.hci import Address
-
 
 # -----------------------------------------------------------------------------
 # Logging

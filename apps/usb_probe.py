@@ -29,10 +29,9 @@
 import click
 import usb1
 
+import bumble.logging
 from bumble.colors import color
 from bumble.transport.usb import load_libusb
-import bumble.logging
-
 
 # -----------------------------------------------------------------------------
 # Constants
