@@ -51,8 +51,8 @@ async def open_udp_transport(spec: str) -> Transport:
             self.transport.close()
 
     local, remote = spec.split(',')
-    local_host, local_port = local.split(':')
-    remote_host, remote_port = remote.split(':')
+    local_host, local_port = local.rsplit(':', maxsplit=1)
+    remote_host, remote_port = remote.rsplit(':', maxsplit=1)
     (
         udp_transport,
         packet_source,

@@ -16,8 +16,7 @@ import asyncio
 import os
 import pytest
 import socket
-import unittest
-from unittest.mock import ANY, patch
+from unittest import mock
 
 from bumble.transport.tcp_server import (
     open_tcp_server_transport,
@@ -25,28 +24,23 @@ from bumble.transport.tcp_server import (
 )
 
 
-class OpenTcpServerTransportTests(unittest.TestCase):
-    def setUp(self):
-        self.patcher = patch('bumble.transport.tcp_server._create_server')
-        self.mock_create_server = self.patcher.start()
+async def test_open_with_spec():
+    with mock.patch.object(asyncio.get_running_loop(), 'create_server') as m:
+        await open_tcp_server_transport('localhost:32100')
+        m.assert_awaited_once_with(mock.ANY, host='localhost', port=32100)
 
-    def tearDown(self):
-        self.patcher.stop()
 
-    def test_open_with_spec(self):
-        asyncio.run(open_tcp_server_transport('localhost:32100'))
-        self.mock_create_server.assert_awaited_once_with(
-            ANY, host='localhost', port=32100
-        )
+async def test_open_with_port_only_spec():
+    with mock.patch.object(asyncio.get_running_loop(), 'create_server') as m:
+        await open_tcp_server_transport('_:32100')
+        m.assert_awaited_once_with(mock.ANY, host=None, port=32100)
 
-    def test_open_with_port_only_spec(self):
-        asyncio.run(open_tcp_server_transport('_:32100'))
-        self.mock_create_server.assert_awaited_once_with(ANY, host=None, port=32100)
 
-    def test_open_with_socket(self):
+async def test_open_with_socket():
+    with mock.patch.object(asyncio.get_running_loop(), 'create_server') as m:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            asyncio.run(open_tcp_server_transport_with_socket(sock=sock))
-        self.mock_create_server.assert_awaited_once_with(ANY, sock=sock)
+            await open_tcp_server_transport_with_socket(sock=sock)
+        m.assert_awaited_once_with(mock.ANY, sock=sock)
 
 
 @pytest.mark.skipif(

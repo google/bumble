@@ -29,13 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-
-
-# A pass-through function to ease mock testing.
-async def _create_server(*args, **kw_args):
-    await asyncio.get_running_loop().create_server(*args, **kw_args)
-
-
 async def open_tcp_server_transport(spec: str) -> Transport:
     '''
     Open a TCP server transport.
@@ -46,13 +39,15 @@ async def open_tcp_server_transport(spec: str) -> Transport:
 
     Example: _:9001
     '''
-    local_host, local_port = spec.split(':')
+    local_host, local_port = spec.rsplit(':', maxsplit=1)
     return await _open_tcp_server_transport_impl(
         host=local_host if local_host != '_' else None, port=int(local_port)
     )
 
 
-async def open_tcp_server_transport_with_socket(sock: socket.socket) -> Transport:
+async def open_tcp_server_transport_with_socket(
+    sock: socket.socket,
+) -> Transport:
     '''
     Open a TCP server transport with an existing socket.
 
@@ -63,8 +58,9 @@ async def open_tcp_server_transport_with_socket(sock: socket.socket) -> Transpor
 
 async def _open_tcp_server_transport_impl(**kwargs) -> Transport:
     class TcpServerTransport(Transport):
-        async def close(self):
-            await super().close()
+        def __init__(self, source, sink, server):
+            self.server = server
+            super().__init__(source, sink)
 
     class TcpServerProtocol(asyncio.BaseProtocol):
         def __init__(self, packet_source, packet_sink):
@@ -102,8 +98,8 @@ async def _open_tcp_server_transport_impl(**kwargs) -> Transport:
 
     packet_source = StreamPacketSource()
     packet_sink = TcpServerPacketSink()
-    await _create_server(
+    server = await asyncio.get_running_loop().create_server(
         lambda: TcpServerProtocol(packet_source, packet_sink), **kwargs
     )
 
-    return TcpServerTransport(packet_source, packet_sink)
+    return TcpServerTransport(packet_source, packet_sink, server)

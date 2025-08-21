@@ -185,11 +185,17 @@ async def _open_transport(scheme: str, spec: Optional[str]) -> Transport:
 
         return await open_android_netsim_transport(spec)
 
-    if scheme == 'unix':
+    if scheme in ('unix', 'unix-client'):
         from bumble.transport.unix import open_unix_client_transport
 
         assert spec
         return await open_unix_client_transport(spec)
+
+    if scheme == 'unix-server':
+        from bumble.transport.unix import open_unix_server_transport
+
+        assert spec
+        return await open_unix_server_transport(spec)
 
     raise TransportSpecError('unknown transport scheme')
 

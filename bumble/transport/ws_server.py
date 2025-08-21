@@ -82,7 +82,7 @@ async def open_ws_server_transport(spec: str) -> Transport:
                 return
             return await self.connection.send(packet)
 
-    local_host, local_port = spec.split(':')
+    local_host, local_port = spec.rsplit(':', maxsplit=1)
     transport = WsServerTransport()
     await transport.serve(local_host, local_port)
     return transport
