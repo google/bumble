@@ -207,6 +207,28 @@ async def test_unix_connection_abstract():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "address,",
+    ("127.0.0.1",),
+)
+async def test_android_netsim_connection(address):
+    controller_transport = await transport.open_transport(
+        "android-netsim:_:0,mode=controller"
+    )
+    port = controller_transport.source.port
+    _make_controller_from_transport(controller_transport)
+
+    client_transport = await transport.open_transport(
+        f"android-netsim:{address}:{port},mode=host"
+    )
+    client_device = _make_device_from_transport(client_transport)
+    await client_device.power_on()
+
+    await client_transport.close()
+    await controller_transport.close()
+
+
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     test_parser()
     test_parser_extensions()

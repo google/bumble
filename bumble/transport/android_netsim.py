@@ -145,8 +145,6 @@ def publish_grpc_port(grpc_port: int, instance_number: int) -> bool:
 async def open_android_netsim_controller_transport(
     server_host: Optional[str], server_port: int, options: dict[str, str]
 ) -> Transport:
-    if not server_port:
-        raise TransportSpecError('invalid port')
     if server_host == '_' or not server_host:
         server_host = 'localhost'
 
@@ -168,14 +166,16 @@ async def open_android_netsim_controller_transport(
                 await self.pump_loop()
             except asyncio.CancelledError:
                 logger.debug('Pump task canceled')
-                self.done.set_result(None)
+                if not self.done.done():
+                    self.done.set_result(None)
 
         async def pump_loop(self):
             while True:
                 request = await self.context.read()
                 if request == grpc.aio.EOF:
                     logger.debug('End of request stream')
-                    self.done.set_result(None)
+                    if not self.done.done():
+                        self.done.set_result(None)
                     return
 
                 # If we're not initialized yet, wait for a init packet.
@@ -220,6 +220,8 @@ async def open_android_netsim_controller_transport(
         async def wait_for_termination(self):
             await self.done
 
+    server_address = f'{server_host}:{server_port}'
+
     class Server(PacketStreamerServicer, ParserSource):
         def __init__(self):
             PacketStreamerServicer.__init__(self)
@@ -230,8 +232,8 @@ async def open_android_netsim_controller_transport(
             # a server listening on that port, we get an exception.
             self.grpc_server = grpc.aio.server(options=(('grpc.so_reuseport', 0),))
             add_PacketStreamerServicer_to_server(self, self.grpc_server)
-            self.grpc_server.add_insecure_port(f'{server_host}:{server_port}')
-            logger.debug(f'gRPC server listening on {server_host}:{server_port}')
+            self.port = self.grpc_server.add_insecure_port(server_address)
+            logger.debug('gRPC server listening on %s', server_address)
 
         async def start(self):
             logger.debug('Starting gRPC server')
