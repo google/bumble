@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import os
-
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from contextlib import asynccontextmanager
+import logging
+import os
+import re
 from typing import Optional
 
 from bumble import utils
@@ -85,12 +84,14 @@ async def open_transport(name: str) -> Transport:
     scheme, *tail = name.split(':', 1)
     spec = tail[0] if tail else None
     metadata = None
-    if spec:
-        # Metadata may precede the spec
-        if spec.startswith('['):
-            metadata_str, *tail = spec[1:].split(']')
-            spec = tail[0] if tail else None
-            metadata = dict([entry.split('=') for entry in metadata_str.split(',')])
+    if spec and (m := re.search(r'\[(\w+=\w+(?:,\w+=\w+)*,?)\]', spec)):
+        metadata_str = m.group(1)
+        if m.start() == 0:
+            # <metadata><spec>
+            spec = spec[m.end() :]
+        else:
+            spec = spec[: m.start()]
+        metadata = dict([entry.split('=') for entry in metadata_str.split(',')])
 
     transport = await _open_transport(scheme, spec)
     if metadata:
