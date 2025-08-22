@@ -17,18 +17,15 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import dataclasses
 import logging
 import struct
 from typing import Optional, Sequence, Union
 
-from bumble.profiles.bap import AudioLocation, CodecSpecificCapabilities, ContextType
+from bumble import gatt, gatt_adapters, gatt_client, hci
 from bumble.profiles import le_audio
-from bumble import gatt
-from bumble import gatt_adapters
-from bumble import gatt_client
-from bumble import hci
-
+from bumble.profiles.bap import AudioLocation, CodecSpecificCapabilities, ContextType
 
 # -----------------------------------------------------------------------------
 # Logging

@@ -48,6 +48,7 @@ development = [
     "bt-test-interfaces >= 0.0.6",
     "grpcio-tools >= 1.62.1",
     "invoke >= 1.7.3",
+    "isort ~= 5.13.2",
     "mobly >= 1.12.2",
     "mypy == 1.12.0",
     "nox >= 2022",
@@ -203,3 +204,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "usb1.*"
 ignore_missing_imports = true
+
+[tool.isort]
+profile = "black"
+skip = ["_version.py", "grpc_protobuf"]

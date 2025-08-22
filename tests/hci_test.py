@@ -22,7 +22,6 @@ import pytest
 
 from bumble import hci
 
-
 # -----------------------------------------------------------------------------
 # pylint: disable=invalid-name
 

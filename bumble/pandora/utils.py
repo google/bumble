@@ -13,16 +13,18 @@
 # limitations under the License.
 
 from __future__ import annotations
+
 import contextlib
 import functools
-import grpc
 import inspect
 import logging
+from typing import Any, Generator, MutableMapping, Optional
+
+import grpc
+from google.protobuf.message import Message  # pytype: disable=pyi-error
 
 from bumble.device import Device
 from bumble.hci import Address, AddressType
-from google.protobuf.message import Message  # pytype: disable=pyi-error
-from typing import Any, Generator, MutableMapping, Optional
 
 ADDRESS_TYPES: dict[str, AddressType] = {
     "public": Address.PUBLIC_DEVICE_ADDRESS,

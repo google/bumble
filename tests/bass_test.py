@@ -16,12 +16,11 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import os
 import logging
+import os
 
 from bumble import hci
 from bumble.profiles import bass
-
 
 # -----------------------------------------------------------------------------
 # Logging

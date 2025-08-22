@@ -17,16 +17,15 @@
 # -----------------------------------------------------------------------------
 import logging
 import pathlib
-import urllib.request
 import urllib.error
+import urllib.request
 
 import click
 
+import bumble.logging
 from bumble.colors import color
 from bumble.drivers import rtk
 from bumble.tools import rtk_util
-import bumble.logging
-
 
 # -----------------------------------------------------------------------------
 # Logging

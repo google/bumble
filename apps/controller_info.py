@@ -20,44 +20,44 @@ import time
 
 import click
 
-from bumble.company_ids import COMPANY_IDENTIFIERS
+import bumble.logging
 from bumble.colors import color
+from bumble.company_ids import COMPANY_IDENTIFIERS
 from bumble.core import name_or_number
 from bumble.hci import (
-    map_null_terminated_utf8_string,
-    CodecID,
-    LeFeature,
+    HCI_LE_READ_BUFFER_SIZE_COMMAND,
+    HCI_LE_READ_BUFFER_SIZE_V2_COMMAND,
+    HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND,
+    HCI_LE_READ_MAXIMUM_DATA_LENGTH_COMMAND,
+    HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND,
+    HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
+    HCI_READ_BD_ADDR_COMMAND,
+    HCI_READ_BUFFER_SIZE_COMMAND,
+    HCI_READ_LOCAL_NAME_COMMAND,
     HCI_SUCCESS,
     HCI_VERSION_NAMES,
     LMP_VERSION_NAMES,
+    CodecID,
     HCI_Command,
     HCI_Command_Complete_Event,
     HCI_Command_Status_Event,
-    HCI_READ_BUFFER_SIZE_COMMAND,
-    HCI_Read_Buffer_Size_Command,
-    HCI_LE_READ_BUFFER_SIZE_V2_COMMAND,
-    HCI_LE_Read_Buffer_Size_V2_Command,
-    HCI_READ_BD_ADDR_COMMAND,
-    HCI_Read_BD_ADDR_Command,
-    HCI_READ_LOCAL_NAME_COMMAND,
-    HCI_Read_Local_Name_Command,
-    HCI_LE_READ_BUFFER_SIZE_COMMAND,
     HCI_LE_Read_Buffer_Size_Command,
-    HCI_LE_READ_MAXIMUM_DATA_LENGTH_COMMAND,
-    HCI_LE_Read_Maximum_Data_Length_Command,
-    HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND,
-    HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command,
-    HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND,
+    HCI_LE_Read_Buffer_Size_V2_Command,
     HCI_LE_Read_Maximum_Advertising_Data_Length_Command,
-    HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
+    HCI_LE_Read_Maximum_Data_Length_Command,
+    HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command,
     HCI_LE_Read_Suggested_Default_Data_Length_Command,
+    HCI_Read_BD_ADDR_Command,
+    HCI_Read_Buffer_Size_Command,
+    HCI_Read_Local_Name_Command,
     HCI_Read_Local_Supported_Codecs_Command,
     HCI_Read_Local_Supported_Codecs_V2_Command,
     HCI_Read_Local_Version_Information_Command,
+    LeFeature,
+    map_null_terminated_utf8_string,
 )
 from bumble.host import Host
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

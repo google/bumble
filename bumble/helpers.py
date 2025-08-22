@@ -17,43 +17,36 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-from collections.abc import Callable, MutableMapping
 import datetime
-from typing import cast, Any, Optional
 import logging
+from collections.abc import Callable, MutableMapping
+from typing import Any, Optional, cast
 
-from bumble import avc
-from bumble import avctp
-from bumble import avdtp
-from bumble import avrcp
-from bumble import crypto
-from bumble import rfcomm
-from bumble import sdp
-from bumble.colors import color
+from bumble import avc, avctp, avdtp, avrcp, crypto, rfcomm, sdp
 from bumble.att import ATT_CID, ATT_PDU
-from bumble.smp import SMP_CID, SMP_Command
+from bumble.colors import color
 from bumble.core import name_or_number
-from bumble.l2cap import (
-    CommandCode,
-    L2CAP_PDU,
-    L2CAP_SIGNALING_CID,
-    L2CAP_LE_SIGNALING_CID,
-    L2CAP_Control_Frame,
-    L2CAP_Connection_Request,
-    L2CAP_Connection_Response,
-)
 from bumble.hci import (
-    Address,
-    HCI_EVENT_PACKET,
     HCI_ACL_DATA_PACKET,
     HCI_DISCONNECTION_COMPLETE_EVENT,
-    HCI_AclDataPacketAssembler,
-    HCI_Packet,
-    HCI_Event,
+    HCI_EVENT_PACKET,
+    Address,
     HCI_AclDataPacket,
+    HCI_AclDataPacketAssembler,
     HCI_Disconnection_Complete_Event,
+    HCI_Event,
+    HCI_Packet,
 )
-
+from bumble.l2cap import (
+    L2CAP_LE_SIGNALING_CID,
+    L2CAP_PDU,
+    L2CAP_SIGNALING_CID,
+    CommandCode,
+    L2CAP_Connection_Request,
+    L2CAP_Connection_Response,
+    L2CAP_Control_Frame,
+)
+from bumble.smp import SMP_CID, SMP_Command
 
 # -----------------------------------------------------------------------------
 # Logging

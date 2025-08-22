@@ -16,33 +16,19 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import collections
 import dataclasses
 import logging
 import struct
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, cast
 
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    Optional,
-    cast,
-    TYPE_CHECKING,
-)
-
-
+from bumble import drivers, hci, utils
 from bumble.colors import color
+from bumble.core import ConnectionParameters, ConnectionPHY, PhysicalTransport
 from bumble.l2cap import L2CAP_PDU
 from bumble.snoop import Snooper
-from bumble import drivers
-from bumble import hci
-from bumble.core import (
-    PhysicalTransport,
-    ConnectionPHY,
-    ConnectionParameters,
-)
-from bumble import utils
 from bumble.transport.common import TransportLostError
 
 if TYPE_CHECKING:

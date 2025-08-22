@@ -20,16 +20,15 @@ import struct
 
 import click
 
+import bumble.logging
 from bumble import l2cap
 from bumble.colors import color
-from bumble.device import Device, Peer
 from bumble.core import AdvertisingData
-from bumble.gatt import Service, Characteristic, CharacteristicValue
-from bumble.utils import AsyncRunner
-from bumble.transport import open_transport
+from bumble.device import Device, Peer
+from bumble.gatt import Characteristic, CharacteristicValue, Service
 from bumble.hci import HCI_Constant
-import bumble.logging
-
+from bumble.transport import open_transport
+from bumble.utils import AsyncRunner
 
 # -----------------------------------------------------------------------------
 # Constants

@@ -16,14 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import os
-import pytest
 import logging
+import os
 
-from bumble import device
-from bumble import gatt
-from bumble.profiles import cap
-from bumble.profiles import csip
+import pytest
+
+from bumble import device, gatt
+from bumble.profiles import cap, csip
+
 from .test_utils import TwoDevices
 
 # -----------------------------------------------------------------------------

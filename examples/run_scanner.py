@@ -17,11 +17,12 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import sys
-from bumble.colors import color
-from bumble.hci import Address
-from bumble.device import Device
-from bumble.transport import open_transport
+
 from bumble import logging
+from bumble.colors import color
+from bumble.device import Device
+from bumble.hci import Address
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

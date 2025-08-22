@@ -18,16 +18,13 @@
 import asyncio
 import sys
 
-from bumble.colors import color
-from bumble.device import Device
-from bumble.transport import open_transport
-from bumble.core import PhysicalTransport, BT_L2CAP_PROTOCOL_ID, CommandTimeoutError
-from bumble.sdp import (
-    Client as SDP_Client,
-    SDP_PUBLIC_BROWSE_ROOT,
-    SDP_ALL_ATTRIBUTES_RANGE,
-)
 import bumble.logging
+from bumble.colors import color
+from bumble.core import BT_L2CAP_PROTOCOL_ID, CommandTimeoutError, PhysicalTransport
+from bumble.device import Device
+from bumble.sdp import SDP_ALL_ATTRIBUTES_RANGE, SDP_PUBLIC_BROWSE_ROOT
+from bumble.sdp import Client as SDP_Client
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

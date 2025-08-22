@@ -17,15 +17,16 @@
 # -----------------------------------------------------------------------------
 import asyncio
 from typing import Optional
+
 from typing_extensions import Self
 
 from bumble.controller import Controller
-from bumble.link import LocalLink
-from bumble.device import Device, Connection
-from bumble.host import Host
-from bumble.transport.common import AsyncPipeSink
+from bumble.device import Connection, Device
 from bumble.hci import Address
+from bumble.host import Host
 from bumble.keys import PairingKeys
+from bumble.link import LocalLink
+from bumble.transport.common import AsyncPipeSink
 
 
 # -----------------------------------------------------------------------------

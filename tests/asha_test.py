@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import asyncio
-import pytest
 import struct
 from unittest import mock
+
+import pytest
 
 from bumble import device as bumble_device
 from bumble.profiles import asha

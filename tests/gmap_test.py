@@ -21,13 +21,13 @@ import pytest_asyncio
 
 from bumble import device
 from bumble.profiles.gmap import (
+    BgrFeatures,
+    BgsFeatures,
     GamingAudioService,
     GamingAudioServiceProxy,
     GmapRole,
     UggFeatures,
     UgtFeatures,
-    BgrFeatures,
-    BgsFeatures,
 )
 
 from .test_utils import TwoDevices

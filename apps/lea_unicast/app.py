@@ -20,31 +20,30 @@ from __future__ import annotations
 import asyncio
 import datetime
 import functools
-from importlib import resources
 import json
 import logging
 import pathlib
-import weakref
 import wave
+import weakref
+from importlib import resources
 
 try:
     import lc3  # type: ignore  # pylint: disable=E0401
 except ImportError as e:
     raise ImportError("Try `python -m pip install \".[lc3]\"`.") from e
 
-import click
 import aiohttp.web
+import click
 
 import bumble
-from bumble import utils
-from bumble.core import AdvertisingData
-from bumble.colors import color
-from bumble.device import Device, DeviceConfiguration, AdvertisingParameters, CisLink
-from bumble.transport import open_transport
-from bumble.profiles import ascs, bap, pacs
-from bumble.hci import Address, CodecID, CodingFormat, HCI_IsoDataPacket
 import bumble.logging
-
+from bumble import utils
+from bumble.colors import color
+from bumble.core import AdvertisingData
+from bumble.device import AdvertisingParameters, CisLink, Device, DeviceConfiguration
+from bumble.hci import Address, CodecID, CodingFormat, HCI_IsoDataPacket
+from bumble.profiles import ascs, bap, pacs
+from bumble.transport import open_transport
 
 # -----------------------------------------------------------------------------
 # Logging

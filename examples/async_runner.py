@@ -17,8 +17,8 @@
 # -----------------------------------------------------------------------------
 import asyncio
 
-from bumble.utils import AsyncRunner
 import bumble.logging
+from bumble.utils import AsyncRunner
 
 # -----------------------------------------------------------------------------
 my_work_queue1 = AsyncRunner.WorkQueue()

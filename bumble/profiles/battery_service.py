@@ -18,19 +18,18 @@
 # -----------------------------------------------------------------------------
 from typing import Optional
 
-from bumble.gatt_client import ProfileServiceProxy
 from bumble.gatt import (
-    GATT_BATTERY_SERVICE,
     GATT_BATTERY_LEVEL_CHARACTERISTIC,
-    TemplateService,
+    GATT_BATTERY_SERVICE,
     Characteristic,
     CharacteristicValue,
+    TemplateService,
 )
-from bumble.gatt_client import CharacteristicProxy
 from bumble.gatt_adapters import (
     PackedCharacteristicAdapter,
     PackedCharacteristicProxyAdapter,
 )
+from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy
 
 
 # -----------------------------------------------------------------------------

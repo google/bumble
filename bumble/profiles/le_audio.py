@@ -16,14 +16,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import dataclasses
 import enum
 import struct
 from typing import Any
+
 from typing_extensions import Self
 
-from bumble.profiles import bap
 from bumble import utils
+from bumble.profiles import bap
 
 
 # -----------------------------------------------------------------------------

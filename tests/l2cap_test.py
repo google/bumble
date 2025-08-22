@@ -19,12 +19,13 @@ import asyncio
 import logging
 import os
 import random
+
 import pytest
 
-from bumble.core import ProtocolError
 from bumble import l2cap
-from .test_utils import TwoDevices, async_barrier
+from bumble.core import ProtocolError
 
+from .test_utils import TwoDevices, async_barrier
 
 # -----------------------------------------------------------------------------
 # Logging

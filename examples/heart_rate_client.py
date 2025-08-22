@@ -18,12 +18,12 @@
 import asyncio
 import sys
 
+import bumble.logging
 from bumble.colors import color
 from bumble.device import Device
 from bumble.hci import Address
-from bumble.transport import open_transport
 from bumble.profiles.heart_rate_service import HeartRateServiceProxy
-import bumble.logging
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

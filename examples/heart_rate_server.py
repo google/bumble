@@ -12,23 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+import math
+import random
+import struct
+
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 import sys
 import time
-import math
-import random
-import struct
-import asyncio
 
+import bumble.logging
 from bumble.core import AdvertisingData
 from bumble.device import Device
-from bumble.transport import open_transport
 from bumble.profiles.device_information_service import DeviceInformationService
 from bumble.profiles.heart_rate_service import HeartRateService
+from bumble.transport import open_transport
 from bumble.utils import AsyncRunner
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

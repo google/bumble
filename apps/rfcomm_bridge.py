@@ -21,15 +21,10 @@ from typing import Optional
 
 import click
 
-from bumble.colors import color
-from bumble.device import Device, DeviceConfiguration, Connection
-from bumble import core
-from bumble import hci
-from bumble import rfcomm
-from bumble import transport
-from bumble import utils
 import bumble.logging
-
+from bumble import core, hci, rfcomm, transport, utils
+from bumble.colors import color
+from bumble.device import Connection, Device, DeviceConfiguration
 
 # -----------------------------------------------------------------------------
 # Constants

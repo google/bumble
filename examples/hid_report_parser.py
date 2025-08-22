@@ -1,5 +1,6 @@
-from bumble.colors import color
 from hid_key_map import base_keys, mod_keys, shift_map
+
+from bumble.colors import color
 
 
 # ------------------------------------------------------------------------------

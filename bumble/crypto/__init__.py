@@ -22,12 +22,12 @@ import operator
 import secrets
 
 try:
-    from bumble.crypto.cryptography import EccKey, e, aes_cmac
+    from bumble.crypto.cryptography import EccKey, aes_cmac, e
 except ImportError:
     logging.getLogger(__name__).debug(
         "Unable to import cryptography, use built-in primitives."
     )
-    from bumble.crypto.builtin import EccKey, e, aes_cmac  # type: ignore[assignment]
+    from bumble.crypto.builtin import EccKey, aes_cmac, e  # type: ignore[assignment]
 
 
 # -----------------------------------------------------------------------------

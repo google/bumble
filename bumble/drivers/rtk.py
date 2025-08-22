@@ -17,10 +17,6 @@ Based on various online bits of information, including the Linux kernel.
 (see `drivers/bluetooth/btrtl.c`)
 """
 
-# -----------------------------------------------------------------------------
-# Imports
-# -----------------------------------------------------------------------------
-from dataclasses import dataclass, field
 import asyncio
 import enum
 import logging
@@ -31,9 +27,12 @@ import platform
 import struct
 import weakref
 
+# -----------------------------------------------------------------------------
+# Imports
+# -----------------------------------------------------------------------------
+from dataclasses import dataclass, field
 
-from bumble import core
-from bumble import hci
+from bumble import core, hci
 from bumble.drivers import common
 
 # -----------------------------------------------------------------------------

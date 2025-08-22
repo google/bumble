@@ -16,11 +16,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
+
 import websockets.client
 
 from bumble.transport.common import (
-    PumpedPacketSource,
     PumpedPacketSink,
+    PumpedPacketSource,
     PumpedTransport,
     Transport,
 )

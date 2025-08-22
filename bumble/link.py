@@ -12,25 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-import asyncio
-
-from bumble import core
-from bumble.hci import (
-    Address,
-    Role,
-    HCI_SUCCESS,
-    HCI_CONNECTION_ACCEPT_TIMEOUT_ERROR,
-    HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
-    HCI_PAGE_TIMEOUT_ERROR,
-    HCI_Connection_Complete_Event,
-)
-from bumble import controller
-
 from typing import Optional
+
+from bumble import controller, core
+from bumble.hci import (
+    HCI_CONNECTION_ACCEPT_TIMEOUT_ERROR,
+    HCI_PAGE_TIMEOUT_ERROR,
+    HCI_SUCCESS,
+    HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+    Address,
+    HCI_Connection_Complete_Event,
+    Role,
+)
 
 # -----------------------------------------------------------------------------
 # Logging

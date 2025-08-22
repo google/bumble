@@ -19,24 +19,21 @@ import pytest
 import pytest_asyncio
 
 from bumble import device
-
 from bumble.att import ATT_Error
-
 from bumble.profiles.aics import (
-    Mute,
     AICSService,
-    AudioInputState,
     AICSServiceProxy,
+    AudioInputControlPointOpCode,
+    AudioInputState,
+    AudioInputStatus,
+    ErrorCode,
     GainMode,
     GainSettingsProperties,
-    AudioInputStatus,
-    AudioInputControlPointOpCode,
-    ErrorCode,
+    Mute,
 )
 from bumble.profiles.vcs import VolumeControlService, VolumeControlServiceProxy
 
 from .test_utils import TwoDevices
-
 
 # -----------------------------------------------------------------------------
 # Tests

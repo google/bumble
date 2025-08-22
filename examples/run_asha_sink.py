@@ -16,20 +16,18 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import sys
 import logging
+import sys
 from typing import Optional
 
 import websockets
 
-from bumble import decoder
-from bumble import gatt
-from bumble.core import AdvertisingData
-from bumble.device import Device, AdvertisingParameters
-from bumble.transport import open_transport
-from bumble.profiles import asha
 import bumble.logging
-
+from bumble import decoder, gatt
+from bumble.core import AdvertisingData
+from bumble.device import AdvertisingParameters, Device
+from bumble.profiles import asha
+from bumble.transport import open_transport
 
 ws_connection: Optional[websockets.WebSocketServerProtocol] = None
 g722_decoder = decoder.G722Decoder()

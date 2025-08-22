@@ -16,27 +16,26 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-import grpc.aio
-
 from typing import Optional, Union
 
+import grpc.aio
+
 from bumble.transport.common import (
-    PumpedTransport,
-    PumpedPacketSource,
     PumpedPacketSink,
+    PumpedPacketSource,
+    PumpedTransport,
     Transport,
     TransportSpecError,
 )
 
 # pylint: disable=no-name-in-module
+from bumble.transport.grpc_protobuf.emulated_bluetooth_packets_pb2 import HCIPacket
 from bumble.transport.grpc_protobuf.emulated_bluetooth_pb2_grpc import (
     EmulatedBluetoothServiceStub,
 )
-from bumble.transport.grpc_protobuf.emulated_bluetooth_packets_pb2 import HCIPacket
 from bumble.transport.grpc_protobuf.emulated_bluetooth_vhci_pb2_grpc import (
     VhciForwardingServiceStub,
 )
-
 
 # -----------------------------------------------------------------------------
 # Logging

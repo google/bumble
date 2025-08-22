@@ -19,22 +19,21 @@ import asyncio
 import sys
 from typing import Any
 
-from bumble.device import Device
-from bumble.transport import open_transport
-from bumble.core import PhysicalTransport
-from bumble.avdtp import (
-    AVDTP_AUDIO_MEDIA_TYPE,
-    Protocol,
-    Listener,
-    MediaCodecCapabilities,
-)
+import bumble.logging
 from bumble.a2dp import (
-    make_audio_sink_service_sdp_records,
     A2DP_SBC_CODEC_TYPE,
     SbcMediaCodecInformation,
+    make_audio_sink_service_sdp_records,
 )
-import bumble.logging
-
+from bumble.avdtp import (
+    AVDTP_AUDIO_MEDIA_TYPE,
+    Listener,
+    MediaCodecCapabilities,
+    Protocol,
+)
+from bumble.core import PhysicalTransport
+from bumble.device import Device
+from bumble.transport import open_transport
 
 Context: dict[Any, Any] = {'output': None}
 

@@ -22,12 +22,11 @@ import struct
 
 import click
 
-from bumble.colors import color
-from bumble import hci
-from bumble.transport.common import PacketReader
-from bumble.helpers import PacketTracer
 import bumble.logging
-
+from bumble import hci
+from bumble.colors import color
+from bumble.helpers import PacketTracer
+from bumble.transport.common import PacketReader
 
 # -----------------------------------------------------------------------------
 # Logging

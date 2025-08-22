@@ -16,53 +16,50 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import logging
 from typing import Optional, Union
 
 import click
 
+import bumble.logging
 from bumble.a2dp import (
-    make_audio_source_service_sdp_records,
-    A2DP_SBC_CODEC_TYPE,
     A2DP_MPEG_2_4_AAC_CODEC_TYPE,
     A2DP_NON_A2DP_CODEC_TYPE,
+    A2DP_SBC_CODEC_TYPE,
     AacFrame,
-    AacParser,
-    AacPacketSource,
     AacMediaCodecInformation,
-    SbcFrame,
-    SbcParser,
-    SbcPacketSource,
-    SbcMediaCodecInformation,
-    OpusPacket,
-    OpusParser,
-    OpusPacketSource,
+    AacPacketSource,
+    AacParser,
     OpusMediaCodecInformation,
+    OpusPacket,
+    OpusPacketSource,
+    OpusParser,
+    SbcFrame,
+    SbcMediaCodecInformation,
+    SbcPacketSource,
+    SbcParser,
+    make_audio_source_service_sdp_records,
 )
-from bumble.avrcp import Protocol as AvrcpProtocol
 from bumble.avdtp import (
-    find_avdtp_service_with_connection,
     AVDTP_AUDIO_MEDIA_TYPE,
     AVDTP_DELAY_REPORTING_SERVICE_CATEGORY,
     MediaCodecCapabilities,
     MediaPacketPump,
-    Protocol as AvdtpProtocol,
 )
+from bumble.avdtp import Protocol as AvdtpProtocol
+from bumble.avdtp import find_avdtp_service_with_connection
+from bumble.avrcp import Protocol as AvrcpProtocol
 from bumble.colors import color
-from bumble.core import (
-    AdvertisingData,
-    ConnectionError as BumbleConnectionError,
-    DeviceClass,
-    PhysicalTransport,
-)
+from bumble.core import AdvertisingData
+from bumble.core import ConnectionError as BumbleConnectionError
+from bumble.core import DeviceClass, PhysicalTransport
 from bumble.device import Connection, Device, DeviceConfiguration
-from bumble.hci import Address, HCI_CONNECTION_ALREADY_EXISTS_ERROR, HCI_Constant
+from bumble.hci import HCI_CONNECTION_ALREADY_EXISTS_ERROR, Address, HCI_Constant
 from bumble.pairing import PairingConfig
 from bumble.transport import open_transport
 from bumble.utils import AsyncRunner
-import bumble.logging
-
 
 # -----------------------------------------------------------------------------
 # Logging

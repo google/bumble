@@ -18,12 +18,10 @@
 import asyncio
 import sys
 
-from bumble.device import Device, CigParameters, CisLink, Connection
-from bumble.hci import (
-    OwnAddressType,
-)
-from bumble.transport import open_transport
 import bumble.logging
+from bumble.device import CigParameters, CisLink, Connection, Device
+from bumble.hci import OwnAddressType
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

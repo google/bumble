@@ -26,16 +26,19 @@ from typing import Optional
 
 import click
 
+import bumble.core
+import bumble.logging
+import bumble.rfcomm
 from bumble import l2cap
+from bumble.colors import color
 from bumble.core import (
-    PhysicalTransport,
     BT_L2CAP_PROTOCOL_ID,
     BT_RFCOMM_PROTOCOL_ID,
     UUID,
     CommandTimeoutError,
+    ConnectionPHY,
+    PhysicalTransport,
 )
-from bumble.colors import color
-from bumble.core import ConnectionPHY
 from bumble.device import (
     CigParameters,
     CisLink,
@@ -49,12 +52,13 @@ from bumble.hci import (
     HCI_LE_1M_PHY,
     HCI_LE_2M_PHY,
     HCI_LE_CODED_PHY,
-    Role,
     HCI_Constant,
     HCI_Error,
-    HCI_StatusError,
     HCI_IsoDataPacket,
+    HCI_StatusError,
+    Role,
 )
+from bumble.pairing import PairingConfig
 from bumble.sdp import (
     SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
@@ -65,12 +69,7 @@ from bumble.sdp import (
     ServiceAttribute,
 )
 from bumble.transport import open_transport
-import bumble.rfcomm
-import bumble.core
 from bumble.utils import AsyncRunner
-from bumble.pairing import PairingConfig
-import bumble.logging
-
 
 # -----------------------------------------------------------------------------
 # Logging

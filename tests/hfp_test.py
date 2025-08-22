@@ -18,17 +18,14 @@
 import asyncio
 import logging
 import os
+from typing import Optional
+
 import pytest
 import pytest_asyncio
 
-from typing import Optional
+from bumble import core, hci, hfp, rfcomm
 
 from .test_utils import TwoDevices
-from bumble import core
-from bumble import hfp
-from bumble import rfcomm
-from bumble import hci
-
 
 # -----------------------------------------------------------------------------
 # Logging

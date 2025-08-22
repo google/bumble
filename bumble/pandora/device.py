@@ -15,6 +15,9 @@
 """Generic & dependency free Bumble (reference) device."""
 
 from __future__ import annotations
+
+from typing import Any, Optional
+
 from bumble import transport
 from bumble.core import (
     BT_GENERIC_AUDIO_SERVICE,
@@ -32,8 +35,6 @@ from bumble.sdp import (
     DataElement,
     ServiceAttribute,
 )
-from typing import Any, Optional
-
 
 # Default rootcanal HCI TCP address
 ROOTCANAL_HCI_ADDRESS = "localhost:6402"

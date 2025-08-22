@@ -18,11 +18,11 @@
 import asyncio
 import sys
 
-from bumble.hci import Address
-from bumble.device import Device
-from bumble.transport import open_transport
-from bumble.snoop import BtSnooper
 import bumble.logging
+from bumble.device import Device
+from bumble.hci import Address
+from bumble.snoop import BtSnooper
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

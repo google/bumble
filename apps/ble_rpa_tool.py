@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import click
+
 from bumble.colors import color
 from bumble.hci import Address
 from bumble.helpers import generate_irk, verify_rpa_with_irk

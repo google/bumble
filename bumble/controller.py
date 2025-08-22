@@ -17,17 +17,17 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-import logging
 import asyncio
 import dataclasses
 import itertools
+import logging
 import random
 import struct
-from bumble.colors import color
-from bumble.core import (
-    PhysicalTransport,
-)
+from typing import TYPE_CHECKING, Any, Optional, Union
+
 from bumble import hci
+from bumble.colors import color
+from bumble.core import PhysicalTransport
 from bumble.hci import (
     HCI_ACL_DATA_PACKET,
     HCI_COMMAND_DISALLOWED_ERROR,
@@ -38,13 +38,12 @@ from bumble.hci import (
     HCI_EVENT_PACKET,
     HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR,
     HCI_LE_1M_PHY,
-    HCI_SUCCESS,
-    HCI_UNKNOWN_HCI_COMMAND_ERROR,
-    HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
     HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
+    HCI_SUCCESS,
+    HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+    HCI_UNKNOWN_HCI_COMMAND_ERROR,
     HCI_VERSION_BLUETOOTH_CORE_5_0,
     Address,
-    Role,
     HCI_AclDataPacket,
     HCI_AclDataPacketAssembler,
     HCI_Command_Complete_Event,
@@ -53,7 +52,6 @@ from bumble.hci import (
     HCI_Connection_Request_Event,
     HCI_Disconnection_Complete_Event,
     HCI_Encryption_Change_Event,
-    HCI_Synchronous_Connection_Complete_Event,
     HCI_LE_Advertising_Report_Event,
     HCI_LE_CIS_Established_Event,
     HCI_LE_CIS_Request_Event,
@@ -62,8 +60,9 @@ from bumble.hci import (
     HCI_Number_Of_Completed_Packets_Event,
     HCI_Packet,
     HCI_Role_Change_Event,
+    HCI_Synchronous_Connection_Complete_Event,
+    Role,
 )
-from typing import Optional, Union, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bumble.link import LocalLink

@@ -16,16 +16,17 @@
 Invoke tasks
 """
 
+import glob
+
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 import os
-import glob
 import shutil
 from pathlib import Path
-from invoke import task, call, Collection
-from invoke.exceptions import Exit, UnexpectedExit
 
+from invoke import Collection, call, task
+from invoke.exceptions import Exit, UnexpectedExit
 
 # -----------------------------------------------------------------------------
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -136,11 +137,19 @@ def lint(ctx, disable='C,R', errors_only=False):
 # -----------------------------------------------------------------------------
 @task
 def format_code(ctx, check=False, diff=False):
+
     options = []
     if check:
         options.append("--check")
     if diff:
         options.append("--diff")
+
+    print(">>> Sorting imports...")
+    try:
+        ctx.run(f"isort {' '.join(options)} .")
+    except UnexpectedExit as exc:
+        print("Please run 'invoke project.format' or 'isort .' to format the code. ❌")
+        raise Exit(code=1) from exc
 
     print(">>> Running the formatter...")
     try:

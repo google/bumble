@@ -23,58 +23,55 @@ import asyncio
 import logging
 import os
 import re
-import humanize
-from typing import Optional, Union
 from collections import OrderedDict
+from typing import Optional, Union
 
 import click
+import humanize
 from prettytable import PrettyTable
-
 from prompt_toolkit import Application
-from prompt_toolkit.history import FileHistory
 from prompt_toolkit.completion import Completer, Completion, NestedCompleter
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.formatted_text import ANSI
-from prompt_toolkit.styles import Style
-from prompt_toolkit.filters import Condition
-from prompt_toolkit.widgets import TextArea, Frame
-from prompt_toolkit.widgets.toolbars import FormattedTextToolbar
 from prompt_toolkit.data_structures import Point
+from prompt_toolkit.filters import Condition
+from prompt_toolkit.formatted_text import ANSI
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import (
-    Layout,
-    HSplit,
-    Window,
     CompletionsMenu,
-    Float,
-    FormattedTextControl,
-    FloatContainer,
     ConditionalContainer,
     Dimension,
+    Float,
+    FloatContainer,
+    FormattedTextControl,
+    HSplit,
+    Layout,
+    Window,
 )
+from prompt_toolkit.styles import Style
+from prompt_toolkit.widgets import Frame, TextArea
+from prompt_toolkit.widgets.toolbars import FormattedTextToolbar
 
-from bumble import __version__
 import bumble.core
-from bumble import colors
+from bumble import __version__, colors
 from bumble.core import UUID, AdvertisingData
 from bumble.device import (
+    Connection,
     ConnectionParametersPreferences,
     ConnectionPHY,
     Device,
-    Connection,
     Peer,
 )
-from bumble.utils import AsyncRunner
-from bumble.transport import open_transport
-from bumble.gatt import Characteristic, Service, CharacteristicDeclaration, Descriptor
+from bumble.gatt import Characteristic, CharacteristicDeclaration, Descriptor, Service
 from bumble.gatt_client import CharacteristicProxy
 from bumble.hci import (
-    Address,
-    HCI_Constant,
     HCI_LE_1M_PHY,
     HCI_LE_2M_PHY,
     HCI_LE_CODED_PHY,
+    Address,
+    HCI_Constant,
 )
-
+from bumble.transport import open_transport
+from bumble.utils import AsyncRunner
 
 # -----------------------------------------------------------------------------
 # Constants

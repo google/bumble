@@ -24,18 +24,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import logging
-from collections import defaultdict
 import struct
-from typing import (
-    Iterable,
-    Optional,
-    TypeVar,
-    TYPE_CHECKING,
-)
+from collections import defaultdict
+from typing import TYPE_CHECKING, Iterable, Optional, TypeVar
 
-from bumble import att
+from bumble import att, utils
 from bumble.colors import color
 from bumble.core import UUID
 from bumble.gatt import (
@@ -48,14 +44,13 @@ from bumble.gatt import (
     Characteristic,
     CharacteristicDeclaration,
     CharacteristicValue,
-    IncludedServiceDeclaration,
     Descriptor,
+    IncludedServiceDeclaration,
     Service,
 )
-from bumble import utils
 
 if TYPE_CHECKING:
-    from bumble.device import Device, Connection
+    from bumble.device import Connection, Device
 
 # -----------------------------------------------------------------------------
 # Logging

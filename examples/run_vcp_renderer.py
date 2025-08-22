@@ -16,35 +16,31 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import sys
-import secrets
 import json
+import secrets
+import sys
 from typing import Optional
 
 import websockets
 
+import bumble.logging
 from bumble.core import AdvertisingData
-from bumble.device import Device, AdvertisingParameters, AdvertisingEventProperties
-from bumble.hci import (
-    CodecID,
-    CodingFormat,
-    OwnAddressType,
-)
+from bumble.device import AdvertisingEventProperties, AdvertisingParameters, Device
+from bumble.hci import CodecID, CodingFormat, OwnAddressType
 from bumble.profiles.ascs import AudioStreamControlService
 from bumble.profiles.bap import (
-    UnicastServerAdvertisingData,
+    AudioLocation,
     CodecSpecificCapabilities,
     ContextType,
-    AudioLocation,
-    SupportedSamplingFrequency,
     SupportedFrameDuration,
+    SupportedSamplingFrequency,
+    UnicastServerAdvertisingData,
 )
-from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
+from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.profiles.vcs import VolumeControlService
 from bumble.transport import open_transport
-import bumble.logging
 
 
 def dumps_volume_state(volume_setting: int, muted: int, change_counter: int) -> str:

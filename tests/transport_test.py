@@ -12,21 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 import random
-import os
 import socket
 import sys
 
 import pytest
 
-from bumble import controller
-from bumble import device
-from bumble import hci
-from bumble import link
-from bumble import transport
+from bumble import controller, device, hci, link, transport
 from bumble.transport.common import PacketParser
 
 

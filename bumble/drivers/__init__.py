@@ -20,12 +20,13 @@ like loading firmware after a cold start.
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import logging
 import pathlib
 import platform
-from typing import Iterable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, Optional
 
-from bumble.drivers import rtk, intel
+from bumble.drivers import intel, rtk
 from bumble.drivers.common import Driver
 
 if TYPE_CHECKING:

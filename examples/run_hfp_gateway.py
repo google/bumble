@@ -16,21 +16,20 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import json
-import sys
 import io
+import json
 import logging
+import sys
 from typing import Iterable, Optional
 
 import websockets
 
 import bumble.core
+import bumble.logging
+from bumble import hci, hfp, rfcomm
+from bumble.core import PhysicalTransport
 from bumble.device import Device, ScoLink
 from bumble.transport import open_transport
-from bumble.core import PhysicalTransport
-from bumble import hci, rfcomm, hfp
-import bumble.logging
-
 
 logger = logging.getLogger(__name__)
 

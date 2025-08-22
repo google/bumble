@@ -16,33 +16,32 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import dataclasses
 import enum
 import logging
 import struct
-
 from collections import deque
 from collections.abc import Sequence
 from typing import (
-    Optional,
-    Callable,
+    TYPE_CHECKING,
     Any,
-    Union,
+    Callable,
+    ClassVar,
     Iterable,
+    Optional,
     SupportsBytes,
     TypeVar,
-    ClassVar,
-    TYPE_CHECKING,
+    Union,
 )
 
-from bumble import utils
-from bumble import hci
+from bumble import hci, utils
 from bumble.colors import color
 from bumble.core import (
-    InvalidStateError,
     InvalidArgumentError,
     InvalidPacketError,
+    InvalidStateError,
     OutOfResourcesError,
     ProtocolError,
 )

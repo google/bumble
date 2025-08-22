@@ -18,13 +18,13 @@
 import asyncio
 import json
 import logging
-import pathlib
-import pytest
-import tempfile
 import os
+import pathlib
+import tempfile
+
+import pytest
 
 from bumble.keys import JsonKeyStore, PairingKeys
-
 
 # -----------------------------------------------------------------------------
 # Logging

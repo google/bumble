@@ -20,25 +20,24 @@ Apple Media Service (AMS).
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import dataclasses
 import enum
 import logging
-from typing import Optional, Iterable, Union
+from typing import Iterable, Optional, Union
 
-
+from bumble import utils
 from bumble.device import Peer
 from bumble.gatt import (
-    Characteristic,
-    GATT_AMS_SERVICE,
-    GATT_AMS_REMOTE_COMMAND_CHARACTERISTIC,
-    GATT_AMS_ENTITY_UPDATE_CHARACTERISTIC,
     GATT_AMS_ENTITY_ATTRIBUTE_CHARACTERISTIC,
+    GATT_AMS_ENTITY_UPDATE_CHARACTERISTIC,
+    GATT_AMS_REMOTE_COMMAND_CHARACTERISTIC,
+    GATT_AMS_SERVICE,
+    Characteristic,
     TemplateService,
 )
 from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
-from bumble import utils
-
 
 # -----------------------------------------------------------------------------
 # Logging

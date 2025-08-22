@@ -16,11 +16,9 @@ from __future__ import annotations
 
 import functools
 
-from cryptography.hazmat.primitives import ciphers
-from cryptography.hazmat.primitives.ciphers import algorithms
-from cryptography.hazmat.primitives.ciphers import modes
+from cryptography.hazmat.primitives import ciphers, cmac
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import cmac
+from cryptography.hazmat.primitives.ciphers import algorithms, modes
 
 
 def e(key: bytes, data: bytes) -> bytes:

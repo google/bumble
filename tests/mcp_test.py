@@ -17,15 +17,15 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import dataclasses
+import logging
+import struct
+
 import pytest
 import pytest_asyncio
-import struct
-import logging
 
 from bumble import device
 from bumble.profiles import mcp
 from tests.test_utils import TwoDevices
-
 
 # -----------------------------------------------------------------------------
 # Logging

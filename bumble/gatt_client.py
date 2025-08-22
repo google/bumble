@@ -24,40 +24,38 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import logging
 import struct
 from datetime import datetime
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Generic,
     Iterable,
     Optional,
-    Union,
     TypeVar,
-    TYPE_CHECKING,
+    Union,
 )
 
-
+from bumble import att, core, utils
 from bumble.colors import color
-from bumble.hci import HCI_Constant
-from bumble import att
-from bumble import utils
-from bumble import core
 from bumble.core import UUID, InvalidStateError
 from bumble.gatt import (
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
+    GATT_INCLUDE_ATTRIBUTE_TYPE,
     GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE,
     GATT_REQUEST_TIMEOUT,
     GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
-    GATT_INCLUDE_ATTRIBUTE_TYPE,
     Characteristic,
     ClientCharacteristicConfigurationBits,
     InvalidServiceError,
     TemplateService,
 )
+from bumble.hci import HCI_Constant
 
 # -----------------------------------------------------------------------------
 # Typing

@@ -16,7 +16,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-
 from typing import Optional
 
 from bumble.transport.common import Transport

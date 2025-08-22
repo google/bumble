@@ -16,16 +16,15 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import atexit
+import io
+import logging
+import os
 import pty
 import tty
-import io
-import atexit
-import os
-import logging
-
 from typing import Optional
 
-from bumble.transport.common import Transport, StreamPacketSource, StreamPacketSink
+from bumble.transport.common import StreamPacketSink, StreamPacketSource, Transport
 
 # -----------------------------------------------------------------------------
 # Logging

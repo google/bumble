@@ -16,19 +16,21 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import collections
 import dataclasses
-from dataclasses import field
 import enum
 import functools
 import logging
 import secrets
 import struct
 from collections.abc import Sequence
-from typing import Any, Callable, Iterable, Optional, Union, TypeVar, ClassVar, cast
+from dataclasses import field
+from typing import Any, Callable, ClassVar, Iterable, Optional, TypeVar, Union, cast
+
 from typing_extensions import Self
 
-from bumble import crypto
+from bumble import crypto, utils
 from bumble.colors import color
 from bumble.core import (
     DeviceClass,
@@ -40,8 +42,6 @@ from bumble.core import (
     name_or_number,
     padded_bytes,
 )
-from bumble import utils
-
 
 # -----------------------------------------------------------------------------
 # Logging

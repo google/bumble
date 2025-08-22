@@ -17,10 +17,7 @@ from __future__ import annotations
 import struct
 from typing import TYPE_CHECKING
 
-from bumble import att
-from bumble import gatt
-from bumble import gatt_client
-from bumble import crypto
+from bumble import att, crypto, gatt, gatt_client
 
 if TYPE_CHECKING:
     from bumble import device

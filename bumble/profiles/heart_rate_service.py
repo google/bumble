@@ -17,20 +17,21 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-from enum import IntEnum
+
 import struct
+from enum import IntEnum
 from typing import Optional
 
 from bumble import core
 from bumble.att import ATT_Error
 from bumble.gatt import (
-    GATT_HEART_RATE_SERVICE,
-    GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
     GATT_BODY_SENSOR_LOCATION_CHARACTERISTIC,
     GATT_HEART_RATE_CONTROL_POINT_CHARACTERISTIC,
-    TemplateService,
+    GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
+    GATT_HEART_RATE_SERVICE,
     Characteristic,
     CharacteristicValue,
+    TemplateService,
 )
 from bumble.gatt_adapters import (
     DelegatedCharacteristicAdapter,

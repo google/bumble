@@ -13,51 +13,23 @@
 # limitations under the License.
 
 from __future__ import annotations
+
 import asyncio
-import bumble.device
-import grpc
-import grpc.aio
 import logging
 import struct
+from typing import AsyncGenerator, Optional, cast
 
-import bumble.utils
-from bumble.pandora import utils
-from bumble.pandora.config import Config
-from bumble.core import (
-    PhysicalTransport,
-    UUID,
-    AdvertisingData,
-    Appearance,
-    ConnectionError,
-)
-from bumble.device import (
-    DEVICE_DEFAULT_SCAN_INTERVAL,
-    DEVICE_DEFAULT_SCAN_WINDOW,
-    Advertisement,
-    AdvertisingParameters,
-    AdvertisingEventProperties,
-    AdvertisingType,
-    Device,
-)
-from bumble.gatt import Service
-from bumble.hci import (
-    HCI_CONNECTION_ALREADY_EXISTS_ERROR,
-    HCI_PAGE_TIMEOUT_ERROR,
-    HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
-    Address,
-    Phy,
-    Role,
-    OwnAddressType,
-)
+import grpc
+import grpc.aio
 from google.protobuf import any_pb2  # pytype: disable=pyi-error
 from google.protobuf import empty_pb2  # pytype: disable=pyi-error
-from pandora.host_grpc_aio import HostServicer
 from pandora import host_pb2
+from pandora.host_grpc_aio import HostServicer
 from pandora.host_pb2 import (
+    DISCOVERABLE_GENERAL,
+    DISCOVERABLE_LIMITED,
     NOT_CONNECTABLE,
     NOT_DISCOVERABLE,
-    DISCOVERABLE_LIMITED,
-    DISCOVERABLE_GENERAL,
     PRIMARY_1M,
     PRIMARY_CODED,
     SECONDARY_1M,
@@ -85,7 +57,37 @@ from pandora.host_pb2 import (
     WaitConnectionResponse,
     WaitDisconnectionRequest,
 )
-from typing import AsyncGenerator, Optional, cast
+
+import bumble.device
+import bumble.utils
+from bumble.core import (
+    UUID,
+    AdvertisingData,
+    Appearance,
+    ConnectionError,
+    PhysicalTransport,
+)
+from bumble.device import (
+    DEVICE_DEFAULT_SCAN_INTERVAL,
+    DEVICE_DEFAULT_SCAN_WINDOW,
+    Advertisement,
+    AdvertisingEventProperties,
+    AdvertisingParameters,
+    AdvertisingType,
+    Device,
+)
+from bumble.gatt import Service
+from bumble.hci import (
+    HCI_CONNECTION_ALREADY_EXISTS_ERROR,
+    HCI_PAGE_TIMEOUT_ERROR,
+    HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
+    Address,
+    OwnAddressType,
+    Phy,
+    Role,
+)
+from bumble.pandora import utils
+from bumble.pandora.config import Config
 
 PRIMARY_PHY_MAP: dict[int, PrimaryPhy] = {
     # Default value reported by Bumble for legacy Advertising reports.

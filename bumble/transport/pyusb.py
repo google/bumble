@@ -19,20 +19,18 @@ import asyncio
 import logging
 import threading
 import time
+from typing import Optional
 
 import usb.core
 import usb.util
-
-from typing import Optional
 from usb.core import Device as UsbDevice
 from usb.core import USBError
-from usb.util import CTRL_TYPE_CLASS, CTRL_RECIPIENT_OTHER
-from usb.legacy import REQ_SET_FEATURE, REQ_CLEAR_FEATURE, CLASS_HUB
+from usb.legacy import CLASS_HUB, REQ_CLEAR_FEATURE, REQ_SET_FEATURE
+from usb.util import CTRL_RECIPIENT_OTHER, CTRL_TYPE_CLASS
 
-from bumble.transport.common import Transport, ParserSource, TransportInitError
 from bumble import hci
 from bumble.colors import color
-
+from bumble.transport.common import ParserSource, Transport, TransportInitError
 
 # -----------------------------------------------------------------------------
 # Constant

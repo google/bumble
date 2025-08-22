@@ -16,14 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import sys
 import struct
+import sys
 
+import bumble.logging
 from bumble.core import AdvertisingData
 from bumble.device import Device
-from bumble.transport import open_transport
 from bumble.profiles.device_information_service import DeviceInformationService
-import bumble.logging
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

@@ -16,27 +16,28 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import enum
-from dataclasses import dataclass
 import secrets
+from dataclasses import dataclass
 from typing import Optional
 
 from bumble import hci
+from bumble.core import AdvertisingData, LeRole
 from bumble.smp import (
-    SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
-    SMP_KEYBOARD_ONLY_IO_CAPABILITY,
     SMP_DISPLAY_ONLY_IO_CAPABILITY,
     SMP_DISPLAY_YES_NO_IO_CAPABILITY,
-    SMP_KEYBOARD_DISPLAY_IO_CAPABILITY,
     SMP_ENC_KEY_DISTRIBUTION_FLAG,
     SMP_ID_KEY_DISTRIBUTION_FLAG,
-    SMP_SIGN_KEY_DISTRIBUTION_FLAG,
+    SMP_KEYBOARD_DISPLAY_IO_CAPABILITY,
+    SMP_KEYBOARD_ONLY_IO_CAPABILITY,
     SMP_LINK_KEY_DISTRIBUTION_FLAG,
+    SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
+    SMP_SIGN_KEY_DISTRIBUTION_FLAG,
     OobContext,
     OobLegacyContext,
     OobSharedData,
 )
-from bumble.core import AdvertisingData, LeRole
 
 
 # -----------------------------------------------------------------------------

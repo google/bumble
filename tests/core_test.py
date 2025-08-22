@@ -16,7 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 
-from bumble.core import AdvertisingData, Appearance, UUID, get_dict_key_by_value
+from bumble.core import UUID, AdvertisingData, Appearance, get_dict_key_by_value
 
 
 # -----------------------------------------------------------------------------

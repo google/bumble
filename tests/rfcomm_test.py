@@ -16,20 +16,22 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+
 import pytest
 
-from . import test_utils
 from bumble import core
 from bumble.rfcomm import (
+    DLC,
+    RFCOMM_PSM,
+    Client,
     RFCOMM_Frame,
     Server,
-    Client,
-    DLC,
-    make_service_sdp_records,
-    find_rfcomm_channels,
     find_rfcomm_channel_with_uuid,
-    RFCOMM_PSM,
+    find_rfcomm_channels,
+    make_service_sdp_records,
 )
+
+from . import test_utils
 
 _TIMEOUT = 0.1
 

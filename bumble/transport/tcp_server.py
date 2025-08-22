@@ -16,11 +16,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import asyncio
 import logging
 import socket
 
-from bumble.transport.common import Transport, StreamPacketSource
+from bumble.transport.common import StreamPacketSource, Transport
 
 # -----------------------------------------------------------------------------
 # Logging

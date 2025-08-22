@@ -16,18 +16,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import sys
 import secrets
+import sys
 
+import bumble.logging
 from bumble.core import AdvertisingData
 from bumble.device import Device
-from bumble.hci import (
-    Address,
-)
+from bumble.hci import Address
 from bumble.profiles.cap import CommonAudioServiceService
 from bumble.profiles.csip import CoordinatedSetIdentificationService, SirkType
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

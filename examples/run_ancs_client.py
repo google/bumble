@@ -18,9 +18,9 @@
 import asyncio
 import sys
 
+import bumble.logging
 from bumble.colors import color
 from bumble.device import Device, Peer
-from bumble.transport import open_transport
 from bumble.profiles.ancs import (
     AncsClient,
     AppAttributeId,
@@ -29,8 +29,7 @@ from bumble.profiles.ancs import (
     Notification,
     NotificationAttributeId,
 )
-import bumble.logging
-
+from bumble.transport import open_transport
 
 # -----------------------------------------------------------------------------
 _cached_app_names: dict[str, str] = {}

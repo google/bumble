@@ -16,12 +16,12 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import enum
 import struct
 from typing import Union
 
-from bumble import core
-from bumble import utils
+from bumble import core, utils
 
 
 # -----------------------------------------------------------------------------

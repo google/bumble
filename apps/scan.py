@@ -16,16 +16,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+
 import click
 
+import bumble.logging
 from bumble.colors import color
-from bumble.device import Device
-from bumble.transport import open_transport
+from bumble.device import Advertisement, Device
+from bumble.hci import HCI_LE_1M_PHY, HCI_LE_CODED_PHY, Address, HCI_Constant
 from bumble.keys import JsonKeyStore
 from bumble.smp import AddressResolver
-from bumble.device import Advertisement
-from bumble.hci import Address, HCI_Constant, HCI_LE_1M_PHY, HCI_LE_CODED_PHY
-import bumble.logging
+from bumble.transport import open_transport
 
 
 # -----------------------------------------------------------------------------

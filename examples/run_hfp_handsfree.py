@@ -17,21 +17,18 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import contextlib
-import sys
-import json
 import functools
+import json
+import sys
 from typing import Optional
 
 import websockets
 
-from bumble import rfcomm
-from bumble import hci
-from bumble.device import Device, Connection
-from bumble.transport import open_transport
-from bumble import hfp
-from bumble.hfp import HfProtocol
 import bumble.logging
-
+from bumble import hci, hfp, rfcomm
+from bumble.device import Connection, Device
+from bumble.hfp import HfProtocol
+from bumble.transport import open_transport
 
 ws: Optional[websockets.WebSocketServerProtocol] = None
 hf_protocol: Optional[HfProtocol] = None

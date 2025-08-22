@@ -18,12 +18,12 @@
 import asyncio
 import sys
 
+import bumble.logging
 from bumble.colors import color
 from bumble.device import Device, Peer
 from bumble.hci import Address
 from bumble.profiles.device_information_service import DeviceInformationServiceProxy
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------

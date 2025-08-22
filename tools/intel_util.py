@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-import asyncio
 from typing import Any, Optional
 
 import click
 
-from bumble.colors import color
+import bumble.logging
 from bumble import transport
+from bumble.colors import color
 from bumble.drivers import intel
 from bumble.host import Host
-import bumble.logging
-
 
 # -----------------------------------------------------------------------------
 # Logging

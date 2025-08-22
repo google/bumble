@@ -22,15 +22,11 @@ import asyncio
 import dataclasses
 import enum
 import struct
+from typing import TYPE_CHECKING, ClassVar, Optional
 
-from bumble import core
-from bumble import device
-from bumble import gatt
-from bumble import gatt_client
-from bumble import utils
-
-from typing import Optional, ClassVar, TYPE_CHECKING
 from typing_extensions import Self
+
+from bumble import core, device, gatt, gatt_client, utils
 
 # -----------------------------------------------------------------------------
 # Constants

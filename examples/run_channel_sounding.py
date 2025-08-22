@@ -18,15 +18,13 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 import functools
+import sys
 
-from bumble import core
-from bumble import hci
-from bumble.device import Connection, Device, ChannelSoundingCapabilities
-from bumble.transport import open_transport
 import bumble.logging
-
+from bumble import core, hci
+from bumble.device import ChannelSoundingCapabilities, Connection, Device
+from bumble.transport import open_transport
 
 # From https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Bluetooth/system/gd/hci/distance_measurement_manager.cc.
 CS_TONE_ANTENNA_CONFIG_MAPPING_TABLE = [

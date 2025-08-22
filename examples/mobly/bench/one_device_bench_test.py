@@ -1,5 +1,4 @@
-from mobly import base_test
-from mobly import test_runner
+from mobly import base_test, test_runner
 from mobly.controllers import android_device
 
 

@@ -20,11 +20,10 @@ import logging
 
 import click
 
-from bumble import company_ids, hci, transport
-from bumble.host import Host
-from bumble.drivers import rtk
 import bumble.logging
-
+from bumble import company_ids, hci, transport
+from bumble.drivers import rtk
+from bumble.host import Host
 
 # -----------------------------------------------------------------------------
 # Logging

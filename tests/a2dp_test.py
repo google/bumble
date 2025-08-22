@@ -18,31 +18,32 @@
 import asyncio
 import logging
 import os
+
 import pytest
 
-from bumble.controller import Controller
-from bumble.core import PhysicalTransport
-from bumble.link import LocalLink
-from bumble.device import Device
-from bumble.host import Host
-from bumble.transport.common import AsyncPipeSink
-from bumble.avdtp import (
-    AVDTP_IDLE_STATE,
-    AVDTP_STREAMING_STATE,
-    MediaPacketPump,
-    Protocol,
-    Listener,
-    MediaCodecCapabilities,
-    AVDTP_AUDIO_MEDIA_TYPE,
-    AVDTP_TSEP_SNK,
-    A2DP_SBC_CODEC_TYPE,
-)
 from bumble.a2dp import (
     AacMediaCodecInformation,
     OpusMediaCodecInformation,
     SbcMediaCodecInformation,
 )
+from bumble.avdtp import (
+    A2DP_SBC_CODEC_TYPE,
+    AVDTP_AUDIO_MEDIA_TYPE,
+    AVDTP_IDLE_STATE,
+    AVDTP_STREAMING_STATE,
+    AVDTP_TSEP_SNK,
+    Listener,
+    MediaCodecCapabilities,
+    MediaPacketPump,
+    Protocol,
+)
+from bumble.controller import Controller
+from bumble.core import PhysicalTransport
+from bumble.device import Device
+from bumble.host import Host
+from bumble.link import LocalLink
 from bumble.rtp import MediaPacket
+from bumble.transport.common import AsyncPipeSink
 
 # -----------------------------------------------------------------------------
 # Logging

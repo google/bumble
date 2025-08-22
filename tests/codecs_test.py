@@ -16,7 +16,9 @@
 # Imports
 # -----------------------------------------------------------------------------
 import random
+
 import pytest
+
 from bumble.codecs import AacAudioRtpPacket, BitReader, BitWriter
 
 

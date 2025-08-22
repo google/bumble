@@ -16,42 +16,42 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import os
 import logging
+import os
 import struct
 
 import click
 from prompt_toolkit.shortcuts import PromptSession
 
 from bumble.a2dp import make_audio_sink_service_sdp_records
+from bumble.att import (
+    ATT_INSUFFICIENT_AUTHENTICATION_ERROR,
+    ATT_INSUFFICIENT_ENCRYPTION_ERROR,
+    ATT_Error,
+)
 from bumble.colors import color
-from bumble.device import Device, Peer
-from bumble.transport import open_transport
-from bumble.pairing import OobData, PairingDelegate, PairingConfig
-from bumble.smp import OobContext, OobLegacyContext
-from bumble.smp import error_name as smp_error_name
-from bumble.keys import JsonKeyStore
 from bumble.core import (
+    UUID,
     AdvertisingData,
     Appearance,
-    ProtocolError,
     PhysicalTransport,
-    UUID,
+    ProtocolError,
 )
+from bumble.device import Device, Peer
 from bumble.gatt import (
     GATT_DEVICE_NAME_CHARACTERISTIC,
     GATT_GENERIC_ACCESS_SERVICE,
-    GATT_HEART_RATE_SERVICE,
     GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC,
-    Service,
+    GATT_HEART_RATE_SERVICE,
     Characteristic,
+    Service,
 )
 from bumble.hci import OwnAddressType
-from bumble.att import (
-    ATT_Error,
-    ATT_INSUFFICIENT_AUTHENTICATION_ERROR,
-    ATT_INSUFFICIENT_ENCRYPTION_ERROR,
-)
+from bumble.keys import JsonKeyStore
+from bumble.pairing import OobData, PairingConfig, PairingDelegate
+from bumble.smp import OobContext, OobLegacyContext
+from bumble.smp import error_name as smp_error_name
+from bumble.transport import open_transport
 from bumble.utils import AsyncRunner
 
 # -----------------------------------------------------------------------------

@@ -22,14 +22,13 @@ import logging
 import struct
 
 from bumble.gatt import (
-    TemplateService,
-    Characteristic,
     GATT_TELEPHONY_AND_MEDIA_AUDIO_SERVICE,
     GATT_TMAP_ROLE_CHARACTERISTIC,
+    Characteristic,
+    TemplateService,
 )
 from bumble.gatt_adapters import DelegatedCharacteristicProxyAdapter
 from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
-
 
 # -----------------------------------------------------------------------------
 # Logging

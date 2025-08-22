@@ -23,42 +23,41 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-import logging
+
 import asyncio
 import enum
+import logging
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
+    ClassVar,
     Optional,
     TypeVar,
-    ClassVar,
     cast,
 )
 
-
+from bumble import crypto, utils
 from bumble.colors import color
-from bumble.hci import (
-    Address,
-    Role,
-    HCI_LE_Enable_Encryption_Command,
-    HCI_Object,
-    Fields,
-    key_with_value,
-    metadata,
-)
 from bumble.core import (
-    PhysicalTransport,
     AdvertisingData,
     InvalidArgumentError,
+    PhysicalTransport,
     ProtocolError,
     name_or_number,
 )
+from bumble.hci import (
+    Address,
+    Fields,
+    HCI_LE_Enable_Encryption_Command,
+    HCI_Object,
+    Role,
+    key_with_value,
+    metadata,
+)
 from bumble.keys import PairingKeys
-from bumble import crypto
-from bumble import utils
 
 if TYPE_CHECKING:
     from bumble.device import Connection, Device

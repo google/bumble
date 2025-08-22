@@ -18,21 +18,21 @@
 # Imports
 # -----------------------------------------------------------------------------
 import struct
+from enum import IntFlag
 from typing import Optional
 
 from bumble.gatt import (
-    TemplateService,
-    Characteristic,
+    GATT_BGR_FEATURES_CHARACTERISTIC,
+    GATT_BGS_FEATURES_CHARACTERISTIC,
     GATT_GAMING_AUDIO_SERVICE,
     GATT_GMAP_ROLE_CHARACTERISTIC,
     GATT_UGG_FEATURES_CHARACTERISTIC,
     GATT_UGT_FEATURES_CHARACTERISTIC,
-    GATT_BGS_FEATURES_CHARACTERISTIC,
-    GATT_BGR_FEATURES_CHARACTERISTIC,
+    Characteristic,
+    TemplateService,
 )
 from bumble.gatt_adapters import DelegatedCharacteristicProxyAdapter
 from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy, ServiceProxy
-from enum import IntFlag
 
 
 # -----------------------------------------------------------------------------

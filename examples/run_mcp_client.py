@@ -16,43 +16,39 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import sys
 import json
+import sys
 from typing import Optional
 
 import websockets
 
+import bumble.logging
 from bumble.core import AdvertisingData
 from bumble.device import (
-    Device,
-    AdvertisingParameters,
     AdvertisingEventProperties,
+    AdvertisingParameters,
     Connection,
+    Device,
     Peer,
 )
-from bumble.hci import (
-    CodecID,
-    CodingFormat,
-    OwnAddressType,
-)
+from bumble.hci import CodecID, CodingFormat, OwnAddressType
 from bumble.profiles.ascs import AudioStreamControlService
 from bumble.profiles.bap import (
+    AudioLocation,
     CodecSpecificCapabilities,
     ContextType,
-    AudioLocation,
-    SupportedSamplingFrequency,
     SupportedFrameDuration,
+    SupportedSamplingFrequency,
     UnicastServerAdvertisingData,
 )
 from bumble.profiles.mcp import (
-    MediaControlServiceProxy,
     GenericMediaControlServiceProxy,
-    MediaState,
     MediaControlPointOpcode,
+    MediaControlServiceProxy,
+    MediaState,
 )
 from bumble.profiles.pacs import PacRecord, PublishedAudioCapabilitiesService
 from bumble.transport import open_transport
-import bumble.logging
 
 
 # -----------------------------------------------------------------------------
