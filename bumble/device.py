@@ -1688,6 +1688,21 @@ class IsoPacketStream:
 
 
 # -----------------------------------------------------------------------------
+
+
+@dataclass
+class _PendingConnection:
+    device: Device
+    peer_address: hci.Address
+    role: hci.Role
+
+    def __init__(self, device: Device, peer_address: hci.Address, role: hci.Role):
+        self.device = device
+        self.peer_address = peer_address
+        self.role = role
+
+
+# -----------------------------------------------------------------------------
 class Connection(utils.CompositeEventEmitter):
     device: Device
     handle: int
@@ -1695,6 +1710,7 @@ class Connection(utils.CompositeEventEmitter):
     self_address: hci.Address
     self_resolvable_address: Optional[hci.Address]
     peer_address: hci.Address
+    peer_name: None | str  # Classic only
     peer_resolvable_address: Optional[hci.Address]
     peer_le_features: Optional[hci.LeFeatureMask]
     role: hci.Role
@@ -1835,33 +1851,23 @@ class Connection(utils.CompositeEventEmitter):
 
     # [Classic only]
     @classmethod
-    def incomplete(cls, device: Device, peer_address: hci.Address, role: hci.Role):
+    def create_from_pending_connection(
+        cls, pending_connection: _PendingConnection, handle: int, parameters: Parameters
+    ):
         """
-        Instantiate an incomplete connection (ie. one waiting for a HCI Connection
-        Complete event).
-        Once received it shall be completed using the `.complete` method.
+        Instantiate an connection.
         """
         return cls(
-            device,
-            None,
+            pending_connection.device,
+            handle,
             PhysicalTransport.BR_EDR,
-            device.public_address,
+            pending_connection.device.public_address,
             None,
-            peer_address,
+            pending_connection.peer_address,
             None,
-            role,
-            None,
+            pending_connection.role,
+            parameters,
         )
-
-    # [Classic only]
-    def complete(self, handle: int, parameters: Parameters):
-        """
-        Finish an incomplete connection upon completion.
-        """
-        assert self.handle is None
-        assert self.transport == PhysicalTransport.BR_EDR
-        self.handle = handle
-        self.parameters = parameters
 
     @property
     def role_name(self):
@@ -2193,8 +2199,6 @@ def with_connection_from_handle(function):
 def with_connection_from_address(function):
     @functools.wraps(function)
     def wrapper(self, address: hci.Address, *args, **kwargs):
-        if connection := self.pending_connections.get(address, False):
-            return function(self, connection, *args, **kwargs)
         for connection in self.connections.values():
             if connection.peer_address == address:
                 return function(self, connection, *args, **kwargs)
@@ -2208,8 +2212,6 @@ def with_connection_from_address(function):
 def try_with_connection_from_address(function):
     @functools.wraps(function)
     def wrapper(self, address: hci.Address, *args, **kwargs):
-        if connection := self.pending_connections.get(address, False):
-            return function(self, connection, address, *args, **kwargs)
         for connection in self.connections.values():
             if connection.peer_address == address:
                 return function(self, connection, address, *args, **kwargs)
@@ -2261,7 +2263,7 @@ class Device(utils.CompositeEventEmitter):
     scan_response_data: bytes
     cs_capabilities: ChannelSoundingCapabilities | None = None
     connections: dict[int, Connection]
-    pending_connections: dict[hci.Address, Connection]
+    pending_connections: dict[hci.Address, _PendingConnection]
     classic_pending_accepts: dict[
         hci.Address,
         list[asyncio.Future[Union[Connection, tuple[hci.Address, int, int]]]],
@@ -3731,9 +3733,10 @@ class Device(utils.CompositeEventEmitter):
                 # If the address is not parsable, assume it is a name instead
                 always_resolve = False
                 logger.debug('looking for peer by name')
-                peer_address = await self.find_peer_by_name(
-                    peer_address, transport
-                )  # TODO: timeout
+                if isinstance(peer_address, str):
+                    peer_address = await self.find_peer_by_name(
+                        peer_address, transport
+                    )  # TODO: timeout
         else:
             # All BR/EDR addresses should be public addresses
             if (
@@ -3898,7 +3901,7 @@ class Device(utils.CompositeEventEmitter):
                     )
             else:
                 # Save pending connection
-                self.pending_connections[peer_address] = Connection.incomplete(
+                self.pending_connections[peer_address] = _PendingConnection(
                     self, peer_address, hci.Role.CENTRAL
                 )
 
@@ -3978,9 +3981,10 @@ class Device(utils.CompositeEventEmitter):
             except InvalidArgumentError:
                 # If the address is not parsable, assume it is a name instead
                 logger.debug('looking for peer by name')
-                peer_address = await self.find_peer_by_name(
-                    peer_address, PhysicalTransport.BR_EDR
-                )  # TODO: timeout
+                if isinstance(peer_address, str):
+                    peer_address = await self.find_peer_by_name(
+                        peer_address, PhysicalTransport.BR_EDR
+                    )  # TODO: timeout
 
         assert isinstance(peer_address, hci.Address)
 
@@ -4050,7 +4054,7 @@ class Device(utils.CompositeEventEmitter):
         # Even if we requested a role switch in the hci.HCI_Accept_Connection_Request
         # command, this connection is still considered Peripheral until an eventual
         # role change event.
-        self.pending_connections[peer_address] = Connection.incomplete(
+        self.pending_connections[peer_address] = _PendingConnection(
             self, peer_address, hci.Role.PERIPHERAL
         )
 
@@ -4090,7 +4094,7 @@ class Device(utils.CompositeEventEmitter):
     def is_disconnecting(self):
         return self.disconnecting
 
-    async def cancel_connection(self, peer_address: hci.Address = None):
+    async def cancel_connection(self, peer_address: hci.Address | None = None):
         # Low-energy: cancel ongoing connection
         if peer_address is None:
             if not self.is_le_connecting:
@@ -4109,14 +4113,16 @@ class Device(utils.CompositeEventEmitter):
                 except InvalidArgumentError:
                     # If the address is not parsable, assume it is a name instead
                     logger.debug('looking for peer by name')
-                    peer_address = await self.find_peer_by_name(
-                        peer_address, PhysicalTransport.BR_EDR
-                    )  # TODO: timeout
+                    if isinstance(peer_address, str):
+                        peer_address = await self.find_peer_by_name(
+                            peer_address, PhysicalTransport.BR_EDR
+                        )  # TODO: timeout
 
-            await self.send_command(
-                hci.HCI_Create_Connection_Cancel_Command(bd_addr=peer_address),
-                check_result=True,
-            )
+            if isinstance(peer_address, hci.Address):
+                await self.send_command(
+                    hci.HCI_Create_Connection_Cancel_Command(bd_addr=peer_address),
+                    check_result=True,
+                )
 
     async def disconnect(
         self, connection: Union[Connection, ScoLink, CisLink], reason: int
@@ -4347,7 +4353,7 @@ class Device(utils.CompositeEventEmitter):
             if local_name == name:
                 peer_address.set_result(address)
 
-        listener = None
+        listener: Optional[Callable[..., None]] = None
         was_scanning = self.scanning
         was_discovering = self.discovering
         try:
@@ -5517,7 +5523,7 @@ class Device(utils.CompositeEventEmitter):
         self_resolvable_address: Optional[hci.Address],
         peer_resolvable_address: Optional[hci.Address],
         role: hci.Role,
-        connection_parameters: Optional[core.ConnectionParameters],
+        connection_parameters: Connection.Parameters,
     ) -> None:
         # Convert all-zeros addresses into None.
         if self_resolvable_address == hci.Address.ANY_RANDOM:
@@ -5539,16 +5545,16 @@ class Device(utils.CompositeEventEmitter):
 
         if transport == PhysicalTransport.BR_EDR:
             # Create a new connection
-            connection = self.pending_connections.pop(peer_address)
-            connection.complete(connection_handle, connection_parameters)
+            pending_connection = self.pending_connections.pop(peer_address)
+            connection = Connection.create_from_pending_connection(
+                pending_connection, connection_handle, connection_parameters
+            )
             self.connections[connection_handle] = connection
 
             # Emit an event to notify listeners of the new connection
             self.emit(self.EVENT_CONNECTION, connection)
 
             return
-
-        assert connection_parameters is not None
 
         if peer_resolvable_address is None:
             # Resolve the peer address if we can
@@ -5698,7 +5704,7 @@ class Device(utils.CompositeEventEmitter):
         # device configuration is set to accept any incoming connection
         elif self.classic_accept_any:
             # Save pending connection
-            self.pending_connections[bd_addr] = Connection.incomplete(
+            self.pending_connections[bd_addr] = _PendingConnection(
                 self, bd_addr, hci.Role.PERIPHERAL
             )
 
@@ -5822,8 +5828,8 @@ class Device(utils.CompositeEventEmitter):
         io_capability: int,
         authentication_requirements: int,
     ):
-        connection.peer_pairing_io_capability = io_capability
-        connection.peer_pairing_authentication_requirements = (
+        connection.pairing_peer_io_capability = io_capability
+        connection.pairing_peer_authentication_requirements = (
             authentication_requirements
         )
 
@@ -5836,7 +5842,7 @@ class Device(utils.CompositeEventEmitter):
         # Ask what the pairing config should be for this connection
         pairing_config = self.pairing_config_factory(connection)
         io_capability = pairing_config.delegate.classic_io_capability
-        peer_io_capability = connection.peer_pairing_io_capability
+        peer_io_capability = connection.pairing_peer_io_capability
 
         async def confirm() -> bool:
             # Ask the user to confirm the pairing, without display
@@ -5885,6 +5891,11 @@ class Device(utils.CompositeEventEmitter):
                 hci.IoCapability.NO_INPUT_NO_OUTPUT: auto_confirm,
             },
         }
+        if peer_io_capability is None:
+            logger.warning(
+                'peer_io_capability is None. Cannot decide which method to continue'
+            )
+            return
 
         method = methods[peer_io_capability][io_capability]
 
@@ -6017,11 +6028,10 @@ class Device(utils.CompositeEventEmitter):
     ):
         # Try to decode the name
         try:
-            remote_name = remote_name.decode('utf-8')
             if connection:
-                connection.peer_name = remote_name
+                connection.peer_name = remote_name.decode('utf-8')
                 connection.emit(connection.EVENT_REMOTE_NAME)
-            self.emit(self.EVENT_REMOTE_NAME, address, remote_name)
+            self.emit(self.EVENT_REMOTE_NAME, address, remote_name.decode('utf-8'))
         except UnicodeDecodeError as error:
             logger.warning('peer name is not valid UTF-8')
             if connection:
@@ -6245,7 +6255,7 @@ class Device(utils.CompositeEventEmitter):
     @host_event_handler
     @with_connection_from_handle
     def on_connection_parameters_update(
-        self, connection: Connection, connection_parameters: core.ConnectionParameters
+        self, connection: Connection, connection_parameters: Connection.Parameters
     ):
         logger.debug(
             f'*** Connection Parameters Update: [0x{connection.handle:04X}] '

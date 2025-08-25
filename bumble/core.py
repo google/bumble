@@ -1790,23 +1790,6 @@ class AdvertisingData:
 
 
 # -----------------------------------------------------------------------------
-# Connection Parameters
-# -----------------------------------------------------------------------------
-class ConnectionParameters:
-    def __init__(self, connection_interval, peripheral_latency, supervision_timeout):
-        self.connection_interval = connection_interval
-        self.peripheral_latency = peripheral_latency
-        self.supervision_timeout = supervision_timeout
-
-    def __str__(self):
-        return (
-            f'ConnectionParameters(connection_interval={self.connection_interval}, '
-            f'peripheral_latency={self.peripheral_latency}, '
-            f'supervision_timeout={self.supervision_timeout}'
-        )
-
-
-# -----------------------------------------------------------------------------
 # Connection PHY
 # -----------------------------------------------------------------------------
 class ConnectionPHY:

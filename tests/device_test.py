@@ -24,7 +24,6 @@ import pytest
 
 from bumble.core import (
     PhysicalTransport,
-    ConnectionParameters,
 )
 from bumble.device import (
     AdvertisingEventProperties,
@@ -301,7 +300,7 @@ async def test_legacy_advertising_disconnection(auto_restart):
         None,
         None,
         Role.PERIPHERAL,
-        ConnectionParameters(0, 0, 0),
+        Connection.Parameters(0, 0, 0),
     )
 
     device.on_advertising_set_termination(
@@ -359,7 +358,7 @@ async def test_extended_advertising_connection(own_address_type):
         None,
         None,
         Role.PERIPHERAL,
-        ConnectionParameters(0, 0, 0),
+        Connection.Parameters(0, 0, 0),
     )
     device.on_advertising_set_termination(
         HCI_SUCCESS,
@@ -403,7 +402,7 @@ async def test_extended_advertising_connection_out_of_order(own_address_type):
         None,
         None,
         Role.PERIPHERAL,
-        ConnectionParameters(0, 0, 0),
+        Connection.Parameters(0, 0, 0),
     )
 
     if own_address_type == OwnAddressType.PUBLIC:

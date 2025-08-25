@@ -40,10 +40,10 @@ from bumble import hci
 from bumble.core import (
     PhysicalTransport,
     ConnectionPHY,
-    ConnectionParameters,
 )
 from bumble import utils
 from bumble.transport.common import TransportLostError
+from bumble import device
 
 if TYPE_CHECKING:
     from bumble.transport.common import TransportSink, TransportSource
@@ -916,10 +916,12 @@ class Host(utils.EventEmitter):
     def on_l2cap_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
 
-    def on_command_processed(self, event: hci.HCI_Event):
+    def on_command_processed(self, event: hci.HCI_Command_Complete_Event):
         if self.pending_response:
+            if self.pending_command is None:
+                logger.warning('!!! pending_command is None ')
             # Check that it is what we were expecting
-            if self.pending_command.op_code != event.command_opcode:
+            elif self.pending_command.op_code != event.command_opcode:
                 logger.warning(
                     '!!! command result mismatch, expected '
                     f'0x{self.pending_command.op_code:X} but got '
@@ -945,7 +947,7 @@ class Host(utils.EventEmitter):
 
         return self.on_command_processed(event)
 
-    def on_hci_command_status_event(self, event: hci.HCI_Command_Status_Event):
+    def on_hci_command_status_event(self, event: hci.HCI_Command_Complete_Event):
         return self.on_command_processed(event)
 
     def on_hci_number_of_completed_packets_event(
@@ -996,7 +998,7 @@ class Host(utils.EventEmitter):
                 self.connections[event.connection_handle] = connection
 
             # Notify the client
-            connection_parameters = ConnectionParameters(
+            connection_parameters = (
                 event.connection_interval,
                 event.peripheral_latency,
                 event.supervision_timeout,
@@ -1026,13 +1028,35 @@ class Host(utils.EventEmitter):
         self, event: hci.HCI_LE_Enhanced_Connection_Complete_Event
     ):
         # Just use the same implementation as for the non-enhanced event for now
-        self.on_hci_le_connection_complete_event(event)
+        le_connection_complete_event = hci.HCI_LE_Connection_Complete_Event(
+            event.status,
+            event.connection_handle,
+            event.role,
+            event.peer_address_type,
+            event.peer_address,
+            event.connection_interval,
+            event.peripheral_latency,
+            event.supervision_timeout,
+            event.central_clock_accuracy,
+        )
+        self.on_hci_le_connection_complete_event(le_connection_complete_event)
 
     def on_hci_le_enhanced_connection_complete_v2_event(
         self, event: hci.HCI_LE_Enhanced_Connection_Complete_V2_Event
     ):
-        # Just use the same implementation as for the v1 event for now
-        self.on_hci_le_enhanced_connection_complete_event(event)
+        # Just use the same implementation as for the non-enhanced event for now
+        le_connection_complete_event = hci.HCI_LE_Connection_Complete_Event(
+            event.status,
+            event.connection_handle,
+            event.role,
+            event.peer_address_type,
+            event.peer_address,
+            event.connection_interval,
+            event.peripheral_latency,
+            event.supervision_timeout,
+            event.central_clock_accuracy,
+        )
+        self.on_hci_le_connection_complete_event(le_connection_complete_event)
 
     def on_hci_connection_complete_event(
         self, event: hci.HCI_Connection_Complete_Event
@@ -1126,7 +1150,7 @@ class Host(utils.EventEmitter):
 
         # Notify the client
         if event.status == hci.HCI_SUCCESS:
-            connection_parameters = ConnectionParameters(
+            connection_parameters = device.Connection.Parameters(
                 event.connection_interval,
                 event.peripheral_latency,
                 event.supervision_timeout,
@@ -1225,7 +1249,7 @@ class Host(utils.EventEmitter):
     ):
         self.bigs[event.big_handle] = set(event.connection_handle)
         if self.iso_packet_queue is None:
-            logger.warning("BIS established but ISO packets not supported")
+            raise ValueError("BIG established ISO packets not supported")
 
         for connection_handle in event.connection_handle:
             self.bis_links[connection_handle] = IsoLink(
@@ -1252,6 +1276,9 @@ class Host(utils.EventEmitter):
         self, event: hci.HCI_LE_BIG_Sync_Established_Event
     ):
         self.bigs[event.big_handle] = set(event.connection_handle)
+        if self.iso_packet_queue is None:
+            raise ValueError("BIS established ISO packets not supported")
+
         for connection_handle in event.connection_handle:
             self.bis_links[connection_handle] = IsoLink(
                 connection_handle, self.iso_packet_queue
@@ -1315,10 +1342,12 @@ class Host(utils.EventEmitter):
         # The remaining parameters are unused for now.
         if event.status == hci.HCI_SUCCESS:
             if self.iso_packet_queue is None:
-                logger.warning("CIS established but ISO packets not supported")
+                raise ValueError("CIS established but ISO packets not supported")
+
             self.cis_links[event.connection_handle] = IsoLink(
                 handle=event.connection_handle, packet_queue=self.iso_packet_queue
             )
+
             self.emit(
                 'cis_establishment',
                 event.connection_handle,
