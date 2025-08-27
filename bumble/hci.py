@@ -26,7 +26,17 @@ import secrets
 import struct
 from collections.abc import Sequence
 from dataclasses import field
-from typing import Any, Callable, ClassVar, Iterable, Optional, TypeVar, Union, cast
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Iterable,
+    Literal,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from typing_extensions import Self
 
@@ -111,37 +121,57 @@ def phy_list_to_bits(phys: Optional[Iterable[Phy]]) -> int:
 class SpecableEnum(utils.OpenIntEnum):
 
     @classmethod
-    def type_spec(cls, size: int):
+    def type_spec(cls, size: int, byteorder: Literal['little', 'big'] = 'little'):
         return {
-            'serializer': lambda x: x.to_bytes(size, 'little'),
+            'serializer': lambda x: x.to_bytes(size, byteorder),
             'parser': lambda data, offset: (
                 offset + size,
-                cls(int.from_bytes(data[offset : offset + size], 'little')),
+                cls(int.from_bytes(data[offset : offset + size], byteorder)),
             ),
             'mapper': lambda x: cls(x).name,
         }
 
     @classmethod
-    def type_metadata(cls, size: int, list_begin: bool = False, list_end: bool = False):
-        return metadata(cls.type_spec(size), list_begin=list_begin, list_end=list_end)
+    def type_metadata(
+        cls,
+        size: int,
+        list_begin: bool = False,
+        list_end: bool = False,
+        byteorder: Literal['little', 'big'] = 'little',
+    ):
+        return metadata(
+            cls.type_spec(size, byteorder),
+            list_begin=list_begin,
+            list_end=list_end,
+        )
 
 
 class SpecableFlag(enum.IntFlag):
 
     @classmethod
-    def type_spec(cls, size: int):
+    def type_spec(cls, size: int, byteorder: Literal['little', 'big'] = 'little'):
         return {
-            'serializer': lambda x: x.to_bytes(size, 'little'),
+            'serializer': lambda x: x.to_bytes(size, byteorder),
             'parser': lambda data, offset: (
                 offset + size,
-                cls(int.from_bytes(data[offset : offset + size], 'little')),
+                cls(int.from_bytes(data[offset : offset + size], byteorder)),
             ),
             'mapper': lambda x: cls(x).name,
         }
 
     @classmethod
-    def type_metadata(cls, size: int, list_begin: bool = False, list_end: bool = False):
-        return metadata(cls.type_spec(size), list_begin=list_begin, list_end=list_end)
+    def type_metadata(
+        cls,
+        size: int,
+        list_begin: bool = False,
+        list_end: bool = False,
+        byteorder: Literal['little', 'big'] = 'little',
+    ):
+        return metadata(
+            cls.type_spec(size, byteorder),
+            list_begin=list_begin,
+            list_end=list_end,
+        )
 
 
 # -----------------------------------------------------------------------------
