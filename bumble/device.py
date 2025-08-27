@@ -1869,16 +1869,6 @@ class Connection(utils.CompositeEventEmitter):
     def send_l2cap_pdu(self, cid: int, pdu: bytes) -> None:
         self.device.send_l2cap_pdu(self.handle, cid, pdu)
 
-    @utils.deprecated("Please use create_l2cap_channel()")
-    async def open_l2cap_channel(
-        self,
-        psm,
-        max_credits=DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
-        mtu=DEVICE_DEFAULT_L2CAP_COC_MTU,
-        mps=DEVICE_DEFAULT_L2CAP_COC_MPS,
-    ):
-        return await self.device.open_l2cap_channel(self, psm, max_credits, mtu, mps)
-
     @overload
     async def create_l2cap_channel(
         self, spec: l2cap.ClassicChannelSpec
@@ -2589,36 +2579,6 @@ class Device(utils.CompositeEventEmitter):
                 not in itertools.chain(self.bigs.keys(), self.big_syncs.keys())
             ),
             None,
-        )
-
-    @utils.deprecated("Please use create_l2cap_server()")
-    def register_l2cap_server(self, psm, server) -> int:
-        return self.l2cap_channel_manager.register_server(psm, server)
-
-    @utils.deprecated("Please use create_l2cap_server()")
-    def register_l2cap_channel_server(
-        self,
-        psm,
-        server,
-        max_credits=DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
-        mtu=DEVICE_DEFAULT_L2CAP_COC_MTU,
-        mps=DEVICE_DEFAULT_L2CAP_COC_MPS,
-    ):
-        return self.l2cap_channel_manager.register_le_coc_server(
-            psm, server, max_credits, mtu, mps
-        )
-
-    @utils.deprecated("Please use create_l2cap_channel()")
-    async def open_l2cap_channel(
-        self,
-        connection,
-        psm,
-        max_credits=DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
-        mtu=DEVICE_DEFAULT_L2CAP_COC_MTU,
-        mps=DEVICE_DEFAULT_L2CAP_COC_MPS,
-    ):
-        return await self.l2cap_channel_manager.open_le_coc(
-            connection, psm, max_credits, mtu, mps
         )
 
     @overload

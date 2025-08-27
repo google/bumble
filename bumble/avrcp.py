@@ -1147,7 +1147,9 @@ class Protocol(utils.EventEmitter):
         A 'connection' event will be emitted when a connection is made, and a 'start'
         event will be emitted when the protocol is ready to be used on that connection.
         """
-        device.register_l2cap_server(avctp.AVCTP_PSM, self._on_avctp_connection)
+        device.create_l2cap_server(
+            l2cap.ClassicChannelSpec(avctp.AVCTP_PSM), self._on_avctp_connection
+        )
 
     async def connect(self, connection: Connection) -> None:
         """
