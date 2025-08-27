@@ -15,13 +15,15 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
+
 import struct
+from collections.abc import Sequence
 
 import pytest
-from collections.abc import Sequence
-from typing import Self
 
 from bumble import avc, avctp, avrcp
+
 from . import test_utils
 
 
@@ -35,7 +37,7 @@ class TwoDevices(test_utils.TwoDevices):
         await self.protocols[1].connect(self.connections[0])
 
     @classmethod
-    async def create_with_avdtp(cls) -> Self:
+    async def create_with_avdtp(cls) -> TwoDevices:
         devices = await cls.create_with_connection()
         await devices.setup_avdtp_connections()
         return devices
@@ -44,7 +46,7 @@ class TwoDevices(test_utils.TwoDevices):
 # -----------------------------------------------------------------------------
 def test_GetPlayStatusCommand():
     command = avrcp.GetPlayStatusCommand()
-    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
 
 
 # -----------------------------------------------------------------------------
@@ -52,13 +54,13 @@ def test_GetCapabilitiesCommand():
     command = avrcp.GetCapabilitiesCommand(
         capability_id=avrcp.GetCapabilitiesCommand.CapabilityId.COMPANY_ID
     )
-    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
 
 
 # -----------------------------------------------------------------------------
 def test_SetAbsoluteVolumeCommand():
     command = avrcp.SetAbsoluteVolumeCommand(volume=5)
-    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
 
 
 # -----------------------------------------------------------------------------
@@ -70,7 +72,7 @@ def test_GetElementAttributesCommand():
             avrcp.MediaAttributeId.ARTIST_NAME,
         ],
     )
-    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
 
 
 # -----------------------------------------------------------------------------
@@ -78,7 +80,7 @@ def test_RegisterNotificationCommand():
     command = avrcp.RegisterNotificationCommand(
         event_id=avrcp.EventId.ADDRESSED_PLAYER_CHANGED, playback_interval=123
     )
-    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
 
 
 # -----------------------------------------------------------------------------
@@ -142,6 +144,76 @@ def test_PlayerApplicationSettingChangedEvent():
         ]
     )
     assert avrcp.Event.from_bytes(bytes(event)) == event
+
+
+# -----------------------------------------------------------------------------
+def test_RejectedResponse():
+    pdu_id = avrcp.PduId.GET_ELEMENT_ATTRIBUTES
+    response = avrcp.RejectedResponse(
+        pdu_id=pdu_id,
+        status_code=avrcp.StatusCode.DOES_NOT_EXIST,
+    )
+    assert (
+        avrcp.RejectedResponse.from_bytes(pdu=bytes(response), pdu_id=pdu_id)
+        == response
+    )
+
+
+# -----------------------------------------------------------------------------
+def test_GetPlayStatusResponse():
+    response = avrcp.GetPlayStatusResponse(
+        song_length=1010, song_position=13, play_status=avrcp.PlayStatus.PAUSED
+    )
+    assert avrcp.GetPlayStatusResponse.from_bytes(bytes(response)) == response
+
+
+# -----------------------------------------------------------------------------
+def test_NotImplementedResponse():
+    pdu_id = avrcp.PduId.GET_ELEMENT_ATTRIBUTES
+    response = avrcp.NotImplementedResponse(pdu_id=pdu_id, parameters=b'koasd')
+    assert (
+        avrcp.NotImplementedResponse.from_bytes(bytes(response), pdu_id=pdu_id)
+        == response
+    )
+
+
+# -----------------------------------------------------------------------------
+def test_GetCapabilitiesResponse():
+    response = avrcp.GetCapabilitiesResponse(
+        capability_id=avrcp.GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED,
+        capabilities=[
+            avrcp.EventId.ADDRESSED_PLAYER_CHANGED,
+            avrcp.EventId.BATT_STATUS_CHANGED,
+        ],
+    )
+    assert avrcp.GetCapabilitiesResponse.from_bytes(bytes(response)) == response
+
+
+# -----------------------------------------------------------------------------
+def test_RegisterNotificationResponse():
+    response = avrcp.RegisterNotificationResponse(
+        event=avrcp.PlaybackPositionChangedEvent(playback_position=38)
+    )
+    assert avrcp.RegisterNotificationResponse.from_bytes(bytes(response)) == response
+
+
+# -----------------------------------------------------------------------------
+def test_SetAbsoluteVolumeResponse():
+    response = avrcp.SetAbsoluteVolumeResponse(volume=99)
+    assert avrcp.SetAbsoluteVolumeResponse.from_bytes(bytes(response)) == response
+
+
+# -----------------------------------------------------------------------------
+def test_GetElementAttributesResponse():
+    response = avrcp.GetElementAttributesResponse(
+        attributes=[
+            avrcp.MediaAttribute(
+                attribute_id=avrcp.MediaAttributeId.ALBUM_NAME,
+                attribute_value="White Album",
+            )
+        ]
+    )
+    assert avrcp.GetElementAttributesResponse.from_bytes(bytes(response)) == response
 
 
 # -----------------------------------------------------------------------------
