@@ -15,67 +15,138 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-import asyncio
 import struct
 
 import pytest
+from collections.abc import Sequence
+from typing import Self
 
-from bumble import avc, avctp, avrcp, controller, core, device, host, link
-from bumble.transport import common
+from bumble import avc, avctp, avrcp
+from . import test_utils
 
 
 # -----------------------------------------------------------------------------
-class TwoDevices:
-    def __init__(self):
-        self.connections = [None, None]
+class TwoDevices(test_utils.TwoDevices):
+    protocols: Sequence[avrcp.Protocol] = ()
 
-        addresses = ['F0:F1:F2:F3:F4:F5', 'F5:F4:F3:F2:F1:F0']
-        self.link = link.LocalLink()
-        self.controllers = [
-            controller.Controller('C1', link=self.link, public_address=addresses[0]),
-            controller.Controller('C2', link=self.link, public_address=addresses[1]),
-        ]
-        self.devices = [
-            device.Device(
-                address=addresses[0],
-                host=host.Host(
-                    self.controllers[0], common.AsyncPipeSink(self.controllers[0])
-                ),
-            ),
-            device.Device(
-                address=addresses[1],
-                host=host.Host(
-                    self.controllers[1], common.AsyncPipeSink(self.controllers[1])
-                ),
-            ),
-        ]
-        self.devices[0].classic_enabled = True
-        self.devices[1].classic_enabled = True
-        self.connections = [None, None]
-        self.protocols = [None, None]
-
-    def on_connection(self, which, connection):
-        self.connections[which] = connection
-
-    async def setup_connections(self):
-        await self.devices[0].power_on()
-        await self.devices[1].power_on()
-
-        self.connections = await asyncio.gather(
-            self.devices[0].connect(
-                self.devices[1].public_address, core.PhysicalTransport.BR_EDR
-            ),
-            self.devices[1].accept(self.devices[0].public_address),
-        )
-
+    async def setup_avdtp_connections(self):
         self.protocols = [avrcp.Protocol(), avrcp.Protocol()]
         self.protocols[0].listen(self.devices[1])
         await self.protocols[1].connect(self.connections[0])
 
+    @classmethod
+    async def create_with_avdtp(cls) -> Self:
+        devices = await cls.create_with_connection()
+        await devices.setup_avdtp_connections()
+        return devices
+
+
+# -----------------------------------------------------------------------------
+def test_GetPlayStatusCommand():
+    command = avrcp.GetPlayStatusCommand()
+    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+
+
+# -----------------------------------------------------------------------------
+def test_GetCapabilitiesCommand():
+    command = avrcp.GetCapabilitiesCommand(
+        capability_id=avrcp.GetCapabilitiesCommand.CapabilityId.COMPANY_ID
+    )
+    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+
+
+# -----------------------------------------------------------------------------
+def test_SetAbsoluteVolumeCommand():
+    command = avrcp.SetAbsoluteVolumeCommand(volume=5)
+    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+
+
+# -----------------------------------------------------------------------------
+def test_GetElementAttributesCommand():
+    command = avrcp.GetElementAttributesCommand(
+        identifier=999,
+        attribute_ids=[
+            avrcp.MediaAttributeId.ALBUM_NAME,
+            avrcp.MediaAttributeId.ARTIST_NAME,
+        ],
+    )
+    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+
+
+# -----------------------------------------------------------------------------
+def test_RegisterNotificationCommand():
+    command = avrcp.RegisterNotificationCommand(
+        event_id=avrcp.EventId.ADDRESSED_PLAYER_CHANGED, playback_interval=123
+    )
+    assert avrcp.Command.from_bytes(command.pdu_id, command.payload) == command
+
+
+# -----------------------------------------------------------------------------
+def test_UidsChangedEvent():
+    event = avrcp.UidsChangedEvent(uid_counter=7)
+    assert avrcp.Event.from_bytes(bytes(event)) == event
+
+
+# -----------------------------------------------------------------------------
+def test_TrackChangedEvent():
+    event = avrcp.TrackChangedEvent(identifier=b'12356')
+    assert avrcp.Event.from_bytes(bytes(event)) == event
+
+
+# -----------------------------------------------------------------------------
+def test_VolumeChangedEvent():
+    event = avrcp.VolumeChangedEvent(volume=9)
+    assert avrcp.Event.from_bytes(bytes(event)) == event
+
+
+# -----------------------------------------------------------------------------
+def test_PlaybackStatusChangedEvent():
+    event = avrcp.PlaybackStatusChangedEvent(play_status=avrcp.PlayStatus.PLAYING)
+    assert avrcp.Event.from_bytes(bytes(event)) == event
+
+
+# -----------------------------------------------------------------------------
+def test_AddressedPlayerChangedEvent():
+    event = avrcp.AddressedPlayerChangedEvent(
+        player=avrcp.AddressedPlayerChangedEvent.Player(player_id=9, uid_counter=10)
+    )
+    assert avrcp.Event.from_bytes(bytes(event)) == event
+
+
+# -----------------------------------------------------------------------------
+def test_AvailablePlayersChangedEvent():
+    event = avrcp.AvailablePlayersChangedEvent()
+    assert avrcp.Event.from_bytes(bytes(event)) == event
+
+
+# -----------------------------------------------------------------------------
+def test_PlaybackPositionChangedEvent():
+    event = avrcp.PlaybackPositionChangedEvent(playback_position=1314)
+    assert avrcp.Event.from_bytes(bytes(event)) == event
+
+
+# -----------------------------------------------------------------------------
+def test_NowPlayingContentChangedEvent():
+    event = avrcp.NowPlayingContentChangedEvent()
+    assert avrcp.Event.from_bytes(bytes(event)) == event
+
+
+# -----------------------------------------------------------------------------
+def test_PlayerApplicationSettingChangedEvent():
+    event = avrcp.PlayerApplicationSettingChangedEvent(
+        player_application_settings=[
+            avrcp.PlayerApplicationSettingChangedEvent.Setting(
+                avrcp.ApplicationSetting.AttributeId.REPEAT_MODE,
+                avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT,
+            )
+        ]
+    )
+    assert avrcp.Event.from_bytes(bytes(event)) == event
+
 
 # -----------------------------------------------------------------------------
 def test_frame_parser():
-    with pytest.raises(ValueError) as error:
+    with pytest.raises(ValueError):
         avc.Frame.from_bytes(bytes.fromhex("11480000"))
 
     x = bytes.fromhex("014D0208")
@@ -217,8 +288,7 @@ def test_passthrough_commands():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_get_supported_events():
-    two_devices = TwoDevices()
-    await two_devices.setup_connections()
+    two_devices = await TwoDevices.create_with_avdtp()
 
     supported_events = await two_devices.protocols[0].get_supported_events()
     assert supported_events == []
