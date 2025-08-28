@@ -112,7 +112,14 @@ class SpecableEnum(utils.OpenIntEnum):
 
     @classmethod
     def type_spec(cls, size: int):
-        return {'size': size, 'mapper': lambda x: cls(x).name}
+        return {
+            'serializer': lambda x: x.to_bytes(size, 'little'),
+            'parser': lambda data, offset: (
+                offset + size,
+                cls(int.from_bytes(data[offset : offset + size], 'little')),
+            ),
+            'mapper': lambda x: cls(x).name,
+        }
 
     @classmethod
     def type_metadata(cls, size: int, list_begin: bool = False, list_end: bool = False):
@@ -123,7 +130,14 @@ class SpecableFlag(enum.IntFlag):
 
     @classmethod
     def type_spec(cls, size: int):
-        return {'size': size, 'mapper': lambda x: cls(x).name}
+        return {
+            'serializer': lambda x: x.to_bytes(size, 'little'),
+            'parser': lambda data, offset: (
+                offset + size,
+                cls(int.from_bytes(data[offset : offset + size], 'little')),
+            ),
+            'mapper': lambda x: cls(x).name,
+        }
 
     @classmethod
     def type_metadata(cls, size: int, list_begin: bool = False, list_end: bool = False):
