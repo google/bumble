@@ -45,7 +45,18 @@ from typing import (
 
 from typing_extensions import Self
 
-from bumble import core, gatt_client, gatt_server, hci, l2cap, pairing, sdp, smp, utils
+from bumble import (
+    core,
+    data_types,
+    gatt_client,
+    gatt_server,
+    hci,
+    l2cap,
+    pairing,
+    sdp,
+    smp,
+    utils,
+)
 from bumble.att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
 from bumble.colors import color
 from bumble.core import (
@@ -2049,9 +2060,7 @@ class DeviceConfiguration:
     connectable: bool = True
     discoverable: bool = True
     advertising_data: bytes = bytes(
-        AdvertisingData(
-            [(AdvertisingData.COMPLETE_LOCAL_NAME, bytes(DEVICE_DEFAULT_NAME, 'utf-8'))]
-        )
+        AdvertisingData([data_types.CompleteLocalName(DEVICE_DEFAULT_NAME)])
     )
     irk: bytes = bytes(16)  # This really must be changed for any level of security
     keystore: Optional[str] = None
@@ -2095,9 +2104,7 @@ class DeviceConfiguration:
             self.advertising_data = bytes.fromhex(advertising_data)
         elif name is not None:
             self.advertising_data = bytes(
-                AdvertisingData(
-                    [(AdvertisingData.COMPLETE_LOCAL_NAME, bytes(self.name, 'utf-8'))]
-                )
+                AdvertisingData([data_types.CompleteLocalName(self.name)])
             )
 
         # Load scan response data
@@ -3544,14 +3551,7 @@ class Device(utils.CompositeEventEmitter):
             # Synthesize an inquiry response if none is set already
             if self.inquiry_response is None:
                 self.inquiry_response = bytes(
-                    AdvertisingData(
-                        [
-                            (
-                                AdvertisingData.COMPLETE_LOCAL_NAME,
-                                bytes(self.name, 'utf-8'),
-                            )
-                        ]
-                    )
+                    AdvertisingData([data_types.CompleteLocalName(self.name)])
                 )
 
             # Update the controller
