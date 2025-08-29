@@ -23,6 +23,7 @@ from typing import Optional
 import websockets
 
 import bumble.logging
+from bumble import data_types
 from bumble.core import AdvertisingData
 from bumble.device import (
     AdvertisingEventProperties,
@@ -106,17 +107,10 @@ async def main() -> None:
         advertising_data = bytes(
             AdvertisingData(
                 [
-                    (
-                        AdvertisingData.COMPLETE_LOCAL_NAME,
-                        bytes('Bumble LE Audio', 'utf-8'),
-                    ),
-                    (
-                        AdvertisingData.FLAGS,
-                        bytes([AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG]),
-                    ),
-                    (
-                        AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                        bytes(PublishedAudioCapabilitiesService.UUID),
+                    data_types.CompleteLocalName('Bumble LE Audio'),
+                    data_types.Flags(AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG),
+                    data_types.IncompleteListOf16BitServiceUUIDs(
+                        [PublishedAudioCapabilitiesService.UUID]
                     ),
                 ]
             )

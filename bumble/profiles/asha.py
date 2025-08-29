@@ -21,7 +21,7 @@ import logging
 import struct
 from typing import Any, Callable, Optional, Union
 
-from bumble import gatt, gatt_client, l2cap, utils
+from bumble import data_types, gatt, gatt_client, l2cap, utils
 from bumble.core import AdvertisingData
 from bumble.device import Connection, Device
 
@@ -185,12 +185,11 @@ class AshaService(gatt.TemplateService):
         return bytes(
             AdvertisingData(
                 [
-                    (
-                        AdvertisingData.SERVICE_DATA_16_BIT_UUID,
-                        bytes(gatt.GATT_ASHA_SERVICE)
-                        + bytes([self.protocol_version, self.capability])
+                    data_types.ServiceData16BitUUID(
+                        gatt.GATT_ASHA_SERVICE,
+                        bytes([self.protocol_version, self.capability])
                         + self.hisyncid[:4],
-                    ),
+                    )
                 ]
             )
         )

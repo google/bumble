@@ -20,6 +20,7 @@ import secrets
 import sys
 
 import bumble.logging
+from bumble import data_types
 from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.hci import Address
@@ -66,23 +67,14 @@ async def main() -> None:
             bytes(
                 AdvertisingData(
                     [
-                        (
-                            AdvertisingData.COMPLETE_LOCAL_NAME,
-                            bytes(f'Bumble LE Audio-{i}', 'utf-8'),
+                        data_types.CompleteLocalName(f'Bumble LE Audio-{i}'),
+                        data_types.Flags(
+                            AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
+                            | AdvertisingData.BR_EDR_HOST_FLAG
+                            | AdvertisingData.BR_EDR_CONTROLLER_FLAG
                         ),
-                        (
-                            AdvertisingData.FLAGS,
-                            bytes(
-                                [
-                                    AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
-                                    | AdvertisingData.BR_EDR_HOST_FLAG
-                                    | AdvertisingData.BR_EDR_CONTROLLER_FLAG
-                                ]
-                            ),
-                        ),
-                        (
-                            AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                            bytes(CoordinatedSetIdentificationService.UUID),
+                        data_types.IncompleteListOf16BitServiceUUIDs(
+                            [CoordinatedSetIdentificationService.UUID]
                         ),
                     ]
                 )

@@ -37,7 +37,7 @@ import click
 
 import bumble
 import bumble.logging
-from bumble import utils
+from bumble import data_types, utils
 from bumble.colors import color
 from bumble.core import AdvertisingData
 from bumble.device import AdvertisingParameters, CisLink, Device, DeviceConfiguration
@@ -330,22 +330,13 @@ class Speaker:
             advertising_data = bytes(
                 AdvertisingData(
                     [
-                        (
-                            AdvertisingData.COMPLETE_LOCAL_NAME,
-                            bytes(device_config.name, 'utf-8'),
+                        data_types.CompleteLocalName(device_config.name),
+                        data_types.Flags(
+                            AdvertisingData.Flags.LE_GENERAL_DISCOVERABLE_MODE
+                            | AdvertisingData.Flags.BR_EDR_NOT_SUPPORTED
                         ),
-                        (
-                            AdvertisingData.FLAGS,
-                            bytes(
-                                [
-                                    AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
-                                    | AdvertisingData.BR_EDR_NOT_SUPPORTED_FLAG
-                                ]
-                            ),
-                        ),
-                        (
-                            AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                            bytes(pacs.PublishedAudioCapabilitiesService.UUID),
+                        data_types.IncompleteListOf16BitServiceUUIDs(
+                            [pacs.PublishedAudioCapabilitiesService.UUID]
                         ),
                     ]
                 )

@@ -24,6 +24,7 @@ from typing import Optional
 import websockets
 
 import bumble.logging
+from bumble import data_types
 from bumble.core import AdvertisingData
 from bumble.device import AdvertisingEventProperties, AdvertisingParameters, Device
 from bumble.hci import CodecID, CodingFormat, OwnAddressType
@@ -127,23 +128,14 @@ async def main() -> None:
             bytes(
                 AdvertisingData(
                     [
-                        (
-                            AdvertisingData.COMPLETE_LOCAL_NAME,
-                            bytes('Bumble LE Audio', 'utf-8'),
+                        data_types.CompleteLocalName('Bumble LE Audio'),
+                        data_types.Flags(
+                            AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
+                            | AdvertisingData.BR_EDR_HOST_FLAG
+                            | AdvertisingData.BR_EDR_CONTROLLER_FLAG
                         ),
-                        (
-                            AdvertisingData.FLAGS,
-                            bytes(
-                                [
-                                    AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
-                                    | AdvertisingData.BR_EDR_HOST_FLAG
-                                    | AdvertisingData.BR_EDR_CONTROLLER_FLAG
-                                ]
-                            ),
-                        ),
-                        (
-                            AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                            bytes(PublishedAudioCapabilitiesService.UUID),
+                        data_types.IncompleteListOf16BitServiceUUIDs(
+                            [PublishedAudioCapabilitiesService.UUID]
                         ),
                     ]
                 )

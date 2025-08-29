@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 import struct
 
+from bumble import data_types
 from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.hci import HCI_Reset_Command
@@ -65,24 +66,18 @@ class HeartRateMonitor:
         self.device.advertising_data = bytes(
             AdvertisingData(
                 [
-                    (
-                        AdvertisingData.FLAGS,
-                        bytes(
-                            [
-                                AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
-                                | AdvertisingData.BR_EDR_NOT_SUPPORTED_FLAG
-                            ]
-                        ),
+                    data_types.Flags(
+                        AdvertisingData.Flags.LE_GENERAL_DISCOVERABLE_MODE
+                        | AdvertisingData.Flags.BR_EDR_NOT_SUPPORTED
                     ),
-                    (
-                        AdvertisingData.COMPLETE_LOCAL_NAME,
-                        bytes('Bumble Heart', 'utf-8'),
+                    data_types.CompleteLocalName('Bumble Heart'),
+                    data_types.IncompleteListOf16BitServiceUUIDs(
+                        [self.heart_rate_service.uuid]
                     ),
-                    (
-                        AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                        bytes(self.heart_rate_service.uuid),
+                    data_types.Appearance(
+                        data_types.Appearance.Category.HEART_RATE_SENSOR,
+                        data_types.Appearance.HeartRateSensorSubcategory.GENERIC_HEART_RATE_SENSOR,
                     ),
-                    (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340)),
                 ]
             )
         )

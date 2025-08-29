@@ -2135,6 +2135,7 @@ class Address:
             if len(address) == 12 + 5:
                 # Form with ':' separators
                 address = address.replace(':', '')
+
             self.address_bytes = bytes(reversed(bytes.fromhex(address)))
 
         if len(self.address_bytes) != 6:

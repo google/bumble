@@ -20,6 +20,7 @@ import asyncio
 import click
 
 import bumble.logging
+from bumble import data_types
 from bumble.colors import color
 from bumble.device import Advertisement, Device
 from bumble.hci import HCI_LE_1M_PHY, HCI_LE_CODED_PHY, Address, HCI_Constant
@@ -94,13 +95,22 @@ class AdvertisementPrinter:
         else:
             phy_info = ''
 
+        details = separator.join(
+            [
+                data_type.to_string(use_label=True)
+                for data_type in data_types.data_types_from_advertising_data(
+                    advertisement.data
+                )
+            ]
+        )
+
         print(
             f'>>> {color(address, address_color)} '
             f'[{color(address_type_string, type_color)}]{address_qualifier}'
             f'{resolution_qualifier}:{separator}'
             f'{phy_info}'
             f'RSSI:{advertisement.rssi:4} {rssi_bar}{separator}'
-            f'{advertisement.data.to_string(separator)}\n'
+            f'{details}\n'
         )
 
     def on_advertisement(self, advertisement):

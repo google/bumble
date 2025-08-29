@@ -20,6 +20,7 @@ import struct
 import sys
 
 import bumble.logging
+from bumble import data_types
 from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.profiles.device_information_service import DeviceInformationService
@@ -53,11 +54,11 @@ async def main() -> None:
         device.advertising_data = bytes(
             AdvertisingData(
                 [
-                    (
-                        AdvertisingData.COMPLETE_LOCAL_NAME,
-                        bytes('Bumble Device', 'utf-8'),
+                    data_types.CompleteLocalName('Bumble Device'),
+                    data_types.Appearance(
+                        data_types.Appearance.Category.HEART_RATE_SENSOR,
+                        data_types.Appearance.HeartRateSensorSubcategory.GENERIC_HEART_RATE_SENSOR,
                     ),
-                    (AdvertisingData.APPEARANCE, struct.pack('<H', 0x0340)),
                 ]
             )
         )
