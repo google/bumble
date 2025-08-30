@@ -17,9 +17,21 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
+import dataclasses
 import enum
 import struct
-from typing import Literal, Optional, Union, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Iterable,
+    Literal,
+    Optional,
+    Type,
+    Union,
+    cast,
+    overload,
+)
 
 from typing_extensions import Self
 
@@ -331,6 +343,9 @@ class UUID:
             result += f' ({self.name})'
         return result
 
+    def __repr__(self) -> str:
+        return self.to_hex_str()
+
 
 # -----------------------------------------------------------------------------
 # Common UUID constants
@@ -447,26 +462,25 @@ BT_HDP_SINK_SERVICE                                  = UUID.from_16_bits(0x1402,
 
 
 # -----------------------------------------------------------------------------
-# DeviceClass
+# ClassOfDevice
+# See Bluetooth - Assigned Numbers - 2.8 Class of Device
 # -----------------------------------------------------------------------------
-class DeviceClass:
+@dataclasses.dataclass
+class ClassOfDevice:
     # fmt: off
-    # pylint: disable=line-too-long
+    class MajorServiceClasses(utils.CompatibleIntFlag):
+        LIMITED_DISCOVERABLE_MODE = (1 << 0)
+        LE_AUDIO                  = (1 << 1)
+        POSITIONING               = (1 << 3)
+        NETWORKING                = (1 << 4)
+        RENDERING                 = (1 << 5)
+        CAPTURING                 = (1 << 6)
+        OBJECT_TRANSFER           = (1 << 7)
+        AUDIO                     = (1 << 8)
+        TELEPHONY                 = (1 << 9)
+        INFORMATION               = (1 << 10)
 
-    # Major Service Classes (flags combined with OR)
-    LIMITED_DISCOVERABLE_MODE_SERVICE_CLASS = (1 << 0)
-    LE_AUDIO_SERVICE_CLASS                  = (1 << 1)
-    RESERVED                                = (1 << 2)
-    POSITIONING_SERVICE_CLASS               = (1 << 3)
-    NETWORKING_SERVICE_CLASS                = (1 << 4)
-    RENDERING_SERVICE_CLASS                 = (1 << 5)
-    CAPTURING_SERVICE_CLASS                 = (1 << 6)
-    OBJECT_TRANSFER_SERVICE_CLASS           = (1 << 7)
-    AUDIO_SERVICE_CLASS                     = (1 << 8)
-    TELEPHONY_SERVICE_CLASS                 = (1 << 9)
-    INFORMATION_SERVICE_CLASS               = (1 << 10)
-
-    SERVICE_CLASS_LABELS = [
+    MAJOR_SERVICE_CLASS_LABELS: ClassVar[list[str]] = [
         'Limited Discoverable Mode',
         'LE audio',
         '(reserved)',
@@ -477,219 +491,439 @@ class DeviceClass:
         'Object Transfer',
         'Audio',
         'Telephony',
-        'Information'
+        'Information',
     ]
 
+    class MajorDeviceClass(utils.OpenIntEnum):
+        MISCELLANEOUS            = 0x00
+        COMPUTER                 = 0x01
+        PHONE                    = 0x02
+        LAN_NETWORK_ACCESS_POINT = 0x03
+        AUDIO_VIDEO              = 0x04
+        PERIPHERAL               = 0x05
+        IMAGING                  = 0x06
+        WEARABLE                 = 0x07
+        TOY                      = 0x08
+        HEALTH                   = 0x09
+        UNCATEGORIZED            = 0x1F
+
+    MAJOR_DEVICE_CLASS_LABELS: ClassVar[dict[MajorDeviceClass, str]] = {
+        MajorDeviceClass.MISCELLANEOUS:            'Miscellaneous',
+        MajorDeviceClass.COMPUTER:                 'Computer',
+        MajorDeviceClass.PHONE:                    'Phone',
+        MajorDeviceClass.LAN_NETWORK_ACCESS_POINT: 'LAN/Network Access Point',
+        MajorDeviceClass.AUDIO_VIDEO:              'Audio/Video',
+        MajorDeviceClass.PERIPHERAL:               'Peripheral',
+        MajorDeviceClass.IMAGING:                  'Imaging',
+        MajorDeviceClass.WEARABLE:                 'Wearable',
+        MajorDeviceClass.TOY:                      'Toy',
+        MajorDeviceClass.HEALTH:                   'Health',
+        MajorDeviceClass.UNCATEGORIZED:            'Uncategorized',
+    }
+
+    class ComputerMinorDeviceClass(utils.OpenIntEnum):
+        UNCATEGORIZED         = 0x00
+        DESKTOP_WORKSTATION   = 0x01
+        SERVER_CLASS_COMPUTER = 0x02
+        LAPTOP_COMPUTER       = 0x03
+        HANDHELD_PC_PDA       = 0x04
+        PALM_SIZE_PC_PDA      = 0x05
+        WEARABLE_COMPUTER     = 0x06
+        TABLET                = 0x07
+
+    COMPUTER_MINOR_DEVICE_CLASS_LABELS: ClassVar[dict[ComputerMinorDeviceClass, str]] = {
+        ComputerMinorDeviceClass.UNCATEGORIZED:         'Uncategorized',
+        ComputerMinorDeviceClass.DESKTOP_WORKSTATION:   'Desktop workstation',
+        ComputerMinorDeviceClass.SERVER_CLASS_COMPUTER: 'Server-class computer',
+        ComputerMinorDeviceClass.LAPTOP_COMPUTER:       'Laptop',
+        ComputerMinorDeviceClass.HANDHELD_PC_PDA:       'Handheld PC/PDA',
+        ComputerMinorDeviceClass.PALM_SIZE_PC_PDA:      'Palm-size PC/PDA',
+        ComputerMinorDeviceClass.WEARABLE_COMPUTER:     'Wearable computer',
+        ComputerMinorDeviceClass.TABLET:                'Tablet',
+    }
+
+    class PhoneMinorDeviceClass(utils.OpenIntEnum):
+        UNCATEGORIZED                = 0x00
+        CELLULAR                     = 0x01
+        CORDLESS                     = 0x02
+        SMARTPHONE                   = 0x03
+        WIRED_MODEM_OR_VOICE_GATEWAY = 0x04
+        COMMON_ISDN = 0x05
+
+    PHONE_MINOR_DEVICE_CLASS_LABELS: ClassVar[dict[PhoneMinorDeviceClass, str]] = {
+        PhoneMinorDeviceClass.UNCATEGORIZED:                'Uncategorized',
+        PhoneMinorDeviceClass.CELLULAR:                     'Cellular',
+        PhoneMinorDeviceClass.CORDLESS:                     'Cordless',
+        PhoneMinorDeviceClass.SMARTPHONE:                   'Smartphone',
+        PhoneMinorDeviceClass.WIRED_MODEM_OR_VOICE_GATEWAY: 'Wired modem or voice gateway',
+        PhoneMinorDeviceClass.COMMON_ISDN:                  'Common ISDN access',
+    }
+
+    class LanNetworkMinorDeviceClass(utils.OpenIntEnum):
+        FULLY_AVAILABLE            = 0x00
+        _1_TO_17_PERCENT_UTILIZED  = 0x01
+        _17_TO_33_PERCENT_UTILIZED = 0x02
+        _33_TO_50_PERCENT_UTILIZED = 0x03
+        _50_TO_67_PERCENT_UTILIZED = 0x04
+        _67_TO_83_PERCENT_UTILIZED = 0x05
+        _83_TO_99_PERCENT_UTILIZED = 0x06
+        _NO_SERVICE_AVAILABLE      = 0x07
+
+    LAN_NETWORK_MINOR_DEVICE_CLASS_LABELS: ClassVar[dict[LanNetworkMinorDeviceClass, str]] = {
+        LanNetworkMinorDeviceClass.FULLY_AVAILABLE:            'Fully availbable',
+        LanNetworkMinorDeviceClass._1_TO_17_PERCENT_UTILIZED:  '1% to 17% utilized',
+        LanNetworkMinorDeviceClass._17_TO_33_PERCENT_UTILIZED: '17% to 33% utilized',
+        LanNetworkMinorDeviceClass._33_TO_50_PERCENT_UTILIZED: '33% to 50% utilized',
+        LanNetworkMinorDeviceClass._50_TO_67_PERCENT_UTILIZED: '50% to 67% utilized',
+        LanNetworkMinorDeviceClass._67_TO_83_PERCENT_UTILIZED: '67% to 83% utilized',
+        LanNetworkMinorDeviceClass._83_TO_99_PERCENT_UTILIZED: '83% to 99% utilized',
+        LanNetworkMinorDeviceClass._NO_SERVICE_AVAILABLE:      'No service available',
+    }
+
+    class AudioVideoMinorDeviceClass(utils.OpenIntEnum):
+        UNCATEGORIZED                 = 0x00
+        WEARABLE_HEADSET_DEVICE       = 0x01
+        HANDS_FREE_DEVICE             = 0x02
+        # (RESERVED)                  = 0x03
+        MICROPHONE                    = 0x04
+        LOUDSPEAKER                   = 0x05
+        HEADPHONES                    = 0x06
+        PORTABLE_AUDIO                = 0x07
+        CAR_AUDIO                     = 0x08
+        SET_TOP_BOX                   = 0x09
+        HIFI_AUDIO_DEVICE             = 0x0A
+        VCR                           = 0x0B
+        VIDEO_CAMERA                  = 0x0C
+        CAMCORDER                     = 0x0D
+        VIDEO_MONITOR                 = 0x0E
+        VIDEO_DISPLAY_AND_LOUDSPEAKER = 0x0F
+        VIDEO_CONFERENCING            = 0x10
+        # (RESERVED)                  = 0x11
+        GAMING_OR_TOY                 = 0x12
+
+    AUDIO_VIDEO_MINOR_DEVICE_CLASS_LABELS: ClassVar[dict[AudioVideoMinorDeviceClass, str]] = {
+        AudioVideoMinorDeviceClass.UNCATEGORIZED:                 'Uncategorized',
+        AudioVideoMinorDeviceClass.WEARABLE_HEADSET_DEVICE:       'Wearable Headset Device',
+        AudioVideoMinorDeviceClass.HANDS_FREE_DEVICE:             'Hands-free Device',
+        AudioVideoMinorDeviceClass.MICROPHONE:                    'Microphone',
+        AudioVideoMinorDeviceClass.LOUDSPEAKER:                   'Loudspeaker',
+        AudioVideoMinorDeviceClass.HEADPHONES:                    'Headphones',
+        AudioVideoMinorDeviceClass.PORTABLE_AUDIO:                'Portable Audio',
+        AudioVideoMinorDeviceClass.CAR_AUDIO:                     'Car audio',
+        AudioVideoMinorDeviceClass.SET_TOP_BOX:                   'Set-top box',
+        AudioVideoMinorDeviceClass.HIFI_AUDIO_DEVICE:             'HiFi Audio Device',
+        AudioVideoMinorDeviceClass.VCR:                           'VCR',
+        AudioVideoMinorDeviceClass.VIDEO_CAMERA:                  'Video Camera',
+        AudioVideoMinorDeviceClass.CAMCORDER:                     'Camcorder',
+        AudioVideoMinorDeviceClass.VIDEO_MONITOR:                 'Video Monitor',
+        AudioVideoMinorDeviceClass.VIDEO_DISPLAY_AND_LOUDSPEAKER: 'Video Display and Loudspeaker',
+        AudioVideoMinorDeviceClass.VIDEO_CONFERENCING:            'Video Conferencing',
+        AudioVideoMinorDeviceClass.GAMING_OR_TOY:                 'Gaming/Toy',
+    }
+
+    class PeripheralMinorDeviceClass(utils.OpenIntEnum):
+        UNCATEGORIZED                  = 0x00
+        KEYBOARD                       = 0x10
+        POINTING_DEVICE                = 0x20
+        COMBO_KEYBOARD_POINTING_DEVICE = 0x30
+        JOYSTICK                       = 0x01
+        GAMEPAD                        = 0x02
+        REMOTE_CONTROL                 = 0x03
+        SENSING_DEVICE                 = 0x04
+        DIGITIZER_TABLET               = 0x05
+        CARD_READER                    = 0x06
+        DIGITAL_PEN                    = 0x07
+        HANDHELD_SCANNER               = 0x08
+        HANDHELD_GESTURAL_INPUT_DEVICE = 0x09
+
+    PERIPHERAL_MINOR_DEVICE_CLASS_LABELS: ClassVar[dict[PeripheralMinorDeviceClass, str]] = {
+        PeripheralMinorDeviceClass.UNCATEGORIZED:                  'Uncategorized',
+        PeripheralMinorDeviceClass.KEYBOARD:                       'Keyboard',
+        PeripheralMinorDeviceClass.POINTING_DEVICE:                'Pointing device',
+        PeripheralMinorDeviceClass.COMBO_KEYBOARD_POINTING_DEVICE: 'Combo keyboard/pointing device',
+        PeripheralMinorDeviceClass.JOYSTICK:                       'Joystick',
+        PeripheralMinorDeviceClass.GAMEPAD:                        'Gamepad',
+        PeripheralMinorDeviceClass.REMOTE_CONTROL:                 'Remote control',
+        PeripheralMinorDeviceClass.SENSING_DEVICE:                 'Sensing device',
+        PeripheralMinorDeviceClass.DIGITIZER_TABLET:               'Digitizer tablet',
+        PeripheralMinorDeviceClass.CARD_READER:                    'Card Reader',
+        PeripheralMinorDeviceClass.DIGITAL_PEN:                    'Digital Pen',
+        PeripheralMinorDeviceClass.HANDHELD_SCANNER:               'Handheld scanner',
+        PeripheralMinorDeviceClass.HANDHELD_GESTURAL_INPUT_DEVICE: 'Handheld gestural input device',
+    }
+
+    class WearableMinorDeviceClass(utils.OpenIntEnum):
+        UNCATEGORIZED = 0x00
+        WRISTWATCH    = 0x01
+        PAGER         = 0x02
+        JACKET        = 0x03
+        HELMET        = 0x04
+        GLASSES       = 0x05
+
+    WEARABLE_MINOR_DEVICE_CLASS_LABELS: ClassVar[dict[WearableMinorDeviceClass, str]] = {
+        WearableMinorDeviceClass.UNCATEGORIZED: 'Uncategorized',
+        WearableMinorDeviceClass.WRISTWATCH:    'Wristwatch',
+        WearableMinorDeviceClass.PAGER:         'Pager',
+        WearableMinorDeviceClass.JACKET:        'Jacket',
+        WearableMinorDeviceClass.HELMET:        'Helmet',
+        WearableMinorDeviceClass.GLASSES:       'Glasses',
+    }
+
+    class ToyMinorDeviceClass(utils.OpenIntEnum):
+        UNCATEGORIZED      = 0x00
+        ROBOT              = 0x01
+        VEHICLE            = 0x02
+        DOLL_ACTION_FIGURE = 0x03
+        CONTROLLER         = 0x04
+        GAME               = 0x05
+
+    TOY_MINOR_DEVICE_CLASS_LABELS: ClassVar[dict[ToyMinorDeviceClass, str]] = {
+        ToyMinorDeviceClass.UNCATEGORIZED:      'Uncategorized',
+        ToyMinorDeviceClass.ROBOT:              'Robot',
+        ToyMinorDeviceClass.VEHICLE:            'Vehicle',
+        ToyMinorDeviceClass.DOLL_ACTION_FIGURE: 'Doll/Action figure',
+        ToyMinorDeviceClass.CONTROLLER:         'Controller',
+        ToyMinorDeviceClass.GAME:               'Game',
+    }
+
+    class HealthMinorDeviceClass(utils.OpenIntEnum):
+        UNDEFINED                 = 0x00
+        BLOOD_PRESSURE_MONITOR    = 0x01
+        THERMOMETER               = 0x02
+        WEIGHING_SCALE            = 0x03
+        GLUCOSE_METER             = 0x04
+        PULSE_OXIMETER            = 0x05
+        HEART_PULSE_RATE_MONITOR  = 0x06
+        HEALTH_DATA_DISPLAY       = 0x07
+        STEP_COUNTER              = 0x08
+        BODY_COMPOSITION_ANALYZER = 0x09
+        PEAK_FLOW_MONITOR         = 0x0A
+        MEDICATION_MONITOR        = 0x0B
+        KNEE_PROSTHESIS           = 0x0C
+        ANKLE_PROSTHESIS          = 0x0D
+        GENERIC_HEALTH_MANAGER    = 0x0E
+        PERSONAL_MOBILITY_DEVICE  = 0x0F
+
+    HEALTH_MINOR_DEVICE_CLASS_LABELS: ClassVar[dict[HealthMinorDeviceClass, str]] = {
+        HealthMinorDeviceClass.UNDEFINED:                 'Undefined',
+        HealthMinorDeviceClass.BLOOD_PRESSURE_MONITOR:    'Blood Pressure Monitor',
+        HealthMinorDeviceClass.THERMOMETER:               'Thermometer',
+        HealthMinorDeviceClass.WEIGHING_SCALE:            'Weighing Scale',
+        HealthMinorDeviceClass.GLUCOSE_METER:             'Glucose Meter',
+        HealthMinorDeviceClass.PULSE_OXIMETER:            'Pulse Oximeter',
+        HealthMinorDeviceClass.HEART_PULSE_RATE_MONITOR:  'Heart/Pulse Rate Monitor',
+        HealthMinorDeviceClass.HEALTH_DATA_DISPLAY:       'Health Data Display',
+        HealthMinorDeviceClass.STEP_COUNTER:              'Step Counter',
+        HealthMinorDeviceClass.BODY_COMPOSITION_ANALYZER: 'Body Composition Analyzer',
+        HealthMinorDeviceClass.PEAK_FLOW_MONITOR:         'Peak Flow Monitor',
+        HealthMinorDeviceClass.MEDICATION_MONITOR:        'Medication Monitor',
+        HealthMinorDeviceClass.KNEE_PROSTHESIS:           'Knee Prosthesis',
+        HealthMinorDeviceClass.ANKLE_PROSTHESIS:          'Ankle Prosthesis',
+        HealthMinorDeviceClass.GENERIC_HEALTH_MANAGER:    'Generic Health Manager',
+        HealthMinorDeviceClass.PERSONAL_MOBILITY_DEVICE:  'Personal Mobility Device',
+    }
+
+    MINOR_DEVICE_CLASS_LABELS: ClassVar[dict[MajorDeviceClass, dict[Any, str]]] = {
+        MajorDeviceClass.COMPUTER: COMPUTER_MINOR_DEVICE_CLASS_LABELS,
+        MajorDeviceClass.PHONE: PHONE_MINOR_DEVICE_CLASS_LABELS,
+        MajorDeviceClass.LAN_NETWORK_ACCESS_POINT: LAN_NETWORK_MINOR_DEVICE_CLASS_LABELS,
+        MajorDeviceClass.AUDIO_VIDEO: AUDIO_VIDEO_MINOR_DEVICE_CLASS_LABELS,
+        MajorDeviceClass.PERIPHERAL: PERIPHERAL_MINOR_DEVICE_CLASS_LABELS,
+        MajorDeviceClass.WEARABLE: WEARABLE_MINOR_DEVICE_CLASS_LABELS,
+        MajorDeviceClass.TOY: TOY_MINOR_DEVICE_CLASS_LABELS,
+        MajorDeviceClass.HEALTH: HEALTH_MINOR_DEVICE_CLASS_LABELS,
+    }
+
+    _MINOR_DEVICE_CLASSES: ClassVar[dict[MajorDeviceClass, Type]] = {
+        MajorDeviceClass.COMPUTER: ComputerMinorDeviceClass,
+        MajorDeviceClass.PHONE: PhoneMinorDeviceClass,
+        MajorDeviceClass.LAN_NETWORK_ACCESS_POINT: LanNetworkMinorDeviceClass,
+        MajorDeviceClass.AUDIO_VIDEO: AudioVideoMinorDeviceClass,
+        MajorDeviceClass.PERIPHERAL: PeripheralMinorDeviceClass,
+        MajorDeviceClass.WEARABLE: WearableMinorDeviceClass,
+        MajorDeviceClass.TOY: ToyMinorDeviceClass,
+        MajorDeviceClass.HEALTH: HealthMinorDeviceClass,
+    }
+
+    # fmt: on
+
+    major_service_classes: MajorServiceClasses
+    major_device_class: MajorDeviceClass
+    minor_device_class: Union[
+        ComputerMinorDeviceClass,
+        PhoneMinorDeviceClass,
+        LanNetworkMinorDeviceClass,
+        AudioVideoMinorDeviceClass,
+        PeripheralMinorDeviceClass,
+        WearableMinorDeviceClass,
+        ToyMinorDeviceClass,
+        HealthMinorDeviceClass,
+        int,
+    ]
+
+    @classmethod
+    def from_int(cls, class_of_device: int) -> Self:
+        major_service_classes = cls.MajorServiceClasses(class_of_device >> 13 & 0x7FF)
+        major_device_class = cls.MajorDeviceClass(class_of_device >> 8 & 0x1F)
+        minor_device_class_int = class_of_device >> 2 & 0x3F
+        if minor_device_class_object := cls._MINOR_DEVICE_CLASSES.get(
+            major_device_class
+        ):
+            minor_device_class = minor_device_class_object(minor_device_class_int)
+        else:
+            minor_device_class = minor_device_class_int
+        return cls(major_service_classes, major_device_class, minor_device_class)
+
+    def __int__(self) -> int:
+        return (
+            self.major_service_classes << 13
+            | self.major_device_class << 8
+            | self.minor_device_class << 2
+        )
+
+    def __str__(self) -> str:
+        minor_device_class_name = (
+            self.minor_device_class.name
+            if hasattr(self.minor_device_class, 'name')
+            else hex(self.minor_device_class)
+        )
+        return (
+            f"ClassOfDevice({self.major_service_classes.composite_name},"
+            f"{self.major_device_class.name}/{minor_device_class_name})"
+        )
+
+    def major_service_classes_labels(self) -> str:
+        return "|".join(
+            bit_flags_to_strings(
+                self.major_service_classes, self.MAJOR_SERVICE_CLASS_LABELS
+            )
+        )
+
+    def major_device_class_label(self) -> str:
+        return name_or_number(
+            cast(dict[int, str], self.MAJOR_DEVICE_CLASS_LABELS),
+            self.major_device_class,
+        )
+
+    def minor_device_class_label(self) -> str:
+        class_names = self.MINOR_DEVICE_CLASS_LABELS.get(self.major_device_class)
+        if class_names is None:
+            return f'#{self.minor_device_class:02X}'
+        return name_or_number(class_names, self.minor_device_class)
+
+
+# -----------------------------------------------------------------------------
+# DeviceClass
+# -----------------------------------------------------------------------------
+class DeviceClass:
+    """Legacy only. Use ClassOfDevice instead"""
+
+    # fmt: off
+    # pylint: disable=line-too-long
+
+    # Major Service Classes (flags combined with OR)
+    LIMITED_DISCOVERABLE_MODE_SERVICE_CLASS = ClassOfDevice.MajorServiceClasses.LIMITED_DISCOVERABLE_MODE
+    LE_AUDIO_SERVICE_CLASS                  = ClassOfDevice.MajorServiceClasses.LE_AUDIO
+    POSITIONING_SERVICE_CLASS               = ClassOfDevice.MajorServiceClasses.POSITIONING
+    NETWORKING_SERVICE_CLASS                = ClassOfDevice.MajorServiceClasses.NETWORKING
+    RENDERING_SERVICE_CLASS                 = ClassOfDevice.MajorServiceClasses.RENDERING
+    CAPTURING_SERVICE_CLASS                 = ClassOfDevice.MajorServiceClasses.CAPTURING
+    OBJECT_TRANSFER_SERVICE_CLASS           = ClassOfDevice.MajorServiceClasses.OBJECT_TRANSFER
+    AUDIO_SERVICE_CLASS                     = ClassOfDevice.MajorServiceClasses.AUDIO
+    TELEPHONY_SERVICE_CLASS                 = ClassOfDevice.MajorServiceClasses.TELEPHONY
+    INFORMATION_SERVICE_CLASS               = ClassOfDevice.MajorServiceClasses.INFORMATION
+
     # Major Device Classes
-    MISCELLANEOUS_MAJOR_DEVICE_CLASS            = 0x00
-    COMPUTER_MAJOR_DEVICE_CLASS                 = 0x01
-    PHONE_MAJOR_DEVICE_CLASS                    = 0x02
-    LAN_NETWORK_ACCESS_POINT_MAJOR_DEVICE_CLASS = 0x03
-    AUDIO_VIDEO_MAJOR_DEVICE_CLASS              = 0x04
-    PERIPHERAL_MAJOR_DEVICE_CLASS               = 0x05
-    IMAGING_MAJOR_DEVICE_CLASS                  = 0x06
-    WEARABLE_MAJOR_DEVICE_CLASS                 = 0x07
-    TOY_MAJOR_DEVICE_CLASS                      = 0x08
-    HEALTH_MAJOR_DEVICE_CLASS                   = 0x09
-    UNCATEGORIZED_MAJOR_DEVICE_CLASS            = 0x1F
+    MISCELLANEOUS_MAJOR_DEVICE_CLASS            = ClassOfDevice.MajorDeviceClass.MISCELLANEOUS
+    COMPUTER_MAJOR_DEVICE_CLASS                 = ClassOfDevice.MajorDeviceClass.COMPUTER
+    PHONE_MAJOR_DEVICE_CLASS                    = ClassOfDevice.MajorDeviceClass.PHONE
+    LAN_NETWORK_ACCESS_POINT_MAJOR_DEVICE_CLASS = ClassOfDevice.MajorDeviceClass.LAN_NETWORK_ACCESS_POINT
+    AUDIO_VIDEO_MAJOR_DEVICE_CLASS              = ClassOfDevice.MajorDeviceClass.AUDIO_VIDEO
+    PERIPHERAL_MAJOR_DEVICE_CLASS               = ClassOfDevice.MajorDeviceClass.PERIPHERAL
+    IMAGING_MAJOR_DEVICE_CLASS                  = ClassOfDevice.MajorDeviceClass.IMAGING
+    WEARABLE_MAJOR_DEVICE_CLASS                 = ClassOfDevice.MajorDeviceClass.WEARABLE
+    TOY_MAJOR_DEVICE_CLASS                      = ClassOfDevice.MajorDeviceClass.TOY
+    HEALTH_MAJOR_DEVICE_CLASS                   = ClassOfDevice.MajorDeviceClass.HEALTH
+    UNCATEGORIZED_MAJOR_DEVICE_CLASS            = ClassOfDevice.MajorDeviceClass.UNCATEGORIZED
 
-    MAJOR_DEVICE_CLASS_NAMES = {
-        MISCELLANEOUS_MAJOR_DEVICE_CLASS:            'Miscellaneous',
-        COMPUTER_MAJOR_DEVICE_CLASS:                 'Computer',
-        PHONE_MAJOR_DEVICE_CLASS:                    'Phone',
-        LAN_NETWORK_ACCESS_POINT_MAJOR_DEVICE_CLASS: 'LAN/Network Access Point',
-        AUDIO_VIDEO_MAJOR_DEVICE_CLASS:              'Audio/Video',
-        PERIPHERAL_MAJOR_DEVICE_CLASS:               'Peripheral',
-        IMAGING_MAJOR_DEVICE_CLASS:                  'Imaging',
-        WEARABLE_MAJOR_DEVICE_CLASS:                 'Wearable',
-        TOY_MAJOR_DEVICE_CLASS:                      'Toy',
-        HEALTH_MAJOR_DEVICE_CLASS:                   'Health',
-        UNCATEGORIZED_MAJOR_DEVICE_CLASS:            'Uncategorized'
-    }
+    COMPUTER_UNCATEGORIZED_MINOR_DEVICE_CLASS         = ClassOfDevice.ComputerMinorDeviceClass.UNCATEGORIZED
+    COMPUTER_DESKTOP_WORKSTATION_MINOR_DEVICE_CLASS   = ClassOfDevice.ComputerMinorDeviceClass.DESKTOP_WORKSTATION
+    COMPUTER_SERVER_CLASS_COMPUTER_MINOR_DEVICE_CLASS = ClassOfDevice.ComputerMinorDeviceClass.SERVER_CLASS_COMPUTER
+    COMPUTER_LAPTOP_COMPUTER_MINOR_DEVICE_CLASS       = ClassOfDevice.ComputerMinorDeviceClass.LAPTOP_COMPUTER
+    COMPUTER_HANDHELD_PC_PDA_MINOR_DEVICE_CLASS       = ClassOfDevice.ComputerMinorDeviceClass.HANDHELD_PC_PDA
+    COMPUTER_PALM_SIZE_PC_PDA_MINOR_DEVICE_CLASS      = ClassOfDevice.ComputerMinorDeviceClass.PALM_SIZE_PC_PDA
+    COMPUTER_WEARABLE_COMPUTER_MINOR_DEVICE_CLASS     = ClassOfDevice.ComputerMinorDeviceClass.WEARABLE_COMPUTER
+    COMPUTER_TABLET_MINOR_DEVICE_CLASS                = ClassOfDevice.ComputerMinorDeviceClass.TABLET
 
-    COMPUTER_UNCATEGORIZED_MINOR_DEVICE_CLASS         = 0x00
-    COMPUTER_DESKTOP_WORKSTATION_MINOR_DEVICE_CLASS   = 0x01
-    COMPUTER_SERVER_CLASS_COMPUTER_MINOR_DEVICE_CLASS = 0x02
-    COMPUTER_LAPTOP_COMPUTER_MINOR_DEVICE_CLASS       = 0x03
-    COMPUTER_HANDHELD_PC_PDA_MINOR_DEVICE_CLASS       = 0x04
-    COMPUTER_PALM_SIZE_PC_PDA_MINOR_DEVICE_CLASS      = 0x05
-    COMPUTER_WEARABLE_COMPUTER_MINOR_DEVICE_CLASS     = 0x06
-    COMPUTER_TABLET_MINOR_DEVICE_CLASS                = 0x07
+    PHONE_UNCATEGORIZED_MINOR_DEVICE_CLASS                = ClassOfDevice.PhoneMinorDeviceClass.UNCATEGORIZED
+    PHONE_CELLULAR_MINOR_DEVICE_CLASS                     = ClassOfDevice.PhoneMinorDeviceClass.CELLULAR
+    PHONE_CORDLESS_MINOR_DEVICE_CLASS                     = ClassOfDevice.PhoneMinorDeviceClass.CORDLESS
+    PHONE_SMARTPHONE_MINOR_DEVICE_CLASS                   = ClassOfDevice.PhoneMinorDeviceClass.SMARTPHONE
+    PHONE_WIRED_MODEM_OR_VOICE_GATEWAY_MINOR_DEVICE_CLASS = ClassOfDevice.PhoneMinorDeviceClass.WIRED_MODEM_OR_VOICE_GATEWAY
+    PHONE_COMMON_ISDN_MINOR_DEVICE_CLASS                  = ClassOfDevice.PhoneMinorDeviceClass.COMMON_ISDN
 
-    COMPUTER_MINOR_DEVICE_CLASS_NAMES = {
-        COMPUTER_UNCATEGORIZED_MINOR_DEVICE_CLASS:         'Uncategorized',
-        COMPUTER_DESKTOP_WORKSTATION_MINOR_DEVICE_CLASS:   'Desktop workstation',
-        COMPUTER_SERVER_CLASS_COMPUTER_MINOR_DEVICE_CLASS: 'Server-class computer',
-        COMPUTER_LAPTOP_COMPUTER_MINOR_DEVICE_CLASS:       'Laptop',
-        COMPUTER_HANDHELD_PC_PDA_MINOR_DEVICE_CLASS:       'Handheld PC/PDA',
-        COMPUTER_PALM_SIZE_PC_PDA_MINOR_DEVICE_CLASS:      'Palm-size PC/PDA',
-        COMPUTER_WEARABLE_COMPUTER_MINOR_DEVICE_CLASS:     'Wearable computer',
-        COMPUTER_TABLET_MINOR_DEVICE_CLASS:                'Tablet'
-    }
+    AUDIO_VIDEO_UNCATEGORIZED_MINOR_DEVICE_CLASS                 = ClassOfDevice.AudioVideoMinorDeviceClass.UNCATEGORIZED
+    AUDIO_VIDEO_WEARABLE_HEADSET_DEVICE_MINOR_DEVICE_CLASS       = ClassOfDevice.AudioVideoMinorDeviceClass.WEARABLE_HEADSET_DEVICE
+    AUDIO_VIDEO_HANDS_FREE_DEVICE_MINOR_DEVICE_CLASS             = ClassOfDevice.AudioVideoMinorDeviceClass.HANDS_FREE_DEVICE
+    AUDIO_VIDEO_MICROPHONE_MINOR_DEVICE_CLASS                    = ClassOfDevice.AudioVideoMinorDeviceClass.MICROPHONE
+    AUDIO_VIDEO_LOUDSPEAKER_MINOR_DEVICE_CLASS                   = ClassOfDevice.AudioVideoMinorDeviceClass.LOUDSPEAKER
+    AUDIO_VIDEO_HEADPHONES_MINOR_DEVICE_CLASS                    = ClassOfDevice.AudioVideoMinorDeviceClass.HEADPHONES
+    AUDIO_VIDEO_PORTABLE_AUDIO_MINOR_DEVICE_CLASS                = ClassOfDevice.AudioVideoMinorDeviceClass.PORTABLE_AUDIO
+    AUDIO_VIDEO_CAR_AUDIO_MINOR_DEVICE_CLASS                     = ClassOfDevice.AudioVideoMinorDeviceClass.CAR_AUDIO
+    AUDIO_VIDEO_SET_TOP_BOX_MINOR_DEVICE_CLASS                   = ClassOfDevice.AudioVideoMinorDeviceClass.SET_TOP_BOX
+    AUDIO_VIDEO_HIFI_AUDIO_DEVICE_MINOR_DEVICE_CLASS             = ClassOfDevice.AudioVideoMinorDeviceClass.HIFI_AUDIO_DEVICE
+    AUDIO_VIDEO_VCR_MINOR_DEVICE_CLASS                           = ClassOfDevice.AudioVideoMinorDeviceClass.VCR
+    AUDIO_VIDEO_VIDEO_CAMERA_MINOR_DEVICE_CLASS                  = ClassOfDevice.AudioVideoMinorDeviceClass.VIDEO_CAMERA
+    AUDIO_VIDEO_CAMCORDER_MINOR_DEVICE_CLASS                     = ClassOfDevice.AudioVideoMinorDeviceClass.CAMCORDER
+    AUDIO_VIDEO_VIDEO_MONITOR_MINOR_DEVICE_CLASS                 = ClassOfDevice.AudioVideoMinorDeviceClass.VIDEO_MONITOR
+    AUDIO_VIDEO_VIDEO_DISPLAY_AND_LOUDSPEAKER_MINOR_DEVICE_CLASS = ClassOfDevice.AudioVideoMinorDeviceClass.VIDEO_DISPLAY_AND_LOUDSPEAKER
+    AUDIO_VIDEO_VIDEO_CONFERENCING_MINOR_DEVICE_CLASS            = ClassOfDevice.AudioVideoMinorDeviceClass.VIDEO_CONFERENCING
+    AUDIO_VIDEO_GAMING_OR_TOY_MINOR_DEVICE_CLASS                 = ClassOfDevice.AudioVideoMinorDeviceClass.GAMING_OR_TOY
 
-    PHONE_UNCATEGORIZED_MINOR_DEVICE_CLASS                = 0x00
-    PHONE_CELLULAR_MINOR_DEVICE_CLASS                     = 0x01
-    PHONE_CORDLESS_MINOR_DEVICE_CLASS                     = 0x02
-    PHONE_SMARTPHONE_MINOR_DEVICE_CLASS                   = 0x03
-    PHONE_WIRED_MODEM_OR_VOICE_GATEWAY_MINOR_DEVICE_CLASS = 0x04
-    PHONE_COMMON_ISDN_MINOR_DEVICE_CLASS                  = 0x05
+    PERIPHERAL_UNCATEGORIZED_MINOR_DEVICE_CLASS                  = ClassOfDevice.PeripheralMinorDeviceClass.UNCATEGORIZED
+    PERIPHERAL_KEYBOARD_MINOR_DEVICE_CLASS                       = ClassOfDevice.PeripheralMinorDeviceClass.KEYBOARD
+    PERIPHERAL_POINTING_DEVICE_MINOR_DEVICE_CLASS                = ClassOfDevice.PeripheralMinorDeviceClass.POINTING_DEVICE
+    PERIPHERAL_COMBO_KEYBOARD_POINTING_DEVICE_MINOR_DEVICE_CLASS = ClassOfDevice.PeripheralMinorDeviceClass.COMBO_KEYBOARD_POINTING_DEVICE
+    PERIPHERAL_JOYSTICK_MINOR_DEVICE_CLASS                       = ClassOfDevice.PeripheralMinorDeviceClass.JOYSTICK
+    PERIPHERAL_GAMEPAD_MINOR_DEVICE_CLASS                        = ClassOfDevice.PeripheralMinorDeviceClass.GAMEPAD
+    PERIPHERAL_REMOTE_CONTROL_MINOR_DEVICE_CLASS                 = ClassOfDevice.PeripheralMinorDeviceClass.REMOTE_CONTROL
+    PERIPHERAL_SENSING_DEVICE_MINOR_DEVICE_CLASS                 = ClassOfDevice.PeripheralMinorDeviceClass.SENSING_DEVICE
+    PERIPHERAL_DIGITIZER_TABLET_MINOR_DEVICE_CLASS               = ClassOfDevice.PeripheralMinorDeviceClass.DIGITIZER_TABLET
+    PERIPHERAL_CARD_READER_MINOR_DEVICE_CLASS                    = ClassOfDevice.PeripheralMinorDeviceClass.CARD_READER
+    PERIPHERAL_DIGITAL_PEN_MINOR_DEVICE_CLASS                    = ClassOfDevice.PeripheralMinorDeviceClass.DIGITAL_PEN
+    PERIPHERAL_HANDHELD_SCANNER_MINOR_DEVICE_CLASS               = ClassOfDevice.PeripheralMinorDeviceClass.HANDHELD_SCANNER
+    PERIPHERAL_HANDHELD_GESTURAL_INPUT_DEVICE_MINOR_DEVICE_CLASS = ClassOfDevice.PeripheralMinorDeviceClass.HANDHELD_GESTURAL_INPUT_DEVICE
 
-    PHONE_MINOR_DEVICE_CLASS_NAMES = {
-        PHONE_UNCATEGORIZED_MINOR_DEVICE_CLASS:                'Uncategorized',
-        PHONE_CELLULAR_MINOR_DEVICE_CLASS:                     'Cellular',
-        PHONE_CORDLESS_MINOR_DEVICE_CLASS:                     'Cordless',
-        PHONE_SMARTPHONE_MINOR_DEVICE_CLASS:                   'Smartphone',
-        PHONE_WIRED_MODEM_OR_VOICE_GATEWAY_MINOR_DEVICE_CLASS: 'Wired modem or voice gateway',
-        PHONE_COMMON_ISDN_MINOR_DEVICE_CLASS:                  'Common ISDN access'
-    }
+    WEARABLE_UNCATEGORIZED_MINOR_DEVICE_CLASS = ClassOfDevice.WearableMinorDeviceClass.UNCATEGORIZED
+    WEARABLE_WRISTWATCH_MINOR_DEVICE_CLASS    = ClassOfDevice.WearableMinorDeviceClass.WRISTWATCH
+    WEARABLE_PAGER_MINOR_DEVICE_CLASS         = ClassOfDevice.WearableMinorDeviceClass.PAGER
+    WEARABLE_JACKET_MINOR_DEVICE_CLASS        = ClassOfDevice.WearableMinorDeviceClass.JACKET
+    WEARABLE_HELMET_MINOR_DEVICE_CLASS        = ClassOfDevice.WearableMinorDeviceClass.HELMET
+    WEARABLE_GLASSES_MINOR_DEVICE_CLASS       = ClassOfDevice.WearableMinorDeviceClass.GLASSES
 
-    AUDIO_VIDEO_UNCATEGORIZED_MINOR_DEVICE_CLASS                 = 0x00
-    AUDIO_VIDEO_WEARABLE_HEADSET_DEVICE_MINOR_DEVICE_CLASS       = 0x01
-    AUDIO_VIDEO_HANDS_FREE_DEVICE_MINOR_DEVICE_CLASS             = 0x02
-    # (RESERVED)                                                 = 0x03
-    AUDIO_VIDEO_MICROPHONE_MINOR_DEVICE_CLASS                    = 0x04
-    AUDIO_VIDEO_LOUDSPEAKER_MINOR_DEVICE_CLASS                   = 0x05
-    AUDIO_VIDEO_HEADPHONES_MINOR_DEVICE_CLASS                    = 0x06
-    AUDIO_VIDEO_PORTABLE_AUDIO_MINOR_DEVICE_CLASS                = 0x07
-    AUDIO_VIDEO_CAR_AUDIO_MINOR_DEVICE_CLASS                     = 0x08
-    AUDIO_VIDEO_SET_TOP_BOX_MINOR_DEVICE_CLASS                   = 0x09
-    AUDIO_VIDEO_HIFI_AUDIO_DEVICE_MINOR_DEVICE_CLASS             = 0x0A
-    AUDIO_VIDEO_VCR_MINOR_DEVICE_CLASS                           = 0x0B
-    AUDIO_VIDEO_VIDEO_CAMERA_MINOR_DEVICE_CLASS                  = 0x0C
-    AUDIO_VIDEO_CAMCORDER_MINOR_DEVICE_CLASS                     = 0x0D
-    AUDIO_VIDEO_VIDEO_MONITOR_MINOR_DEVICE_CLASS                 = 0x0E
-    AUDIO_VIDEO_VIDEO_DISPLAY_AND_LOUDSPEAKER_MINOR_DEVICE_CLASS = 0x0F
-    AUDIO_VIDEO_VIDEO_CONFERENCING_MINOR_DEVICE_CLASS            = 0x10
-    # (RESERVED)                                                 = 0x11
-    AUDIO_VIDEO_GAMING_OR_TOY_MINOR_DEVICE_CLASS                 = 0x12
+    TOY_UNCATEGORIZED_MINOR_DEVICE_CLASS      = ClassOfDevice.ToyMinorDeviceClass.UNCATEGORIZED
+    TOY_ROBOT_MINOR_DEVICE_CLASS              = ClassOfDevice.ToyMinorDeviceClass.ROBOT
+    TOY_VEHICLE_MINOR_DEVICE_CLASS            = ClassOfDevice.ToyMinorDeviceClass.VEHICLE
+    TOY_DOLL_ACTION_FIGURE_MINOR_DEVICE_CLASS = ClassOfDevice.ToyMinorDeviceClass.DOLL_ACTION_FIGURE
+    TOY_CONTROLLER_MINOR_DEVICE_CLASS         = ClassOfDevice.ToyMinorDeviceClass.CONTROLLER
+    TOY_GAME_MINOR_DEVICE_CLASS               = ClassOfDevice.ToyMinorDeviceClass.GAME
 
-    AUDIO_VIDEO_MINOR_DEVICE_CLASS_NAMES = {
-        AUDIO_VIDEO_UNCATEGORIZED_MINOR_DEVICE_CLASS:                 'Uncategorized',
-        AUDIO_VIDEO_WEARABLE_HEADSET_DEVICE_MINOR_DEVICE_CLASS:       'Wearable Headset Device',
-        AUDIO_VIDEO_HANDS_FREE_DEVICE_MINOR_DEVICE_CLASS:             'Hands-free Device',
-        AUDIO_VIDEO_MICROPHONE_MINOR_DEVICE_CLASS:                    'Microphone',
-        AUDIO_VIDEO_LOUDSPEAKER_MINOR_DEVICE_CLASS:                   'Loudspeaker',
-        AUDIO_VIDEO_HEADPHONES_MINOR_DEVICE_CLASS:                    'Headphones',
-        AUDIO_VIDEO_PORTABLE_AUDIO_MINOR_DEVICE_CLASS:                'Portable Audio',
-        AUDIO_VIDEO_CAR_AUDIO_MINOR_DEVICE_CLASS:                     'Car audio',
-        AUDIO_VIDEO_SET_TOP_BOX_MINOR_DEVICE_CLASS:                   'Set-top box',
-        AUDIO_VIDEO_HIFI_AUDIO_DEVICE_MINOR_DEVICE_CLASS:             'HiFi Audio Device',
-        AUDIO_VIDEO_VCR_MINOR_DEVICE_CLASS:                           'VCR',
-        AUDIO_VIDEO_VIDEO_CAMERA_MINOR_DEVICE_CLASS:                  'Video Camera',
-        AUDIO_VIDEO_CAMCORDER_MINOR_DEVICE_CLASS:                     'Camcorder',
-        AUDIO_VIDEO_VIDEO_MONITOR_MINOR_DEVICE_CLASS:                 'Video Monitor',
-        AUDIO_VIDEO_VIDEO_DISPLAY_AND_LOUDSPEAKER_MINOR_DEVICE_CLASS: 'Video Display and Loudspeaker',
-        AUDIO_VIDEO_VIDEO_CONFERENCING_MINOR_DEVICE_CLASS:            'Video Conferencing',
-        AUDIO_VIDEO_GAMING_OR_TOY_MINOR_DEVICE_CLASS:                 'Gaming/Toy'
-    }
-
-    PERIPHERAL_UNCATEGORIZED_MINOR_DEVICE_CLASS                  = 0x00
-    PERIPHERAL_KEYBOARD_MINOR_DEVICE_CLASS                       = 0x10
-    PERIPHERAL_POINTING_DEVICE_MINOR_DEVICE_CLASS                = 0x20
-    PERIPHERAL_COMBO_KEYBOARD_POINTING_DEVICE_MINOR_DEVICE_CLASS = 0x30
-    PERIPHERAL_JOYSTICK_MINOR_DEVICE_CLASS                       = 0x01
-    PERIPHERAL_GAMEPAD_MINOR_DEVICE_CLASS                        = 0x02
-    PERIPHERAL_REMOTE_CONTROL_MINOR_DEVICE_CLASS                 = 0x03
-    PERIPHERAL_SENSING_DEVICE_MINOR_DEVICE_CLASS                 = 0x04
-    PERIPHERAL_DIGITIZER_TABLET_MINOR_DEVICE_CLASS               = 0x05
-    PERIPHERAL_CARD_READER_MINOR_DEVICE_CLASS                    = 0x06
-    PERIPHERAL_DIGITAL_PEN_MINOR_DEVICE_CLASS                    = 0x07
-    PERIPHERAL_HANDHELD_SCANNER_MINOR_DEVICE_CLASS               = 0x08
-    PERIPHERAL_HANDHELD_GESTURAL_INPUT_DEVICE_MINOR_DEVICE_CLASS = 0x09
-
-    PERIPHERAL_MINOR_DEVICE_CLASS_NAMES = {
-        PERIPHERAL_UNCATEGORIZED_MINOR_DEVICE_CLASS:                  'Uncategorized',
-        PERIPHERAL_KEYBOARD_MINOR_DEVICE_CLASS:                       'Keyboard',
-        PERIPHERAL_POINTING_DEVICE_MINOR_DEVICE_CLASS:                'Pointing device',
-        PERIPHERAL_COMBO_KEYBOARD_POINTING_DEVICE_MINOR_DEVICE_CLASS: 'Combo keyboard/pointing device',
-        PERIPHERAL_JOYSTICK_MINOR_DEVICE_CLASS:                       'Joystick',
-        PERIPHERAL_GAMEPAD_MINOR_DEVICE_CLASS:                        'Gamepad',
-        PERIPHERAL_REMOTE_CONTROL_MINOR_DEVICE_CLASS:                 'Remote control',
-        PERIPHERAL_SENSING_DEVICE_MINOR_DEVICE_CLASS:                 'Sensing device',
-        PERIPHERAL_DIGITIZER_TABLET_MINOR_DEVICE_CLASS:               'Digitizer tablet',
-        PERIPHERAL_CARD_READER_MINOR_DEVICE_CLASS:                    'Card Reader',
-        PERIPHERAL_DIGITAL_PEN_MINOR_DEVICE_CLASS:                    'Digital Pen',
-        PERIPHERAL_HANDHELD_SCANNER_MINOR_DEVICE_CLASS:               'Handheld scanner',
-        PERIPHERAL_HANDHELD_GESTURAL_INPUT_DEVICE_MINOR_DEVICE_CLASS: 'Handheld gestural input device'
-    }
-
-    WEARABLE_UNCATEGORIZED_MINOR_DEVICE_CLASS = 0x00
-    WEARABLE_WRISTWATCH_MINOR_DEVICE_CLASS    = 0x01
-    WEARABLE_PAGER_MINOR_DEVICE_CLASS         = 0x02
-    WEARABLE_JACKET_MINOR_DEVICE_CLASS        = 0x03
-    WEARABLE_HELMET_MINOR_DEVICE_CLASS        = 0x04
-    WEARABLE_GLASSES_MINOR_DEVICE_CLASS       = 0x05
-
-    WEARABLE_MINOR_DEVICE_CLASS_NAMES = {
-        WEARABLE_UNCATEGORIZED_MINOR_DEVICE_CLASS: 'Uncategorized',
-        WEARABLE_WRISTWATCH_MINOR_DEVICE_CLASS:    'Wristwatch',
-        WEARABLE_PAGER_MINOR_DEVICE_CLASS:         'Pager',
-        WEARABLE_JACKET_MINOR_DEVICE_CLASS:        'Jacket',
-        WEARABLE_HELMET_MINOR_DEVICE_CLASS:        'Helmet',
-        WEARABLE_GLASSES_MINOR_DEVICE_CLASS:       'Glasses',
-    }
-
-    TOY_UNCATEGORIZED_MINOR_DEVICE_CLASS      = 0x00
-    TOY_ROBOT_MINOR_DEVICE_CLASS              = 0x01
-    TOY_VEHICLE_MINOR_DEVICE_CLASS            = 0x02
-    TOY_DOLL_ACTION_FIGURE_MINOR_DEVICE_CLASS = 0x03
-    TOY_CONTROLLER_MINOR_DEVICE_CLASS         = 0x04
-    TOY_GAME_MINOR_DEVICE_CLASS               = 0x05
-
-    TOY_MINOR_DEVICE_CLASS_NAMES = {
-        TOY_UNCATEGORIZED_MINOR_DEVICE_CLASS:      'Uncategorized',
-        TOY_ROBOT_MINOR_DEVICE_CLASS:              'Robot',
-        TOY_VEHICLE_MINOR_DEVICE_CLASS:            'Vehicle',
-        TOY_DOLL_ACTION_FIGURE_MINOR_DEVICE_CLASS: 'Doll/Action figure',
-        TOY_CONTROLLER_MINOR_DEVICE_CLASS:         'Controller',
-        TOY_GAME_MINOR_DEVICE_CLASS:               'Game',
-    }
-
-    HEALTH_UNDEFINED_MINOR_DEVICE_CLASS                 = 0x00
-    HEALTH_BLOOD_PRESSURE_MONITOR_MINOR_DEVICE_CLASS    = 0x01
-    HEALTH_THERMOMETER_MINOR_DEVICE_CLASS               = 0x02
-    HEALTH_WEIGHING_SCALE_MINOR_DEVICE_CLASS            = 0x03
-    HEALTH_GLUCOSE_METER_MINOR_DEVICE_CLASS             = 0x04
-    HEALTH_PULSE_OXIMETER_MINOR_DEVICE_CLASS            = 0x05
-    HEALTH_HEART_PULSE_RATE_MONITOR_MINOR_DEVICE_CLASS  = 0x06
-    HEALTH_HEALTH_DATA_DISPLAY_MINOR_DEVICE_CLASS       = 0x07
-    HEALTH_STEP_COUNTER_MINOR_DEVICE_CLASS              = 0x08
-    HEALTH_BODY_COMPOSITION_ANALYZER_MINOR_DEVICE_CLASS = 0x09
-    HEALTH_PEAK_FLOW_MONITOR_MINOR_DEVICE_CLASS         = 0x0A
-    HEALTH_MEDICATION_MONITOR_MINOR_DEVICE_CLASS        = 0x0B
-    HEALTH_KNEE_PROSTHESIS_MINOR_DEVICE_CLASS           = 0x0C
-    HEALTH_ANKLE_PROSTHESIS_MINOR_DEVICE_CLASS          = 0x0D
-    HEALTH_GENERIC_HEALTH_MANAGER_MINOR_DEVICE_CLASS    = 0x0E
-    HEALTH_PERSONAL_MOBILITY_DEVICE_MINOR_DEVICE_CLASS  = 0x0F
-
-    HEALTH_MINOR_DEVICE_CLASS_NAMES = {
-        HEALTH_UNDEFINED_MINOR_DEVICE_CLASS:                 'Undefined',
-        HEALTH_BLOOD_PRESSURE_MONITOR_MINOR_DEVICE_CLASS:    'Blood Pressure Monitor',
-        HEALTH_THERMOMETER_MINOR_DEVICE_CLASS:               'Thermometer',
-        HEALTH_WEIGHING_SCALE_MINOR_DEVICE_CLASS:            'Weighing Scale',
-        HEALTH_GLUCOSE_METER_MINOR_DEVICE_CLASS:             'Glucose Meter',
-        HEALTH_PULSE_OXIMETER_MINOR_DEVICE_CLASS:            'Pulse Oximeter',
-        HEALTH_HEART_PULSE_RATE_MONITOR_MINOR_DEVICE_CLASS:  'Heart/Pulse Rate Monitor',
-        HEALTH_HEALTH_DATA_DISPLAY_MINOR_DEVICE_CLASS:       'Health Data Display',
-        HEALTH_STEP_COUNTER_MINOR_DEVICE_CLASS:              'Step Counter',
-        HEALTH_BODY_COMPOSITION_ANALYZER_MINOR_DEVICE_CLASS: 'Body Composition Analyzer',
-        HEALTH_PEAK_FLOW_MONITOR_MINOR_DEVICE_CLASS:         'Peak Flow Monitor',
-        HEALTH_MEDICATION_MONITOR_MINOR_DEVICE_CLASS:        'Medication Monitor',
-        HEALTH_KNEE_PROSTHESIS_MINOR_DEVICE_CLASS:           'Knee Prosthesis',
-        HEALTH_ANKLE_PROSTHESIS_MINOR_DEVICE_CLASS:          'Ankle Prosthesis',
-        HEALTH_GENERIC_HEALTH_MANAGER_MINOR_DEVICE_CLASS:    'Generic Health Manager',
-        HEALTH_PERSONAL_MOBILITY_DEVICE_MINOR_DEVICE_CLASS:  'Personal Mobility Device',
-    }
-
-    MINOR_DEVICE_CLASS_NAMES = {
-        COMPUTER_MAJOR_DEVICE_CLASS:    COMPUTER_MINOR_DEVICE_CLASS_NAMES,
-        PHONE_MAJOR_DEVICE_CLASS:       PHONE_MINOR_DEVICE_CLASS_NAMES,
-        AUDIO_VIDEO_MAJOR_DEVICE_CLASS: AUDIO_VIDEO_MINOR_DEVICE_CLASS_NAMES,
-        PERIPHERAL_MAJOR_DEVICE_CLASS:  PERIPHERAL_MINOR_DEVICE_CLASS_NAMES,
-        WEARABLE_MAJOR_DEVICE_CLASS:    WEARABLE_MINOR_DEVICE_CLASS_NAMES,
-        TOY_MAJOR_DEVICE_CLASS:         TOY_MINOR_DEVICE_CLASS_NAMES,
-        HEALTH_MAJOR_DEVICE_CLASS:      HEALTH_MINOR_DEVICE_CLASS_NAMES,
-    }
+    HEALTH_UNDEFINED_MINOR_DEVICE_CLASS                 = ClassOfDevice.HealthMinorDeviceClass.UNDEFINED
+    HEALTH_BLOOD_PRESSURE_MONITOR_MINOR_DEVICE_CLASS    = ClassOfDevice.HealthMinorDeviceClass.BLOOD_PRESSURE_MONITOR
+    HEALTH_THERMOMETER_MINOR_DEVICE_CLASS               = ClassOfDevice.HealthMinorDeviceClass.THERMOMETER
+    HEALTH_WEIGHING_SCALE_MINOR_DEVICE_CLASS            = ClassOfDevice.HealthMinorDeviceClass.WEIGHING_SCALE
+    HEALTH_GLUCOSE_METER_MINOR_DEVICE_CLASS             = ClassOfDevice.HealthMinorDeviceClass.GLUCOSE_METER
+    HEALTH_PULSE_OXIMETER_MINOR_DEVICE_CLASS            = ClassOfDevice.HealthMinorDeviceClass.PULSE_OXIMETER
+    HEALTH_HEART_PULSE_RATE_MONITOR_MINOR_DEVICE_CLASS  = ClassOfDevice.HealthMinorDeviceClass.HEART_PULSE_RATE_MONITOR
+    HEALTH_HEALTH_DATA_DISPLAY_MINOR_DEVICE_CLASS       = ClassOfDevice.HealthMinorDeviceClass.HEALTH_DATA_DISPLAY
+    HEALTH_STEP_COUNTER_MINOR_DEVICE_CLASS              = ClassOfDevice.HealthMinorDeviceClass.STEP_COUNTER
+    HEALTH_BODY_COMPOSITION_ANALYZER_MINOR_DEVICE_CLASS = ClassOfDevice.HealthMinorDeviceClass.BODY_COMPOSITION_ANALYZER
+    HEALTH_PEAK_FLOW_MONITOR_MINOR_DEVICE_CLASS         = ClassOfDevice.HealthMinorDeviceClass.PEAK_FLOW_MONITOR
+    HEALTH_MEDICATION_MONITOR_MINOR_DEVICE_CLASS        = ClassOfDevice.HealthMinorDeviceClass.MEDICATION_MONITOR
+    HEALTH_KNEE_PROSTHESIS_MINOR_DEVICE_CLASS           = ClassOfDevice.HealthMinorDeviceClass.KNEE_PROSTHESIS
+    HEALTH_ANKLE_PROSTHESIS_MINOR_DEVICE_CLASS          = ClassOfDevice.HealthMinorDeviceClass.ANKLE_PROSTHESIS
+    HEALTH_GENERIC_HEALTH_MANAGER_MINOR_DEVICE_CLASS    = ClassOfDevice.HealthMinorDeviceClass.GENERIC_HEALTH_MANAGER
+    HEALTH_PERSONAL_MOBILITY_DEVICE_MINOR_DEVICE_CLASS  = ClassOfDevice.HealthMinorDeviceClass.PERSONAL_MOBILITY_DEVICE
 
     # fmt: on
     # pylint: enable=line-too-long
@@ -711,16 +945,16 @@ class DeviceClass:
     @staticmethod
     def service_class_labels(service_class_flags):
         return bit_flags_to_strings(
-            service_class_flags, DeviceClass.SERVICE_CLASS_LABELS
+            service_class_flags, ClassOfDevice.MAJOR_SERVICE_CLASS_LABELS
         )
 
     @staticmethod
     def major_device_class_name(device_class):
-        return name_or_number(DeviceClass.MAJOR_DEVICE_CLASS_NAMES, device_class)
+        return name_or_number(ClassOfDevice.MAJOR_DEVICE_CLASS_LABELS, device_class)
 
     @staticmethod
     def minor_device_class_name(major_device_class, minor_device_class):
-        class_names = DeviceClass.MINOR_DEVICE_CLASS_NAMES.get(major_device_class)
+        class_names = ClassOfDevice.MINOR_DEVICE_CLASS_LABELS.get(major_device_class)
         if class_names is None:
             return f'#{minor_device_class:02X}'
         return name_or_number(class_names, minor_device_class)
@@ -1255,6 +1489,10 @@ class Appearance:
         category = cls.Category(appearance >> 6)
         return cls(category, appearance & 0x3F)
 
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        return cls.from_int(int.from_bytes(data, byteorder="little"))
+
     def __init__(self, category: Category, subcategory: int) -> None:
         self.category = category
         if subcategory_class := self.SUBCATEGORY_CLASSES.get(category):
@@ -1264,6 +1502,9 @@ class Appearance:
 
     def __int__(self) -> int:
         return self.category << 6 | self.subcategory
+
+    def __bytes__(self) -> bytes:
+        return int(self).to_bytes(2, byteorder="little")
 
     def __repr__(self) -> str:
         return (
@@ -1275,6 +1516,61 @@ class Appearance:
 
     def __str__(self) -> str:
         return f'{self.category.name}/{self.subcategory.name}'
+
+    def __eq__(self, value: Any) -> bool:
+        return (
+            isinstance(value, Appearance)
+            and self.category == value.category
+            and self.subcategory == value.subcategory
+        )
+
+
+# -----------------------------------------------------------------------------
+# Classes representing "Data Types" defined in
+# "Supplement to the Bluetooth Core Specification", Part A
+# -----------------------------------------------------------------------------
+# TODO: use ABC, figure out multiple base classes with metaclasses
+class DataType:
+    # Human-reable label/name for the type
+    label = ""
+
+    # Advertising Data type ID for this data type.
+    ad_type: AdvertisingData.Type = 0  # type: ignore
+
+    def value_string(self) -> str:
+        """Human-reable string representation of the value."""
+        raise NotImplementedError()
+
+    def to_string(self, use_label: bool = False) -> str:
+        if use_label:
+            return f"[{self.label}]: {self.value_string()}"
+
+        return f"{self.__class__.__name__}({self.value_string()})"
+
+    @classmethod
+    def from_advertising_data(cls, advertising_data: AdvertisingData) -> Optional[Self]:
+        if (data := advertising_data.get(cls.ad_type, raw=True)) is None:
+            return None
+
+        return cls.from_bytes(data)
+
+    @classmethod
+    def all_from_advertising_data(cls, advertising_data: AdvertisingData) -> list[Self]:
+        return [
+            cls.from_bytes(data)
+            for data in advertising_data.get_all(cls.ad_type, raw=True)
+        ]
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
+        """Create an instance from a serialized form."""
+        raise NotImplementedError()
+
+    def __bytes__(self) -> bytes:
+        raise NotImplementedError()
+
+    def __str__(self) -> str:
+        return self.to_string()
 
 
 # -----------------------------------------------------------------------------
@@ -1351,7 +1647,7 @@ class AdvertisingData:
         THREE_D_INFORMATION_DATA                            = 0x3D
         MANUFACTURER_SPECIFIC_DATA                          = 0xFF
 
-    class Flags(enum.IntFlag):
+    class Flags(utils.CompatibleIntFlag):
         LE_LIMITED_DISCOVERABLE_MODE = 1 << 0
         LE_GENERAL_DISCOVERABLE_MODE = 1 << 1
         BR_EDR_NOT_SUPPORTED = 1 << 2
@@ -1419,15 +1715,25 @@ class AdvertisingData:
     BR_EDR_CONTROLLER_FLAG            = Flags.SIMULTANEOUS_LE_BR_EDR_CAPABLE
     BR_EDR_HOST_FLAG                  = 0x10 # Deprecated
 
-    ad_structures: list[tuple[int, bytes]]
+    ad_structures: list[tuple[AdvertisingData.Type, bytes]]
 
     # fmt: on
     # pylint: enable=line-too-long
 
-    def __init__(self, ad_structures: Optional[list[tuple[int, bytes]]] = None) -> None:
+    def __init__(
+        self,
+        ad_structures: Optional[Iterable[Union[tuple[int, bytes], DataType]]] = None,
+    ) -> None:
         if ad_structures is None:
             ad_structures = []
-        self.ad_structures = ad_structures[:]
+        self.ad_structures = [
+            (
+                (element.ad_type, bytes(element))
+                if isinstance(element, DataType)
+                else (AdvertisingData.Type(element[0]), element[1])
+            )
+            for element in ad_structures
+        ]
 
     @classmethod
     def from_bytes(cls, data: bytes) -> AdvertisingData:
@@ -1444,11 +1750,10 @@ class AdvertisingData:
                 'LE Limited Discoverable Mode',
                 'LE General Discoverable Mode',
                 'BR/EDR Not Supported',
-                'Simultaneous LE and BR/EDR (Controller)',
-                'Simultaneous LE and BR/EDR (Host)',
+                'Simultaneous LE and BR/EDR',
             ]
         )
-        return ','.join(bit_flags_to_strings(flags, flag_names))
+        return ', '.join(bit_flags_to_strings(flags, flag_names))
 
     @staticmethod
     def uuid_list_to_objects(ad_data: bytes, uuid_size: int) -> list[UUID]:
@@ -1604,7 +1909,7 @@ class AdvertisingData:
             if length > 0:
                 ad_type = data[offset]
                 ad_data = data[offset + 1 : offset + length]
-                self.ad_structures.append((ad_type, ad_data))
+                self.ad_structures.append((AdvertisingData.Type(ad_type), ad_data))
             offset += length
 
     @overload
@@ -1623,6 +1928,7 @@ class AdvertisingData:
         ],
         raw: Literal[False] = False,
     ) -> list[list[UUID]]: ...
+
     @overload
     def get_all(
         self,
@@ -1633,6 +1939,7 @@ class AdvertisingData:
         ],
         raw: Literal[False] = False,
     ) -> list[tuple[UUID, bytes]]: ...
+
     @overload
     def get_all(
         self,
@@ -1644,6 +1951,7 @@ class AdvertisingData:
         ],
         raw: Literal[False] = False,
     ) -> list[str]: ...
+
     @overload
     def get_all(
         self,
@@ -1655,26 +1963,31 @@ class AdvertisingData:
         ],
         raw: Literal[False] = False,
     ) -> list[int]: ...
+
     @overload
     def get_all(
         self,
         type_id: Literal[AdvertisingData.Type.PERIPHERAL_CONNECTION_INTERVAL_RANGE,],
         raw: Literal[False] = False,
     ) -> list[tuple[int, int]]: ...
+
     @overload
     def get_all(
         self,
         type_id: Literal[AdvertisingData.Type.MANUFACTURER_SPECIFIC_DATA,],
         raw: Literal[False] = False,
     ) -> list[tuple[int, bytes]]: ...
+
     @overload
     def get_all(
         self,
         type_id: Literal[AdvertisingData.Type.APPEARANCE,],
         raw: Literal[False] = False,
     ) -> list[Appearance]: ...
+
     @overload
     def get_all(self, type_id: int, raw: Literal[True]) -> list[bytes]: ...
+
     @overload
     def get_all(
         self, type_id: int, raw: bool = False
@@ -1682,7 +1995,7 @@ class AdvertisingData:
 
     def get_all(self, type_id: int, raw: bool = False) -> list[AdvertisingDataObject]:  # type: ignore[misc]
         '''
-        Get Advertising Data Structure(s) with a given type
+        Get all advertising data elements as simple AdvertisingDataObject objects.
 
         Returns a (possibly empty) list of matches.
         '''
@@ -1708,6 +2021,7 @@ class AdvertisingData:
         ],
         raw: Literal[False] = False,
     ) -> Optional[list[UUID]]: ...
+
     @overload
     def get(
         self,
@@ -1718,6 +2032,7 @@ class AdvertisingData:
         ],
         raw: Literal[False] = False,
     ) -> Optional[tuple[UUID, bytes]]: ...
+
     @overload
     def get(
         self,
@@ -1729,6 +2044,7 @@ class AdvertisingData:
         ],
         raw: Literal[False] = False,
     ) -> Optional[Optional[str]]: ...
+
     @overload
     def get(
         self,
@@ -1740,26 +2056,31 @@ class AdvertisingData:
         ],
         raw: Literal[False] = False,
     ) -> Optional[int]: ...
+
     @overload
     def get(
         self,
         type_id: Literal[AdvertisingData.Type.PERIPHERAL_CONNECTION_INTERVAL_RANGE,],
         raw: Literal[False] = False,
     ) -> Optional[tuple[int, int]]: ...
+
     @overload
     def get(
         self,
         type_id: Literal[AdvertisingData.Type.MANUFACTURER_SPECIFIC_DATA,],
         raw: Literal[False] = False,
     ) -> Optional[tuple[int, bytes]]: ...
+
     @overload
     def get(
         self,
         type_id: Literal[AdvertisingData.Type.APPEARANCE,],
         raw: Literal[False] = False,
     ) -> Optional[Appearance]: ...
+
     @overload
     def get(self, type_id: int, raw: Literal[True]) -> Optional[bytes]: ...
+
     @overload
     def get(
         self, type_id: int, raw: bool = False
@@ -1767,7 +2088,7 @@ class AdvertisingData:
 
     def get(self, type_id: int, raw: bool = False) -> Optional[AdvertisingDataObject]:
         '''
-        Get Advertising Data Structure(s) with a given type
+        Get advertising data as a simple AdvertisingDataObject object.
 
         Returns the first entry, or None if no structure matches.
         '''
@@ -1822,7 +2143,22 @@ class ConnectionPHY:
 # LE Role
 # -----------------------------------------------------------------------------
 class LeRole(enum.IntEnum):
-    PERIPHERAL_ONLY = 0x00
-    CENTRAL_ONLY = 0x01
+    # fmt: off
+    PERIPHERAL_ONLY           = 0x00
+    CENTRAL_ONLY              = 0x01
     BOTH_PERIPHERAL_PREFERRED = 0x02
-    BOTH_CENTRAL_PREFERRED = 0x03
+    BOTH_CENTRAL_PREFERRED    = 0x03
+
+
+# -----------------------------------------------------------------------------
+# Security Manager OOB Flag
+# -----------------------------------------------------------------------------
+class SecurityManagerOutOfBandFlag(utils.CompatibleIntFlag):
+    """
+    See Supplement to the Bluetooth Core Specification, Part A
+    1.7 SECURITY MANAGER OUT OF BAND (OOB)
+    """
+
+    OOB_FLAGS_FIELD = 1 << 0
+    LE_SUPPORTED = 1 << 1
+    ADDRESS_TYPE = 1 << 3

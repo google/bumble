@@ -104,5 +104,8 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python-envs.defaultEnvManager": "ms-python.python:system",
-    "python-envs.pythonProjects": []
+    "python-envs.pythonProjects": [],
+    "nrf-connect.applications": [
+        "${workspaceFolder}/extras/zephyr/hci_usb"
+    ]
 }

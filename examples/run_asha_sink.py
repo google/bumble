@@ -23,7 +23,7 @@ from typing import Optional
 import websockets
 
 import bumble.logging
-from bumble import decoder, gatt
+from bumble import data_types, decoder, gatt
 from bumble.core import AdvertisingData
 from bumble.device import AdvertisingParameters, Device
 from bumble.profiles import asha
@@ -78,14 +78,10 @@ async def main() -> None:
             bytes(
                 AdvertisingData(
                     [
-                        (
-                            AdvertisingData.COMPLETE_LOCAL_NAME,
-                            bytes(device.name, 'utf-8'),
-                        ),
-                        (AdvertisingData.FLAGS, bytes([0x06])),
-                        (
-                            AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                            bytes(gatt.GATT_ASHA_SERVICE),
+                        data_types.CompleteLocalName(device.name),
+                        data_types.Flags(AdvertisingData.Flags(0x06)),
+                        data_types.IncompleteListOf16BitServiceUUIDs(
+                            [gatt.GATT_ASHA_SERVICE]
                         ),
                     ]
                 )

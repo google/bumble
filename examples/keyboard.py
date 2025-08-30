@@ -23,6 +23,7 @@ import sys
 import websockets
 
 import bumble.logging
+from bumble import data_types
 from bumble.colors import color
 from bumble.core import AdvertisingData
 from bumble.device import Connection, Device, Peer
@@ -341,16 +342,18 @@ async def keyboard_device(device, command):
     device.advertising_data = bytes(
         AdvertisingData(
             [
-                (
-                    AdvertisingData.COMPLETE_LOCAL_NAME,
-                    bytes('Bumble Keyboard', 'utf-8'),
+                data_types.CompleteLocalName('Bumble Keyboard'),
+                data_types.IncompleteListOf16BitServiceUUIDs(
+                    [GATT_HUMAN_INTERFACE_DEVICE_SERVICE]
                 ),
-                (
-                    AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                    bytes(GATT_HUMAN_INTERFACE_DEVICE_SERVICE),
+                data_types.Appearance(
+                    data_types.Appearance.Category.HUMAN_INTERFACE_DEVICE,
+                    data_types.Appearance.HumanInterfaceDeviceSubcategory.KEYBOARD,
                 ),
-                (AdvertisingData.APPEARANCE, struct.pack('<H', 0x03C1)),
-                (AdvertisingData.FLAGS, bytes([0x05])),
+                data_types.Flags(
+                    AdvertisingData.Flags.LE_LIMITED_DISCOVERABLE_MODE
+                    | AdvertisingData.Flags.BR_EDR_NOT_SUPPORTED
+                ),
             ]
         )
     )

@@ -16,7 +16,13 @@
 # Imports
 # -----------------------------------------------------------------------------
 
-from bumble.core import UUID, AdvertisingData, Appearance, get_dict_key_by_value
+from bumble.core import (
+    UUID,
+    AdvertisingData,
+    Appearance,
+    ClassOfDevice,
+    get_dict_key_by_value,
+)
 
 
 # -----------------------------------------------------------------------------
@@ -91,6 +97,24 @@ def test_appearance() -> None:
     assert a.category == 0xCC
     assert a.subcategory == 0x33
     assert int(a) == 0x3333
+
+
+# -----------------------------------------------------------------------------
+def test_class_of_device() -> None:
+    c1 = ClassOfDevice(
+        ClassOfDevice.MajorServiceClasses.AUDIO
+        | ClassOfDevice.MajorServiceClasses.RENDERING,
+        ClassOfDevice.MajorDeviceClass.AUDIO_VIDEO,
+        ClassOfDevice.AudioVideoMinorDeviceClass.CAMCORDER,
+    )
+    assert str(c1) == "ClassOfDevice(RENDERING|AUDIO,AUDIO_VIDEO/CAMCORDER)"
+
+    c2 = ClassOfDevice(
+        ClassOfDevice.MajorServiceClasses.AUDIO,
+        ClassOfDevice.MajorDeviceClass.AUDIO_VIDEO,
+        0x123,
+    )
+    assert str(c2) == "ClassOfDevice(AUDIO,AUDIO_VIDEO/0x123)"
 
 
 # -----------------------------------------------------------------------------

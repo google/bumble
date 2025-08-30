@@ -19,6 +19,7 @@ import asyncio
 import sys
 
 import bumble.logging
+from bumble import data_types
 from bumble.core import AdvertisingData
 from bumble.device import Device
 from bumble.profiles.hap import (
@@ -71,23 +72,14 @@ async def main() -> None:
         advertising_data = bytes(
             AdvertisingData(
                 [
-                    (
-                        AdvertisingData.COMPLETE_LOCAL_NAME,
-                        bytes('Bumble HearingAccessService', 'utf-8'),
+                    data_types.CompleteLocalName('Bumble HearingAccessService'),
+                    data_types.Flags(
+                        AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
+                        | AdvertisingData.BR_EDR_HOST_FLAG
+                        | AdvertisingData.BR_EDR_CONTROLLER_FLAG
                     ),
-                    (
-                        AdvertisingData.FLAGS,
-                        bytes(
-                            [
-                                AdvertisingData.LE_GENERAL_DISCOVERABLE_MODE_FLAG
-                                | AdvertisingData.BR_EDR_HOST_FLAG
-                                | AdvertisingData.BR_EDR_CONTROLLER_FLAG
-                            ]
-                        ),
-                    ),
-                    (
-                        AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
-                        bytes(HearingAccessService.UUID),
+                    data_types.IncompleteListOf16BitServiceUUIDs(
+                        [HearingAccessService.UUID]
                     ),
                 ]
             )
