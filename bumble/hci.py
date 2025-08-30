@@ -1322,7 +1322,7 @@ class LeFeature(SpecableEnum):
     MONITORING_ADVERTISERS                         = 64
     FRAME_SPACE_UPDATE                             = 65
 
-class LeFeatureMask(enum.IntFlag):
+class LeFeatureMask(utils.CompatibleIntFlag):
     LE_ENCRYPTION                                  = 1 << LeFeature.LE_ENCRYPTION
     CONNECTION_PARAMETERS_REQUEST_PROCEDURE        = 1 << LeFeature.CONNECTION_PARAMETERS_REQUEST_PROCEDURE
     EXTENDED_REJECT_INDICATION                     = 1 << LeFeature.EXTENDED_REJECT_INDICATION
@@ -1463,7 +1463,7 @@ class LmpFeature(SpecableEnum):
     SLOT_AVAILABILITY_MASK                                       = 138
     TRAIN_NUDGING                                                = 139
 
-class LmpFeatureMask(enum.IntFlag):
+class LmpFeatureMask(utils.CompatibleIntFlag):
     # Page 0 (Legacy LMP features)
     LMP_3_SLOT_PACKETS                                           = (1 << LmpFeature.LMP_3_SLOT_PACKETS)
     LMP_5_SLOT_PACKETS                                           = (1 << LmpFeature.LMP_5_SLOT_PACKETS)

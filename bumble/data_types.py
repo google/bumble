@@ -25,7 +25,7 @@ from __future__ import annotations
 import dataclasses
 import math
 import struct
-from typing import Any, ClassVar, Literal, Optional, TypeVar, Union, overload
+from typing import Any, ClassVar, Sequence
 
 from typing_extensions import Self
 
@@ -70,7 +70,7 @@ class ListOfServiceUUIDs(core.DataType):
     """Base class for complete or incomplete lists of UUIDs."""
 
     _uuid_size: ClassVar[int] = 0
-    uuids: list[core.UUID]
+    uuids: Sequence[core.UUID]
 
     @classmethod
     def from_bytes(cls, data: bytes) -> ListOfServiceUUIDs:
@@ -215,7 +215,7 @@ class Flags(int, core.DataType):
         return self.to_bytes(length=bytes_length, byteorder="little")
 
     def value_string(self) -> str:
-        return core.AdvertisingData.Flags(self).name or ""
+        return core.AdvertisingData.Flags(self).composite_name
 
 
 @dataclasses.dataclass
@@ -292,6 +292,13 @@ class FixedSizeBytesDataType(bytes, core.DataType):
 
     def __str__(self) -> str:
         return core.DataType.__str__(self)
+
+    def __bytes__(self) -> bytes:  # pylint: disable=E0308
+        # Python < 3.11 compatibility (before 3.11, the byte class does not have
+        # a __bytes__ method).
+        # Concatenate with an empty string to perform a direct conversion without
+        # calling bytes() explicity, which may cause an infinite recursion.
+        return b"" + self
 
 
 class ClassOfDevice(core.ClassOfDevice, core.DataType):
@@ -416,7 +423,7 @@ class SecurityManagerOutOfBandFlag(int, core.DataType):
         return core.DataType.__str__(self)
 
     def value_string(self) -> str:
-        return core.SecurityManagerOutOfBandFlag(self).name or ""
+        return core.SecurityManagerOutOfBandFlag(self).composite_name
 
 
 class SecurityManagerTKValue(FixedSizeBytesDataType):
@@ -751,7 +758,7 @@ class LeSupportedFeatures(int, core.DataType):
         return self.to_bytes(length=bytes_length, byteorder="little")
 
     def value_string(self) -> str:
-        return hci.LeFeatureMask(self).name or ""
+        return hci.LeFeatureMask(self).composite_name
 
 
 @dataclasses.dataclass

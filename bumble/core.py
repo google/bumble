@@ -468,7 +468,7 @@ BT_HDP_SINK_SERVICE                                  = UUID.from_16_bits(0x1402,
 @dataclasses.dataclass
 class ClassOfDevice:
     # fmt: off
-    class MajorServiceClasses(enum.IntFlag):
+    class MajorServiceClasses(utils.CompatibleIntFlag):
         LIMITED_DISCOVERABLE_MODE = (1 << 0)
         LE_AUDIO                  = (1 << 1)
         POSITIONING               = (1 << 3)
@@ -1647,7 +1647,7 @@ class AdvertisingData:
         THREE_D_INFORMATION_DATA                            = 0x3D
         MANUFACTURER_SPECIFIC_DATA                          = 0xFF
 
-    class Flags(enum.IntFlag):
+    class Flags(utils.CompatibleIntFlag):
         LE_LIMITED_DISCOVERABLE_MODE = 1 << 0
         LE_GENERAL_DISCOVERABLE_MODE = 1 << 1
         BR_EDR_NOT_SUPPORTED = 1 << 2
@@ -2153,7 +2153,7 @@ class LeRole(enum.IntEnum):
 # -----------------------------------------------------------------------------
 # Security Manager OOB Flag
 # -----------------------------------------------------------------------------
-class SecurityManagerOutOfBandFlag(enum.IntFlag):
+class SecurityManagerOutOfBandFlag(utils.CompatibleIntFlag):
     """
     See Supplement to the Bluetooth Core Specification, Part A
     1.7 SECURITY MANAGER OUT OF BAND (OOB)
