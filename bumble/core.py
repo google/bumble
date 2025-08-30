@@ -788,7 +788,7 @@ class ClassOfDevice:
             else hex(self.minor_device_class)
         )
         return (
-            f"ClassOfDevice({self.major_service_classes.name},"
+            f"ClassOfDevice({self.major_service_classes.composite_name},"
             f"{self.major_device_class.name}/{minor_device_class_name})"
         )
 
