@@ -1531,16 +1531,6 @@ class ChannelManager:
         if cid in self.fixed_channels:
             del self.fixed_channels[cid]
 
-    @utils.deprecated("Please use create_classic_server")
-    def register_server(
-        self,
-        psm: int,
-        server: Callable[[ClassicChannel], Any],
-    ) -> int:
-        return self.create_classic_server(
-            handler=server, spec=ClassicChannelSpec(psm=psm)
-        ).psm
-
     def create_classic_server(
         self,
         spec: ClassicChannelSpec,
@@ -1576,22 +1566,6 @@ class ChannelManager:
         self.servers[spec.psm] = ClassicChannelServer(self, spec.psm, handler, spec.mtu)
 
         return self.servers[spec.psm]
-
-    @utils.deprecated("Please use create_le_credit_based_server()")
-    def register_le_coc_server(
-        self,
-        psm: int,
-        server: Callable[[LeCreditBasedChannel], Any],
-        max_credits: int,
-        mtu: int,
-        mps: int,
-    ) -> int:
-        return self.create_le_credit_based_server(
-            spec=LeCreditBasedChannelSpec(
-                psm=None if psm == 0 else psm, mtu=mtu, mps=mps, max_credits=max_credits
-            ),
-            handler=server,
-        ).psm
 
     def create_le_credit_based_server(
         self,
@@ -2145,17 +2119,6 @@ class ChannelManager:
             if channel.source_cid in connection_channels:
                 del connection_channels[channel.source_cid]
 
-    @utils.deprecated("Please use create_le_credit_based_channel()")
-    async def open_le_coc(
-        self, connection: Connection, psm: int, max_credits: int, mtu: int, mps: int
-    ) -> LeCreditBasedChannel:
-        return await self.create_le_credit_based_channel(
-            connection=connection,
-            spec=LeCreditBasedChannelSpec(
-                psm=psm, max_credits=max_credits, mtu=mtu, mps=mps
-            ),
-        )
-
     async def create_le_credit_based_channel(
         self,
         connection: Connection,
@@ -2202,12 +2165,6 @@ class ChannelManager:
 
         return channel
 
-    @utils.deprecated("Please use create_classic_channel()")
-    async def connect(self, connection: Connection, psm: int) -> ClassicChannel:
-        return await self.create_classic_channel(
-            connection=connection, spec=ClassicChannelSpec(psm=psm)
-        )
-
     async def create_classic_channel(
         self, connection: Connection, spec: ClassicChannelSpec
     ) -> ClassicChannel:
@@ -2244,20 +2201,3 @@ class ChannelManager:
             raise e
 
         return channel
-
-
-# -----------------------------------------------------------------------------
-# Deprecated Classes
-# -----------------------------------------------------------------------------
-
-
-class Channel(ClassicChannel):
-    @utils.deprecated("Please use ClassicChannel")
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-
-class LeConnectionOrientedChannel(LeCreditBasedChannel):
-    @utils.deprecated("Please use LeCreditBasedChannel")
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)

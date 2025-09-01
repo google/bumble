@@ -112,7 +112,14 @@ class SpecableEnum(utils.OpenIntEnum):
 
     @classmethod
     def type_spec(cls, size: int):
-        return {'size': size, 'mapper': lambda x: cls(x).name}
+        return {
+            'serializer': lambda x: x.to_bytes(size, 'little'),
+            'parser': lambda data, offset: (
+                offset + size,
+                cls(int.from_bytes(data[offset : offset + size], 'little')),
+            ),
+            'mapper': lambda x: cls(x).name,
+        }
 
     @classmethod
     def type_metadata(cls, size: int, list_begin: bool = False, list_end: bool = False):
@@ -123,7 +130,14 @@ class SpecableFlag(enum.IntFlag):
 
     @classmethod
     def type_spec(cls, size: int):
-        return {'size': size, 'mapper': lambda x: cls(x).name}
+        return {
+            'serializer': lambda x: x.to_bytes(size, 'little'),
+            'parser': lambda data, offset: (
+                offset + size,
+                cls(int.from_bytes(data[offset : offset + size], 'little')),
+            ),
+            'mapper': lambda x: cls(x).name,
+        }
 
     @classmethod
     def type_metadata(cls, size: int, list_begin: bool = False, list_end: bool = False):
@@ -1322,7 +1336,7 @@ class LeFeature(SpecableEnum):
     MONITORING_ADVERTISERS                         = 64
     FRAME_SPACE_UPDATE                             = 65
 
-class LeFeatureMask(enum.IntFlag):
+class LeFeatureMask(utils.CompatibleIntFlag):
     LE_ENCRYPTION                                  = 1 << LeFeature.LE_ENCRYPTION
     CONNECTION_PARAMETERS_REQUEST_PROCEDURE        = 1 << LeFeature.CONNECTION_PARAMETERS_REQUEST_PROCEDURE
     EXTENDED_REJECT_INDICATION                     = 1 << LeFeature.EXTENDED_REJECT_INDICATION
@@ -1463,7 +1477,7 @@ class LmpFeature(SpecableEnum):
     SLOT_AVAILABILITY_MASK                                       = 138
     TRAIN_NUDGING                                                = 139
 
-class LmpFeatureMask(enum.IntFlag):
+class LmpFeatureMask(utils.CompatibleIntFlag):
     # Page 0 (Legacy LMP features)
     LMP_3_SLOT_PACKETS                                           = (1 << LmpFeature.LMP_3_SLOT_PACKETS)
     LMP_5_SLOT_PACKETS                                           = (1 << LmpFeature.LMP_5_SLOT_PACKETS)
@@ -2135,6 +2149,7 @@ class Address:
             if len(address) == 12 + 5:
                 # Form with ':' separators
                 address = address.replace(':', '')
+
             self.address_bytes = bytes(reversed(bytes.fromhex(address)))
 
         if len(self.address_bytes) != 6:

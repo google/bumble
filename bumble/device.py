@@ -47,6 +47,7 @@ from typing_extensions import Self
 
 from bumble import (
     core,
+    data_types,
     gatt,
     gatt_client,
     gatt_server,
@@ -1881,16 +1882,6 @@ class Connection(utils.CompositeEventEmitter):
     def send_l2cap_pdu(self, cid: int, pdu: bytes) -> None:
         self.device.send_l2cap_pdu(self.handle, cid, pdu)
 
-    @utils.deprecated("Please use create_l2cap_channel()")
-    async def open_l2cap_channel(
-        self,
-        psm,
-        max_credits=DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
-        mtu=DEVICE_DEFAULT_L2CAP_COC_MTU,
-        mps=DEVICE_DEFAULT_L2CAP_COC_MPS,
-    ):
-        return await self.device.open_l2cap_channel(self, psm, max_credits, mtu, mps)
-
     @overload
     async def create_l2cap_channel(
         self, spec: l2cap.ClassicChannelSpec
@@ -2076,9 +2067,7 @@ class DeviceConfiguration:
     connectable: bool = True
     discoverable: bool = True
     advertising_data: bytes = bytes(
-        AdvertisingData(
-            [(AdvertisingData.COMPLETE_LOCAL_NAME, bytes(DEVICE_DEFAULT_NAME, 'utf-8'))]
-        )
+        AdvertisingData([data_types.CompleteLocalName(DEVICE_DEFAULT_NAME)])
     )
     irk: bytes = bytes(16)  # This really must be changed for any level of security
     keystore: Optional[str] = None
@@ -2122,9 +2111,7 @@ class DeviceConfiguration:
             self.advertising_data = bytes.fromhex(advertising_data)
         elif name is not None:
             self.advertising_data = bytes(
-                AdvertisingData(
-                    [(AdvertisingData.COMPLETE_LOCAL_NAME, bytes(self.name, 'utf-8'))]
-                )
+                AdvertisingData([data_types.CompleteLocalName(self.name)])
             )
 
         # Load scan response data
@@ -2606,36 +2593,6 @@ class Device(utils.CompositeEventEmitter):
                 not in itertools.chain(self.bigs.keys(), self.big_syncs.keys())
             ),
             None,
-        )
-
-    @utils.deprecated("Please use create_l2cap_server()")
-    def register_l2cap_server(self, psm, server) -> int:
-        return self.l2cap_channel_manager.register_server(psm, server)
-
-    @utils.deprecated("Please use create_l2cap_server()")
-    def register_l2cap_channel_server(
-        self,
-        psm,
-        server,
-        max_credits=DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
-        mtu=DEVICE_DEFAULT_L2CAP_COC_MTU,
-        mps=DEVICE_DEFAULT_L2CAP_COC_MPS,
-    ):
-        return self.l2cap_channel_manager.register_le_coc_server(
-            psm, server, max_credits, mtu, mps
-        )
-
-    @utils.deprecated("Please use create_l2cap_channel()")
-    async def open_l2cap_channel(
-        self,
-        connection,
-        psm,
-        max_credits=DEVICE_DEFAULT_L2CAP_COC_MAX_CREDITS,
-        mtu=DEVICE_DEFAULT_L2CAP_COC_MTU,
-        mps=DEVICE_DEFAULT_L2CAP_COC_MPS,
-    ):
-        return await self.l2cap_channel_manager.open_le_coc(
-            connection, psm, max_credits, mtu, mps
         )
 
     @overload
@@ -3605,14 +3562,7 @@ class Device(utils.CompositeEventEmitter):
             # Synthesize an inquiry response if none is set already
             if self.inquiry_response is None:
                 self.inquiry_response = bytes(
-                    AdvertisingData(
-                        [
-                            (
-                                AdvertisingData.COMPLETE_LOCAL_NAME,
-                                bytes(self.name, 'utf-8'),
-                            )
-                        ]
-                    )
+                    AdvertisingData([data_types.CompleteLocalName(self.name)])
                 )
 
             # Update the controller
