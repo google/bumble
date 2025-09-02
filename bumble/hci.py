@@ -6436,7 +6436,9 @@ class HCI_LE_Create_BIG_Complete_Event(HCI_LE_Meta_Event):
     irc: int = field(metadata=metadata(1))
     max_pdu: int = field(metadata=metadata(2))
     iso_interval: int = field(metadata=metadata(2))
-    connection_handle: int = field(metadata=metadata(2, list_begin=True, list_end=True))
+    connection_handle: Sequence[int] = field(
+        metadata=metadata(2, list_begin=True, list_end=True)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -6468,7 +6470,9 @@ class HCI_LE_BIG_Sync_Established_Event(HCI_LE_Meta_Event):
     irc: int = field(metadata=metadata(1))
     max_pdu: int = field(metadata=metadata(2))
     iso_interval: int = field(metadata=metadata(2))
-    connection_handle: int = field(metadata=metadata(2, list_begin=True, list_end=True))
+    connection_handle: Sequence[int] = field(
+        metadata=metadata(2, list_begin=True, list_end=True)
+    )
 
 
 # -----------------------------------------------------------------------------
