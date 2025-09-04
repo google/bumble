@@ -43,177 +43,228 @@ class TwoDevices(test_utils.TwoDevices):
         return devices
 
 
-# -----------------------------------------------------------------------------
-def test_GetPlayStatusCommand():
-    command = avrcp.GetPlayStatusCommand()
-    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
-
-
-# -----------------------------------------------------------------------------
-def test_GetCapabilitiesCommand():
-    command = avrcp.GetCapabilitiesCommand(
-        capability_id=avrcp.GetCapabilitiesCommand.CapabilityId.COMPANY_ID
-    )
-    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
-
-
-# -----------------------------------------------------------------------------
-def test_SetAbsoluteVolumeCommand():
-    command = avrcp.SetAbsoluteVolumeCommand(volume=5)
-    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
-
-
-# -----------------------------------------------------------------------------
-def test_GetElementAttributesCommand():
-    command = avrcp.GetElementAttributesCommand(
-        identifier=999,
-        attribute_ids=[
-            avrcp.MediaAttributeId.ALBUM_NAME,
-            avrcp.MediaAttributeId.ARTIST_NAME,
-        ],
-    )
-    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
-
-
-# -----------------------------------------------------------------------------
-def test_RegisterNotificationCommand():
-    command = avrcp.RegisterNotificationCommand(
-        event_id=avrcp.EventId.ADDRESSED_PLAYER_CHANGED, playback_interval=123
-    )
-    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
-
-
-# -----------------------------------------------------------------------------
-def test_UidsChangedEvent():
-    event = avrcp.UidsChangedEvent(uid_counter=7)
-    assert avrcp.Event.from_bytes(bytes(event)) == event
-
-
-# -----------------------------------------------------------------------------
-def test_TrackChangedEvent():
-    event = avrcp.TrackChangedEvent(identifier=b'12356')
-    assert avrcp.Event.from_bytes(bytes(event)) == event
-
-
-# -----------------------------------------------------------------------------
-def test_VolumeChangedEvent():
-    event = avrcp.VolumeChangedEvent(volume=9)
-    assert avrcp.Event.from_bytes(bytes(event)) == event
-
-
-# -----------------------------------------------------------------------------
-def test_PlaybackStatusChangedEvent():
-    event = avrcp.PlaybackStatusChangedEvent(play_status=avrcp.PlayStatus.PLAYING)
-    assert avrcp.Event.from_bytes(bytes(event)) == event
-
-
-# -----------------------------------------------------------------------------
-def test_AddressedPlayerChangedEvent():
-    event = avrcp.AddressedPlayerChangedEvent(
-        player=avrcp.AddressedPlayerChangedEvent.Player(player_id=9, uid_counter=10)
-    )
-    assert avrcp.Event.from_bytes(bytes(event)) == event
-
-
-# -----------------------------------------------------------------------------
-def test_AvailablePlayersChangedEvent():
-    event = avrcp.AvailablePlayersChangedEvent()
-    assert avrcp.Event.from_bytes(bytes(event)) == event
-
-
-# -----------------------------------------------------------------------------
-def test_PlaybackPositionChangedEvent():
-    event = avrcp.PlaybackPositionChangedEvent(playback_position=1314)
-    assert avrcp.Event.from_bytes(bytes(event)) == event
-
-
-# -----------------------------------------------------------------------------
-def test_NowPlayingContentChangedEvent():
-    event = avrcp.NowPlayingContentChangedEvent()
-    assert avrcp.Event.from_bytes(bytes(event)) == event
-
-
-# -----------------------------------------------------------------------------
-def test_PlayerApplicationSettingChangedEvent():
-    event = avrcp.PlayerApplicationSettingChangedEvent(
-        player_application_settings=[
-            avrcp.PlayerApplicationSettingChangedEvent.Setting(
+@pytest.mark.parametrize(
+    "command,",
+    [
+        avrcp.GetPlayStatusCommand(),
+        avrcp.GetCapabilitiesCommand(
+            capability_id=avrcp.GetCapabilitiesCommand.CapabilityId.COMPANY_ID
+        ),
+        avrcp.SetAbsoluteVolumeCommand(volume=5),
+        avrcp.GetElementAttributesCommand(
+            identifier=999,
+            attribute_ids=[
+                avrcp.MediaAttributeId.ALBUM_NAME,
+                avrcp.MediaAttributeId.ARTIST_NAME,
+            ],
+        ),
+        avrcp.RegisterNotificationCommand(
+            event_id=avrcp.EventId.ADDRESSED_PLAYER_CHANGED, playback_interval=123
+        ),
+        avrcp.SearchCommand(
+            character_set_id=avrcp.CharacterSetId.UTF_8, search_string="Bumble!"
+        ),
+        avrcp.PlayItemCommand(
+            scope=avrcp.Scope.MEDIA_PLAYER_LIST, uid=0, uid_counter=1
+        ),
+        avrcp.ListPlayerApplicationSettingAttributesCommand(),
+        avrcp.ListPlayerApplicationSettingValuesCommand(
+            attribute=avrcp.ApplicationSetting.AttributeId.REPEAT_MODE
+        ),
+        avrcp.GetCurrentPlayerApplicationSettingValueCommand(
+            attribute=[
                 avrcp.ApplicationSetting.AttributeId.REPEAT_MODE,
+                avrcp.ApplicationSetting.AttributeId.SHUFFLE_ON_OFF,
+            ]
+        ),
+        avrcp.SetPlayerApplicationSettingValueCommand(
+            attribute=[avrcp.ApplicationSetting.AttributeId.REPEAT_MODE],
+            value=[avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT],
+        ),
+        avrcp.GetPlayerApplicationSettingAttributeTextCommand(
+            attribute=[
+                avrcp.ApplicationSetting.AttributeId.REPEAT_MODE,
+                avrcp.ApplicationSetting.AttributeId.SHUFFLE_ON_OFF,
+            ]
+        ),
+        avrcp.GetPlayerApplicationSettingValueTextCommand(
+            attribute=avrcp.ApplicationSetting.AttributeId.REPEAT_MODE,
+            value=[
                 avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT,
-            )
-        ]
-    )
+                avrcp.ApplicationSetting.RepeatModeStatus.GROUP_REPEAT,
+            ],
+        ),
+        avrcp.InformDisplayableCharacterSetCommand(
+            character_set_id=[avrcp.CharacterSetId.UTF_8]
+        ),
+        avrcp.InformBatteryStatusOfCtCommand(
+            battery_status=avrcp.InformBatteryStatusOfCtCommand.BatteryStatus.NORMAL
+        ),
+        avrcp.SetAddressedPlayerCommand(player_id=1),
+        avrcp.SetBrowsedPlayerCommand(player_id=1),
+        avrcp.GetFolderItemsCommand(
+            scope=avrcp.Scope.NOW_PLAYING,
+            start_item=0,
+            end_item=1,
+            attributes=[avrcp.MediaAttributeId.ARTIST_NAME],
+        ),
+        avrcp.ChangePathCommand(
+            uid_counter=1,
+            direction=avrcp.ChangePathCommand.Direction.DOWN,
+            folder_uid=2,
+        ),
+        avrcp.GetItemAttributesCommand(
+            scope=avrcp.Scope.NOW_PLAYING,
+            uid=0,
+            uid_counter=1,
+            start_item=0,
+            end_item=0,
+            attributes=[avrcp.MediaAttributeId.DEFAULT_COVER_ART],
+        ),
+        avrcp.GetTotalNumberOfItemsCommand(scope=avrcp.Scope.NOW_PLAYING),
+        avrcp.AddToNowPlayingCommand(
+            scope=avrcp.Scope.NOW_PLAYING, uid=0, uid_counter=1
+        ),
+    ],
+)
+def test_command(command: avrcp.Command):
+    assert avrcp.Command.from_bytes(command.pdu_id, bytes(command)) == command
+
+
+@pytest.mark.parametrize(
+    "event,",
+    [
+        avrcp.UidsChangedEvent(uid_counter=7),
+        avrcp.TrackChangedEvent(identifier=b'12356'),
+        avrcp.VolumeChangedEvent(volume=9),
+        avrcp.PlaybackStatusChangedEvent(play_status=avrcp.PlayStatus.PLAYING),
+        avrcp.AddressedPlayerChangedEvent(
+            player=avrcp.AddressedPlayerChangedEvent.Player(player_id=9, uid_counter=10)
+        ),
+        avrcp.AvailablePlayersChangedEvent(),
+        avrcp.PlaybackPositionChangedEvent(playback_position=1314),
+        avrcp.NowPlayingContentChangedEvent(),
+        avrcp.PlayerApplicationSettingChangedEvent(
+            player_application_settings=[
+                avrcp.PlayerApplicationSettingChangedEvent.Setting(
+                    avrcp.ApplicationSetting.AttributeId.REPEAT_MODE,
+                    avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT,
+                )
+            ]
+        ),
+    ],
+)
+def test_event(event: avrcp.Event):
     assert avrcp.Event.from_bytes(bytes(event)) == event
 
 
-# -----------------------------------------------------------------------------
-def test_RejectedResponse():
-    pdu_id = avrcp.PduId.GET_ELEMENT_ATTRIBUTES
-    response = avrcp.RejectedResponse(
-        pdu_id=pdu_id,
-        status_code=avrcp.StatusCode.DOES_NOT_EXIST,
-    )
-    assert (
-        avrcp.RejectedResponse.from_bytes(pdu=bytes(response), pdu_id=pdu_id)
-        == response
-    )
-
-
-# -----------------------------------------------------------------------------
-def test_GetPlayStatusResponse():
-    response = avrcp.GetPlayStatusResponse(
-        song_length=1010, song_position=13, play_status=avrcp.PlayStatus.PAUSED
-    )
-    assert avrcp.GetPlayStatusResponse.from_bytes(bytes(response)) == response
-
-
-# -----------------------------------------------------------------------------
-def test_NotImplementedResponse():
-    pdu_id = avrcp.PduId.GET_ELEMENT_ATTRIBUTES
-    response = avrcp.NotImplementedResponse(pdu_id=pdu_id, parameters=b'koasd')
-    assert (
-        avrcp.NotImplementedResponse.from_bytes(bytes(response), pdu_id=pdu_id)
-        == response
-    )
-
-
-# -----------------------------------------------------------------------------
-def test_GetCapabilitiesResponse():
-    response = avrcp.GetCapabilitiesResponse(
-        capability_id=avrcp.GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED,
-        capabilities=[
-            avrcp.EventId.ADDRESSED_PLAYER_CHANGED,
-            avrcp.EventId.BATT_STATUS_CHANGED,
-        ],
-    )
-    assert avrcp.GetCapabilitiesResponse.from_bytes(bytes(response)) == response
-
-
-# -----------------------------------------------------------------------------
-def test_RegisterNotificationResponse():
-    response = avrcp.RegisterNotificationResponse(
-        event=avrcp.PlaybackPositionChangedEvent(playback_position=38)
-    )
-    assert avrcp.RegisterNotificationResponse.from_bytes(bytes(response)) == response
-
-
-# -----------------------------------------------------------------------------
-def test_SetAbsoluteVolumeResponse():
-    response = avrcp.SetAbsoluteVolumeResponse(volume=99)
-    assert avrcp.SetAbsoluteVolumeResponse.from_bytes(bytes(response)) == response
-
-
-# -----------------------------------------------------------------------------
-def test_GetElementAttributesResponse():
-    response = avrcp.GetElementAttributesResponse(
-        attributes=[
-            avrcp.MediaAttribute(
-                attribute_id=avrcp.MediaAttributeId.ALBUM_NAME,
-                attribute_value="White Album",
-            )
-        ]
-    )
-    assert avrcp.GetElementAttributesResponse.from_bytes(bytes(response)) == response
+@pytest.mark.parametrize(
+    "response,",
+    [
+        avrcp.GetPlayStatusResponse(
+            song_length=1010, song_position=13, play_status=avrcp.PlayStatus.PAUSED
+        ),
+        avrcp.GetCapabilitiesResponse(
+            capability_id=avrcp.GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED,
+            capabilities=[
+                avrcp.EventId.ADDRESSED_PLAYER_CHANGED,
+                avrcp.EventId.BATT_STATUS_CHANGED,
+            ],
+        ),
+        avrcp.RegisterNotificationResponse(
+            event=avrcp.PlaybackPositionChangedEvent(playback_position=38)
+        ),
+        avrcp.SetAbsoluteVolumeResponse(volume=99),
+        avrcp.GetElementAttributesResponse(
+            attributes=[
+                avrcp.MediaAttribute(
+                    attribute_id=avrcp.MediaAttributeId.ALBUM_NAME,
+                    attribute_value="White Album",
+                    character_set_id=avrcp.CharacterSetId.UTF_8,
+                )
+            ]
+        ),
+        avrcp.ListPlayerApplicationSettingAttributesResponse(
+            attribute=[
+                avrcp.ApplicationSetting.AttributeId.REPEAT_MODE,
+                avrcp.ApplicationSetting.AttributeId.SHUFFLE_ON_OFF,
+            ]
+        ),
+        avrcp.ListPlayerApplicationSettingValuesResponse(
+            value=[
+                avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT,
+                avrcp.ApplicationSetting.RepeatModeStatus.GROUP_REPEAT,
+            ]
+        ),
+        avrcp.GetCurrentPlayerApplicationSettingValueResponse(
+            attribute=[avrcp.ApplicationSetting.AttributeId.REPEAT_MODE],
+            value=[avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT],
+        ),
+        avrcp.SetPlayerApplicationSettingValueResponse(),
+        avrcp.GetPlayerApplicationSettingAttributeTextResponse(
+            attribute=[avrcp.ApplicationSetting.AttributeId.REPEAT_MODE],
+            character_set_id=[avrcp.CharacterSetId.UTF_8],
+            attribute_string=["Repeat"],
+        ),
+        avrcp.GetPlayerApplicationSettingValueTextResponse(
+            value=[avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT],
+            character_set_id=[avrcp.CharacterSetId.UTF_8],
+            attribute_string=["All track repeat"],
+        ),
+        avrcp.InformDisplayableCharacterSetResponse(),
+        avrcp.InformBatteryStatusOfCtResponse(),
+        avrcp.SetAddressedPlayerResponse(status=avrcp.StatusCode.OPERATION_COMPLETED),
+        avrcp.SetBrowsedPlayerResponse(
+            status=avrcp.StatusCode.OPERATION_COMPLETED,
+            uid_counter=1,
+            numbers_of_items=2,
+            character_set_id=avrcp.CharacterSetId.UTF_8,
+            folder_names=["folder1", "folder2"],
+        ),
+        avrcp.GetFolderItemsResponse(
+            status=avrcp.StatusCode.OPERATION_COMPLETED,
+            uid_counter=1,
+            items=[
+                avrcp.MediaPlayerItem(
+                    player_id=1,
+                    major_player_type=avrcp.MediaPlayerItem.MajorPlayerType.AUDIO,
+                    player_sub_type=avrcp.MediaPlayerItem.PlayerSubType.AUDIO_BOOK,
+                    play_status=avrcp.PlayStatus.FWD_SEEK,
+                    feature_bitmask=avrcp.MediaPlayerItem.Features.ADD_TO_NOW_PLAYING,
+                    character_set_id=avrcp.CharacterSetId.UTF_8,
+                    displayable_name="Woo",
+                )
+            ],
+        ),
+        avrcp.ChangePathResponse(
+            status=avrcp.StatusCode.OPERATION_COMPLETED, number_of_items=2
+        ),
+        avrcp.GetItemAttributesResponse(
+            status=avrcp.StatusCode.OPERATION_COMPLETED,
+            attribute_value_entry_list=[
+                avrcp.AttributeValueEntry(
+                    attribute_id=avrcp.MediaAttributeId.GENRE,
+                    character_set_id=avrcp.CharacterSetId.UTF_8,
+                    attribute_value="uuddlrlrabab",
+                )
+            ],
+        ),
+        avrcp.GetTotalNumberOfItemsResponse(
+            status=avrcp.StatusCode.OPERATION_COMPLETED,
+            uid_counter=1,
+            number_of_items=2,
+        ),
+        avrcp.SearchResponse(
+            status=avrcp.StatusCode.OPERATION_COMPLETED,
+            uid_counter=1,
+            number_of_items=2,
+        ),
+        avrcp.PlayItemResponse(status=avrcp.StatusCode.OPERATION_COMPLETED),
+        avrcp.AddToNowPlayingResponse(status=avrcp.StatusCode.OPERATION_COMPLETED),
+    ],
+)
+def test_response(response: avrcp.Response):
+    assert avrcp.Response.from_bytes(bytes(response), response.pdu_id) == response
 
 
 # -----------------------------------------------------------------------------
