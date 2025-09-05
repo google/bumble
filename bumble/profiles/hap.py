@@ -277,8 +277,10 @@ class HearingAccessService(gatt.TemplateService):
             def on_pairing(*_: Any) -> None:
                 self.on_incoming_paired_connection(connection)
 
-            if connection.peer_resolvable_address:
-                self.on_incoming_paired_connection(connection)
+            @connection.on(connection.EVENT_CONNECTION_ATT_MTU_UPDATE)
+            def on_mtu_update(*_: Any) -> None:
+                if connection.peer_resolvable_address:
+                    self.on_incoming_paired_connection(connection)
 
         self.hearing_aid_features_characteristic = gatt.Characteristic(
             uuid=gatt.GATT_HEARING_AID_FEATURES_CHARACTERISTIC,
@@ -457,6 +459,7 @@ class HearingAccessService(gatt.TemplateService):
                     connection,
                     self.hearing_aid_preset_control_point,
                     value=op_list[0].to_bytes(len(op_list) == 1),
+                    force=True, # Gatt server forget who was subscribed to notification
                 )
                 # Remove item once sent, and keep the non sent item in the list
                 op_list.pop(0)
