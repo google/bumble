@@ -1833,33 +1833,27 @@ class Connection(utils.CompositeEventEmitter):
 
     # [Classic only]
     @classmethod
-    def incomplete(cls, device, peer_address, role):
+    def from_pending_connection(
+        cls,
+        device: Device,
+        pending_connection: Device._PendingConnection,
+        handle: int,
+        parameters: Parameters,
+    ) -> Connection:
         """
-        Instantiate an incomplete connection (ie. one waiting for a HCI Connection
-        Complete event).
-        Once received it shall be completed using the `.complete` method.
+        Instantiate a connection from a _PendingConnection and its now-resolved parameters.
         """
         return cls(
-            device,
-            None,
-            PhysicalTransport.BR_EDR,
-            device.public_address,
-            None,
-            peer_address,
-            None,
-            role,
-            None,
+            device=device,
+            handle=handle,
+            transport=PhysicalTransport.BR_EDR,
+            self_address=device.public_address,
+            self_resolvable_address=None,
+            peer_address=pending_connection.peer_address,
+            peer_resolvable_address=None,
+            role=pending_connection.role,
+            parameters=parameters,
         )
-
-    # [Classic only]
-    def complete(self, handle, parameters):
-        """
-        Finish an incomplete connection upon completion.
-        """
-        assert self.handle is None
-        assert self.transport == PhysicalTransport.BR_EDR
-        self.handle = handle
-        self.parameters = parameters
 
     @property
     def role_name(self):
@@ -1872,7 +1866,7 @@ class Connection(utils.CompositeEventEmitter):
         return f'UNKNOWN[{self.role}]'
 
     @property
-    def is_encrypted(self):
+    def is_encrypted(self) -> bool:
         return self.encryption != 0
 
     @property
@@ -2245,7 +2239,7 @@ class Device(utils.CompositeEventEmitter):
     scan_response_data: bytes
     cs_capabilities: ChannelSoundingCapabilities | None = None
     connections: dict[int, Connection]
-    pending_connections: dict[hci.Address, Connection]
+    pending_connections: dict[hci.Address, Device._PendingConnection]
     classic_pending_accepts: dict[
         hci.Address,
         list[asyncio.Future[Union[Connection, tuple[hci.Address, int, int]]]],
@@ -2340,6 +2334,11 @@ class Device(utils.CompositeEventEmitter):
     ) -> Device:
         config = DeviceConfiguration.from_file(filename)
         return cls.from_config_with_hci(config, hci_source, hci_sink)
+
+    @dataclass
+    class _PendingConnection:
+        peer_address: hci.Address
+        role: hci.Role
 
     def __init__(
         self,
@@ -3836,8 +3835,8 @@ class Device(utils.CompositeEventEmitter):
                     )
             else:
                 # Save pending connection
-                self.pending_connections[peer_address] = Connection.incomplete(
-                    self, peer_address, hci.Role.CENTRAL
+                self.pending_connections[peer_address] = Device._PendingConnection(
+                    peer_address, hci.Role.CENTRAL
                 )
 
                 # TODO: allow passing other settings
@@ -3989,8 +3988,8 @@ class Device(utils.CompositeEventEmitter):
         # Even if we requested a role switch in the hci.HCI_Accept_Connection_Request
         # command, this connection is still considered Peripheral until an eventual
         # role change event.
-        self.pending_connections[peer_address] = Connection.incomplete(
-            self, peer_address, hci.Role.PERIPHERAL
+        self.pending_connections[peer_address] = Device._PendingConnection(
+            peer_address, hci.Role.PERIPHERAL
         )
 
         try:
@@ -5456,8 +5455,10 @@ class Device(utils.CompositeEventEmitter):
         peer_address: hci.Address,
         self_resolvable_address: Optional[hci.Address],
         peer_resolvable_address: Optional[hci.Address],
-        role: hci.Role,
-        connection_parameters: Optional[core.ConnectionParameters],
+        role: Optional[hci.Role],
+        connection_interval: int,
+        peripheral_latency: int,
+        supervision_timeout: int,
     ) -> None:
         # Convert all-zeros addresses into None.
         if self_resolvable_address == hci.Address.ANY_RANDOM:
@@ -5479,16 +5480,23 @@ class Device(utils.CompositeEventEmitter):
 
         if transport == PhysicalTransport.BR_EDR:
             # Create a new connection
-            connection = self.pending_connections.pop(peer_address)
-            connection.complete(connection_handle, connection_parameters)
+            pending_connection = self.pending_connections.pop(peer_address)
+            connection = Connection.from_pending_connection(
+                self,
+                pending_connection,
+                connection_handle,
+                Connection.Parameters(
+                    connection_interval * 1.25,
+                    peripheral_latency,
+                    supervision_timeout * 10,
+                ),
+            )
             self.connections[connection_handle] = connection
 
             # Emit an event to notify listeners of the new connection
             self.emit(self.EVENT_CONNECTION, connection)
 
             return
-
-        assert connection_parameters is not None
 
         if peer_resolvable_address is None:
             # Resolve the peer address if we can
@@ -5546,9 +5554,9 @@ class Device(utils.CompositeEventEmitter):
             peer_resolvable_address,
             role,
             Connection.Parameters(
-                connection_parameters.connection_interval * 1.25,
-                connection_parameters.peripheral_latency,
-                connection_parameters.supervision_timeout * 10.0,
+                connection_interval * 1.25,
+                peripheral_latency,
+                supervision_timeout * 10.0,
             ),
         )
         self.connections[connection_handle] = connection
@@ -5639,8 +5647,8 @@ class Device(utils.CompositeEventEmitter):
         # device configuration is set to accept any incoming connection
         elif self.classic_accept_any:
             # Save pending connection
-            self.pending_connections[bd_addr] = Connection.incomplete(
-                self, bd_addr, hci.Role.PERIPHERAL
+            self.pending_connections[bd_addr] = Device._PendingConnection(
+                bd_addr, hci.Role.PERIPHERAL
             )
 
             self.host.send_command_sync(
@@ -6183,27 +6191,27 @@ class Device(utils.CompositeEventEmitter):
     @host_event_handler
     @with_connection_from_handle
     def on_connection_parameters_update(
-        self, connection: Connection, connection_parameters: core.ConnectionParameters
+        self,
+        connection: Connection,
+        connection_interval,
+        peripheral_latency,
+        supervision_timeout,
     ):
         logger.debug(
             f'*** Connection Parameters Update: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}, '
-            f'{connection_parameters}'
         )
-        if (
-            connection.parameters.connection_interval
-            != connection_parameters.connection_interval * 1.25
-        ):
+        if connection.parameters.connection_interval != connection_interval * 1.25:
             connection.parameters = Connection.Parameters(
-                connection_parameters.connection_interval * 1.25,
-                connection_parameters.peripheral_latency,
-                connection_parameters.supervision_timeout * 10.0,
+                connection_interval * 1.25,
+                peripheral_latency,
+                supervision_timeout * 10.0,
             )
         else:
             connection.parameters = Connection.Parameters(
-                connection_parameters.connection_interval * 1.25,
-                connection_parameters.peripheral_latency,
-                connection_parameters.supervision_timeout * 10.0,
+                connection_interval * 1.25,
+                peripheral_latency,
+                supervision_timeout * 10.0,
                 connection.parameters.subrate_factor,
                 connection.parameters.continuation_number,
             )

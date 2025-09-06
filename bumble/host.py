@@ -26,12 +26,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Union, cas
 
 from bumble import drivers, hci, utils
 from bumble.colors import color
-from bumble.core import (
-    ConnectionParameters,
-    ConnectionPHY,
-    InvalidStateError,
-    PhysicalTransport,
-)
+from bumble.core import ConnectionPHY, InvalidStateError, PhysicalTransport
 from bumble.l2cap import L2CAP_PDU
 from bumble.snoop import Snooper
 from bumble.transport.common import TransportLostError
@@ -996,11 +991,6 @@ class Host(utils.EventEmitter):
                 self.connections[event.connection_handle] = connection
 
             # Notify the client
-            connection_parameters = ConnectionParameters(
-                event.connection_interval,
-                event.peripheral_latency,
-                event.supervision_timeout,
-            )
             self.emit(
                 'connection',
                 event.connection_handle,
@@ -1009,7 +999,9 @@ class Host(utils.EventEmitter):
                 getattr(event, 'local_resolvable_private_address', None),
                 getattr(event, 'peer_resolvable_private_address', None),
                 hci.Role(event.role),
-                connection_parameters,
+                event.connection_interval,
+                event.peripheral_latency,
+                event.supervision_timeout,
             )
         else:
             logger.debug(f'### CONNECTION FAILED: {event.status}')
@@ -1067,7 +1059,9 @@ class Host(utils.EventEmitter):
                 None,
                 None,
                 None,
-                None,
+                0,
+                0,
+                0,
             )
         else:
             logger.debug(f'### BR/EDR CONNECTION FAILED: {event.status}')
@@ -1130,13 +1124,12 @@ class Host(utils.EventEmitter):
 
         # Notify the client
         if event.status == hci.HCI_SUCCESS:
-            connection_parameters = ConnectionParameters(
+            self.emit(
+                'connection_parameters_update',
+                connection.handle,
                 event.connection_interval,
                 event.peripheral_latency,
                 event.supervision_timeout,
-            )
-            self.emit(
-                'connection_parameters_update', connection.handle, connection_parameters
             )
         else:
             self.emit(
