@@ -1782,15 +1782,22 @@ class Connection(utils.CompositeEventEmitter):
 
     @dataclass
     class Parameters:
-        connection_interval: float  # Connection interval, in milliseconds. [LE only]
-        peripheral_latency: int  # Peripheral latency, in number of intervals. [LE only]
-        supervision_timeout: float  # Supervision timeout, in milliseconds.
-        subrate_factor: int = (
-            1  # See Bluetooth spec Vol 6, Part B - 4.5.1 Connection events
-        )
-        continuation_number: int = (
-            0  # See Bluetooth spec Vol 6, Part B - 4.5.1 Connection events
-        )
+        """
+        LE connection parameters.
+
+        Attributes:
+          connection_interval: Connection interval, in milliseconds.
+          peripheral_latency: Peripheral latency, in number of intervals.
+          supervision_timeout: Supervision timeout, in milliseconds.
+          subrate_factor: See Bluetooth spec Vol 6, Part B - 4.5.1 Connection events
+          continuation_number: See Bluetooth spec Vol 6, Part B - 4.5.1 Connection events
+        """
+
+        connection_interval: float
+        peripheral_latency: int
+        supervision_timeout: float
+        subrate_factor: int = 1
+        continuation_number: int = 0
 
     def __init__(
         self,
@@ -5413,13 +5420,10 @@ class Device(utils.CompositeEventEmitter):
         self.emit(self.EVENT_CONNECTION, connection)
 
     @host_event_handler
-    def on_connection_complete(
+    def on_classic_connection(
         self,
         connection_handle: int,
         peer_address: hci.Address,
-        connection_interval: int,
-        peripheral_latency: int,
-        supervision_timeout: int,
     ) -> None:
         connection_role = self.connection_roles.pop(peer_address, hci.Role.PERIPHERAL)
 
@@ -5442,18 +5446,14 @@ class Device(utils.CompositeEventEmitter):
             peer_address=peer_address,
             peer_resolvable_address=None,
             role=connection_role,
-            parameters=Connection.Parameters(
-                connection_interval * 1.25,
-                peripheral_latency,
-                supervision_timeout * 10.0,
-            ),
+            parameters=Connection.Parameters(0.0, 0, 0.0),
         )
         self.connections[connection_handle] = connection
 
         self.emit(self.EVENT_CONNECTION, connection)
 
     @host_event_handler
-    def on_le_connection_complete(
+    def on_le_connection(
         self,
         connection_handle: int,
         peer_address: hci.Address,
