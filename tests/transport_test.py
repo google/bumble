@@ -24,7 +24,7 @@ import sys
 import pytest
 
 from bumble import controller, device, hci, link, transport
-from bumble.transport.common import PacketParser
+from bumble.transport import common
 
 
 # -----------------------------------------------------------------------------
@@ -61,9 +61,9 @@ class Sink:
 # -----------------------------------------------------------------------------
 def test_parser():
     sink1 = Sink()
-    parser1 = PacketParser(sink1)
+    parser1 = common.PacketParser(sink1)
     sink2 = Sink()
-    parser2 = PacketParser(sink2)
+    parser2 = common.PacketParser(sink2)
 
     for parser in [parser1, parser2]:
         with open(
@@ -82,7 +82,7 @@ def test_parser():
 # -----------------------------------------------------------------------------
 def test_parser_extensions():
     sink = Sink()
-    parser = PacketParser(sink)
+    parser = common.PacketParser(sink)
 
     # Check that an exception is thrown for an unknown type
     try:
@@ -206,7 +206,7 @@ async def test_unix_connection_abstract():
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "address,",
-    ("127.0.0.1",),
+    ("127.0.0.1", "[::1]"),
 )
 async def test_android_netsim_connection(address):
     controller_transport = await transport.open_transport(
@@ -222,6 +222,33 @@ async def test_android_netsim_connection(address):
     await client_device.power_on()
 
     await client_transport.close()
+    await controller_transport.source.grpc_server.stop(None)
+    await controller_transport.close()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "spec,",
+    (
+        "android-netsim:[::1]:{port},mode=host[a=b,c=d]",
+        "android-netsim:localhost:{port},mode=host[a=b,c=d]",
+        "android-netsim:[a=b,c=d][::1]:{port},mode=host",
+        "android-netsim:[a=b,c=d]localhost:{port},mode=host",
+    ),
+)
+async def test_open_transport_with_metadata(spec):
+    controller_transport = await transport.open_transport(
+        "android-netsim:_:0,mode=controller"
+    )
+    port = controller_transport.source.port
+    _make_controller_from_transport(controller_transport)
+
+    client_transport = await transport.open_transport(spec.format(port=port))
+    assert client_transport.source.metadata['a'] == 'b'
+    assert client_transport.source.metadata['c'] == 'd'
+
+    await client_transport.close()
+    await controller_transport.source.grpc_server.stop(None)
     await controller_transport.close()
 
 
