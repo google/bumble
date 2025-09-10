@@ -992,7 +992,7 @@ class Host(utils.EventEmitter):
 
             # Notify the client
             self.emit(
-                'le_connection_complete',
+                'le_connection',
                 event.connection_handle,
                 event.peer_address,
                 getattr(event, 'local_resolvable_private_address', None),
@@ -1051,12 +1051,9 @@ class Host(utils.EventEmitter):
 
             # Notify the client
             self.emit(
-                'connection_complete',
+                'classic_connection',
                 event.connection_handle,
                 event.bd_addr,
-                0,
-                0,
-                0,
             )
         else:
             logger.debug(f'### BR/EDR CONNECTION FAILED: {event.status}')
