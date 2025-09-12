@@ -1453,6 +1453,8 @@ class _IsoLink:
     handle: int
     device: Device
     sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
+    data_paths: set[_IsoLink.Direction]
+    _data_path_lock: asyncio.Lock
 
     class Direction(IntEnum):
         HOST_TO_CONTROLLER = (
@@ -1461,6 +1463,10 @@ class _IsoLink:
         CONTROLLER_TO_HOST = (
             hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction.CONTROLLER_TO_HOST
         )
+
+    def __init__(self) -> None:
+        self._data_path_lock = asyncio.Lock()
+        self.data_paths = set()
 
     async def setup_data_path(
         self,
@@ -1482,37 +1488,45 @@ class _IsoLink:
         Raises:
             HCI_Error: When command complete status is not HCI_SUCCESS.
         """
-        await self.device.send_command(
-            hci.HCI_LE_Setup_ISO_Data_Path_Command(
-                connection_handle=self.handle,
-                data_path_direction=direction,
-                data_path_id=data_path_id,
-                codec_id=codec_id or hci.CodingFormat(hci.CodecID.TRANSPARENT),
-                controller_delay=controller_delay,
-                codec_configuration=codec_configuration,
-            ),
-            check_result=True,
-        )
+        async with self._data_path_lock:
+            if direction in self.data_paths:
+                return
+            await self.device.send_command(
+                hci.HCI_LE_Setup_ISO_Data_Path_Command(
+                    connection_handle=self.handle,
+                    data_path_direction=direction,
+                    data_path_id=data_path_id,
+                    codec_id=codec_id or hci.CodingFormat(hci.CodecID.TRANSPARENT),
+                    controller_delay=controller_delay,
+                    codec_configuration=codec_configuration,
+                ),
+                check_result=True,
+            )
+            self.data_paths.add(direction)
 
-    async def remove_data_path(self, directions: Iterable[_IsoLink.Direction]) -> int:
+    async def remove_data_path(self, directions: Iterable[_IsoLink.Direction]) -> None:
         """Remove a data path with controller on given direction.
 
         Args:
             direction: Direction of data path.
 
-        Returns:
-            Command status.
+        Raises:
+            HCI_Error: When command complete status is not HCI_SUCCESS.
         """
-        response = await self.device.send_command(
-            hci.HCI_LE_Remove_ISO_Data_Path_Command(
-                connection_handle=self.handle,
-                data_path_direction=sum(
-                    1 << direction for direction in set(directions)
+        async with self._data_path_lock:
+            directions_to_remove = set(directions).intersection(self.data_paths)
+            if not directions_to_remove:
+                return
+            await self.device.send_command(
+                hci.HCI_LE_Remove_ISO_Data_Path_Command(
+                    connection_handle=self.handle,
+                    data_path_direction=sum(
+                        1 << direction for direction in directions_to_remove
+                    ),
                 ),
-            ),
-            check_result=False,
-        )
-        return response.return_parameters.status
+                check_result=True,
+            )
+            self.data_paths.difference_update(directions_to_remove)
 
     def write(self, sdu: bytes) -> None:
         """Write an ISO SDU."""
@@ -1622,7 +1636,8 @@ class CisLink(utils.EventEmitter, _IsoLink):
     EVENT_ESTABLISHMENT_FAILURE: ClassVar[str] = "establishment_failure"
 
     def __post_init__(self) -> None:
-        super().__init__()
+        utils.EventEmitter.__init__(self)
+        _IsoLink.__init__(self)
 
     async def disconnect(
         self, reason: int = hci.HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
@@ -1638,6 +1653,7 @@ class BisLink(_IsoLink):
     sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
 
     def __post_init__(self) -> None:
+        super().__init__()
         self.device = self.big.device
 
 

@@ -310,12 +310,12 @@ async def test_pacs():
 @pytest.mark.asyncio
 async def test_ascs():
     devices = TwoDevices()
-    devices[0].add_service(
-        AudioStreamControlService(device=devices[0], sink_ase_id=[1, 2])
+    devices[1].add_service(
+        AudioStreamControlService(device=devices[1], sink_ase_id=[1, 2])
     )
 
     await devices.setup_connection()
-    peer = device.Peer(devices.connections[1])
+    peer = device.Peer(devices.connections[0])
     ascs_client = await peer.discover_service_and_create_proxy(
         AudioStreamControlServiceProxy
     )
@@ -369,7 +369,7 @@ async def test_ascs():
     await ascs_client.ase_control_point.write_value(
         ASE_Config_QOS(
             ase_id=[1, 2],
-            cig_id=[1, 2],
+            cig_id=[1, 1],
             cis_id=[3, 4],
             sdu_interval=[5, 6],
             framing=[0, 1],
@@ -402,25 +402,19 @@ async def test_ascs():
     )
 
     # CIS establishment
-    devices[0].emit(
-        'cis_establishment',
-        device.CisLink(
-            device=devices[0],
-            acl_connection=devices.connections[0],
-            handle=5,
-            cis_id=3,
+    cis_handles = await devices[0].setup_cig(
+        device.CigParameters(
             cig_id=1,
-        ),
+            cis_parameters=[
+                device.CigParameters.CisParameters(cis_id=3),
+                device.CigParameters.CisParameters(cis_id=4),
+            ],
+            sdu_interval_c_to_p=0,
+            sdu_interval_p_to_c=0,
+        )
     )
-    devices[0].emit(
-        'cis_establishment',
-        device.CisLink(
-            device=devices[0],
-            acl_connection=devices.connections[0],
-            handle=6,
-            cis_id=4,
-            cig_id=2,
-        ),
+    await devices[0].create_cis(
+        [(cis_handle, devices.connections[0]) for cis_handle in cis_handles]
     )
     assert (await notifications[1].get())[:2] == bytes(
         [1, AseStateMachine.State.STREAMING]
