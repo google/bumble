@@ -18,13 +18,23 @@
 import asyncio
 import logging
 import os
+import struct
+from typing import Awaitable
 
 import pytest
 
 from bumble.a2dp import (
+    AacFrame,
     AacMediaCodecInformation,
+    AacPacketSource,
+    AacParser,
     OpusMediaCodecInformation,
+    OpusPacket,
+    OpusPacketSource,
+    OpusParser,
     SbcMediaCodecInformation,
+    SbcPacketSource,
+    SbcParser,
 )
 from bumble.avdtp import (
     A2DP_SBC_CODEC_TYPE,
@@ -80,6 +90,24 @@ class TwoDevices:
 
     def on_paired(self, which, keys):
         self.paired[which] = keys
+
+
+# -----------------------------------------------------------------------------
+class Data:
+    pointer: int = 0
+    data: bytes
+
+    def __init__(self, data: bytes):
+        self.data = data
+
+    async def read(self, length: int) -> Awaitable[bytes]:
+        def generate_read():
+            end = min(self.pointer + length, len(self.data))
+            chunk = self.data[self.pointer : end]
+            self.pointer = end
+            return chunk
+
+        return generate_read()
 
 
 # -----------------------------------------------------------------------------
@@ -388,12 +416,152 @@ def test_opus_codec_specific_information():
 
 
 # -----------------------------------------------------------------------------
+async def test_sbc_parser():
+    header = b'\x9c\x80\x08\x00'
+    payload = b'\x00\x00\x00\x00\x00\x00'
+    data = Data(header + payload)
+
+    parser = SbcParser(data.read)
+    async for frame in parser.frames:
+        assert frame.sampling_frequency == 44100
+        assert frame.block_count == 4
+        assert frame.channel_mode == 0
+        assert frame.allocation_method == 0
+        assert frame.subband_count == 4
+        assert frame.bitpool == 8
+        assert frame.payload == header + payload
+
+
+# -----------------------------------------------------------------------------
+async def test_sbc_packet_source():
+    header = b'\x9c\x80\x08\x00'
+    payload = b'\x00\x00\x00\x00\x00\x00'
+    data = Data((header + payload) * 2)
+
+    packet_source = SbcPacketSource(data.read, 23)
+    async for packet in packet_source.packets:
+        assert packet.sequence_number == 0
+        assert packet.timestamp == 0
+        assert packet.payload == b'\x01' + header + payload
+
+
+# -----------------------------------------------------------------------------
+async def test_aac_parser():
+    header = b'\xff\xf0\x10\x00\x01\xa0\x00'
+    payload = b'\x00\x00\x00\x00\x00\x00'
+    data = Data(header + payload)
+
+    parser = AacParser(data.read)
+    async for frame in parser.frames:
+        assert frame.profile == AacFrame.Profile.MAIN
+        assert frame.sampling_frequency == 44100
+        assert frame.channel_configuration == 0
+        assert frame.payload == payload
+
+
+# -----------------------------------------------------------------------------
+async def test_aac_packet_source():
+    header = b'\xff\xf0\x10\x00\x01\xa0\x00'
+    payload = b'\x00\x00\x00\x00\x00\x00'
+    data = Data(header + payload)
+
+    packet_source = AacPacketSource(data.read, 0)
+    async for packet in packet_source.packets:
+        assert packet.sequence_number == 0
+        assert packet.timestamp == 0
+        assert packet.payload == b' \x00\x12\x00\x00\x000\x00\x00\x00\x00\x00\x00'
+
+
+# -----------------------------------------------------------------------------
+async def test_opus_parser():
+    packed_header_data_revised = struct.pack(
+        "<QIIIB",
+        0,  # granule_position
+        2,  # bitstream_serial_number
+        2,  # page_sequence_number
+        0,  # crc_checksum
+        3,  # page_segments
+    )
+
+    first_page_header_revised = (
+        b'OggS'  # Capture pattern
+        + b'\x00'  # Version
+        + b'\x02'  # Header type
+        + packed_header_data_revised
+    )
+
+    segment_table_revised = b'\x0a\x08\x0a'
+
+    opus_head_packet_data = b'OpusHead' + b'\x00' + b'\x00'
+    opus_tags_packet_data = b'OpusTags'
+    audio_data_packet = b'0123456789'
+
+    data = Data(
+        first_page_header_revised
+        + segment_table_revised
+        + opus_head_packet_data
+        + opus_tags_packet_data
+        + audio_data_packet
+    )
+
+    parser = OpusParser(data.read)
+    async for packet in parser.packets:
+        assert packet.channel_mode == OpusPacket.ChannelMode.STEREO
+        assert packet.payload == audio_data_packet
+
+
+# -----------------------------------------------------------------------------
+async def test_opus_packet_source():
+    packed_header_data_revised = struct.pack(
+        "<QIIIB",
+        0,  # granule_position
+        2,  # bitstream_serial_number
+        2,  # page_sequence_number
+        0,  # crc_checksum
+        3,  # page_segments
+    )
+
+    first_page_header_revised = (
+        b'OggS'  # Capture pattern
+        + b'\x00'  # Version
+        + b'\x02'  # Header type
+        + packed_header_data_revised
+    )
+
+    segment_table_revised = b'\x0a\x08\x0a'
+
+    opus_head_packet_data = b'OpusHead' + b'\x00' + b'\x00'
+    opus_tags_packet_data = b'OpusTags'
+    audio_data_packet = b'0123456789'
+
+    data = Data(
+        first_page_header_revised
+        + segment_table_revised
+        + opus_head_packet_data
+        + opus_tags_packet_data
+        + audio_data_packet
+    )
+
+    parser = OpusPacketSource(data.read, 0)
+    async for packet in parser.packets:
+        assert packet.sequence_number == 0
+        assert packet.timestamp == 0
+        assert packet.payload == b'\x01' + audio_data_packet
+
+
+# -----------------------------------------------------------------------------
 async def async_main():
     test_sbc_codec_specific_information()
     test_aac_codec_specific_information()
     test_opus_codec_specific_information()
     await test_self_connection()
     await test_source_sink_1()
+    test_sbc_parser()
+    test_sbc_packet_source()
+    test_aac_parser()
+    test_aac_packet_source()
+    test_opus_parser()
+    test_opus_packet_source()
 
 
 # -----------------------------------------------------------------------------
