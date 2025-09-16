@@ -2346,7 +2346,7 @@ class Device(utils.CompositeEventEmitter):
         self.gatt_server = gatt_server.Server(self)
         self.sdp_server = sdp.Server(self)
         self.l2cap_channel_manager = l2cap.ChannelManager(
-            [l2cap.L2CAP_Information_Request.EXTENDED_FEATURE_FIXED_CHANNELS]
+            [l2cap.L2CAP_Information_Request.ExtendedFeatures.FIXED_CHANNELS]
         )
         self.advertisement_accumulators = {}  # Accumulators, by address
         self.periodic_advertising_syncs = []
