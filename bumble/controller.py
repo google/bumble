@@ -33,7 +33,6 @@ from bumble.hci import (
     HCI_COMMAND_DISALLOWED_ERROR,
     HCI_COMMAND_PACKET,
     HCI_COMMAND_STATUS_PENDING,
-    HCI_CONNECTION_TIMEOUT_ERROR,
     HCI_CONTROLLER_BUSY_ERROR,
     HCI_EVENT_PACKET,
     HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR,
@@ -88,6 +87,7 @@ class CisLink:
     cis_id: int
     cig_id: int
     acl_connection: Optional[Connection] = None
+    data_paths: set[int] = dataclasses.field(default_factory=set)
 
 
 # -----------------------------------------------------------------------------
@@ -380,6 +380,11 @@ class Controller:
             if connection.handle == handle:
                 return connection
         return None
+
+    def find_iso_link_by_handle(self, handle: int) -> Optional[CisLink]:
+        return self.central_cis_links.get(handle) or self.peripheral_cis_links.get(
+            handle
+        )
 
     def on_link_central_connected(self, central_address):
         '''
@@ -1853,16 +1858,51 @@ class Controller:
             )
         )
 
-    def on_hci_le_setup_iso_data_path_command(self, command):
+    def on_hci_le_setup_iso_data_path_command(
+        self, command: hci.HCI_LE_Setup_ISO_Data_Path_Command
+    ) -> bytes:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.109 LE Setup ISO Data Path Command
         '''
+        if not (iso_link := self.find_iso_link_by_handle(command.connection_handle)):
+            return struct.pack(
+                '<BH',
+                HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+                command.connection_handle,
+            )
+        if command.data_path_direction in iso_link.data_paths:
+            return struct.pack(
+                '<BH',
+                HCI_COMMAND_DISALLOWED_ERROR,
+                command.connection_handle,
+            )
+        iso_link.data_paths.add(command.data_path_direction)
         return struct.pack('<BH', HCI_SUCCESS, command.connection_handle)
 
-    def on_hci_le_remove_iso_data_path_command(self, command):
+    def on_hci_le_remove_iso_data_path_command(
+        self, command: hci.HCI_LE_Remove_ISO_Data_Path_Command
+    ) -> bytes:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.110 LE Remove ISO Data Path Command
         '''
+        if not (iso_link := self.find_iso_link_by_handle(command.connection_handle)):
+            return struct.pack(
+                '<BH',
+                HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+                command.connection_handle,
+            )
+        data_paths: set[int] = set(
+            direction
+            for direction in hci.HCI_LE_Setup_ISO_Data_Path_Command.Direction
+            if (1 << direction) & command.data_path_direction
+        )
+        if not data_paths.issubset(iso_link.data_paths):
+            return struct.pack(
+                '<BH',
+                HCI_COMMAND_DISALLOWED_ERROR,
+                command.connection_handle,
+            )
+        iso_link.data_paths.difference_update(data_paths)
         return struct.pack('<BH', HCI_SUCCESS, command.connection_handle)
 
     def on_hci_le_set_host_feature_command(
