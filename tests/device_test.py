@@ -289,7 +289,7 @@ async def test_legacy_advertising_disconnection(auto_restart):
     await device.power_on()
     peer_address = Address('F0:F1:F2:F3:F4:F5')
     await device.start_advertising(auto_restart=auto_restart)
-    device.on_le_connection_complete(
+    device.on_le_connection(
         0x0001,
         peer_address,
         None,
@@ -348,7 +348,7 @@ async def test_extended_advertising_connection(own_address_type):
     advertising_set = await device.create_advertising_set(
         advertising_parameters=AdvertisingParameters(own_address_type=own_address_type)
     )
-    device.on_le_connection_complete(
+    device.on_le_connection(
         0x0001,
         peer_address,
         None,
@@ -393,7 +393,7 @@ async def test_extended_advertising_connection_out_of_order(own_address_type):
         0x0001,
         0,
     )
-    device.on_le_connection_complete(
+    device.on_le_connection(
         0x0001,
         Address('F0:F1:F2:F3:F4:F5'),
         None,
