@@ -49,7 +49,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-        rust-version: [ "1.76.0", "stable" ]
+        rust-version: [ "1.80.0", "stable" ]
       fail-fast: false
     steps:
       - name: Check out from Git
@@ -72,7 +72,7 @@ jobs:
       - name: Check License Headers
         run: cd rust && cargo run --features dev-tools --bin file-header check-all
       - name: Rust Build
-        run: cd rust && cargo build --all-targets && cargo build-all-features --all-targets
+        run: cd rust && cargo build --all-targets && cargo build-all-features
       # Lints after build so what clippy needs is already built
       - name: Rust Lints
         run: cd rust && cargo fmt --check && cargo clippy --all-targets -- --deny warnings && cargo clippy --all-features --all-targets -- --deny warnings
