@@ -36,6 +36,8 @@ from typing import (
     Union,
 )
 
+from typing_extensions import override
+
 from bumble import hci, utils
 from bumble.colors import color
 from bumble.core import (
@@ -133,10 +135,6 @@ L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MTU             = 2048
 L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS             = 2048
 L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_INITIAL_CREDITS = 256
 
-L2CAP_MAXIMUM_TRANSMISSION_UNIT_CONFIGURATION_OPTION_TYPE = 0x01
-
-L2CAP_MTU_CONFIGURATION_PARAMETER_TYPE = 0x01
-
 # fmt: on
 # pylint: enable=line-too-long
 
@@ -149,8 +147,27 @@ L2CAP_MTU_CONFIGURATION_PARAMETER_TYPE = 0x01
 
 @dataclasses.dataclass
 class ClassicChannelSpec:
+    '''Spec of L2CAP Channel over Classic Transport.
+
+    Attributes:
+        psm: PSM of channel. This is optional for server, and when it is None, a PSM
+            will be allocated.
+        mtu: Maximum Transmission Unit.
+        mode: Mode of channel. Use Basic by default.
+    '''
+
+    class Mode(utils.OpenIntEnum):
+        '''See Bluetooth spec @ Vol 3, Part A - 5.4. Retransmission and Flow Control option'''
+
+        BASIC = 0x00
+        RETRANSMISSION = 0x01
+        FLOW_CONTROL = 0x02
+        ENHANCED_RETRANSMISSION = 0x03
+        STREAMING = 0x04
+
     psm: Optional[int] = None
     mtu: int = L2CAP_DEFAULT_MTU
+    mode: Mode = Mode.BASIC
 
 
 @dataclasses.dataclass
@@ -206,6 +223,114 @@ class L2CAP_PDU:
         return f'{color("L2CAP", "green")} [CID={self.cid}]: {self.payload.hex()}'
 
 
+class StandardControlField:
+    '''
+    See Bluetooth spec @ Vol 3, Part A - 3.3.2 Control field.
+    '''
+
+    class FieldType(utils.OpenIntEnum):
+        I_FRAME = 0x00
+        S_FRAME = 0x01
+
+    class SegmentationAndReassembly(utils.OpenIntEnum):
+        UNSEGMENTED = 0x00
+        START = 0x01
+        END = 0x02
+        CONTINUATION = 0x03
+
+    class RetransmissionBit(utils.OpenIntEnum):
+        NORMAL = 0x00
+        RETRANSMISSION = 0x01
+
+    req_seq: int
+    frame_type: ClassVar[FieldType]
+    retransmit_or_final: int
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> StandardControlField:
+        frame_type = data[0] & 0x01
+        if frame_type == cls.FieldType.I_FRAME:
+            return IFrameStandardControlField.from_bytes(data)
+        elif frame_type == cls.FieldType.S_FRAME:
+            return SFrameStandardControlField.from_bytes(data)
+        else:
+            raise InvalidArgumentError(f'Invalid frame type: {frame_type}')
+
+    def __bytes__(self) -> bytes:
+        raise NotImplementedError()
+
+
+@dataclasses.dataclass
+class IFrameStandardControlField(StandardControlField):
+    tx_seq: int = 0
+    req_seq: int = 0
+    segmentation_and_reassembly: int = (
+        StandardControlField.SegmentationAndReassembly.UNSEGMENTED
+    )
+    retransmit_or_final: int = StandardControlField.RetransmissionBit.NORMAL
+
+    frame_type = StandardControlField.FieldType.I_FRAME
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> StandardControlField:
+        return cls(
+            tx_seq=(data[0] >> 1) & 0b0111111,
+            retransmit_or_final=(data[0] >> 7) & 0b1,
+            req_seq=(data[1] & 0b001111111),
+            segmentation_and_reassembly=(data[1] >> 6) & 0b11,
+        )
+
+    def __bytes__(self) -> bytes:
+        return bytes(
+            [
+                self.frame_type | (self.tx_seq << 1) | (self.retransmit_or_final << 7),
+                self.req_seq | (self.segmentation_and_reassembly << 6),
+            ]
+        )
+
+
+@dataclasses.dataclass
+class SFrameStandardControlField(StandardControlField):
+    class SupervisoryFunction(utils.OpenIntEnum):
+        #  Receiver Ready
+        RR = 0
+        #  Reject
+        REJ = 1
+        #  Receiver Not Ready
+        RNR = 2
+        #  Select Reject
+        SREJ = 3
+
+    supervision_function: int = SupervisoryFunction.RR
+    poll: int = 0
+    req_seq: int = 0
+    retransmit_or_final: int = 0
+
+    frame_type = StandardControlField.FieldType.S_FRAME
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> StandardControlField:
+        return cls(
+            supervision_function=(data[0] >> 2) & 0b11,
+            poll=(data[0] >> 4) & 0b1,
+            retransmit_or_final=(data[0] >> 7) & 0b1,
+            req_seq=(data[1] & 0b1111111),
+        )
+
+    def __bytes__(self) -> bytes:
+        return bytes(
+            [
+                (
+                    self.frame_type
+                    | (self.supervision_function << 2)
+                    | self.poll << 7
+                    | (self.retransmit_or_final << 7)
+                ),
+                self.req_seq,
+            ]
+        )
+
+
 # -----------------------------------------------------------------------------
 @dataclasses.dataclass
 class L2CAP_Control_Frame:
@@ -248,14 +373,16 @@ class L2CAP_Control_Frame:
         return frame
 
     @staticmethod
-    def decode_configuration_options(data: bytes) -> list[tuple[int, bytes]]:
+    def decode_configuration_options(
+        data: bytes,
+    ) -> list[tuple[L2CAP_Configure_Request.ParameterType, bytes]]:
         options = []
         while len(data) >= 2:
             value_type = data[0]
             length = data[1]
             value = data[2 : 2 + length]
             data = data[2 + length :]
-            options.append((value_type, value))
+            options.append((L2CAP_Configure_Request.ParameterType(value_type), value))
 
         return options
 
@@ -398,6 +525,15 @@ class L2CAP_Configure_Request(L2CAP_Control_Frame):
     See Bluetooth spec @ Vol 3, Part A - 4.4 CONFIGURATION REQUEST
     '''
 
+    class ParameterType(utils.OpenIntEnum):
+        MTU = 0x01
+        FLUSH_TIMEOUT = 0x02
+        QOS = 0x03
+        RETRANSMISSION_AND_FLOW_CONTROL = 0x04
+        FCS = 0x05
+        EXTENDED_FLOW_SPEC = 0x06
+        EXTENDED_WINDOW_SIZE = 0x07
+
     destination_cid: int = dataclasses.field(metadata=hci.metadata(2))
     flags: int = dataclasses.field(metadata=hci.metadata(2))
     options: bytes = dataclasses.field(metadata=hci.metadata('*'))
@@ -484,17 +620,18 @@ class L2CAP_Information_Request(L2CAP_Control_Frame):
         EXTENDED_FEATURES_SUPPORTED = 0x0002
         FIXED_CHANNELS_SUPPORTED = 0x0003
 
-    EXTENDED_FEATURE_FLOW_MODE_CONTROL = 0x0001
-    EXTENDED_FEATURE_RETRANSMISSION_MODE = 0x0002
-    EXTENDED_FEATURE_BIDIRECTIONAL_QOS = 0x0004
-    EXTENDED_FEATURE_ENHANCED_RETRANSMISSION_MODE = 0x0008
-    EXTENDED_FEATURE_STREAMING_MODE = 0x0010
-    EXTENDED_FEATURE_FCS_OPTION = 0x0020
-    EXTENDED_FEATURE_EXTENDED_FLOW_SPEC = 0x0040
-    EXTENDED_FEATURE_FIXED_CHANNELS = 0x0080
-    EXTENDED_FEATURE_EXTENDED_WINDOW_SIZE = 0x0100
-    EXTENDED_FEATURE_UNICAST_CONNECTIONLESS_DATA = 0x0200
-    EXTENDED_FEATURE_ENHANCED_CREDIT_BASE_FLOW_CONTROL = 0x0400
+    class ExtendedFeatures(hci.SpecableFlag):
+        FLOW_MODE_CONTROL = 0x0001
+        RETRANSMISSION_MODE = 0x0002
+        BIDIRECTIONAL_QOS = 0x0004
+        ENHANCED_RETRANSMISSION_MODE = 0x0008
+        STREAMING_MODE = 0x0010
+        FCS_OPTION = 0x0020
+        EXTENDED_FLOW_SPEC = 0x0040
+        FIXED_CHANNELS = 0x0080
+        EXTENDED_WINDOW_SIZE = 0x0100
+        UNICAST_CONNECTIONLESS_DATA = 0x0200
+        ENHANCED_CREDIT_BASE_FLOW_CONTROL = 0x0400
 
     info_type: int = dataclasses.field(metadata=InfoType.type_metadata(2))
 
@@ -703,6 +840,217 @@ class L2CAP_Credit_Based_Reconfigure_Response(L2CAP_Control_Frame):
 
 
 # -----------------------------------------------------------------------------
+class BaseProcessor:
+    def __init__(self, channel: ClassicChannel) -> None:
+        self.channel = channel
+
+    def send_sdu(self, sdu: bytes) -> None:
+        self.channel.send_pdu(sdu)
+
+    def on_pdu(self, pdu: bytes) -> None:
+        self.channel.on_sdu(pdu)
+
+
+# TODO: Handle retransmission
+class EnhancedRetransmissionProcessor(BaseProcessor):
+
+    MAX_SEQ_NUM = 64
+    DEFAULT_MONITOR_TIMEOUT = 12.0
+    DEFAULT_RECEIVER_READY_POLL_TIMEOUT = 2.0
+    DEFAULT_RETRANSMISSION_TIMEOUT = 2.0
+    DEFAULT_MPS = 4096
+    DEFAULT_TX_WINDOW = 10
+    DEFAULT_MAX_RETRANSMISSION = 20
+
+    @dataclasses.dataclass
+    class _PendingPdu:
+        payload: bytes
+        tx_seq: int
+        req_seq: int = 0
+
+        def __bytes__(self) -> bytes:
+            return (
+                bytes(
+                    IFrameStandardControlField(tx_seq=self.tx_seq, req_seq=self.req_seq)
+                )
+                + self.payload
+            )
+
+    _expected_ack_seq: int = 0
+    _next_tx_seq: int = 0
+    _last_tx_seq: int = 0
+    _req_seq_num: int = 0
+    _next_seq_num: int = 0
+    _remote_is_busy: bool = False
+
+    _num_receiver_ready_polls_sent: int = 0
+    _pending_pdus: list[_PendingPdu]
+    _monitor_task: Optional[asyncio.Task] = None
+    _receiver_ready_poll_task: Optional[asyncio.Task] = None
+
+    # Timeout, in seconds.
+    monitor_timeout: float
+    receiver_ready_timeout: float
+    retransmission_timeout: float
+
+    @classmethod
+    def _num_frames_between(cls, low: int, high: int) -> int:
+        if high < low:
+            high += cls.MAX_SEQ_NUM + 1
+        return high - low
+
+    def __init__(
+        self,
+        channel: ClassicChannel,
+        monitor_timeout: float = DEFAULT_MONITOR_TIMEOUT,
+        mps: int = DEFAULT_MPS,
+        tx_window_size: int = DEFAULT_MAX_RETRANSMISSION,
+        receiver_ready_timeout: float = DEFAULT_RECEIVER_READY_POLL_TIMEOUT,
+        retransmission_timeout: float = DEFAULT_RETRANSMISSION_TIMEOUT,
+        max_retransmission: int = DEFAULT_MAX_RETRANSMISSION,
+    ):
+        self.mps = mps
+        self.tx_window_size = tx_window_size
+        self._pending_pdus = []
+        self.monitor_timeout = monitor_timeout
+        self.channel = channel
+        self.receiver_ready_timeout = receiver_ready_timeout
+        self.retransmission_timeout = retransmission_timeout
+        self.max_retransmission = max_retransmission
+
+    def _start_monitor_task(self) -> None:
+        if self._monitor_task and not self._monitor_task.done():
+            self._monitor_task.cancel()
+
+        async def monitor() -> None:
+            await asyncio.sleep(self.monitor_timeout)
+            self._send_receiver_ready_poll()
+            self._start_monitor_task()
+
+        self._monitor_task = asyncio.create_task(monitor())
+
+    def _start_receiver_ready_task(self) -> None:
+        if self._receiver_ready_poll_task and not self._receiver_ready_poll_task.done():
+            self._receiver_ready_poll_task.cancel()
+        self._num_receiver_ready_polls_sent = 0
+
+        async def receiver_ready_poll() -> None:
+            await asyncio.sleep(self.receiver_ready_timeout)
+            self._send_receiver_ready_poll()
+            self._start_monitor_task()
+
+        self._receiver_ready_poll_task = asyncio.create_task(receiver_ready_poll())
+
+    def _send_receiver_ready_poll(self) -> None:
+        self._num_receiver_ready_polls_sent += 1
+        self.channel.send_pdu(
+            bytes(
+                SFrameStandardControlField(
+                    supervision_function=SFrameStandardControlField.SupervisoryFunction.RR,
+                    retransmit_or_final=1,
+                )
+            )
+        )
+
+    def _get_next_tx_seq(self) -> int:
+        seq_num = self._next_tx_seq
+        self._next_tx_seq = (self._next_tx_seq + 1) % self.MAX_SEQ_NUM
+        return seq_num
+
+    @override
+    def send_sdu(self, sdu: bytes) -> None:
+        if len(sdu) > self.mps:
+            raise InvalidArgumentError(
+                f'SDU size({len(sdu)}) exceeds channel MPS {self.mps}'
+            )
+        pdu = self._PendingPdu(payload=sdu, tx_seq=self._get_next_tx_seq())
+        self._pending_pdus.append(pdu)
+        self._process_output()
+
+    @override
+    def on_pdu(self, pdu: bytes) -> None:
+        control_field = StandardControlField.from_bytes(pdu)
+        self._update_ack_seq(
+            control_field.req_seq, control_field.retransmit_or_final != 0
+        )
+        if isinstance(control_field, IFrameStandardControlField):
+            if control_field.tx_seq != self._next_seq_num:
+                return
+            self._next_seq_num = (self._next_seq_num + 1) % self.MAX_SEQ_NUM
+            self._req_seq_num = self._next_seq_num
+
+            ack_frame = SFrameStandardControlField(
+                supervision_function=SFrameStandardControlField.SupervisoryFunction.RR,
+                req_seq=self._next_seq_num,
+            )
+            self.channel.send_pdu(ack_frame)
+            self.channel.on_sdu(pdu[2:])
+        elif isinstance(control_field, SFrameStandardControlField):
+            self._remote_is_busy = (
+                control_field.supervision_function
+                == SFrameStandardControlField.SupervisoryFunction.RNR
+            )
+
+            if control_field.supervision_function in (
+                SFrameStandardControlField.SupervisoryFunction.RR,
+                SFrameStandardControlField.SupervisoryFunction.RNR,
+            ):
+                if control_field.poll:
+                    self.channel.send_pdu(
+                        SFrameStandardControlField(
+                            supervision_function=SFrameStandardControlField.SupervisoryFunction.RR,
+                            retransmit_or_final=1,
+                            req_seq=self._next_seq_num,
+                        )
+                    )
+            else:
+                # TODO: Handle Retransmission.
+                pass
+
+    def _process_output(self) -> None:
+        if self._remote_is_busy or self._monitor_task:
+            return
+
+        for pdu in self._pending_pdus:
+            if self._num_unacked_frames >= self.tx_window_size:
+                return
+            self._send_pdu(pdu)
+            self._last_tx_seq = pdu.tx_seq
+
+    @property
+    def _num_unacked_frames(self) -> int:
+        if not self._pending_pdus:
+            return 0
+        return self._num_frames_between(self._expected_ack_seq, self._last_tx_seq + 1)
+
+    def _send_pdu(self, pdu: _PendingPdu) -> None:
+        pdu.req_seq = self._req_seq_num
+
+        self._start_receiver_ready_task()
+        self.channel.send_pdu(bytes(pdu))
+
+    def _update_ack_seq(self, new_seq: int, is_poll_response: bool) -> None:
+        num_frames_acked = self._num_frames_between(self._expected_ack_seq, new_seq)
+        if num_frames_acked > self._num_unacked_frames:
+            # connection_failure_callback
+            return
+        if is_poll_response and self._monitor_task:
+            self._monitor_task.cancel()
+            self._monitor_task = None
+
+        del self._pending_pdus[:num_frames_acked]
+        self._expected_ack_seq = new_seq
+        if (
+            self._expected_ack_seq == self._next_tx_seq
+            and self._receiver_ready_poll_task
+        ):
+            self._receiver_ready_poll_task.cancel()
+            self._receiver_ready_poll_task = None
+
+        self._process_output()
+
+
+# -----------------------------------------------------------------------------
 class ClassicChannel(utils.EventEmitter):
     class State(enum.IntEnum):
         # States
@@ -739,6 +1087,7 @@ class ClassicChannel(utils.EventEmitter):
     connection: Connection
     mtu: int
     peer_mtu: int
+    processor: BaseProcessor
 
     def __init__(
         self,
@@ -748,6 +1097,7 @@ class ClassicChannel(utils.EventEmitter):
         psm: int,
         source_cid: int,
         mtu: int,
+        mode: int = ClassicChannelSpec.Mode.BASIC,
     ) -> None:
         super().__init__()
         self.manager = manager
@@ -762,10 +1112,21 @@ class ClassicChannel(utils.EventEmitter):
         self.connection_result = None
         self.disconnection_result = None
         self.sink = None
+        if mode == ClassicChannelSpec.Mode.BASIC:
+            self.processor = BaseProcessor(self)
+        elif mode == ClassicChannelSpec.Mode.ENHANCED_RETRANSMISSION:
+            self.processor = EnhancedRetransmissionProcessor(self)
+        else:
+            raise InvalidArgumentError(
+                f"Unimplemented L2CAP channel mode {ClassicChannelSpec.Mode(mode).name}"
+            )
 
     def _change_state(self, new_state: State) -> None:
         logger.debug(f'{self} state change -> {color(new_state.name, "cyan")}')
         self.state = new_state
+
+    def write(self, sdu: bytes) -> None:
+        self.processor.send_sdu(sdu)
 
     def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
         if self.state != self.State.OPEN:
@@ -776,12 +1137,15 @@ class ClassicChannel(utils.EventEmitter):
         self.manager.send_control_frame(self.connection, self.signaling_cid, frame)
 
     def on_pdu(self, pdu: bytes) -> None:
+        self.processor.on_pdu(pdu)
+
+    def on_sdu(self, sdu: bytes) -> None:
         if self.sink:
             # pylint: disable=not-callable
-            self.sink(pdu)
+            self.sink(sdu)
         else:
             logger.warning(
-                color('received pdu without a pending request or sink', 'red')
+                color('received sdu without a pending request or sink', 'red')
             )
 
     async def connect(self) -> None:
@@ -835,20 +1199,33 @@ class ClassicChannel(utils.EventEmitter):
             self.emit(self.EVENT_CLOSE)
 
     def send_configure_request(self) -> None:
-        options = L2CAP_Control_Frame.encode_configuration_options(
-            [
+        options: list[tuple[int, bytes]] = [
+            (
+                L2CAP_Configure_Request.ParameterType.MTU,
+                struct.pack('<H', self.mtu),
+            )
+        ]
+        if isinstance(self.processor, EnhancedRetransmissionProcessor):
+            options.append(
                 (
-                    L2CAP_MAXIMUM_TRANSMISSION_UNIT_CONFIGURATION_OPTION_TYPE,
-                    struct.pack('<H', self.mtu),
+                    L2CAP_Configure_Request.ParameterType.RETRANSMISSION_AND_FLOW_CONTROL,
+                    struct.pack(
+                        '<BBBHHH',
+                        ClassicChannelSpec.Mode.ENHANCED_RETRANSMISSION,
+                        self.processor.tx_window_size,
+                        self.processor.max_retransmission,
+                        int(self.processor.retransmission_timeout * 1000),
+                        int(self.processor.monitor_timeout * 1000),
+                        self.processor.mps,
+                    ),
                 )
-            ]
-        )
+            )
         self.send_control_frame(
             L2CAP_Configure_Request(
                 identifier=self.manager.next_identifier(self.connection),
                 destination_cid=self.destination_cid,
                 flags=0x0000,
-                options=options,
+                options=L2CAP_Control_Frame.encode_configuration_options(options),
             )
         )
 
@@ -903,10 +1280,41 @@ class ClassicChannel(utils.EventEmitter):
 
         # Decode the options
         options = L2CAP_Control_Frame.decode_configuration_options(request.options)
+        # Result to options
+        replied_options = list[tuple[int, bytes]]()
         for option in options:
-            if option[0] == L2CAP_MTU_CONFIGURATION_PARAMETER_TYPE:
+            if option[0] == L2CAP_Configure_Request.ParameterType.MTU:
                 self.peer_mtu = struct.unpack('<H', option[1])[0]
                 logger.debug(f'peer MTU = {self.peer_mtu}')
+                replied_options.append(option)
+            elif (
+                option[0]
+                == L2CAP_Configure_Request.ParameterType.RETRANSMISSION_AND_FLOW_CONTROL
+            ):
+                (
+                    mode,
+                    tx_window,
+                    max_retransmission,
+                    retransmission_timeout,
+                    monitor_timeout,
+                    mps,
+                ) = struct.unpack_from('<BBBHHH', option[1])
+                if mode == ClassicChannelSpec.Mode.ENHANCED_RETRANSMISSION:
+                    self.processor = EnhancedRetransmissionProcessor(
+                        channel=self,
+                        mps=mps,
+                        tx_window_size=tx_window,
+                        monitor_timeout=monitor_timeout / 1000.0,
+                        retransmission_timeout=retransmission_timeout / 1000.0,
+                        max_retransmission=max_retransmission,
+                    )
+                    replied_options.append(option)
+            else:
+                logger.debug(
+                    "Ignore unimplemented option %s[%s]",
+                    option[0].name,
+                    option[1].hex(),
+                )
 
         self.send_control_frame(
             L2CAP_Configure_Response(
@@ -914,9 +1322,12 @@ class ClassicChannel(utils.EventEmitter):
                 source_cid=self.destination_cid,
                 flags=0x0000,
                 result=L2CAP_Configure_Response.Result.SUCCESS,
-                options=request.options,  # TODO: don't accept everything blindly
+                options=L2CAP_Control_Frame.encode_configuration_options(
+                    replied_options
+                ),  # TODO: don't accept everything blindly
             )
         )
+
         if self.state == self.State.WAIT_CONFIG:
             self._change_state(self.State.WAIT_SEND_CONFIG)
             self.send_configure_request()
@@ -1459,7 +1870,7 @@ class ChannelManager:
         )  # LE CoC channels, mapped by connection and destination cid
         self.le_coc_servers = {}  # LE CoC - Servers accepting connections, by PSM
         self.le_coc_requests = {}  # LE CoC connection requests, by identifier
-        self.extended_features = extended_features
+        self.extended_features = set(extended_features)
         self.connectionless_mtu = connectionless_mtu
         self.connection_parameters_update_response = None
 
@@ -2184,12 +2595,13 @@ class ChannelManager:
             f'creating client channel with cid={source_cid} for psm {spec.psm}'
         )
         channel = ClassicChannel(
-            self,
-            connection,
-            L2CAP_SIGNALING_CID,
-            spec.psm,
-            source_cid,
-            spec.mtu,
+            manager=self,
+            connection=connection,
+            signaling_cid=L2CAP_SIGNALING_CID,
+            psm=spec.psm,
+            source_cid=source_cid,
+            mtu=spec.mtu,
+            mode=spec.mode,
         )
         connection_channels[source_cid] = channel
 
