@@ -2171,7 +2171,7 @@ def with_connection_from_address(function):
     @functools.wraps(function)
     def wrapper(device: Device, address: hci.Address, *args, **kwargs):
         if connection := device.pending_connections.get(address):
-            return function(device, connection, address, *args, **kwargs)
+            return function(device, connection, *args, **kwargs)
         for connection in device.connections.values():
             if connection.peer_address == address:
                 return function(device, connection, *args, **kwargs)
@@ -6443,18 +6443,14 @@ class Device(utils.CompositeEventEmitter):
 
     # [Classic only]
     @host_event_handler
-    @try_with_connection_from_address
+    @with_connection_from_address
     def on_role_change(
         self,
-        connection: Optional[Connection],
-        peer_address: hci.Address,
+        connection: Connection,
         new_role: hci.Role,
     ):
-        if connection:
-            connection.role = new_role
-            connection.emit(connection.EVENT_ROLE_CHANGE, new_role)
-        else:
-            logger.warning("Role change to unknown connection %s", peer_address)
+        connection.role = new_role
+        connection.emit(connection.EVENT_ROLE_CHANGE, new_role)
 
     # [Classic only]
     @host_event_handler
