@@ -762,6 +762,34 @@ async def test_inquiry_result_with_rssi():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "roles",
+    (
+        (hci.Role.PERIPHERAL, hci.Role.CENTRAL),
+        (hci.Role.CENTRAL, hci.Role.PERIPHERAL),
+    ),
+)
+@pytest.mark.asyncio
+async def test_accept_classic_connection(roles: tuple[hci.Role, hci.Role]):
+    devices = TwoDevices()
+    devices[0].classic_enabled = True
+    devices[1].classic_enabled = True
+    await devices[0].power_on()
+    await devices[1].power_on()
+
+    accept_task = asyncio.create_task(devices[1].accept(role=roles[1]))
+    await devices[0].connect(
+        devices[1].public_address, transport=PhysicalTransport.BR_EDR
+    )
+    await accept_task
+
+    assert devices.connections[0]
+    assert devices.connections[0].role == roles[0]
+    assert devices.connections[1]
+    assert devices.connections[1].role == roles[1]
+
+
+# -----------------------------------------------------------------------------
 async def run_test_device():
     await test_device_connect_parallel()
     await test_flush()
