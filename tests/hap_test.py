@@ -82,7 +82,6 @@ async def hap_client():
     )
 
     await devices.setup_connection()
-    # TODO negotiate MTU > 49 to not truncate preset names
 
     # Mock encryption.
     devices.connections[0].encryption = 1  # type: ignore
@@ -93,6 +92,9 @@ async def hap_client():
     )
 
     peer = device.Peer(devices.connections[1])  # type: ignore
+    await peer.request_mtu(49)
+    peer2 = device.Peer(devices.connections[0])  # type: ignore
+    await peer2.request_mtu(49)
     hap_client = await peer.discover_service_and_create_proxy(
         hap.HearingAccessServiceProxy
     )

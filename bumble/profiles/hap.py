@@ -273,12 +273,19 @@ class HearingAccessService(gatt.TemplateService):
             def on_disconnection(_reason) -> None:
                 self.currently_connected_clients.discard(connection)
 
+            @connection.on(connection.EVENT_CONNECTION_ATT_MTU_UPDATE)
+            def on_mtu_update(*_: Any) -> None:
+                self.on_incoming_connection(connection)
+
+            @connection.on(connection.EVENT_CONNECTION_ENCRYPTION_CHANGE)
+            def on_encryption_change(*_: Any) -> None:
+                self.on_incoming_connection(connection)
+
             @connection.on(connection.EVENT_PAIRING)
             def on_pairing(*_: Any) -> None:
-                self.on_incoming_paired_connection(connection)
+                self.on_incoming_connection(connection)
 
-            if connection.peer_resolvable_address:
-                self.on_incoming_paired_connection(connection)
+            self.on_incoming_connection(connection)
 
         self.hearing_aid_features_characteristic = gatt.Characteristic(
             uuid=gatt.GATT_HEARING_AID_FEATURES_CHARACTERISTIC,
@@ -315,9 +322,30 @@ class HearingAccessService(gatt.TemplateService):
             ]
         )
 
-    def on_incoming_paired_connection(self, connection: Connection):
+    def on_incoming_connection(self, connection: Connection):
         '''Setup initial operations to handle a remote bonded HAP device'''
         # TODO Should we filter on HAP device only ?
+
+        if not connection.is_encrypted:
+            logging.debug(f'HAS: {connection.peer_address} is not encrypted')
+            return
+
+        if not connection.peer_resolvable_address:
+            logging.debug(f'HAS: {connection.peer_address} is not paired')
+            return
+
+        if connection.att_mtu < 49:
+            logging.debug(
+                f'HAS: {connection.peer_address} invalid MTU={connection.att_mtu}'
+            )
+            return
+
+        if connection.peer_address in self.currently_connected_clients:
+            logging.debug(
+                f'HAS: Already connected to {connection.peer_address} nothing to do'
+            )
+            return
+
         self.currently_connected_clients.add(connection)
         if (
             connection.peer_address
@@ -457,6 +485,7 @@ class HearingAccessService(gatt.TemplateService):
                     connection,
                     self.hearing_aid_preset_control_point,
                     value=op_list[0].to_bytes(len(op_list) == 1),
+                    force=True,  # TODO GATT notification subscription should be persistent
                 )
                 # Remove item once sent, and keep the non sent item in the list
                 op_list.pop(0)
