@@ -550,7 +550,7 @@ class Host(utils.EventEmitter):
             logger.debug(
                 'HCI LE flow control: '
                 f'le_acl_data_packet_length={le_acl_data_packet_length},'
-                f'total_num_le_acl_data_packets={total_num_le_acl_data_packets}'
+                f'total_num_le_acl_data_packets={total_num_le_acl_data_packets},'
                 f'iso_data_packet_length={iso_data_packet_length},'
                 f'total_num_iso_data_packets={total_num_iso_data_packets}'
             )
