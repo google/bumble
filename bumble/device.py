@@ -4743,7 +4743,7 @@ class Device(utils.CompositeEventEmitter):
             }
 
             def on_cis_establishment(cis_link: CisLink) -> None:
-                self._pending_cis.pop(cis_handle)
+                self._pending_cis.pop(cis_link.handle)
                 if pending_future := pending_cis_establishments.get(cis_link.handle):
                     pending_future.set_result(cis_link)
 
