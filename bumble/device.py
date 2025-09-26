@@ -4727,7 +4727,7 @@ class Device(utils.CompositeEventEmitter):
         self, cis_acl_pairs: Sequence[tuple[int, Connection]]
     ) -> list[CisLink]:
         for cis_handle, acl_connection in cis_acl_pairs:
-            cis_id, cig_id = self._pending_cis.get[cis_handle]
+            cis_id, cig_id = self._pending_cis[cis_handle]
             self.cis_links[cis_handle] = CisLink(
                 device=self,
                 acl_connection=acl_connection,
