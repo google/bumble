@@ -131,7 +131,11 @@ def publish_grpc_port(grpc_port: int, instance_number: int) -> bool:
 
         def cleanup():
             logger.debug("removing .ini file")
-            ini_file.unlink()
+            try:
+                ini_file.unlink()
+            except OSError as error:
+                # Don't log at exception level, since this may happen normally.
+                logger.debug(f'failed to remove .ini file ({error})')
 
         atexit.register(cleanup)
         return True
