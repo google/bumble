@@ -947,7 +947,8 @@ class GetFolderItemsCommand(Command):
     attributes: Sequence[MediaAttributeId] = field(
         metadata=MediaAttributeId.type_metadata(
             4, list_begin=True, list_end=True, byteorder='big'
-        )
+        ),
+        default_factory=list,
     )
 
 
@@ -2012,9 +2013,12 @@ class Protocol(utils.EventEmitter):
 
         self.emit(self.EVENT_STOP)
 
-    def _on_avctp_command(
-        self, transaction_label: int, command: avc.CommandFrame
-    ) -> None:
+    def _on_avctp_command(self, transaction_label: int, payload: bytes) -> None:
+        command = avc.CommandFrame.from_bytes(payload)
+        if not isinstance(command, avc.CommandFrame):
+            raise core.InvalidPacketError(
+                f"{command} is not a valid AV/C Command Frame"
+            )
         logger.debug(
             f"<<< AVCTP Command, transaction_label={transaction_label}: " f"{command}"
         )
@@ -2073,8 +2077,13 @@ class Protocol(utils.EventEmitter):
         self.send_not_implemented_response(transaction_label, command)
 
     def _on_avctp_response(
-        self, transaction_label: int, response: Optional[avc.ResponseFrame]
+        self, transaction_label: int, payload: Optional[bytes]
     ) -> None:
+        response = avc.ResponseFrame.from_bytes(payload) if payload else None
+        if not isinstance(response, avc.ResponseFrame):
+            raise core.InvalidPacketError(
+                f"{response} is not a valid AV/C Response Frame"
+            )
         logger.debug(
             f"<<< AVCTP Response, transaction_label={transaction_label}: {response}"
         )
@@ -2437,3 +2446,162 @@ class Protocol(utils.EventEmitter):
                 return
 
         self._delegate_command(transaction_label, command, register_notification())
+
+
+class BrowsingChannel:
+    """AVRCP Browsing Channel implementation."""
+
+    class PendingCommand:
+        response: asyncio.Future[Response]
+
+        def __init__(self, transaction_label: int) -> None:
+            self.transaction_label = transaction_label
+            self.reset()
+
+        def reset(self):
+            self.response = asyncio.get_running_loop().create_future()
+
+    class Listener(utils.EventEmitter):
+        EVENT_CONNECTION = "connection"
+
+        def __init__(self, device: Device, delegate: Optional[Delegate] = None) -> None:
+            super().__init__()
+            server = device.create_l2cap_server(
+                spec=l2cap.ClassicChannelSpec(psm=avctp.AVCTP_BROWSING_PSM)
+            )
+            self.l2cap_server = server
+            self.delegate = delegate
+            self.l2cap_server.handler = self._on_connection
+
+        def _on_connection(self, channel: l2cap.ClassicChannel) -> None:
+            self.emit(self.EVENT_CONNECTION, BrowsingChannel(channel, self.delegate))
+
+    pending_commands: dict[int, PendingCommand]  # Pending commands, by label
+    free_commands: asyncio.Queue[PendingCommand]
+
+    def __init__(
+        self, l2cap_channel: l2cap.ClassicChannel, delegate: Optional[Delegate] = None
+    ):
+        self.delegate = delegate or Delegate()
+
+        # Create an initial pool of free commands
+        self.pending_commands = {}
+        self.free_commands = asyncio.Queue[BrowsingChannel.PendingCommand]()
+        for transaction_label in range(16):
+            self.free_commands.put_nowait(self.PendingCommand(transaction_label))
+
+        self.avctp_protocol = avctp.Protocol(l2cap_channel)
+        self.avctp_protocol.register_command_handler(AVRCP_PID, self._on_avctp_command)
+        self.avctp_protocol.register_response_handler(
+            AVRCP_PID, self._on_avctp_response
+        )
+
+    @classmethod
+    async def connect(
+        cls, connection: Connection, delegate: Optional[Delegate] = None
+    ) -> BrowsingChannel:
+        return cls(
+            await connection.create_l2cap_channel(
+                l2cap.ClassicChannelSpec(psm=avctp.AVCTP_BROWSING_PSM)
+            ),
+            delegate,
+        )
+
+    async def _obtain_pending_command(self) -> PendingCommand:
+        pending_command = await self.free_commands.get()
+        self.pending_commands[pending_command.transaction_label] = pending_command
+        return pending_command
+
+    async def send_command(self, command: Command) -> Response:
+        """Sends an AVRCP command to the device.
+
+        Args:
+          command: The AVRCP command to send.
+
+        Returns:
+          The response from the device.
+        """
+        # Wait for a free command slot.
+        pending_command = await self._obtain_pending_command()
+
+        logger.debug(">>> AVRCP Browsing command PDU: %s", command)
+        payload = bytes(command)
+        self.avctp_protocol.send_command(
+            pending_command.transaction_label,
+            AVRCP_PID,
+            struct.pack(">BH", command.pdu_id, len(payload)) + payload,
+        )
+
+        # Wait for the response.
+        return await pending_command.response
+
+    def send_response(self, transaction_label: int, response: Response) -> None:
+        logger.debug(">>> AVRCP Browsing response PDU: %s", response)
+        pdu = bytes(response)
+        self.avctp_protocol.send_command(
+            transaction_label,
+            AVRCP_PID,
+            struct.pack(">BH", response.pdu_id, len(pdu)) + pdu,
+        )
+
+    def _on_avctp_response(
+        self, transaction_label: int, payload: Optional[bytes]
+    ) -> None:
+        if not payload:
+            raise core.InvalidPacketError(
+                "Browsing Channel should not receive empty payload"
+            )
+        pending_command = self.pending_commands[transaction_label]
+        pdu_id = PduId(payload[0])
+        pdu = payload[2:]
+        response: Response
+        if (
+            pdu_id
+            in (
+                PduId.SET_BROWSED_PLAYER,
+                PduId.GET_FOLDER_ITEMS,
+                PduId.CHANGE_PATH,
+                PduId.GET_ITEM_ATTRIBUTES,
+                PduId.GET_TOTAL_NUMBER_OF_ITEMS,
+                PduId.SEARCH,
+            )
+            and len(pdu) <= 1
+        ):
+            # On error, remaining parameters are not present.
+            response = RejectedResponse.from_bytes(pdu, pdu_id)
+        else:
+            response = Response.from_bytes(pdu, pdu_id)
+        pending_command.response.set_result(response)
+
+    def _on_avctp_command(self, transaction_label: int, payload: bytes) -> None:
+        pdu_id = PduId(payload[0])
+        command = Command.from_bytes(pdu_id, payload[2:])
+        logger.debug("<<< AVRCP command PDU: %s", command)
+
+        self.send_response(
+            transaction_label, RejectedResponse(pdu_id, StatusCode.INTERNAL_ERROR)
+        )
+
+    def _delegate_command(
+        self, transaction_label: int, command: Command, method: Awaitable
+    ) -> None:
+        async def call() -> None:
+            try:
+                await method
+            except Delegate.Error as error:
+                self.send_response(
+                    transaction_label,
+                    RejectedResponse(
+                        pdu_id=command.pdu_id, status_code=error.status_code
+                    ),
+                )
+            except Exception:
+                logger.exception("delegate method raised exception")
+                self.send_response(
+                    transaction_label,
+                    RejectedResponse(
+                        pdu_id=command.pdu_id, status_code=StatusCode.INTERNAL_ERROR
+                    ),
+                )
+
+        utils.AsyncRunner.spawn(call())
