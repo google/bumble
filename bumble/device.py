@@ -2071,6 +2071,8 @@ class DeviceConfiguration:
     enhanced_retransmission_supported: bool = False
     l2cap_extended_features: Sequence[int] = (
         l2cap.L2CAP_Information_Request.ExtendedFeatures.FIXED_CHANNELS,
+        l2cap.L2CAP_Information_Request.ExtendedFeatures.FCS_OPTION,
+        l2cap.L2CAP_Information_Request.ExtendedFeatures.ENHANCED_RETRANSMISSION_MODE,
     )
 
     def __post_init__(self) -> None:

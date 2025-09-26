@@ -23,18 +23,8 @@ import enum
 import logging
 import struct
 from collections import deque
-from collections.abc import Sequence
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    ClassVar,
-    Iterable,
-    Optional,
-    SupportsBytes,
-    TypeVar,
-    Union,
-)
+from collections.abc import Callable, Iterable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, SupportsBytes, TypeVar, Union
 
 from typing_extensions import override
 
@@ -73,8 +63,8 @@ L2CAP_MAX_BR_EDR_MTU = 65535
 
 L2CAP_DEFAULT_MTU              = 2048  # Default value for the MTU we are willing to accept
 L2CAP_DEFAULT_MPS              = 1010  # Default value for the MPS we are willing to accept
-DEFAULT_TX_WINDOW_SIZE         = 10
-DEFAULT_MAX_RETRANSMISSION     = 10
+DEFAULT_TX_WINDOW_SIZE         = 63
+DEFAULT_MAX_RETRANSMISSION     = 1
 DEFAULT_RETRANSMISSION_TIMEOUT = 2.0
 DEFAULT_MONITOR_TIMEOUT        = 12.0
 
@@ -160,6 +150,11 @@ class TransmissionMode(utils.OpenIntEnum):
 # pylint: disable=invalid-name
 
 
+class L2capError(ProtocolError):
+    def __init__(self, error_code, error_name='', details=''):
+        super().__init__(error_code, 'L2CAP', error_name, details)
+
+
 @dataclasses.dataclass
 class ClassicChannelSpec:
     '''Spec of L2CAP Channel over Classic Transport.
@@ -177,16 +172,18 @@ class ClassicChannelSpec:
         monitor_timeout: The interval at which S-frames should be transmitted on the
             return channel when no frames are received on the forward channel.
         mode: The transmission mode to use.
+        fcs_enabled: Whether to enable FCS (Frame Check Sequence).
     '''
 
     psm: Optional[int] = None
     mtu: int = L2CAP_DEFAULT_MTU
-    mps: int = L2CAP_DEFAULT_MTU
+    mps: int = L2CAP_DEFAULT_MPS
     tx_window_size: int = DEFAULT_TX_WINDOW_SIZE
     max_retransmission: int = DEFAULT_MAX_RETRANSMISSION
     retransmission_timeout: float = DEFAULT_RETRANSMISSION_TIMEOUT
     monitor_timeout: float = DEFAULT_MONITOR_TIMEOUT
     mode: TransmissionMode = TransmissionMode.BASIC
+    fcs_enabled: bool = False
 
 
 @dataclasses.dataclass
@@ -219,20 +216,29 @@ class L2CAP_PDU:
     See Bluetooth spec @ Vol 3, Part A - 3 DATA PACKET FORMAT
     '''
 
-    @staticmethod
-    def from_bytes(data: bytes) -> L2CAP_PDU:
+    @classmethod
+    def from_bytes(cls, data: bytes) -> L2CAP_PDU:
         # Check parameters
         if len(data) < 4:
             raise InvalidPacketError('not enough data for L2CAP header')
 
-        _, l2cap_pdu_cid = struct.unpack_from('<HH', data, 0)
-        l2cap_pdu_payload = data[4:]
+        length, l2cap_pdu_cid = struct.unpack_from('<HH', data, 0)
+        l2cap_pdu_payload = data[4 : 4 + length]
 
-        return L2CAP_PDU(l2cap_pdu_cid, l2cap_pdu_payload)
+        return cls(l2cap_pdu_cid, l2cap_pdu_payload)
 
     def __bytes__(self) -> bytes:
-        header = struct.pack('<HH', len(self.payload), self.cid)
-        return header + self.payload
+        return self.to_bytes(with_fcs=False)
+
+    def to_bytes(self, with_fcs: bool = False) -> bytes:
+        length = len(self.payload)
+        if with_fcs:
+            length += 2
+        header = struct.pack('<HH', length, self.cid)
+        body = header + self.payload
+        if with_fcs:
+            body += struct.pack('<H', utils.crc_16(body))
+        return body
 
     def __init__(self, cid: int, payload: bytes) -> None:
         self.cid = cid
@@ -865,7 +871,7 @@ class L2CAP_Credit_Based_Reconfigure_Response(L2CAP_Control_Frame):
 
 
 # -----------------------------------------------------------------------------
-class BaseProcessor:
+class Processor:
     def __init__(self, channel: ClassicChannel) -> None:
         self.channel = channel
 
@@ -877,7 +883,7 @@ class BaseProcessor:
 
 
 # TODO: Handle retransmission
-class EnhancedRetransmissionProcessor(BaseProcessor):
+class EnhancedRetransmissionProcessor(Processor):
 
     MAX_SEQ_NUM = 64
 
@@ -916,24 +922,30 @@ class EnhancedRetransmissionProcessor(BaseProcessor):
     @classmethod
     def _num_frames_between(cls, low: int, high: int) -> int:
         if high < low:
-            high += cls.MAX_SEQ_NUM + 1
+            high += cls.MAX_SEQ_NUM
         return high - low
 
-    def __init__(self, channel: ClassicChannel):
+    def __init__(
+        self,
+        channel: ClassicChannel,
+        peer_tx_window_size: int = DEFAULT_TX_WINDOW_SIZE,
+        peer_max_retransmission: int = DEFAULT_MAX_RETRANSMISSION,
+        peer_mps: int = L2CAP_DEFAULT_MPS,
+    ):
         spec = channel.spec
         self.mps = spec.mps
-        self.peer_mps = 0
-        self.tx_window_size = spec.tx_window_size
+        self.peer_mps = peer_mps
+        self.peer_tx_window_size = peer_tx_window_size
         self._pending_pdus = []
         self.monitor_timeout = spec.monitor_timeout
         self.channel = channel
         self.retransmission_timeout = spec.retransmission_timeout
-        self.max_retransmission = spec.max_retransmission
+        self.peer_max_retransmission = peer_max_retransmission
 
     def _monitor(self) -> None:
         if (
-            self.max_retransmission <= 0
-            or self._num_receiver_ready_polls_sent < self.max_retransmission
+            self.peer_max_retransmission <= 0
+            or self._num_receiver_ready_polls_sent < self.peer_max_retransmission
         ):
             self._send_receiver_ready_poll()
             self._start_monitor()
@@ -1028,7 +1040,7 @@ class EnhancedRetransmissionProcessor(BaseProcessor):
             return
 
         for pdu in self._pending_pdus:
-            if self._num_unacked_frames >= self.tx_window_size:
+            if self._num_unacked_frames >= self.peer_tx_window_size:
                 return
             self._send_pdu(pdu)
             self._last_tx_seq = pdu.tx_seq
@@ -1107,7 +1119,7 @@ class ClassicChannel(utils.EventEmitter):
     connection: Connection
     mtu: int
     peer_mtu: int
-    processor: BaseProcessor
+    processor: Processor
 
     def __init__(
         self,
@@ -1131,12 +1143,15 @@ class ClassicChannel(utils.EventEmitter):
         self.connection_result = None
         self.disconnection_result = None
         self.sink = None
+        self.fcs_enabled = spec.fcs_enabled
         self.spec = spec
-        if spec.mode == TransmissionMode.BASIC:
-            self.processor = BaseProcessor(self)
-        elif spec.mode == TransmissionMode.ENHANCED_RETRANSMISSION:
-            self.processor = EnhancedRetransmissionProcessor(self)
-        else:
+        self.mode = spec.mode
+        # Configure mode-specific processor later on configure request.
+        self.processor = Processor(self)
+        if self.mode not in (
+            TransmissionMode.BASIC,
+            TransmissionMode.ENHANCED_RETRANSMISSION,
+        ):
             raise InvalidArgumentError(f"Mode {spec.mode} is not supported")
 
     def _change_state(self, new_state: State) -> None:
@@ -1149,12 +1164,17 @@ class ClassicChannel(utils.EventEmitter):
     def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
         if self.state != self.State.OPEN:
             raise InvalidStateError('channel not open')
-        self.manager.send_pdu(self.connection, self.destination_cid, pdu)
+        self.manager.send_pdu(
+            self.connection, self.destination_cid, pdu, self.fcs_enabled
+        )
 
     def send_control_frame(self, frame: L2CAP_Control_Frame) -> None:
         self.manager.send_control_frame(self.connection, self.signaling_cid, frame)
 
     def on_pdu(self, pdu: bytes) -> None:
+        if self.fcs_enabled:
+            # Drop FCS.
+            pdu = pdu[:-2]
         self.processor.on_pdu(pdu)
 
     def on_sdu(self, sdu: bytes) -> None:
@@ -1193,10 +1213,8 @@ class ClassicChannel(utils.EventEmitter):
         finally:
             self.connection_result = None
 
-    async def disconnect(self) -> None:
-        if self.state != self.State.OPEN:
-            raise InvalidStateError('invalid state')
-
+    def _disconnect_sync(self) -> None:
+        """For internal sync disconnection."""
         self._change_state(self.State.WAIT_DISCONNECT)
         self.send_control_frame(
             L2CAP_Disconnection_Request(
@@ -1209,7 +1227,21 @@ class ClassicChannel(utils.EventEmitter):
         # Create a future to wait for the state machine to get to a success or error
         # state
         self.disconnection_result = asyncio.get_running_loop().create_future()
-        return await self.disconnection_result
+
+    def _abort_connection_result(self, message: str = 'Connection failure') -> None:
+        # Cancel pending connection result.
+        if self.connection_result and not self.connection_result.done():
+            self.connection_result.set_exception(
+                L2capError(error_code=0, error_name=message)
+            )
+
+    async def disconnect(self) -> None:
+        if self.state != self.State.OPEN:
+            raise InvalidStateError('invalid state')
+
+        self._disconnect_sync()
+        if self.disconnection_result:
+            return await self.disconnection_result
 
     def abort(self) -> None:
         if self.state == self.State.OPEN:
@@ -1223,19 +1255,26 @@ class ClassicChannel(utils.EventEmitter):
                 struct.pack('<H', self.mtu),
             )
         ]
-        if isinstance(self.processor, EnhancedRetransmissionProcessor):
+        if self.mode == TransmissionMode.ENHANCED_RETRANSMISSION:
             options.append(
                 (
                     L2CAP_Configure_Request.ParameterType.RETRANSMISSION_AND_FLOW_CONTROL,
                     struct.pack(
                         '<BBBHHH',
                         TransmissionMode.ENHANCED_RETRANSMISSION,
-                        self.processor.tx_window_size,
-                        self.processor.max_retransmission,
-                        int(self.processor.retransmission_timeout * 1000),
-                        int(self.processor.monitor_timeout * 1000),
-                        self.processor.mps,
+                        self.spec.tx_window_size,
+                        self.spec.max_retransmission,
+                        int(self.spec.retransmission_timeout * 1000),
+                        int(self.spec.monitor_timeout * 1000),
+                        self.spec.mps,
                     ),
+                )
+            )
+        if self.fcs_enabled:
+            options.append(
+                (
+                    L2CAP_Configure_Request.ParameterType.FCS,
+                    bytes([1 if self.fcs_enabled else 0]),
                 )
             )
         self.send_control_frame(
@@ -1279,9 +1318,8 @@ class ClassicChannel(utils.EventEmitter):
             self._change_state(self.State.CLOSED)
             if self.connection_result:
                 self.connection_result.set_exception(
-                    ProtocolError(
+                    L2capError(
                         response.result,
-                        'l2cap',
                         L2CAP_Connection_Response.Result(response.result).name,
                     )
                 )
@@ -1301,69 +1339,93 @@ class ClassicChannel(utils.EventEmitter):
         # Result to options
         replied_options = list[tuple[int, bytes]]()
         result = L2CAP_Configure_Response.Result.SUCCESS
+        new_mode = TransmissionMode.BASIC
         for option in options:
-            if option[0] == L2CAP_Configure_Request.ParameterType.MTU:
-                self.peer_mtu = struct.unpack('<H', option[1])[0]
-                logger.debug('Peer MTU = %d', self.peer_mtu)
-                replied_options.append(option)
-            elif (
-                option[0]
-                == L2CAP_Configure_Request.ParameterType.RETRANSMISSION_AND_FLOW_CONTROL
-            ):
-                (
-                    mode,
-                    peer_tx_window_size,
-                    peer_max_retransmission,
-                    peer_retransmission_timeout,
-                    peer_monitor_timeout,
-                    peer_mps,
-                ) = struct.unpack_from('<BBBHHH', option[1])
-                logger.debug(
-                    'Peer requests Retransmission or Flow Control: mode=%s, tx_window_size=%s, retransmission_timeout=%s, monitor_timeout=%s, mps=%s',
-                    TransmissionMode(mode).name,
-                    peer_tx_window_size,
-                    peer_max_retransmission,
-                    peer_retransmission_timeout,
-                    peer_monitor_timeout,
-                    peer_mps,
-                )
-                if mode == TransmissionMode.BASIC:
-                    self.processor = BaseProcessor(self)
+            match option[0]:
+                case L2CAP_Configure_Request.ParameterType.MTU:
+                    self.peer_mtu = struct.unpack('<H', option[1])[0]
+                    logger.debug('Peer MTU = %d', self.peer_mtu)
                     replied_options.append(option)
-                elif mode == TransmissionMode.ENHANCED_RETRANSMISSION:
-                    if (
-                        L2CAP_Information_Request.ExtendedFeatures.ENHANCED_RETRANSMISSION_MODE
-                        in self.manager.extended_features
-                    ):
-                        self.processor = EnhancedRetransmissionProcessor(self)
-                        self.processor.peer_mps = peer_mps
+                case (
+                    L2CAP_Configure_Request.ParameterType.RETRANSMISSION_AND_FLOW_CONTROL
+                ):
+                    (
+                        mode,
+                        peer_tx_window_size,
+                        peer_max_retransmission,
+                        peer_retransmission_timeout,
+                        peer_monitor_timeout,
+                        peer_mps,
+                    ) = struct.unpack_from('<BBBHHH', option[1])
+                    new_mode = TransmissionMode(mode)
+                    logger.debug(
+                        'Peer requests Retransmission or Flow Control: mode=%s,'
+                        ' tx_window_size=%s,'
+                        ' max_retransmission=%s,'
+                        ' retransmission_timeout=%s,'
+                        ' monitor_timeout=%s,'
+                        ' mps=%s',
+                        new_mode.name,
+                        peer_tx_window_size,
+                        peer_max_retransmission,
+                        peer_retransmission_timeout,
+                        peer_monitor_timeout,
+                        peer_mps,
+                    )
+                    if new_mode != self.mode:
+                        logger.error('Mode mismatch, abort connection')
+                        self._abort_connection_result(
+                            'Abort on configuration - mode mismatch'
+                        )
+                        self._disconnect_sync()
+                        return
+
+                    if new_mode == TransmissionMode.BASIC:
+                        replied_options.append(option)
+                    elif new_mode == TransmissionMode.ENHANCED_RETRANSMISSION:
+                        self.processor = self.manager.make_mode_processor(
+                            self,
+                            mode=new_mode,
+                            peer_tx_window_size=peer_tx_window_size,
+                            peer_max_retransmission=peer_max_retransmission,
+                            peer_monitor_timeout=peer_monitor_timeout,
+                            peer_retransmission_timeout=peer_retransmission_timeout,
+                            peer_mps=peer_mps,
+                        )
                         replied_options.append(option)
                     else:
-                        logger.error("Enhanced Retransmission Mode is not enabled")
-                        result = L2CAP_Configure_Response.Result.FAILURE_REJECTED
-                        replied_options.clear()
+                        logger.error("Mode %s is not supported", new_mode.name)
+                        self._abort_connection_result(
+                            'Abort on configuration - unsupported mode'
+                        )
+                        self._disconnect_sync()
+                        return
+
+                case L2CAP_Configure_Request.ParameterType.FCS:
+                    enabled = option[1][0] != 0
+                    logger.debug("Peer requests FCS: %s", enabled)
+                    if (
+                        L2CAP_Information_Request.ExtendedFeatures.FCS_OPTION
+                        in self.manager.extended_features
+                    ):
+                        self.fcs_enabled = enabled
                         replied_options.append(option)
+                    else:
+                        logger.error("Frame Check Sequence is not supported")
+                        result = (
+                            L2CAP_Configure_Response.Result.FAILURE_UNACCEPTABLE_PARAMETERS
+                        )
+                        replied_options = [option]
                         break
-                else:
-                    logger.error(
-                        "Mode %s is not supported", TransmissionMode(mode).name
+                case _:
+                    logger.debug(
+                        "Reject unimplemented option %s[%s]",
+                        option[0].name,
+                        option[1].hex(),
                     )
-                    result = (
-                        L2CAP_Configure_Response.Result.FAILURE_UNACCEPTABLE_PARAMETERS
-                    )
-                    replied_options.clear()
-                    replied_options.append(option)
+                    result = L2CAP_Configure_Response.Result.FAILURE_UNKNOWN_OPTIONS
+                    replied_options = [option]
                     break
-            else:
-                logger.debug(
-                    "Reject unimplemented option %s[%s]",
-                    option[0].name,
-                    option[1].hex(),
-                )
-                result = L2CAP_Configure_Response.Result.FAILURE_UNKNOWN_OPTIONS
-                replied_options.clear()
-                replied_options.append(option)
-                break
 
         self.send_control_frame(
             L2CAP_Configure_Response(
@@ -1376,6 +1438,8 @@ class ClassicChannel(utils.EventEmitter):
                 ),
             )
         )
+        if result != L2CAP_Configure_Response.Result.SUCCESS:
+            return
 
         if self.state == self.State.WAIT_CONFIG:
             self._change_state(self.State.WAIT_SEND_CONFIG)
@@ -1429,25 +1493,19 @@ class ClassicChannel(utils.EventEmitter):
             # TODO: decide how to fail gracefully
 
     def on_disconnection_request(self, request: L2CAP_Disconnection_Request) -> None:
-        if self.state in (self.State.OPEN, self.State.WAIT_DISCONNECT):
-            self.send_control_frame(
-                L2CAP_Disconnection_Response(
-                    identifier=request.identifier,
-                    destination_cid=request.destination_cid,
-                    source_cid=request.source_cid,
-                )
+        self.send_control_frame(
+            L2CAP_Disconnection_Response(
+                identifier=request.identifier,
+                destination_cid=request.destination_cid,
+                source_cid=request.source_cid,
             )
-            self._change_state(self.State.CLOSED)
-            self.emit(self.EVENT_CLOSE)
-            self.manager.on_channel_closed(self)
-        else:
-            logger.warning(color('invalid state', 'red'))
+        )
+        self._abort_connection_result()
+        self._change_state(self.State.CLOSED)
+        self.emit(self.EVENT_CLOSE)
+        self.manager.on_channel_closed(self)
 
     def on_disconnection_response(self, response: L2CAP_Disconnection_Response) -> None:
-        if self.state != self.State.WAIT_DISCONNECT:
-            logger.warning(color('invalid state', 'red'))
-            return
-
         if (
             response.destination_cid != self.destination_cid
             or response.source_cid != self.source_cid
@@ -1702,9 +1760,8 @@ class LeCreditBasedChannel(utils.EventEmitter):
             self._change_state(self.State.CONNECTED)
         else:
             self.connection_result.set_exception(
-                ProtocolError(
+                L2capError(
                     response.result,
-                    'l2cap',
                     L2CAP_LE_Credit_Based_Connection_Response.Result(
                         response.result
                     ).name,
@@ -2075,7 +2132,13 @@ class ChannelManager:
         if connection_handle in self.identifiers:
             del self.identifiers[connection_handle]
 
-    def send_pdu(self, connection, cid: int, pdu: Union[SupportsBytes, bytes]) -> None:
+    def send_pdu(
+        self,
+        connection: Connection,
+        cid: int,
+        pdu: Union[SupportsBytes, bytes],
+        with_fcs: bool = False,
+    ) -> None:
         pdu_str = pdu.hex() if isinstance(pdu, bytes) else str(pdu)
         pdu_bytes = bytes(pdu)
         logger.debug(
@@ -2083,7 +2146,9 @@ class ChannelManager:
             f'on connection [0x{connection.handle:04X}] (CID={cid}) '
             f'{connection.peer_address}: {len(pdu_bytes)} bytes, {pdu_str}'
         )
-        self.host.send_l2cap_pdu(connection.handle, cid, pdu_bytes)
+        self.host.send_acl_sdu(
+            connection.handle, L2CAP_PDU(cid, bytes(pdu)).to_bytes(with_fcs=with_fcs)
+        )
 
     def on_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         if cid in (L2CAP_SIGNALING_CID, L2CAP_LE_SIGNALING_CID):
@@ -2660,7 +2725,27 @@ class ChannelManager:
         try:
             await channel.connect()
         except BaseException as e:
-            del connection_channels[source_cid]
+            connection_channels.pop(source_cid, None)
             raise e
 
         return channel
+
+    @classmethod
+    def make_mode_processor(
+        self,
+        channel: ClassicChannel,
+        mode: TransmissionMode,
+        peer_tx_window_size: int,
+        peer_max_retransmission: int,
+        peer_retransmission_timeout: int,
+        peer_monitor_timeout: int,
+        peer_mps: int,
+    ) -> Processor:
+        del peer_retransmission_timeout, peer_monitor_timeout  # Unused.
+        if mode == TransmissionMode.BASIC:
+            return Processor(channel)
+        elif mode == TransmissionMode.ENHANCED_RETRANSMISSION:
+            return EnhancedRetransmissionProcessor(
+                channel, peer_tx_window_size, peer_max_retransmission, peer_mps
+            )
+        raise InvalidArgumentError("Mode %s is not implemented", mode.name)
