@@ -219,20 +219,41 @@ class L2CAP_PDU:
     See Bluetooth spec @ Vol 3, Part A - 3 DATA PACKET FORMAT
     '''
 
-    @staticmethod
-    def from_bytes(data: bytes) -> L2CAP_PDU:
+    @classmethod
+    def from_bytes(cls, data: bytes) -> L2CAP_PDU:
         # Check parameters
         if len(data) < 4:
             raise InvalidPacketError('not enough data for L2CAP header')
 
-        _, l2cap_pdu_cid = struct.unpack_from('<HH', data, 0)
-        l2cap_pdu_payload = data[4:]
+        length, l2cap_pdu_cid = struct.unpack_from('<HH', data, 0)
+        l2cap_pdu_payload = data[4 : 4 + length]
 
-        return L2CAP_PDU(l2cap_pdu_cid, l2cap_pdu_payload)
+        return cls(l2cap_pdu_cid, l2cap_pdu_payload)
 
     def __bytes__(self) -> bytes:
-        header = struct.pack('<HH', len(self.payload), self.cid)
-        return header + self.payload
+        return self.to_bytes(with_fcs=False)
+
+    @classmethod
+    def crc16(self, data: bytes) -> int:
+        crc = 0x0000
+        for byte in data:
+            crc ^= byte
+            for _ in range(8):
+                if (crc & 0x0001) > 0:
+                    crc = (crc >> 1) ^ 0xA001
+                else:
+                    crc = crc >> 1
+        return crc
+
+    def to_bytes(self, with_fcs: bool = False) -> bytes:
+        length = len(self.payload)
+        if with_fcs:
+            length += 2
+        header = struct.pack('<HH', length, self.cid)
+        body = header + self.payload
+        if with_fcs:
+            body += struct.pack('<H', self.crc16(body))
+        return body
 
     def __init__(self, cid: int, payload: bytes) -> None:
         self.cid = cid
@@ -1120,6 +1141,7 @@ class ClassicChannel(utils.EventEmitter):
         self.connection_result = None
         self.disconnection_result = None
         self.sink = None
+        self.fcs_enabled = False
         self.spec = spec
         if spec.mode == TransmissionMode.BASIC:
             self.processor = BaseProcessor(self)
@@ -1138,12 +1160,17 @@ class ClassicChannel(utils.EventEmitter):
     def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
         if self.state != self.State.OPEN:
             raise InvalidStateError('channel not open')
-        self.manager.send_pdu(self.connection, self.destination_cid, pdu)
+        self.manager.send_pdu(
+            self.connection, self.destination_cid, pdu, self.fcs_enabled
+        )
 
     def send_control_frame(self, frame: L2CAP_Control_Frame) -> None:
         self.manager.send_control_frame(self.connection, self.signaling_cid, frame)
 
     def on_pdu(self, pdu: bytes) -> None:
+        if self.fcs_enabled:
+            # Drop FCS.
+            pdu = pdu[:-2]
         self.processor.on_pdu(pdu)
 
     def on_sdu(self, sdu: bytes) -> None:
@@ -1308,7 +1335,12 @@ class ClassicChannel(utils.EventEmitter):
                     peer_mps,
                 ) = struct.unpack_from('<BBBHHH', option[1])
                 logger.debug(
-                    'Peer requests Retransmission or Flow Control: mode=%s, tx_window_size=%s, retransmission_timeout=%s, monitor_timeout=%s, mps=%s',
+                    'Peer requests Retransmission or Flow Control: mode=%s,'
+                    ' tx_window_size=%s,'
+                    ' max_retransmission=%s,'
+                    ' retransmission_timeout=%s,'
+                    ' monitor_timeout=%s,'
+                    ' mps=%s',
                     TransmissionMode(mode).name,
                     peer_tx_window_size,
                     peer_max_retransmission,
@@ -1330,8 +1362,7 @@ class ClassicChannel(utils.EventEmitter):
                     else:
                         logger.error("Enhanced Retransmission Mode is not enabled")
                         result = L2CAP_Configure_Response.Result.FAILURE_REJECTED
-                        replied_options.clear()
-                        replied_options.append(option)
+                        replied_options = [option]
                         break
                 else:
                     logger.error(
@@ -1340,8 +1371,23 @@ class ClassicChannel(utils.EventEmitter):
                     result = (
                         L2CAP_Configure_Response.Result.FAILURE_UNACCEPTABLE_PARAMETERS
                     )
-                    replied_options.clear()
+                    replied_options = [option]
+                    break
+            elif option[0] == L2CAP_Configure_Request.ParameterType.FCS:
+                enabled = option[1][0] != 0
+                logger.debug("Peer requests FCS: %s", enabled)
+                if (
+                    L2CAP_Information_Request.ExtendedFeatures.FCS_OPTION
+                    in self.manager.extended_features
+                ):
+                    self.fcs_enabled = enabled
                     replied_options.append(option)
+                else:
+                    logger.error("Frame Check Sequence is not supported")
+                    result = (
+                        L2CAP_Configure_Response.Result.FAILURE_UNACCEPTABLE_PARAMETERS
+                    )
+                    replied_options = [option]
                     break
             else:
                 logger.debug(
@@ -1350,8 +1396,7 @@ class ClassicChannel(utils.EventEmitter):
                     option[1].hex(),
                 )
                 result = L2CAP_Configure_Response.Result.FAILURE_UNKNOWN_OPTIONS
-                replied_options.clear()
-                replied_options.append(option)
+                replied_options = [option]
                 break
 
         self.send_control_frame(
@@ -2061,7 +2106,13 @@ class ChannelManager:
         if connection_handle in self.identifiers:
             del self.identifiers[connection_handle]
 
-    def send_pdu(self, connection, cid: int, pdu: Union[SupportsBytes, bytes]) -> None:
+    def send_pdu(
+        self,
+        connection,
+        cid: int,
+        pdu: Union[SupportsBytes, bytes],
+        with_fcs: bool = False,
+    ) -> None:
         pdu_str = pdu.hex() if isinstance(pdu, bytes) else str(pdu)
         pdu_bytes = bytes(pdu)
         logger.debug(
@@ -2069,7 +2120,7 @@ class ChannelManager:
             f'on connection [0x{connection.handle:04X}] (CID={cid}) '
             f'{connection.peer_address}: {len(pdu_bytes)} bytes, {pdu_str}'
         )
-        self.host.send_l2cap_pdu(connection.handle, cid, pdu_bytes)
+        self.host.send_l2cap_pdu(connection.handle, cid, pdu_bytes, with_fcs)
 
     def on_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         if cid in (L2CAP_SIGNALING_CID, L2CAP_LE_SIGNALING_CID):

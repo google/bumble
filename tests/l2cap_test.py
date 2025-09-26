@@ -347,10 +347,19 @@ async def test_mtu():
 async def test_enhanced_retransmission_channel():
     devices = TwoDevices()
     await devices.setup_connection()
+    devices[0].l2cap_channel_manager.extended_features.add(
+        l2cap.L2CAP_Information_Request.ExtendedFeatures.ENHANCED_RETRANSMISSION_MODE
+    )
+    devices[1].l2cap_channel_manager.extended_features.add(
+        l2cap.L2CAP_Information_Request.ExtendedFeatures.ENHANCED_RETRANSMISSION_MODE
+    )
 
     server_channels = asyncio.Queue[l2cap.ClassicChannel]()
     server = devices.devices[1].create_l2cap_server(
-        spec=l2cap.ClassicChannelSpec(), handler=server_channels.put_nowait
+        spec=l2cap.ClassicChannelSpec(
+            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION
+        ),
+        handler=server_channels.put_nowait,
     )
     client_channel = await devices.connections[0].create_l2cap_channel(
         spec=l2cap.ClassicChannelSpec(
@@ -373,6 +382,20 @@ async def test_enhanced_retransmission_channel():
         client_channel.write(b'456')
     for _ in range(128):
         assert (await sinks[0].get()) == b'456'
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    'cid, payload, expected',
+    [
+        (0x0040, '020000010203040506070809', '0E0040000200000102030405060708093861'),
+        (0x0040, '0101', '040040000101D414'),
+    ],
+)
+def test_fcs(cid: int, payload: str, expected: str):
+    '''Core Spec 6.1, Vol 3, Part A, 3.3.5. Frame Check Sequence.'''
+    pdu = l2cap.L2CAP_PDU(cid, bytes.fromhex(payload))
+    assert pdu.to_bytes(with_fcs=True) == bytes.fromhex(expected)
 
 
 # -----------------------------------------------------------------------------
