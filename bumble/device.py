@@ -2263,8 +2263,6 @@ class Device(utils.CompositeEventEmitter):
     EVENT_CONNECTION_FAILURE = "connection_failure"
     EVENT_SCO_REQUEST = "sco_request"
     EVENT_INQUIRY_COMPLETE = "inquiry_complete"
-    EVENT_REMOTE_NAME = "remote_name"
-    EVENT_REMOTE_NAME_FAILURE = "remote_name_failure"
     EVENT_SCO_CONNECTION = "sco_connection"
     EVENT_SCO_CONNECTION_FAILURE = "sco_connection_failure"
     EVENT_CIS_REQUEST = "cis_request"
