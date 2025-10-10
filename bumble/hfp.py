@@ -489,9 +489,9 @@ STATUS_CODES = {
 
 @dataclasses.dataclass
 class HfConfiguration:
-    supported_hf_features: list[HfFeature]
-    supported_hf_indicators: list[HfIndicator]
-    supported_audio_codecs: list[AudioCodec]
+    supported_hf_features: Iterable[HfFeature]
+    supported_hf_indicators: Iterable[HfIndicator]
+    supported_audio_codecs: Iterable[AudioCodec]
 
 
 @dataclasses.dataclass
@@ -716,7 +716,7 @@ class HfProtocol(utils.EventEmitter):
         """Termination signal for run() loop."""
 
     supported_hf_features: int
-    supported_audio_codecs: list[AudioCodec]
+    supported_audio_codecs: Iterable[AudioCodec]
 
     supported_ag_features: int
     supported_ag_call_hold_operations: list[CallHoldOperation]
