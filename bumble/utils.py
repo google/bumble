@@ -241,11 +241,7 @@ def cancel_on_event(
             return
         msg = f'abort: {event} event occurred.'
         if isinstance(future, asyncio.Task):
-            # python < 3.9 does not support passing a message on `Task.cancel`
-            if sys.version_info < (3, 9, 0):
-                future.cancel()
-            else:
-                future.cancel(msg)
+            future.cancel(msg)
         else:
             future.set_exception(asyncio.CancelledError(msg))
 
