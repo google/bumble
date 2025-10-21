@@ -459,6 +459,10 @@ class Driver(common.Driver):
             == ModeOfOperation.OPERATIONAL
         ):
             logger.debug("firmware already loaded")
+            # If the firmeare is already loaded, still attempt to load any
+            # device configuration (DDC). DDC can be applied independently of a
+            # firmware reload and may contain runtime overrides or patches.
+            await self.load_ddc_if_any()
             return
 
         # We only support some platforms and variants.
@@ -598,17 +602,39 @@ class Driver(common.Driver):
         await self.reset_complete.wait()
         logger.debug("reset complete")
 
-        # Load the device config if there is one.
+        await self.load_ddc_if_any(firmware_base_name)
+
+    async def load_ddc_if_any(self, firmware_base_name: Optional[str] = None) -> None:
+        """
+        Check for and load any Device Data Configuration (DDC) blobs.
+
+        Args:
+            firmware_base_name: Base name of the selected firmware (e.g. "ibt-XXXX-YYYY").
+                                If None, don't attempt to look up a .ddc file that
+                                corresponds to the firmware image.
+        Priority:
+        1. If a ddc_override was provided via driver metadata, use it (highest priority).
+        2. Otherwise, if firmware_base_name is provided, attempt to find a .ddc file
+           that corresponds to the selected firmware image.
+        3. Finally, if a ddc_addon was provided, append/load it after the primary DDC.
+        """
+        # If an explicit DDC override was supplied, use it and skip file lookup.
         if self.ddc_override:
             logger.debug("loading overridden DDC")
             await self.load_device_config(self.ddc_override)
         else:
-            ddc_name = f"{firmware_base_name}.ddc"
-            ddc_path = _find_binary_path(ddc_name)
-            if ddc_path:
-                logger.debug(f"loading DDC from {ddc_path}")
-                ddc_data = ddc_path.read_bytes()
-                await self.load_device_config(ddc_data)
+            # Only attempt .ddc file lookup if a firmware_base_name was provided.
+            if firmware_base_name is None:
+                logger.debug(
+                    "no firmware_base_name provided; skipping .ddc file lookup"
+                )
+            else:
+                ddc_name = f"{firmware_base_name}.ddc"
+                ddc_path = _find_binary_path(ddc_name)
+                if ddc_path:
+                    logger.debug(f"loading DDC from {ddc_path}")
+                    ddc_data = ddc_path.read_bytes()
+                    await self.load_device_config(ddc_data)
         if self.ddc_addon:
             logger.debug("loading DDC addon")
             await self.load_device_config(self.ddc_addon)
