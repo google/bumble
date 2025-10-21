@@ -2374,11 +2374,7 @@ class Device(utils.CompositeEventEmitter):
             hci.Address.ANY: []
         }  # Futures, by BD address OR [Futures] for hci.Address.ANY
 
-        # In Python <= 3.9 + Rust Runtime, asyncio.Lock cannot be properly initiated.
-        if sys.version_info >= (3, 10):
-            self._cis_lock = asyncio.Lock()
-        else:
-            self._cis_lock = AsyncExitStack()
+        self._cis_lock = asyncio.Lock()
 
         # Own address type cache
         self.connect_own_address_type = None
