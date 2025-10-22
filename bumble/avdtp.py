@@ -41,7 +41,6 @@ from bumble.core import (
     BT_ADVANCED_AUDIO_DISTRIBUTION_SERVICE,
     InvalidStateError,
     ProtocolError,
-    name_or_number,
 )
 from bumble.rtp import MediaPacket
 
@@ -62,74 +61,72 @@ AVDTP_PSM = 0x0019
 AVDTP_DEFAULT_RTX_SIG_TIMER = 5  # Seconds
 
 # Signal Identifiers (AVDTP spec - 8.5 Signal Command Set)
-AVDTP_DISCOVER             = 0x01
-AVDTP_GET_CAPABILITIES     = 0x02
-AVDTP_SET_CONFIGURATION    = 0x03
-AVDTP_GET_CONFIGURATION    = 0x04
-AVDTP_RECONFIGURE          = 0x05
-AVDTP_OPEN                 = 0x06
-AVDTP_START                = 0x07
-AVDTP_CLOSE                = 0x08
-AVDTP_SUSPEND              = 0x09
-AVDTP_ABORT                = 0x0A
-AVDTP_SECURITY_CONTROL     = 0x0B
-AVDTP_GET_ALL_CAPABILITIES = 0x0C
-AVDTP_DELAYREPORT          = 0x0D
+class SignalIdentifier(hci.SpecableEnum):
+    DISCOVER             = 0x01
+    GET_CAPABILITIES     = 0x02
+    SET_CONFIGURATION    = 0x03
+    GET_CONFIGURATION    = 0x04
+    RECONFIGURE          = 0x05
+    OPEN                 = 0x06
+    START                = 0x07
+    CLOSE                = 0x08
+    SUSPEND              = 0x09
+    ABORT                = 0x0A
+    SECURITY_CONTROL     = 0x0B
+    GET_ALL_CAPABILITIES = 0x0C
+    DELAYREPORT          = 0x0D
 
-AVDTP_SIGNAL_NAMES = {
-    AVDTP_DISCOVER:             'AVDTP_DISCOVER',
-    AVDTP_GET_CAPABILITIES:     'AVDTP_GET_CAPABILITIES',
-    AVDTP_SET_CONFIGURATION:    'AVDTP_SET_CONFIGURATION',
-    AVDTP_GET_CONFIGURATION:    'AVDTP_GET_CONFIGURATION',
-    AVDTP_RECONFIGURE:          'AVDTP_RECONFIGURE',
-    AVDTP_OPEN:                 'AVDTP_OPEN',
-    AVDTP_START:                'AVDTP_START',
-    AVDTP_CLOSE:                'AVDTP_CLOSE',
-    AVDTP_SUSPEND:              'AVDTP_SUSPEND',
-    AVDTP_ABORT:                'AVDTP_ABORT',
-    AVDTP_SECURITY_CONTROL:     'AVDTP_SECURITY_CONTROL',
-    AVDTP_GET_ALL_CAPABILITIES: 'AVDTP_GET_ALL_CAPABILITIES',
-    AVDTP_DELAYREPORT:          'AVDTP_DELAYREPORT'
-}
+AVDTP_DISCOVER             = SignalIdentifier.DISCOVER
+AVDTP_GET_CAPABILITIES     = SignalIdentifier.GET_CAPABILITIES
+AVDTP_SET_CONFIGURATION    = SignalIdentifier.SET_CONFIGURATION
+AVDTP_GET_CONFIGURATION    = SignalIdentifier.GET_CONFIGURATION
+AVDTP_RECONFIGURE          = SignalIdentifier.RECONFIGURE
+AVDTP_OPEN                 = SignalIdentifier.OPEN
+AVDTP_START                = SignalIdentifier.START
+AVDTP_CLOSE                = SignalIdentifier.CLOSE
+AVDTP_SUSPEND              = SignalIdentifier.SUSPEND
+AVDTP_ABORT                = SignalIdentifier.ABORT
+AVDTP_SECURITY_CONTROL     = SignalIdentifier.SECURITY_CONTROL
+AVDTP_GET_ALL_CAPABILITIES = SignalIdentifier.GET_ALL_CAPABILITIES
+AVDTP_DELAYREPORT          = SignalIdentifier.DELAYREPORT
 
-# Error codes (AVDTP spec - 8.20.6.2 ERROR_CODE tables)
-AVDTP_BAD_HEADER_FORMAT_ERROR          = 0x01
-AVDTP_BAD_LENGTH_ERROR                 = 0x11
-AVDTP_BAD_ACP_SEID_ERROR               = 0x12
-AVDTP_SEP_IN_USE_ERROR                 = 0x13
-AVDTP_SEP_NOT_IN_USE_ERROR             = 0x14
-AVDTP_BAD_SERV_CATEGORY_ERROR          = 0x17
-AVDTP_BAD_PAYLOAD_FORMAT_ERROR         = 0x18
-AVDTP_NOT_SUPPORTED_COMMAND_ERROR      = 0x19
-AVDTP_INVALID_CAPABILITIES_ERROR       = 0x1A
-AVDTP_BAD_RECOVERY_TYPE_ERROR          = 0x22
-AVDTP_BAD_MEDIA_TRANSPORT_FORMAT_ERROR = 0x23
-AVDTP_BAD_RECOVERY_FORMAT_ERROR        = 0x25
-AVDTP_BAD_ROHC_FORMAT_ERROR            = 0x26
-AVDTP_BAD_CP_FORMAT_ERROR              = 0x27
-AVDTP_BAD_MULTIPLEXING_FORMAT_ERROR    = 0x28
-AVDTP_UNSUPPORTED_CONFIGURATION_ERROR  = 0x29
-AVDTP_BAD_STATE_ERROR                  = 0x31
+class ErrorCode(hci.SpecableEnum):
+    '''Error codes (AVDTP spec - 8.20.6.2 ERROR_CODE tables)'''
+    BAD_HEADER_FORMAT          = 0x01
+    BAD_LENGTH                 = 0x11
+    BAD_ACP_SEID               = 0x12
+    SEP_IN_USE                 = 0x13
+    SEP_NOT_IN_USE             = 0x14
+    BAD_SERV_CATEGORY          = 0x17
+    BAD_PAYLOAD_FORMAT         = 0x18
+    NOT_SUPPORTED_COMMAND      = 0x19
+    INVALID_CAPABILITIES       = 0x1A
+    BAD_RECOVERY_TYPE          = 0x22
+    BAD_MEDIA_TRANSPORT_FORMAT = 0x23
+    BAD_RECOVERY_FORMAT        = 0x25
+    BAD_ROHC_FORMAT            = 0x26
+    BAD_CP_FORMAT              = 0x27
+    BAD_MULTIPLEXING_FORMAT    = 0x28
+    UNSUPPORTED_CONFIGURATION  = 0x29
+    BAD_STATE                  = 0x31
 
-AVDTP_ERROR_NAMES = {
-    AVDTP_BAD_HEADER_FORMAT_ERROR:          'AVDTP_BAD_HEADER_FORMAT_ERROR',
-    AVDTP_BAD_LENGTH_ERROR:                 'AVDTP_BAD_LENGTH_ERROR',
-    AVDTP_BAD_ACP_SEID_ERROR:               'AVDTP_BAD_ACP_SEID_ERROR',
-    AVDTP_SEP_IN_USE_ERROR:                 'AVDTP_SEP_IN_USE_ERROR',
-    AVDTP_SEP_NOT_IN_USE_ERROR:             'AVDTP_SEP_NOT_IN_USE_ERROR',
-    AVDTP_BAD_SERV_CATEGORY_ERROR:          'AVDTP_BAD_SERV_CATEGORY_ERROR',
-    AVDTP_BAD_PAYLOAD_FORMAT_ERROR:         'AVDTP_BAD_PAYLOAD_FORMAT_ERROR',
-    AVDTP_NOT_SUPPORTED_COMMAND_ERROR:      'AVDTP_NOT_SUPPORTED_COMMAND_ERROR',
-    AVDTP_INVALID_CAPABILITIES_ERROR:       'AVDTP_INVALID_CAPABILITIES_ERROR',
-    AVDTP_BAD_RECOVERY_TYPE_ERROR:          'AVDTP_BAD_RECOVERY_TYPE_ERROR',
-    AVDTP_BAD_MEDIA_TRANSPORT_FORMAT_ERROR: 'AVDTP_BAD_MEDIA_TRANSPORT_FORMAT_ERROR',
-    AVDTP_BAD_RECOVERY_FORMAT_ERROR:        'AVDTP_BAD_RECOVERY_FORMAT_ERROR',
-    AVDTP_BAD_ROHC_FORMAT_ERROR:            'AVDTP_BAD_ROHC_FORMAT_ERROR',
-    AVDTP_BAD_CP_FORMAT_ERROR:              'AVDTP_BAD_CP_FORMAT_ERROR',
-    AVDTP_BAD_MULTIPLEXING_FORMAT_ERROR:    'AVDTP_BAD_MULTIPLEXING_FORMAT_ERROR',
-    AVDTP_UNSUPPORTED_CONFIGURATION_ERROR:  'AVDTP_UNSUPPORTED_CONFIGURATION_ERROR',
-    AVDTP_BAD_STATE_ERROR:                  'AVDTP_BAD_STATE_ERROR'
-}
+AVDTP_BAD_HEADER_FORMAT_ERROR          = ErrorCode.BAD_HEADER_FORMAT
+AVDTP_BAD_LENGTH_ERROR                 = ErrorCode.BAD_LENGTH
+AVDTP_BAD_ACP_SEID_ERROR               = ErrorCode.BAD_ACP_SEID
+AVDTP_SEP_IN_USE_ERROR                 = ErrorCode.SEP_IN_USE
+AVDTP_SEP_NOT_IN_USE_ERROR             = ErrorCode.SEP_NOT_IN_USE
+AVDTP_BAD_SERV_CATEGORY_ERROR          = ErrorCode.BAD_SERV_CATEGORY
+AVDTP_BAD_PAYLOAD_FORMAT_ERROR         = ErrorCode.BAD_PAYLOAD_FORMAT
+AVDTP_NOT_SUPPORTED_COMMAND_ERROR      = ErrorCode.NOT_SUPPORTED_COMMAND
+AVDTP_INVALID_CAPABILITIES_ERROR       = ErrorCode.INVALID_CAPABILITIES
+AVDTP_BAD_RECOVERY_TYPE_ERROR          = ErrorCode.BAD_RECOVERY_TYPE
+AVDTP_BAD_MEDIA_TRANSPORT_FORMAT_ERROR = ErrorCode.BAD_MEDIA_TRANSPORT_FORMAT
+AVDTP_BAD_RECOVERY_FORMAT_ERROR        = ErrorCode.BAD_RECOVERY_FORMAT
+AVDTP_BAD_ROHC_FORMAT_ERROR            = ErrorCode.BAD_ROHC_FORMAT
+AVDTP_BAD_CP_FORMAT_ERROR              = ErrorCode.BAD_CP_FORMAT
+AVDTP_BAD_MULTIPLEXING_FORMAT_ERROR    = ErrorCode.BAD_MULTIPLEXING_FORMAT
+AVDTP_UNSUPPORTED_CONFIGURATION_ERROR  = ErrorCode.UNSUPPORTED_CONFIGURATION
+AVDTP_BAD_STATE_ERROR                  = ErrorCode.BAD_STATE
 
 class MediaType(utils.OpenIntEnum):
     AUDIO      = 0x00
@@ -140,52 +137,42 @@ AVDTP_AUDIO_MEDIA_TYPE      = MediaType.AUDIO
 AVDTP_VIDEO_MEDIA_TYPE      = MediaType.VIDEO
 AVDTP_MULTIMEDIA_MEDIA_TYPE = MediaType.MULTIMEDIA
 
-# TSEP (AVDTP spec - 8.20.3 Stream End-point Type, Source or Sink (TSEP))
-AVDTP_TSEP_SRC = 0x00
-AVDTP_TSEP_SNK = 0x01
+class StreamEndPointType(utils.OpenIntEnum):
+    '''TSEP (AVDTP spec - 8.20.3 Stream End-point Type, Source or Sink (TSEP)).'''
+    SRC = 0x00
+    SNK = 0x01
 
-AVDTP_TSEP_NAMES = {
-    AVDTP_TSEP_SRC: 'AVDTP_TSEP_SRC',
-    AVDTP_TSEP_SNK: 'AVDTP_TSEP_SNK'
-}
+AVDTP_TSEP_SRC = StreamEndPointType.SRC
+AVDTP_TSEP_SNK = StreamEndPointType.SNK
 
-# Service Categories (AVDTP spec - Table 8.47: Service Category information element field values)
-AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY    = 0x01
-AVDTP_REPORTING_SERVICE_CATEGORY          = 0x02
-AVDTP_RECOVERY_SERVICE_CATEGORY           = 0x03
-AVDTP_CONTENT_PROTECTION_SERVICE_CATEGORY = 0x04
-AVDTP_HEADER_COMPRESSION_SERVICE_CATEGORY = 0x05
-AVDTP_MULTIPLEXING_SERVICE_CATEGORY       = 0x06
-AVDTP_MEDIA_CODEC_SERVICE_CATEGORY        = 0x07
-AVDTP_DELAY_REPORTING_SERVICE_CATEGORY    = 0x08
+class ServiceCategory(hci.SpecableEnum):
+    '''Service Categories (AVDTP spec - Table 8.47: Service Category information element field values).'''
+    MEDIA_TRANSPORT    = 0x01
+    REPORTING          = 0x02
+    RECOVERY           = 0x03
+    CONTENT_PROTECTION = 0x04
+    HEADER_COMPRESSION = 0x05
+    MULTIPLEXING       = 0x06
+    MEDIA_CODEC        = 0x07
+    DELAY_REPORTING    = 0x08
 
-AVDTP_SERVICE_CATEGORY_NAMES = {
-    AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY:    'AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY',
-    AVDTP_REPORTING_SERVICE_CATEGORY:          'AVDTP_REPORTING_SERVICE_CATEGORY',
-    AVDTP_RECOVERY_SERVICE_CATEGORY:           'AVDTP_RECOVERY_SERVICE_CATEGORY',
-    AVDTP_CONTENT_PROTECTION_SERVICE_CATEGORY: 'AVDTP_CONTENT_PROTECTION_SERVICE_CATEGORY',
-    AVDTP_HEADER_COMPRESSION_SERVICE_CATEGORY: 'AVDTP_HEADER_COMPRESSION_SERVICE_CATEGORY',
-    AVDTP_MULTIPLEXING_SERVICE_CATEGORY:       'AVDTP_MULTIPLEXING_SERVICE_CATEGORY',
-    AVDTP_MEDIA_CODEC_SERVICE_CATEGORY:        'AVDTP_MEDIA_CODEC_SERVICE_CATEGORY',
-    AVDTP_DELAY_REPORTING_SERVICE_CATEGORY:    'AVDTP_DELAY_REPORTING_SERVICE_CATEGORY'
-}
+AVDTP_MEDIA_TRANSPORT_SERVICE_CATEGORY    = ServiceCategory.MEDIA_TRANSPORT
+AVDTP_REPORTING_SERVICE_CATEGORY          = ServiceCategory.REPORTING
+AVDTP_RECOVERY_SERVICE_CATEGORY           = ServiceCategory.RECOVERY
+AVDTP_CONTENT_PROTECTION_SERVICE_CATEGORY = ServiceCategory.CONTENT_PROTECTION
+AVDTP_HEADER_COMPRESSION_SERVICE_CATEGORY = ServiceCategory.HEADER_COMPRESSION
+AVDTP_MULTIPLEXING_SERVICE_CATEGORY       = ServiceCategory.MULTIPLEXING
+AVDTP_MEDIA_CODEC_SERVICE_CATEGORY        = ServiceCategory.MEDIA_CODEC
+AVDTP_DELAY_REPORTING_SERVICE_CATEGORY    = ServiceCategory.DELAY_REPORTING
 
-# States (AVDTP spec - 9.1 State Definitions)
-AVDTP_IDLE_STATE       = 0x00
-AVDTP_CONFIGURED_STATE = 0x01
-AVDTP_OPEN_STATE       = 0x02
-AVDTP_STREAMING_STATE  = 0x03
-AVDTP_CLOSING_STATE    = 0x04
-AVDTP_ABORTING_STATE   = 0x05
-
-AVDTP_STATE_NAMES = {
-    AVDTP_IDLE_STATE:       'AVDTP_IDLE_STATE',
-    AVDTP_CONFIGURED_STATE: 'AVDTP_CONFIGURED_STATE',
-    AVDTP_OPEN_STATE:       'AVDTP_OPEN_STATE',
-    AVDTP_STREAMING_STATE:  'AVDTP_STREAMING_STATE',
-    AVDTP_CLOSING_STATE:    'AVDTP_CLOSING_STATE',
-    AVDTP_ABORTING_STATE:   'AVDTP_ABORTING_STATE'
-}
+class State(utils.OpenIntEnum):
+    '''States (AVDTP spec - 9.1 State Definitions)'''
+    IDLE       = 0x00
+    CONFIGURED = 0x01
+    OPEN       = 0x02
+    STREAMING  = 0x03
+    CLOSING    = 0x04
+    ABORTING   = 0x05
 
 # fmt: on
 # pylint: enable=line-too-long
@@ -308,6 +295,7 @@ class MediaPacketPump:
 # -----------------------------------------------------------------------------
 class MessageAssembler:
     message: Optional[bytes]
+    signal_identifier: SignalIdentifier
 
     def __init__(self, callback: Callable[[int, Message], Any]) -> None:
         self.callback = callback
@@ -317,7 +305,7 @@ class MessageAssembler:
         self.transaction_label = 0
         self.message = None
         self.message_type = Message.MessageType.COMMAND
-        self.signal_identifier = 0
+        self.signal_identifier = SignalIdentifier(0)
         self.number_of_signal_packets = 0
         self.packet_count = 0
 
@@ -346,7 +334,7 @@ class MessageAssembler:
                 self.reset()
 
             self.transaction_label = transaction_label
-            self.signal_identifier = pdu[1] & 0x3F
+            self.signal_identifier = SignalIdentifier(pdu[1] & 0x3F)
             self.message_type = message_type
 
             if packet_type == Protocol.PacketType.SINGLE_PACKET:
@@ -402,7 +390,9 @@ class MessageAssembler:
 
     def on_message_complete(self) -> None:
         message = Message.create(
-            self.signal_identifier, self.message_type, self.message or b''
+            self.signal_identifier,
+            self.message_type,
+            self.message or b'',
         )
         try:
             self.callback(self.transaction_label, message)
@@ -524,7 +514,7 @@ class EndPointInfo:
     seid: int
     in_use: int
     media_type: MediaType
-    tsep: int
+    tsep: StreamEndPointType
 
     @classmethod
     def from_bytes(cls, payload: bytes) -> EndPointInfo:
@@ -532,7 +522,7 @@ class EndPointInfo:
             seid=payload[0] >> 2,
             in_use=payload[0] >> 1 & 1,
             media_type=MediaType(payload[1] >> 4),
-            tsep=payload[1] >> 3 & 1,
+            tsep=StreamEndPointType(payload[1] >> 3 & 1),
         )
 
     def __bytes__(self) -> bytes:
@@ -560,7 +550,7 @@ class Message:
     subclasses: ClassVar[dict[int, dict[int, type[Message]]]] = {}
 
     message_type: MessageType
-    signal_identifier: int
+    signal_identifier: SignalIdentifier
     _payload: Optional[bytes] = None
     fields: ClassVar[hci.Fields] = ()
 
@@ -588,7 +578,10 @@ class Message:
     # type
     @classmethod
     def create(
-        cls, signal_identifier: int, message_type: MessageType, payload: bytes
+        cls,
+        signal_identifier: SignalIdentifier,
+        message_type: MessageType,
+        payload: bytes,
     ) -> Message:
         instance: Message
         # Look for a registered subclass
@@ -604,7 +597,7 @@ class Message:
         # Instantiate the appropriate class based on the message type
         if message_type == Message.MessageType.RESPONSE_REJECT:
             # Assume a simple reject message
-            instance = Simple_Reject(payload[0])
+            instance = Simple_Reject(ErrorCode(payload[0]))
         else:
             instance = Message()
             instance.payload = payload
@@ -614,8 +607,7 @@ class Message:
 
     def to_string(self, details: Union[str, Iterable[str]]) -> str:
         base = color(
-            f'{name_or_number(AVDTP_SIGNAL_NAMES, self.signal_identifier)}_'
-            f'{self.message_type.name}',
+            f'{self.signal_identifier.name}_{self.message_type.name}',
             'yellow',
         )
 
@@ -659,10 +651,10 @@ class Simple_Reject(Message):
 
     message_type = Message.MessageType.RESPONSE_REJECT
 
-    error_code: int = field(metadata=hci.metadata(1))
+    error_code: ErrorCode = field(metadata=ErrorCode.type_metadata(1))
 
     def __str__(self) -> str:
-        details = [f'error_code: {name_or_number(AVDTP_ERROR_NAMES, self.error_code)}']
+        details = [f'error_code: {self.error_code.name}']
         return self.to_string(details)
 
 
@@ -724,7 +716,7 @@ class Discover_Response(Message):
                     f'ACP SEID: {endpoint.seid}',
                     f'  in_use:     {endpoint.in_use}',
                     f'  media_type: {endpoint.media_type.name}',
-                    f'  tsep:       {name_or_number(AVDTP_TSEP_NAMES, endpoint.tsep)}',
+                    f'  tsep:       {endpoint.tsep.name}',
                 ]
             )
         return self.to_string(details)
@@ -857,19 +849,17 @@ class Set_Configuration_Reject(Message):
     signal_identifier = AVDTP_SET_CONFIGURATION
     message_type = Message.MessageType.RESPONSE_REJECT
 
-    service_category: int = field(metadata=hci.metadata(1), default=0)
-    error_code: int = field(metadata=hci.metadata(1), default=0)
+    service_category: ServiceCategory = field(
+        metadata=ServiceCategory.type_metadata(1), default=ServiceCategory(0)
+    )
+    error_code: ErrorCode = field(
+        metadata=ErrorCode.type_metadata(1), default=ErrorCode(0)
+    )
 
     def __str__(self) -> str:
         details = [
-            (
-                'service_category: '
-                f'{name_or_number(AVDTP_SERVICE_CATEGORY_NAMES, self.service_category)}'
-            ),
-            (
-                'error_code:       '
-                f'{name_or_number(AVDTP_ERROR_NAMES, self.error_code)}'
-            ),
+            (f'service_category: {self.service_category.name}'),
+            (f'error_code:       {self.error_code.name}'),
         ]
         return self.to_string(details)
 
@@ -1052,12 +1042,12 @@ class Start_Reject(Message):
     message_type = Message.MessageType.RESPONSE_REJECT
 
     acp_seid: int = field(metadata=Message.SEID_METADATA)
-    error_code: int = field(metadata=hci.metadata(1))
+    error_code: ErrorCode = field(metadata=ErrorCode.type_metadata(1))
 
     def __str__(self) -> str:
         details = [
             f'acp_seid:   {self.acp_seid}',
-            f'error_code: {name_or_number(AVDTP_ERROR_NAMES, self.error_code)}',
+            f'error_code: {self.error_code.name}',
         ]
         return self.to_string(details)
 
@@ -1210,7 +1200,7 @@ class General_Reject(Message):
     See Bluetooth AVDTP spec - 8.18 General Reject
     '''
 
-    signal_identifier = 0
+    signal_identifier = SignalIdentifier(0)
     message_type = Message.MessageType.GENERAL_REJECT
 
     def to_string(self, details):
@@ -1285,10 +1275,6 @@ class Protocol(utils.EventEmitter):
         START_PACKET = 1
         CONTINUE_PACKET = 2
         END_PACKET = 3
-
-    @staticmethod
-    def packet_type_name(packet_type):
-        return name_or_number(Protocol.PACKET_TYPE_NAMES, packet_type)
 
     @staticmethod
     async def connect(
@@ -1462,11 +1448,7 @@ class Protocol(utils.EventEmitter):
 
         if message.message_type == Message.MessageType.COMMAND:
             # Command
-            signal_name = (
-                AVDTP_SIGNAL_NAMES.get(message.signal_identifier, "")
-                .replace("AVDTP_", "")
-                .lower()
-            )
+            signal_name = message.signal_identifier.name.lower()
             handler_name = f'on_{signal_name}_command'
             handler = getattr(self, handler_name, None)
             if handler:
@@ -1649,11 +1631,11 @@ class Protocol(utils.EventEmitter):
     ) -> Optional[Message]:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
-            return Set_Configuration_Reject(AVDTP_BAD_ACP_SEID_ERROR)
+            return Set_Configuration_Reject(error_code=AVDTP_BAD_ACP_SEID_ERROR)
 
         # Check that the local endpoint isn't in use
         if endpoint.in_use:
-            return Set_Configuration_Reject(AVDTP_SEP_IN_USE_ERROR)
+            return Set_Configuration_Reject(error_code=AVDTP_SEP_IN_USE_ERROR)
 
         # Create a stream object for the pair of endpoints
         stream = Stream(self, endpoint, StreamEndPointProxy(self, command.int_seid))
@@ -1676,9 +1658,9 @@ class Protocol(utils.EventEmitter):
     def on_reconfigure_command(self, command: Reconfigure_Command) -> Optional[Message]:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
-            return Reconfigure_Reject(0, AVDTP_BAD_ACP_SEID_ERROR)
+            return Reconfigure_Reject(error_code=AVDTP_BAD_ACP_SEID_ERROR)
         if endpoint.stream is None:
-            return Reconfigure_Reject(0, AVDTP_BAD_STATE_ERROR)
+            return Reconfigure_Reject(error_code=AVDTP_BAD_STATE_ERROR)
 
         result = endpoint.stream.on_reconfigure_command(command.capabilities)
         return result or Reconfigure_Response()
@@ -1842,12 +1824,8 @@ class Stream:
 
     rtp_channel: Optional[l2cap.ClassicChannel]
 
-    @staticmethod
-    def state_name(state: int) -> str:
-        return name_or_number(AVDTP_STATE_NAMES, state)
-
-    def change_state(self, state: int) -> None:
-        logger.debug(f'{self} state change -> {color(self.state_name(state), "cyan")}')
+    def change_state(self, state: State) -> None:
+        logger.debug(f'{self} state change -> {color(state.name, "cyan")}')
         self.state = state
 
     def send_media_packet(self, packet: MediaPacket) -> None:
@@ -1855,22 +1833,22 @@ class Stream:
         self.rtp_channel.send_pdu(bytes(packet))
 
     async def configure(self) -> None:
-        if self.state != AVDTP_IDLE_STATE:
+        if self.state != State.IDLE:
             raise InvalidStateError('current state is not IDLE')
 
         await self.remote_endpoint.set_configuration(
             self.local_endpoint.seid, self.local_endpoint.configuration
         )
-        self.change_state(AVDTP_CONFIGURED_STATE)
+        self.change_state(State.CONFIGURED)
 
     async def open(self) -> None:
-        if self.state != AVDTP_CONFIGURED_STATE:
+        if self.state != State.CONFIGURED:
             raise InvalidStateError('current state is not CONFIGURED')
 
         logger.debug('opening remote endpoint')
         await self.remote_endpoint.open()
 
-        self.change_state(AVDTP_OPEN_STATE)
+        self.change_state(State.OPEN)
 
         # Create a channel for RTP packets
         self.rtp_channel = (
@@ -1882,10 +1860,10 @@ class Stream:
     async def start(self) -> None:
         """[Source] Start streaming."""
         # Auto-open if needed
-        if self.state == AVDTP_CONFIGURED_STATE:
+        if self.state == State.CONFIGURED:
             await self.open()
 
-        if self.state != AVDTP_OPEN_STATE:
+        if self.state != State.OPEN:
             raise InvalidStateError('current state is not OPEN')
 
         logger.debug('starting remote endpoint')
@@ -1894,11 +1872,11 @@ class Stream:
         logger.debug('starting local endpoint')
         await self.local_endpoint.start()
 
-        self.change_state(AVDTP_STREAMING_STATE)
+        self.change_state(State.STREAMING)
 
     async def stop(self) -> None:
         """[Source] Stop streaming and transit to OPEN state."""
-        if self.state != AVDTP_STREAMING_STATE:
+        if self.state != State.STREAMING:
             raise InvalidStateError('current state is not STREAMING')
 
         logger.debug('stopping local endpoint')
@@ -1907,11 +1885,11 @@ class Stream:
         logger.debug('stopping remote endpoint')
         await self.remote_endpoint.stop()
 
-        self.change_state(AVDTP_OPEN_STATE)
+        self.change_state(State.OPEN)
 
     async def close(self) -> None:
         """[Source] Close channel and transit to IDLE state."""
-        if self.state not in (AVDTP_OPEN_STATE, AVDTP_STREAMING_STATE):
+        if self.state not in (State.OPEN, State.STREAMING):
             raise InvalidStateError('current state is not OPEN or STREAMING')
 
         logger.debug('closing local endpoint')
@@ -1921,7 +1899,7 @@ class Stream:
         await self.remote_endpoint.close()
 
         # Release any channels we may have created
-        self.change_state(AVDTP_CLOSING_STATE)
+        self.change_state(State.CLOSING)
         if self.rtp_channel:
             await self.rtp_channel.disconnect()
             self.rtp_channel = None
@@ -1929,31 +1907,31 @@ class Stream:
         # Release the endpoint
         self.local_endpoint.in_use = 0
 
-        self.change_state(AVDTP_IDLE_STATE)
+        self.change_state(State.IDLE)
 
     def on_set_configuration_command(self, configuration):
-        if self.state != AVDTP_IDLE_STATE:
+        if self.state != State.IDLE:
             return Set_Configuration_Reject(AVDTP_BAD_STATE_ERROR)
 
         result = self.local_endpoint.on_set_configuration_command(configuration)
         if result is not None:
             return result
 
-        self.change_state(AVDTP_CONFIGURED_STATE)
+        self.change_state(State.CONFIGURED)
         return None
 
     def on_get_configuration_command(self):
         if self.state not in (
-            AVDTP_CONFIGURED_STATE,
-            AVDTP_OPEN_STATE,
-            AVDTP_STREAMING_STATE,
+            State.CONFIGURED,
+            State.OPEN,
+            State.STREAMING,
         ):
             return Get_Configuration_Reject(AVDTP_BAD_STATE_ERROR)
 
         return self.local_endpoint.on_get_configuration_command()
 
     def on_reconfigure_command(self, configuration):
-        if self.state != AVDTP_OPEN_STATE:
+        if self.state != State.OPEN:
             return Reconfigure_Reject(AVDTP_BAD_STATE_ERROR)
 
         result = self.local_endpoint.on_reconfigure_command(configuration)
@@ -1963,7 +1941,7 @@ class Stream:
         return None
 
     def on_open_command(self):
-        if self.state != AVDTP_CONFIGURED_STATE:
+        if self.state != State.CONFIGURED:
             return Open_Reject(AVDTP_BAD_STATE_ERROR)
 
         result = self.local_endpoint.on_open_command()
@@ -1973,11 +1951,11 @@ class Stream:
         # Register to accept the next channel
         self.protocol.channel_acceptor = self
 
-        self.change_state(AVDTP_OPEN_STATE)
+        self.change_state(State.OPEN)
         return None
 
     def on_start_command(self):
-        if self.state != AVDTP_OPEN_STATE:
+        if self.state != State.OPEN:
             return Open_Reject(AVDTP_BAD_STATE_ERROR)
 
         # Check that we have an RTP channel
@@ -1989,33 +1967,33 @@ class Stream:
         if result is not None:
             return result
 
-        self.change_state(AVDTP_STREAMING_STATE)
+        self.change_state(State.STREAMING)
         return None
 
     def on_suspend_command(self):
-        if self.state != AVDTP_STREAMING_STATE:
+        if self.state != State.STREAMING:
             return Open_Reject(AVDTP_BAD_STATE_ERROR)
 
         result = self.local_endpoint.on_suspend_command()
         if result is not None:
             return result
 
-        self.change_state(AVDTP_OPEN_STATE)
+        self.change_state(State.OPEN)
         return None
 
     def on_close_command(self):
-        if self.state not in (AVDTP_OPEN_STATE, AVDTP_STREAMING_STATE):
+        if self.state not in (State.OPEN, State.STREAMING):
             return Open_Reject(AVDTP_BAD_STATE_ERROR)
 
         result = self.local_endpoint.on_close_command()
         if result is not None:
             return result
 
-        self.change_state(AVDTP_CLOSING_STATE)
+        self.change_state(State.CLOSING)
 
         if self.rtp_channel is None:
             # No channel to release, we're done
-            self.change_state(AVDTP_IDLE_STATE)
+            self.change_state(State.IDLE)
         else:
             # TODO: set a timer as we wait for the RTP channel to be closed
             pass
@@ -2025,10 +2003,10 @@ class Stream:
     def on_abort_command(self):
         if self.rtp_channel is None:
             # No need to wait
-            self.change_state(AVDTP_IDLE_STATE)
+            self.change_state(State.IDLE)
         else:
             # Wait for the RTP channel to be closed
-            self.change_state(AVDTP_ABORTING_STATE)
+            self.change_state(State.ABORTING)
 
     def on_l2cap_connection(self, channel: l2cap.ClassicChannel) -> None:
         logger.debug(color('<<< stream channel connected', 'magenta'))
@@ -2049,8 +2027,8 @@ class Stream:
         self.local_endpoint.in_use = 0
         self.rtp_channel = None
 
-        if self.state in (AVDTP_CLOSING_STATE, AVDTP_ABORTING_STATE):
-            self.change_state(AVDTP_IDLE_STATE)
+        if self.state in (State.CLOSING, State.ABORTING):
+            self.change_state(State.IDLE)
         else:
             logger.warning('unexpected channel close while not CLOSING or ABORTING')
 
@@ -2068,7 +2046,7 @@ class Stream:
         self.local_endpoint = local_endpoint
         self.remote_endpoint = remote_endpoint
         self.rtp_channel = None
-        self.state = AVDTP_IDLE_STATE
+        self.state = State.IDLE
 
         local_endpoint.stream = self
         local_endpoint.in_use = 1
@@ -2076,7 +2054,7 @@ class Stream:
     def __str__(self) -> str:
         return (
             f'Stream({self.local_endpoint.seid} -> '
-            f'{self.remote_endpoint.seid} {self.state_name(self.state)})'
+            f'{self.remote_endpoint.seid} {self.state.name})'
         )
 
 
@@ -2085,7 +2063,7 @@ class Stream:
 class StreamEndPoint:
     seid: int
     media_type: MediaType
-    tsep: int
+    tsep: StreamEndPointType
     in_use: int
     capabilities: Iterable[ServiceCapabilities]
 
@@ -2124,7 +2102,7 @@ class DiscoveredStreamEndPoint(StreamEndPoint, StreamEndPointProxy):
         protocol: Protocol,
         seid: int,
         media_type: MediaType,
-        tsep: int,
+        tsep: StreamEndPointType,
         in_use: int,
         capabilities: Iterable[ServiceCapabilities],
     ) -> None:
@@ -2154,7 +2132,7 @@ class LocalStreamEndPoint(StreamEndPoint, utils.EventEmitter):
         protocol: Protocol,
         seid: int,
         media_type: MediaType,
-        tsep: int,
+        tsep: StreamEndPointType,
         capabilities: Iterable[ServiceCapabilities],
         configuration: Optional[Iterable[ServiceCapabilities]] = None,
     ):

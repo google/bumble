@@ -23,17 +23,7 @@ from typing import Awaitable
 
 import pytest
 
-from bumble import a2dp
-from bumble.avdtp import (
-    AVDTP_AUDIO_MEDIA_TYPE,
-    AVDTP_IDLE_STATE,
-    AVDTP_STREAMING_STATE,
-    AVDTP_TSEP_SNK,
-    Listener,
-    MediaCodecCapabilities,
-    MediaPacketPump,
-    Protocol,
-)
+from bumble import a2dp, avdtp
 from bumble.controller import Controller
 from bumble.core import PhysicalTransport
 from bumble.device import Device
@@ -134,8 +124,8 @@ async def test_self_connection():
 
 # -----------------------------------------------------------------------------
 def source_codec_capabilities():
-    return MediaCodecCapabilities(
-        media_type=AVDTP_AUDIO_MEDIA_TYPE,
+    return avdtp.MediaCodecCapabilities(
+        media_type=avdtp.MediaType.AUDIO,
         media_codec_type=a2dp.CodecType.SBC,
         media_codec_information=a2dp.SbcMediaCodecInformation(
             sampling_frequency=a2dp.SbcMediaCodecInformation.SamplingFrequency.SF_44100,
@@ -151,8 +141,8 @@ def source_codec_capabilities():
 
 # -----------------------------------------------------------------------------
 def sink_codec_capabilities():
-    return MediaCodecCapabilities(
-        media_type=AVDTP_AUDIO_MEDIA_TYPE,
+    return avdtp.MediaCodecCapabilities(
+        media_type=avdtp.MediaType.AUDIO,
         media_codec_type=a2dp.CodecType.SBC,
         media_codec_information=a2dp.SbcMediaCodecInformation(
             sampling_frequency=a2dp.SbcMediaCodecInformation.SamplingFrequency.SF_48000
@@ -200,7 +190,7 @@ async def test_source_sink_1():
         sink.on('rtp_packet', on_rtp_packet)
 
     # Create a listener to wait for AVDTP connections
-    listener = Listener.for_device(two_devices.devices[1])
+    listener = avdtp.Listener.for_device(two_devices.devices[1])
     listener.on('connection', on_avdtp_connection)
 
     async def make_connection():
@@ -213,13 +203,13 @@ async def test_source_sink_1():
         return connections[0]
 
     connection = await make_connection()
-    client = await Protocol.connect(connection)
+    client = await avdtp.Protocol.connect(connection)
     endpoints = await client.discover_remote_endpoints()
     assert len(endpoints) == 1
     remote_sink = list(endpoints)[0]
     assert remote_sink.in_use == 0
-    assert remote_sink.media_type == AVDTP_AUDIO_MEDIA_TYPE
-    assert remote_sink.tsep == AVDTP_TSEP_SNK
+    assert remote_sink.media_type == avdtp.MediaType.AUDIO
+    assert remote_sink.tsep == avdtp.StreamEndPointType.SNK
 
     async def generate_packets(packet_count):
         sequence_number = 0
@@ -238,24 +228,24 @@ async def test_source_sink_1():
     rtp_packets_fully_received = asyncio.get_running_loop().create_future()
     rtp_packets_expected = 3
     rtp_packets = []
-    pump = MediaPacketPump(generate_packets(3))
+    pump = avdtp.MediaPacketPump(generate_packets(3))
     source = client.add_source(source_codec_capabilities(), pump)
     stream = await client.create_stream(source, remote_sink)
     await stream.start()
-    assert stream.state == AVDTP_STREAMING_STATE
+    assert stream.state == avdtp.State.STREAMING
     assert stream.local_endpoint.in_use == 1
     assert stream.rtp_channel is not None
     assert sink.in_use == 1
     assert sink.stream is not None
-    assert sink.stream.state == AVDTP_STREAMING_STATE
+    assert sink.stream.state == avdtp.State.STREAMING
     await rtp_packets_fully_received
 
     await stream.close()
     assert stream.rtp_channel is None
     assert source.in_use == 0
-    assert source.stream.state == AVDTP_IDLE_STATE
+    assert source.stream.state == avdtp.State.IDLE
     assert sink.in_use == 0
-    assert sink.stream.state == AVDTP_IDLE_STATE
+    assert sink.stream.state == avdtp.State.IDLE
 
     # Send packets manually
     rtp_packets_fully_received = asyncio.get_running_loop().create_future()
@@ -267,12 +257,12 @@ async def test_source_sink_1():
     source = client.add_source(source_codec_capabilities(), None)
     stream = await client.create_stream(source, remote_sink)
     await stream.start()
-    assert stream.state == AVDTP_STREAMING_STATE
+    assert stream.state == avdtp.State.STREAMING
     assert stream.local_endpoint.in_use == 1
     assert stream.rtp_channel is not None
     assert sink.in_use == 1
     assert sink.stream is not None
-    assert sink.stream.state == AVDTP_STREAMING_STATE
+    assert sink.stream.state == avdtp.State.STREAMING
 
     stream.send_media_packet(source_packets[0])
     stream.send_media_packet(source_packets[1])
@@ -282,9 +272,9 @@ async def test_source_sink_1():
     assert stream.rtp_channel is None
     assert len(rtp_packets) == 3
     assert source.in_use == 0
-    assert source.stream.state == AVDTP_IDLE_STATE
+    assert source.stream.state == avdtp.State.IDLE
     assert sink.in_use == 0
-    assert sink.stream.state == AVDTP_IDLE_STATE
+    assert sink.stream.state == avdtp.State.IDLE
 
 
 # -----------------------------------------------------------------------------

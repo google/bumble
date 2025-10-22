@@ -30,7 +30,10 @@ from bumble.rtp import MediaPacket
         avdtp.Discover_Response(
             endpoints=[
                 avdtp.EndPointInfo(
-                    seid=1, in_use=1, media_type=avdtp.MediaType.AUDIO, tsep=1
+                    seid=1,
+                    in_use=1,
+                    media_type=avdtp.MediaType.AUDIO,
+                    tsep=avdtp.StreamEndPointType.SNK,
                 )
             ]
         ),
