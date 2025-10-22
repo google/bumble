@@ -21,11 +21,12 @@ import dataclasses
 import enum
 import logging
 import struct
-from collections.abc import AsyncGenerator
-from typing import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from typing import Union
 
 from typing_extensions import ClassVar, Self
 
+from bumble import utils
 from bumble.codecs import AacAudioRtpPacket
 from bumble.company_ids import COMPANY_IDENTIFIERS
 from bumble.core import (
@@ -59,19 +60,18 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # fmt: off
 
-A2DP_SBC_CODEC_TYPE            = 0x00
-A2DP_MPEG_1_2_AUDIO_CODEC_TYPE = 0x01
-A2DP_MPEG_2_4_AAC_CODEC_TYPE   = 0x02
-A2DP_ATRAC_FAMILY_CODEC_TYPE   = 0x03
-A2DP_NON_A2DP_CODEC_TYPE       = 0xFF
+class CodecType(utils.OpenIntEnum):
+    SBC            = 0x00
+    MPEG_1_2_AUDIO = 0x01
+    MPEG_2_4_AAC   = 0x02
+    ATRAC_FAMILY   = 0x03
+    NON_A2DP       = 0xFF
 
-A2DP_CODEC_TYPE_NAMES = {
-    A2DP_SBC_CODEC_TYPE:            'A2DP_SBC_CODEC_TYPE',
-    A2DP_MPEG_1_2_AUDIO_CODEC_TYPE: 'A2DP_MPEG_1_2_AUDIO_CODEC_TYPE',
-    A2DP_MPEG_2_4_AAC_CODEC_TYPE:   'A2DP_MPEG_2_4_AAC_CODEC_TYPE',
-    A2DP_ATRAC_FAMILY_CODEC_TYPE:   'A2DP_ATRAC_FAMILY_CODEC_TYPE',
-    A2DP_NON_A2DP_CODEC_TYPE:       'A2DP_NON_A2DP_CODEC_TYPE'
-}
+A2DP_SBC_CODEC_TYPE            = CodecType.SBC
+A2DP_MPEG_1_2_AUDIO_CODEC_TYPE = CodecType.MPEG_1_2_AUDIO
+A2DP_MPEG_2_4_AAC_CODEC_TYPE   = CodecType.MPEG_2_4_AAC
+A2DP_ATRAC_FAMILY_CODEC_TYPE   = CodecType.ATRAC_FAMILY
+A2DP_NON_A2DP_CODEC_TYPE       = CodecType.NON_A2DP
 
 
 SBC_SYNC_WORD = 0x9C
@@ -260,8 +260,47 @@ def make_audio_sink_service_sdp_records(service_record_handle, version=(1, 3)):
 
 
 # -----------------------------------------------------------------------------
+class MediaCodecInformation:
+    '''Base Media Codec Information.'''
+
+    @classmethod
+    def create(
+        cls, media_codec_type: int, data: bytes
+    ) -> Union[MediaCodecInformation, bytes]:
+        if media_codec_type == CodecType.SBC:
+            return SbcMediaCodecInformation.from_bytes(data)
+        elif media_codec_type == CodecType.MPEG_2_4_AAC:
+            return AacMediaCodecInformation.from_bytes(data)
+        elif media_codec_type == CodecType.NON_A2DP:
+            vendor_media_codec_information = (
+                VendorSpecificMediaCodecInformation.from_bytes(data)
+            )
+            if (
+                vendor_class_map := A2DP_VENDOR_MEDIA_CODEC_INFORMATION_CLASSES.get(
+                    vendor_media_codec_information.vendor_id
+                )
+            ) and (
+                media_codec_information_class := vendor_class_map.get(
+                    vendor_media_codec_information.codec_id
+                )
+            ):
+                return media_codec_information_class.from_bytes(
+                    vendor_media_codec_information.value
+                )
+        return vendor_media_codec_information
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Self:
+        del data  # Unused.
+        raise NotImplementedError
+
+    def __bytes__(self) -> bytes:
+        raise NotImplementedError
+
+
+# -----------------------------------------------------------------------------
 @dataclasses.dataclass
-class SbcMediaCodecInformation:
+class SbcMediaCodecInformation(MediaCodecInformation):
     '''
     A2DP spec - 4.3.2 Codec Specific Information Elements
     '''
@@ -345,7 +384,7 @@ class SbcMediaCodecInformation:
 
 # -----------------------------------------------------------------------------
 @dataclasses.dataclass
-class AacMediaCodecInformation:
+class AacMediaCodecInformation(MediaCodecInformation):
     '''
     A2DP spec - 4.5.2 Codec Specific Information Elements
     '''
@@ -427,7 +466,7 @@ class AacMediaCodecInformation:
 
 @dataclasses.dataclass
 # -----------------------------------------------------------------------------
-class VendorSpecificMediaCodecInformation:
+class VendorSpecificMediaCodecInformation(MediaCodecInformation):
     '''
     A2DP spec - 4.7.2 Codec Specific Information Elements
     '''

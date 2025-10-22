@@ -25,7 +25,6 @@ import pytest
 
 from bumble import a2dp
 from bumble.avdtp import (
-    A2DP_SBC_CODEC_TYPE,
     AVDTP_AUDIO_MEDIA_TYPE,
     AVDTP_IDLE_STATE,
     AVDTP_STREAMING_STATE,
@@ -137,7 +136,7 @@ async def test_self_connection():
 def source_codec_capabilities():
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
-        media_codec_type=A2DP_SBC_CODEC_TYPE,
+        media_codec_type=a2dp.CodecType.SBC,
         media_codec_information=a2dp.SbcMediaCodecInformation(
             sampling_frequency=a2dp.SbcMediaCodecInformation.SamplingFrequency.SF_44100,
             channel_mode=a2dp.SbcMediaCodecInformation.ChannelMode.JOINT_STEREO,
@@ -154,7 +153,7 @@ def source_codec_capabilities():
 def sink_codec_capabilities():
     return MediaCodecCapabilities(
         media_type=AVDTP_AUDIO_MEDIA_TYPE,
-        media_codec_type=A2DP_SBC_CODEC_TYPE,
+        media_codec_type=a2dp.CodecType.SBC,
         media_codec_information=a2dp.SbcMediaCodecInformation(
             sampling_frequency=a2dp.SbcMediaCodecInformation.SamplingFrequency.SF_48000
             | a2dp.SbcMediaCodecInformation.SamplingFrequency.SF_44100
