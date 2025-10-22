@@ -489,9 +489,9 @@ STATUS_CODES = {
 
 @dataclasses.dataclass
 class HfConfiguration:
-    supported_hf_features: list[HfFeature]
-    supported_hf_indicators: list[HfIndicator]
-    supported_audio_codecs: list[AudioCodec]
+    supported_hf_features: collections.abc.Sequence[HfFeature]
+    supported_hf_indicators: collections.abc.Sequence[HfIndicator]
+    supported_audio_codecs: collections.abc.Sequence[AudioCodec]
 
 
 @dataclasses.dataclass
@@ -753,7 +753,7 @@ class HfProtocol(utils.EventEmitter):
 
         # Build local features.
         self.supported_hf_features = sum(configuration.supported_hf_features)
-        self.supported_audio_codecs = configuration.supported_audio_codecs
+        self.supported_audio_codecs = list(configuration.supported_audio_codecs)
 
         self.hf_indicators = {
             indicator: HfIndicatorState(indicator=indicator)
