@@ -671,7 +671,9 @@ class DLC(utils.EventEmitter):
     def process_tx(self) -> None:
         # Send anything we can (or an empty frame if we need to send rx credits)
         rx_credits_needed = self.rx_credits_needed()
-        while (self.tx_buffer and self.tx_credits > 0) or (rx_credits_needed > 0 and self.tx_credit > 0):
+        while (self.tx_buffer and self.tx_credits > 0) or (
+            rx_credits_needed > 0 and self.tx_credit > 0
+        ):
             # Get the next chunk, up to MTU size
             if rx_credits_needed > 0:
                 chunk = bytes([rx_credits_needed]) + self.tx_buffer[: self.mtu - 1]
