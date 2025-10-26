@@ -674,10 +674,14 @@ class DLC(utils.EventEmitter):
         while (self.tx_buffer and self.tx_credits > 0) or rx_credits_needed > 0:
             # Get the next chunk, up to MTU size
             if rx_credits_needed > 0:
-                chunk = bytes([rx_credits_needed]) + self.tx_buffer[: self.mtu - 1]
-                self.tx_buffer = self.tx_buffer[len(chunk) - 1 :]
+                chunk = bytes([rx_credits_needed])
                 self.rx_credits += rx_credits_needed
-                tx_credit_spent = len(chunk) > 1
+                if self.tx_buffer and self.tx_credits > 0:
+                    chunk += self.tx_buffer[: self.mtu - 1]
+                    self.tx_buffer = self.tx_buffer[len(chunk) - 1 :]
+                    tx_credit_spent = True
+                else:
+                    tx_credit_spent = False
             else:
                 chunk = self.tx_buffer[: self.mtu]
                 self.tx_buffer = self.tx_buffer[len(chunk) :]
