@@ -2391,7 +2391,7 @@ class Protocol(utils.EventEmitter):
             effective_volume = await self.delegate.get_absolute_volume()
             self.send_avrcp_response(
                 transaction_label,
-                avc.ResponseFrame.ResponseCode.IMPLEMENTED_OR_STABLE,
+                avc.ResponseFrame.ResponseCode.ACCEPTED,
                 SetAbsoluteVolumeResponse(effective_volume),
             )
 
