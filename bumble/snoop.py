@@ -65,7 +65,7 @@ class BtSnooper(Snooper):
     """
 
     IDENTIFICATION_PATTERN = b'btsnoop\0'
-    TIMESTAMP_ANCHOR = datetime.datetime(2000, 1, 1)
+    TIMESTAMP_ANCHOR = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
     TIMESTAMP_DELTA = 0x00E03AB44A676000
     ONE_MS = datetime.timedelta(microseconds=1)
 
@@ -85,7 +85,13 @@ class BtSnooper(Snooper):
 
         # Compute the current timestamp
         timestamp = (
-            int((datetime.datetime.utcnow() - self.TIMESTAMP_ANCHOR) / self.ONE_MS)
+            int(
+                (
+                    datetime.datetime.now(tz=datetime.timezone.utc)
+                    - self.TIMESTAMP_ANCHOR
+                )
+                / self.ONE_MS
+            )
             + self.TIMESTAMP_DELTA
         )
 
@@ -129,7 +135,7 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
           records will be written to that file if it can be opened/created.
           The keyword args that may be referenced by the string pattern are:
             now: the value of `datetime.now()`
-            utcnow: the value of `datetime.utcnow()`
+            utcnow: the value of `datetime.now(tz=datetime.timezone.utc)`
             pid: the current process ID.
             instance: the instance ID in the current process.
 
@@ -153,7 +159,7 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
             global _SNOOPER_INSTANCE_COUNT
             file_path = io_name.format(
                 now=datetime.datetime.now(),
-                utcnow=datetime.datetime.utcnow(),
+                utcnow=datetime.datetime.now(tz=datetime.timezone.utc),
                 pid=os.getpid(),
                 instance=_SNOOPER_INSTANCE_COUNT,
             )
