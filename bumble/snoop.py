@@ -135,7 +135,7 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
           records will be written to that file if it can be opened/created.
           The keyword args that may be referenced by the string pattern are:
             now: the value of `datetime.now()`
-            utcnow: the value of 'datetime.now(tz=datetime.timezone.utc)'
+            utcnow: the value of `datetime.now(tz=datetime.timezone.utc)`
             pid: the current process ID.
             instance: the instance ID in the current process.
 
