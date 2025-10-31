@@ -16,8 +16,9 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
+from typing import Optional
 
-import websockets
+import websockets.asyncio.server
 
 from bumble.transport.common import ParserSource, PumpedPacketSink, Transport
 
@@ -40,7 +41,12 @@ async def open_ws_server_transport(spec: str) -> Transport:
     '''
 
     class WsServerTransport(Transport):
-        def __init__(self):
+        sink: PumpedPacketSink
+        source: ParserSource
+        connection: Optional[websockets.asyncio.server.ServerConnection]
+        server: Optional[websockets.asyncio.server.Server]
+
+        def __init__(self) -> None:
             source = ParserSource()
             sink = PumpedPacketSink(self.send_packet)
             self.connection = None
@@ -48,17 +54,19 @@ async def open_ws_server_transport(spec: str) -> Transport:
 
             super().__init__(source, sink)
 
-        async def serve(self, local_host, local_port):
+        async def serve(self, local_host: str, local_port: str) -> None:
             self.sink.start()
             # pylint: disable-next=no-member
-            self.server = await websockets.serve(
-                ws_handler=self.on_connection,
+            self.server = await websockets.asyncio.server.serve(
+                handler=self.on_connection,
                 host=local_host if local_host != '_' else None,
                 port=int(local_port),
             )
             logger.debug(f'websocket server ready on port {local_port}')
 
-        async def on_connection(self, connection):
+        async def on_connection(
+            self, connection: websockets.asyncio.server.ServerConnection
+        ) -> None:
             logger.debug(
                 f'new connection on {connection.local_address} '
                 f'from {connection.remote_address}'
@@ -77,11 +85,11 @@ async def open_ws_server_transport(spec: str) -> Transport:
             # We're now disconnected
             self.connection = None
 
-        async def send_packet(self, packet):
+        async def send_packet(self, packet: bytes) -> None:
             if self.connection is None:
                 logger.debug('no connection, dropping packet')
                 return
-            return await self.connection.send(packet)
+            await self.connection.send(packet)
 
     local_host, local_port = spec.rsplit(':', maxsplit=1)
     transport = WsServerTransport()

@@ -22,7 +22,7 @@ import logging
 import sys
 from typing import Iterable, Optional
 
-import websockets
+import websockets.asyncio.server
 
 import bumble.core
 import bumble.logging
@@ -33,7 +33,7 @@ from bumble.transport import open_transport
 
 logger = logging.getLogger(__name__)
 
-ws: Optional[websockets.WebSocketServerProtocol] = None
+ws: Optional[websockets.asyncio.server.ServerConnection] = None
 ag_protocol: Optional[hfp.AgProtocol] = None
 source_file: Optional[io.BufferedReader] = None
 
@@ -114,8 +114,7 @@ def on_hfp_state_change(connected: bool):
     send_message(type='hfp_state_change', connected=connected)
 
 
-async def ws_server(ws_client: websockets.WebSocketServerProtocol, path: str):
-    del path
+async def ws_server(ws_client: websockets.asyncio.server.ServerConnection):
     global ws
     ws = ws_client
 
@@ -273,7 +272,7 @@ async def main() -> None:
 
             on_dlc(session)
 
-        await websockets.serve(ws_server, port=8888)
+        await websockets.asyncio.server.serve(ws_server, port=8888)
 
         if len(sys.argv) >= 5:
             global source_file
