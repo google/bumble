@@ -65,7 +65,7 @@ class BtSnooper(Snooper):
     """
 
     IDENTIFICATION_PATTERN = b'btsnoop\0'
-    TIMESTAMP_ANCHOR = datetime.datetime(2000, 1, 1)
+    TIMESTAMP_ANCHOR = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
     TIMESTAMP_DELTA = 0x00E03AB44A676000
     ONE_MS = datetime.timedelta(microseconds=1)
 
