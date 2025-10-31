@@ -1763,7 +1763,8 @@ class Controller:
         '''
 
         # Remove old CIG implicitly.
-        for handle, cis_link in self.central_cis_links.items():
+        cis_links = list(self.central_cis_links.items())
+        for handle, cis_link in cis_links:
             if cis_link.cig_id == command.cig_id:
                 self.central_cis_links.pop(handle)
 
@@ -1822,7 +1823,8 @@ class Controller:
 
         status = HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
 
-        for cis_handle, cis_link in self.central_cis_links.items():
+        cis_links = list(self.central_cis_links.items())
+        for cis_handle, cis_link in cis_links:
             if cis_link.cig_id == command.cig_id:
                 self.central_cis_links.pop(cis_handle)
                 status = HCI_SUCCESS
