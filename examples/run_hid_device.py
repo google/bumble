@@ -20,7 +20,7 @@ import json
 import struct
 import sys
 
-import websockets
+import websockets.asyncio.server
 
 import bumble.logging
 from bumble.core import (
@@ -425,7 +425,7 @@ deviceData = DeviceData()
 async def keyboard_device(hid_device: HID_Device):
 
     # Start a Websocket server to receive events from a web page
-    async def serve(websocket, _path):
+    async def serve(websocket: websockets.asyncio.server.ServerConnection):
         global deviceData
         while True:
             try:
@@ -476,7 +476,7 @@ async def keyboard_device(hid_device: HID_Device):
                 pass
 
     # pylint: disable-next=no-member
-    await websockets.serve(serve, 'localhost', 8989)
+    await websockets.asyncio.server.serve(serve, 'localhost', 8989)
     await asyncio.get_event_loop().create_future()
 
 
