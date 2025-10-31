@@ -3444,6 +3444,17 @@ class HCI_Write_Synchronous_Flow_Control_Enable_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
+class HCI_Set_Controller_To_Host_Flow_Control_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.3.38 Set Controller To Host Flow Control command
+    '''
+
+    flow_control_enable: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
 class HCI_Host_Buffer_Size_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.3.39 Host Buffer Size Command
@@ -4341,6 +4352,15 @@ class HCI_LE_Write_Suggested_Default_Data_Length_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
+class HCI_LE_Read_Local_P_256_Public_Key_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.36 LE LE Read Local P-256 Public Key command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
 class HCI_LE_Add_Device_To_Resolving_List_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.38 LE Add Device To Resolving List Command
@@ -4362,6 +4382,15 @@ class HCI_LE_Add_Device_To_Resolving_List_Command(HCI_Command):
 class HCI_LE_Clear_Resolving_List_Command(HCI_Command):
     '''
     See Bluetooth spec @ 7.8.40 LE Clear Resolving List Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Read_Resolving_List_Size_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.41 LE Read Resolving List Size command
     '''
 
 
@@ -5026,6 +5055,15 @@ class HCI_LE_Periodic_Advertising_Terminate_Sync_Command(HCI_Command):
     '''
 
     sync_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Read_Transmit_Power_Command(HCI_Command):
+    '''
+    See Bluetooth spec @ 7.8.74 LE Read Transmit Power command
+    '''
 
 
 # -----------------------------------------------------------------------------
