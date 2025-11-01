@@ -21,8 +21,9 @@ import asyncio
 import json
 import logging
 import sys
+from typing import Optional
 
-import websockets
+import websockets.asyncio.server
 
 import bumble.logging
 from bumble import a2dp, avc, avdtp, avrcp, utils
@@ -217,6 +218,8 @@ def on_avrcp_start(avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketSe
 
 # -----------------------------------------------------------------------------
 class WebSocketServer:
+    socket: Optional[websockets.asyncio.server.ServerConnection]
+
     def __init__(
         self, avrcp_protocol: avrcp.Protocol, avrcp_delegate: Delegate
     ) -> None:
@@ -227,9 +230,9 @@ class WebSocketServer:
 
     async def start(self) -> None:
         # pylint: disable-next=no-member
-        await websockets.serve(self.serve, 'localhost', 8989)  # type: ignore
+        await websockets.asyncio.server.serve(self.serve, 'localhost', 8989)  # type: ignore
 
-    async def serve(self, socket, _path) -> None:
+    async def serve(self, socket: websockets.asyncio.server.ServerConnection) -> None:
         print('### WebSocket connected')
         self.socket = socket
         while True:

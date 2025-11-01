@@ -22,6 +22,7 @@ import contextlib
 import io
 import logging
 import struct
+from collections.abc import Awaitable, Callable
 from typing import Any, ContextManager, Optional, Protocol
 
 from bumble import core, hci
@@ -389,15 +390,17 @@ class PumpedPacketSource(ParserSource):
 
 # -----------------------------------------------------------------------------
 class PumpedPacketSink:
-    def __init__(self, send):
+    pump_task: Optional[asyncio.Task[None]]
+
+    def __init__(self, send: Callable[[bytes], Awaitable[Any]]):
         self.send_function = send
-        self.packet_queue = asyncio.Queue()
+        self.packet_queue = asyncio.Queue[bytes]()
         self.pump_task = None
 
     def on_packet(self, packet: bytes) -> None:
         self.packet_queue.put_nowait(packet)
 
-    def start(self):
+    def start(self) -> None:
         async def pump_packets():
             while True:
                 try:

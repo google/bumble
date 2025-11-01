@@ -199,7 +199,6 @@ class Controller:
         self.advertising_interval = 2000  # Fixed for now
         self.advertising_data: Optional[bytes] = None
         self.advertising_timer_handle: Optional[asyncio.Handle] = None
-
         self._random_address = Address('00:00:00:00:00:00')
         if isinstance(public_address, Address):
             self._public_address = public_address
@@ -489,8 +488,8 @@ class Controller:
                 logger.debug(
                     f'New CENTRAL connection handle: 0x{connection_handle:04X}'
                 )
-            else:
-                connection = None
+        else:
+            connection = None
 
         # Say that the connection has completed
         self.send_hci_packet(
@@ -1940,7 +1939,8 @@ class Controller:
         '''
 
         # Remove old CIG implicitly.
-        for handle, cis_link in list(self.central_cis_links.items()):
+        cis_links = list(self.central_cis_links.items())
+        for handle, cis_link in cis_links:
             if cis_link.cig_id == command.cig_id:
                 self.central_cis_links.pop(handle)
 
@@ -2004,7 +2004,8 @@ class Controller:
 
         status = HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR
 
-        for cis_handle, cis_link in list(self.central_cis_links.items()):
+        cis_links = list(self.central_cis_links.items())
+        for cis_handle, cis_link in cis_links:
             if cis_link.cig_id == command.cig_id:
                 self.central_cis_links.pop(cis_handle)
                 status = HCI_SUCCESS

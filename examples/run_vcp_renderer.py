@@ -21,7 +21,7 @@ import secrets
 import sys
 from typing import Optional
 
-import websockets
+import websockets.asyncio.server
 
 import bumble.logging
 from bumble import data_types
@@ -110,7 +110,7 @@ async def main() -> None:
         vcs = VolumeControlService()
         device.add_service(vcs)
 
-        ws: Optional[websockets.WebSocketServerProtocol] = None
+        ws: Optional[websockets.asyncio.server.ServerConnection] = None
 
         def on_volume_state_change():
             if ws:
@@ -152,7 +152,7 @@ async def main() -> None:
             advertising_data=advertising_data,
         )
 
-        async def serve(websocket: websockets.WebSocketServerProtocol, _path):
+        async def serve(websocket: websockets.asyncio.server.ServerConnection):
             nonlocal ws
             await websocket.send(
                 dumps_volume_state(vcs.volume_setting, vcs.muted, vcs.change_counter)
@@ -166,7 +166,7 @@ async def main() -> None:
                 await device.notify_subscribers(vcs.volume_state)
             ws = None
 
-        await websockets.serve(serve, 'localhost', 8989)
+        await websockets.asyncio.server.serve(serve, 'localhost', 8989)
 
         await hci_transport.source.terminated
 

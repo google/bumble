@@ -22,7 +22,7 @@ import json
 import sys
 from typing import Optional
 
-import websockets
+import websockets.asyncio.server
 
 import bumble.logging
 from bumble import hci, hfp, rfcomm
@@ -30,7 +30,7 @@ from bumble.device import Connection, Device
 from bumble.hfp import HfProtocol
 from bumble.transport import open_transport
 
-ws: Optional[websockets.WebSocketServerProtocol] = None
+ws: Optional[websockets.asyncio.server.ServerConnection] = None
 hf_protocol: Optional[HfProtocol] = None
 
 
@@ -143,7 +143,7 @@ async def main() -> None:
         await device.set_connectable(True)
 
         # Start the UI websocket server to offer a few buttons and input boxes
-        async def serve(websocket: websockets.WebSocketServerProtocol, _path):
+        async def serve(websocket: websockets.asyncio.server.ServerConnection):
             global ws
             ws = websocket
             async for message in websocket:
@@ -166,7 +166,7 @@ async def main() -> None:
                             response = str(await hf_protocol.query_current_calls())
                             await websocket.send(response)
 
-        await websockets.serve(serve, 'localhost', 8989)
+        await websockets.asyncio.server.serve(serve, 'localhost', 8989)
 
         await hci_transport.source.wait_for_termination()
 

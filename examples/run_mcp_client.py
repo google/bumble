@@ -20,7 +20,7 @@ import json
 import sys
 from typing import Optional
 
-import websockets
+import websockets.asyncio.server
 
 import bumble.logging
 from bumble import data_types
@@ -101,7 +101,7 @@ async def main() -> None:
         )
         device.add_service(AudioStreamControlService(device, sink_ase_id=[1]))
 
-        ws: Optional[websockets.WebSocketServerProtocol] = None
+        ws: Optional[websockets.asyncio.server.ServerConnection] = None
         mcp: Optional[MediaControlServiceProxy] = None
 
         advertising_data = bytes(
@@ -162,7 +162,7 @@ async def main() -> None:
 
         device.on('connection', on_connection)
 
-        async def serve(websocket: websockets.WebSocketServerProtocol, _path):
+        async def serve(websocket: websockets.asyncio.server.ServerConnection):
             nonlocal ws
             ws = websocket
             async for message in websocket:
@@ -173,7 +173,7 @@ async def main() -> None:
                     )
             ws = None
 
-        await websockets.serve(serve, 'localhost', 8989)
+        await websockets.asyncio.server.serve(serve, 'localhost', 8989)
 
         await hci_transport.source.terminated
 

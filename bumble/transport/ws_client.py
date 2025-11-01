@@ -17,7 +17,7 @@
 # -----------------------------------------------------------------------------
 import logging
 
-import websockets.client
+import websockets.asyncio.client
 
 from bumble.transport.common import (
     PumpedPacketSink,
@@ -42,7 +42,7 @@ async def open_ws_client_transport(spec: str) -> Transport:
     Example: ws://localhost:7681/v1/websocket/bt
     '''
 
-    websocket = await websockets.client.connect(spec)
+    websocket = await websockets.asyncio.client.connect(spec)
 
     class WsTransport(PumpedTransport):
         async def close(self):
