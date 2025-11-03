@@ -19,10 +19,11 @@ from __future__ import annotations
 
 import logging
 import struct
+from collections.abc import Callable
 from enum import IntEnum
-from typing import Callable, Optional, cast
+from typing import Optional
 
-from bumble import avc, core, l2cap
+from bumble import core, l2cap
 from bumble.colors import color
 
 # -----------------------------------------------------------------------------
@@ -144,9 +145,9 @@ class MessageAssembler:
 
 # -----------------------------------------------------------------------------
 class Protocol:
-    CommandHandler = Callable[[int, avc.CommandFrame], None]
+    CommandHandler = Callable[[int, bytes], None]
     command_handlers: dict[int, CommandHandler]  # Command handlers, by PID
-    ResponseHandler = Callable[[int, Optional[avc.ResponseFrame]], None]
+    ResponseHandler = Callable[[int, Optional[bytes]], None]
     response_handlers: dict[int, ResponseHandler]  # Response handlers, by PID
     next_transaction_label: int
     message_assembler: MessageAssembler
@@ -204,20 +205,15 @@ class Protocol:
                 self.send_ipid(transaction_label, pid)
                 return
 
-            command_frame = cast(avc.CommandFrame, avc.Frame.from_bytes(payload))
-            self.command_handlers[pid](transaction_label, command_frame)
+            self.command_handlers[pid](transaction_label, payload)
         else:
             if pid not in self.response_handlers:
                 logger.warning(f"no response handler for PID {pid}")
                 return
 
             # By convention, for an ipid, send a None payload to the response handler.
-            if ipid:
-                response_frame = None
-            else:
-                response_frame = cast(avc.ResponseFrame, avc.Frame.from_bytes(payload))
-
-            self.response_handlers[pid](transaction_label, response_frame)
+            response_payload = None if ipid else payload
+            self.response_handlers[pid](transaction_label, response_payload)
 
     def send_message(
         self,

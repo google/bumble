@@ -22,21 +22,9 @@ import enum
 import functools
 import logging
 import struct
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import (
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    ClassVar,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    SupportsBytes,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import ClassVar, Optional, SupportsBytes, TypeVar, Union
 
 from bumble import avc, avctp, core, hci, l2cap, utils
 from bumble.colors import color
@@ -1762,7 +1750,11 @@ class Protocol(utils.EventEmitter):
             ),
         )
         response = self._check_response(response_context, GetCapabilitiesResponse)
-        return cast(List[EventId], response.capabilities)
+        return list(
+            capability
+            for capability in response.capabilities
+            if isinstance(capability, EventId)
+        )
 
     async def get_play_status(self) -> SongAndPlayStatus:
         """Get the play status of the connected peer."""
@@ -2012,9 +2004,12 @@ class Protocol(utils.EventEmitter):
 
         self.emit(self.EVENT_STOP)
 
-    def _on_avctp_command(
-        self, transaction_label: int, command: avc.CommandFrame
-    ) -> None:
+    def _on_avctp_command(self, transaction_label: int, payload: bytes) -> None:
+        command = avc.CommandFrame.from_bytes(payload)
+        if not isinstance(command, avc.CommandFrame):
+            raise core.InvalidPacketError(
+                f"{command} is not a valid AV/C Command Frame"
+            )
         logger.debug(
             f"<<< AVCTP Command, transaction_label={transaction_label}: " f"{command}"
         )
@@ -2073,8 +2068,13 @@ class Protocol(utils.EventEmitter):
         self.send_not_implemented_response(transaction_label, command)
 
     def _on_avctp_response(
-        self, transaction_label: int, response: Optional[avc.ResponseFrame]
+        self, transaction_label: int, payload: Optional[bytes]
     ) -> None:
+        response = avc.ResponseFrame.from_bytes(payload) if payload else None
+        if not isinstance(response, avc.ResponseFrame):
+            raise core.InvalidPacketError(
+                f"{response} is not a valid AV/C Response Frame"
+            )
         logger.debug(
             f"<<< AVCTP Response, transaction_label={transaction_label}: {response}"
         )
