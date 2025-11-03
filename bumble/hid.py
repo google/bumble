@@ -246,7 +246,7 @@ class HID(ABC, utils.EventEmitter):
         # Create a new L2CAP connection - interrupt channel
         try:
             channel = await self.connection.create_l2cap_channel(
-                l2cap.ClassicChannelSpec(HID_CONTROL_PSM)
+                l2cap.ClassicChannelSpec(HID_INTERRUPT_PSM)
             )
             channel.sink = self.on_intr_pdu
             self.l2cap_intr_channel = channel
