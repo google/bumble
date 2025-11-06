@@ -215,6 +215,17 @@ class Server(utils.EventEmitter):
         # Add this attribute to the list
         self.attributes.append(attribute)
 
+    def make_cccd_value(
+        self, characteristic: Characteristic
+    ) -> CharacteristicValue[bytes]:
+        def read(connection: Connection) -> bytes:
+            return self.read_cccd(connection, characteristic)
+
+        def write(connection: Connection, value: bytes) -> None:
+            return self.write_cccd(connection, characteristic, value)
+
+        return CharacteristicValue(read=read, write=write)
+
     def add_service(self, service: Service) -> None:
         # Add the service attribute to the DB
         self.add_attribute(service)
@@ -257,18 +268,10 @@ class Server(utils.EventEmitter):
                 is None
             ):
                 self.add_attribute(
-                    # pylint: disable=line-too-long
                     Descriptor(
                         GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
-                        att.Attribute.READABLE | att.Attribute.WRITEABLE,
-                        CharacteristicValue(
-                            read=lambda connection, characteristic=characteristic: self.read_cccd(
-                                connection, characteristic
-                            ),
-                            write=lambda connection, value, characteristic=characteristic: self.write_cccd(
-                                connection, characteristic, value
-                            ),
-                        ),
+                        permissions=att.Attribute.READABLE | att.Attribute.WRITEABLE,
+                        value=self.make_cccd_value(characteristic),
                     )
                 )
 
