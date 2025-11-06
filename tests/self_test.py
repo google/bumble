@@ -29,8 +29,7 @@ from bumble.gatt import Characteristic, Service
 from bumble.hci import Role
 from bumble.pairing import PairingConfig, PairingDelegate
 from bumble.smp import (
-    SMP_CONFIRM_VALUE_FAILED_ERROR,
-    SMP_PAIRING_NOT_SUPPORTED_ERROR,
+    ErrorCode,
     OobContext,
     OobLegacyContext,
 )
@@ -378,7 +377,7 @@ async def test_self_smp_reject():
         await _test_self_smp_with_configs(None, rejecting_pairing_config)
         paired = True
     except ProtocolError as error:
-        assert error.error_code == SMP_PAIRING_NOT_SUPPORTED_ERROR
+        assert error.error_code == ErrorCode.PAIRING_NOT_SUPPORTED
 
     assert not paired
 
@@ -403,7 +402,7 @@ async def test_self_smp_wrong_pin():
         )
         paired = True
     except ProtocolError as error:
-        assert error.error_code == SMP_CONFIRM_VALUE_FAILED_ERROR
+        assert error.error_code == ErrorCode.CONFIRM_VALUE_FAILED
 
     assert not paired
 
@@ -534,11 +533,11 @@ async def test_self_smp_oob_sc():
 
     with pytest.raises(ProtocolError) as error:
         await _test_self_smp_with_configs(pairing_config_1, pairing_config_4)
-    assert error.value.error_code == SMP_CONFIRM_VALUE_FAILED_ERROR
+    assert error.value.error_code == ErrorCode.CONFIRM_VALUE_FAILED
 
     with pytest.raises(ProtocolError):
         await _test_self_smp_with_configs(pairing_config_4, pairing_config_1)
-    assert error.value.error_code == SMP_CONFIRM_VALUE_FAILED_ERROR
+    assert error.value.error_code == ErrorCode.CONFIRM_VALUE_FAILED
 
 
 # -----------------------------------------------------------------------------
