@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         os: ['ubuntu-latest', 'macos-latest', 'windows-latest']
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
       fail-fast: false
 
     steps:
@@ -48,7 +48,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        # Rust runtime doesn't support 3.14 yet.
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         rust-version: [ "1.80.0", "stable" ]
       fail-fast: false
     steps:
