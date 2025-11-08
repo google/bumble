@@ -185,6 +185,7 @@ class Controller:
     advertising_interval: int = 2000
     advertising_data: Optional[bytes] = None
     advertising_timer_handle: Optional[asyncio.Handle] = None
+    classic_scan_enable: int = 0
 
     _random_address: 'Address' = Address('00:00:00:00:00:00')
 
@@ -1679,6 +1680,15 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.17 LE Remove Device From Filter Accept
         List Command
         '''
+        return bytes([HCI_SUCCESS])
+
+    def on_hci_write_scan_enable_command(
+        self, command: hci.HCI_Write_Scan_Enable_Command
+    ) -> Optional[bytes]:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.3.18 Write Scan Enable Command
+        '''
+        self.classic_scan_enable = command.scan_enable
         return bytes([HCI_SUCCESS])
 
     def on_hci_le_read_remote_features_command(

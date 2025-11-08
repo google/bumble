@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Google", email = "bumble-dev@google.com" }]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "aiohttp ~= 3.8; platform_system!='Emscripten'",
     "appdirs >= 1.4; platform_system!='Emscripten'",

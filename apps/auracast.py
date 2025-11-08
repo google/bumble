@@ -742,10 +742,9 @@ async def run_receive(
         ]
         packet_stats = [0, 0]
 
-        audio_output = await audio_io.create_audio_output(output)
-        # This try should be replaced with contextlib.aclosing() when python 3.9 is no
-        # longer needed.
-        try:
+        async with contextlib.AsyncExitStack() as stack:
+            audio_output = await audio_io.create_audio_output(output)
+            stack.push_async_callback(audio_output.aclose)
             await audio_output.open(
                 audio_io.PcmFormat(
                     audio_io.PcmFormat.Endianness.LITTLE,
@@ -793,8 +792,6 @@ async def run_receive(
             terminated = asyncio.Event()
             big_sync.on(big_sync.Event.TERMINATION, lambda _: terminated.set())
             await terminated.wait()
-        finally:
-            await audio_output.aclose()
 
 
 async def run_transmit(
@@ -891,11 +888,10 @@ async def run_transmit(
         print('Start Periodic Advertising')
         await advertising_set.start_periodic()
 
-        audio_input = await audio_io.create_audio_input(input, input_format)
-        pcm_format = await audio_input.open()
-        # This try should be replaced with contextlib.aclosing() when python 3.9 is no
-        # longer needed.
-        try:
+        async with contextlib.AsyncExitStack() as stack:
+            audio_input = await audio_io.create_audio_input(input, input_format)
+            pcm_format = await audio_input.open()
+            stack.push_async_callback(audio_input.aclose)
             if pcm_format.channels != 2:
                 print("Only 2 channels PCM configurations are supported")
                 return
@@ -967,8 +963,6 @@ async def run_transmit(
                 await iso_queues[1].write(lc3_frame[mid:])
 
                 frame_count += 1
-        finally:
-            await audio_input.aclose()
 
 
 def run_async(async_command: Coroutine) -> None:
