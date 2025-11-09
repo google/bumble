@@ -99,6 +99,8 @@ class TwoDevices:
 
 # -----------------------------------------------------------------------------
 async def async_barrier():
-    ready = asyncio.get_running_loop().create_future()
-    asyncio.get_running_loop().call_soon(ready.set_result, None)
-    await ready
+    # TODO: Remove async barrier - this doesn't always mean what we want.
+    for _ in range(3):
+        ready = asyncio.get_running_loop().create_future()
+        asyncio.get_running_loop().call_soon(ready.set_result, None)
+        await ready
