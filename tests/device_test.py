@@ -41,6 +41,7 @@ from bumble.hci import (
     HCI_CREATE_CONNECTION_COMMAND,
     HCI_SUCCESS,
     Address,
+    HCI_Authentication_Requested_Command,
     HCI_Command_Complete_Event,
     HCI_Command_Status_Event,
     HCI_Connection_Complete_Event,
@@ -787,6 +788,14 @@ async def test_accept_classic_connection(roles: tuple[hci.Role, hci.Role]):
     assert devices.connections[0].role == roles[0]
     assert devices.connections[1]
     assert devices.connections[1].role == roles[1]
+
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_secure_simple_pairing():
+    devices = await TwoDevices.create_with_connection()
+    await devices[0].authenticate(devices.connections[0])
 
 
 # -----------------------------------------------------------------------------
