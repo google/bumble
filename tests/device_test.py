@@ -790,6 +790,19 @@ async def test_accept_classic_connection(roles: tuple[hci.Role, hci.Role]):
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_remote_name_request():
+    devices = TwoDevices()
+    devices[0].classic_enabled = True
+    devices[1].classic_enabled = True
+    expected_name = devices[1].name = "An Awesome Name"
+    await devices[0].power_on()
+    await devices[1].power_on()
+    actual_name = await devices[0].request_remote_name(devices[1].public_address)
+    assert actual_name == expected_name
+
+
+# -----------------------------------------------------------------------------
 async def run_test_device():
     await test_device_connect_parallel()
     await test_flush()

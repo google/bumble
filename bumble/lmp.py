@@ -304,3 +304,21 @@ class LmpSwitchReq(Packet):
     opcode = Opcode.LMP_SWITCH_REQ
 
     switch_instant: int = field(metadata=hci.metadata(4), default=0)
+
+
+@Packet.subclass
+@dataclass
+class LmpNameReq(Packet):
+    opcode = Opcode.LMP_NAME_REQ
+
+    name_offset: int = field(metadata=hci.metadata(2))
+
+
+@Packet.subclass
+@dataclass
+class LmpNameRes(Packet):
+    opcode = Opcode.LMP_NAME_RES
+
+    name_offset: int = field(metadata=hci.metadata(2))
+    name_length: int = field(metadata=hci.metadata(3))
+    name_fregment: bytes = field(metadata=hci.metadata('*'))

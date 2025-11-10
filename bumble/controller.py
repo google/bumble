@@ -730,6 +730,15 @@ class Controller:
             self.on_classic_role_change_request(sender_address)
         elif isinstance(packet, (lmp.LmpRemoveScoLinkReq, lmp.LmpRemoveEscoLinkReq)):
             self.on_classic_sco_disconnected(sender_address, packet.error_code)
+        elif isinstance(packet, lmp.LmpNameReq):
+            self.on_classic_remote_name_request(sender_address, packet.name_offset)
+        elif isinstance(packet, lmp.LmpNameRes):
+            self.on_classic_remote_name_response(
+                sender_address,
+                packet.name_offset,
+                packet.name_length,
+                packet.name_fregment,
+            )
         else:
             logger.error("!!! Unhandled packet: %s", packet)
 
@@ -892,6 +901,33 @@ class Controller:
                 rx_packet_length=0,
                 tx_packet_length=0,
                 air_mode=0,
+            )
+        )
+
+    def on_classic_remote_name_request(
+        self, peer_address: hci.Address, name_offset: int
+    ):
+        self.send_lmp_packet(
+            peer_address,
+            lmp.LmpNameRes(
+                name_offset=name_offset,
+                name_length=len(self.local_name),
+                name_fregment=self.local_name.encode('utf-8'),
+            ),
+        )
+
+    def on_classic_remote_name_response(
+        self,
+        peer_address: hci.Address,
+        name_offset: int,
+        name_length: int,
+        name_fregment: bytes,
+    ):
+        self.send_hci_packet(
+            hci.HCI_Remote_Name_Request_Complete_Event(
+                status=hci.HCI_SUCCESS,
+                bd_addr=peer_address,
+                remote_name=name_fregment,
             )
         )
 
@@ -1118,6 +1154,24 @@ class Controller:
                 lmp.LmpAccepted(lmp.Opcode.LMP_HOST_CONNECTION_REQ),
             )
             self.on_classic_connection_complete(command.bd_addr, hci.HCI_SUCCESS)
+        return None
+
+    def on_hci_remote_name_request_command(
+        self, command: hci.HCI_Remote_Name_Request_Command
+    ) -> Optional[bytes]:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.19 Remote Name Request command
+        '''
+        self.send_hci_packet(
+            hci.HCI_Command_Status_Event(
+                status=hci.HCI_SUCCESS,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
+
+        self.send_lmp_packet(command.bd_addr, lmp.LmpNameReq(0))
+
         return None
 
     def on_hci_enhanced_setup_synchronous_connection_command(
