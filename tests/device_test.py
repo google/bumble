@@ -795,9 +795,11 @@ async def test_remote_name_request():
     devices = TwoDevices()
     devices[0].classic_enabled = True
     devices[1].classic_enabled = True
-    await devices.setup_connection()
-    remote_name = await devices[0].request_remote_name(devices[1].public_address)
-    assert remote_name == "Bumble"
+    expected_name = devices[1].name = "An Awesome Name"
+    await devices[0].power_on()
+    await devices[1].power_on()
+    actual_name = await devices[0].request_remote_name(devices[1].public_address)
+    assert actual_name == expected_name
 
 
 # -----------------------------------------------------------------------------
