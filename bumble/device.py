@@ -2068,6 +2068,10 @@ class DeviceConfiguration:
     io_capability: int = pairing.PairingDelegate.IoCapability.NO_OUTPUT_NO_INPUT
     gap_service_enabled: bool = True
     gatt_service_enabled: bool = True
+    enhanced_retransmission_supported: bool = False
+    l2cap_extended_features: Sequence[int] = (
+        l2cap.L2CAP_Information_Request.ExtendedFeatures.FIXED_CHANNELS,
+    )
 
     def __post_init__(self) -> None:
         self.gatt_services: list[dict[str, Any]] = []
@@ -2337,6 +2341,10 @@ class Device(utils.CompositeEventEmitter):
     ) -> None:
         super().__init__()
 
+        # Use the initial config or a default
+        config = config or DeviceConfiguration()
+        self.config = config
+
         self._host = None
         self.powered_on = False
         self.auto_restart_inquiry = True
@@ -2344,7 +2352,7 @@ class Device(utils.CompositeEventEmitter):
         self.gatt_server = gatt_server.Server(self)
         self.sdp_server = sdp.Server(self)
         self.l2cap_channel_manager = l2cap.ChannelManager(
-            [l2cap.L2CAP_Information_Request.EXTENDED_FEATURE_FIXED_CHANNELS]
+            config.l2cap_extended_features
         )
         self.advertisement_accumulators = {}  # Accumulators, by address
         self.periodic_advertising_syncs = []
@@ -2374,10 +2382,6 @@ class Device(utils.CompositeEventEmitter):
 
         # Own address type cache
         self.connect_own_address_type = None
-
-        # Use the initial config or a default
-        config = config or DeviceConfiguration()
-        self.config = config
 
         self.name = config.name
         self.public_address = hci.Address.ANY
