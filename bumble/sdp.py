@@ -20,11 +20,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import struct
-from typing import TYPE_CHECKING, Iterable, NewType, Optional, Sequence, Union
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, ClassVar, NewType, Optional, TypeVar, Union
 
 from typing_extensions import Self
 
-from bumble import core, l2cap
+from bumble import core, hci, l2cap, utils
 from bumble.colors import color
 from bumble.core import (
     InvalidArgumentError,
@@ -53,81 +55,78 @@ SDP_CONTINUATION_WATCHDOG = 64  # Maximum number of continuations we're willing 
 
 SDP_PSM = 0x0001
 
-SDP_ERROR_RESPONSE                    = 0x01
-SDP_SERVICE_SEARCH_REQUEST            = 0x02
-SDP_SERVICE_SEARCH_RESPONSE           = 0x03
-SDP_SERVICE_ATTRIBUTE_REQUEST         = 0x04
-SDP_SERVICE_ATTRIBUTE_RESPONSE        = 0x05
-SDP_SERVICE_SEARCH_ATTRIBUTE_REQUEST  = 0x06
-SDP_SERVICE_SEARCH_ATTRIBUTE_RESPONSE = 0x07
+class PduId(utils.OpenIntEnum):
+    ERROR_RESPONSE                    = 0x01
+    SERVICE_SEARCH_REQUEST            = 0x02
+    SERVICE_SEARCH_RESPONSE           = 0x03
+    SERVICE_ATTRIBUTE_REQUEST         = 0x04
+    SERVICE_ATTRIBUTE_RESPONSE        = 0x05
+    SERVICE_SEARCH_ATTRIBUTE_REQUEST  = 0x06
+    SERVICE_SEARCH_ATTRIBUTE_RESPONSE = 0x07
 
-SDP_PDU_NAMES = {
-    SDP_ERROR_RESPONSE:                    'SDP_ERROR_RESPONSE',
-    SDP_SERVICE_SEARCH_REQUEST:            'SDP_SERVICE_SEARCH_REQUEST',
-    SDP_SERVICE_SEARCH_RESPONSE:           'SDP_SERVICE_SEARCH_RESPONSE',
-    SDP_SERVICE_ATTRIBUTE_REQUEST:         'SDP_SERVICE_ATTRIBUTE_REQUEST',
-    SDP_SERVICE_ATTRIBUTE_RESPONSE:        'SDP_SERVICE_ATTRIBUTE_RESPONSE',
-    SDP_SERVICE_SEARCH_ATTRIBUTE_REQUEST:  'SDP_SERVICE_SEARCH_ATTRIBUTE_REQUEST',
-    SDP_SERVICE_SEARCH_ATTRIBUTE_RESPONSE: 'SDP_SERVICE_SEARCH_ATTRIBUTE_RESPONSE'
-}
+SDP_ERROR_RESPONSE                    = PduId.ERROR_RESPONSE
+SDP_SERVICE_SEARCH_REQUEST            = PduId.SERVICE_SEARCH_REQUEST
+SDP_SERVICE_SEARCH_RESPONSE           = PduId.SERVICE_SEARCH_RESPONSE
+SDP_SERVICE_ATTRIBUTE_REQUEST         = PduId.SERVICE_ATTRIBUTE_REQUEST
+SDP_SERVICE_ATTRIBUTE_RESPONSE        = PduId.SERVICE_ATTRIBUTE_RESPONSE
+SDP_SERVICE_SEARCH_ATTRIBUTE_REQUEST  = PduId.SERVICE_SEARCH_ATTRIBUTE_REQUEST
+SDP_SERVICE_SEARCH_ATTRIBUTE_RESPONSE = PduId.SERVICE_SEARCH_ATTRIBUTE_RESPONSE
 
-SDP_INVALID_SDP_VERSION_ERROR                       = 0x0001
-SDP_INVALID_SERVICE_RECORD_HANDLE_ERROR             = 0x0002
-SDP_INVALID_REQUEST_SYNTAX_ERROR                    = 0x0003
-SDP_INVALID_PDU_SIZE_ERROR                          = 0x0004
-SDP_INVALID_CONTINUATION_STATE_ERROR                = 0x0005
-SDP_INSUFFICIENT_RESOURCES_TO_SATISFY_REQUEST_ERROR = 0x0006
+class ErrorCode(hci.SpecableEnum):
+    INVALID_SDP_VERSION                       = 0x0001
+    INVALID_SERVICE_RECORD_HANDLE             = 0x0002
+    INVALID_REQUEST_SYNTAX                    = 0x0003
+    INVALID_PDU_SIZE                          = 0x0004
+    INVALID_CONTINUATION_STATE                = 0x0005
+    INSUFFICIENT_RESOURCES_TO_SATISFY_REQUEST = 0x0006
 
-SDP_ERROR_NAMES = {
-    SDP_INVALID_SDP_VERSION_ERROR:                       'SDP_INVALID_SDP_VERSION_ERROR',
-    SDP_INVALID_SERVICE_RECORD_HANDLE_ERROR:             'SDP_INVALID_SERVICE_RECORD_HANDLE_ERROR',
-    SDP_INVALID_REQUEST_SYNTAX_ERROR:                    'SDP_INVALID_REQUEST_SYNTAX_ERROR',
-    SDP_INVALID_PDU_SIZE_ERROR:                          'SDP_INVALID_PDU_SIZE_ERROR',
-    SDP_INVALID_CONTINUATION_STATE_ERROR:                'SDP_INVALID_CONTINUATION_STATE_ERROR',
-    SDP_INSUFFICIENT_RESOURCES_TO_SATISFY_REQUEST_ERROR: 'SDP_INSUFFICIENT_RESOURCES_TO_SATISFY_REQUEST_ERROR'
-}
+SDP_INVALID_SDP_VERSION_ERROR                       = ErrorCode.INVALID_SDP_VERSION
+SDP_INVALID_SERVICE_RECORD_HANDLE_ERROR             = ErrorCode.INVALID_SERVICE_RECORD_HANDLE
+SDP_INVALID_REQUEST_SYNTAX_ERROR                    = ErrorCode.INVALID_REQUEST_SYNTAX
+SDP_INVALID_PDU_SIZE_ERROR                          = ErrorCode.INVALID_PDU_SIZE
+SDP_INVALID_CONTINUATION_STATE_ERROR                = ErrorCode.INVALID_CONTINUATION_STATE
+SDP_INSUFFICIENT_RESOURCES_TO_SATISFY_REQUEST_ERROR = ErrorCode.INSUFFICIENT_RESOURCES_TO_SATISFY_REQUEST
 
 SDP_SERVICE_NAME_ATTRIBUTE_ID_OFFSET        = 0x0000
 SDP_SERVICE_DESCRIPTION_ATTRIBUTE_ID_OFFSET = 0x0001
 SDP_PROVIDER_NAME_ATTRIBUTE_ID_OFFSET       = 0x0002
 
-SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID               = 0X0000
-SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID               = 0X0001
-SDP_SERVICE_RECORD_STATE_ATTRIBUTE_ID                = 0X0002
-SDP_SERVICE_ID_ATTRIBUTE_ID                          = 0X0003
-SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID            = 0X0004
-SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID                   = 0X0005
-SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID     = 0X0006
-SDP_SERVICE_INFO_TIME_TO_LIVE_ATTRIBUTE_ID           = 0X0007
-SDP_SERVICE_AVAILABILITY_ATTRIBUTE_ID                = 0X0008
-SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID   = 0X0009
-SDP_DOCUMENTATION_URL_ATTRIBUTE_ID                   = 0X000A
-SDP_CLIENT_EXECUTABLE_URL_ATTRIBUTE_ID               = 0X000B
-SDP_ICON_URL_ATTRIBUTE_ID                            = 0X000C
-SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID = 0X000D
+class AttributeId(utils.OpenIntEnum):
+    SERVICE_RECORD_HANDLE               = 0X0000
+    SERVICE_CLASS_ID_LIST               = 0X0001
+    SERVICE_RECORD_STATE                = 0X0002
+    SERVICE_ID                          = 0X0003
+    PROTOCOL_DESCRIPTOR_LIST            = 0X0004
+    BROWSE_GROUP_LIST                   = 0X0005
+    LANGUAGE_BASE_ATTRIBUTE_ID_LIST     = 0X0006
+    SERVICE_INFO_TIME_TO_LIVE           = 0X0007
+    SERVICE_AVAILABILITY                = 0X0008
+    BLUETOOTH_PROFILE_DESCRIPTOR_LIST   = 0X0009
+    DOCUMENTATION_URL                   = 0X000A
+    CLIENT_EXECUTABLE_URL               = 0X000B
+    ICON_URL                            = 0X000C
+    ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST = 0X000D
+    SUPPORTED_FEATURES                  = 0x0311
+
+SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID               = AttributeId.SERVICE_RECORD_HANDLE
+SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID               = AttributeId.SERVICE_CLASS_ID_LIST
+SDP_SERVICE_RECORD_STATE_ATTRIBUTE_ID                = AttributeId.SERVICE_RECORD_STATE
+SDP_SERVICE_ID_ATTRIBUTE_ID                          = AttributeId.SERVICE_ID
+SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID            = AttributeId.PROTOCOL_DESCRIPTOR_LIST
+SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID                   = AttributeId.BROWSE_GROUP_LIST
+SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID     = AttributeId.LANGUAGE_BASE_ATTRIBUTE_ID_LIST
+SDP_SERVICE_INFO_TIME_TO_LIVE_ATTRIBUTE_ID           = AttributeId.SERVICE_INFO_TIME_TO_LIVE
+SDP_SERVICE_AVAILABILITY_ATTRIBUTE_ID                = AttributeId.SERVICE_AVAILABILITY
+SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID   = AttributeId.BLUETOOTH_PROFILE_DESCRIPTOR_LIST
+SDP_DOCUMENTATION_URL_ATTRIBUTE_ID                   = AttributeId.DOCUMENTATION_URL
+SDP_CLIENT_EXECUTABLE_URL_ATTRIBUTE_ID               = AttributeId.CLIENT_EXECUTABLE_URL
+SDP_ICON_URL_ATTRIBUTE_ID                            = AttributeId.ICON_URL
+SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID = AttributeId.ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST
 
 
 # Profile-specific Attribute Identifiers (cf. Assigned Numbers for Service Discovery)
 # used by AVRCP, HFP and A2DP
-SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID = 0x0311
-
-SDP_ATTRIBUTE_ID_NAMES = {
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID:               'SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID',
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID:               'SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID',
-    SDP_SERVICE_RECORD_STATE_ATTRIBUTE_ID:                'SDP_SERVICE_RECORD_STATE_ATTRIBUTE_ID',
-    SDP_SERVICE_ID_ATTRIBUTE_ID:                          'SDP_SERVICE_ID_ATTRIBUTE_ID',
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID:            'SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID',
-    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID:                   'SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID',
-    SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID:     'SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID',
-    SDP_SERVICE_INFO_TIME_TO_LIVE_ATTRIBUTE_ID:           'SDP_SERVICE_INFO_TIME_TO_LIVE_ATTRIBUTE_ID',
-    SDP_SERVICE_AVAILABILITY_ATTRIBUTE_ID:                'SDP_SERVICE_AVAILABILITY_ATTRIBUTE_ID',
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID:   'SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID',
-    SDP_DOCUMENTATION_URL_ATTRIBUTE_ID:                   'SDP_DOCUMENTATION_URL_ATTRIBUTE_ID',
-    SDP_CLIENT_EXECUTABLE_URL_ATTRIBUTE_ID:               'SDP_CLIENT_EXECUTABLE_URL_ATTRIBUTE_ID',
-    SDP_ICON_URL_ATTRIBUTE_ID:                            'SDP_ICON_URL_ATTRIBUTE_ID',
-    SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID: 'SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID',
-    SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID:                  'SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID',
-}
+SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID = AttributeId.SUPPORTED_FEATURES
 
 SDP_PUBLIC_BROWSE_ROOT = core.UUID.from_16_bits(0x1002, 'PublicBrowseRoot')
 
@@ -137,6 +136,54 @@ SDP_ALL_ATTRIBUTES_RANGE = (0x0000, 0xFFFF)
 # fmt: on
 # pylint: enable=line-too-long
 # pylint: disable=invalid-name
+
+
+# -----------------------------------------------------------------------------
+# METADATA
+# -----------------------------------------------------------------------------
+
+
+def _parse_bytes_preceded_by_length(data: bytes, offset: int) -> tuple[int, bytes]:
+    length = struct.unpack_from('>H', data, offset)[0]
+    return offset + length + 2, data[offset + 2 : offset + 2 + length]
+
+
+def _serialize_bytes_preceded_by_length(data: bytes) -> bytes:
+    return struct.pack('>H', len(data)) + data
+
+
+BYTES_PRECEDED_BY_LENGTH_METADATA = hci.metadata(
+    {
+        'parser': _parse_bytes_preceded_by_length,
+        'serializer': _serialize_bytes_preceded_by_length,
+    }
+)
+
+
+def _parse_service_record_handle_list(
+    data: bytes, offset: int
+) -> tuple[int, list[int]]:
+    count = struct.unpack_from('>H', data, offset)[0]
+    handle_list = [
+        struct.unpack_from('>I', data, offset + x * 4 + 2)[0] for x in range(count)
+    ]
+    return offset + count * 4 + 2, handle_list
+
+
+def _serialize_service_record_handle_list(
+    service_record_handles: Sequence[int],
+) -> bytes:
+    return struct.pack('>H', len(service_record_handles)) + b''.join(
+        struct.pack('>I', handle) for handle in service_record_handles
+    )
+
+
+SERVICE_RECORD_HANDLE_METADATA = hci.metadata(
+    {
+        'parser': _parse_service_record_handle_list,
+        'serializer': _serialize_service_record_handle_list,
+    }
+)
 
 
 # -----------------------------------------------------------------------------
@@ -476,7 +523,7 @@ class DataElement:
 
 # -----------------------------------------------------------------------------
 class ServiceAttribute:
-    def __init__(self, attribute_id: int, value: DataElement) -> None:
+    def __init__(self, attribute_id: AttributeId, value: DataElement) -> None:
         self.id = attribute_id
         self.value = value
 
@@ -508,10 +555,6 @@ class ServiceAttribute:
         )
 
     @staticmethod
-    def id_name(id_code):
-        return name_or_number(SDP_ATTRIBUTE_ID_NAMES, id_code)
-
-    @staticmethod
     def is_uuid_in_value(uuid: core.UUID, value: DataElement) -> bool:
         # Find if a uuid matches a value, either directly or recursing into sequences
         if value.type == DataElement.UUID:
@@ -528,17 +571,17 @@ class ServiceAttribute:
     def to_string(self, with_colors=False):
         if with_colors:
             return (
-                f'Attribute(id={color(self.id_name(self.id),"magenta")},'
-                f'value={self.value})'
+                f'Attribute(id={color(self.id.name,"magenta")},' f'value={self.value})'
             )
 
-        return f'Attribute(id={self.id_name(self.id)},value={self.value})'
+        return f'Attribute(id={self.id.name},value={self.value})'
 
     def __str__(self):
         return self.to_string()
 
 
 # -----------------------------------------------------------------------------
+@dataclass
 class SDP_PDU:
     '''
     See Bluetooth spec @ Vol 3, Part B - 4.2 PROTOCOL DATA UNIT FORMAT
@@ -549,229 +592,185 @@ class SDP_PDU:
         SDP_SERVICE_ATTRIBUTE_REQUEST: SDP_SERVICE_ATTRIBUTE_RESPONSE,
         SDP_SERVICE_SEARCH_ATTRIBUTE_REQUEST: SDP_SERVICE_SEARCH_ATTRIBUTE_RESPONSE,
     }
-    sdp_pdu_classes: dict[int, type[SDP_PDU]] = {}
-    name = None
-    pdu_id = 0
+    sdp_pdu_classes: ClassVar[dict[PduId, type[SDP_PDU]]] = {}
+    name: str = field(init=False)
+    pdu_id: PduId = field(init=False)
+    fields: ClassVar[hci.Fields] = ()
+    _payload: Optional[bytes] = field(init=False, default=None)
 
-    @staticmethod
-    def from_bytes(pdu):
-        pdu_id, transaction_id, _parameters_length = struct.unpack_from('>BHH', pdu, 0)
+    transaction_id: int
 
-        cls = SDP_PDU.sdp_pdu_classes.get(pdu_id)
-        if cls is None:
-            instance = SDP_PDU(pdu)
-            instance.name = SDP_PDU.pdu_name(pdu_id)
-            instance.pdu_id = pdu_id
-            instance.transaction_id = transaction_id
-            return instance
-        self = cls.__new__(cls)
-        SDP_PDU.__init__(self, pdu, transaction_id)
-        if hasattr(self, 'fields'):
-            self.init_from_bytes(pdu, 5)
-        return self
+    @classmethod
+    def from_bytes(cls, data: bytes) -> SDP_PDU:
+        pdu_id, transaction_id, _parameters_length = struct.unpack_from('>BHH', data, 0)
+        pdu_id = PduId(pdu_id)
 
-    @staticmethod
-    def parse_service_record_handle_list_preceded_by_count(
-        data: bytes, offset: int
-    ) -> tuple[int, list[int]]:
-        count = struct.unpack_from('>H', data, offset - 2)[0]
-        handle_list = [
-            struct.unpack_from('>I', data, offset + x * 4)[0] for x in range(count)
-        ]
-        return offset + count * 4, handle_list
-
-    @staticmethod
-    def parse_bytes_preceded_by_length(data, offset):
-        length = struct.unpack_from('>H', data, offset - 2)[0]
-        return offset + length, data[offset : offset + length]
-
-    @staticmethod
-    def error_name(error_code):
-        return name_or_number(SDP_ERROR_NAMES, error_code)
-
-    @staticmethod
-    def pdu_name(code):
-        return name_or_number(SDP_PDU_NAMES, code)
-
-    @staticmethod
-    def subclass(fields):
-        def inner(cls):
-            name = cls.__name__
-
-            # add a _ character before every uppercase letter, except the SDP_ prefix
-            location = len(name) - 1
-            while location > 4:
-                if not name[location].isupper():
-                    location -= 1
-                    continue
-                name = name[:location] + '_' + name[location:]
-                location -= 1
-
-            cls.name = name.upper()
-            cls.pdu_id = key_with_value(SDP_PDU_NAMES, cls.name)
-            if cls.pdu_id is None:
-                raise KeyError(f'PDU name {cls.name} not found in SDP_PDU_NAMES')
-            cls.fields = fields
-
-            # Register a factory for this class
-            SDP_PDU.sdp_pdu_classes[cls.pdu_id] = cls
-
-            return cls
-
-        return inner
-
-    def __init__(self, pdu=None, transaction_id=0, **kwargs):
-        if hasattr(self, 'fields') and kwargs:
-            HCI_Object.init_from_fields(self, self.fields, kwargs)
-        if pdu is None:
-            parameters = HCI_Object.dict_to_bytes(kwargs, self.fields)
-            pdu = (
-                struct.pack('>BHH', self.pdu_id, transaction_id, len(parameters))
-                + parameters
+        subclass = SDP_PDU.sdp_pdu_classes.get(pdu_id)
+        if subclass := SDP_PDU.sdp_pdu_classes.get(pdu_id):
+            instance = subclass(
+                **hci.HCI_Object.dict_from_bytes(
+                    data, offset=5, fields=subclass.fields
+                ),
+                transaction_id=transaction_id,
             )
-        self.pdu = pdu
-        self.transaction_id = transaction_id
+        else:
+            instance = SDP_PDU(transaction_id=transaction_id)
+            instance.pdu_id = PduId(pdu_id)
+            instance.name = instance.pdu_id.name
+        instance.payload = data[5:]
+        return instance
 
-    def init_from_bytes(self, pdu, offset):
-        return HCI_Object.init_from_bytes(self, pdu, offset, self.fields)
+    _Pdu = TypeVar('_Pdu', bound='SDP_PDU')
+
+    @classmethod
+    def subclass(cls, subclass: type[_Pdu]) -> type[_Pdu]:
+        cls.sdp_pdu_classes[subclass.pdu_id] = subclass
+        subclass.fields = hci.HCI_Object.fields_from_dataclass(subclass)
+        return subclass
+
+    @property
+    def payload(self) -> bytes:
+        if self._payload is None:
+            self._payload = hci.HCI_Object.dict_to_bytes(self.__dict__, self.fields)
+        return self._payload
+
+    @payload.setter
+    def payload(self, value: bytes) -> None:
+        self._payload = value
 
     def __bytes__(self):
-        return self.pdu
+        return (
+            struct.pack('>BHH', self.pdu_id, self.transaction_id, len(self.payload))
+            + self.payload
+        )
 
     def __str__(self):
         result = f'{color(self.name, "blue")} [TID={self.transaction_id}]'
-        if fields := getattr(self, 'fields', None):
-            result += ':\n' + HCI_Object.format_fields(self.__dict__, fields, '  ')
+        if self.fields:
+            result += ':\n' + HCI_Object.format_fields(self.__dict__, self.fields, '  ')
         elif len(self.pdu) > 1:
             result += f': {self.pdu.hex()}'
         return result
 
 
 # -----------------------------------------------------------------------------
-@SDP_PDU.subclass([('error_code', {'size': 2, 'mapper': SDP_PDU.error_name})])
+@SDP_PDU.subclass
+@dataclass
 class SDP_ErrorResponse(SDP_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part B - 4.4.1 SDP_ErrorResponse PDU
     '''
 
-    error_code: int
+    pdu_id = PduId.ERROR_RESPONSE
+    name = PduId.ERROR_RESPONSE.name
+
+    error_code: int = field(metadata=ErrorCode.type_metadata(2))
 
 
 # -----------------------------------------------------------------------------
-@SDP_PDU.subclass(
-    [
-        ('service_search_pattern', DataElement.parse_from_bytes),
-        ('maximum_service_record_count', '>2'),
-        ('continuation_state', '*'),
-    ]
-)
+@SDP_PDU.subclass
+@dataclass
 class SDP_ServiceSearchRequest(SDP_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part B - 4.5.1 SDP_ServiceSearchRequest PDU
     '''
 
-    service_search_pattern: DataElement
-    maximum_service_record_count: int
-    continuation_state: bytes
+    pdu_id = PduId.SERVICE_SEARCH_REQUEST
+    name = PduId.SERVICE_SEARCH_REQUEST.name
+
+    service_search_pattern: DataElement = field(
+        metadata=hci.metadata(DataElement.parse_from_bytes)
+    )
+    maximum_service_record_count: int = field(metadata=hci.metadata('>2'))
+    continuation_state: bytes = field(metadata=hci.metadata('*'))
 
 
 # -----------------------------------------------------------------------------
-@SDP_PDU.subclass(
-    [
-        ('total_service_record_count', '>2'),
-        ('current_service_record_count', '>2'),
-        (
-            'service_record_handle_list',
-            SDP_PDU.parse_service_record_handle_list_preceded_by_count,
-        ),
-        ('continuation_state', '*'),
-    ]
-)
+@SDP_PDU.subclass
+@dataclass
 class SDP_ServiceSearchResponse(SDP_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part B - 4.5.2 SDP_ServiceSearchResponse PDU
     '''
 
-    service_record_handle_list: list[int]
-    total_service_record_count: int
-    current_service_record_count: int
-    continuation_state: bytes
+    pdu_id = PduId.SERVICE_SEARCH_RESPONSE
+    name = PduId.SERVICE_SEARCH_RESPONSE.name
+
+    total_service_record_count: int = field(metadata=hci.metadata('>2'))
+    service_record_handle_list: Sequence[int] = field(
+        metadata=SERVICE_RECORD_HANDLE_METADATA
+    )
+    continuation_state: bytes = field(metadata=hci.metadata('*'))
 
 
 # -----------------------------------------------------------------------------
-@SDP_PDU.subclass(
-    [
-        ('service_record_handle', '>4'),
-        ('maximum_attribute_byte_count', '>2'),
-        ('attribute_id_list', DataElement.parse_from_bytes),
-        ('continuation_state', '*'),
-    ]
-)
+@SDP_PDU.subclass
+@dataclass
 class SDP_ServiceAttributeRequest(SDP_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part B - 4.6.1 SDP_ServiceAttributeRequest PDU
     '''
 
-    service_record_handle: int
-    maximum_attribute_byte_count: int
-    attribute_id_list: DataElement
-    continuation_state: bytes
+    pdu_id = PduId.SERVICE_ATTRIBUTE_REQUEST
+    name = PduId.SERVICE_ATTRIBUTE_REQUEST.name
+
+    service_record_handle: int = field(metadata=hci.metadata('>4'))
+    maximum_attribute_byte_count: int = field(metadata=hci.metadata('>2'))
+    attribute_id_list: DataElement = field(
+        metadata=hci.metadata(DataElement.parse_from_bytes)
+    )
+    continuation_state: bytes = field(metadata=hci.metadata('*'))
 
 
 # -----------------------------------------------------------------------------
-@SDP_PDU.subclass(
-    [
-        ('attribute_list_byte_count', '>2'),
-        ('attribute_list', SDP_PDU.parse_bytes_preceded_by_length),
-        ('continuation_state', '*'),
-    ]
-)
+@SDP_PDU.subclass
+@dataclass
 class SDP_ServiceAttributeResponse(SDP_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part B - 4.6.2 SDP_ServiceAttributeResponse PDU
     '''
 
-    attribute_list_byte_count: int
-    attribute_list: bytes
-    continuation_state: bytes
+    pdu_id = PduId.SERVICE_ATTRIBUTE_RESPONSE
+    name = PduId.SERVICE_ATTRIBUTE_RESPONSE.name
+
+    attribute_list: bytes = field(metadata=BYTES_PRECEDED_BY_LENGTH_METADATA)
+    continuation_state: bytes = field(metadata=hci.metadata('*'))
 
 
 # -----------------------------------------------------------------------------
-@SDP_PDU.subclass(
-    [
-        ('service_search_pattern', DataElement.parse_from_bytes),
-        ('maximum_attribute_byte_count', '>2'),
-        ('attribute_id_list', DataElement.parse_from_bytes),
-        ('continuation_state', '*'),
-    ]
-)
+@SDP_PDU.subclass
+@dataclass
 class SDP_ServiceSearchAttributeRequest(SDP_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part B - 4.7.1 SDP_ServiceSearchAttributeRequest PDU
     '''
 
-    service_search_pattern: DataElement
-    maximum_attribute_byte_count: int
-    attribute_id_list: DataElement
-    continuation_state: bytes
+    pdu_id = PduId.SERVICE_SEARCH_ATTRIBUTE_REQUEST
+    name = PduId.SERVICE_SEARCH_ATTRIBUTE_REQUEST.name
+
+    service_search_pattern: DataElement = field(
+        metadata=hci.metadata(DataElement.parse_from_bytes)
+    )
+    maximum_attribute_byte_count: int = field(metadata=hci.metadata('>2'))
+    attribute_id_list: DataElement = field(
+        metadata=hci.metadata(DataElement.parse_from_bytes)
+    )
+    continuation_state: bytes = field(metadata=hci.metadata('*'))
 
 
 # -----------------------------------------------------------------------------
-@SDP_PDU.subclass(
-    [
-        ('attribute_lists_byte_count', '>2'),
-        ('attribute_lists', SDP_PDU.parse_bytes_preceded_by_length),
-        ('continuation_state', '*'),
-    ]
-)
+@SDP_PDU.subclass
+@dataclass
 class SDP_ServiceSearchAttributeResponse(SDP_PDU):
     '''
     See Bluetooth spec @ Vol 3, Part B - 4.7.2 SDP_ServiceSearchAttributeResponse PDU
     '''
 
-    attribute_lists_byte_count: int
-    attribute_lists: bytes
-    continuation_state: bytes
+    pdu_id = PduId.SERVICE_SEARCH_ATTRIBUTE_RESPONSE
+    name = PduId.SERVICE_SEARCH_ATTRIBUTE_RESPONSE.name
+
+    attribute_lists: bytes = field(metadata=BYTES_PRECEDED_BY_LENGTH_METADATA)
+    continuation_state: bytes = field(metadata=hci.metadata('*'))
 
 
 # -----------------------------------------------------------------------------
@@ -872,7 +871,7 @@ class Client:
         )
 
         # Request and accumulate until there's no more continuation
-        service_record_handle_list = []
+        service_record_handle_list: list[int] = []
         continuation_state = bytes([0])
         watchdog = SDP_CONTINUATION_WATCHDOG
         while watchdog > 0:
@@ -1058,7 +1057,9 @@ class Server:
             spec=l2cap.ClassicChannelSpec(psm=SDP_PSM), handler=self.on_connection
         )
 
-    def send_response(self, response):
+    def send_response(self, response: SDP_PDU) -> None:
+        if not self.channel:
+            raise core.InvalidStateError("Not connected")
         logger.debug(f'{color(">>> Sending SDP Response", "blue")}: {response}')
         self.channel.send_pdu(response)
 
@@ -1079,11 +1080,11 @@ class Server:
 
         return matching_services
 
-    def on_connection(self, channel):
+    def on_connection(self, channel: l2cap.ClassicChannel) -> None:
         self.channel = channel
-        self.channel.sink = self.on_pdu
+        channel.sink = self.on_pdu
 
-    def on_pdu(self, pdu):
+    def on_pdu(self, pdu: bytes) -> None:
         try:
             sdp_pdu = SDP_PDU.from_bytes(pdu)
         except Exception:
@@ -1093,13 +1094,17 @@ class Server:
                     transaction_id=0, error_code=SDP_INVALID_REQUEST_SYNTAX_ERROR
                 )
             )
+            return
 
         logger.debug(f'{color("<<< Received SDP Request", "green")}: {sdp_pdu}')
 
         # Find the handler method
-        handler_name = f'on_{sdp_pdu.name.lower()}'
-        handler = getattr(self, handler_name, None)
-        if handler:
+        handler = {
+            PduId.SERVICE_SEARCH_REQUEST: self.on_sdp_service_search_request,
+            PduId.SERVICE_ATTRIBUTE_REQUEST: self.on_sdp_service_attribute_request,
+            PduId.SERVICE_SEARCH_ATTRIBUTE_REQUEST: self.on_sdp_service_search_attribute_request,
+        }[sdp_pdu.pdu_id]
+        if callable(handler):
             try:
                 handler(sdp_pdu)
             except Exception:
@@ -1227,15 +1232,11 @@ class Server:
             if service_record_handles_remaining
             else bytes([0])
         )
-        service_record_handle_list = b''.join(
-            [struct.pack('>I', handle) for handle in service_record_handles]
-        )
         self.send_response(
             SDP_ServiceSearchResponse(
                 transaction_id=request.transaction_id,
                 total_service_record_count=total_service_record_count,
-                current_service_record_count=len(service_record_handles),
-                service_record_handle_list=service_record_handle_list,
+                service_record_handle_list=service_record_handles,
                 continuation_state=continuation_state,
             )
         )
@@ -1283,7 +1284,6 @@ class Server:
         self.send_response(
             SDP_ServiceAttributeResponse(
                 transaction_id=request.transaction_id,
-                attribute_list_byte_count=len(attribute_list_response),
                 attribute_list=attribute_list_response,
                 continuation_state=continuation_state,
             )
@@ -1330,7 +1330,6 @@ class Server:
         self.send_response(
             SDP_ServiceSearchAttributeResponse(
                 transaction_id=request.transaction_id,
-                attribute_lists_byte_count=len(attribute_lists_response),
                 attribute_lists=attribute_lists_response,
                 continuation_state=continuation_state,
             )
