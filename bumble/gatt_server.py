@@ -255,7 +255,7 @@ class Server(utils.EventEmitter):
                     # pylint: disable=line-too-long
                     Descriptor(
                         GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
-                        att.Attribute.READABLE | att.Attribute.WRITEABLE,
+                        characteristic.permissions,
                         CharacteristicValue(
                             read=lambda connection, characteristic=characteristic: self.read_cccd(
                                 connection, characteristic
