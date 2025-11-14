@@ -1149,6 +1149,9 @@ class LeCreditBasedChannel(utils.EventEmitter):
     def abort(self) -> None:
         if self.state == self.State.CONNECTED:
             self._change_state(self.State.DISCONNECTED)
+        if self.state == self.State.CONNECTING:
+            if self.connection_result is not None:
+                self.connection_result.cancel()
 
     def on_pdu(self, pdu: bytes) -> None:
         if self.sink is None:
