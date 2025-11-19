@@ -39,7 +39,7 @@ from typing import (
     cast,
 )
 
-from bumble import crypto, utils
+from bumble import crypto, hci, utils
 from bumble.colors import color
 from bumble.core import (
     AdvertisingData,
@@ -79,97 +79,94 @@ logger = logging.getLogger(__name__)
 SMP_CID = 0x06
 SMP_BR_CID = 0x07
 
-SMP_PAIRING_REQUEST_COMMAND               = 0x01
-SMP_PAIRING_RESPONSE_COMMAND              = 0x02
-SMP_PAIRING_CONFIRM_COMMAND               = 0x03
-SMP_PAIRING_RANDOM_COMMAND                = 0x04
-SMP_PAIRING_FAILED_COMMAND                = 0x05
-SMP_ENCRYPTION_INFORMATION_COMMAND        = 0x06
-SMP_MASTER_IDENTIFICATION_COMMAND         = 0x07
-SMP_IDENTITY_INFORMATION_COMMAND          = 0x08
-SMP_IDENTITY_ADDRESS_INFORMATION_COMMAND  = 0x09
-SMP_SIGNING_INFORMATION_COMMAND           = 0x0A
-SMP_SECURITY_REQUEST_COMMAND              = 0x0B
-SMP_PAIRING_PUBLIC_KEY_COMMAND            = 0x0C
-SMP_PAIRING_DHKEY_CHECK_COMMAND           = 0x0D
-SMP_PAIRING_KEYPRESS_NOTIFICATION_COMMAND = 0x0E
+class CommandCode(hci.SpecableEnum):
+    PAIRING_REQUEST               = 0x01
+    PAIRING_RESPONSE              = 0x02
+    PAIRING_CONFIRM               = 0x03
+    PAIRING_RANDOM                = 0x04
+    PAIRING_FAILED                = 0x05
+    ENCRYPTION_INFORMATION        = 0x06
+    MASTER_IDENTIFICATION         = 0x07
+    IDENTITY_INFORMATION          = 0x08
+    IDENTITY_ADDRESS_INFORMATION  = 0x09
+    SIGNING_INFORMATION           = 0x0A
+    SECURITY_REQUEST              = 0x0B
+    PAIRING_PUBLIC_KEY            = 0x0C
+    PAIRING_DHKEY_CHECK           = 0x0D
+    PAIRING_KEYPRESS_NOTIFICATION = 0x0E
 
-SMP_COMMAND_NAMES = {
-    SMP_PAIRING_REQUEST_COMMAND:               'SMP_PAIRING_REQUEST_COMMAND',
-    SMP_PAIRING_RESPONSE_COMMAND:              'SMP_PAIRING_RESPONSE_COMMAND',
-    SMP_PAIRING_CONFIRM_COMMAND:               'SMP_PAIRING_CONFIRM_COMMAND',
-    SMP_PAIRING_RANDOM_COMMAND:                'SMP_PAIRING_RANDOM_COMMAND',
-    SMP_PAIRING_FAILED_COMMAND:                'SMP_PAIRING_FAILED_COMMAND',
-    SMP_ENCRYPTION_INFORMATION_COMMAND:        'SMP_ENCRYPTION_INFORMATION_COMMAND',
-    SMP_MASTER_IDENTIFICATION_COMMAND:         'SMP_MASTER_IDENTIFICATION_COMMAND',
-    SMP_IDENTITY_INFORMATION_COMMAND:          'SMP_IDENTITY_INFORMATION_COMMAND',
-    SMP_IDENTITY_ADDRESS_INFORMATION_COMMAND:  'SMP_IDENTITY_ADDRESS_INFORMATION_COMMAND',
-    SMP_SIGNING_INFORMATION_COMMAND:           'SMP_SIGNING_INFORMATION_COMMAND',
-    SMP_SECURITY_REQUEST_COMMAND:              'SMP_SECURITY_REQUEST_COMMAND',
-    SMP_PAIRING_PUBLIC_KEY_COMMAND:            'SMP_PAIRING_PUBLIC_KEY_COMMAND',
-    SMP_PAIRING_DHKEY_CHECK_COMMAND:           'SMP_PAIRING_DHKEY_CHECK_COMMAND',
-    SMP_PAIRING_KEYPRESS_NOTIFICATION_COMMAND: 'SMP_PAIRING_KEYPRESS_NOTIFICATION_COMMAND'
-}
+SMP_PAIRING_REQUEST_COMMAND = CommandCode.PAIRING_REQUEST
+SMP_PAIRING_RESPONSE_COMMAND = CommandCode.PAIRING_RESPONSE
+SMP_PAIRING_CONFIRM_COMMAND = CommandCode.PAIRING_CONFIRM
+SMP_PAIRING_RANDOM_COMMAND = CommandCode.PAIRING_RANDOM
+SMP_PAIRING_FAILED_COMMAND = CommandCode.PAIRING_FAILED
+SMP_ENCRYPTION_INFORMATION_COMMAND = CommandCode.ENCRYPTION_INFORMATION
+SMP_MASTER_IDENTIFICATION_COMMAND = CommandCode.MASTER_IDENTIFICATION
+SMP_IDENTITY_INFORMATION_COMMAND = CommandCode.IDENTITY_INFORMATION
+SMP_IDENTITY_ADDRESS_INFORMATION_COMMAND = CommandCode.IDENTITY_ADDRESS_INFORMATION
+SMP_SIGNING_INFORMATION_COMMAND = CommandCode.SIGNING_INFORMATION
+SMP_SECURITY_REQUEST_COMMAND = CommandCode.SECURITY_REQUEST
+SMP_PAIRING_PUBLIC_KEY_COMMAND = CommandCode.PAIRING_PUBLIC_KEY
+SMP_PAIRING_DHKEY_CHECK_COMMAND = CommandCode.PAIRING_DHKEY_CHECK
+SMP_PAIRING_KEYPRESS_NOTIFICATION_COMMAND = CommandCode.PAIRING_KEYPRESS_NOTIFICATION
 
-SMP_DISPLAY_ONLY_IO_CAPABILITY       = 0x00
-SMP_DISPLAY_YES_NO_IO_CAPABILITY     = 0x01
-SMP_KEYBOARD_ONLY_IO_CAPABILITY      = 0x02
-SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY = 0x03
-SMP_KEYBOARD_DISPLAY_IO_CAPABILITY   = 0x04
 
-SMP_IO_CAPABILITY_NAMES = {
-    SMP_DISPLAY_ONLY_IO_CAPABILITY:       'SMP_DISPLAY_ONLY_IO_CAPABILITY',
-    SMP_DISPLAY_YES_NO_IO_CAPABILITY:     'SMP_DISPLAY_YES_NO_IO_CAPABILITY',
-    SMP_KEYBOARD_ONLY_IO_CAPABILITY:      'SMP_KEYBOARD_ONLY_IO_CAPABILITY',
-    SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: 'SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY',
-    SMP_KEYBOARD_DISPLAY_IO_CAPABILITY:   'SMP_KEYBOARD_DISPLAY_IO_CAPABILITY'
-}
+class IoCapability(hci.SpecableEnum):
+    DISPLAY_ONLY       = 0x00
+    DISPLAY_YES_NO     = 0x01
+    KEYBOARD_ONLY      = 0x02
+    NO_INPUT_NO_OUTPUT = 0x03
+    KEYBOARD_DISPLAY   = 0x04
 
-SMP_PASSKEY_ENTRY_FAILED_ERROR                       = 0x01
-SMP_OOB_NOT_AVAILABLE_ERROR                          = 0x02
-SMP_AUTHENTICATION_REQUIREMENTS_ERROR                = 0x03
-SMP_CONFIRM_VALUE_FAILED_ERROR                       = 0x04
-SMP_PAIRING_NOT_SUPPORTED_ERROR                      = 0x05
-SMP_ENCRYPTION_KEY_SIZE_ERROR                        = 0x06
-SMP_COMMAND_NOT_SUPPORTED_ERROR                      = 0x07
-SMP_UNSPECIFIED_REASON_ERROR                         = 0x08
-SMP_REPEATED_ATTEMPTS_ERROR                          = 0x09
-SMP_INVALID_PARAMETERS_ERROR                         = 0x0A
-SMP_DHKEY_CHECK_FAILED_ERROR                         = 0x0B
-SMP_NUMERIC_COMPARISON_FAILED_ERROR                  = 0x0C
-SMP_BD_EDR_PAIRING_IN_PROGRESS_ERROR                 = 0x0D
-SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR = 0x0E
+SMP_DISPLAY_ONLY_IO_CAPABILITY       = IoCapability.DISPLAY_ONLY
+SMP_DISPLAY_YES_NO_IO_CAPABILITY     = IoCapability.DISPLAY_YES_NO
+SMP_KEYBOARD_ONLY_IO_CAPABILITY      = IoCapability.KEYBOARD_ONLY
+SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY = IoCapability.NO_INPUT_NO_OUTPUT
+SMP_KEYBOARD_DISPLAY_IO_CAPABILITY   = IoCapability.KEYBOARD_DISPLAY
 
-SMP_ERROR_NAMES = {
-    SMP_PASSKEY_ENTRY_FAILED_ERROR:                       'SMP_PASSKEY_ENTRY_FAILED_ERROR',
-    SMP_OOB_NOT_AVAILABLE_ERROR:                          'SMP_OOB_NOT_AVAILABLE_ERROR',
-    SMP_AUTHENTICATION_REQUIREMENTS_ERROR:                'SMP_AUTHENTICATION_REQUIREMENTS_ERROR',
-    SMP_CONFIRM_VALUE_FAILED_ERROR:                       'SMP_CONFIRM_VALUE_FAILED_ERROR',
-    SMP_PAIRING_NOT_SUPPORTED_ERROR:                      'SMP_PAIRING_NOT_SUPPORTED_ERROR',
-    SMP_ENCRYPTION_KEY_SIZE_ERROR:                        'SMP_ENCRYPTION_KEY_SIZE_ERROR',
-    SMP_COMMAND_NOT_SUPPORTED_ERROR:                      'SMP_COMMAND_NOT_SUPPORTED_ERROR',
-    SMP_UNSPECIFIED_REASON_ERROR:                         'SMP_UNSPECIFIED_REASON_ERROR',
-    SMP_REPEATED_ATTEMPTS_ERROR:                          'SMP_REPEATED_ATTEMPTS_ERROR',
-    SMP_INVALID_PARAMETERS_ERROR:                         'SMP_INVALID_PARAMETERS_ERROR',
-    SMP_DHKEY_CHECK_FAILED_ERROR:                         'SMP_DHKEY_CHECK_FAILED_ERROR',
-    SMP_NUMERIC_COMPARISON_FAILED_ERROR:                  'SMP_NUMERIC_COMPARISON_FAILED_ERROR',
-    SMP_BD_EDR_PAIRING_IN_PROGRESS_ERROR:                 'SMP_BD_EDR_PAIRING_IN_PROGRESS_ERROR',
-    SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR: 'SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR'
-}
+class ErrorCode(hci.SpecableEnum):
+    PASSKEY_ENTRY_FAILED                       = 0x01
+    OOB_NOT_AVAILABLE                          = 0x02
+    AUTHENTICATION_REQUIREMENTS                = 0x03
+    CONFIRM_VALUE_FAILED                       = 0x04
+    PAIRING_NOT_SUPPORTED                      = 0x05
+    ENCRYPTION_KEY_SIZE                        = 0x06
+    COMMAND_NOT_SUPPORTED                      = 0x07
+    UNSPECIFIED_REASON                         = 0x08
+    REPEATED_ATTEMPTS                          = 0x09
+    INVALID_PARAMETERS                         = 0x0A
+    DHKEY_CHECK_FAILED                         = 0x0B
+    NUMERIC_COMPARISON_FAILED                  = 0x0C
+    BD_EDR_PAIRING_IN_PROGRESS                 = 0x0D
+    CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED = 0x0E
 
-SMP_PASSKEY_ENTRY_STARTED_KEYPRESS_NOTIFICATION_TYPE   = 0
-SMP_PASSKEY_DIGIT_ENTERED_KEYPRESS_NOTIFICATION_TYPE   = 1
-SMP_PASSKEY_DIGIT_ERASED_KEYPRESS_NOTIFICATION_TYPE    = 2
-SMP_PASSKEY_CLEARED_KEYPRESS_NOTIFICATION_TYPE         = 3
-SMP_PASSKEY_ENTRY_COMPLETED_KEYPRESS_NOTIFICATION_TYPE = 4
+SMP_PASSKEY_ENTRY_FAILED_ERROR                       = ErrorCode.PASSKEY_ENTRY_FAILED
+SMP_OOB_NOT_AVAILABLE_ERROR                          = ErrorCode.OOB_NOT_AVAILABLE
+SMP_AUTHENTICATION_REQUIREMENTS_ERROR                = ErrorCode.AUTHENTICATION_REQUIREMENTS
+SMP_CONFIRM_VALUE_FAILED_ERROR                       = ErrorCode.CONFIRM_VALUE_FAILED
+SMP_PAIRING_NOT_SUPPORTED_ERROR                      = ErrorCode.PAIRING_NOT_SUPPORTED
+SMP_ENCRYPTION_KEY_SIZE_ERROR                        = ErrorCode.ENCRYPTION_KEY_SIZE
+SMP_COMMAND_NOT_SUPPORTED_ERROR                      = ErrorCode.COMMAND_NOT_SUPPORTED
+SMP_UNSPECIFIED_REASON_ERROR                         = ErrorCode.UNSPECIFIED_REASON
+SMP_REPEATED_ATTEMPTS_ERROR                          = ErrorCode.REPEATED_ATTEMPTS
+SMP_INVALID_PARAMETERS_ERROR                         = ErrorCode.INVALID_PARAMETERS
+SMP_DHKEY_CHECK_FAILED_ERROR                         = ErrorCode.DHKEY_CHECK_FAILED
+SMP_NUMERIC_COMPARISON_FAILED_ERROR                  = ErrorCode.NUMERIC_COMPARISON_FAILED
+SMP_BD_EDR_PAIRING_IN_PROGRESS_ERROR                 = ErrorCode.BD_EDR_PAIRING_IN_PROGRESS
+SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR = ErrorCode.CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED
 
-SMP_KEYPRESS_NOTIFICATION_TYPE_NAMES = {
-    SMP_PASSKEY_ENTRY_STARTED_KEYPRESS_NOTIFICATION_TYPE:   'SMP_PASSKEY_ENTRY_STARTED_KEYPRESS_NOTIFICATION_TYPE',
-    SMP_PASSKEY_DIGIT_ENTERED_KEYPRESS_NOTIFICATION_TYPE:   'SMP_PASSKEY_DIGIT_ENTERED_KEYPRESS_NOTIFICATION_TYPE',
-    SMP_PASSKEY_DIGIT_ERASED_KEYPRESS_NOTIFICATION_TYPE:    'SMP_PASSKEY_DIGIT_ERASED_KEYPRESS_NOTIFICATION_TYPE',
-    SMP_PASSKEY_CLEARED_KEYPRESS_NOTIFICATION_TYPE:         'SMP_PASSKEY_CLEARED_KEYPRESS_NOTIFICATION_TYPE',
-    SMP_PASSKEY_ENTRY_COMPLETED_KEYPRESS_NOTIFICATION_TYPE: 'SMP_PASSKEY_ENTRY_COMPLETED_KEYPRESS_NOTIFICATION_TYPE'
-}
+class KeypressNotificationType(hci.SpecableEnum):
+    PASSKEY_ENTRY_STARTED   = 0
+    PASSKEY_DIGIT_ENTERED   = 1
+    PASSKEY_DIGIT_ERASED    = 2
+    PASSKEY_CLEARED         = 3
+    PASSKEY_ENTRY_COMPLETED = 4
+
+SMP_PASSKEY_ENTRY_STARTED_KEYPRESS_NOTIFICATION_TYPE   = KeypressNotificationType.PASSKEY_ENTRY_STARTED
+SMP_PASSKEY_DIGIT_ENTERED_KEYPRESS_NOTIFICATION_TYPE   = KeypressNotificationType.PASSKEY_DIGIT_ENTERED
+SMP_PASSKEY_DIGIT_ERASED_KEYPRESS_NOTIFICATION_TYPE    = KeypressNotificationType.PASSKEY_DIGIT_ERASED
+SMP_PASSKEY_CLEARED_KEYPRESS_NOTIFICATION_TYPE         = KeypressNotificationType.PASSKEY_CLEARED
+SMP_PASSKEY_ENTRY_COMPLETED_KEYPRESS_NOTIFICATION_TYPE = KeypressNotificationType.PASSKEY_ENTRY_COMPLETED
 
 # Bit flags for key distribution/generation
 SMP_ENC_KEY_DISTRIBUTION_FLAG  = 0b0001
@@ -196,8 +193,6 @@ SMP_CTKD_H7_BRLE_SALT = bytes.fromhex('000000000000000000000000746D7032')
 # -----------------------------------------------------------------------------
 # Utils
 # -----------------------------------------------------------------------------
-def error_name(error_code: int) -> str:
-    return name_or_number(SMP_ERROR_NAMES, error_code)
 
 
 # -----------------------------------------------------------------------------
@@ -209,30 +204,26 @@ class SMP_Command:
     See Bluetooth spec @ Vol 3, Part H - 3 SECURITY MANAGER PROTOCOL
     '''
 
-    smp_classes: ClassVar[dict[int, type[SMP_Command]]] = {}
+    smp_classes: ClassVar[dict[CommandCode, type[SMP_Command]]] = {}
     fields: ClassVar[Fields]
-    code: int = field(default=0, init=False)
+    code: CommandCode = field(default=CommandCode(0), init=False)
     name: str = field(default='', init=False)
     _payload: Optional[bytes] = field(default=None, init=False)
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> "SMP_Command":
-        code = pdu[0]
+        code = CommandCode(pdu[0])
 
         subclass = SMP_Command.smp_classes.get(code)
         if subclass is None:
             instance = SMP_Command()
-            instance.name = SMP_Command.command_name(code)
+            instance.name = code.name
             instance.code = code
             instance.payload = pdu
             return instance
         instance = subclass(**HCI_Object.dict_from_bytes(pdu, 1, subclass.fields))
         instance.payload = pdu[1:]
         return instance
-
-    @staticmethod
-    def command_name(code: int) -> str:
-        return name_or_number(SMP_COMMAND_NAMES, code)
 
     @staticmethod
     def auth_req_str(value: int) -> str:
@@ -248,10 +239,6 @@ class SMP_Command:
         )
 
     @staticmethod
-    def io_capability_name(io_capability: int) -> str:
-        return name_or_number(SMP_IO_CAPABILITY_NAMES, io_capability)
-
-    @staticmethod
     def key_distribution_str(value: int) -> str:
         key_types: list[str] = []
         if value & SMP_ENC_KEY_DISTRIBUTION_FLAG:
@@ -264,16 +251,11 @@ class SMP_Command:
             key_types.append('LINK')
         return ','.join(key_types)
 
-    @staticmethod
-    def keypress_notification_type_name(notification_type: int) -> str:
-        return name_or_number(SMP_KEYPRESS_NOTIFICATION_TYPE_NAMES, notification_type)
-
     _Command = TypeVar("_Command", bound="SMP_Command")
 
     @classmethod
     def subclass(cls, subclass: type[_Command]) -> type[_Command]:
         subclass.name = subclass.__name__.upper()
-        subclass.code = key_with_value(SMP_COMMAND_NAMES, subclass.name)
         if subclass.code is None:
             raise KeyError(
                 f'Command name {subclass.name} not found in SMP_COMMAND_NAMES'
@@ -316,9 +298,9 @@ class SMP_Pairing_Request_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.1 Pairing Request
     '''
 
-    io_capability: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.io_capability_name})
-    )
+    code = CommandCode.PAIRING_REQUEST
+
+    io_capability: IoCapability = field(metadata=IoCapability.type_metadata(1))
     oob_data_flag: int = field(metadata=metadata(1))
     auth_req: int = field(
         metadata=metadata({'size': 1, 'mapper': SMP_Command.auth_req_str})
@@ -340,9 +322,9 @@ class SMP_Pairing_Response_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.2 Pairing Response
     '''
 
-    io_capability: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.io_capability_name})
-    )
+    code = CommandCode.PAIRING_RESPONSE
+
+    io_capability: IoCapability = field(metadata=IoCapability.type_metadata(1))
     oob_data_flag: int = field(metadata=metadata(1))
     auth_req: int = field(
         metadata=metadata({'size': 1, 'mapper': SMP_Command.auth_req_str})
@@ -364,6 +346,8 @@ class SMP_Pairing_Confirm_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.3 Pairing Confirm
     '''
 
+    code = CommandCode.PAIRING_CONFIRM
+
     confirm_value: bytes = field(metadata=metadata(16))
 
 
@@ -374,6 +358,8 @@ class SMP_Pairing_Random_Command(SMP_Command):
     '''
     See Bluetooth spec @ Vol 3, Part H - 3.5.4 Pairing Random
     '''
+
+    code = CommandCode.PAIRING_RANDOM
 
     random_value: bytes = field(metadata=metadata(16))
 
@@ -386,7 +372,9 @@ class SMP_Pairing_Failed_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.5 Pairing Failed
     '''
 
-    reason: int = field(metadata=metadata({'size': 1, 'mapper': error_name}))
+    code = CommandCode.PAIRING_FAILED
+
+    reason: ErrorCode = field(metadata=ErrorCode.type_metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -396,6 +384,8 @@ class SMP_Pairing_Public_Key_Command(SMP_Command):
     '''
     See Bluetooth spec @ Vol 3, Part H - 3.5.6 Pairing Public Key
     '''
+
+    code = CommandCode.PAIRING_PUBLIC_KEY
 
     public_key_x: bytes = field(metadata=metadata(32))
     public_key_y: bytes = field(metadata=metadata(32))
@@ -409,6 +399,8 @@ class SMP_Pairing_DHKey_Check_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.7 Pairing DHKey Check
     '''
 
+    code = CommandCode.PAIRING_DHKEY_CHECK
+
     dhkey_check: bytes = field(metadata=metadata(16))
 
 
@@ -420,10 +412,10 @@ class SMP_Pairing_Keypress_Notification_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.8 Keypress Notification
     '''
 
-    notification_type: int = field(
-        metadata=metadata(
-            {'size': 1, 'mapper': SMP_Command.keypress_notification_type_name}
-        )
+    code = CommandCode.PAIRING_KEYPRESS_NOTIFICATION
+
+    notification_type: KeypressNotificationType = field(
+        metadata=KeypressNotificationType.type_metadata(1)
     )
 
 
@@ -435,6 +427,8 @@ class SMP_Encryption_Information_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.6.2 Encryption Information
     '''
 
+    code = CommandCode.ENCRYPTION_INFORMATION
+
     long_term_key: bytes = field(metadata=metadata(16))
 
 
@@ -445,6 +439,8 @@ class SMP_Master_Identification_Command(SMP_Command):
     '''
     See Bluetooth spec @ Vol 3, Part H - 3.6.3 Master Identification
     '''
+
+    code = CommandCode.MASTER_IDENTIFICATION
 
     ediv: int = field(metadata=metadata(2))
     rand: bytes = field(metadata=metadata(8))
@@ -458,6 +454,8 @@ class SMP_Identity_Information_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.6.4 Identity Information
     '''
 
+    code = CommandCode.IDENTITY_INFORMATION
+
     identity_resolving_key: bytes = field(metadata=metadata(16))
 
 
@@ -468,6 +466,8 @@ class SMP_Identity_Address_Information_Command(SMP_Command):
     '''
     See Bluetooth spec @ Vol 3, Part H - 3.6.5 Identity Address Information
     '''
+
+    code = CommandCode.IDENTITY_ADDRESS_INFORMATION
 
     addr_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
     bd_addr: Address = field(metadata=metadata(Address.parse_address_preceded_by_type))
@@ -481,6 +481,8 @@ class SMP_Signing_Information_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.6.6 Signing Information
     '''
 
+    code = CommandCode.SIGNING_INFORMATION
+
     signature_key: bytes = field(metadata=metadata(16))
 
 
@@ -491,6 +493,8 @@ class SMP_Security_Request_Command(SMP_Command):
     '''
     See Bluetooth spec @ Vol 3, Part H - 3.6.7 Security Request
     '''
+
+    code = CommandCode.SECURITY_REQUEST
 
     auth_req: int = field(
         metadata=metadata({'size': 1, 'mapper': SMP_Command.auth_req_str})
@@ -746,7 +750,7 @@ class Session:
         self.ct2: bool = False
 
         # I/O Capabilities
-        self.io_capability = pairing_config.delegate.io_capability
+        self.io_capability = IoCapability(pairing_config.delegate.io_capability)
         self.peer_io_capability = SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
 
         # OOB
@@ -864,7 +868,7 @@ class Session:
             self.passkey_display = details[1 if self.is_initiator else 2]
 
     def check_expected_value(
-        self, expected: bytes, received: bytes, error: int
+        self, expected: bytes, received: bytes, error: ErrorCode
     ) -> bool:
         logger.debug(f'expected={expected.hex()} got={received.hex()}')
         if expected != received:
@@ -975,7 +979,7 @@ class Session:
     def send_command(self, command: SMP_Command) -> None:
         self.manager.send_command(self.connection, command)
 
-    def send_pairing_failed(self, error: int) -> None:
+    def send_pairing_failed(self, error: ErrorCode) -> None:
         self.send_command(SMP_Pairing_Failed_Command(reason=error))
         self.on_pairing_failure(error)
 
@@ -1393,15 +1397,15 @@ class Session:
             )
         await self.manager.on_pairing(self, peer_address, keys)
 
-    def on_pairing_failure(self, reason: int) -> None:
-        logger.warning(f'pairing failure ({error_name(reason)})')
+    def on_pairing_failure(self, reason: ErrorCode) -> None:
+        logger.warning('pairing failure (%s)', reason.name)
 
         if self.completed:
             return
 
         self.completed = True
 
-        error = ProtocolError(reason, 'smp', error_name(reason))
+        error = ProtocolError(reason, 'smp', reason.name)
         if self.pairing_result is not None and not self.pairing_result.done():
             self.pairing_result.set_exception(error)
         self.manager.on_pairing_failure(self, reason)
@@ -2031,7 +2035,7 @@ class Manager(utils.EventEmitter):
         # Notify the device
         self.device.on_pairing(session.connection, identity_address, keys, session.sc)
 
-    def on_pairing_failure(self, session: Session, reason: int) -> None:
+    def on_pairing_failure(self, session: Session, reason: ErrorCode) -> None:
         self.device.on_pairing_failure(session.connection, reason)
 
     def on_session_end(self, session: Session) -> None:
