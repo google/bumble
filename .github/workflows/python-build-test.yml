@@ -69,7 +69,7 @@ jobs:
           components: clippy,rustfmt
           toolchain: ${{ matrix.rust-version }}
       - name: Install Rust dependencies
-        run: cargo install cargo-all-features # allows building/testing combinations of features
+        run: cargo install cargo-all-features --version 1.11.0  # allows building/testing combinations of features
       - name: Check License Headers
         run: cd rust && cargo run --features dev-tools --bin file-header check-all
       - name: Rust Build
