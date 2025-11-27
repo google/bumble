@@ -65,6 +65,11 @@ class LocalLink:
         for controller in self.controllers:
             if controller.random_address == address:
                 return controller
+            if controller.public_address == address:
+                return controller
+            for advertising_set in controller.advertising_sets.values():
+                if advertising_set.random_address == address:
+                    return controller
         return None
 
     def find_classic_controller(
@@ -90,6 +95,17 @@ class LocalLink:
         for controller in self.controllers:
             if controller.random_address != sender_address:
                 controller.on_link_advertising_data(sender_address, data)
+
+    def send_extended_advertising_data(
+        self, sender_address: hci.Address, data: bytes, properties: int = 0
+    ):
+        # Send the advertising data to all controllers, except the sender
+        sender_controller = self.find_controller(sender_address)
+        for controller in self.controllers:
+            if controller != sender_controller:
+                controller.on_link_extended_advertising_data(
+                    sender_address, data, properties
+                )
 
     def send_acl_data(
         self,
@@ -136,7 +152,9 @@ class LocalLink:
             central_controller.on_link_peripheral_connection_complete(
                 le_create_connection_command, hci.HCI_SUCCESS
             )
-            peripheral_controller.on_link_central_connected(central_address)
+            peripheral_controller.on_link_central_connected(
+                central_address, le_create_connection_command.peer_address
+            )
             return
 
         # No peripheral found
@@ -147,7 +165,10 @@ class LocalLink:
     def connect(
         self,
         central_address: hci.Address,
-        le_create_connection_command: hci.HCI_LE_Create_Connection_Command,
+        le_create_connection_command: (
+            hci.HCI_LE_Create_Connection_Command
+            | hci.HCI_LE_Extended_Create_Connection_Command
+        ),
     ):
         logger.debug(
             f'$$$ CONNECTION {central_address} -> '
