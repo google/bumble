@@ -285,10 +285,12 @@ async def test_legacy_advertising():
 async def test_legacy_advertising_disconnection(auto_restart):
     devices = TwoDevices()
     for controller in devices.controllers:
-        controller.le_features = bytes.fromhex('ffffffffffffffff')
+        controller.le_features |= hci.LeFeatureMask.LE_EXTENDED_ADVERTISING
     for dev in devices:
         await dev.power_on()
-    await devices[0].start_advertising(auto_restart=auto_restart)
+    await devices[0].start_advertising(
+        auto_restart=auto_restart, advertising_interval_min=1.0
+    )
     connecion = await devices[1].connect(devices[0].random_address)
 
     await connecion.disconnect()
@@ -343,12 +345,15 @@ async def test_extended_advertising_connection(own_address_type):
     for dev in devices:
         await dev.power_on()
     advertising_set = await devices[0].create_advertising_set(
-        advertising_parameters=AdvertisingParameters(own_address_type=own_address_type)
+        advertising_parameters=AdvertisingParameters(
+            own_address_type=own_address_type, primary_advertising_interval_min=1.0
+        )
     )
     await asyncio.wait_for(
         devices[1].connect(advertising_set.random_address or devices[0].public_address),
         _TIMEOUT,
     )
+    await async_barrier()
 
     # Advertising set should be terminated after connected.
     assert not advertising_set.enabled
@@ -376,7 +381,7 @@ async def test_extended_advertising_connection(own_address_type):
 async def test_extended_advertising_connection_out_of_order(own_address_type):
     devices = TwoDevices()
     device = devices[0]
-    devices.controllers[0].le_features = bytes.fromhex('ffffffffffffffff')
+    devices.controllers[0].le_features |= hci.LeFeatureMask.LE_EXTENDED_ADVERTISING
     await device.power_on()
     advertising_set = await device.create_advertising_set(
         advertising_parameters=AdvertisingParameters(own_address_type=own_address_type)

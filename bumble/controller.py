@@ -25,12 +25,14 @@ import random
 import struct
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
-from bumble import hci, lmp
+from bumble import hci
+from bumble import link
+from bumble import link as bumble_link
+from bumble import ll, lmp
 from bumble.colors import color
 from bumble.core import PhysicalTransport
 
 if TYPE_CHECKING:
-    from bumble.link import LocalLink
     from bumble.transport.common import TransportSink
 
 # -----------------------------------------------------------------------------
@@ -58,6 +60,69 @@ class CisLink:
 
 # -----------------------------------------------------------------------------
 @dataclasses.dataclass
+class LegacyAdvertiser:
+    controller: Controller
+    advertising_interval_min: int = 0
+    advertising_interval_max: int = 0
+    advertising_type: int = 0
+    own_address_type: int = 0
+    peer_address_type: int = 0
+    peer_address: hci.Address = hci.Address.ANY
+    advertising_channel_map: int = 0
+    advertising_filter_policy: int = 0
+
+    advertising_data: bytes = b''
+    scan_response_data: bytes = b''
+
+    enabled: bool = False
+    timer_handle: Optional[asyncio.Handle] = None
+
+    @property
+    def address(self) -> hci.Address:
+        '''Address used in advertising PDU.'''
+        if self.own_address_type == hci.Address.PUBLIC_DEVICE_ADDRESS:
+            return self.controller.public_address
+        else:
+            return self.controller.random_address
+
+    def _on_timer_fired(self) -> None:
+        self.send_advertising_data()
+        self.timer_handle = asyncio.get_running_loop().call_later(
+            self.advertising_interval_min / 1000.0, self._on_timer_fired
+        )
+
+    def start(self) -> None:
+        # Stop any ongoing advertising before we start again
+        self.stop()
+        self.enabled = True
+
+        # Advertise now
+        self.timer_handle = asyncio.get_running_loop().call_soon(self._on_timer_fired)
+
+    def stop(self) -> None:
+        if self.timer_handle is not None:
+            self.timer_handle.cancel()
+            self.timer_handle = None
+        self.enabled = False
+
+    def send_advertising_data(self) -> None:
+        if not self.enabled:
+            return
+
+        if (
+            self.advertising_type
+            == hci.HCI_LE_Set_Advertising_Parameters_Command.AdvertisingType.ADV_IND
+        ):
+            self.controller.send_advertising_pdu(
+                ll.AdvInd(
+                    advertiser_address=self.address,
+                    data=self.advertising_data,
+                )
+            )
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
 class AdvertisingSet:
     controller: Controller
     handle: int
@@ -67,6 +132,16 @@ class AdvertisingSet:
     enabled: bool = False
     timer_handle: Optional[asyncio.Handle] = None
     random_address: Optional[hci.Address] = None
+
+    @property
+    def address(self) -> hci.Address | None:
+        '''Address used in advertising PDU.'''
+        if not self.parameters:
+            return None
+        if self.parameters.own_address_type == hci.Address.PUBLIC_DEVICE_ADDRESS:
+            return self.controller.public_address
+        else:
+            return self.random_address
 
     def _on_extended_advertising_timer_fired(self) -> None:
         if not self.enabled:
@@ -95,20 +170,14 @@ class AdvertisingSet:
 
     def send_extended_advertising_data(self) -> None:
         if self.controller.link:
-            address = self.random_address or self.random_address
-
             properties = (
                 self.parameters.advertising_event_properties if self.parameters else 0
             )
 
-            self.controller.link.send_extended_advertising_data(
-                address, bytes(self.data), properties
-            )
+            address = self.address
+            assert address
 
-            if self.scan_response_data:
-                self.controller.link.send_extended_advertising_data(
-                    address, self.scan_response_data, properties | 0x08
-                )
+            self.controller.send_advertising_pdu(ll.AdvInd(address, bytes(self.data)))
 
 
 # -----------------------------------------------------------------------------
@@ -125,9 +194,10 @@ class Connection:
     controller: Controller
     handle: int
     role: hci.Role
+    self_address: hci.Address
     peer_address: hci.Address
-    link: Any
-    transport: int
+    link: link.LocalLink
+    transport: PhysicalTransport
     link_type: int
     classic_allow_role_switch: bool = False
 
@@ -148,23 +218,27 @@ class Connection:
                 self.controller, self.peer_address, self.transport, pdu
             )
 
+    def send_ll_control_pdu(self, packet: ll.ControlPdu) -> None:
+        if self.link:
+            self.link.send_ll_control_pdu(
+                sender_address=self.self_address,
+                receiver_address=self.peer_address,
+                packet=packet,
+            )
+
 
 # -----------------------------------------------------------------------------
 class Controller:
     hci_sink: Optional[TransportSink] = None
 
-    central_connections: dict[
-        hci.Address, Connection
-    ]  # Connections where this controller is the central
-    peripheral_connections: dict[
-        hci.Address, Connection
-    ]  # Connections where this controller is the peripheral
+    le_connections: dict[hci.Address, Connection]  # LE Connections
     classic_connections: dict[hci.Address, Connection]  # Connections in BR/EDR
     classic_pending_commands: dict[hci.Address, dict[lmp.Opcode, asyncio.Future[int]]]
     sco_links: dict[hci.Address, ScoLink]  # SCO links by address
     central_cis_links: dict[int, CisLink]  # CIS links by handle
     peripheral_cis_links: dict[int, CisLink]  # CIS links by handle
     advertising_sets: dict[int, AdvertisingSet]  # Advertising sets by handle
+    le_legacy_advertiser: LegacyAdvertiser
 
     hci_version: int = hci.HCI_VERSION_BLUETOOTH_CORE_5_0
     hci_revision: int = 0
@@ -187,10 +261,20 @@ class Controller:
         '30f0f9ff01008004002000000000000000000000000000000000000000000000'
     )
     le_event_mask: int = 0
-    advertising_parameters: Optional[hci.HCI_LE_Set_Advertising_Parameters_Command] = (
-        None
+    le_features: hci.LeFeatureMask = (
+        hci.LeFeatureMask.LE_ENCRYPTION
+        | hci.LeFeatureMask.CONNECTION_PARAMETERS_REQUEST_PROCEDURE
+        | hci.LeFeatureMask.EXTENDED_REJECT_INDICATION
+        | hci.LeFeatureMask.PERIPHERAL_INITIATED_FEATURE_EXCHANGE
+        | hci.LeFeatureMask.LE_PING
+        | hci.LeFeatureMask.LE_DATA_PACKET_LENGTH_EXTENSION
+        | hci.LeFeatureMask.LL_PRIVACY
+        | hci.LeFeatureMask.EXTENDED_SCANNER_FILTER_POLICIES
+        | hci.LeFeatureMask.LE_2M_PHY
+        | hci.LeFeatureMask.LE_CODED_PHY
+        | hci.LeFeatureMask.CHANNEL_SELECTION_ALGORITHM_2
+        | hci.LeFeatureMask.MINIMUM_NUMBER_OF_USED_CHANNELS_PROCEDURE
     )
-    le_features: bytes = bytes.fromhex('ff49010000000000')
     le_states: bytes = bytes.fromhex('ffff3fffff030000')
     advertising_channel_tx_power: int = 0
     filter_accept_list_size: int = 8
@@ -209,7 +293,6 @@ class Controller:
     le_scan_enable: bool = False
     le_scan_own_address_type: int = hci.Address.RANDOM_DEVICE_ADDRESS
     le_scanning_filter_policy: int = 0
-    le_scan_response_data: Optional[bytes] = None
     le_address_resolution: bool = False
     le_rpa_timeout: int = 0
     sync_flow_control: bool = False
@@ -219,6 +302,11 @@ class Controller:
     advertising_timer_handle: Optional[asyncio.Handle] = None
     classic_scan_enable: int = 0
     classic_allow_role_switch: bool = True
+    pending_le_connection: (
+        hci.HCI_LE_Create_Connection_Command
+        | hci.HCI_LE_Extended_Create_Connection_Command
+        | None
+    ) = None
 
     _random_address: hci.Address = hci.Address('00:00:00:00:00:00')
 
@@ -227,13 +315,12 @@ class Controller:
         name: str,
         host_source=None,
         host_sink: Optional[TransportSink] = None,
-        link: Optional[LocalLink] = None,
+        link: Optional[link.LocalLink] = None,
         public_address: Optional[Union[bytes, str, hci.Address]] = None,
     ) -> None:
         self.name = name
-        self.link = link
-        self.central_connections = {}
-        self.peripheral_connections = {}
+        self.link = link or bumble_link.LocalLink()
+        self.le_connections = {}
         self.classic_connections = {}
         self.sco_links = {}
         self.classic_pending_commands = {}
@@ -245,6 +332,7 @@ class Controller:
             'tx_phys': 0,
             'rx_phys': 0,
         }
+        self.le_legacy_advertiser = LegacyAdvertiser(self)
 
         if isinstance(public_address, hci.Address):
             self._public_address = public_address
@@ -377,8 +465,7 @@ class Controller:
         current_handles = set(
             cast(Connection | CisLink | ScoLink, link).handle
             for link in itertools.chain(
-                self.central_connections.values(),
-                self.peripheral_connections.values(),
+                self.le_connections.values(),
                 self.classic_connections.values(),
                 self.sco_links.values(),
                 self.central_cis_links.values(),
@@ -391,42 +478,11 @@ class Controller:
             if handle not in current_handles
         )
 
-    def find_le_connection_by_address(
-        self, address: hci.Address
-    ) -> Optional[Connection]:
-        return self.central_connections.get(address) or self.peripheral_connections.get(
-            address
-        )
-
-    def find_classic_connection_by_address(
-        self, address: hci.Address
-    ) -> Optional[Connection]:
-        return self.classic_connections.get(address)
-
     def find_connection_by_handle(self, handle: int) -> Optional[Connection]:
         for connection in itertools.chain(
-            self.central_connections.values(),
-            self.peripheral_connections.values(),
+            self.le_connections.values(),
             self.classic_connections.values(),
         ):
-            if connection.handle == handle:
-                return connection
-        return None
-
-    def find_central_connection_by_handle(self, handle: int) -> Optional[Connection]:
-        for connection in self.central_connections.values():
-            if connection.handle == handle:
-                return connection
-        return None
-
-    def find_peripheral_connection_by_handle(self, handle: int) -> Optional[Connection]:
-        for connection in self.peripheral_connections.values():
-            if connection.handle == handle:
-                return connection
-        return None
-
-    def find_classic_connection_by_handle(self, handle: int) -> Optional[Connection]:
-        for connection in self.classic_connections.values():
             if connection.handle == handle:
                 return connection
         return None
@@ -442,30 +498,81 @@ class Controller:
             handle
         )
 
-    def on_link_central_connected(
-        self, central_address: hci.Address, local_address: Optional[hci.Address] = None
+    def send_advertising_pdu(self, packet: ll.AdvertisingPdu) -> None:
+        logger.debug("[%s] >>> Advertising PDU: %s", self.name, packet)
+        if self.link:
+            self.link.send_advertising_pdu(self, packet)
+
+    def on_ll_control_pdu(
+        self, sender_address: hci.Address, packet: ll.ControlPdu
     ) -> None:
+        logger.debug("[%s] >>> LL Control PDU: %s", self.name, packet)
+        if not (connection := self.le_connections.get(sender_address)):
+            logger.error("Cannot find a connection for %s", sender_address)
+            return
+
+        if isinstance(packet, ll.TerminateInd):
+            self.on_le_disconnected(connection, packet.error_code)
+        elif isinstance(packet, ll.CisReq):
+            self.on_le_cis_request(connection, packet.cig_id, packet.cis_id)
+        elif isinstance(packet, ll.CisRsp):
+            self.on_le_cis_established(packet.cig_id, packet.cis_id)
+            connection.send_ll_control_pdu(ll.CisInd(packet.cig_id, packet.cis_id))
+        elif isinstance(packet, ll.CisInd):
+            self.on_le_cis_established(packet.cig_id, packet.cis_id)
+        elif isinstance(packet, ll.CisTerminateInd):
+            self.on_le_cis_disconnected(packet.cig_id, packet.cis_id)
+        elif isinstance(packet, ll.EncReq):
+            self.on_le_encrypted(connection)
+
+    def on_ll_advertising_pdu(self, packet: ll.AdvertisingPdu) -> None:
+        logger.debug("[%s] <<< Advertising PDU: %s", self.name, packet)
+        if isinstance(packet, ll.ConnectInd):
+            self.on_le_connect_ind(packet)
+        elif isinstance(packet, (ll.AdvInd, ll.AdvExtInd)):
+            self.on_advertising_pdu(packet)
+
+    def on_le_connect_ind(self, packet: ll.ConnectInd) -> None:
         '''
         Called when an incoming connection occurs from a central on the link
         '''
+        advertiser: LegacyAdvertiser | AdvertisingSet | None
+        if (
+            self.le_legacy_advertiser.address == packet.advertiser_address
+            and self.le_legacy_advertiser.enabled
+        ):
+            advertiser = self.le_legacy_advertiser
+        else:
+            advertiser = next(
+                (
+                    advertising_set
+                    for advertising_set in self.advertising_sets.values()
+                    if advertising_set.address == packet.advertiser_address
+                    and advertising_set.enabled
+                ),
+                None,
+            )
+
+        if not advertiser:
+            # This is not send to us.
+            return
 
         # Allocate (or reuse) a connection handle
-        peer_address = central_address
-        peer_address_type = central_address.address_type
-        connection = self.peripheral_connections.get(peer_address)
-        if connection is None:
-            connection_handle = self.allocate_connection_handle()
-            connection = Connection(
-                controller=self,
-                handle=connection_handle,
-                role=hci.Role.PERIPHERAL,
-                peer_address=peer_address,
-                link=self.link,
-                transport=PhysicalTransport.LE,
-                link_type=hci.HCI_Connection_Complete_Event.LinkType.ACL,
-            )
-            self.peripheral_connections[peer_address] = connection
-            logger.debug(f'New PERIPHERAL connection handle: 0x{connection_handle:04X}')
+        peer_address = packet.initiator_address
+
+        connection_handle = self.allocate_connection_handle()
+        connection = Connection(
+            controller=self,
+            handle=connection_handle,
+            role=hci.Role.PERIPHERAL,
+            self_address=packet.advertiser_address,
+            peer_address=peer_address,
+            link=self.link,
+            transport=PhysicalTransport.LE,
+            link_type=hci.HCI_Connection_Complete_Event.LinkType.ACL,
+        )
+        self.le_connections[peer_address] = connection
+        logger.debug(f'New PERIPHERAL connection handle: 0x{connection_handle:04X}')
 
         # Then say that the connection has completed
         self.send_hci_packet(
@@ -473,7 +580,7 @@ class Controller:
                 status=hci.HCI_SUCCESS,
                 connection_handle=connection.handle,
                 role=connection.role,
-                peer_address_type=peer_address_type,
+                peer_address_type=peer_address.address_type,
                 peer_address=peer_address,
                 connection_interval=10,  # FIXME
                 peripheral_latency=0,  # FIXME
@@ -482,188 +589,113 @@ class Controller:
             )
         )
 
-        if local_address:
-            for handle, adv_set in self.advertising_sets.items():
-                set_address = (
-                    adv_set.random_address
-                    if adv_set.random_address
-                    else self.random_address
+        if isinstance(advertiser, AdvertisingSet):
+            self.send_hci_packet(
+                hci.HCI_LE_Advertising_Set_Terminated_Event(
+                    status=hci.HCI_SUCCESS,
+                    advertising_handle=advertiser.handle,
+                    connection_handle=connection.handle,
+                    num_completed_extended_advertising_events=0,
                 )
-                # Check if address matches.
-                # Note: local_address passed from Link is what central connected to.
-                # If set uses Public address, local_address should match self.public_address.
-                # But set_address above is random_address or self.random_address.
-                # We need to handle Public address case.
+            )
+        advertiser.stop()
 
-                # If set parameters say Own_Address_Type is Public, set_address logic above is wrong?
-                # The set itself doesn't store Own_Address_Type, it is in parameters.
-
-                use_public = False
-                if adv_set.parameters and adv_set.parameters.own_address_type in (
-                    hci.OwnAddressType.PUBLIC,
-                    hci.OwnAddressType.RESOLVABLE_OR_PUBLIC,
-                ):
-                    use_public = True
-
-                matched = False
-                if use_public:
-                    if self.public_address == local_address:
-                        matched = True
-                else:
-                    if set_address == local_address:
-                        matched = True
-
-                if matched and adv_set.enabled:
-                    self.send_hci_packet(
-                        hci.HCI_LE_Advertising_Set_Terminated_Event(
-                            status=hci.HCI_SUCCESS,
-                            advertising_handle=handle,
-                            connection_handle=connection.handle,
-                            num_completed_extended_advertising_events=0,
-                        )
-                    )
-                    adv_set.stop()
-                    break
-
-    def on_link_disconnected(self, peer_address: hci.Address, reason: int) -> None:
-        '''
-        Called when an active disconnection occurs from a peer
-        '''
-
+    def on_le_disconnected(self, connection: Connection, reason: int) -> None:
         # Send a disconnection complete event
-        if connection := self.peripheral_connections.get(peer_address):
-            self.send_hci_packet(
-                hci.HCI_Disconnection_Complete_Event(
-                    status=hci.HCI_SUCCESS,
-                    connection_handle=connection.handle,
-                    reason=reason,
-                )
+        self.send_hci_packet(
+            hci.HCI_Disconnection_Complete_Event(
+                status=hci.HCI_SUCCESS,
+                connection_handle=connection.handle,
+                reason=reason,
             )
+        )
 
-            # Remove the connection
-            del self.peripheral_connections[peer_address]
-        elif connection := self.central_connections.get(peer_address):
-            self.send_hci_packet(
-                hci.HCI_Disconnection_Complete_Event(
-                    status=hci.HCI_SUCCESS,
-                    connection_handle=connection.handle,
-                    reason=reason,
-                )
-            )
-
-            # Remove the connection
-            del self.central_connections[peer_address]
-        else:
-            logger.warning(f'!!! No peripheral connection found for {peer_address}')
-
-    def on_link_peripheral_connection_complete(
-        self,
-        le_create_connection_command: Union[
-            hci.HCI_LE_Create_Connection_Command,
-            hci.HCI_LE_Extended_Create_Connection_Command,
-        ],
-        status: int,
-    ) -> None:
+    def create_le_connection(self, peer_address: hci.Address) -> None:
         '''
-        Called by the link when a connection has been made or has failed to be made
+        Called when we receive advertisement matching connection filter.
         '''
+        pending_le_connection = self.pending_le_connection
+        assert pending_le_connection
 
-        if status == hci.HCI_SUCCESS:
-            # Allocate (or reuse) a connection handle
-            peer_address = le_create_connection_command.peer_address
-            connection = self.central_connections.get(peer_address)
-            if connection is None:
-                connection_handle = self.allocate_connection_handle()
-                connection = Connection(
-                    controller=self,
-                    handle=connection_handle,
-                    role=hci.Role.CENTRAL,
-                    peer_address=peer_address,
-                    link=self.link,
-                    transport=PhysicalTransport.LE,
-                    link_type=hci.HCI_Connection_Complete_Event.LinkType.ACL,
-                )
-                self.central_connections[peer_address] = connection
-                logger.debug(
-                    f'New CENTRAL connection handle: 0x{connection_handle:04X}'
-                )
-        else:
-            connection = None
+        if self.le_connections.get(peer_address):
+            logger.error("Connection for %s already exists?", peer_address)
+            return
+
+        self_address = (
+            self.public_address
+            if pending_le_connection.own_address_type == hci.OwnAddressType.PUBLIC
+            else self.random_address
+        )
+
+        # Allocate (or reuse) a connection handle
+        peer_address = pending_le_connection.peer_address
+        connection_handle = self.allocate_connection_handle()
+        connection = Connection(
+            controller=self,
+            handle=connection_handle,
+            role=hci.Role.CENTRAL,
+            self_address=self_address,
+            peer_address=peer_address,
+            link=self.link,
+            transport=PhysicalTransport.LE,
+            link_type=hci.HCI_Connection_Complete_Event.LinkType.ACL,
+        )
+        self.le_connections[peer_address] = connection
+        logger.debug(f'New CENTRAL connection handle: 0x{connection_handle:04X}')
 
         if isinstance(
-            le_create_connection_command, hci.HCI_LE_Extended_Create_Connection_Command
+            pending_le_connection, hci.HCI_LE_Extended_Create_Connection_Command
         ):
-            interval = le_create_connection_command.connection_interval_mins[0]
-            latency = le_create_connection_command.max_latencies[0]
-            timeout = le_create_connection_command.supervision_timeouts[0]
+            interval = pending_le_connection.connection_interval_mins[0]
+            latency = pending_le_connection.max_latencies[0]
+            timeout = pending_le_connection.supervision_timeouts[0]
         else:
-            interval = le_create_connection_command.connection_interval_min
-            latency = le_create_connection_command.max_latency
-            timeout = le_create_connection_command.supervision_timeout
+            interval = pending_le_connection.connection_interval_min
+            latency = pending_le_connection.max_latency
+            timeout = pending_le_connection.supervision_timeout
 
+        self.send_advertising_pdu(
+            ll.ConnectInd(
+                initiator_address=self_address,
+                advertiser_address=peer_address,
+                interval=interval,
+                latency=latency,
+                timeout=timeout,
+            )
+        )
         # Say that the connection has completed
         self.send_hci_packet(
             # pylint: disable=line-too-long
             hci.HCI_LE_Connection_Complete_Event(
-                status=status,
+                status=hci.HCI_SUCCESS,
                 connection_handle=connection.handle if connection else 0,
                 role=hci.Role.CENTRAL,
-                peer_address_type=le_create_connection_command.peer_address_type,
-                peer_address=le_create_connection_command.peer_address,
+                peer_address_type=peer_address.address_type,
+                peer_address=peer_address,
                 connection_interval=interval,
                 peripheral_latency=latency,
                 supervision_timeout=timeout,
                 central_clock_accuracy=0,
             )
         )
+        self.pending_le_connection = None
 
-    def on_link_disconnection_complete(
-        self, disconnection_command: hci.HCI_Disconnect_Command, status: int
-    ) -> None:
-        '''
-        Called when a disconnection has been completed
-        '''
-
-        # Send a disconnection complete event
+    def on_le_encrypted(self, connection: Connection) -> None:
+        # For now, just setup the encryption without asking the host
         self.send_hci_packet(
-            hci.HCI_Disconnection_Complete_Event(
-                status=status,
-                connection_handle=disconnection_command.connection_handle,
-                reason=disconnection_command.reason,
+            hci.HCI_Encryption_Change_Event(
+                status=0, connection_handle=connection.handle, encryption_enabled=1
             )
         )
-
-        # Remove the connection
-        if connection := self.find_central_connection_by_handle(
-            disconnection_command.connection_handle
-        ):
-            logger.debug(f'CENTRAL Connection removed: {connection}')
-            del self.central_connections[connection.peer_address]
-        elif connection := self.find_peripheral_connection_by_handle(
-            disconnection_command.connection_handle
-        ):
-            logger.debug(f'PERIPHERAL Connection removed: {connection}')
-            del self.peripheral_connections[connection.peer_address]
-
-    def on_link_encrypted(
-        self, peer_address: hci.Address, _rand: bytes, _ediv: int, _ltk: bytes
-    ) -> None:
-        # For now, just setup the encryption without asking the host
-        if connection := self.find_le_connection_by_address(peer_address):
-            self.send_hci_packet(
-                hci.HCI_Encryption_Change_Event(
-                    status=0, connection_handle=connection.handle, encryption_enabled=1
-                )
-            )
 
     def on_link_acl_data(
         self, sender_address: hci.Address, transport: PhysicalTransport, data: bytes
     ) -> None:
         # Look for the connection to which this data belongs
         if transport == PhysicalTransport.LE:
-            connection = self.find_le_connection_by_address(sender_address)
+            connection = self.le_connections.get(sender_address)
         else:
-            connection = self.find_classic_connection_by_address(sender_address)
+            connection = self.classic_connections.get(sender_address)
         if connection is None:
             logger.warning(f'!!! no connection for {sender_address}')
             return
@@ -673,43 +705,83 @@ class Controller:
         acl_packet = hci.HCI_AclDataPacket(connection.handle, 2, 0, len(data), data)
         self.send_hci_packet(acl_packet)
 
-    def on_link_advertising_data(
-        self, sender_address: hci.Address, data: bytes
-    ) -> None:
-        # Ignore if we're not scanning
-        if not self.le_scan_enable:
-            return
+    def on_advertising_pdu(self, pdu: ll.AdvInd | ll.AdvExtInd) -> None:
+        if isinstance(pdu, ll.AdvExtInd):
+            direct_address = pdu.target_address
+        else:
+            direct_address = None
 
-        # Send a scan report
-        report = hci.HCI_LE_Advertising_Report_Event.Report(
-            event_type=hci.HCI_LE_Advertising_Report_Event.EventType.ADV_IND,
-            address_type=sender_address.address_type,
-            address=sender_address,
-            data=data,
-            rssi=-50,
-        )
-        self.send_hci_packet(hci.HCI_LE_Advertising_Report_Event([report]))
+        if self.le_scan_enable:
+            # Send a scan report
+            if self.le_features & hci.LeFeatureMask.LE_EXTENDED_ADVERTISING:
+                ext_report = hci.HCI_LE_Extended_Advertising_Report_Event.Report(
+                    event_type=hci.HCI_LE_Extended_Advertising_Report_Event.EventType.CONNECTABLE_ADVERTISING,
+                    address_type=pdu.advertiser_address.address_type,
+                    address=pdu.advertiser_address,
+                    primary_phy=hci.Phy.LE_1M,
+                    secondary_phy=hci.Phy.LE_1M,
+                    advertising_sid=0,
+                    tx_power=0,
+                    rssi=-50,
+                    periodic_advertising_interval=0,
+                    direct_address_type=(
+                        direct_address.address_type if direct_address else 0
+                    ),
+                    direct_address=direct_address or hci.Address.ANY,
+                    data=pdu.data,
+                )
+                self.send_hci_packet(
+                    hci.HCI_LE_Extended_Advertising_Report_Event([ext_report])
+                )
+                ext_report = hci.HCI_LE_Extended_Advertising_Report_Event.Report(
+                    event_type=hci.HCI_LE_Extended_Advertising_Report_Event.EventType.SCAN_RESPONSE,
+                    address_type=pdu.advertiser_address.address_type,
+                    address=pdu.advertiser_address,
+                    primary_phy=hci.Phy.LE_1M,
+                    secondary_phy=hci.Phy.LE_1M,
+                    advertising_sid=0,
+                    tx_power=0,
+                    rssi=-50,
+                    periodic_advertising_interval=0,
+                    direct_address_type=(
+                        direct_address.address_type if direct_address else 0
+                    ),
+                    direct_address=direct_address or hci.Address.ANY,
+                    data=pdu.data,
+                )
+                self.send_hci_packet(
+                    hci.HCI_LE_Extended_Advertising_Report_Event([ext_report])
+                )
+            else:
+                report = hci.HCI_LE_Advertising_Report_Event.Report(
+                    event_type=hci.HCI_LE_Advertising_Report_Event.EventType.ADV_IND,
+                    address_type=pdu.advertiser_address.address_type,
+                    address=pdu.advertiser_address,
+                    data=pdu.data,
+                    rssi=-50,
+                )
+                self.send_hci_packet(hci.HCI_LE_Advertising_Report_Event([report]))
+                report = hci.HCI_LE_Advertising_Report_Event.Report(
+                    event_type=hci.HCI_LE_Advertising_Report_Event.EventType.SCAN_RSP,
+                    address_type=pdu.advertiser_address.address_type,
+                    address=pdu.advertiser_address,
+                    data=pdu.data,
+                    rssi=-50,
+                )
+                self.send_hci_packet(hci.HCI_LE_Advertising_Report_Event([report]))
 
-        # Simulate a scan response
-        report = hci.HCI_LE_Advertising_Report_Event.Report(
-            event_type=hci.HCI_LE_Advertising_Report_Event.EventType.SCAN_RSP,
-            address_type=sender_address.address_type,
-            address=sender_address,
-            data=data,
-            rssi=-50,
-        )
-        self.send_hci_packet(hci.HCI_LE_Advertising_Report_Event([report]))
+        # Create connection.
+        if (
+            pending_le_connection := self.pending_le_connection
+        ) and pending_le_connection.peer_address == pdu.advertiser_address:
+            self.create_le_connection(pdu.advertiser_address)
 
-    def on_link_cis_request(
-        self, central_address: hci.Address, cig_id: int, cis_id: int
+    def on_le_cis_request(
+        self, connection: Connection, cig_id: int, cis_id: int
     ) -> None:
         '''
         Called when an incoming CIS request occurs from a central on the link
         '''
-
-        connection = self.peripheral_connections.get(central_address)
-        assert connection
-
         pending_cis_link = CisLink(
             handle=self.allocate_connection_handle(),
             cis_id=cis_id,
@@ -727,7 +799,7 @@ class Controller:
             )
         )
 
-    def on_link_cis_established(self, cig_id: int, cis_id: int) -> None:
+    def on_le_cis_established(self, cig_id: int, cis_id: int) -> None:
         '''
         Called when an incoming CIS established.
         '''
@@ -762,7 +834,7 @@ class Controller:
             )
         )
 
-    def on_link_cis_disconnected(self, cig_id: int, cis_id: int) -> None:
+    def on_le_cis_disconnected(self, cig_id: int, cis_id: int) -> None:
         '''
         Called when a CIS disconnected.
         '''
@@ -868,6 +940,7 @@ class Controller:
                 controller=self,
                 handle=0,
                 role=hci.Role.PERIPHERAL,
+                self_address=self.public_address,
                 peer_address=peer_address,
                 link=self.link,
                 transport=PhysicalTransport.BR_EDR,
@@ -902,6 +975,7 @@ class Controller:
                     controller=self,
                     handle=connection_handle,
                     role=hci.Role.CENTRAL,
+                    self_address=self.public_address,
                     peer_address=peer_address,
                     link=self.link,
                     transport=PhysicalTransport.BR_EDR,
@@ -1052,60 +1126,12 @@ class Controller:
     ############################################################
     # Advertising support
     ############################################################
-    def on_advertising_timer_fired(self) -> None:
-        self.send_advertising_data()
-        self.advertising_timer_handle = asyncio.get_running_loop().call_later(
-            self.advertising_interval / 1000.0, self.on_advertising_timer_fired
-        )
-
-    def start_advertising(self) -> None:
-        # Stop any ongoing advertising before we start again
-        self.stop_advertising()
-
-        # Advertise now
-        self.advertising_timer_handle = asyncio.get_running_loop().call_soon(
-            self.on_advertising_timer_fired
-        )
-
-    def stop_advertising(self) -> None:
-        if self.advertising_timer_handle is not None:
-            self.advertising_timer_handle.cancel()
-            self.advertising_timer_handle = None
-
-    def send_advertising_data(self) -> None:
-        if self.link:
-            self.link.send_advertising_data(
-                self.random_address, self.advertising_data or b''
-            )
 
     @property
     def is_advertising(self) -> bool:
-        return self.advertising_timer_handle is not None or any(
+        return self.le_legacy_advertiser.enabled or any(
             s.enabled for s in self.advertising_sets.values()
         )
-
-    def on_link_extended_advertising_data(
-        self, sender_address: hci.Address, data: bytes, properties: int
-    ) -> None:
-        if not self.le_scan_enable:
-            return
-
-        # Send extended advertising report
-        report = hci.HCI_LE_Extended_Advertising_Report_Event.Report(
-            event_type=properties,
-            address_type=sender_address.address_type,
-            address=sender_address,
-            primary_phy=hci.HCI_LE_1M_PHY,
-            secondary_phy=hci.HCI_LE_1M_PHY,
-            advertising_sid=0,
-            tx_power=127,
-            rssi=-50,
-            periodic_advertising_interval=0,
-            direct_address_type=0,
-            direct_address=hci.Address('00:00:00:00:00:00'),
-            data=data,
-        )
-        self.send_hci_packet(hci.HCI_LE_Extended_Advertising_Report_Event([report]))
 
     ############################################################
     # HCI handlers
@@ -1126,7 +1152,7 @@ class Controller:
         logger.debug(f'Connection request to {command.bd_addr}')
 
         # Check that we don't already have a pending connection
-        if self.link.get_pending_connection():
+        if self.pending_le_connection:
             self.send_hci_packet(
                 hci.HCI_Command_Status_Event(
                     status=hci.HCI_CONTROLLER_BUSY_ERROR,
@@ -1140,6 +1166,7 @@ class Controller:
             controller=self,
             handle=0,
             role=hci.Role.CENTRAL,
+            self_address=self.public_address,
             peer_address=command.bd_addr,
             link=self.link,
             transport=PhysicalTransport.BR_EDR,
@@ -1180,29 +1207,19 @@ class Controller:
 
         # Notify the link of the disconnection
         handle = command.connection_handle
-        if connection := self.find_central_connection_by_handle(handle):
+        if connection := self.find_connection_by_handle(handle):
             if self.link:
-                self.link.disconnect(
-                    self.random_address, connection.peer_address, command
-                )
-            else:
-                # Remove the connection
-                del self.central_connections[connection.peer_address]
-        elif connection := self.find_peripheral_connection_by_handle(handle):
-            if self.link:
-                self.link.disconnect(
-                    self.random_address, connection.peer_address, command
-                )
-            else:
-                # Remove the connection
-                del self.peripheral_connections[connection.peer_address]
-        elif connection := self.find_classic_connection_by_handle(handle):
-            if self.link:
-                self.send_lmp_packet(
-                    connection.peer_address,
-                    lmp.LmpDetach(command.reason),
-                )
-                self.on_classic_disconnected(connection.peer_address, command.reason)
+                if connection.transport == PhysicalTransport.BR_EDR:
+                    self.send_lmp_packet(
+                        connection.peer_address,
+                        lmp.LmpDetach(command.reason),
+                    )
+                    self.on_classic_disconnected(
+                        connection.peer_address, command.reason
+                    )
+                else:
+                    connection.send_ll_control_pdu(ll.TerminateInd(command.reason))
+                    self.on_le_disconnected(connection, command.reason)
             else:
                 # Remove the connection
                 del self.classic_connections[connection.peer_address]
@@ -1233,12 +1250,12 @@ class Controller:
             self.central_cis_links.get(handle) or self.peripheral_cis_links.get(handle)
         ):
             if self.link and cis_link.acl_connection:
-                self.link.disconnect_cis(
-                    initiator_controller=self,
-                    peer_address=cis_link.acl_connection.peer_address,
-                    cig_id=cis_link.cig_id,
-                    cis_id=cis_link.cis_id,
+                cis_link.acl_connection.send_ll_control_pdu(
+                    ll.CisTerminateInd(
+                        cis_link.cig_id, cis_link.cis_id, command.reason
+                    ),
                 )
+                self.on_le_cis_disconnected(cis_link.cig_id, cis_link.cis_id)
             # Spec requires handle to be kept after disconnection.
 
         return None
@@ -1330,9 +1347,7 @@ class Controller:
             return None
 
         if not (
-            connection := self.find_classic_connection_by_handle(
-                command.connection_handle
-            )
+            connection := self.find_connection_by_handle(command.connection_handle)
         ):
             self.send_hci_packet(
                 hci.HCI_Command_Status_Event(
@@ -1388,7 +1403,7 @@ class Controller:
         if self.link is None:
             return None
 
-        if not (connection := self.find_classic_connection_by_address(command.bd_addr)):
+        if not (connection := self.classic_connections.get(command.bd_addr)):
             self.send_hci_packet(
                 hci.HCI_Command_Status_Event(
                     status=hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
@@ -1887,7 +1902,7 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.3 LE Read Local Supported Features
         Command
         '''
-        return bytes([hci.HCI_SUCCESS]) + self.le_features
+        return bytes([hci.HCI_SUCCESS]) + self.le_features.value.to_bytes(8, 'little')
 
     def on_hci_le_set_random_address_command(
         self, command: hci.HCI_LE_Set_Random_Address_Command
@@ -1904,7 +1919,22 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.5 LE Set Advertising Parameters Command
         '''
-        self.advertising_parameters = command
+        self.le_legacy_advertiser.advertising_interval_min = (
+            command.advertising_interval_min
+        )
+        self.le_legacy_advertiser.advertising_interval_max = (
+            command.advertising_interval_max
+        )
+        self.le_legacy_advertiser.advertising_type = command.advertising_type
+        self.le_legacy_advertiser.own_address_type = command.own_address_type
+        self.le_legacy_advertiser.peer_address_type = command.peer_address_type
+        self.le_legacy_advertiser.peer_address = command.peer_address
+        self.le_legacy_advertiser.advertising_channel_map = (
+            command.advertising_channel_map
+        )
+        self.le_legacy_advertiser.advertising_filter_policy = (
+            command.advertising_filter_policy
+        )
         return bytes([hci.HCI_SUCCESS])
 
     def on_hci_le_read_advertising_physical_channel_tx_power_command(
@@ -1922,7 +1952,8 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.7 LE Set Advertising Data Command
         '''
-        self.advertising_data = command.advertising_data
+        self.le_legacy_advertiser.advertising_data = command.advertising_data
+
         return bytes([hci.HCI_SUCCESS])
 
     def on_hci_le_set_scan_response_data_command(
@@ -1931,7 +1962,7 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.8 LE Set Scan Response Data Command
         '''
-        self.le_scan_response_data = command.scan_response_data
+        self.le_legacy_advertiser.scan_response_data = command.scan_response_data
         return bytes([hci.HCI_SUCCESS])
 
     def on_hci_le_set_advertising_enable_command(
@@ -1941,9 +1972,9 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.9 LE Set Advertising Enable Command
         '''
         if command.advertising_enable:
-            self.start_advertising()
+            self.le_legacy_advertiser.start()
         else:
-            self.stop_advertising()
+            self.le_legacy_advertiser.stop()
 
         return bytes([hci.HCI_SUCCESS])
 
@@ -1986,7 +2017,7 @@ class Controller:
         logger.debug(f'Connection request to {command.peer_address}')
 
         # Check that we don't already have a pending connection
-        if self.link.get_pending_connection():
+        if self.pending_le_connection:
             self.send_hci_packet(
                 hci.HCI_Command_Status_Event(
                     status=hci.HCI_COMMAND_DISALLOWED_ERROR,
@@ -1996,8 +2027,7 @@ class Controller:
             )
             return None
 
-        # Initiate the connection
-        self.link.connect(self.random_address, command)
+        self.pending_le_connection = command
 
         # Say that the connection is pending
         self.send_hci_packet(
@@ -2027,7 +2057,7 @@ class Controller:
             return None
 
         # Check pending
-        if self.link.get_pending_connection():
+        if self.pending_le_connection:
             self.send_hci_packet(
                 hci.HCI_Command_Status_Event(
                     status=hci.HCI_COMMAND_DISALLOWED_ERROR,
@@ -2037,7 +2067,7 @@ class Controller:
             )
             return None
 
-        self.link.connect(self.random_address, command)
+        self.pending_le_connection = command
 
         self.send_hci_packet(
             hci.HCI_Command_Status_Event(
@@ -2148,21 +2178,21 @@ class Controller:
             return None
 
         # Check the parameters
-        if not (
-            connection := self.find_central_connection_by_handle(
-                command.connection_handle
+        if (
+            not (
+                connection := self.find_connection_by_handle(command.connection_handle)
             )
+            or connection.transport != PhysicalTransport.LE
         ):
             logger.warning('connection not found')
             return bytes([hci.HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
 
-        # Notify that the connection is now encrypted
-        self.link.on_connection_encrypted(
-            self.random_address,
-            connection.peer_address,
-            command.random_number,
-            command.encrypted_diversifier,
-            command.long_term_key,
+        connection.send_ll_control_pdu(
+            ll.EncReq(
+                rand=command.random_number,
+                ediv=command.encrypted_diversifier,
+                ltk=command.long_term_key,
+            ),
         )
 
         self.send_hci_packet(
@@ -2172,6 +2202,9 @@ class Controller:
                 command_opcode=command.op_code,
             )
         )
+
+        # TODO: Handle authentication
+        self.on_le_encrypted(connection)
 
         return None
 
@@ -2532,11 +2565,8 @@ class Controller:
 
             cis_link.acl_connection = connection
 
-            self.link.create_cis(
-                self,
-                peripheral_address=connection.peer_address,
-                cig_id=cis_link.cig_id,
-                cis_id=cis_link.cis_id,
+            connection.send_ll_control_pdu(
+                ll.CisReq(cig_id=cis_link.cig_id, cis_id=cis_link.cis_id)
             )
 
         self.send_hci_packet(
@@ -2581,11 +2611,8 @@ class Controller:
             return bytes([hci.HCI_INVALID_HCI_COMMAND_PARAMETERS_ERROR])
 
         assert pending_cis_link.acl_connection
-        self.link.accept_cis(
-            peripheral_controller=self,
-            central_address=pending_cis_link.acl_connection.peer_address,
-            cig_id=pending_cis_link.cig_id,
-            cis_id=pending_cis_link.cis_id,
+        pending_cis_link.acl_connection.send_ll_control_pdu(
+            ll.CisRsp(cig_id=pending_cis_link.cig_id, cis_id=pending_cis_link.cis_id),
         )
 
         self.send_hci_packet(
