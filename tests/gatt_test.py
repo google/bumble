@@ -69,7 +69,7 @@ from bumble.host import Host
 from bumble.link import LocalLink
 from bumble.transport.common import AsyncPipeSink
 
-from .test_utils import async_barrier
+from .test_utils import Devices, TwoDevices, async_barrier
 
 
 # -----------------------------------------------------------------------------
@@ -160,7 +160,8 @@ async def test_characteristic_encoding():
         def decode_value(self, value_bytes):
             return value_bytes[0]
 
-    [client, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [client, server] = devices
 
     characteristic = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
@@ -189,9 +190,7 @@ async def test_characteristic_encoding():
     )
     server.add_service(service)
 
-    await client.power_on()
-    await server.power_on()
-    connection = await client.connect(server.random_address)
+    connection = devices.connections[0]
     peer = Peer(connection)
 
     await peer.discover_services()
@@ -279,7 +278,8 @@ async def test_characteristic_encoding():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_attribute_getters():
-    [client, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [client, server] = devices
 
     characteristic_uuid = UUID('FDB159DB-036C-49E3-B3DB-6325AC750806')
     characteristic = Characteristic(
@@ -630,38 +630,10 @@ async def test_CharacteristicValue_async():
 
 
 # -----------------------------------------------------------------------------
-class LinkedDevices:
-    def __init__(self):
-        self.connections = [None, None, None]
-
-        self.link = LocalLink()
-        self.controllers = [
-            Controller('C1', link=self.link),
-            Controller('C2', link=self.link),
-            Controller('C3', link=self.link),
-        ]
-        self.devices = [
-            Device(
-                address='F0:F1:F2:F3:F4:F5',
-                host=Host(self.controllers[0], AsyncPipeSink(self.controllers[0])),
-            ),
-            Device(
-                address='F1:F2:F3:F4:F5:F6',
-                host=Host(self.controllers[1], AsyncPipeSink(self.controllers[1])),
-            ),
-            Device(
-                address='F2:F3:F4:F5:F6:F7',
-                host=Host(self.controllers[2], AsyncPipeSink(self.controllers[2])),
-            ),
-        ]
-
-        self.paired = [None, None, None]
-
-
-# -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_read_write():
-    [client, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [client, server] = devices
 
     characteristic1 = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
@@ -694,9 +666,7 @@ async def test_read_write():
     )
     server.add_services([service1])
 
-    await client.power_on()
-    await server.power_on()
-    connection = await client.connect(server.random_address)
+    connection = devices.connections[0]
     peer = Peer(connection)
 
     await peer.discover_services()
@@ -740,7 +710,8 @@ async def test_read_write():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_read_write2():
-    [client, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [client, server] = devices
 
     v = bytes([0x11, 0x22, 0x33, 0x44])
     characteristic1 = Characteristic(
@@ -753,9 +724,7 @@ async def test_read_write2():
     service1 = Service('3A657F47-D34F-46B3-B1EC-698E29B6B829', [characteristic1])
     server.add_services([service1])
 
-    await client.power_on()
-    await server.power_on()
-    connection = await client.connect(server.random_address)
+    connection = devices.connections[0]
     peer = Peer(connection)
 
     await peer.discover_services()
@@ -785,7 +754,8 @@ async def test_read_write2():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_subscribe_notify():
-    [client, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [client, server] = devices
 
     characteristic1 = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
@@ -855,9 +825,7 @@ async def test_subscribe_notify():
 
     server.on('characteristic_subscription', on_characteristic_subscription)
 
-    await client.power_on()
-    await server.power_on()
-    connection = await client.connect(server.random_address)
+    connection = devices.connections[0]
     peer = Peer(connection)
 
     await peer.discover_services()
@@ -1006,7 +974,8 @@ async def test_subscribe_notify():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_unsubscribe():
-    [client, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [client, server] = devices
 
     characteristic1 = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
@@ -1032,9 +1001,7 @@ async def test_unsubscribe():
     mock2 = Mock()
     characteristic2.on('subscription', mock2)
 
-    await client.power_on()
-    await server.power_on()
-    connection = await client.connect(server.random_address)
+    connection = devices.connections[0]
     peer = Peer(connection)
 
     await peer.discover_services()
@@ -1094,7 +1061,8 @@ async def test_unsubscribe():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_discover_all():
-    [client, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [client, server] = devices
 
     characteristic1 = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
@@ -1120,9 +1088,7 @@ async def test_discover_all():
     service2 = Service('1111', [])
     server.add_services([service1, service2])
 
-    await client.power_on()
-    await server.power_on()
-    connection = await client.connect(server.random_address)
+    connection = devices.connections[0]
     peer = Peer(connection)
 
     await peer.discover_all()
@@ -1146,7 +1112,10 @@ async def test_discover_all():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_mtu_exchange():
-    [d1, d2, d3] = LinkedDevices().devices[:3]
+    devices = Devices(3)
+    for dev in devices:
+        await dev.power_on()
+    [d1, d2, d3] = devices
 
     d3.gatt_server.max_mtu = 100
 
@@ -1160,11 +1129,15 @@ async def test_mtu_exchange():
     await d2.power_on()
     await d3.power_on()
 
+    await d3.start_advertising(advertising_interval_min=1.0)
     d1_connection = await d1.connect(d3.random_address)
+    await async_barrier()
     assert len(d3_connections) == 1
     assert d3_connections[0] is not None
 
+    await d3.start_advertising(advertising_interval_min=1.0)
     d2_connection = await d2.connect(d3.random_address)
+    await async_barrier()
     assert len(d3_connections) == 2
     assert d3_connections[1] is not None
 
@@ -1233,7 +1206,8 @@ Got: BROADCAST,HELLO"""
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_server_string():
-    [_, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [_, server] = devices
 
     characteristic = Characteristic(
         'FDB159DB-036C-49E3-B3DB-6325AC750806',
@@ -1422,7 +1396,8 @@ def test_get_attribute_group():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_get_characteristics_by_uuid():
-    [client, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [client, server] = devices
 
     characteristic1 = Characteristic(
         '1234',
@@ -1447,9 +1422,7 @@ async def test_get_characteristics_by_uuid():
 
     server.add_services([service1, service2])
 
-    await client.power_on()
-    await server.power_on()
-    connection = await client.connect(server.random_address)
+    connection = devices.connections[0]
     peer = Peer(connection)
 
     await peer.discover_services()
@@ -1472,7 +1445,8 @@ async def test_get_characteristics_by_uuid():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_write_return_error():
-    [client, server] = LinkedDevices().devices[:2]
+    devices = await TwoDevices.create_with_connection()
+    [client, server] = devices
 
     on_write = Mock(side_effect=ATT_Error(error_code=ErrorCode.VALUE_NOT_ALLOWED))
     characteristic = Characteristic(
@@ -1484,9 +1458,7 @@ async def test_write_return_error():
     service = Service('ABCD', [characteristic])
     server.add_service(service)
 
-    await client.power_on()
-    await server.power_on()
-    connection = await client.connect(server.random_address)
+    connection = devices.connections[0]
 
     async with Peer(connection) as peer:
         c = peer.get_characteristics_by_uuid(uuid=UUID('1234'))[0]
