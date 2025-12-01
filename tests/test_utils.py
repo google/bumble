@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import functools
 from typing import Optional
 
 from typing_extensions import Self
@@ -30,39 +31,34 @@ from bumble.transport.common import AsyncPipeSink
 
 
 # -----------------------------------------------------------------------------
-class TwoDevices:
+class Devices:
     connections: list[Optional[Connection]]
 
-    def __init__(self) -> None:
-        self.connections = [None, None]
+    def __init__(self, num_devices: int) -> None:
+        self.connections = [None for _ in range(num_devices)]
 
         self.link = LocalLink()
-        addresses = ['F0:F1:F2:F3:F4:F5', 'F5:F4:F3:F2:F1:F0']
+        addresses = [":".join([f"F{i}"] * 6) for i in range(num_devices)]
         self.controllers = [
-            Controller('C1', link=self.link, public_address=addresses[0]),
-            Controller('C2', link=self.link, public_address=addresses[1]),
+            Controller(f'C{i+i}', link=self.link, public_address=addresses[i])
+            for i in range(num_devices)
         ]
         self.devices = [
             Device(
-                address=Address(addresses[0]),
-                host=Host(self.controllers[0], AsyncPipeSink(self.controllers[0])),
-            ),
-            Device(
-                address=Address(addresses[1]),
-                host=Host(self.controllers[1], AsyncPipeSink(self.controllers[1])),
-            ),
+                address=Address(addresses[i]),
+                host=Host(self.controllers[i], AsyncPipeSink(self.controllers[i])),
+            )
+            for i in range(num_devices)
         ]
 
-        self.devices[0].on(
-            'connection', lambda connection: self.on_connection(0, connection)
-        )
-        self.devices[1].on(
-            'connection', lambda connection: self.on_connection(1, connection)
-        )
+        for i in range(num_devices):
+            self.devices[i].on(
+                self.devices[i].EVENT_CONNECTION,
+                functools.partial(self.on_connection, i),
+            )
 
         self.paired = [
-            asyncio.get_event_loop().create_future(),
-            asyncio.get_event_loop().create_future(),
+            asyncio.get_event_loop().create_future() for _ in range(num_devices)
         ]
 
     def on_connection(self, which, connection):
@@ -77,18 +73,25 @@ class TwoDevices:
 
     async def setup_connection(self) -> None:
         # Start
-        await self.devices[0].power_on()
-        await self.devices[1].power_on()
+        for dev in self.devices:
+            await dev.power_on()
 
-        # Connect the two devices
-        await self.devices[0].connect(self.devices[1].random_address)
-
-        # Check the post conditions
-        assert self.connections[0] is not None
-        assert self.connections[1] is not None
+        # Connect devices
+        for dev in self.devices[1:]:
+            connection_future = asyncio.get_running_loop().create_future()
+            dev.once(dev.EVENT_CONNECTION, connection_future.set_result)
+            await dev.start_advertising(advertising_interval_min=1.0)
+            await self.devices[0].connect(dev.random_address)
+            await connection_future
 
     def __getitem__(self, index: int) -> Device:
         return self.devices[index]
+
+
+# -----------------------------------------------------------------------------
+class TwoDevices(Devices):
+    def __init__(self) -> None:
+        super().__init__(2)
 
     @classmethod
     async def create_with_connection(cls: type[Self]) -> Self:
