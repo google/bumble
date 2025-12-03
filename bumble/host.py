@@ -707,7 +707,7 @@ class Host(utils.EventEmitter):
 
         asyncio.create_task(send_command(command))
 
-    def send_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes) -> None:
+    def send_acl_sdu(self, connection_handle: int, sdu: bytes) -> None:
         if not (connection := self.connections.get(connection_handle)):
             logger.warning(f'connection 0x{connection_handle:04X} not found')
             return
@@ -718,27 +718,24 @@ class Host(utils.EventEmitter):
             )
             return
 
-        # Create a PDU
-        l2cap_pdu = bytes(L2CAP_PDU(cid, pdu))
-
         # Send the data to the controller via ACL packets
-        bytes_remaining = len(l2cap_pdu)
-        offset = 0
-        pb_flag = 0
-        while bytes_remaining:
-            data_total_length = min(bytes_remaining, packet_queue.max_packet_size)
+        max_packet_size = packet_queue.max_packet_size
+        for offset in range(0, len(sdu), max_packet_size):
+            pdu = sdu[offset : offset + max_packet_size]
             acl_packet = hci.HCI_AclDataPacket(
                 connection_handle=connection_handle,
-                pb_flag=pb_flag,
+                pb_flag=1 if offset > 0 else 0,
                 bc_flag=0,
-                data_total_length=data_total_length,
-                data=l2cap_pdu[offset : offset + data_total_length],
+                data_total_length=len(pdu),
+                data=pdu,
             )
-            logger.debug(f'>>> ACL packet enqueue: (CID={cid}) {acl_packet}')
+            logger.debug(
+                '>>> ACL packet enqueue: (Handle=0x%04X) %s', connection_handle, pdu
+            )
             packet_queue.enqueue(acl_packet, connection_handle)
-            pb_flag = 1
-            offset += data_total_length
-            bytes_remaining -= data_total_length
+
+    def send_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes) -> None:
+        self.send_acl_sdu(connection_handle, bytes(L2CAP_PDU(cid, pdu)))
 
     def get_data_packet_queue(self, connection_handle: int) -> DataPacketQueue | None:
         if connection := self.connections.get(connection_handle):

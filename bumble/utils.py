@@ -533,3 +533,20 @@ class IntConvertible(Protocol):
 
     def __init__(self, value: int) -> None: ...
     def __int__(self) -> int: ...
+
+
+# -----------------------------------------------------------------------------
+def crc_16(data: bytes) -> int:
+    """Calculate CRC-16-IBM of given data.
+
+    Polynomial = x^16 + x^15 + x^2 + 1 = 0x8005 or 0xA001(Reversed)
+    """
+    crc = 0x0000
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            if (crc & 0x0001) > 0:
+                crc = (crc >> 1) ^ 0xA001
+            else:
+                crc = crc >> 1
+    return crc
