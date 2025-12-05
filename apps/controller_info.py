@@ -35,8 +35,6 @@ from bumble.hci import (
     HCI_READ_BUFFER_SIZE_COMMAND,
     HCI_READ_LOCAL_NAME_COMMAND,
     HCI_SUCCESS,
-    HCI_VERSION_NAMES,
-    LMP_VERSION_NAMES,
     CodecID,
     HCI_Command,
     HCI_Command_Complete_Event,
@@ -54,6 +52,7 @@ from bumble.hci import (
     HCI_Read_Local_Supported_Codecs_V2_Command,
     HCI_Read_Local_Version_Information_Command,
     LeFeature,
+    SpecificationVersion,
     map_null_terminated_utf8_string,
 )
 from bumble.host import Host
@@ -289,14 +288,20 @@ async def async_main(
         )
         print(
             color('  HCI Version:   ', 'green'),
-            name_or_number(HCI_VERSION_NAMES, host.local_version.hci_version),
+            SpecificationVersion(host.local_version.hci_version).name,
         )
-        print(color('  HCI Subversion:', 'green'), host.local_version.hci_subversion)
+        print(
+            color('  HCI Subversion:', 'green'),
+            f'0x{host.local_version.hci_subversion:04x}',
+        )
         print(
             color('  LMP Version:   ', 'green'),
-            name_or_number(LMP_VERSION_NAMES, host.local_version.lmp_version),
+            SpecificationVersion(host.local_version.lmp_version).name,
         )
-        print(color('  LMP Subversion:', 'green'), host.local_version.lmp_subversion)
+        print(
+            color('  LMP Subversion:', 'green'),
+            f'0x{host.local_version.lmp_subversion:04x}',
+        )
 
         # Get the Classic info
         await get_classic_info(host)

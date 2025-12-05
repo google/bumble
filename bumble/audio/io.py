@@ -546,5 +546,6 @@ class SoundDeviceAudioInput(ThreadedAudioInput):
         return bytes(pcm_buffer)
 
     def _close(self):
-        self._stream.stop()
-        self._stream = None
+        if self._stream:
+            self._stream.stop()
+            self._stream = None

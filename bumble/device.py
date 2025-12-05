@@ -864,8 +864,8 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
 
     EVENT_STATE_CHANGE = "state_change"
     EVENT_ESTABLISHMENT = "establishment"
+    EVENT_ESTABLISHMENT_ERROR = "establishment_error"
     EVENT_CANCELLATION = "cancellation"
-    EVENT_ERROR = "error"
     EVENT_LOSS = "loss"
     EVENT_PERIODIC_ADVERTISEMENT = "periodic_advertisement"
     EVENT_BIGINFO_ADVERTISEMENT = "biginfo_advertisement"
@@ -998,7 +998,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
             return
 
         self.state = self.State.ERROR
-        self.emit(self.EVENT_ERROR)
+        self.emit(self.EVENT_ESTABLISHMENT_ERROR)
 
     def on_loss(self):
         self.state = self.State.LOST

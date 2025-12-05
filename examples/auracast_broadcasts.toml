@@ -1,0 +1,19 @@
+[[broadcasts]]
+name = "Broadcast 1"
+id = 1234
+language="en"
+program_info="Jazz"
+[[broadcasts.sources]]
+input = "file:audio_1_48k.wav"
+bitrate = 80000
+
+[[broadcasts]]
+name = "Broadcast 2"
+id = 5678
+language="fr"
+program_info="Classical"
+[[broadcasts.sources]]
+input = "file:audio_2.wav"
+[broadcasts.sources.manufacturer_data]
+company_id = 87
+data = "00000000000000000000000000000000dffd"
