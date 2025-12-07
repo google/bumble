@@ -7,8 +7,8 @@ emulator.
 
 The two main use cases are:
 
-  * Connecting the Bumble host stack to the Android emulator's virtual controller.
-  * Using Bumble as an HCI bridge to connect the Android emulator to a physical
+* Connecting the Bumble host stack to the Android emulator's virtual controller.
+* Using Bumble as an HCI bridge to connect the Android emulator to a physical
     Bluetooth controller, such as a USB dongle, or other HCI transport.
 
 !!! warning
@@ -109,7 +109,6 @@ You will likely need to start the emulator from the command line, in order to sp
     Attaching a virtual controller while the Android Bluetooth stack is running may not be well supported. So you may need to disable Bluetooth in your running Android guest
     before attaching the virtual controller, then re-enable it once attached.
 
-
 ## Other Tools
 
 The `show` application that's included with Bumble can be used to parse and pretty-print the HCI packets
@@ -121,3 +120,41 @@ Use the `--format snoop` option to specify that the file is in that specific for
     ```shell
     $ bumble-show --format snoop btsnoop_hci.log
     ```
+
+## Application
+
+Even though there are some sample Applications in this repo, Bumble doesn't have any support to build Bluetooth applications on Android. You may refer to the [Official Doc](https://developer.android.com/develop/connectivity/bluetooth) or other blog articles to learn more about Android and Bluetooth applications.
+
+## Debugging
+
+Note that the HCI Bridge just serves a bridge between the Android Emulator and physical controllers, so if you encounter issues such as `Android cannot scan / pair / connect my another device`, these are usually related to the Android or physical controllers, and not to the Bumble framework.
+
+Setting the environment variable `BUMBLE_LOGLEVEL=DEBUG` when running hci_bridge may be a good first option.
+
+!!! example "Run HCI Bridge with debugging log"
+    ```shell
+    $ BUMBLE_LOGLEVEL=DEBUG bumble-hci-bridge android-netsim:_:8877,mode=controller usb:0
+    ```
+
+Once you can see HCI logs output from bumble-hci-bridge, it means the bridge is properly working.
+
+To further debug Android scenarios, you should get [snoop logs](https://source.android.com/docs/core/connect/bluetooth/verifying_debugging#debugging-with-logs) and [bug reports](https://developer.android.com/studio/debug/bug-report) from Android.
+
+### Common issues
+
+#### Cannot turn on Bluetooth
+
+There might be some commands failures, or the controller may not support some capabilities necessary for Android. Particularly, LE-only controllers are not supported by Android Bluetooth stack.
+
+#### Cannot scan / pair / connect my another device
+
+1. Make sure the other device is in Pairing mode. For Android, it can usually be achieved by opening Settings > Bluetooth page.
+2. For LE, make sure the other device has a name in its advertising data, or Android may filter out advertisements without names to avoid spamming.
+3. There must be a connectable profile such as A2DP / HFP / HID for Android to connect over Settings page, or you need to have an App to connect GATT or Bluetooth sockets. If there isn't any active profile, the connection will usually be terminated automatically after pairing by Android.
+4. Check other HCI event status in snoop logs.
+
+#### Cannot use SCO or LE Audio
+
+SCO and LE Audio are usually unavailable. This is often due to incomplete feature implementation in many common USB dongles.
+
+Additionally, LE Audio is a very recent standard, and cross-controller compatibility is still maturing.

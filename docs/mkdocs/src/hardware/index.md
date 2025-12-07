@@ -13,7 +13,11 @@ It is also possible to use an embedded development board, running a specialized 
 
 Some specific USB dongles and embedded boards that are known to work include:
 
-  * [Nordic nRF52840 DK board](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk) with the Zephyr `HCI UART` application
-  * [Nordic nRF52840 DK board](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk) with the mynewt `blehci` application
-  * [Nordic nrf52840 dongle](https://www.nordicsemi.com/Products/Development-hardware/nRF52840-Dongle) with the Zephyr `HCI USB` application
-  * [BT820 USB Dongle](https://www.lairdconnect.com/wireless-modules/bluetooth-modules/bluetooth-42-and-40-modules/bt800-series-bluetooth-module)
+* [Nordic nRF52840 DK board](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk) with the Zephyr `HCI UART` application
+* [Nordic nRF52840 DK board](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk) with the mynewt `blehci` application
+* [Nordic nrf52840 dongle](https://www.nordicsemi.com/Products/Development-hardware/nRF52840-Dongle) with the Zephyr `HCI USB` application
+* [BT820 USB Dongle](https://www.lairdconnect.com/wireless-modules/bluetooth-modules/bluetooth-42-and-40-modules/bt800-series-bluetooth-module)
+
+However, many Bluetooth controllers do not fully implement the complete set of Bluetooth specifications. To help us improve compatibility and expand support, we are collecting data on user hardware.
+
+We would greatly appreciate it if you could share the capabilities and purchase details for any controllers you have available for testing. We will later build a capability table here.
