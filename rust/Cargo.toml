@@ -31,8 +31,8 @@ itertools = "0.11.0"
 lazy_static = "1.4.0"
 thiserror = "1.0.41"
 bytes = "1.5.0"
-pdl-derive = "0.2.0"
-pdl-runtime = "0.2.0"
+pdl-derive = "0.4.2"
+pdl-runtime = "0.4.2"
 futures = "0.3.28"
 
 # Dev tools
