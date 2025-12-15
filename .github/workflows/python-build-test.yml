@@ -50,7 +50,7 @@ jobs:
       matrix:
         # Rust runtime doesn't support 3.14 yet.
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        rust-version: [ "1.80.0", "stable" ]
+        rust-version: [ "1.80.0", "1.91.0" ]
       fail-fast: false
     steps:
       - name: Check out from Git
