@@ -19,10 +19,10 @@ import asyncio
 import sys
 
 import bumble.logging
+from bumble import gatt_client
 from bumble.colors import color
 from bumble.core import ProtocolError
-from bumble.device import Device, Peer
-from bumble.gatt import show_services
+from bumble.device import Connection, Device
 from bumble.transport import open_transport
 from bumble.utils import AsyncRunner
 
@@ -34,24 +34,27 @@ class Listener(Device.Listener):
 
     @AsyncRunner.run_in_task()
     # pylint: disable=invalid-overridden-method
-    async def on_connection(self, connection):
+    async def on_connection(self, connection: Connection):
         print(f'=== Connected to {connection}')
 
         # Discover all services
         print('=== Discovering services')
-        peer = Peer(connection)
-        await peer.discover_services()
-        for service in peer.services:
+        if connection.device.config.eatt_enabled:
+            client = await gatt_client.Client.connect_eatt(connection)
+        else:
+            client = connection.gatt_client
+        await client.discover_services()
+        for service in client.services:
             await service.discover_characteristics()
             for characteristic in service.characteristics:
                 await characteristic.discover_descriptors()
 
         print('=== Services discovered')
-        show_services(peer.services)
+        gatt_client.show_services(client.services)
 
         # Discover all attributes
         print('=== Discovering attributes')
-        attributes = await peer.discover_attributes()
+        attributes = await client.discover_attributes()
         for attribute in attributes:
             print(attribute)
         print('=== Attributes discovered')
@@ -59,7 +62,7 @@ class Listener(Device.Listener):
         # Read all attributes
         for attribute in attributes:
             try:
-                value = await peer.read_value(attribute)
+                value = await client.read_value(attribute)
                 print(color(f'0x{attribute.handle:04X} = {value.hex()}', 'green'))
             except ProtocolError as error:
                 print(color(f'cannot read {attribute.handle:04X}:', 'red'), error)
