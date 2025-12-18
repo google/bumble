@@ -1552,6 +1552,7 @@ class LeCreditBasedChannel(utils.EventEmitter):
 
     EVENT_OPEN = "open"
     EVENT_CLOSE = "close"
+    EVENT_ATT_MTU_UPDATE = "att_mtu_update"
 
     def __init__(
         self,
@@ -1591,6 +1592,7 @@ class LeCreditBasedChannel(utils.EventEmitter):
         self.connection_result = None
         self.disconnection_result = None
         self.drained = asyncio.Event()
+        self.att_mtu = 0  # Filled by GATT client or server later.
 
         self.drained.set()
 
@@ -1820,6 +1822,10 @@ class LeCreditBasedChannel(utils.EventEmitter):
         if self.disconnection_result:
             self.disconnection_result.set_result(None)
             self.disconnection_result = None
+
+    def on_att_mtu_update(self, mtu: int) -> None:
+        self.att_mtu = mtu
+        self.emit(self.EVENT_ATT_MTU_UPDATE, mtu)
 
     def flush_output(self) -> None:
         self.out_queue.clear()
