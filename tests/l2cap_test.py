@@ -16,15 +16,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import itertools
 import logging
 import os
 import random
 import struct
+from unittest import mock
 
 import pytest
 
-from bumble import l2cap
-from bumble.core import ProtocolError
+from bumble import core, l2cap
 
 from .test_utils import TwoDevices, async_barrier
 
@@ -143,7 +144,7 @@ async def test_basic_connection():
     psm = 1234
 
     # Check that if there's no one listening, we can't connect
-    with pytest.raises(ProtocolError):
+    with pytest.raises(core.ProtocolError):
         l2cap_channel = await devices.connections[0].create_l2cap_channel(
             spec=l2cap.LeCreditBasedChannelSpec(psm)
         )
@@ -267,12 +268,12 @@ async def transfer_payload(max_credits, mtu, mps):
 
 
 @pytest.mark.asyncio
-async def test_transfer():
-    for max_credits in (1, 10, 100, 10000):
-        for mtu in (50, 255, 256, 1000):
-            for mps in (50, 255, 256, 1000):
-                # print(max_credits, mtu, mps)
-                await transfer_payload(max_credits, mtu, mps)
+@pytest.mark.parametrize(
+    "max_credits, mtu, mps",
+    itertools.product((1, 10, 100, 10000), (50, 255, 256, 1000), (50, 255, 256, 1000)),
+)
+async def test_transfer(max_credits: int, mtu: int, mps: int):
+    await transfer_payload(max_credits, mtu, mps)
 
 
 # -----------------------------------------------------------------------------
@@ -396,6 +397,75 @@ async def test_mode_mismatching(server_mode, client_mode):
     with pytest.raises(l2cap.L2capError):
         await devices.connections[0].create_l2cap_channel(
             spec=l2cap.ClassicChannelSpec(psm=server.psm, mode=client_mode)
+        )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_enhanced_credit_based_flow_control_connection():
+    devices = await TwoDevices.create_with_connection()
+    server_channels = asyncio.Queue()
+    server = devices[1].create_l2cap_server(
+        spec=l2cap.LeCreditBasedChannelSpec(), handler=server_channels.put_nowait
+    )
+
+    channels = await devices[
+        0
+    ].l2cap_channel_manager.create_enhanced_credit_based_channels(
+        devices.connections[0], l2cap.LeCreditBasedChannelSpec(psm=server.psm), count=5
+    )
+    assert len(channels) == 5
+    for _ in range(5):
+        await server_channels.get()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_enhanced_credit_based_flow_control_connection_failure_no_psm():
+    devices = await TwoDevices.create_with_connection()
+
+    with pytest.raises(l2cap.L2capError):
+        await devices[0].l2cap_channel_manager.create_enhanced_credit_based_channels(
+            devices.connections[0], l2cap.LeCreditBasedChannelSpec(psm=12345), count=5
+        )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_enhanced_credit_based_flow_control_connection_failure_insufficient_resource_client_side():
+    devices = await TwoDevices.create_with_connection()
+    server = devices[1].create_l2cap_server(spec=l2cap.LeCreditBasedChannelSpec())
+
+    with pytest.raises(core.OutOfResourcesError):
+        await devices[0].l2cap_channel_manager.create_enhanced_credit_based_channels(
+            devices.connections[0],
+            l2cap.LeCreditBasedChannelSpec(server.psm),
+            count=(
+                l2cap.L2CAP_LE_U_DYNAMIC_CID_RANGE_END
+                - l2cap.L2CAP_LE_U_DYNAMIC_CID_RANGE_START
+            )
+            * 2,
+        )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_enhanced_credit_based_flow_control_connection_failure_insufficient_resource_server_side():
+    devices = await TwoDevices.create_with_connection()
+    server = devices[1].create_l2cap_server(spec=l2cap.LeCreditBasedChannelSpec())
+    # Simulate that the server side has no available CID.
+    channels = {
+        cid: mock.Mock()
+        for cid in range(
+            l2cap.L2CAP_LE_U_DYNAMIC_CID_RANGE_START,
+            l2cap.L2CAP_LE_U_DYNAMIC_CID_RANGE_END + 1,
+        )
+    }
+    devices[1].l2cap_channel_manager.channels[devices.connections[1].handle] = channels
+
+    with pytest.raises(l2cap.L2capError):
+        await devices[0].l2cap_channel_manager.create_enhanced_credit_based_channels(
+            devices.connections[0], l2cap.LeCreditBasedChannelSpec(server.psm), count=1
         )
 
 

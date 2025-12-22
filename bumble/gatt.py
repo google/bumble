@@ -30,7 +30,7 @@ import logging
 import struct
 from typing import Iterable, Optional, Sequence, TypeVar, Union
 
-from bumble.att import Attribute, AttributeValue
+from bumble.att import Attribute, AttributeValue, AttributeValueV2
 from bumble.colors import color
 from bumble.core import UUID, BaseBumbleError
 
@@ -579,7 +579,7 @@ class Descriptor(Attribute):
     def __str__(self) -> str:
         if isinstance(self.value, bytes):
             value_str = self.value.hex()
-        elif isinstance(self.value, CharacteristicValue):
+        elif isinstance(self.value, (AttributeValue, AttributeValueV2)):
             value_str = '<dynamic>'
         else:
             value_str = '<...>'
