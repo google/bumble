@@ -16,14 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import functools
 import json
-import struct
 import sys
 
 import websockets.asyncio.server
 
 import bumble.logging
-from bumble import data_types
+from bumble import data_types, gatt_client
 from bumble.colors import color
 from bumble.core import AdvertisingData
 from bumble.device import Connection, Device, Peer
@@ -148,17 +148,17 @@ class ServerListener(Device.Listener, Connection.Listener):
 
 
 # -----------------------------------------------------------------------------
-def on_hid_control_point_write(_connection, value):
-    print(f'Control Point Write: {value}')
+def on_hid_control_point_write(_connection: Connection, value: bytes):
+    print(f'Control Point Write: {value.hex()}')
 
 
 # -----------------------------------------------------------------------------
-def on_report(characteristic, value):
+def on_report(characteristic: gatt_client.CharacteristicProxy, value: bytes):
     print(color('Report:', 'cyan'), value.hex(), 'from', characteristic)
 
 
 # -----------------------------------------------------------------------------
-async def keyboard_host(device, peer_address):
+async def keyboard_host(device: Device, peer_address: str):
     await device.power_on()
     connection = await device.connect(peer_address)
     await connection.pair()
@@ -221,10 +221,7 @@ async def keyboard_host(device, peer_address):
             else:
                 report_reference = bytes([0, 0])
             await peer.subscribe(
-                characteristic,
-                lambda value, param=f'[{i}] {report_reference.hex()}': on_report(
-                    param, value
-                ),
+                characteristic, functools.partial(on_report, characteristic)
             )
 
     protocol_mode = await peer.read_value(protocol_mode_characteristic)
@@ -238,7 +235,7 @@ async def keyboard_host(device, peer_address):
 
 
 # -----------------------------------------------------------------------------
-async def keyboard_device(device, command):
+async def keyboard_device(device: Device, command: str):
     # Create an 'input report' characteristic to send keyboard reports to the host
     input_report_characteristic = Characteristic(
         GATT_REPORT_CHARACTERISTIC,
