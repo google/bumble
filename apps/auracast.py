@@ -23,7 +23,6 @@ import contextlib
 import dataclasses
 import functools
 import logging
-import struct
 from typing import Any, AsyncGenerator, Coroutine, Optional
 
 import click

@@ -19,7 +19,7 @@ This module implement the Pandora Bluetooth test APIs for the Bumble stack.
 
 __version__ = "0.0.1"
 
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
 import grpc
 import grpc.aio

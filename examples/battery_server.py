@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import random
-import struct
 import sys
 
 import bumble.logging

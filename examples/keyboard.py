@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import json
-import struct
 import sys
 
 import websockets.asyncio.server

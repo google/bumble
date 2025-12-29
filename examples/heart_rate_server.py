@@ -15,7 +15,6 @@
 import asyncio
 import math
 import random
-import struct
 
 # -----------------------------------------------------------------------------
 # Imports

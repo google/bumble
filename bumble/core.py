@@ -21,7 +21,6 @@ import dataclasses
 import enum
 import struct
 from typing import (
-    TYPE_CHECKING,
     Any,
     ClassVar,
     Iterable,

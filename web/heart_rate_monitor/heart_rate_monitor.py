@@ -15,7 +15,6 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-import struct
 
 from bumble import data_types
 from bumble.core import AdvertisingData

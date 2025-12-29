@@ -38,7 +38,6 @@ from bumble.att import (
     ErrorCode,
     Opcode,
 )
-from bumble.controller import Controller
 from bumble.core import UUID
 from bumble.device import Device, Peer
 from bumble.gatt import (
@@ -65,9 +64,6 @@ from bumble.gatt_adapters import (
     UTF8CharacteristicProxyAdapter,
 )
 from bumble.gatt_client import CharacteristicProxy
-from bumble.host import Host
-from bumble.link import LocalLink
-from bumble.transport.common import AsyncPipeSink
 
 from .test_utils import Devices, TwoDevices, async_barrier
 
