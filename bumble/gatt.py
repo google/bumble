@@ -227,7 +227,6 @@ GATT_MEDIA_CONTROL_POINT_CHARACTERISTIC                   = UUID.from_16_bits(0x
 GATT_MEDIA_CONTROL_POINT_OPCODES_SUPPORTED_CHARACTERISTIC = UUID.from_16_bits(0x2BA5, 'Media Control Point Opcodes Supported')
 GATT_SEARCH_RESULTS_OBJECT_ID_CHARACTERISTIC              = UUID.from_16_bits(0x2BA6, 'Search Results Object ID')
 GATT_SEARCH_CONTROL_POINT_CHARACTERISTIC                  = UUID.from_16_bits(0x2BA7, 'Search Control Point')
-GATT_CONTENT_CONTROL_ID_CHARACTERISTIC                    = UUID.from_16_bits(0x2BBA, 'Content Control Id')
 
 # Telephone Bearer Service (TBS)
 GATT_BEARER_PROVIDER_NAME_CHARACTERISTIC                      = UUID.from_16_bits(0x2BB3, 'Bearer Provider Name')
