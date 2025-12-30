@@ -22,7 +22,6 @@ import collections
 import enum
 import functools
 import logging
-import sys
 import warnings
 from typing import (
     Any,

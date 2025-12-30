@@ -25,7 +25,6 @@ import itertools
 import json
 import logging
 import secrets
-import sys
 from collections.abc import Iterable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager, closing
 from dataclasses import dataclass, field

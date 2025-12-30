@@ -16,7 +16,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import struct
 import sys
 
 import bumble.logging

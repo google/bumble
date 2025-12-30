@@ -21,7 +21,7 @@ import logging
 import click
 
 import bumble.logging
-from bumble import company_ids, hci, transport
+from bumble import transport
 from bumble.drivers import rtk
 from bumble.host import Host
 

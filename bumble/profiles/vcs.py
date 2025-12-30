@@ -22,7 +22,7 @@ import dataclasses
 import enum
 from typing import Sequence
 
-from bumble import att, device, gatt, gatt_adapters, gatt_client, utils
+from bumble import att, device, gatt, gatt_adapters, gatt_client
 
 # -----------------------------------------------------------------------------
 # Constants

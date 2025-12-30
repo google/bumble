@@ -18,7 +18,6 @@
 import asyncio
 import logging
 import os
-import struct
 
 import click
 from prompt_toolkit.shortcuts import PromptSession
