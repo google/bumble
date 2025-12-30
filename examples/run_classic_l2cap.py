@@ -32,7 +32,6 @@ from bumble.transport import open_transport
 async def main(
     config_file: str, transport: str, mode: int, peer_address: str, psm: int
 ) -> None:
-
     print('<<< connecting to HCI...')
     async with await open_transport(transport) as hci_transport:
         print('<<< connected')
@@ -59,7 +58,6 @@ async def main(
         active_channel: l2cap.ClassicChannel | None = None
 
         def on_connection(channel: l2cap.ClassicChannel):
-
             def on_sdu(sdu: bytes):
                 print(f'<<< {sdu.decode()}')
 

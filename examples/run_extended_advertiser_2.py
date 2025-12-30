@@ -90,7 +90,7 @@ async def main() -> None:
                 ),
                 scan_response_data=bytes(scan_response_data3),
             )
-            print("Selected TX power 3:", set2.selected_tx_power)
+            print("Selected TX power 3:", set3.selected_tx_power)
 
         await hci_transport.source.terminated
 

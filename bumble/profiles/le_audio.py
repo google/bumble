@@ -137,7 +137,7 @@ class Metadata:
                 values.append(str(decoded))
 
         return '\n'.join(
-            f'{indent}{key}: {" " * (max_key_length-len(key))}{value}'
+            f'{indent}{key}: {" " * (max_key_length - len(key))}{value}'
             for key, value in zip(keys, values)
         )
 

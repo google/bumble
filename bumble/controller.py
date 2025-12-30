@@ -25,10 +25,8 @@ import random
 import struct
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
-from bumble import hci
-from bumble import link
+from bumble import hci, link, ll, lmp
 from bumble import link as bumble_link
-from bumble import ll, lmp
 from bumble.colors import color
 from bumble.core import PhysicalTransport
 
@@ -170,10 +168,6 @@ class AdvertisingSet:
 
     def send_extended_advertising_data(self) -> None:
         if self.controller.link:
-            properties = (
-                self.parameters.advertising_event_properties if self.parameters else 0
-            )
-
             address = self.address
             assert address
 

@@ -108,8 +108,7 @@ class DataPacketQueue(utils.EventEmitter):
 
         if self._packets:
             logger.debug(
-                f'{self._in_flight} packets in flight, '
-                f'{len(self._packets)} in queue'
+                f'{self._in_flight} packets in flight, {len(self._packets)} in queue'
             )
 
     def flush(self, connection_handle: int) -> None:
@@ -1394,8 +1393,7 @@ class Host(utils.EventEmitter):
         if event.status == hci.HCI_SUCCESS:
             # Create/update the connection
             logger.debug(
-                f'### SCO CONNECTION: [0x{event.connection_handle:04X}] '
-                f'{event.bd_addr}'
+                f'### SCO CONNECTION: [0x{event.connection_handle:04X}] {event.bd_addr}'
             )
 
             self.sco_links[event.connection_handle] = ScoLink(
@@ -1447,7 +1445,7 @@ class Host(utils.EventEmitter):
     def on_hci_le_data_length_change_event(
         self, event: hci.HCI_LE_Data_Length_Change_Event
     ):
-        if (connection := self.connections.get(event.connection_handle)) is None:
+        if event.connection_handle not in self.connections:
             logger.warning('!!! DATA LENGTH CHANGE: unknown handle')
             return
 

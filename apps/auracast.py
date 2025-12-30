@@ -646,7 +646,6 @@ async def run_assist(
 
 async def run_pair(transport: str, address: str) -> None:
     async with create_device(transport) as device:
-
         # Connect to the server
         print(f'=== Connecting to {address}...')
         async with device.connect_as_gatt(address) as peer:

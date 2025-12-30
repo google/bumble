@@ -30,6 +30,7 @@ from bumble.profiles.ancs import (
     NotificationAttributeId,
 )
 from bumble.transport import open_transport
+from bumble.utils import AsyncRunner
 
 # -----------------------------------------------------------------------------
 _cached_app_names: dict[str, str] = {}
@@ -192,9 +193,7 @@ async def main() -> None:
         ancs_client.on("notification", on_ancs_notification)
 
         # Process all notifications in a task.
-        notification_processing_task = asyncio.create_task(
-            process_notifications(ancs_client)
-        )
+        AsyncRunner.spawn(process_notifications(ancs_client))
 
         # Accept a TCP connection to handle commands.
         tcp_server = await asyncio.start_server(

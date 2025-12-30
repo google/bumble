@@ -55,7 +55,7 @@ from bumble.transport import open_transport
 # -----------------------------------------------------------------------------
 async def main() -> None:
     if len(sys.argv) < 3:
-        print('Usage: run_mcp_client.py <config-file>' '<transport-spec-for-device>')
+        print('Usage: run_mcp_client.py <config-file><transport-spec-for-device>')
         return
 
     print('<<< connecting to HCI...')

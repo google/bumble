@@ -380,7 +380,7 @@ class Driver(common.Driver):
 
         if (vendor_id, product_id) not in INTEL_USB_PRODUCTS:
             logger.debug(
-                f"USB device ({vendor_id:04X}, {product_id:04X}) " "not in known list"
+                f"USB device ({vendor_id:04X}, {product_id:04X}) not in known list"
             )
             return False
 
@@ -483,9 +483,7 @@ class Driver(common.Driver):
             raise DriverError("insufficient device info, missing CNVI or CNVR")
 
         firmware_base_name = (
-            "ibt-"
-            f"{device_info[ValueType.CNVI]:04X}-"
-            f"{device_info[ValueType.CNVR]:04X}"
+            f"ibt-{device_info[ValueType.CNVI]:04X}-{device_info[ValueType.CNVR]:04X}"
         )
         logger.debug(f"FW base name: {firmware_base_name}")
 

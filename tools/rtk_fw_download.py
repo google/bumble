@@ -21,11 +21,11 @@ import urllib.error
 import urllib.request
 
 import click
+from bumble.tools import rtk_util
 
 import bumble.logging
 from bumble.colors import color
 from bumble.drivers import rtk
-from bumble.tools import rtk_util
 
 # -----------------------------------------------------------------------------
 # Logging

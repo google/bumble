@@ -21,9 +21,11 @@ from collections.abc import Awaitable
 from typing import Any, AsyncGenerator, AsyncIterator, Callable, Optional, Union
 
 import grpc
-from google.protobuf import any_pb2  # pytype: disable=pyi-error
-from google.protobuf import empty_pb2  # pytype: disable=pyi-error
-from google.protobuf import wrappers_pb2  # pytype: disable=pyi-error
+from google.protobuf import (
+    any_pb2,  # pytype: disable=pyi-error
+    empty_pb2,  # pytype: disable=pyi-error
+    wrappers_pb2,  # pytype: disable=pyi-error
+)
 from pandora.host_pb2 import Connection
 from pandora.security_grpc_aio import SecurityServicer, SecurityStorageServicer
 from pandora.security_pb2 import (
@@ -455,7 +457,7 @@ class SecurityService(SecurityServicer):
 
         def pair(*_: Any) -> None:
             if self.need_pairing(connection, level):
-                pair_task = asyncio.create_task(connection.pair())
+                bumble.utils.AsyncRunner.spawn(connection.pair())
 
         listeners: dict[str, Callable[..., Union[None, Awaitable[None]]]] = {
             'disconnection': set_failure('connection_died'),

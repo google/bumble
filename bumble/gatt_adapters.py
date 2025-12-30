@@ -361,5 +361,4 @@ class EnumCharacteristicProxyAdapter(CharacteristicProxyAdapter[_T3]):
 
     def decode_value(self, value: bytes) -> _T3:
         int_value = int.from_bytes(value, self.byteorder)
-        a = self.cls(int_value)
         return self.cls(int_value)

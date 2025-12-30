@@ -47,14 +47,13 @@ from bumble.avdtp import (
     AVDTP_DELAY_REPORTING_SERVICE_CATEGORY,
     MediaCodecCapabilities,
     MediaPacketPump,
+    find_avdtp_service_with_connection,
 )
 from bumble.avdtp import Protocol as AvdtpProtocol
-from bumble.avdtp import find_avdtp_service_with_connection
 from bumble.avrcp import Protocol as AvrcpProtocol
 from bumble.colors import color
-from bumble.core import AdvertisingData
+from bumble.core import AdvertisingData, DeviceClass, PhysicalTransport
 from bumble.core import ConnectionError as BumbleConnectionError
-from bumble.core import DeviceClass, PhysicalTransport
 from bumble.device import Connection, Device, DeviceConfiguration
 from bumble.hci import HCI_CONNECTION_ALREADY_EXISTS_ERROR, Address, HCI_Constant
 from bumble.pairing import PairingConfig
@@ -381,11 +380,11 @@ class Player:
             print(f">>> {color(address.to_string(False), 'yellow')}:")
             print(f"  Device Class (raw): {class_of_device:06X}")
             major_class_name = DeviceClass.major_device_class_name(major_device_class)
-            print("  Device Major Class: " f"{major_class_name}")
+            print(f"  Device Major Class: {major_class_name}")
             minor_class_name = DeviceClass.minor_device_class_name(
                 major_device_class, minor_device_class
             )
-            print("  Device Minor Class: " f"{minor_class_name}")
+            print(f"  Device Minor Class: {minor_class_name}")
             print(
                 "  Device Services: "
                 f"{', '.join(DeviceClass.service_class_labels(service_classes))}"

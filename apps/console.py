@@ -1096,9 +1096,7 @@ class DeviceListener(Device.Listener, Connection.Listener):
             if self.app.connected_peer.connection.is_encrypted
             else 'not encrypted'
         )
-        self.app.append_to_output(
-            'connection encryption change: ' f'{encryption_state}'
-        )
+        self.app.append_to_output(f'connection encryption change: {encryption_state}')
 
     def on_connection_data_length_change(self):
         self.app.append_to_output(

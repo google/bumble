@@ -163,23 +163,23 @@ class AacAudioRtpPacket:
             cls, reader: BitReader, channel_configuration: int, audio_object_type: int
         ) -> Self:
             # GASpecificConfig - ISO/EIC 14496-3 Table 4.1
-            frame_length_flag = reader.read(1)
+            reader.read(1)  # frame_length_flag
             depends_on_core_coder = reader.read(1)
             if depends_on_core_coder:
-                core_coder_delay = reader.read(14)
+                reader.read(14)  # core_coder_delay
             extension_flag = reader.read(1)
             if not channel_configuration:
                 raise core.InvalidPacketError('program_config_element not supported')
             if audio_object_type in (6, 20):
-                layer_nr = reader.read(3)
+                reader.read(3)  # layer_nr
             if extension_flag:
                 if audio_object_type == 22:
-                    num_of_sub_frame = reader.read(5)
-                layer_length = reader.read(11)
+                    reader.read(5)  # num_of_sub_frame
+                reader.read(11)  # layer_length
                 if audio_object_type in (17, 19, 20, 23):
-                    aac_section_data_resilience_flags = reader.read(1)
-                    aac_scale_factor_data_resilience_flags = reader.read(1)
-                    aac_spectral_data_resilience_flags = reader.read(1)
+                    reader.read(1)  # aac_section_data_resilience_flags
+                    reader.read(1)  # aac_scale_factor_data_resilience_flags
+                    reader.read(1)  # aac_spectral_data_resilience_flags
                 extension_flag_3 = reader.read(1)
                 if extension_flag_3 == 1:
                     raise core.InvalidPacketError('extensionFlag3 == 1 not supported')
@@ -364,10 +364,10 @@ class AacAudioRtpPacket:
             if audio_mux_version_a != 0:
                 raise core.InvalidPacketError('audioMuxVersionA != 0 not supported')
             if audio_mux_version == 1:
-                tara_buffer_fullness = AacAudioRtpPacket.read_latm_value(reader)
-            stream_cnt = 0
-            all_streams_same_time_framing = reader.read(1)
-            num_sub_frames = reader.read(6)
+                AacAudioRtpPacket.read_latm_value(reader)  # tara_buffer_fullness
+            # stream_cnt = 0
+            reader.read(1)  # all_streams_same_time_framing
+            reader.read(6)  # num_sub_frames
             num_program = reader.read(4)
             if num_program != 0:
                 raise core.InvalidPacketError('num_program != 0 not supported')
@@ -391,9 +391,9 @@ class AacAudioRtpPacket:
                 reader.skip(asc_len)
             frame_length_type = reader.read(3)
             if frame_length_type == 0:
-                latm_buffer_fullness = reader.read(8)
+                reader.read(8)  # latm_buffer_fullness
             elif frame_length_type == 1:
-                frame_length = reader.read(9)
+                reader.read(9)  # frame_length
             else:
                 raise core.InvalidPacketError(
                     f'frame_length_type {frame_length_type} not supported'
@@ -413,7 +413,7 @@ class AacAudioRtpPacket:
                             break
             crc_check_present = reader.read(1)
             if crc_check_present:
-                crc_checksum = reader.read(8)
+                reader.read(8)  # crc_checksum
 
             return cls(other_data_present, other_data_len_bits, audio_specific_config)
 

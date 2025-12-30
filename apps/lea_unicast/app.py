@@ -268,7 +268,6 @@ class UiServer:
 
 # -----------------------------------------------------------------------------
 class Speaker:
-
     def __init__(
         self,
         device_config_path: str | None,

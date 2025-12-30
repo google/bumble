@@ -36,7 +36,7 @@ def tokenize_parameters(buffer: bytes) -> list[bytes]:
 
         if in_quotes:
             token.extend(char)
-            if char == b'\"':
+            if char == b'"':
                 in_quotes = False
                 tokens.append(token[1:-1])
                 token = bytearray()

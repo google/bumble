@@ -33,9 +33,10 @@ from bumble.sdp import (
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+    DataElement,
+    ServiceAttribute,
 )
 from bumble.sdp import Client as SDP_Client
-from bumble.sdp import DataElement, ServiceAttribute
 from bumble.transport import open_transport
 
 

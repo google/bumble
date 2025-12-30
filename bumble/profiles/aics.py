@@ -199,7 +199,6 @@ class AudioInputControlPoint:
     gain_settings_properties: GainSettingsProperties
 
     async def on_write(self, connection: Connection, value: bytes) -> None:
-
         opcode = AudioInputControlPointOpCode(value[0])
 
         if opcode == AudioInputControlPointOpCode.SET_GAIN_SETTING:

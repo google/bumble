@@ -997,7 +997,6 @@ class Session:
         self.send_command(response)
 
     def send_pairing_confirm_command(self) -> None:
-
         if self.pairing_method != PairingMethod.OOB:
             self.r = crypto.r()
             logger.debug(f'generated random: {self.r.hex()}')
@@ -1833,7 +1832,6 @@ class Session:
             self.send_public_key_command()
 
             def next_steps() -> None:
-
                 if self.pairing_method in (
                     PairingMethod.JUST_WORKS,
                     PairingMethod.NUMERIC_COMPARISON,

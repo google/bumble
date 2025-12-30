@@ -59,28 +59,28 @@ class Keyboard:
 
     def print_keyboard_report(self) -> None:
         print(color('\tKeyboard Input Received', 'green', None, 'bold'))
-        print(color(f'Keys:', 'white', None, 'bold'))
+        print(color('Keys:', 'white', None, 'bold'))
         for i in range(1, 7):
             print(
                 color(f' Key{i}{" ":>8s}=  ', 'cyan', None, 'bold'), self.report[i + 1]
             )
-        print(color(f'\nModifier Keys:', 'white', None, 'bold'))
+        print(color('\nModifier Keys:', 'white', None, 'bold'))
         print(
-            color(f'  Left Ctrl   : ', 'cyan'),
+            color('  Left Ctrl   : ', 'cyan'),
             f'{self.report[0][0] == 1!s:<5}',  # type: ignore
-            color(f'  Left Shift  : ', 'cyan'),
+            color('  Left Shift  : ', 'cyan'),
             f'{self.report[0][1] == 1!s:<5}',  # type: ignore
-            color(f'  Left ALT    : ', 'cyan'),
+            color('  Left ALT    : ', 'cyan'),
             f'{self.report[0][2] == 1!s:<5}',  # type: ignore
-            color(f'  Left GUI    : ', 'cyan'),
+            color('  Left GUI    : ', 'cyan'),
             f'{self.report[0][3] == 1!s:<5}\n',  # type: ignore
-            color(f' Right Ctrl  : ', 'cyan'),
+            color(' Right Ctrl  : ', 'cyan'),
             f'{self.report[0][4] == 1!s:<5}',  # type: ignore
-            color(f'  Right Shift : ', 'cyan'),
+            color('  Right Shift : ', 'cyan'),
             f'{self.report[0][5] == 1!s:<5}',  # type: ignore
-            color(f'  Right ALT   : ', 'cyan'),
+            color('  Right ALT   : ', 'cyan'),
             f'{self.report[0][6] == 1!s:<5}',  # type: ignore
-            color(f'  Right GUI   : ', 'cyan'),
+            color('  Right GUI   : ', 'cyan'),
             f'{self.report[0][7] == 1!s:<5}',  # type: ignore
         )
 
@@ -117,23 +117,23 @@ class Mouse:
     def print_mouse_report(self) -> None:
         print(color('\tMouse Input Received', 'green', None, 'bold'))
         print(
-            color(f' Button 1 (primary/trigger) = ', 'cyan'),
+            color(' Button 1 (primary/trigger) = ', 'cyan'),
             self.report[0][0] == 1,  # type: ignore
-            color(f'\n Button 2 (secondary)       = ', 'cyan'),
+            color('\n Button 2 (secondary)       = ', 'cyan'),
             self.report[0][1] == 1,  # type: ignore
-            color(f'\n Button 3 (tertiary)        = ', 'cyan'),
+            color('\n Button 3 (tertiary)        = ', 'cyan'),
             self.report[0][2] == 1,  # type: ignore
-            color(f'\n Button4                    = ', 'cyan'),
+            color('\n Button4                    = ', 'cyan'),
             self.report[0][3] == 1,  # type: ignore
-            color(f'\n Button5                    = ', 'cyan'),
+            color('\n Button5                    = ', 'cyan'),
             self.report[0][4] == 1,  # type: ignore
-            color(f'\n X (X-axis displacement)    = ', 'cyan'),
+            color('\n X (X-axis displacement)    = ', 'cyan'),
             self.report[1],
-            color(f'\n Y (Y-axis displacement)    = ', 'cyan'),
+            color('\n Y (Y-axis displacement)    = ', 'cyan'),
             self.report[2],
-            color(f'\n Wheel                      = ', 'cyan'),
+            color('\n Wheel                      = ', 'cyan'),
             self.report[3],
-            color(f'\n AC PAN                     = ', 'cyan'),
+            color('\n AC PAN                     = ', 'cyan'),
             self.report[4],
         )
 
@@ -142,7 +142,6 @@ class Mouse:
 class ReportParser:
     @staticmethod
     def parse_input_report(input_report: bytes) -> None:
-
         report_id = input_report[0]  # pylint: disable=unsubscriptable-object
         report_length = len(input_report)
 

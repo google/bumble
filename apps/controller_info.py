@@ -275,7 +275,7 @@ async def async_main(
                 (
                     f'min={min(latencies):.2f}, '
                     f'max={max(latencies):.2f}, '
-                    f'average={sum(latencies)/len(latencies):.2f},'
+                    f'average={sum(latencies) / len(latencies):.2f},'
                 ),
                 [f'{latency:.4}' for latency in latencies],
                 '\n',

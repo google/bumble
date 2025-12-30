@@ -528,7 +528,7 @@ class ServiceAttribute:
     def to_string(self, with_colors=False):
         if with_colors:
             return (
-                f'Attribute(id={color(self.id_name(self.id),"magenta")},'
+                f'Attribute(id={color(self.id_name(self.id), "magenta")},'
                 f'value={self.value})'
             )
 

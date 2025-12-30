@@ -40,7 +40,6 @@ class GenericAttributeProfileService(gatt.TemplateService):
         database_hash_enabled: bool = True,
         service_change_enabled: bool = True,
     ) -> None:
-
         if server_supported_features is not None:
             self.server_supported_features_characteristic = gatt.Characteristic(
                 uuid=gatt.GATT_SERVER_SUPPORTED_FEATURES_CHARACTERISTIC,

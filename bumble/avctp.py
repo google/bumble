@@ -258,7 +258,7 @@ class Protocol:
 
     def send_ipid(self, transaction_label: int, pid: int) -> None:
         logger.debug(
-            ">>> AVCTP ipid: " f"transaction_label={transaction_label}, " f"pid={pid}"
+            f">>> AVCTP ipid: transaction_label={transaction_label}, pid={pid}"
         )
         self.send_message(transaction_label, False, True, pid, b'')
 

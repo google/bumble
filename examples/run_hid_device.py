@@ -30,9 +30,8 @@ from bumble.core import (
     PhysicalTransport,
 )
 from bumble.device import Device
-from bumble.hid import HID_CONTROL_PSM, HID_INTERRUPT_PSM
+from bumble.hid import HID_CONTROL_PSM, HID_INTERRUPT_PSM, Message
 from bumble.hid import Device as HID_Device
-from bumble.hid import Message
 from bumble.sdp import (
     SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
     SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
@@ -423,7 +422,6 @@ deviceData = DeviceData()
 
 # -----------------------------------------------------------------------------
 async def keyboard_device(hid_device: HID_Device):
-
     # Start a Websocket server to receive events from a web page
     async def serve(websocket: websockets.asyncio.server.ServerConnection):
         global deviceData

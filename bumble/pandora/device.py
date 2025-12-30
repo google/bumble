@@ -74,7 +74,9 @@ class PandoraDevice:
 
         # open HCI transport & set device host.
         self._hci = await transport.open_transport(self._hci_name)
-        self.device.host = Host(controller_source=self._hci.source, controller_sink=self._hci.sink)  # type: ignore[no-untyped-call]
+        self.device.host = Host(
+            controller_source=self._hci.source, controller_sink=self._hci.sink
+        )  # type: ignore[no-untyped-call]
 
         # power-on.
         await self.device.power_on()

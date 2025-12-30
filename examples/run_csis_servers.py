@@ -36,7 +36,7 @@ async def main() -> None:
             'Usage: run_csis_servers.py <config-file> '
             '<transport-spec-for-device-1> <transport-spec-for-device-2>'
         )
-        print('example: run_csis_servers.py device1.json ' 'hci-socket:0 hci-socket:1')
+        print('example: run_csis_servers.py device1.json hci-socket:0 hci-socket:1')
         return
 
     print('<<< connecting to HCI...')

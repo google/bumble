@@ -67,7 +67,6 @@ SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID = 0x0210
 
 
 async def get_hid_device_sdp_record(connection):
-
     # Connect to the SDP Server
     sdp_client = SDP_Client(connection)
     await sdp_client.connect()
@@ -84,7 +83,7 @@ async def get_hid_device_sdp_record(connection):
     if len(service_record_handles) < 1:
         await sdp_client.disconnect()
         raise Exception(
-            color(f'BT HID Device service not found on peer device!!!!', 'red')
+            color('BT HID Device service not found on peer device!!!!', 'red')
         )
 
     # For BT_HUMAN_INTERFACE_DEVICE_SERVICE service, get all its attributes
@@ -92,8 +91,8 @@ async def get_hid_device_sdp_record(connection):
         attributes = await sdp_client.get_attributes(
             service_record_handle, [SDP_ALL_ATTRIBUTES_RANGE]
         )
-        print(color(f'SERVICE {service_record_handle:04X} attributes:', 'yellow'))
-        print(color(f'SDP attributes for HID device', 'magenta'))
+        print(color('SERVICE {service_record_handle:04X} attributes:', 'yellow'))
+        print(color('SDP attributes for HID device', 'magenta'))
         for attribute in attributes:
             if attribute.id == SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID:
                 print(
@@ -287,7 +286,7 @@ async def main() -> None:
     def on_hid_interrupt_data_cb(pdu: bytes):
         report_type = pdu[0] & 0x0F
         if len(pdu) == 1:
-            print(color(f'Warning: No report received', 'yellow'))
+            print(color('Warning: No report received', 'yellow'))
             return
         report_length = len(pdu[1:])
         report_id = pdu[1]

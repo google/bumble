@@ -25,10 +25,11 @@ try:
     from bumble.crypto.cryptography import EccKey, aes_cmac, e
 except ImportError:
     logging.getLogger(__name__).debug(
-        "Unable to import cryptography, use built-in primitives."
+        "Unable to import cryptography, using built-in primitives."
     )
     from bumble.crypto.builtin import EccKey, aes_cmac, e  # type: ignore[assignment]
 
+_EccKey = EccKey  # For the linter only
 
 # -----------------------------------------------------------------------------
 # Logging
