@@ -85,7 +85,6 @@ class _AES:
     # fmt: on
 
     def __init__(self, key: bytes) -> None:
-
         if len(key) not in (16, 24, 32):
             raise core.InvalidArgumentError(f'Invalid key size {len(key)}')
 
@@ -112,7 +111,6 @@ class _AES:
         r_con_pointer = 0
         t = kc
         while t < round_key_count:
-
             tt = tk[kc - 1]
             tk[0] ^= (
                 (self._S[(tt >> 16) & 0xFF] << 24)
@@ -269,7 +267,6 @@ class _ECB:
 
 
 class _CBC:
-
     def __init__(self, key: bytes, iv: bytes = bytes(16)) -> None:
         if len(iv) != 16:
             raise core.InvalidArgumentError(
@@ -302,7 +299,6 @@ class _CBC:
 
 
 class _CMAC:
-
     def __init__(
         self,
         key: bytes,
@@ -414,7 +410,6 @@ class _CMAC:
         self._last_pt = _xor(second_last, data_block[-bs:])
 
     def digest(self) -> bytes:
-
         bs = self._block_size
 
         if self._mac_tag is not None and not self._update_after_digest:

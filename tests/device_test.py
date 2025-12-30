@@ -23,9 +23,10 @@ from unittest import mock
 
 import pytest
 
-from bumble import device, gatt, hci, utils
+from bumble import gatt, hci, utils
 from bumble.core import PhysicalTransport
 from bumble.device import (
+    Advertisement,
     AdvertisingEventProperties,
     AdvertisingParameters,
     CigParameters,
@@ -146,7 +147,7 @@ async def test_device_connect_parallel():
             )
         )
 
-        assert (yield) == None
+        assert (yield) is None
 
     def d1_flow():
         packet = HCI_Packet.from_bytes((yield))
@@ -180,7 +181,7 @@ async def test_device_connect_parallel():
             )
         )
 
-        assert (yield) == None
+        assert (yield) is None
 
     def d2_flow():
         packet = HCI_Packet.from_bytes((yield))
@@ -214,7 +215,7 @@ async def test_device_connect_parallel():
             )
         )
 
-        assert (yield) == None
+        assert (yield) is None
 
     d0.host.set_packet_sink(Sink(d0_flow()))
     d1.host.set_packet_sink(Sink(d1_flow()))
@@ -239,10 +240,10 @@ async def test_device_connect_parallel():
         ]
     )
 
-    assert type(c01) == Connection
-    assert type(c02) == Connection
-    assert type(a10) == Connection
-    assert type(a20) == Connection
+    assert isinstance(c01, Connection)
+    assert isinstance(c02, Connection)
+    assert isinstance(a10, Connection)
+    assert isinstance(a20, Connection)
 
     assert c01.handle == a10.handle and c01.handle == 0x100
     assert c02.handle == a20.handle and c02.handle == 0x101
@@ -317,7 +318,7 @@ async def test_advertising_and_scanning():
         await dev.power_on()
 
     # Start scanning
-    advertisements = asyncio.Queue[device.Advertisement]()
+    advertisements = asyncio.Queue[Advertisement]()
     devices[1].on(devices[1].EVENT_ADVERTISEMENT, advertisements.put_nowait)
     await devices[1].start_scanning()
 

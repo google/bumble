@@ -51,6 +51,7 @@ class HCI_LE_Get_Vendor_Capabilities_Command(hci.HCI_Command):
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#vendor-specific-capabilities
     '''
+
     return_parameters_fields = [
         ('status', hci.STATUS_SPEC),
         ('max_advt_instances', 1),
@@ -137,6 +138,7 @@ class HCI_Get_Controller_Activity_Energy_Info_Command(hci.HCI_Command):
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#le_get_controller_activity_energy_info
     '''
+
     return_parameters_fields = [
         ('status', hci.STATUS_SPEC),
         ('total_tx_time_ms', 4),
@@ -229,6 +231,7 @@ class HCI_Bluetooth_Quality_Report_Event(HCI_Android_Vendor_Event):
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#bluetooth-quality-report-sub-event
     '''
+
     quality_report_id: int = field(metadata=hci.metadata(1))
     packet_types: int = field(metadata=hci.metadata(1))
     connection_handle: int = field(metadata=hci.metadata(2))

@@ -301,9 +301,7 @@ async def test_pacs():
 
     await devices.setup_connection()
     peer = device.Peer(devices.connections[1])
-    pacs_client = await peer.discover_service_and_create_proxy(
-        PublishedAudioCapabilitiesServiceProxy
-    )
+    await peer.discover_service_and_create_proxy(PublishedAudioCapabilitiesServiceProxy)
 
 
 # -----------------------------------------------------------------------------

@@ -597,7 +597,7 @@ class AgIndicatorState:
             supported_values_text = (
                 f'({",".join(str(v) for v in self.supported_values)})'
             )
-        return f'(\"{self.indicator.value}\",{supported_values_text})'
+        return f'("{self.indicator.value}",{supported_values_text})'
 
     @classmethod
     def call(cls: type[Self]) -> Self:
@@ -1351,7 +1351,7 @@ class AgProtocol(utils.EventEmitter):
             logger.warning(f'AG indicator {indicator} is disabled')
 
         indicator_state.current_status = value
-        self.send_response(f'+CIEV: {index+1},{value}')
+        self.send_response(f'+CIEV: {index + 1},{value}')
 
     async def negotiate_codec(self, codec: AudioCodec) -> None:
         """Starts codec negotiation."""
@@ -1417,7 +1417,7 @@ class AgProtocol(utils.EventEmitter):
             operation_code = operation_code[:1] + b'x'
         try:
             operation = CallHoldOperation(operation_code.decode())
-        except:
+        except Exception:
             logger.error(f'Invalid operation: {operation_code.decode()}')
             self.send_cme_error(CmeError.OPERATION_NOT_SUPPORTED)
             return
@@ -1589,7 +1589,7 @@ class AgProtocol(utils.EventEmitter):
 
     def _on_clcc(self) -> None:
         for call in self.calls:
-            number_text = f',\"{call.number}\"' if call.number is not None else ''
+            number_text = f',"{call.number}"' if call.number is not None else ''
             type_text = f',{call.type}' if call.type is not None else ''
             response = (
                 f'+CLCC: {call.index}'

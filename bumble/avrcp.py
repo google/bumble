@@ -2011,7 +2011,7 @@ class Protocol(utils.EventEmitter):
                 f"{command} is not a valid AV/C Command Frame"
             )
         logger.debug(
-            f"<<< AVCTP Command, transaction_label={transaction_label}: " f"{command}"
+            f"<<< AVCTP Command, transaction_label={transaction_label}: {command}"
         )
 
         # Only addressing the unit, or the PANEL subunit with subunit ID 0 is supported

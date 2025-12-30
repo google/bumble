@@ -331,7 +331,6 @@ class InformationEnhancedControlField(EnhancedControlField):
 
 @dataclasses.dataclass
 class SupervisoryEnhancedControlField(EnhancedControlField):
-
     supervision_function: int = ControlField.SupervisoryFunction.RR
     poll: int = 0
     req_seq: int = 0
@@ -884,7 +883,6 @@ class Processor:
 
 # TODO: Handle retransmission
 class EnhancedRetransmissionProcessor(Processor):
-
     MAX_SEQ_NUM = 64
 
     @dataclasses.dataclass

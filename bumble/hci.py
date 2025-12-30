@@ -119,7 +119,6 @@ def phy_list_to_bits(phys: Optional[Iterable[Phy]]) -> int:
 
 
 class SpecableEnum(utils.OpenIntEnum):
-
     @classmethod
     def type_spec(cls, size: int, byteorder: Literal['little', 'big'] = 'little'):
         return {
@@ -147,7 +146,6 @@ class SpecableEnum(utils.OpenIntEnum):
 
 
 class SpecableFlag(enum.IntFlag):
-
     @classmethod
     def type_spec(cls, size: int, byteorder: Literal['little', 'big'] = 'little'):
         return {
@@ -1786,20 +1784,20 @@ class HCI_Object:
 
     @classmethod
     def dict_and_offset_from_bytes(
-        cls, data: bytes, offset: int, fields: Fields
+        cls, data: bytes, offset: int, object_fields: Fields
     ) -> tuple[int, collections.OrderedDict[str, Any]]:
         result = collections.OrderedDict[str, Any]()
-        for field in fields:
-            if isinstance(field, list):
+        for object_field in object_fields:
+            if isinstance(object_field, list):
                 # This is an array field, starting with a 1-byte item count.
                 item_count = data[offset]
                 offset += 1
                 # Set fields first, because item_count might be 0.
-                for sub_field_name, _ in field:
+                for sub_field_name, _ in object_field:
                     result[sub_field_name] = []
 
                 for _ in range(item_count):
-                    for sub_field_name, sub_field_type in field:
+                    for sub_field_name, sub_field_type in object_field:
                         value, size = HCI_Object.parse_field(
                             data, offset, sub_field_type
                         )
@@ -1807,7 +1805,7 @@ class HCI_Object:
                         offset += size
                 continue
 
-            field_name, field_type = field
+            field_name, field_type = object_field
             assert isinstance(field_name, str)
             field_value, field_size = HCI_Object.parse_field(
                 data, offset, cast(FieldSpec, field_type)
@@ -1890,26 +1888,26 @@ class HCI_Object:
         return field_bytes
 
     @staticmethod
-    def dict_to_bytes(hci_object, fields):
+    def dict_to_bytes(hci_object, object_fields):
         result = bytearray()
-        for field in fields:
-            if isinstance(field, list):
+        for object_field in object_fields:
+            if isinstance(object_field, list):
                 # The field is an array. The serialized form starts with a 1-byte
                 # item count. We use the length of the first array field as the
                 # array count, since all array fields have the same number of items.
-                item_count = len(hci_object[field[0][0]])
+                item_count = len(hci_object[object_field[0][0]])
                 result += bytes([item_count]) + b''.join(
                     b''.join(
                         HCI_Object.serialize_field(
                             hci_object[sub_field_name][i], sub_field_type
                         )
-                        for sub_field_name, sub_field_type in field
+                        for sub_field_name, sub_field_type in object_field
                     )
                     for i in range(item_count)
                 )
                 continue
 
-            (field_name, field_type) = field
+            (field_name, field_type) = object_field
             result += HCI_Object.serialize_field(hci_object[field_name], field_type)
 
         return bytes(result)
@@ -1967,15 +1965,15 @@ class HCI_Object:
         )
 
     @staticmethod
-    def format_fields(hci_object, fields, indentation='', value_mappers=None):
-        if not fields:
+    def format_fields(hci_object, object_fields, indentation='', value_mappers=None):
+        if not object_fields:
             return ''
 
         # Build array of formatted key:value pairs
         field_strings = []
-        for field in fields:
-            if isinstance(field, list):
-                for sub_field in field:
+        for object_field in object_fields:
+            if isinstance(object_field, list):
+                for sub_field in object_field:
                     sub_field_name, sub_field_type = sub_field
                     item_count = len(hci_object[sub_field_name])
                     for i in range(item_count):
@@ -1993,7 +1991,7 @@ class HCI_Object:
                         )
                 continue
 
-            field_name, field_type = field
+            field_name, field_type = object_field
             field_value = hci_object[field_name]
             field_strings.append(
                 (
@@ -2016,16 +2014,16 @@ class HCI_Object:
     @classmethod
     def fields_from_dataclass(cls, obj: Any) -> list[Any]:
         stack: list[list[Any]] = [[]]
-        for field in dataclasses.fields(obj):
+        for object_field in dataclasses.fields(obj):
             # Fields without metadata should be ignored.
             if not isinstance(
-                (metadata := field.metadata.get("bumble.hci")), FieldMetadata
+                (metadata := object_field.metadata.get("bumble.hci")), FieldMetadata
             ):
                 continue
             if metadata.list_begin:
                 stack.append([])
             if metadata.spec:
-                stack[-1].append((field.name, metadata.spec))
+                stack[-1].append((object_field.name, metadata.spec))
             if metadata.list_end:
                 top = stack.pop()
                 stack[-1].append(top)

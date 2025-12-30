@@ -24,9 +24,9 @@ from typing import AsyncGenerator, Optional, Union
 import grpc
 from google.protobuf import any_pb2, empty_pb2  # pytype: disable=pyi-error
 from pandora.l2cap_grpc_aio import L2CAPServicer  # pytype: disable=pyi-error
-from pandora.l2cap_pb2 import COMMAND_NOT_UNDERSTOOD, INVALID_CID_IN_REQUEST
-from pandora.l2cap_pb2 import Channel as PandoraChannel  # pytype: disable=pyi-error
 from pandora.l2cap_pb2 import (
+    COMMAND_NOT_UNDERSTOOD,
+    INVALID_CID_IN_REQUEST,
     ConnectRequest,
     ConnectResponse,
     CreditBasedChannelRequest,
@@ -41,6 +41,7 @@ from pandora.l2cap_pb2 import (
     WaitDisconnectionRequest,
     WaitDisconnectionResponse,
 )
+from pandora.l2cap_pb2 import Channel as PandoraChannel  # pytype: disable=pyi-error
 
 from bumble.core import InvalidArgumentError, OutOfResourcesError
 from bumble.device import Device

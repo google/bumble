@@ -484,7 +484,7 @@ class Driver(common.Driver):
 
         if (vendor_id, product_id) not in RTK_USB_PRODUCTS:
             logger.debug(
-                f"USB device ({vendor_id:04X}, {product_id:04X}) " "not in known list"
+                f"USB device ({vendor_id:04X}, {product_id:04X}) not in known list"
             )
             return False
 

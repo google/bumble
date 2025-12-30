@@ -127,6 +127,9 @@ def lint(ctx, disable='C,R', errors_only=False):
 
     print(f">>> Running the linter{qualifier}...")
     try:
+        print("+++ Checking with ruff...")
+        ctx.run("ruff check")
+        print("+++ Checking with pylint...")
         ctx.run(f"pylint {' '.join(options)} bumble apps examples tasks.py")
         print("The linter is happy. ✅ 😊 🐝")
     except UnexpectedExit as exc:
@@ -138,20 +141,24 @@ def lint(ctx, disable='C,R', errors_only=False):
 @task
 def format_code(ctx, check=False, diff=False):
 
-    options = []
-    if check:
-        options.append("--check")
-    if diff:
-        options.append("--diff")
-
     print(">>> Sorting imports...")
+    options = []
     try:
-        ctx.run(f"isort {' '.join(options)} .")
+        if diff:
+            options.append("--diff")
+        else:
+            options.append("--fix")
+        ctx.run(f"ruff check --select I {' '.join(options)} .")
     except UnexpectedExit as exc:
         print("Please run 'invoke project.format' or 'isort .' to format the code. ❌")
         raise Exit(code=1) from exc
 
     print(">>> Running the formatter...")
+    options = []
+    if check:
+        options.append("--check")
+    if diff:
+        options.append("--diff")
     try:
         ctx.run(f"black -S {' '.join(options)} .")
     except UnexpectedExit as exc:

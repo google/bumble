@@ -490,7 +490,7 @@ class VendorSpecificMediaCodecInformation(MediaCodecInformation):
                 'VendorSpecificMediaCodecInformation(',
                 f'  vendor_id: {self.vendor_id:08X} ({name_or_number(COMPANY_IDENTIFIERS, self.vendor_id & 0xFFFF)})',
                 f'  codec_id:  {self.codec_id:04X}',
-                f'  value:     {self.value.hex()}' ')',
+                f'  value:     {self.value.hex()})',
             ]
         )
 

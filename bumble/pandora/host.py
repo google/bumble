@@ -21,8 +21,10 @@ from typing import AsyncGenerator, Optional, cast
 
 import grpc
 import grpc.aio
-from google.protobuf import any_pb2  # pytype: disable=pyi-error
-from google.protobuf import empty_pb2  # pytype: disable=pyi-error
+from google.protobuf import (
+    any_pb2,  # pytype: disable=pyi-error
+    empty_pb2,  # pytype: disable=pyi-error
+)
 from pandora import host_pb2
 from pandora.host_grpc_aio import HostServicer
 from pandora.host_pb2 import (
@@ -302,7 +304,9 @@ class HostService(HostServicer):
                 await disconnection_future
                 self.log.debug("Disconnected")
             finally:
-                connection.remove_listener(connection.EVENT_DISCONNECTION, on_disconnection)  # type: ignore
+                connection.remove_listener(
+                    connection.EVENT_DISCONNECTION, on_disconnection
+                )  # type: ignore
 
         return empty_pb2.Empty()
 
@@ -539,7 +543,7 @@ class HostService(HostServicer):
                 await bumble.utils.cancel_on_event(
                     self.device, 'flush', self.device.stop_advertising()
                 )
-            except:
+            except Exception:
                 pass
 
     @utils.rpc
@@ -609,7 +613,7 @@ class HostService(HostServicer):
                 await bumble.utils.cancel_on_event(
                     self.device, 'flush', self.device.stop_scanning()
                 )
-            except:
+            except Exception:
                 pass
 
     @utils.rpc
@@ -644,14 +648,18 @@ class HostService(HostServicer):
                 )
 
         finally:
-            self.device.remove_listener(self.device.EVENT_INQUIRY_COMPLETE, complete_handler)  # type: ignore
-            self.device.remove_listener(self.device.EVENT_INQUIRY_RESULT, result_handler)  # type: ignore
+            self.device.remove_listener(
+                self.device.EVENT_INQUIRY_COMPLETE, complete_handler
+            )  # type: ignore
+            self.device.remove_listener(
+                self.device.EVENT_INQUIRY_RESULT, result_handler
+            )  # type: ignore
             try:
                 self.log.debug('Stop inquiry')
                 await bumble.utils.cancel_on_event(
                     self.device, 'flush', self.device.stop_discovery()
                 )
-            except:
+            except Exception:
                 pass
 
     @utils.rpc

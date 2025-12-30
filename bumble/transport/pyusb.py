@@ -284,7 +284,9 @@ async def open_pyusb_transport(spec: str) -> Transport:
             device = await _power_cycle(device)  # type: ignore
         except Exception as e:
             logging.debug(e, stack_info=True)
-            logging.info(f"Unable to power cycle {hex(device.idVendor)} {hex(device.idProduct)}")  # type: ignore
+            logging.info(
+                f"Unable to power cycle {hex(device.idVendor)} {hex(device.idProduct)}"
+            )  # type: ignore
 
     # Collect the metadata
     device_metadata = {'vendor_id': device.idVendor, 'product_id': device.idProduct}
@@ -370,7 +372,9 @@ async def _power_cycle(device: UsbDevice) -> UsbDevice:
             # Device needs to be find again otherwise it will appear as disconnected
             return usb.core.find(idVendor=device.idVendor, idProduct=device.idProduct)  # type: ignore
         except USBError:
-            logger.exception(f"Adjustment needed: Please revise the udev rule for device {hex(device.idVendor)}:{hex(device.idProduct)} for proper recognition.")  # type: ignore
+            logger.exception(
+                f"Adjustment needed: Please revise the udev rule for device {hex(device.idVendor)}:{hex(device.idProduct)} for proper recognition."
+            )  # type: ignore
 
     return device
 

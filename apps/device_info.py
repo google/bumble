@@ -215,7 +215,6 @@ async def show_device_info(peer, done: Optional[asyncio.Future]) -> None:
 # -----------------------------------------------------------------------------
 async def async_main(device_config, encrypt, transport, address_or_name):
     async with await open_transport(transport) as (hci_source, hci_sink):
-
         # Create a device
         if device_config:
             device = Device.from_config_file_with_hci(

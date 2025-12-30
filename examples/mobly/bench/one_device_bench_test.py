@@ -3,7 +3,6 @@ from mobly.controllers import android_device
 
 
 class OneDeviceBenchTest(base_test.BaseTestClass):
-
     def setup_class(self):
         self.ads = self.register_controller(android_device)
         self.dut = self.ads[0]

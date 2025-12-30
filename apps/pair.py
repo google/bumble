@@ -527,7 +527,9 @@ async def pair(
                 if advertise_appearance:
                     advertise_appearance = advertise_appearance.upper()
                     try:
-                        advertise_appearance_int = int(advertise_appearance)
+                        appearance = data_types.Appearance.from_int(
+                            int(advertise_appearance)
+                        )
                     except ValueError:
                         category, subcategory = advertise_appearance.split('/')
                         try:
@@ -545,12 +547,11 @@ async def pair(
                         except ValueError:
                             print(color(f'Invalid subcategory {subcategory}', 'red'))
                             return
-                        advertise_appearance_int = int(
-                            Appearance(category_enum, subcategory_enum)
+                        appearance = data_types.Appearance(
+                            category_enum, subcategory_enum
                         )
-                    advertising_data_types.append(
-                        data_types.Appearance(category_enum, subcategory_enum)
-                    )
+
+                    advertising_data_types.append(appearance)
                 device.advertising_data = bytes(AdvertisingData(advertising_data_types))
                 await device.start_advertising(
                     auto_restart=True,

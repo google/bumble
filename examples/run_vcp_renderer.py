@@ -57,7 +57,7 @@ def dumps_volume_state(volume_setting: int, muted: int, change_counter: int) -> 
 # -----------------------------------------------------------------------------
 async def main() -> None:
     if len(sys.argv) < 3:
-        print('Usage: run_vcp_renderer.py <config-file>' '<transport-spec-for-device>')
+        print('Usage: run_vcp_renderer.py <config-file><transport-spec-for-device>')
         return
 
     print('<<< connecting to HCI...')

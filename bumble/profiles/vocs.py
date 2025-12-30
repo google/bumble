@@ -118,7 +118,6 @@ class VolumeOffsetControlPoint:
     volume_offset_state: VolumeOffsetState
 
     async def on_write(self, connection: Connection, value: bytes) -> None:
-
         opcode = value[0]
         if opcode != SetVolumeOffsetOpCode.SET_VOLUME_OFFSET:
             raise ATT_Error(ErrorCode.OPCODE_NOT_SUPPORTED)
@@ -177,7 +176,6 @@ class VolumeOffsetControlService(TemplateService):
         audio_location: Optional[VocsAudioLocation] = None,
         audio_output_description: Optional[AudioOutputDescription] = None,
     ) -> None:
-
         self.volume_offset_state = (
             VolumeOffsetState() if volume_offset_state is None else volume_offset_state
         )

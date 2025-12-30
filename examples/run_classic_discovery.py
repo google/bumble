@@ -38,11 +38,11 @@ class DiscoveryListener(Device.Listener):
         print(f'>>> {color(address, "yellow")}:')
         print(f'  Device Class (raw): {class_of_device:06X}')
         major_class_name = DeviceClass.major_device_class_name(major_device_class)
-        print('  Device Major Class: ' f'{major_class_name}')
+        print(f'  Device Major Class: {major_class_name}')
         minor_class_name = DeviceClass.minor_device_class_name(
             major_device_class, minor_device_class
         )
-        print('  Device Minor Class: ' f'{minor_class_name}')
+        print(f'  Device Minor Class: {minor_class_name}')
         print(
             '  Device Services: '
             f'{", ".join(DeviceClass.service_class_labels(service_classes))}'

@@ -48,12 +48,12 @@ development = [
     "bt-test-interfaces >= 0.0.6",
     "grpcio-tools >= 1.62.1",
     "invoke >= 1.7.3",
-    "isort ~= 5.13.2",
     "mobly >= 1.12.2",
     "mypy == 1.12.0",
     "nox >= 2022",
     "pylint == 3.3.1",
     "pyyaml >= 6.0",
+    "ruff == 0.14.10",
     "types-appdirs >= 1.4.3",
     "types-invoke >= 1.7.3",
     "types-protobuf >= 4.21.0",
@@ -208,3 +208,11 @@ ignore_missing_imports = true
 [tool.isort]
 profile = "black"
 skip = ["_version.py", "grpc_protobuf"]
+
+[tool.ruff]
+exclude = [
+    "bumble/transport/grpc_protobuf"
+]
+
+[tool.ruff.format]
+quote-style = "preserve"

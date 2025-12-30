@@ -217,9 +217,7 @@ async def scan(
 @click.option(
     '--irk',
     metavar='<IRK_HEX>:<ADDRESS>',
-    help=(
-        'Use this IRK for resolving private addresses ' '(may be used more than once)'
-    ),
+    help=('Use this IRK for resolving private addresses (may be used more than once)'),
     multiple=True,
 )
 @click.option(

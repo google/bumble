@@ -51,7 +51,6 @@ async def main() -> None:
     devices[1].cis_enabled = True
 
     await asyncio.gather(*[device.power_on() for device in devices])
-    advertising_set = await devices[0].create_advertising_set()
 
     connection = await devices[1].connect(
         devices[0].random_address, own_address_type=OwnAddressType.RANDOM

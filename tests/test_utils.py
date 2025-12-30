@@ -40,7 +40,7 @@ class Devices:
         self.link = LocalLink()
         addresses = [":".join([f"F{i}"] * 6) for i in range(num_devices)]
         self.controllers = [
-            Controller(f'C{i+i}', link=self.link, public_address=addresses[i])
+            Controller(f'C{i + i}', link=self.link, public_address=addresses[i])
             for i in range(num_devices)
         ]
         self.devices = [

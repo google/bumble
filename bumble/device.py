@@ -5248,8 +5248,7 @@ class Device(utils.CompositeEventEmitter):
 
         if status != hci.HCI_SUCCESS:
             logger.debug(
-                f'advertising set {advertising_handle} '
-                f'terminated with status {status}'
+                f'advertising set {advertising_handle} terminated with status {status}'
             )
             return
 
@@ -5628,7 +5627,8 @@ class Device(utils.CompositeEventEmitter):
 
             self.host.send_command_sync(
                 hci.HCI_Accept_Connection_Request_Command(
-                    bd_addr=bd_addr, role=0x01  # Remain the peripheral
+                    bd_addr=bd_addr,
+                    role=0x01,  # Remain the peripheral
                 )
             )
 
