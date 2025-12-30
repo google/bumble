@@ -5172,7 +5172,7 @@ class Device(utils.CompositeEventEmitter):
         await self.gatt_server.notify_subscriber(connection, attribute, value, force)
 
     async def notify_subscribers(
-        self, attribute: Attribute, value=None, force=False
+        self, attribute: Attribute, value: Optional[Any] = None, force: bool = False
     ) -> None:
         """
         Send a notification to all the subscribers of an attribute.
