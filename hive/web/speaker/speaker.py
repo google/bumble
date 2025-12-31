@@ -16,31 +16,30 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+
 import enum
 import logging
-from typing import Dict, List
 
-from bumble.core import BT_BR_EDR_TRANSPORT, CommandTimeoutError
-from bumble.device import Device, DeviceConfiguration
-from bumble.pairing import PairingConfig
-from bumble.sdp import ServiceAttribute
+from bumble.a2dp import (
+    A2DP_MPEG_2_4_AAC_CODEC_TYPE,
+    A2DP_SBC_CODEC_TYPE,
+    AacMediaCodecInformation,
+    SbcMediaCodecInformation,
+    make_audio_sink_service_sdp_records,
+)
 from bumble.avdtp import (
     AVDTP_AUDIO_MEDIA_TYPE,
     Listener,
     MediaCodecCapabilities,
     Protocol,
 )
-from bumble.a2dp import (
-    make_audio_sink_service_sdp_records,
-    A2DP_SBC_CODEC_TYPE,
-    A2DP_MPEG_2_4_AAC_CODEC_TYPE,
-    SbcMediaCodecInformation,
-    AacMediaCodecInformation,
-)
 from bumble.codecs import AacAudioRtpPacket
+from bumble.core import CommandTimeoutError, PhysicalTransport
+from bumble.device import Device, DeviceConfiguration
 from bumble.hci import HCI_Reset_Command
+from bumble.pairing import PairingConfig
 from bumble.rtp import MediaPacket
-
+from bumble.sdp import ServiceAttribute
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -101,7 +100,7 @@ class Speaker:
         self.stream_state = Speaker.StreamState.IDLE
         self.audio_extractor = AudioExtractor.create(codec)
 
-    def sdp_records(self) -> Dict[int, List[ServiceAttribute]]:
+    def sdp_records(self) -> dict[int, list[ServiceAttribute]]:
         service_record_handle = 0x00010001
         return {
             service_record_handle: make_audio_sink_service_sdp_records(
@@ -229,7 +228,9 @@ class Speaker:
     async def connect(self, address):
         # Connect to the source
         print(f'=== Connecting to {address}...')
-        connection = await self.device.connect(address, transport=BT_BR_EDR_TRANSPORT)
+        connection = await self.device.connect(
+            address, transport=PhysicalTransport.BR_EDR
+        )
         print(f'=== Connected to {connection.peer_address}')
 
         # Request authentication

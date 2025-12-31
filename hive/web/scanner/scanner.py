@@ -15,14 +15,14 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-import pyee
 
+from bumble import utils
 from bumble.device import Device
 from bumble.hci import HCI_Reset_Command
 
 
 # -----------------------------------------------------------------------------
-class Scanner(pyee.EventEmitter):
+class Scanner(utils.EventEmitter):
     """
     Scanner web app
 
