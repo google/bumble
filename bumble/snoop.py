@@ -16,13 +16,14 @@ import datetime
 import logging
 import os
 import struct
+from collections.abc import Generator
 
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
 from contextlib import contextmanager
 from enum import IntEnum
-from typing import BinaryIO, Generator
+from typing import BinaryIO
 
 from bumble import core
 from bumble.hci import HCI_COMMAND_PACKET, HCI_EVENT_PACKET

@@ -18,7 +18,6 @@
 import asyncio
 import logging
 import os
-from typing import Optional
 
 import pytest
 import pytest_asyncio
@@ -113,8 +112,8 @@ def _default_ag_sdp_features() -> hfp.AgSdpFeature:
 
 # -----------------------------------------------------------------------------
 async def make_hfp_connections(
-    hf_config: Optional[hfp.HfConfiguration] = None,
-    ag_config: Optional[hfp.AgConfiguration] = None,
+    hf_config: hfp.HfConfiguration | None = None,
+    ag_config: hfp.AgConfiguration | None = None,
 ):
     if not hf_config:
         hf_config = _default_hf_configuration()

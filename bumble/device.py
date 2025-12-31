@@ -25,19 +25,15 @@ import itertools
 import json
 import logging
 import secrets
-from collections.abc import Iterable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager, closing
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
     ClassVar,
-    Optional,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -188,7 +184,7 @@ class Advertisement:
         self.data = AdvertisingData.from_bytes(self.data_bytes)
 
     @classmethod
-    def from_advertising_report(cls, report) -> Optional[Advertisement]:
+    def from_advertising_report(cls, report) -> Advertisement | None:
         if isinstance(report, hci.HCI_LE_Advertising_Report_Event.Report):
             return LegacyAdvertisement.from_advertising_report(report)
 
@@ -604,11 +600,11 @@ class AdvertisingSet(utils.EventEmitter):
     device: Device
     advertising_handle: int
     auto_restart: bool
-    random_address: Optional[hci.Address]
+    random_address: hci.Address | None
     advertising_parameters: AdvertisingParameters
     advertising_data: bytes
     scan_response_data: bytes
-    periodic_advertising_parameters: Optional[PeriodicAdvertisingParameters]
+    periodic_advertising_parameters: PeriodicAdvertisingParameters | None
     periodic_advertising_data: bytes
     selected_tx_power: int = 0
     enabled: bool = False
@@ -855,7 +851,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
         TERMINATED = 6
 
     _state: State
-    sync_handle: Optional[int]
+    sync_handle: int | None
     advertiser_address: hci.Address
     sid: int
     skip: int
@@ -1282,7 +1278,7 @@ class Peer:
         return mtu
 
     async def discover_service(
-        self, uuid: Union[core.UUID, str]
+        self, uuid: core.UUID | str
     ) -> list[gatt_client.ServiceProxy]:
         return await self.gatt_client.discover_service(uuid)
 
@@ -1298,8 +1294,8 @@ class Peer:
 
     async def discover_characteristics(
         self,
-        uuids: Iterable[Union[core.UUID, str]] = (),
-        service: Optional[gatt_client.ServiceProxy] = None,
+        uuids: Iterable[core.UUID | str] = (),
+        service: gatt_client.ServiceProxy | None = None,
     ) -> list[gatt_client.CharacteristicProxy[bytes]]:
         return await self.gatt_client.discover_characteristics(
             uuids=uuids, service=service
@@ -1307,9 +1303,9 @@ class Peer:
 
     async def discover_descriptors(
         self,
-        characteristic: Optional[gatt_client.CharacteristicProxy] = None,
-        start_handle: Optional[int] = None,
-        end_handle: Optional[int] = None,
+        characteristic: gatt_client.CharacteristicProxy | None = None,
+        start_handle: int | None = None,
+        end_handle: int | None = None,
     ):
         return await self.gatt_client.discover_descriptors(
             characteristic, start_handle, end_handle
@@ -1330,7 +1326,7 @@ class Peer:
     async def subscribe(
         self,
         characteristic: gatt_client.CharacteristicProxy,
-        subscriber: Optional[Callable[[bytes], Any]] = None,
+        subscriber: Callable[[bytes], Any] | None = None,
         prefer_notify: bool = True,
     ) -> None:
         return await self.gatt_client.subscribe(
@@ -1340,25 +1336,23 @@ class Peer:
     async def unsubscribe(
         self,
         characteristic: gatt_client.CharacteristicProxy,
-        subscriber: Optional[Callable[[bytes], Any]] = None,
+        subscriber: Callable[[bytes], Any] | None = None,
     ) -> None:
         return await self.gatt_client.unsubscribe(characteristic, subscriber)
 
-    async def read_value(
-        self, attribute: Union[int, gatt_client.AttributeProxy]
-    ) -> bytes:
+    async def read_value(self, attribute: int | gatt_client.AttributeProxy) -> bytes:
         return await self.gatt_client.read_value(attribute)
 
     async def write_value(
         self,
-        attribute: Union[int, gatt_client.AttributeProxy],
+        attribute: int | gatt_client.AttributeProxy,
         value: bytes,
         with_response: bool = False,
     ) -> None:
         return await self.gatt_client.write_value(attribute, value, with_response)
 
     async def read_characteristics_by_uuid(
-        self, uuid: core.UUID, service: Optional[gatt_client.ServiceProxy] = None
+        self, uuid: core.UUID, service: gatt_client.ServiceProxy | None = None
     ) -> list[bytes]:
         return await self.gatt_client.read_characteristics_by_uuid(uuid, service)
 
@@ -1368,7 +1362,7 @@ class Peer:
     def get_characteristics_by_uuid(
         self,
         uuid: core.UUID,
-        service: Optional[Union[gatt_client.ServiceProxy, core.UUID]] = None,
+        service: gatt_client.ServiceProxy | core.UUID | None = None,
     ) -> list[gatt_client.CharacteristicProxy[bytes]]:
         if isinstance(service, core.UUID):
             return list(
@@ -1384,7 +1378,7 @@ class Peer:
 
     def create_service_proxy(
         self, proxy_class: type[_PROXY_CLASS]
-    ) -> Optional[_PROXY_CLASS]:
+    ) -> _PROXY_CLASS | None:
         if proxy := proxy_class.from_client(self.gatt_client):
             return cast(_PROXY_CLASS, proxy)
 
@@ -1392,7 +1386,7 @@ class Peer:
 
     async def discover_service_and_create_proxy(
         self, proxy_class: type[_PROXY_CLASS]
-    ) -> Optional[_PROXY_CLASS]:
+    ) -> _PROXY_CLASS | None:
         # Discover the first matching service and its characteristics
         services = await self.discover_service(proxy_class.SERVICE_CLASS.UUID)
         if services:
@@ -1401,7 +1395,7 @@ class Peer:
             return self.create_service_proxy(proxy_class)
         return None
 
-    async def sustain(self, timeout: Optional[float] = None) -> None:
+    async def sustain(self, timeout: float | None = None) -> None:
         await self.connection.sustain(timeout)
 
     # [Classic only]
@@ -1444,7 +1438,7 @@ class ScoLink(utils.CompositeEventEmitter):
     acl_connection: Connection
     handle: int
     link_type: int
-    sink: Optional[Callable[[hci.HCI_SynchronousDataPacket], Any]] = None
+    sink: Callable[[hci.HCI_SynchronousDataPacket], Any] | None = None
 
     EVENT_DISCONNECTION: ClassVar[str] = "disconnection"
     EVENT_DISCONNECTION_FAILURE: ClassVar[str] = "disconnection_failure"
@@ -1627,8 +1621,8 @@ class CisLink(utils.EventEmitter, _IsoLink):
     cis_sync_delay: int = 0  # CIS sync delay, in microseconds
     transport_latency_c_to_p: int = 0  # C->P transport latency, in microseconds
     transport_latency_p_to_c: int = 0  # P->C transport latency, in microseconds
-    phy_c_to_p: Optional[hci.Phy] = None
-    phy_p_to_c: Optional[hci.Phy] = None
+    phy_c_to_p: hci.Phy | None = None
+    phy_p_to_c: hci.Phy | None = None
     nse: int = 0
     bn_c_to_p: int = 0
     bn_p_to_c: int = 0
@@ -1716,11 +1710,11 @@ class Connection(utils.CompositeEventEmitter):
     handle: int
     transport: core.PhysicalTransport
     self_address: hci.Address
-    self_resolvable_address: Optional[hci.Address]
+    self_resolvable_address: hci.Address | None
     peer_address: hci.Address
-    peer_name: Optional[str]
-    peer_resolvable_address: Optional[hci.Address]
-    peer_le_features: Optional[hci.LeFeatureMask]
+    peer_name: str | None
+    peer_resolvable_address: hci.Address | None
+    peer_le_features: hci.LeFeatureMask | None
     role: hci.Role
     parameters: Parameters
     encryption: int
@@ -1728,8 +1722,8 @@ class Connection(utils.CompositeEventEmitter):
     authenticated: bool
     sc: bool
     gatt_client: gatt_client.Client
-    pairing_peer_io_capability: Optional[int]
-    pairing_peer_authentication_requirements: Optional[int]
+    pairing_peer_io_capability: int | None
+    pairing_peer_authentication_requirements: int | None
     cs_configs: dict[int, ChannelSoundingConfig]  # Config ID to Configuration
     cs_procedures: dict[int, ChannelSoundingProcedure]  # Config ID to Procedures
     classic_mode: int = hci.HCI_Mode_Change_Event.Mode.ACTIVE
@@ -1831,9 +1825,9 @@ class Connection(utils.CompositeEventEmitter):
         handle: int,
         transport: core.PhysicalTransport,
         self_address: hci.Address,
-        self_resolvable_address: Optional[hci.Address],
+        self_resolvable_address: hci.Address | None,
         peer_address: hci.Address,
-        peer_resolvable_address: Optional[hci.Address],
+        peer_resolvable_address: hci.Address | None,
         role: hci.Role,
         parameters: Parameters,
     ):
@@ -1896,8 +1890,8 @@ class Connection(utils.CompositeEventEmitter):
     ) -> l2cap.LeCreditBasedChannel: ...
 
     async def create_l2cap_channel(
-        self, spec: Union[l2cap.ClassicChannelSpec, l2cap.LeCreditBasedChannelSpec]
-    ) -> Union[l2cap.ClassicChannel, l2cap.LeCreditBasedChannel]:
+        self, spec: l2cap.ClassicChannelSpec | l2cap.LeCreditBasedChannelSpec
+    ) -> l2cap.ClassicChannel | l2cap.LeCreditBasedChannel:
         return await self.device.create_l2cap_channel(connection=self, spec=spec)
 
     async def disconnect(
@@ -1921,7 +1915,7 @@ class Connection(utils.CompositeEventEmitter):
     async def switch_role(self, role: hci.Role) -> None:
         return await self.device.switch_role(self, role)
 
-    async def sustain(self, timeout: Optional[float] = None) -> None:
+    async def sustain(self, timeout: float | None = None) -> None:
         """Idles the current task waiting for a disconnect or timeout"""
 
         abort = asyncio.get_running_loop().create_future()
@@ -1965,8 +1959,8 @@ class Connection(utils.CompositeEventEmitter):
 
     async def set_phy(
         self,
-        tx_phys: Optional[Iterable[hci.Phy]] = None,
-        rx_phys: Optional[Iterable[hci.Phy]] = None,
+        tx_phys: Iterable[hci.Phy] | None = None,
+        rx_phys: Iterable[hci.Phy] | None = None,
         phy_options: int = 0,
     ):
         return await self.device.set_connection_phy(self, tx_phys, rx_phys, phy_options)
@@ -2070,12 +2064,12 @@ class DeviceConfiguration:
         AdvertisingData([data_types.CompleteLocalName(DEVICE_DEFAULT_NAME)])
     )
     irk: bytes = bytes(16)  # This really must be changed for any level of security
-    keystore: Optional[str] = None
+    keystore: str | None = None
     address_resolution_offload: bool = False
     address_generation_offload: bool = False
     cis_enabled: bool = False
     channel_sounding_enabled: bool = False
-    identity_address_type: Optional[int] = None
+    identity_address_type: int | None = None
     io_capability: int = pairing.PairingDelegate.IoCapability.NO_OUTPUT_NO_INPUT
     gap_service_enabled: bool = True
     gatt_service_enabled: bool = True
@@ -2143,7 +2137,7 @@ class DeviceConfiguration:
             setattr(self, key, value)
 
     def load_from_file(self, filename: str) -> None:
-        with open(filename, 'r', encoding='utf-8') as file:
+        with open(filename, encoding='utf-8') as file:
             self.load_from_dict(json.load(file))
 
     @classmethod
@@ -2254,12 +2248,12 @@ class Device(utils.CompositeEventEmitter):
     pending_connections: dict[hci.Address, Connection]
     classic_pending_accepts: dict[
         hci.Address,
-        list[asyncio.Future[Union[Connection, tuple[hci.Address, int, int]]]],
+        list[asyncio.Future[Connection | tuple[hci.Address, int, int]]],
     ]
     advertisement_accumulators: dict[hci.Address, AdvertisementDataAccumulator]
     periodic_advertising_syncs: list[PeriodicAdvertisingSync]
     config: DeviceConfiguration
-    legacy_advertiser: Optional[LegacyAdvertiser]
+    legacy_advertiser: LegacyAdvertiser | None
     sco_links: dict[int, ScoLink]
     cis_links: dict[int, CisLink]
     bigs: dict[int, Big]
@@ -2347,10 +2341,10 @@ class Device(utils.CompositeEventEmitter):
 
     def __init__(
         self,
-        name: Optional[str] = None,
-        address: Optional[hci.Address] = None,
-        config: Optional[DeviceConfiguration] = None,
-        host: Optional[Host] = None,
+        name: str | None = None,
+        address: hci.Address | None = None,
+        config: DeviceConfiguration | None = None,
+        host: Host | None = None,
     ) -> None:
         super().__init__()
 
@@ -2407,7 +2401,7 @@ class Device(utils.CompositeEventEmitter):
         self.le_simultaneous_enabled = config.le_simultaneous_enabled
         self.le_privacy_enabled = config.le_privacy_enabled
         self.le_rpa_timeout = config.le_rpa_timeout
-        self.le_rpa_periodic_update_task: Optional[asyncio.Task] = None
+        self.le_rpa_periodic_update_task: asyncio.Task | None = None
         self.le_subrate_enabled = config.le_subrate_enabled
         self.classic_enabled = config.classic_enabled
         self.cis_enabled = config.cis_enabled
@@ -2431,8 +2425,8 @@ class Device(utils.CompositeEventEmitter):
         # can be initialized from a config object, and for backward compatibility for
         # client code that may set those values directly before calling
         # start_advertising().
-        self.legacy_advertising_set: Optional[AdvertisingSet] = None
-        self.legacy_advertiser: Optional[LegacyAdvertiser] = None
+        self.legacy_advertising_set: AdvertisingSet | None = None
+        self.legacy_advertiser: LegacyAdvertiser | None = None
         self.advertising_data = config.advertising_data
         self.scan_response_data = config.scan_response_data
         self.advertising_interval_min = config.advertising_interval_min
@@ -2550,7 +2544,7 @@ class Device(utils.CompositeEventEmitter):
     def sdp_service_records(self, service_records):
         self.sdp_server.service_records = service_records
 
-    def lookup_connection(self, connection_handle: int) -> Optional[Connection]:
+    def lookup_connection(self, connection_handle: int) -> Connection | None:
         if connection := self.connections.get(connection_handle):
             return connection
 
@@ -2559,9 +2553,9 @@ class Device(utils.CompositeEventEmitter):
     def find_connection_by_bd_addr(
         self,
         bd_addr: hci.Address,
-        transport: Optional[int] = None,
+        transport: int | None = None,
         check_address_type: bool = False,
-    ) -> Optional[Connection]:
+    ) -> Connection | None:
         for connection in self.connections.values():
             if bytes(connection.peer_address) == bytes(bd_addr):
                 if (
@@ -2576,7 +2570,7 @@ class Device(utils.CompositeEventEmitter):
 
     def lookup_periodic_advertising_sync(
         self, sync_handle: int
-    ) -> Optional[PeriodicAdvertisingSync]:
+    ) -> PeriodicAdvertisingSync | None:
         return next(
             (
                 sync
@@ -2614,8 +2608,8 @@ class Device(utils.CompositeEventEmitter):
     async def create_l2cap_channel(
         self,
         connection: Connection,
-        spec: Union[l2cap.ClassicChannelSpec, l2cap.LeCreditBasedChannelSpec],
-    ) -> Union[l2cap.ClassicChannel, l2cap.LeCreditBasedChannel]:
+        spec: l2cap.ClassicChannelSpec | l2cap.LeCreditBasedChannelSpec,
+    ) -> l2cap.ClassicChannel | l2cap.LeCreditBasedChannel:
         if isinstance(spec, l2cap.ClassicChannelSpec):
             return await self.l2cap_channel_manager.create_classic_channel(
                 connection=connection, spec=spec
@@ -2629,25 +2623,25 @@ class Device(utils.CompositeEventEmitter):
     def create_l2cap_server(
         self,
         spec: l2cap.ClassicChannelSpec,
-        handler: Optional[Callable[[l2cap.ClassicChannel], Any]] = None,
+        handler: Callable[[l2cap.ClassicChannel], Any] | None = None,
     ) -> l2cap.ClassicChannelServer: ...
 
     @overload
     def create_l2cap_server(
         self,
         spec: l2cap.LeCreditBasedChannelSpec,
-        handler: Optional[Callable[[l2cap.LeCreditBasedChannel], Any]] = None,
+        handler: Callable[[l2cap.LeCreditBasedChannel], Any] | None = None,
     ) -> l2cap.LeCreditBasedChannelServer: ...
 
     def create_l2cap_server(
         self,
-        spec: Union[l2cap.ClassicChannelSpec, l2cap.LeCreditBasedChannelSpec],
-        handler: Union[
-            Callable[[l2cap.ClassicChannel], Any],
-            Callable[[l2cap.LeCreditBasedChannel], Any],
-            None,
-        ] = None,
-    ) -> Union[l2cap.ClassicChannelServer, l2cap.LeCreditBasedChannelServer]:
+        spec: l2cap.ClassicChannelSpec | l2cap.LeCreditBasedChannelSpec,
+        handler: (
+            Callable[[l2cap.ClassicChannel], Any]
+            | Callable[[l2cap.LeCreditBasedChannel], Any]
+            | None
+        ) = None,
+    ) -> l2cap.ClassicChannelServer | l2cap.LeCreditBasedChannelServer:
         if isinstance(spec, l2cap.ClassicChannelSpec):
             return self.l2cap_channel_manager.create_classic_server(
                 spec=spec,
@@ -2949,13 +2943,13 @@ class Device(utils.CompositeEventEmitter):
     async def start_advertising(
         self,
         advertising_type: AdvertisingType = AdvertisingType.UNDIRECTED_CONNECTABLE_SCANNABLE,
-        target: Optional[hci.Address] = None,
+        target: hci.Address | None = None,
         own_address_type: hci.OwnAddressType = hci.OwnAddressType.RANDOM,
         auto_restart: bool = False,
-        advertising_data: Optional[bytes] = None,
-        scan_response_data: Optional[bytes] = None,
-        advertising_interval_min: Optional[float] = None,
-        advertising_interval_max: Optional[float] = None,
+        advertising_data: bytes | None = None,
+        scan_response_data: bytes | None = None,
+        advertising_interval_min: float | None = None,
+        advertising_interval_max: float | None = None,
     ) -> None:
         """Start legacy advertising.
 
@@ -3059,11 +3053,11 @@ class Device(utils.CompositeEventEmitter):
 
     async def create_advertising_set(
         self,
-        advertising_parameters: Optional[AdvertisingParameters] = None,
-        random_address: Optional[hci.Address] = None,
+        advertising_parameters: AdvertisingParameters | None = None,
+        random_address: hci.Address | None = None,
         advertising_data: bytes = b'',
         scan_response_data: bytes = b'',
-        periodic_advertising_parameters: Optional[PeriodicAdvertisingParameters] = None,
+        periodic_advertising_parameters: PeriodicAdvertisingParameters | None = None,
         periodic_advertising_data: bytes = b'',
         auto_start: bool = True,
         auto_restart: bool = False,
@@ -3599,13 +3593,13 @@ class Device(utils.CompositeEventEmitter):
 
     async def connect(
         self,
-        peer_address: Union[hci.Address, str],
+        peer_address: hci.Address | str,
         transport: core.PhysicalTransport = PhysicalTransport.LE,
-        connection_parameters_preferences: Optional[
-            dict[hci.Phy, ConnectionParametersPreferences]
-        ] = None,
+        connection_parameters_preferences: (
+            dict[hci.Phy, ConnectionParametersPreferences] | None
+        ) = None,
         own_address_type: hci.OwnAddressType = hci.OwnAddressType.RANDOM,
-        timeout: Optional[float] = DEVICE_DEFAULT_CONNECT_TIMEOUT,
+        timeout: float | None = DEVICE_DEFAULT_CONNECT_TIMEOUT,
         always_resolve: bool = False,
     ) -> Connection:
         '''
@@ -3915,9 +3909,9 @@ class Device(utils.CompositeEventEmitter):
 
     async def accept(
         self,
-        peer_address: Union[hci.Address, str] = hci.Address.ANY,
+        peer_address: hci.Address | str = hci.Address.ANY,
         role: hci.Role = hci.Role.PERIPHERAL,
-        timeout: Optional[float] = DEVICE_DEFAULT_CONNECT_TIMEOUT,
+        timeout: float | None = DEVICE_DEFAULT_CONNECT_TIMEOUT,
     ) -> Connection:
         '''
         Wait and accept any incoming connection or a connection from `peer_address` when
@@ -4041,7 +4035,7 @@ class Device(utils.CompositeEventEmitter):
             self.pending_connections.pop(peer_address, None)
 
     @asynccontextmanager
-    async def connect_as_gatt(self, peer_address: Union[hci.Address, str]):
+    async def connect_as_gatt(self, peer_address: hci.Address | str):
         async with AsyncExitStack() as stack:
             connection = await stack.enter_async_context(
                 await self.connect(peer_address)
@@ -4088,7 +4082,7 @@ class Device(utils.CompositeEventEmitter):
             )
 
     async def disconnect(
-        self, connection: Union[Connection, ScoLink, CisLink], reason: int
+        self, connection: Connection | ScoLink | CisLink, reason: int
     ) -> None:
         # Create a future so that we can wait for the disconnection's result
         pending_disconnection = asyncio.get_running_loop().create_future()
@@ -4227,8 +4221,8 @@ class Device(utils.CompositeEventEmitter):
     async def set_connection_phy(
         self,
         connection: Connection,
-        tx_phys: Optional[Iterable[hci.Phy]] = None,
-        rx_phys: Optional[Iterable[hci.Phy]] = None,
+        tx_phys: Iterable[hci.Phy] | None = None,
+        rx_phys: Iterable[hci.Phy] | None = None,
         phy_options: int = 0,
     ):
         if not self.host.supports_command(hci.HCI_LE_SET_PHY_COMMAND):
@@ -4252,8 +4246,8 @@ class Device(utils.CompositeEventEmitter):
 
     async def set_default_phy(
         self,
-        tx_phys: Optional[Iterable[hci.Phy]] = None,
-        rx_phys: Optional[Iterable[hci.Phy]] = None,
+        tx_phys: Iterable[hci.Phy] | None = None,
+        rx_phys: Iterable[hci.Phy] | None = None,
     ):
         all_phys_bits = (1 if tx_phys is None else 0) | (
             (1 if rx_phys is None else 0) << 1
@@ -4307,7 +4301,7 @@ class Device(utils.CompositeEventEmitter):
             if local_name == name:
                 peer_address.set_result(address)
 
-        listener: Optional[Callable[..., None]] = None
+        listener: Callable[..., None] | None = None
         was_scanning = self.scanning
         was_discovering = self.discovering
         try:
@@ -4421,7 +4415,7 @@ class Device(utils.CompositeEventEmitter):
 
     async def get_long_term_key(
         self, connection_handle: int, rand: bytes, ediv: int
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         if (connection := self.lookup_connection(connection_handle)) is None:
             return None
 
@@ -4445,7 +4439,7 @@ class Device(utils.CompositeEventEmitter):
                     return keys.ltk_peripheral.value
         return None
 
-    async def get_link_key(self, address: hci.Address) -> Optional[bytes]:
+    async def get_link_key(self, address: hci.Address) -> bytes | None:
         if self.keystore is None:
             return None
 
@@ -4583,7 +4577,7 @@ class Device(utils.CompositeEventEmitter):
             await connection.cancel_on_disconnection(pending_role_change)
 
     # [Classic only]
-    async def request_remote_name(self, remote: Union[hci.Address, Connection]) -> str:
+    async def request_remote_name(self, remote: hci.Address | Connection) -> str:
         # Set up event handlers
         pending_name: asyncio.Future[str] = asyncio.get_running_loop().create_future()
 
@@ -5153,7 +5147,7 @@ class Device(utils.CompositeEventEmitter):
         self,
         connection: Connection,
         attribute: Attribute,
-        value: Optional[Any] = None,
+        value: Any | None = None,
         force: bool = False,
     ) -> None:
         """
@@ -5172,7 +5166,7 @@ class Device(utils.CompositeEventEmitter):
         await self.gatt_server.notify_subscriber(connection, attribute, value, force)
 
     async def notify_subscribers(
-        self, attribute: Attribute, value: Optional[Any] = None, force: bool = False
+        self, attribute: Attribute, value: Any | None = None, force: bool = False
     ) -> None:
         """
         Send a notification to all the subscribers of an attribute.
@@ -5192,7 +5186,7 @@ class Device(utils.CompositeEventEmitter):
         self,
         connection: Connection,
         attribute: Attribute,
-        value: Optional[Any] = None,
+        value: Any | None = None,
         force: bool = False,
     ):
         """
@@ -5213,7 +5207,7 @@ class Device(utils.CompositeEventEmitter):
         await self.gatt_server.indicate_subscriber(connection, attribute, value, force)
 
     async def indicate_subscribers(
-        self, attribute: Attribute, value: Optional[Any] = None, force: bool = False
+        self, attribute: Attribute, value: Any | None = None, force: bool = False
     ):
         """
         Send an indication to all the subscribers of an attribute.
@@ -5437,8 +5431,8 @@ class Device(utils.CompositeEventEmitter):
         self,
         connection_handle: int,
         peer_address: hci.Address,
-        self_resolvable_address: Optional[hci.Address],
-        peer_resolvable_address: Optional[hci.Address],
+        self_resolvable_address: hci.Address | None,
+        peer_resolvable_address: hci.Address | None,
         role: hci.Role,
         connection_interval: int,
         peripheral_latency: int,
@@ -5473,7 +5467,7 @@ class Device(utils.CompositeEventEmitter):
                         peer_address = resolved_address
 
         self_address = None
-        own_address_type: Optional[hci.OwnAddressType] = None
+        own_address_type: hci.OwnAddressType | None = None
         if role == hci.Role.CENTRAL:
             own_address_type = self.connect_own_address_type
             assert own_address_type is not None
@@ -5938,7 +5932,7 @@ class Device(utils.CompositeEventEmitter):
     @host_event_handler
     @try_with_connection_from_address
     def on_remote_name(
-        self, connection: Optional[Connection], address: hci.Address, remote_name: bytes
+        self, connection: Connection | None, address: hci.Address, remote_name: bytes
     ):
         # Try to decode the name
         try:
@@ -5957,7 +5951,7 @@ class Device(utils.CompositeEventEmitter):
     @host_event_handler
     @try_with_connection_from_address
     def on_remote_name_failure(
-        self, connection: Optional[Connection], address: hci.Address, error: int
+        self, connection: Connection | None, address: hci.Address, error: int
     ):
         if connection:
             connection.emit(connection.EVENT_REMOTE_NAME_FAILURE, error)
@@ -6402,7 +6396,7 @@ class Device(utils.CompositeEventEmitter):
     @host_event_handler
     @try_with_connection_from_address
     def on_role_change_failure(
-        self, connection: Optional[Connection], address: hci.Address, error: int
+        self, connection: Connection | None, address: hci.Address, error: int
     ):
         if connection:
             connection.emit(connection.EVENT_ROLE_CHANGE_FAILURE, error)
@@ -6426,7 +6420,7 @@ class Device(utils.CompositeEventEmitter):
     def on_pairing(
         self,
         connection: Connection,
-        identity_address: Optional[hci.Address],
+        identity_address: hci.Address | None,
         keys: PairingKeys,
         sc: bool,
     ) -> None:

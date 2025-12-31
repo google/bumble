@@ -27,7 +27,7 @@ import datetime
 import enum
 import logging
 import struct
-from typing import Optional, Sequence, Union
+from collections.abc import Sequence
 
 from bumble import utils
 from bumble.att import ATT_Error
@@ -116,7 +116,7 @@ class NotificationAttributeId(utils.OpenIntEnum):
 @dataclasses.dataclass
 class NotificationAttribute:
     attribute_id: NotificationAttributeId
-    value: Union[str, int, datetime.datetime]
+    value: str | int | datetime.datetime
 
 
 @dataclasses.dataclass
@@ -242,10 +242,10 @@ class AncsProxy(ProfileServiceProxy):
 
 
 class AncsClient(utils.EventEmitter):
-    _expected_response_command_id: Optional[CommandId]
-    _expected_response_notification_uid: Optional[int]
-    _expected_response_app_identifier: Optional[str]
-    _expected_app_identifier: Optional[str]
+    _expected_response_command_id: CommandId | None
+    _expected_response_notification_uid: int | None
+    _expected_response_app_identifier: str | None
+    _expected_app_identifier: str | None
     _expected_response_tuples: int
     _response_accumulator: bytes
 
@@ -255,12 +255,12 @@ class AncsClient(utils.EventEmitter):
         super().__init__()
         self._ancs_proxy = ancs_proxy
         self._command_semaphore = asyncio.Semaphore()
-        self._response: Optional[asyncio.Future] = None
+        self._response: asyncio.Future | None = None
         self._reset_response()
         self._started = False
 
     @classmethod
-    async def for_peer(cls, peer: Peer) -> Optional[AncsClient]:
+    async def for_peer(cls, peer: Peer) -> AncsClient | None:
         ancs_proxy = await peer.discover_service_and_create_proxy(AncsProxy)
         if ancs_proxy is None:
             return None
@@ -316,7 +316,7 @@ class AncsClient(utils.EventEmitter):
             # Not enough data yet.
             return
 
-        attributes: list[Union[NotificationAttribute, AppAttribute]] = []
+        attributes: list[NotificationAttribute | AppAttribute] = []
 
         if command_id == CommandId.GET_NOTIFICATION_ATTRIBUTES:
             (notification_uid,) = struct.unpack_from(
@@ -342,7 +342,7 @@ class AncsClient(utils.EventEmitter):
                 str_value = attribute_data[3 : 3 + attribute_data_length].decode(
                     "utf-8"
                 )
-                value: Union[str, int, datetime.datetime]
+                value: str | int | datetime.datetime
                 if attribute_id == NotificationAttributeId.MESSAGE_SIZE:
                     value = int(str_value)
                 elif attribute_id == NotificationAttributeId.DATE:
@@ -415,7 +415,7 @@ class AncsClient(utils.EventEmitter):
         self,
         notification_uid: int,
         attributes: Sequence[
-            Union[NotificationAttributeId, tuple[NotificationAttributeId, int]]
+            NotificationAttributeId | tuple[NotificationAttributeId, int]
         ],
     ) -> list[NotificationAttribute]:
         if not self._started:

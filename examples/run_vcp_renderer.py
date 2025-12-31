@@ -19,7 +19,6 @@ import asyncio
 import json
 import secrets
 import sys
-from typing import Optional
 
 import websockets.asyncio.server
 
@@ -110,7 +109,7 @@ async def main() -> None:
         vcs = VolumeControlService()
         device.add_service(vcs)
 
-        ws: Optional[websockets.asyncio.server.ServerConnection] = None
+        ws: websockets.asyncio.server.ServerConnection | None = None
 
         def on_volume_state_change():
             if ws:

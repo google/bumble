@@ -20,7 +20,7 @@ from __future__ import annotations
 import datetime
 import logging
 from collections.abc import Callable, MutableMapping
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from bumble import avc, avctp, avdtp, avrcp, crypto, rfcomm, sdp
 from bumble.att import ATT_CID, ATT_PDU
@@ -70,7 +70,7 @@ AVCTP_PID_NAMES = {avrcp.AVRCP_PID: 'AVRCP'}
 class PacketTracer:
     class AclStream:
         psms: MutableMapping[int, int]
-        peer: Optional[PacketTracer.AclStream]
+        peer: PacketTracer.AclStream | None
         avdtp_assemblers: MutableMapping[int, avdtp.MessageAssembler]
         avctp_assemblers: MutableMapping[int, avctp.MessageAssembler]
 
@@ -201,7 +201,7 @@ class PacketTracer:
             self.label = label
             self.emit_message = emit_message
             self.acl_streams = {}  # ACL streams, by connection handle
-            self.packet_timestamp: Optional[datetime.datetime] = None
+            self.packet_timestamp: datetime.datetime | None = None
 
         def start_acl_stream(self, connection_handle: int) -> PacketTracer.AclStream:
             logger.info(
@@ -230,7 +230,7 @@ class PacketTracer:
                 self.peer.end_acl_stream(connection_handle)
 
         def on_packet(
-            self, timestamp: Optional[datetime.datetime], packet: HCI_Packet
+            self, timestamp: datetime.datetime | None, packet: HCI_Packet
         ) -> None:
             self.packet_timestamp = timestamp
             self.emit(packet)
@@ -262,7 +262,7 @@ class PacketTracer:
         self,
         packet: HCI_Packet,
         direction: int = 0,
-        timestamp: Optional[datetime.datetime] = None,
+        timestamp: datetime.datetime | None = None,
     ) -> None:
         if direction == 0:
             self.host_to_controller_analyzer.on_packet(timestamp, packet)

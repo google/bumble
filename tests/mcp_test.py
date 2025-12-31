@@ -87,7 +87,7 @@ async def test_update_track_title(gmcs_context):
 
     await gmcs_context.devices[0].notify_subscribers(
         gmcs_context.server.track_title_characteristic,
-        value="My Song".encode(),
+        value=b"My Song",
     )
 
     assert (await asyncio.wait_for(state.get(), TIMEOUT)) == "My Song"

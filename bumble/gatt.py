@@ -28,7 +28,8 @@ import enum
 import functools
 import logging
 import struct
-from typing import Iterable, Optional, Sequence, TypeVar, Union
+from collections.abc import Iterable, Sequence
+from typing import TypeVar
 
 from bumble.att import Attribute, AttributeValue
 from bumble.colors import color
@@ -355,7 +356,7 @@ class Service(Attribute):
 
     def __init__(
         self,
-        uuid: Union[str, UUID],
+        uuid: str | UUID,
         characteristics: Iterable[Characteristic],
         primary=True,
         included_services: Iterable[Service] = (),
@@ -378,7 +379,7 @@ class Service(Attribute):
         self.characteristics = list(characteristics)
         self.primary = primary
 
-    def get_advertising_data(self) -> Optional[bytes]:
+    def get_advertising_data(self) -> bytes | None:
         """
         Get Service specific advertising data
         Defined by each Service, default value is empty
@@ -502,10 +503,10 @@ class Characteristic(Attribute[_T]):
 
     def __init__(
         self,
-        uuid: Union[str, bytes, UUID],
+        uuid: str | bytes | UUID,
         properties: Characteristic.Properties,
-        permissions: Union[str, Attribute.Permissions],
-        value: Union[AttributeValue[_T], _T, None] = None,
+        permissions: str | Attribute.Permissions,
+        value: AttributeValue[_T] | _T | None = None,
         descriptors: Sequence[Descriptor] = (),
     ):
         super().__init__(uuid, permissions, value)

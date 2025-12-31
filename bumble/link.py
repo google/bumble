@@ -19,7 +19,7 @@ import asyncio
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from bumble import core, hci, ll, lmp
 
@@ -67,7 +67,7 @@ class LocalLink:
 
     def find_classic_controller(
         self, address: hci.Address
-    ) -> Optional[controller.Controller]:
+    ) -> controller.Controller | None:
         for controller in self.controllers:
             if controller.public_address == address:
                 return controller

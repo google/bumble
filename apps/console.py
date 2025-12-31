@@ -24,7 +24,6 @@ import logging
 import os
 import re
 from collections import OrderedDict
-from typing import Optional, Union
 
 import click
 import humanize
@@ -126,8 +125,8 @@ def parse_phys(phys):
 # Console App
 # -----------------------------------------------------------------------------
 class ConsoleApp:
-    connected_peer: Optional[Peer]
-    connection_phy: Optional[ConnectionPHY]
+    connected_peer: Peer | None
+    connection_phy: ConnectionPHY | None
 
     def __init__(self):
         self.known_addresses = set()
@@ -520,7 +519,7 @@ class ConsoleApp:
 
         self.show_attributes(attributes)
 
-    def find_remote_characteristic(self, param) -> Optional[CharacteristicProxy]:
+    def find_remote_characteristic(self, param) -> CharacteristicProxy | None:
         if not self.connected_peer:
             return None
         parts = param.split('.')
@@ -542,9 +541,7 @@ class ConsoleApp:
 
         return None
 
-    def find_local_attribute(
-        self, param
-    ) -> Optional[Union[Characteristic, Descriptor]]:
+    def find_local_attribute(self, param) -> Characteristic | Descriptor | None:
         parts = param.split('.')
         if len(parts) == 3:
             service_uuid = UUID(parts[0])

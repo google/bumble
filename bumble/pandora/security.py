@@ -17,8 +17,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import Awaitable
-from typing import Any, AsyncGenerator, AsyncIterator, Callable, Optional, Union
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
+from typing import Any
 
 import grpc
 from google.protobuf import (
@@ -66,7 +66,7 @@ class PairingDelegate(BasePairingDelegate):
     def __init__(
         self,
         connection: BumbleConnection,
-        service: "SecurityService",
+        service: SecurityService,
         io_capability: BasePairingDelegate.IoCapability = BasePairingDelegate.NO_OUTPUT_NO_INPUT,
         local_initiator_key_distribution: BasePairingDelegate.KeyDistribution = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
         local_responder_key_distribution: BasePairingDelegate.KeyDistribution = BasePairingDelegate.DEFAULT_KEY_DISTRIBUTION,
@@ -132,7 +132,7 @@ class PairingDelegate(BasePairingDelegate):
         assert answer.answer_variant() == 'confirm' and answer.confirm is not None
         return answer.confirm
 
-    async def get_number(self) -> Optional[int]:
+    async def get_number(self) -> int | None:
         self.log.debug(
             f"Pairing event: `passkey_entry_request` (io_capability: {self.io_capability})"
         )
@@ -149,7 +149,7 @@ class PairingDelegate(BasePairingDelegate):
         assert answer.answer_variant() == 'passkey'
         return answer.passkey
 
-    async def get_string(self, max_length: int) -> Optional[str]:
+    async def get_string(self, max_length: int) -> str | None:
         self.log.debug(
             f"Pairing event: `pin_code_request` (io_capability: {self.io_capability})"
         )
@@ -197,8 +197,8 @@ class SecurityService(SecurityServicer):
         self.log = utils.BumbleServerLoggerAdapter(
             logging.getLogger(), {'service_name': 'Security', 'device': device}
         )
-        self.event_queue: Optional[asyncio.Queue[PairingEvent]] = None
-        self.event_answer: Optional[AsyncIterator[PairingEventAnswer]] = None
+        self.event_queue: asyncio.Queue[PairingEvent] | None = None
+        self.event_answer: AsyncIterator[PairingEventAnswer] | None = None
         self.device = device
         self.config = config
 
@@ -233,7 +233,7 @@ class SecurityService(SecurityServicer):
         if level == LEVEL2:
             return connection.encryption != 0 and connection.authenticated
 
-        link_key_type: Optional[int] = None
+        link_key_type: int | None = None
         if (keystore := connection.device.keystore) and (
             keys := await keystore.get(str(connection.peer_address))
         ):
@@ -412,8 +412,8 @@ class SecurityService(SecurityServicer):
         wait_for_security: asyncio.Future[str] = (
             asyncio.get_running_loop().create_future()
         )
-        authenticate_task: Optional[asyncio.Future[None]] = None
-        pair_task: Optional[asyncio.Future[None]] = None
+        authenticate_task: asyncio.Future[None] | None = None
+        pair_task: asyncio.Future[None] | None = None
 
         async def authenticate() -> None:
             if (encryption := connection.encryption) != 0:
@@ -459,7 +459,7 @@ class SecurityService(SecurityServicer):
             if self.need_pairing(connection, level):
                 bumble.utils.AsyncRunner.spawn(connection.pair())
 
-        listeners: dict[str, Callable[..., Union[None, Awaitable[None]]]] = {
+        listeners: dict[str, Callable[..., None | Awaitable[None]]] = {
             'disconnection': set_failure('connection_died'),
             'pairing_failure': set_failure('pairing_failure'),
             'connection_authentication_failure': set_failure('authentication_failure'),
@@ -502,7 +502,7 @@ class SecurityService(SecurityServicer):
         return WaitSecurityResponse(**kwargs)
 
     async def reached_security_level(
-        self, connection: BumbleConnection, level: Union[SecurityLevel, LESecurityLevel]
+        self, connection: BumbleConnection, level: SecurityLevel | LESecurityLevel
     ) -> bool:
         self.log.debug(
             str(

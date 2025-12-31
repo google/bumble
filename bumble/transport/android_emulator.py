@@ -16,7 +16,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-from typing import Optional, Union
 
 import grpc.aio
 
@@ -44,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_android_emulator_transport(spec: Optional[str]) -> Transport:
+async def open_android_emulator_transport(spec: str | None) -> Transport:
     '''
     Open a transport connection to an Android emulator via its gRPC interface.
     The parameter string has this syntax:
@@ -89,7 +88,7 @@ async def open_android_emulator_transport(spec: Optional[str]) -> Transport:
     logger.debug('connecting to gRPC server at %s', server_address)
     channel = grpc.aio.insecure_channel(server_address)
 
-    service: Union[EmulatedBluetoothServiceStub, VhciForwardingServiceStub]
+    service: EmulatedBluetoothServiceStub | VhciForwardingServiceStub
     if mode == 'host':
         # Connect as a host
         service = EmulatedBluetoothServiceStub(channel)

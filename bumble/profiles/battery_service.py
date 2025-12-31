@@ -16,7 +16,6 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
-from typing import Optional
 
 from bumble.gatt import (
     GATT_BATTERY_LEVEL_CHARACTERISTIC,
@@ -56,7 +55,7 @@ class BatteryService(TemplateService):
 class BatteryServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = BatteryService
 
-    battery_level: Optional[CharacteristicProxy[int]]
+    battery_level: CharacteristicProxy[int] | None
 
     def __init__(self, service_proxy):
         self.service_proxy = service_proxy

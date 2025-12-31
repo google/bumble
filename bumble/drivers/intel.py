@@ -29,7 +29,7 @@ import os
 import pathlib
 import platform
 import struct
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from bumble import core, hci, utils
 from bumble.drivers import common
@@ -353,8 +353,8 @@ class Driver(common.Driver):
         self.reset_complete = asyncio.Event()
 
         # Parse configuration options from the driver name.
-        self.ddc_addon: Optional[bytes] = None
-        self.ddc_override: Optional[bytes] = None
+        self.ddc_addon: bytes | None = None
+        self.ddc_override: bytes | None = None
         driver = host.hci_metadata.get("driver")
         if driver is not None and driver.startswith("intel/"):
             for key, value in [
@@ -602,7 +602,7 @@ class Driver(common.Driver):
 
         await self.load_ddc_if_any(firmware_base_name)
 
-    async def load_ddc_if_any(self, firmware_base_name: Optional[str] = None) -> None:
+    async def load_ddc_if_any(self, firmware_base_name: str | None = None) -> None:
         """
         Check for and load any Device Data Configuration (DDC) blobs.
 

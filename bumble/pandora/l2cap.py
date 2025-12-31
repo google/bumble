@@ -18,8 +18,8 @@ import json
 import logging
 from asyncio import Future
 from asyncio import Queue as AsyncQueue
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import AsyncGenerator, Optional, Union
 
 import grpc
 from google.protobuf import any_pb2, empty_pb2  # pytype: disable=pyi-error
@@ -56,7 +56,7 @@ from bumble.l2cap import (
 from bumble.pandora import utils
 from bumble.pandora.config import Config
 
-L2capChannel = Union[ClassicChannel, LeCreditBasedChannel]
+L2capChannel = ClassicChannel | LeCreditBasedChannel
 
 
 @dataclass
@@ -107,10 +107,8 @@ class L2CAPService(L2CAPServicer):
         oneof = request.WhichOneof('type')
         self.log.debug(f'WaitConnection channel request type: {oneof}.')
         channel_type = getattr(request, oneof)
-        spec: Optional[Union[ClassicChannelSpec, LeCreditBasedChannelSpec]] = None
-        l2cap_server: Optional[
-            Union[ClassicChannelServer, LeCreditBasedChannelServer]
-        ] = None
+        spec: ClassicChannelSpec | LeCreditBasedChannelSpec | None = None
+        l2cap_server: ClassicChannelServer | LeCreditBasedChannelServer | None = None
         if isinstance(channel_type, CreditBasedChannelRequest):
             spec = LeCreditBasedChannelSpec(
                 psm=channel_type.spsm,
@@ -217,7 +215,7 @@ class L2CAPService(L2CAPServicer):
         oneof = request.WhichOneof('type')
         self.log.debug(f'Channel request type: {oneof}.')
         channel_type = getattr(request, oneof)
-        spec: Optional[Union[ClassicChannelSpec, LeCreditBasedChannelSpec]] = None
+        spec: ClassicChannelSpec | LeCreditBasedChannelSpec | None = None
         if isinstance(channel_type, CreditBasedChannelRequest):
             spec = LeCreditBasedChannelSpec(
                 psm=channel_type.spsm,

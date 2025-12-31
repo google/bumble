@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Union
 
 # -----------------------------------------------------------------------------
 # Constants
@@ -167,12 +166,12 @@ class G722Decoder:
         # The initial value in BLOCK 3H
         self._band[1].det = 8
 
-    def decode_frame(self, encoded_data: Union[bytes, bytearray]) -> bytearray:
+    def decode_frame(self, encoded_data: bytes | bytearray) -> bytearray:
         result_array = bytearray(len(encoded_data) * 4)
         self.g722_decode(result_array, encoded_data)
         return result_array
 
-    def g722_decode(self, result_array, encoded_data: Union[bytes, bytearray]) -> int:
+    def g722_decode(self, result_array, encoded_data: bytes | bytearray) -> int:
         """Decode the data frame using g722 decoder."""
         result_length = 0
 

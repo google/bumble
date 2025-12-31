@@ -23,14 +23,11 @@ import enum
 import functools
 import logging
 import warnings
+from collections.abc import Awaitable, Callable
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Optional,
     Protocol,
     TypeVar,
-    Union,
     overload,
 )
 
@@ -169,8 +166,8 @@ class EventWatcher:
     ) -> _Handler: ...
 
     def on(
-        self, emitter: pyee.EventEmitter, event: str, handler: Optional[_Handler] = None
-    ) -> Union[_Handler, Callable[[_Handler], _Handler]]:
+        self, emitter: pyee.EventEmitter, event: str, handler: _Handler | None = None
+    ) -> _Handler | Callable[[_Handler], _Handler]:
         '''Watch an event until the context is closed.
 
         Args:
@@ -198,8 +195,8 @@ class EventWatcher:
     ) -> _Handler: ...
 
     def once(
-        self, emitter: pyee.EventEmitter, event: str, handler: Optional[_Handler] = None
-    ) -> Union[_Handler, Callable[[_Handler], _Handler]]:
+        self, emitter: pyee.EventEmitter, event: str, handler: _Handler | None = None
+    ) -> _Handler | Callable[[_Handler], _Handler]:
         '''Watch an event for once.
 
         Args:

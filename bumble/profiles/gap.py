@@ -19,7 +19,6 @@
 # -----------------------------------------------------------------------------
 import logging
 import struct
-from typing import Optional, Union
 
 from bumble.core import Appearance
 from bumble.gatt import (
@@ -54,7 +53,7 @@ class GenericAccessService(TemplateService):
     appearance_characteristic: Characteristic[bytes]
 
     def __init__(
-        self, device_name: str, appearance: Union[Appearance, tuple[int, int], int] = 0
+        self, device_name: str, appearance: Appearance | tuple[int, int] | int = 0
     ):
         if isinstance(appearance, int):
             appearance_int = appearance
@@ -88,8 +87,8 @@ class GenericAccessService(TemplateService):
 class GenericAccessServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = GenericAccessService
 
-    device_name: Optional[CharacteristicProxy[str]]
-    appearance: Optional[CharacteristicProxy[Appearance]]
+    device_name: CharacteristicProxy[str] | None
+    appearance: CharacteristicProxy[Appearance] | None
 
     def __init__(self, service_proxy: ServiceProxy):
         self.service_proxy = service_proxy

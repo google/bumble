@@ -13,7 +13,6 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 from functools import partial
-from typing import Optional, Union
 
 
 class ColorError(ValueError):
@@ -38,7 +37,7 @@ STYLES = (
 )
 
 
-ColorSpec = Union[str, int]
+ColorSpec = str | int
 
 
 def _join(*values: ColorSpec) -> str:
@@ -56,14 +55,14 @@ def _color_code(spec: ColorSpec, base: int) -> str:
     elif isinstance(spec, int) and 0 <= spec <= 255:
         return _join(base + 8, 5, spec)
     else:
-        raise ColorError('Invalid color spec "%s"' % spec)
+        raise ColorError(f'Invalid color spec "{spec}"')
 
 
 def color(
     s: str,
-    fg: Optional[ColorSpec] = None,
-    bg: Optional[ColorSpec] = None,
-    style: Optional[str] = None,
+    fg: ColorSpec | None = None,
+    bg: ColorSpec | None = None,
+    style: str | None = None,
 ) -> str:
     codes: list[ColorSpec] = []
 
@@ -76,10 +75,10 @@ def color(
             if style_part in STYLES:
                 codes.append(STYLES.index(style_part))
             else:
-                raise ColorError('Invalid style "%s"' % style_part)
+                raise ColorError(f'Invalid style "{style_part}"')
 
     if codes:
-        return '\x1b[{0}m{1}\x1b[0m'.format(_join(*codes), s)
+        return f'\x1b[{_join(*codes)}m{s}\x1b[0m'
     else:
         return s
 

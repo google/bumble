@@ -19,7 +19,7 @@ This module implement the Pandora Bluetooth test APIs for the Bumble stack.
 
 __version__ = "0.0.1"
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import grpc
 import grpc.aio
@@ -58,7 +58,7 @@ def register_servicer_hook(
 async def serve(
     bumble: PandoraDevice,
     config: Config = Config(),
-    grpc_server: Optional[grpc.aio.Server] = None,
+    grpc_server: grpc.aio.Server | None = None,
     port: int = 0,
 ) -> None:
     # initialize a gRPC server if not provided.

@@ -23,7 +23,8 @@ import contextlib
 import dataclasses
 import functools
 import logging
-from typing import Any, AsyncGenerator, Coroutine, Optional
+from collections.abc import AsyncGenerator, Coroutine
+from typing import Any
 
 import click
 
@@ -112,12 +113,12 @@ class BroadcastScanner(bumble.utils.EventEmitter):
         sync: bumble.device.PeriodicAdvertisingSync
         broadcast_id: int
         rssi: int = 0
-        public_broadcast_announcement: Optional[pbp.PublicBroadcastAnnouncement] = None
-        broadcast_audio_announcement: Optional[bap.BroadcastAudioAnnouncement] = None
-        basic_audio_announcement: Optional[bap.BasicAudioAnnouncement] = None
-        appearance: Optional[core.Appearance] = None
-        biginfo: Optional[bumble.device.BigInfoAdvertisement] = None
-        manufacturer_data: Optional[tuple[str, bytes]] = None
+        public_broadcast_announcement: pbp.PublicBroadcastAnnouncement | None = None
+        broadcast_audio_announcement: bap.BroadcastAudioAnnouncement | None = None
+        basic_audio_announcement: bap.BasicAudioAnnouncement | None = None
+        appearance: core.Appearance | None = None
+        biginfo: bumble.device.BigInfoAdvertisement | None = None
+        manufacturer_data: tuple[str, bytes] | None = None
 
         def __post_init__(self) -> None:
             super().__init__()
@@ -433,7 +434,7 @@ async def create_device(transport: str) -> AsyncGenerator[bumble.device.Device, 
 
 
 async def find_broadcast_by_name(
-    device: bumble.device.Device, name: Optional[str]
+    device: bumble.device.Device, name: str | None
 ) -> BroadcastScanner.Broadcast:
     result = asyncio.get_running_loop().create_future()
 
@@ -474,8 +475,8 @@ async def run_scan(
 
 
 async def run_assist(
-    broadcast_name: Optional[str],
-    source_id: Optional[int],
+    broadcast_name: str | None,
+    source_id: int | None,
     command: str,
     transport: str,
     address: str,
@@ -658,7 +659,7 @@ async def run_pair(transport: str, address: str) -> None:
 
 async def run_receive(
     transport: str,
-    broadcast_id: Optional[int],
+    broadcast_id: int | None,
     output: str,
     broadcast_code: str | None,
     sync_timeout: float,

@@ -17,7 +17,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import struct
-from typing import AsyncGenerator, Optional, cast
+from collections.abc import AsyncGenerator
+from typing import cast
 
 import grpc
 import grpc.aio
@@ -623,7 +624,7 @@ class HostService(HostServicer):
         self.log.debug('Inquiry')
 
         inquiry_queue: asyncio.Queue[
-            Optional[tuple[Address, int, AdvertisingData, int]]
+            tuple[Address, int, AdvertisingData, int] | None
         ] = asyncio.Queue()
         complete_handler = self.device.on(
             self.device.EVENT_INQUIRY_COMPLETE, lambda: inquiry_queue.put_nowait(None)

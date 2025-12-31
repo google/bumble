@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import enum
 import struct
-from typing import Optional
 
 from bumble import core, crypto, device, gatt, gatt_client
 
@@ -96,17 +95,17 @@ class CoordinatedSetIdentificationService(gatt.TemplateService):
 
     set_identity_resolving_key: bytes
     set_identity_resolving_key_characteristic: gatt.Characteristic[bytes]
-    coordinated_set_size_characteristic: Optional[gatt.Characteristic[bytes]] = None
-    set_member_lock_characteristic: Optional[gatt.Characteristic[bytes]] = None
-    set_member_rank_characteristic: Optional[gatt.Characteristic[bytes]] = None
+    coordinated_set_size_characteristic: gatt.Characteristic[bytes] | None = None
+    set_member_lock_characteristic: gatt.Characteristic[bytes] | None = None
+    set_member_rank_characteristic: gatt.Characteristic[bytes] | None = None
 
     def __init__(
         self,
         set_identity_resolving_key: bytes,
         set_identity_resolving_key_type: SirkType,
-        coordinated_set_size: Optional[int] = None,
-        set_member_lock: Optional[MemberLock] = None,
-        set_member_rank: Optional[int] = None,
+        coordinated_set_size: int | None = None,
+        set_member_lock: MemberLock | None = None,
+        set_member_rank: int | None = None,
     ) -> None:
         if len(set_identity_resolving_key) != SET_IDENTITY_RESOLVING_KEY_LENGTH:
             raise core.InvalidArgumentError(
@@ -198,9 +197,9 @@ class CoordinatedSetIdentificationProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = CoordinatedSetIdentificationService
 
     set_identity_resolving_key: gatt_client.CharacteristicProxy[bytes]
-    coordinated_set_size: Optional[gatt_client.CharacteristicProxy[bytes]] = None
-    set_member_lock: Optional[gatt_client.CharacteristicProxy[bytes]] = None
-    set_member_rank: Optional[gatt_client.CharacteristicProxy[bytes]] = None
+    coordinated_set_size: gatt_client.CharacteristicProxy[bytes] | None = None
+    set_member_lock: gatt_client.CharacteristicProxy[bytes] | None = None
+    set_member_rank: gatt_client.CharacteristicProxy[bytes] | None = None
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy

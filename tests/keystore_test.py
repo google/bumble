@@ -118,7 +118,7 @@ async def test_basic(temporary_file):
     assert foo.ltk is not None
     assert foo.ltk.value == ltk
 
-    with open(file.name, "r", encoding="utf-8") as json_file:
+    with open(file.name, encoding="utf-8") as json_file:
         json_data = json.load(json_file)
         assert 'my_namespace' in json_data
         assert 'foo' in json_data['my_namespace']
@@ -161,7 +161,7 @@ async def test_default_namespace(temporary_file):
     ltk = bytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
     keys.ltk = PairingKeys.Key(ltk)
     await keystore.update('foo', keys)
-    with open(file.name, "r", encoding="utf-8") as json_file:
+    with open(file.name, encoding="utf-8") as json_file:
         json_data = json.load(json_file)
         assert '__DEFAULT__' in json_data
         assert 'foo' in json_data['__DEFAULT__']

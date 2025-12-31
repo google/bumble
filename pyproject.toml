@@ -214,5 +214,8 @@ exclude = [
     "bumble/transport/grpc_protobuf"
 ]
 
+[tool.ruff.lint]
+extend-select = ["UP"]
+
 [tool.ruff.format]
 quote-style = "preserve"

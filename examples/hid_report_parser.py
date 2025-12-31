@@ -46,7 +46,7 @@ class Keyboard:
     def decode_keyboard_report(self, input_report: bytes, report_length: int) -> None:
         if report_length >= 8:
             modifier = input_report[1]
-            self.report[0] = [int(x) for x in '{0:08b}'.format(modifier)]
+            self.report[0] = [int(x) for x in f'{modifier:08b}']
             self.report[0].reverse()  # type: ignore
 
             modifier_key = str((modifier & 0x22).to_bytes(1, "big").hex())
@@ -106,7 +106,7 @@ class Mouse:
         ]
 
     def decode_mouse_report(self, input_report: bytes, report_length: int) -> None:
-        self.report[0] = [int(x) for x in '{0:08b}'.format(input_report[1])]
+        self.report[0] = [int(x) for x in f'{input_report[1]:08b}']
         self.report[0].reverse()  # type: ignore
         self.report[1] = input_report[2]
         self.report[2] = input_report[3]

@@ -20,7 +20,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import struct
-from typing import TYPE_CHECKING, Iterable, NewType, Optional, Sequence, Union
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, NewType
 
 from typing_extensions import Self
 
@@ -497,7 +498,7 @@ class ServiceAttribute:
     @staticmethod
     def find_attribute_in_list(
         attribute_list: Iterable[ServiceAttribute], attribute_id: int
-    ) -> Optional[DataElement]:
+    ) -> DataElement | None:
         return next(
             (
                 attribute.value
@@ -778,11 +779,11 @@ class SDP_ServiceSearchAttributeResponse(SDP_PDU):
 class Client:
     def __init__(self, connection: Connection, mtu: int = 0) -> None:
         self.connection = connection
-        self.channel: Optional[l2cap.ClassicChannel] = None
+        self.channel: l2cap.ClassicChannel | None = None
         self.mtu = mtu
         self.request_semaphore = asyncio.Semaphore(1)
-        self.pending_request: Optional[SDP_PDU] = None
-        self.pending_response: Optional[asyncio.futures.Future[SDP_PDU]] = None
+        self.pending_request: SDP_PDU | None = None
+        self.pending_response: asyncio.futures.Future[SDP_PDU] | None = None
         self.next_transaction_id = 0
 
     async def connect(self) -> None:
@@ -898,7 +899,7 @@ class Client:
     async def search_attributes(
         self,
         uuids: Iterable[core.UUID],
-        attribute_ids: Iterable[Union[int, tuple[int, int]]],
+        attribute_ids: Iterable[int | tuple[int, int]],
     ) -> list[list[ServiceAttribute]]:
         """
         Search for attributes by UUID and attribute IDs.
@@ -970,7 +971,7 @@ class Client:
     async def get_attributes(
         self,
         service_record_handle: int,
-        attribute_ids: Iterable[Union[int, tuple[int, int]]],
+        attribute_ids: Iterable[int | tuple[int, int]],
     ) -> list[ServiceAttribute]:
         """
         Get attributes for a service.
@@ -1042,10 +1043,10 @@ class Client:
 # -----------------------------------------------------------------------------
 class Server:
     CONTINUATION_STATE = bytes([0x01, 0x00])
-    channel: Optional[l2cap.ClassicChannel]
+    channel: l2cap.ClassicChannel | None
     Service = NewType('Service', list[ServiceAttribute])
     service_records: dict[int, Service]
-    current_response: Union[None, bytes, tuple[int, list[int]]]
+    current_response: None | bytes | tuple[int, list[int]]
 
     def __init__(self, device: Device) -> None:
         self.device = device
@@ -1123,7 +1124,7 @@ class Server:
         self,
         continuation_state: bytes,
         transaction_id: int,
-    ) -> Optional[bool]:
+    ) -> bool | None:
         # Check if this is a valid continuation
         if len(continuation_state) > 1:
             if (

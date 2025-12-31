@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import enum
 import struct
-from typing import Union
 
 from bumble import core, utils
 
@@ -166,7 +165,7 @@ class Frame:
 
     def to_bytes(
         self,
-        ctype_or_response: Union[CommandFrame.CommandType, ResponseFrame.ResponseCode],
+        ctype_or_response: CommandFrame.CommandType | ResponseFrame.ResponseCode,
     ) -> bytes:
         # TODO: support extended subunit types and ids.
         return (

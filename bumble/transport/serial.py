@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import logging
-from typing import Optional
 
 import serial_asyncio
 
@@ -52,7 +51,7 @@ class SerialPacketSource(StreamPacketSource):
         logger.debug('connection made')
         self._ready.set()
 
-    def connection_lost(self, exc: Optional[Exception]) -> None:
+    def connection_lost(self, exc: Exception | None) -> None:
         logger.debug('connection lost')
         self.on_transport_lost()
 

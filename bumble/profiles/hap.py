@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional, Union
+from typing import Any
 
 from bumble import att, gatt, gatt_adapters, gatt_client, utils
 from bumble.core import InvalidArgumentError, InvalidStateError
@@ -145,7 +145,7 @@ class PresetChangedOperation:
             return bytes([self.prev_index]) + bytes(self.preset_record)
 
     change_id: ChangeId
-    additional_parameters: Union[Generic, int]
+    additional_parameters: Generic | int
 
     def to_bytes(self, is_last: bool) -> bytes:
         if isinstance(self.additional_parameters, PresetChangedOperation.Generic):
@@ -235,7 +235,7 @@ class HearingAccessService(gatt.TemplateService):
     preset_records: dict[int, PresetRecord]  # key is the preset index
     read_presets_request_in_progress: bool
 
-    other_server_in_binaural_set: Optional[HearingAccessService] = None
+    other_server_in_binaural_set: HearingAccessService | None = None
 
     preset_changed_operations_history_per_device: dict[
         Address, list[PresetChangedOperation]

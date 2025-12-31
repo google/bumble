@@ -25,7 +25,8 @@ from __future__ import annotations
 import dataclasses
 import math
 import struct
-from typing import Any, ClassVar, Sequence
+from collections.abc import Sequence
+from typing import Any, ClassVar
 
 from typing_extensions import Self
 

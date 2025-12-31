@@ -18,7 +18,7 @@ import asyncio
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import click
 
@@ -47,7 +47,7 @@ def print_device_info(device_info: dict[intel.ValueType, Any]) -> None:
 
 
 # -----------------------------------------------------------------------------
-async def get_driver(host: Host, force: bool) -> Optional[intel.Driver]:
+async def get_driver(host: Host, force: bool) -> intel.Driver | None:
     # Create a driver
     driver = await intel.Driver.for_host(host, force)
     if driver is None:

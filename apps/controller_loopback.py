@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import time
-from typing import Optional
 
 import click
 
@@ -41,7 +40,7 @@ class Loopback:
         self.transport = transport
         self.packet_size = packet_size
         self.packet_count = packet_count
-        self.connection_handle: Optional[int] = None
+        self.connection_handle: int | None = None
         self.connection_event = asyncio.Event()
         self.done = asyncio.Event()
         self.expected_cid = 0

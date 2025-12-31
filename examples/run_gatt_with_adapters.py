@@ -24,7 +24,7 @@ import functools
 import random
 import struct
 import sys
-from typing import Any, Union
+from typing import Any
 
 import bumble.logging
 from bumble import core, gatt, gatt_adapters, gatt_client, hci, transport
@@ -118,7 +118,7 @@ async def client(device: Device, address: hci.Address) -> None:
     c1 = characteristics[0]
     c1_value = await c1.read_value()
     print(f"@@@ C1 {c1} value = {c1_value!r} (type={type(c1_value)})")
-    await c1.write_value("happy π day".encode("utf-8"))
+    await c1.write_value("happy π day".encode())
     await c1.subscribe(functools.partial(on_adapted_characteristic_update, c1))
 
     # Static characteristic with a string value.
@@ -187,7 +187,7 @@ async def client(device: Device, address: hci.Address) -> None:
 
 
 # -----------------------------------------------------------------------------
-def dynamic_read(selector: str) -> Union[bytes, str]:
+def dynamic_read(selector: str) -> bytes | str:
     if selector == "bytes":
         print("$$$ Returning random bytes")
         return random.randbytes(7)

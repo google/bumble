@@ -29,7 +29,8 @@ import asyncio
 import logging
 import struct
 from collections import defaultdict
-from typing import TYPE_CHECKING, Iterable, Optional, TypeVar
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, TypeVar
 
 from bumble import att, utils
 from bumble.colors import color
@@ -73,7 +74,7 @@ class Server(utils.EventEmitter):
     attributes_by_handle: dict[int, att.Attribute]
     subscribers: dict[int, dict[int, bytes]]
     indication_semaphores: defaultdict[int, asyncio.Semaphore]
-    pending_confirmations: defaultdict[int, Optional[asyncio.futures.Future]]
+    pending_confirmations: defaultdict[int, asyncio.futures.Future | None]
 
     EVENT_CHARACTERISTIC_SUBSCRIPTION = "characteristic_subscription"
 
@@ -109,7 +110,7 @@ class Server(utils.EventEmitter):
             and (data := attribute.get_advertising_data())
         }
 
-    def get_attribute(self, handle: int) -> Optional[att.Attribute]:
+    def get_attribute(self, handle: int) -> att.Attribute | None:
         attribute = self.attributes_by_handle.get(handle)
         if attribute:
             return attribute
@@ -126,7 +127,7 @@ class Server(utils.EventEmitter):
 
     def get_attribute_group(
         self, handle: int, group_type: type[AttributeGroupType]
-    ) -> Optional[AttributeGroupType]:
+    ) -> AttributeGroupType | None:
         return next(
             (
                 attribute
@@ -137,7 +138,7 @@ class Server(utils.EventEmitter):
             None,
         )
 
-    def get_service_attribute(self, service_uuid: UUID) -> Optional[Service]:
+    def get_service_attribute(self, service_uuid: UUID) -> Service | None:
         return next(
             (
                 attribute
@@ -151,7 +152,7 @@ class Server(utils.EventEmitter):
 
     def get_characteristic_attributes(
         self, service_uuid: UUID, characteristic_uuid: UUID
-    ) -> Optional[tuple[CharacteristicDeclaration, Characteristic]]:
+    ) -> tuple[CharacteristicDeclaration, Characteristic] | None:
         service_handle = self.get_service_attribute(service_uuid)
         if not service_handle:
             return None
@@ -176,7 +177,7 @@ class Server(utils.EventEmitter):
 
     def get_descriptor_attribute(
         self, service_uuid: UUID, characteristic_uuid: UUID, descriptor_uuid: UUID
-    ) -> Optional[Descriptor]:
+    ) -> Descriptor | None:
         characteristics = self.get_characteristic_attributes(
             service_uuid, characteristic_uuid
         )
@@ -334,7 +335,7 @@ class Server(utils.EventEmitter):
         self,
         connection: Connection,
         attribute: att.Attribute,
-        value: Optional[bytes] = None,
+        value: bytes | None = None,
         force: bool = False,
     ) -> None:
         # Check if there's a subscriber
@@ -377,7 +378,7 @@ class Server(utils.EventEmitter):
         self,
         connection: Connection,
         attribute: att.Attribute,
-        value: Optional[bytes] = None,
+        value: bytes | None = None,
         force: bool = False,
     ) -> None:
         # Check if there's a subscriber
@@ -437,7 +438,7 @@ class Server(utils.EventEmitter):
         self,
         indicate: bool,
         attribute: att.Attribute,
-        value: Optional[bytes] = None,
+        value: bytes | None = None,
         force: bool = False,
     ) -> None:
         # Get all the connections for which there's at least one subscription
@@ -464,7 +465,7 @@ class Server(utils.EventEmitter):
     async def notify_subscribers(
         self,
         attribute: att.Attribute,
-        value: Optional[bytes] = None,
+        value: bytes | None = None,
         force: bool = False,
     ):
         return await self._notify_or_indicate_subscribers(
@@ -474,7 +475,7 @@ class Server(utils.EventEmitter):
     async def indicate_subscribers(
         self,
         attribute: att.Attribute,
-        value: Optional[bytes] = None,
+        value: bytes | None = None,
         force: bool = False,
     ):
         return await self._notify_or_indicate_subscribers(True, attribute, value, force)

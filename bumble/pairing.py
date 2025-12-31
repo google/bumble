@@ -20,7 +20,6 @@ from __future__ import annotations
 import enum
 import secrets
 from dataclasses import dataclass
-from typing import Optional
 
 from bumble import hci
 from bumble.core import AdvertisingData, LeRole
@@ -45,16 +44,16 @@ from bumble.smp import (
 class OobData:
     """OOB data that can be sent from one device to another."""
 
-    address: Optional[hci.Address] = None
-    role: Optional[LeRole] = None
-    shared_data: Optional[OobSharedData] = None
-    legacy_context: Optional[OobLegacyContext] = None
+    address: hci.Address | None = None
+    role: LeRole | None = None
+    shared_data: OobSharedData | None = None
+    legacy_context: OobLegacyContext | None = None
 
     @classmethod
     def from_ad(cls, ad: AdvertisingData) -> OobData:
         instance = cls()
-        shared_data_c: Optional[bytes] = None
-        shared_data_r: Optional[bytes] = None
+        shared_data_c: bytes | None = None
+        shared_data_r: bytes | None = None
         for ad_type, ad_data in ad.ad_structures:
             if ad_type == AdvertisingData.LE_BLUETOOTH_DEVICE_ADDRESS:
                 instance.address = hci.Address(ad_data)
@@ -181,14 +180,14 @@ class PairingDelegate:
         """Compare two numbers."""
         return True
 
-    async def get_number(self) -> Optional[int]:
+    async def get_number(self) -> int | None:
         """
         Return an optional number as an answer to a passkey request.
         Returning `None` will result in a negative reply.
         """
         return 0
 
-    async def get_string(self, max_length: int) -> Optional[str]:
+    async def get_string(self, max_length: int) -> str | None:
         """
         Return a string whose utf-8 encoding is up to max_length bytes.
         """
@@ -239,18 +238,18 @@ class PairingConfig:
     class OobConfig:
         """Config for OOB pairing."""
 
-        our_context: Optional[OobContext]
-        peer_data: Optional[OobSharedData]
-        legacy_context: Optional[OobLegacyContext]
+        our_context: OobContext | None
+        peer_data: OobSharedData | None
+        legacy_context: OobLegacyContext | None
 
     def __init__(
         self,
         sc: bool = True,
         mitm: bool = True,
         bonding: bool = True,
-        delegate: Optional[PairingDelegate] = None,
-        identity_address_type: Optional[AddressType] = None,
-        oob: Optional[OobConfig] = None,
+        delegate: PairingDelegate | None = None,
+        identity_address_type: AddressType | None = None,
+        oob: OobConfig | None = None,
     ) -> None:
         self.sc = sc
         self.mitm = mitm

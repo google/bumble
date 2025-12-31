@@ -16,7 +16,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
-import io
 import logging
 
 from bumble.transport.common import StreamPacketSink, StreamPacketSource, Transport
@@ -36,7 +35,7 @@ async def open_file_transport(spec: str) -> Transport:
     '''
 
     # Open the file
-    file = io.open(spec, 'r+b', buffering=0)
+    file = open(spec, 'r+b', buffering=0)
 
     # Setup reading
     read_transport, packet_source = await asyncio.get_running_loop().connect_read_pipe(

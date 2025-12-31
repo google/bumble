@@ -24,7 +24,7 @@ import logging
 import struct
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 from bumble import colors, device, gatt, gatt_client, hci, utils
 from bumble.profiles import le_audio
@@ -49,7 +49,7 @@ class ASE_Operation:
     classes: dict[int, type[ASE_Operation]] = {}
     op_code: Opcode
     name: str
-    fields: Optional[Sequence[Any]] = None
+    fields: Sequence[Any] | None = None
     ase_id: Sequence[int]
 
     class Opcode(enum.IntEnum):
@@ -278,7 +278,7 @@ class AseStateMachine(gatt.Characteristic):
 
     EVENT_STATE_CHANGE = "state_change"
 
-    cis_link: Optional[device.CisLink] = None
+    cis_link: device.CisLink | None = None
 
     # Additional parameters in CODEC_CONFIGURED State
     preferred_framing = 0  # Unframed PDU supported
@@ -290,7 +290,7 @@ class AseStateMachine(gatt.Characteristic):
     preferred_presentation_delay_min = 0
     preferred_presentation_delay_max = 0
     codec_id = hci.CodingFormat(hci.CodecID.LC3)
-    codec_specific_configuration: Union[CodecSpecificConfiguration, bytes] = b''
+    codec_specific_configuration: CodecSpecificConfiguration | bytes = b''
 
     # Additional parameters in QOS_CONFIGURED State
     cig_id = 0
@@ -610,7 +610,7 @@ class AudioStreamControlService(gatt.TemplateService):
 
     ase_state_machines: dict[int, AseStateMachine]
     ase_control_point: gatt.Characteristic[bytes]
-    _active_client: Optional[device.Connection] = None
+    _active_client: device.Connection | None = None
 
     def __init__(
         self,

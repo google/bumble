@@ -18,7 +18,8 @@ import contextlib
 import functools
 import inspect
 import logging
-from typing import Any, Generator, MutableMapping, Optional
+from collections.abc import Generator, MutableMapping
+from typing import Any
 
 import grpc
 from google.protobuf.message import Message  # pytype: disable=pyi-error
@@ -34,7 +35,7 @@ ADDRESS_TYPES: dict[str, AddressType] = {
 }
 
 
-def address_from_request(request: Message, field: Optional[str]) -> Address:
+def address_from_request(request: Message, field: str | None) -> Address:
     if field is None:
         return Address.ANY
     return Address(bytes(reversed(getattr(request, field))), ADDRESS_TYPES[field])
@@ -95,8 +96,7 @@ def rpc(func: Any) -> Any:
     @functools.wraps(func)
     def gen_wrapper(self: Any, request: Any, context: grpc.ServicerContext) -> Any:
         with exception_to_rpc_error(context):
-            for v in func(self, request, context):
-                yield v
+            yield from func(self, request, context)
 
     @functools.wraps(func)
     def wrapper(self: Any, request: Any, context: grpc.ServicerContext) -> Any:

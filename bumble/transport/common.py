@@ -23,7 +23,7 @@ import io
 import logging
 import struct
 from collections.abc import Awaitable, Callable
-from typing import Any, ContextManager, Optional, Protocol
+from typing import Any, Protocol
 
 from bumble import core, hci
 from bumble.colors import color
@@ -107,11 +107,11 @@ class PacketParser:
     NEED_LENGTH = 1
     NEED_BODY = 2
 
-    sink: Optional[TransportSink]
+    sink: TransportSink | None
     extended_packet_info: dict[int, tuple[int, int, str]]
-    packet_info: Optional[tuple[int, int, str]] = None
+    packet_info: tuple[int, int, str] | None = None
 
-    def __init__(self, sink: Optional[TransportSink] = None) -> None:
+    def __init__(self, sink: TransportSink | None = None) -> None:
         self.sink = sink
         self.extended_packet_info = {}
         self.reset()
@@ -176,7 +176,7 @@ class PacketReader:
         self.source = source
         self.at_end = False
 
-    def next_packet(self) -> Optional[bytes]:
+    def next_packet(self) -> bytes | None:
         # Get the packet type
         packet_type = self.source.read(1)
         if len(packet_type) != 1:
@@ -253,7 +253,7 @@ class BaseSource:
     """
 
     terminated: asyncio.Future[None]
-    sink: Optional[TransportSink]
+    sink: TransportSink | None
 
     def __init__(self) -> None:
         self.terminated = asyncio.get_running_loop().create_future()
@@ -357,7 +357,7 @@ class Transport:
 
 # -----------------------------------------------------------------------------
 class PumpedPacketSource(ParserSource):
-    pump_task: Optional[asyncio.Task[None]]
+    pump_task: asyncio.Task[None] | None
 
     def __init__(self, receive) -> None:
         super().__init__()
@@ -390,7 +390,7 @@ class PumpedPacketSource(ParserSource):
 
 # -----------------------------------------------------------------------------
 class PumpedPacketSink:
-    pump_task: Optional[asyncio.Task[None]]
+    pump_task: asyncio.Task[None] | None
 
     def __init__(self, send: Callable[[bytes], Awaitable[Any]]):
         self.send_function = send
@@ -443,7 +443,7 @@ class SnoopingTransport(Transport):
 
     @staticmethod
     def create_with(
-        transport: Transport, snooper: ContextManager[Snooper]
+        transport: Transport, snooper: contextlib.AbstractContextManager[Snooper]
     ) -> SnoopingTransport:
         """
         Create an instance given a snooper that works as as context manager.

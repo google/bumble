@@ -18,7 +18,6 @@
 import logging
 import os
 import re
-from typing import Optional
 
 from bumble import utils
 from bumble.snoop import create_snooper
@@ -111,7 +110,7 @@ async def open_transport(name: str) -> Transport:
 
 
 # -----------------------------------------------------------------------------
-async def _open_transport(scheme: str, spec: Optional[str]) -> Transport:
+async def _open_transport(scheme: str, spec: str | None) -> Transport:
     # pylint: disable=import-outside-toplevel
     # pylint: disable=too-many-return-statements
 

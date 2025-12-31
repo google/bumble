@@ -19,7 +19,6 @@ import asyncio
 import logging
 import threading
 import time
-from typing import Optional
 
 import usb.core
 import usb.util
@@ -389,7 +388,7 @@ def _set_port_status(device: UsbDevice, port: int, on: bool):
     )
 
 
-def _find_device_by_path(sys_path: str) -> Optional[UsbDevice]:
+def _find_device_by_path(sys_path: str) -> UsbDevice | None:
     """Finds a USB device based on its system path."""
     bus_num, *port_parts = sys_path.split('-')
     ports = [int(port) for port in port_parts[0].split('.')]
@@ -402,7 +401,7 @@ def _find_device_by_path(sys_path: str) -> Optional[UsbDevice]:
     return None
 
 
-def _find_hub_by_device_path(sys_path: str) -> Optional[UsbDevice]:
+def _find_hub_by_device_path(sys_path: str) -> UsbDevice | None:
     """Finds the USB hub associated with a specific device path."""
     hub_sys_path = sys_path.rsplit('.', 1)[0]
     hub_device = _find_device_by_path(hub_sys_path)

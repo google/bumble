@@ -21,7 +21,6 @@ import logging
 import struct
 from collections.abc import Callable
 from enum import IntEnum
-from typing import Optional
 
 from bumble import core, l2cap
 from bumble.colors import color
@@ -147,7 +146,7 @@ class MessageAssembler:
 class Protocol:
     CommandHandler = Callable[[int, bytes], None]
     command_handlers: dict[int, CommandHandler]  # Command handlers, by PID
-    ResponseHandler = Callable[[int, Optional[bytes]], None]
+    ResponseHandler = Callable[[int, bytes | None], None]
     response_handlers: dict[int, ResponseHandler]  # Response handlers, by PID
     next_transaction_label: int
     message_assembler: MessageAssembler

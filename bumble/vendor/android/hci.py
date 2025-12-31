@@ -18,7 +18,6 @@
 import dataclasses
 import struct
 from dataclasses import field
-from typing import Optional
 
 from bumble import hci
 
@@ -209,7 +208,7 @@ class HCI_Android_Vendor_Event(hci.HCI_Extended_Event):
     @classmethod
     def subclass_from_parameters(
         cls, parameters: bytes
-    ) -> Optional[hci.HCI_Extended_Event]:
+    ) -> hci.HCI_Extended_Event | None:
         subevent_code = parameters[0]
         if subevent_code == HCI_BLUETOOTH_QUALITY_REPORT_EVENT:
             quality_report_id = parameters[1]

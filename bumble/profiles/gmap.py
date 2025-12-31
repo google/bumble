@@ -19,7 +19,6 @@
 # -----------------------------------------------------------------------------
 import struct
 from enum import IntFlag
-from typing import Optional
 
 from bumble.gatt import (
     GATT_BGR_FEATURES_CHARACTERISTIC,
@@ -77,18 +76,18 @@ class GamingAudioService(TemplateService):
     UUID = GATT_GAMING_AUDIO_SERVICE
 
     gmap_role: Characteristic
-    ugg_features: Optional[Characteristic] = None
-    ugt_features: Optional[Characteristic] = None
-    bgs_features: Optional[Characteristic] = None
-    bgr_features: Optional[Characteristic] = None
+    ugg_features: Characteristic | None = None
+    ugt_features: Characteristic | None = None
+    bgs_features: Characteristic | None = None
+    bgr_features: Characteristic | None = None
 
     def __init__(
         self,
         gmap_role: GmapRole,
-        ugg_features: Optional[UggFeatures] = None,
-        ugt_features: Optional[UgtFeatures] = None,
-        bgs_features: Optional[BgsFeatures] = None,
-        bgr_features: Optional[BgrFeatures] = None,
+        ugg_features: UggFeatures | None = None,
+        ugt_features: UgtFeatures | None = None,
+        bgs_features: BgsFeatures | None = None,
+        bgr_features: BgrFeatures | None = None,
     ) -> None:
         characteristics = []
 
@@ -150,10 +149,10 @@ class GamingAudioService(TemplateService):
 class GamingAudioServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = GamingAudioService
 
-    ugg_features: Optional[CharacteristicProxy[UggFeatures]] = None
-    ugt_features: Optional[CharacteristicProxy[UgtFeatures]] = None
-    bgs_features: Optional[CharacteristicProxy[BgsFeatures]] = None
-    bgr_features: Optional[CharacteristicProxy[BgrFeatures]] = None
+    ugg_features: CharacteristicProxy[UggFeatures] | None = None
+    ugt_features: CharacteristicProxy[UgtFeatures] | None = None
+    bgs_features: CharacteristicProxy[BgsFeatures] | None = None
+    bgr_features: CharacteristicProxy[BgrFeatures] | None = None
 
     def __init__(self, service_proxy: ServiceProxy) -> None:
         self.service_proxy = service_proxy

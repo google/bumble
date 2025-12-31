@@ -26,7 +26,8 @@ import logging
 import pathlib
 import sys
 import wave
-from typing import TYPE_CHECKING, AsyncGenerator, BinaryIO
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING, BinaryIO
 
 from bumble.colors import color
 

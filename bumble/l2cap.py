@@ -24,7 +24,7 @@ import logging
 import struct
 from collections import deque
 from collections.abc import Callable, Iterable, Sequence
-from typing import TYPE_CHECKING, Any, ClassVar, Optional, SupportsBytes, TypeVar, Union
+from typing import TYPE_CHECKING, Any, ClassVar, SupportsBytes, TypeVar
 
 from typing_extensions import override
 
@@ -175,7 +175,7 @@ class ClassicChannelSpec:
         fcs_enabled: Whether to enable FCS (Frame Check Sequence).
     '''
 
-    psm: Optional[int] = None
+    psm: int | None = None
     mtu: int = L2CAP_DEFAULT_MTU
     mps: int = L2CAP_DEFAULT_MPS
     tx_window_size: int = DEFAULT_TX_WINDOW_SIZE
@@ -188,7 +188,7 @@ class ClassicChannelSpec:
 
 @dataclasses.dataclass
 class LeCreditBasedChannelSpec:
-    psm: Optional[int] = None
+    psm: int | None = None
     mtu: int = L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MTU
     mps: int = L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_MPS
     max_credits: int = L2CAP_LE_CREDIT_BASED_CONNECTION_DEFAULT_INITIAL_CREDITS
@@ -372,7 +372,7 @@ class L2CAP_Control_Frame:
     fields: ClassVar[hci.Fields] = ()
     code: int = dataclasses.field(default=0, init=False)
     name: str = dataclasses.field(default='', init=False)
-    _payload: Optional[bytes] = dataclasses.field(default=None, init=False)
+    _payload: bytes | None = dataclasses.field(default=None, init=False)
 
     identifier: int
 
@@ -910,8 +910,8 @@ class EnhancedRetransmissionProcessor(Processor):
 
     _num_receiver_ready_polls_sent: int = 0
     _pending_pdus: list[_PendingPdu]
-    _monitor_handle: Optional[asyncio.TimerHandle] = None
-    _receiver_ready_poll_handle: Optional[asyncio.TimerHandle] = None
+    _monitor_handle: asyncio.TimerHandle | None = None
+    _receiver_ready_poll_handle: asyncio.TimerHandle | None = None
 
     # Timeout, in seconds.
     monitor_timeout: float
@@ -1109,10 +1109,10 @@ class ClassicChannel(utils.EventEmitter):
     EVENT_OPEN = "open"
     EVENT_CLOSE = "close"
 
-    connection_result: Optional[asyncio.Future[None]]
-    disconnection_result: Optional[asyncio.Future[None]]
-    response: Optional[asyncio.Future[bytes]]
-    sink: Optional[Callable[[bytes], Any]]
+    connection_result: asyncio.Future[None] | None
+    disconnection_result: asyncio.Future[None] | None
+    response: asyncio.Future[bytes] | None
+    sink: Callable[[bytes], Any] | None
     state: State
     connection: Connection
     mtu: int
@@ -1159,7 +1159,7 @@ class ClassicChannel(utils.EventEmitter):
     def write(self, sdu: bytes) -> None:
         self.processor.send_sdu(sdu)
 
-    def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
+    def send_pdu(self, pdu: SupportsBytes | bytes) -> None:
         if self.state != self.State.OPEN:
             raise InvalidStateError('channel not open')
         self.manager.send_pdu(
@@ -1542,13 +1542,13 @@ class LeCreditBasedChannel(utils.EventEmitter):
         CONNECTION_ERROR = 5
 
     out_queue: deque[bytes]
-    connection_result: Optional[asyncio.Future[LeCreditBasedChannel]]
-    disconnection_result: Optional[asyncio.Future[None]]
-    in_sdu: Optional[bytes]
-    out_sdu: Optional[bytes]
+    connection_result: asyncio.Future[LeCreditBasedChannel] | None
+    disconnection_result: asyncio.Future[None] | None
+    in_sdu: bytes | None
+    out_sdu: bytes | None
     state: State
     connection: Connection
-    sink: Optional[Callable[[bytes], Any]]
+    sink: Callable[[bytes], Any] | None
 
     EVENT_OPEN = "open"
     EVENT_CLOSE = "close"
@@ -1608,7 +1608,7 @@ class LeCreditBasedChannel(utils.EventEmitter):
         elif new_state == self.State.DISCONNECTED:
             self.emit(self.EVENT_CLOSE)
 
-    def send_pdu(self, pdu: Union[SupportsBytes, bytes]) -> None:
+    def send_pdu(self, pdu: SupportsBytes | bytes) -> None:
         self.manager.send_pdu(self.connection, self.destination_cid, pdu)
 
     def send_control_frame(self, frame: L2CAP_Control_Frame) -> None:
@@ -1913,7 +1913,7 @@ class ClassicChannelServer(utils.EventEmitter):
         self,
         manager: ChannelManager,
         psm: int,
-        handler: Optional[Callable[[ClassicChannel], Any]],
+        handler: Callable[[ClassicChannel], Any] | None,
         spec: ClassicChannelSpec,
     ) -> None:
         super().__init__()
@@ -1940,7 +1940,7 @@ class LeCreditBasedChannelServer(utils.EventEmitter):
         self,
         manager: ChannelManager,
         psm: int,
-        handler: Optional[Callable[[LeCreditBasedChannel], Any]],
+        handler: Callable[[LeCreditBasedChannel], Any] | None,
         max_credits: int,
         mtu: int,
         mps: int,
@@ -1966,12 +1966,12 @@ class LeCreditBasedChannelServer(utils.EventEmitter):
 # -----------------------------------------------------------------------------
 class ChannelManager:
     identifiers: dict[int, int]
-    channels: dict[int, dict[int, Union[ClassicChannel, LeCreditBasedChannel]]]
+    channels: dict[int, dict[int, ClassicChannel | LeCreditBasedChannel]]
     servers: dict[int, ClassicChannelServer]
     le_coc_channels: dict[int, dict[int, LeCreditBasedChannel]]
     le_coc_servers: dict[int, LeCreditBasedChannelServer]
     le_coc_requests: dict[int, L2CAP_LE_Credit_Based_Connection_Request]
-    fixed_channels: dict[int, Optional[Callable[[int, bytes], Any]]]
+    fixed_channels: dict[int, Callable[[int, bytes], Any] | None]
     pending_credit_based_connections: dict[
         int,
         dict[
@@ -1982,8 +1982,8 @@ class ChannelManager:
             ],
         ],
     ]
-    _host: Optional[Host]
-    connection_parameters_update_response: Optional[asyncio.Future[int]]
+    _host: Host | None
+    connection_parameters_update_response: asyncio.Future[int] | None
 
     def __init__(
         self,
@@ -2089,7 +2089,7 @@ class ChannelManager:
     def create_classic_server(
         self,
         spec: ClassicChannelSpec,
-        handler: Optional[Callable[[ClassicChannel], Any]] = None,
+        handler: Callable[[ClassicChannel], Any] | None = None,
     ) -> ClassicChannelServer:
         if not spec.psm:
             # Find a free PSM
@@ -2125,7 +2125,7 @@ class ChannelManager:
     def create_le_credit_based_server(
         self,
         spec: LeCreditBasedChannelSpec,
-        handler: Optional[Callable[[LeCreditBasedChannel], Any]] = None,
+        handler: Callable[[LeCreditBasedChannel], Any] | None = None,
     ) -> LeCreditBasedChannelServer:
         if not spec.psm:
             # Find a free PSM
@@ -2175,7 +2175,7 @@ class ChannelManager:
         self,
         connection: Connection,
         cid: int,
-        pdu: Union[SupportsBytes, bytes],
+        pdu: SupportsBytes | bytes,
         with_fcs: bool = False,
     ) -> None:
         pdu_str = pdu.hex() if isinstance(pdu, bytes) else str(pdu)

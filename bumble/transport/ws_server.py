@@ -16,7 +16,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 import logging
-from typing import Optional
 
 import websockets.asyncio.server
 
@@ -43,8 +42,8 @@ async def open_ws_server_transport(spec: str) -> Transport:
     class WsServerTransport(Transport):
         sink: PumpedPacketSink
         source: ParserSource
-        connection: Optional[websockets.asyncio.server.ServerConnection]
-        server: Optional[websockets.asyncio.server.Server]
+        connection: websockets.asyncio.server.ServerConnection | None
+        server: websockets.asyncio.server.Server | None
 
         def __init__(self) -> None:
             source = ParserSource()
