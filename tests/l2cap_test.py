@@ -20,7 +20,6 @@ import itertools
 import logging
 import os
 import random
-import struct
 from collections.abc import Sequence
 from unittest import mock
 
