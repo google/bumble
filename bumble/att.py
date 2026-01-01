@@ -29,15 +29,12 @@ import enum
 import functools
 import inspect
 import struct
+from collections.abc import Awaitable, Callable
 from typing import (
     TYPE_CHECKING,
-    Awaitable,
-    Callable,
     ClassVar,
     Generic,
-    Optional,
     TypeVar,
-    Union,
 )
 
 from bumble import hci, utils
@@ -220,7 +217,7 @@ class ATT_PDU:
     fields: ClassVar[hci.Fields] = ()
     op_code: int = dataclasses.field(init=False)
     name: str = dataclasses.field(init=False)
-    _payload: Optional[bytes] = dataclasses.field(default=None, init=False)
+    _payload: bytes | None = dataclasses.field(default=None, init=False)
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> ATT_PDU:
@@ -760,26 +757,24 @@ class AttributeValue(Generic[_T]):
 
     def __init__(
         self,
-        read: Union[
-            Callable[[Connection], _T],
-            Callable[[Connection], Awaitable[_T]],
-            None,
-        ] = None,
-        write: Union[
-            Callable[[Connection, _T], None],
-            Callable[[Connection, _T], Awaitable[None]],
-            None,
-        ] = None,
+        read: (
+            Callable[[Connection], _T] | Callable[[Connection], Awaitable[_T]] | None
+        ) = None,
+        write: (
+            Callable[[Connection, _T], None]
+            | Callable[[Connection, _T], Awaitable[None]]
+            | None
+        ) = None,
     ):
         self._read = read
         self._write = write
 
-    def read(self, connection: Connection) -> Union[_T, Awaitable[_T]]:
+    def read(self, connection: Connection) -> _T | Awaitable[_T]:
         if self._read is None:
             raise InvalidOperationError('AttributeValue has no read function')
         return self._read(connection)
 
-    def write(self, connection: Connection, value: _T) -> Union[Awaitable[None], None]:
+    def write(self, connection: Connection, value: _T) -> Awaitable[None] | None:
         if self._write is None:
             raise InvalidOperationError('AttributeValue has no write function')
         return self._write(connection, value)
@@ -828,13 +823,13 @@ class Attribute(utils.EventEmitter, Generic[_T]):
     EVENT_READ = "read"
     EVENT_WRITE = "write"
 
-    value: Union[AttributeValue[_T], _T, None]
+    value: AttributeValue[_T] | _T | None
 
     def __init__(
         self,
-        attribute_type: Union[str, bytes, UUID],
-        permissions: Union[str, Attribute.Permissions],
-        value: Union[AttributeValue[_T], _T, None] = None,
+        attribute_type: str | bytes | UUID,
+        permissions: str | Attribute.Permissions,
+        value: AttributeValue[_T] | _T | None = None,
     ) -> None:
         utils.EventEmitter.__init__(self)
         self.handle = 0
@@ -883,7 +878,7 @@ class Attribute(utils.EventEmitter, Generic[_T]):
                 error_code=ATT_INSUFFICIENT_AUTHORIZATION_ERROR, att_handle=self.handle
             )
 
-        value: Union[_T, None]
+        value: _T | None
         if isinstance(self.value, AttributeValue):
             try:
                 read_value = self.value.read(connection)

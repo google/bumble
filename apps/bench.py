@@ -22,7 +22,6 @@ import logging
 import statistics
 import struct
 import time
-from typing import Optional
 
 import click
 
@@ -257,8 +256,8 @@ async def pre_power_on(device: Device, classic: bool) -> None:
 
 async def post_power_on(
     device: Device,
-    le_scan: Optional[tuple[int, int]],
-    le_advertise: Optional[int],
+    le_scan: tuple[int, int] | None,
+    le_advertise: int | None,
     classic_page_scan: bool,
     classic_inquiry_scan: bool,
 ) -> None:
@@ -1300,7 +1299,7 @@ class IsoClient(StreamedPacketIO):
         super().__init__()
         self.device = device
         self.ready = asyncio.Event()
-        self.cis_link: Optional[CisLink] = None
+        self.cis_link: CisLink | None = None
 
     async def on_connection(
         self, connection: Connection, cis_link: CisLink, sender: bool
@@ -1341,7 +1340,7 @@ class IsoServer(StreamedPacketIO):
     ):
         super().__init__()
         self.device = device
-        self.cis_link: Optional[CisLink] = None
+        self.cis_link: CisLink | None = None
         self.ready = asyncio.Event()
 
         logging.info(

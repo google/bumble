@@ -52,7 +52,7 @@ async def main() -> None:
 
         if device.host.number_of_supported_advertising_sets >= 1:
             advertising_data1 = AdvertisingData(
-                [(AdvertisingData.COMPLETE_LOCAL_NAME, "Bumble 1".encode("utf-8"))]
+                [(AdvertisingData.COMPLETE_LOCAL_NAME, b"Bumble 1")]
             )
 
             set1 = await device.create_advertising_set(
@@ -61,7 +61,7 @@ async def main() -> None:
             print("Selected TX power 1:", set1.selected_tx_power)
 
             advertising_data2 = AdvertisingData(
-                [(AdvertisingData.COMPLETE_LOCAL_NAME, "Bumble 2".encode("utf-8"))]
+                [(AdvertisingData.COMPLETE_LOCAL_NAME, b"Bumble 2")]
             )
 
         # pylint: disable=possibly-used-before-assignment
@@ -78,7 +78,7 @@ async def main() -> None:
 
         if device.host.number_of_supported_advertising_sets >= 3:
             scan_response_data3 = AdvertisingData(
-                [(AdvertisingData.COMPLETE_LOCAL_NAME, "Bumble 3".encode("utf-8"))]
+                [(AdvertisingData.COMPLETE_LOCAL_NAME, b"Bumble 3")]
             )
 
             set3 = await device.create_advertising_set(

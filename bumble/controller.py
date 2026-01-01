@@ -23,7 +23,7 @@ import itertools
 import logging
 import random
 import struct
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from bumble import hci, link, ll, lmp
 from bumble import link as bumble_link
@@ -52,7 +52,7 @@ class CisLink:
     handle: int
     cis_id: int
     cig_id: int
-    acl_connection: Optional[Connection] = None
+    acl_connection: Connection | None = None
     data_paths: set[int] = dataclasses.field(default_factory=set)
 
 
@@ -73,7 +73,7 @@ class LegacyAdvertiser:
     scan_response_data: bytes = b''
 
     enabled: bool = False
-    timer_handle: Optional[asyncio.Handle] = None
+    timer_handle: asyncio.Handle | None = None
 
     @property
     def address(self) -> hci.Address:
@@ -124,12 +124,12 @@ class LegacyAdvertiser:
 class AdvertisingSet:
     controller: Controller
     handle: int
-    parameters: Optional[hci.HCI_LE_Set_Extended_Advertising_Parameters_Command] = None
+    parameters: hci.HCI_LE_Set_Extended_Advertising_Parameters_Command | None = None
     data: bytearray = dataclasses.field(default_factory=bytearray)
     scan_response_data: bytearray = dataclasses.field(default_factory=bytearray)
     enabled: bool = False
-    timer_handle: Optional[asyncio.Handle] = None
-    random_address: Optional[hci.Address] = None
+    timer_handle: asyncio.Handle | None = None
+    random_address: hci.Address | None = None
 
     @property
     def address(self) -> hci.Address | None:
@@ -223,7 +223,7 @@ class Connection:
 
 # -----------------------------------------------------------------------------
 class Controller:
-    hci_sink: Optional[TransportSink] = None
+    hci_sink: TransportSink | None = None
 
     le_connections: dict[hci.Address, Connection]  # LE Connections
     classic_connections: dict[hci.Address, Connection]  # Connections in BR/EDR
@@ -292,8 +292,8 @@ class Controller:
     sync_flow_control: bool = False
     local_name: str = 'Bumble'
     advertising_interval: int = 2000
-    advertising_data: Optional[bytes] = None
-    advertising_timer_handle: Optional[asyncio.Handle] = None
+    advertising_data: bytes | None = None
+    advertising_timer_handle: asyncio.Handle | None = None
     classic_scan_enable: int = 0
     classic_allow_role_switch: bool = True
     pending_le_connection: (
@@ -308,9 +308,9 @@ class Controller:
         self,
         name: str,
         host_source=None,
-        host_sink: Optional[TransportSink] = None,
-        link: Optional[link.LocalLink] = None,
-        public_address: Optional[Union[bytes, str, hci.Address]] = None,
+        host_sink: TransportSink | None = None,
+        link: link.LocalLink | None = None,
+        public_address: bytes | str | hci.Address | None = None,
     ) -> None:
         self.name = name
         self.link = link or bumble_link.LocalLink()
@@ -351,18 +351,18 @@ class Controller:
         )
 
     @property
-    def host(self) -> Optional[TransportSink]:
+    def host(self) -> TransportSink | None:
         return self.hci_sink
 
     @host.setter
-    def host(self, host: Optional[TransportSink]) -> None:
+    def host(self, host: TransportSink | None) -> None:
         '''
         Sets the host (sink) for this controller, and set this controller as the
         controller (sink) for the host
         '''
         self.set_packet_sink(host)
 
-    def set_packet_sink(self, sink: Optional[TransportSink]) -> None:
+    def set_packet_sink(self, sink: TransportSink | None) -> None:
         '''
         Method from the Packet Source interface
         '''
@@ -373,7 +373,7 @@ class Controller:
         return self._public_address
 
     @public_address.setter
-    def public_address(self, address: Union[hci.Address, str]) -> None:
+    def public_address(self, address: hci.Address | str) -> None:
         if isinstance(address, str):
             address = hci.Address(address)
         self._public_address = address
@@ -383,7 +383,7 @@ class Controller:
         return self._random_address
 
     @random_address.setter
-    def random_address(self, address: Union[hci.Address, str]) -> None:
+    def random_address(self, address: hci.Address | str) -> None:
         if isinstance(address, str):
             address = hci.Address(address)
         self._random_address = address
@@ -415,7 +415,7 @@ class Controller:
     def on_hci_command_packet(self, command: hci.HCI_Command) -> None:
         handler_name = f'on_{command.name.lower()}'
         handler = getattr(self, handler_name, self.on_hci_command)
-        result: Optional[bytes] = handler(command)
+        result: bytes | None = handler(command)
         if isinstance(result, bytes):
             self.send_hci_packet(
                 hci.HCI_Command_Complete_Event(
@@ -472,7 +472,7 @@ class Controller:
             if handle not in current_handles
         )
 
-    def find_connection_by_handle(self, handle: int) -> Optional[Connection]:
+    def find_connection_by_handle(self, handle: int) -> Connection | None:
         for connection in itertools.chain(
             self.le_connections.values(),
             self.classic_connections.values(),
@@ -481,13 +481,13 @@ class Controller:
                 return connection
         return None
 
-    def find_classic_sco_link_by_handle(self, handle: int) -> Optional[ScoLink]:
+    def find_classic_sco_link_by_handle(self, handle: int) -> ScoLink | None:
         for connection in self.sco_links.values():
             if connection.handle == handle:
                 return connection
         return None
 
-    def find_iso_link_by_handle(self, handle: int) -> Optional[CisLink]:
+    def find_iso_link_by_handle(self, handle: int) -> CisLink | None:
         return self.central_cis_links.get(handle) or self.peripheral_cis_links.get(
             handle
         )
@@ -1130,13 +1130,13 @@ class Controller:
     ############################################################
     # HCI handlers
     ############################################################
-    def on_hci_command(self, command: hci.HCI_Command) -> Optional[bytes]:
+    def on_hci_command(self, command: hci.HCI_Command) -> bytes | None:
         logger.warning(color(f'--- Unsupported command {command}', 'red'))
         return bytes([hci.HCI_UNKNOWN_HCI_COMMAND_ERROR])
 
     def on_hci_create_connection_command(
         self, command: hci.HCI_Create_Connection_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.1.5 Create Connection command
         '''
@@ -1186,7 +1186,7 @@ class Controller:
 
     def on_hci_disconnect_command(
         self, command: hci.HCI_Disconnect_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.1.6 Disconnect Command
         '''
@@ -1256,7 +1256,7 @@ class Controller:
 
     def on_hci_accept_connection_request_command(
         self, command: hci.HCI_Accept_Connection_Request_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.1.8 Accept Connection Request command
         '''
@@ -1314,7 +1314,7 @@ class Controller:
 
     def on_hci_remote_name_request_command(
         self, command: hci.HCI_Remote_Name_Request_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.1.19 Remote Name Request command
         '''
@@ -1332,7 +1332,7 @@ class Controller:
 
     def on_hci_enhanced_setup_synchronous_connection_command(
         self, command: hci.HCI_Enhanced_Setup_Synchronous_Connection_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.1.45 Enhanced Setup Synchronous Connection command
         '''
@@ -1389,7 +1389,7 @@ class Controller:
 
     def on_hci_enhanced_accept_synchronous_connection_request_command(
         self, command: hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.1.46 Enhanced Accept Synchronous Connection Request command
         '''
@@ -1427,7 +1427,7 @@ class Controller:
 
     def on_hci_sniff_mode_command(
         self, command: hci.HCI_Sniff_Mode_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.2.2 Sniff Mode command
         '''
@@ -1460,7 +1460,7 @@ class Controller:
 
     def on_hci_exit_sniff_mode_command(
         self, command: hci.HCI_Exit_Sniff_Mode_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.2.3 Exit Sniff Mode command
         '''
@@ -1494,7 +1494,7 @@ class Controller:
 
     def on_hci_switch_role_command(
         self, command: hci.HCI_Switch_Role_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.2.8 Switch hci.Role command
         '''
@@ -1551,7 +1551,7 @@ class Controller:
 
     def on_hci_set_event_mask_command(
         self, command: hci.HCI_Set_Event_Mask_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.1 Set Event Mask Command
         '''
@@ -1560,7 +1560,7 @@ class Controller:
         )
         return bytes([hci.HCI_SUCCESS])
 
-    def on_hci_reset_command(self, _command: hci.HCI_Reset_Command) -> Optional[bytes]:
+    def on_hci_reset_command(self, _command: hci.HCI_Reset_Command) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.2 Reset Command
         '''
@@ -1569,7 +1569,7 @@ class Controller:
 
     def on_hci_write_local_name_command(
         self, command: hci.HCI_Write_Local_Name_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.11 Write Local Name Command
         '''
@@ -1586,7 +1586,7 @@ class Controller:
 
     def on_hci_read_local_name_command(
         self, _command: hci.HCI_Read_Local_Name_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.12 Read Local Name Command
         '''
@@ -1598,7 +1598,7 @@ class Controller:
 
     def on_hci_read_class_of_device_command(
         self, _command: hci.HCI_Read_Class_Of_Device_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.25 Read Class of Device Command
         '''
@@ -1606,7 +1606,7 @@ class Controller:
 
     def on_hci_write_class_of_device_command(
         self, _command: hci.HCI_Write_Class_Of_Device_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.26 Write Class of Device Command
         '''
@@ -1614,7 +1614,7 @@ class Controller:
 
     def on_hci_read_synchronous_flow_control_enable_command(
         self, _command: hci.HCI_Read_Synchronous_Flow_Control_Enable_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.36 Read Synchronous Flow Control Enable
         Command
@@ -1627,7 +1627,7 @@ class Controller:
 
     def on_hci_write_synchronous_flow_control_enable_command(
         self, command: hci.HCI_Write_Synchronous_Flow_Control_Enable_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.37 Write Synchronous Flow Control Enable
         Command
@@ -1643,7 +1643,7 @@ class Controller:
 
     def on_hci_set_controller_to_host_flow_control_command(
         self, _command: hci.HCI_Set_Controller_To_Host_Flow_Control_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.38 Set Controller To Host Flow Control
         Command
@@ -1654,7 +1654,7 @@ class Controller:
 
     def on_hci_host_buffer_size_command(
         self, _command: hci.HCI_Host_Buffer_Size_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.39 Host Buffer Size Command
         '''
@@ -1664,7 +1664,7 @@ class Controller:
 
     def on_hci_write_extended_inquiry_response_command(
         self, _command: hci.HCI_Write_Extended_Inquiry_Response_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.56 Write Extended Inquiry Response
         Command
@@ -1673,7 +1673,7 @@ class Controller:
 
     def on_hci_write_simple_pairing_mode_command(
         self, _command: hci.HCI_Write_Simple_Pairing_Mode_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.59 Write Simple Pairing Mode Command
         '''
@@ -1681,7 +1681,7 @@ class Controller:
 
     def on_hci_set_event_mask_page_2_command(
         self, command: hci.HCI_Set_Event_Mask_Page_2_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.69 Set Event Mask Page 2 Command
         '''
@@ -1692,7 +1692,7 @@ class Controller:
 
     def on_hci_read_le_host_support_command(
         self, _command: hci.HCI_Read_LE_Host_Support_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.78 Write LE Host Support Command
         '''
@@ -1700,7 +1700,7 @@ class Controller:
 
     def on_hci_write_le_host_support_command(
         self, _command: hci.HCI_Write_LE_Host_Support_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.79 Write LE Host Support Command
         '''
@@ -1709,7 +1709,7 @@ class Controller:
 
     def on_hci_write_authenticated_payload_timeout_command(
         self, command: hci.HCI_Write_Authenticated_Payload_Timeout_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.94 Write Authenticated Payload Timeout
         Command
@@ -1719,7 +1719,7 @@ class Controller:
 
     def on_hci_read_local_version_information_command(
         self, _command: hci.HCI_Read_Local_Version_Information_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.4.1 Read Local Version Information Command
         '''
@@ -1735,7 +1735,7 @@ class Controller:
 
     def on_hci_read_local_supported_commands_command(
         self, _command: hci.HCI_Read_Local_Supported_Commands_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.4.2 Read Local Supported Commands Command
         '''
@@ -1743,7 +1743,7 @@ class Controller:
 
     def on_hci_read_local_supported_features_command(
         self, _command: hci.HCI_Read_Local_Supported_Features_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.4.3 Read Local Supported Features Command
         '''
@@ -1751,7 +1751,7 @@ class Controller:
 
     def on_hci_read_local_extended_features_command(
         self, command: hci.HCI_Read_Local_Extended_Features_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.4.4 Read Local Extended Features Command
         '''
@@ -1774,7 +1774,7 @@ class Controller:
 
     def on_hci_read_buffer_size_command(
         self, _command: hci.HCI_Read_Buffer_Size_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.4.5 Read Buffer Size Command
         '''
@@ -1789,7 +1789,7 @@ class Controller:
 
     def on_hci_read_bd_addr_command(
         self, _command: hci.HCI_Read_BD_ADDR_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.4.6 Read BD_ADDR Command
         '''
@@ -1802,7 +1802,7 @@ class Controller:
 
     def on_hci_le_set_default_subrate_command(
         self, command: hci.HCI_LE_Set_Default_Subrate_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 6, Part E - 7.8.123 LE Set Event Mask Command
         '''
@@ -1818,7 +1818,7 @@ class Controller:
 
     def on_hci_le_subrate_request_command(
         self, command: hci.HCI_LE_Subrate_Request_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 6, Part E - 7.8.124 LE Subrate Request command
         '''
@@ -1852,7 +1852,7 @@ class Controller:
 
     def on_hci_le_set_event_mask_command(
         self, command: hci.HCI_LE_Set_Event_Mask_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.1 LE Set Event Mask Command
         '''
@@ -1863,7 +1863,7 @@ class Controller:
 
     def on_hci_le_read_buffer_size_command(
         self, _command: hci.HCI_LE_Read_Buffer_Size_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.2 LE Read Buffer Size Command
         '''
@@ -1876,7 +1876,7 @@ class Controller:
 
     def on_hci_le_read_buffer_size_v2_command(
         self, _command: hci.HCI_LE_Read_Buffer_Size_V2_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.2 LE Read Buffer Size Command
         '''
@@ -1891,7 +1891,7 @@ class Controller:
 
     def on_hci_le_read_local_supported_features_command(
         self, _command: hci.HCI_LE_Read_Local_Supported_Features_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.3 LE Read Local Supported Features
         Command
@@ -1900,7 +1900,7 @@ class Controller:
 
     def on_hci_le_set_random_address_command(
         self, command: hci.HCI_LE_Set_Random_Address_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.4 LE Set Random hci.Address Command
         '''
@@ -1909,7 +1909,7 @@ class Controller:
 
     def on_hci_le_set_advertising_parameters_command(
         self, command: hci.HCI_LE_Set_Advertising_Parameters_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.5 LE Set Advertising Parameters Command
         '''
@@ -1933,7 +1933,7 @@ class Controller:
 
     def on_hci_le_read_advertising_physical_channel_tx_power_command(
         self, _command: hci.HCI_LE_Read_Advertising_Physical_Channel_Tx_Power_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.6 LE Read Advertising Physical Channel
         Tx Power Command
@@ -1942,7 +1942,7 @@ class Controller:
 
     def on_hci_le_set_advertising_data_command(
         self, command: hci.HCI_LE_Set_Advertising_Data_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.7 LE Set Advertising Data Command
         '''
@@ -1952,7 +1952,7 @@ class Controller:
 
     def on_hci_le_set_scan_response_data_command(
         self, command: hci.HCI_LE_Set_Scan_Response_Data_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.8 LE Set Scan Response Data Command
         '''
@@ -1961,7 +1961,7 @@ class Controller:
 
     def on_hci_le_set_advertising_enable_command(
         self, command: hci.HCI_LE_Set_Advertising_Enable_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.9 LE Set Advertising Enable Command
         '''
@@ -1974,7 +1974,7 @@ class Controller:
 
     def on_hci_le_set_scan_parameters_command(
         self, command: hci.HCI_LE_Set_Scan_Parameters_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.10 LE Set Scan Parameters Command
         '''
@@ -1990,7 +1990,7 @@ class Controller:
 
     def on_hci_le_set_scan_enable_command(
         self, command: hci.HCI_LE_Set_Scan_Enable_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.11 LE Set Scan Enable Command
         '''
@@ -2000,7 +2000,7 @@ class Controller:
 
     def on_hci_le_create_connection_command(
         self, command: hci.HCI_LE_Create_Connection_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.12 LE Create Connection Command
         '''
@@ -2035,7 +2035,7 @@ class Controller:
 
     def on_hci_le_create_connection_cancel_command(
         self, _command: hci.HCI_LE_Create_Connection_Cancel_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.13 LE Create Connection Cancel Command
         '''
@@ -2043,7 +2043,7 @@ class Controller:
 
     def on_hci_le_extended_create_connection_command(
         self, command: hci.HCI_LE_Extended_Create_Connection_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.66 LE Extended Create Connection Command
         '''
@@ -2074,7 +2074,7 @@ class Controller:
 
     def on_hci_le_read_filter_accept_list_size_command(
         self, _command: hci.HCI_LE_Read_Filter_Accept_List_Size_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.14 LE Read Filter Accept List Size
         Command
@@ -2083,7 +2083,7 @@ class Controller:
 
     def on_hci_le_clear_filter_accept_list_command(
         self, _command: hci.HCI_LE_Clear_Filter_Accept_List_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.15 LE Clear Filter Accept List Command
         '''
@@ -2091,7 +2091,7 @@ class Controller:
 
     def on_hci_le_add_device_to_filter_accept_list_command(
         self, _command: hci.HCI_LE_Add_Device_To_Filter_Accept_List_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.16 LE Add Device To Filter Accept List
         Command
@@ -2100,7 +2100,7 @@ class Controller:
 
     def on_hci_le_remove_device_from_filter_accept_list_command(
         self, _command: hci.HCI_LE_Remove_Device_From_Filter_Accept_List_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.17 LE Remove Device From Filter Accept
         List Command
@@ -2109,7 +2109,7 @@ class Controller:
 
     def on_hci_write_scan_enable_command(
         self, command: hci.HCI_Write_Scan_Enable_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.18 Write Scan Enable Command
         '''
@@ -2118,7 +2118,7 @@ class Controller:
 
     def on_hci_le_read_remote_features_command(
         self, command: hci.HCI_LE_Read_Remote_Features_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.21 LE Read Remote Features Command
         '''
@@ -2154,9 +2154,7 @@ class Controller:
         )
         return None
 
-    def on_hci_le_rand_command(
-        self, _command: hci.HCI_LE_Rand_Command
-    ) -> Optional[bytes]:
+    def on_hci_le_rand_command(self, _command: hci.HCI_LE_Rand_Command) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.23 LE Rand Command
         '''
@@ -2164,7 +2162,7 @@ class Controller:
 
     def on_hci_le_enable_encryption_command(
         self, command: hci.HCI_LE_Enable_Encryption_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.24 LE Enable Encryption Command
         '''
@@ -2204,7 +2202,7 @@ class Controller:
 
     def on_hci_le_read_supported_states_command(
         self, _command: hci.HCI_LE_Read_Supported_States_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.27 LE Read Supported States Command
         '''
@@ -2212,7 +2210,7 @@ class Controller:
 
     def on_hci_le_read_suggested_default_data_length_command(
         self, _command: hci.HCI_LE_Read_Suggested_Default_Data_Length_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.34 LE Read Suggested Default Data Length
         Command
@@ -2226,7 +2224,7 @@ class Controller:
 
     def on_hci_le_write_suggested_default_data_length_command(
         self, command: hci.HCI_LE_Write_Suggested_Default_Data_Length_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.35 LE Write Suggested Default Data Length
         Command
@@ -2238,7 +2236,7 @@ class Controller:
 
     def on_hci_le_read_local_p_256_public_key_command(
         self, _command: hci.HCI_LE_Read_Local_P_256_Public_Key_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.36 LE Read P-256 Public Key Command
         '''
@@ -2247,7 +2245,7 @@ class Controller:
 
     def on_hci_le_add_device_to_resolving_list_command(
         self, _command: hci.HCI_LE_Add_Device_To_Resolving_List_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.38 LE Add Device To Resolving List
         Command
@@ -2256,7 +2254,7 @@ class Controller:
 
     def on_hci_le_clear_resolving_list_command(
         self, _command: hci.HCI_LE_Clear_Resolving_List_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.40 LE Clear Resolving List Command
         '''
@@ -2264,7 +2262,7 @@ class Controller:
 
     def on_hci_le_read_resolving_list_size_command(
         self, _command: hci.HCI_LE_Read_Resolving_List_Size_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.41 LE Read Resolving List Size Command
         '''
@@ -2272,7 +2270,7 @@ class Controller:
 
     def on_hci_le_set_address_resolution_enable_command(
         self, command: hci.HCI_LE_Set_Address_Resolution_Enable_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.44 LE Set hci.Address Resolution Enable
         Command
@@ -2288,7 +2286,7 @@ class Controller:
 
     def on_hci_le_set_resolvable_private_address_timeout_command(
         self, command: hci.HCI_LE_Set_Resolvable_Private_Address_Timeout_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.45 LE Set Resolvable Private hci.Address
         Timeout Command
@@ -2298,7 +2296,7 @@ class Controller:
 
     def on_hci_le_read_maximum_data_length_command(
         self, _command: hci.HCI_LE_Read_Maximum_Data_Length_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.46 LE Read Maximum Data Length Command
         '''
@@ -2313,7 +2311,7 @@ class Controller:
 
     def on_hci_le_read_phy_command(
         self, command: hci.HCI_LE_Read_PHY_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.47 LE Read PHY Command
         '''
@@ -2327,7 +2325,7 @@ class Controller:
 
     def on_hci_le_set_default_phy_command(
         self, command: hci.HCI_LE_Set_Default_PHY_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.48 LE Set Default PHY Command
         '''
@@ -2338,7 +2336,7 @@ class Controller:
 
     def on_hci_le_set_advertising_set_random_address_command(
         self, command: hci.HCI_LE_Set_Advertising_Set_Random_Address_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.52 LE Set Advertising Set Random hci.Address
         Command
@@ -2353,7 +2351,7 @@ class Controller:
 
     def on_hci_le_set_extended_advertising_parameters_command(
         self, command: hci.HCI_LE_Set_Extended_Advertising_Parameters_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.53 LE Set Extended Advertising Parameters
         Command
@@ -2369,7 +2367,7 @@ class Controller:
 
     def on_hci_le_set_extended_advertising_data_command(
         self, command: hci.HCI_LE_Set_Extended_Advertising_Data_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.54 LE Set Extended Advertising Data
         Command
@@ -2393,7 +2391,7 @@ class Controller:
 
     def on_hci_le_set_extended_scan_response_data_command(
         self, command: hci.HCI_LE_Set_Extended_Scan_Response_Data_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.55 LE Set Extended Scan Response Data
         Command
@@ -2417,7 +2415,7 @@ class Controller:
 
     def on_hci_le_set_extended_advertising_enable_command(
         self, command: hci.HCI_LE_Set_Extended_Advertising_Enable_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.56 LE Set Extended Advertising Enable
         Command
@@ -2438,7 +2436,7 @@ class Controller:
 
     def on_hci_le_remove_advertising_set_command(
         self, command: hci.HCI_LE_Remove_Advertising_Set_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.59 LE Remove Advertising Set Command
         '''
@@ -2449,7 +2447,7 @@ class Controller:
 
     def on_hci_le_clear_advertising_sets_command(
         self, _command: hci.HCI_LE_Clear_Advertising_Sets_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.60 LE Clear Advertising Sets Command
         '''
@@ -2460,7 +2458,7 @@ class Controller:
 
     def on_hci_le_read_maximum_advertising_data_length_command(
         self, _command: hci.HCI_LE_Read_Maximum_Advertising_Data_Length_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.57 LE Read Maximum Advertising Data
         Length Command
@@ -2469,7 +2467,7 @@ class Controller:
 
     def on_hci_le_read_number_of_supported_advertising_sets_command(
         self, _command: hci.HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.58 LE Read Number of Supported
         Advertising Set Command
@@ -2478,7 +2476,7 @@ class Controller:
 
     def on_hci_le_set_periodic_advertising_parameters_command(
         self, _command: hci.HCI_LE_Set_Periodic_Advertising_Parameters_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.61 LE Set Periodic Advertising Parameters
         Command
@@ -2487,7 +2485,7 @@ class Controller:
 
     def on_hci_le_set_periodic_advertising_data_command(
         self, _command: hci.HCI_LE_Set_Periodic_Advertising_Data_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.62 LE Set Periodic Advertising Data
         Command
@@ -2496,7 +2494,7 @@ class Controller:
 
     def on_hci_le_set_periodic_advertising_enable_command(
         self, _command: hci.HCI_LE_Set_Periodic_Advertising_Enable_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.63 LE Set Periodic Advertising Enable
         Command
@@ -2505,7 +2503,7 @@ class Controller:
 
     def on_hci_le_read_transmit_power_command(
         self, _command: hci.HCI_LE_Read_Transmit_Power_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.74 LE Read Transmit Power Command
         '''
@@ -2513,7 +2511,7 @@ class Controller:
 
     def on_hci_le_set_cig_parameters_command(
         self, command: hci.HCI_LE_Set_CIG_Parameters_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.97 LE Set CIG Parameter Command
         '''
@@ -2539,7 +2537,7 @@ class Controller:
 
     def on_hci_le_create_cis_command(
         self, command: hci.HCI_LE_Create_CIS_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.99 LE Create CIS Command
         '''
@@ -2574,7 +2572,7 @@ class Controller:
 
     def on_hci_le_remove_cig_command(
         self, command: hci.HCI_LE_Remove_CIG_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.100 LE Remove CIG Command
         '''
@@ -2591,7 +2589,7 @@ class Controller:
 
     def on_hci_le_accept_cis_request_command(
         self, command: hci.HCI_LE_Accept_CIS_Request_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.101 LE Accept CIS Request Command
         '''
@@ -2620,7 +2618,7 @@ class Controller:
 
     def on_hci_le_setup_iso_data_path_command(
         self, command: hci.HCI_LE_Setup_ISO_Data_Path_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.109 LE Setup ISO Data Path Command
         '''
@@ -2641,7 +2639,7 @@ class Controller:
 
     def on_hci_le_remove_iso_data_path_command(
         self, command: hci.HCI_LE_Remove_ISO_Data_Path_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.110 LE Remove ISO Data Path Command
         '''
@@ -2667,7 +2665,7 @@ class Controller:
 
     def on_hci_le_set_host_feature_command(
         self, _command: hci.HCI_LE_Set_Host_Feature_Command
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.115 LE Set Host Feature command
         '''

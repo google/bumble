@@ -27,7 +27,7 @@ import sys
 import yaml
 
 # -----------------------------------------------------------------------------
-with open(sys.argv[1], "r") as yaml_file:
+with open(sys.argv[1]) as yaml_file:
     root = yaml.safe_load(yaml_file)
     companies = {}
     for company in root["company_identifiers"]:

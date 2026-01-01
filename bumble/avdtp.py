@@ -22,16 +22,13 @@ import enum
 import logging
 import time
 import warnings
-from collections.abc import AsyncGenerator, Awaitable, Iterable
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from typing import (
     Any,
-    Callable,
     ClassVar,
-    Optional,
     SupportsBytes,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -184,7 +181,7 @@ class State(utils.OpenIntEnum):
 # -----------------------------------------------------------------------------
 async def find_avdtp_service_with_sdp_client(
     sdp_client: sdp.Client,
-) -> Optional[tuple[int, int]]:
+) -> tuple[int, int] | None:
     '''
     Find an AVDTP service, using a connected SDP client, and return its version,
     or None if none is found
@@ -214,7 +211,7 @@ async def find_avdtp_service_with_sdp_client(
 # -----------------------------------------------------------------------------
 async def find_avdtp_service_with_connection(
     connection: device.Connection,
-) -> Optional[tuple[int, int]]:
+) -> tuple[int, int] | None:
     '''
     Find an AVDTP service, for a connection, and return its version,
     or None if none is found
@@ -239,7 +236,7 @@ class RealtimeClock:
 
 # -----------------------------------------------------------------------------
 class MediaPacketPump:
-    pump_task: Optional[asyncio.Task]
+    pump_task: asyncio.Task | None
 
     def __init__(
         self, packets: AsyncGenerator, clock: RealtimeClock = RealtimeClock()
@@ -296,7 +293,7 @@ class MediaPacketPump:
 
 # -----------------------------------------------------------------------------
 class MessageAssembler:
-    message: Optional[bytes]
+    message: bytes | None
     signal_identifier: SignalIdentifier
 
     def __init__(self, callback: Callable[[int, Message], Any]) -> None:
@@ -470,15 +467,15 @@ class MediaCodecCapabilities(ServiceCapabilities):
 
     media_type: MediaType
     media_codec_type: a2dp.CodecType
-    media_codec_information: Union[bytes, SupportsBytes]
+    media_codec_information: bytes | SupportsBytes
 
     # Override init to allow passing service_capabilities_bytes.
     def __init__(
         self,
         media_type: MediaType,
         media_codec_type: a2dp.CodecType,
-        media_codec_information: Union[bytes, SupportsBytes],
-        service_capabilities_bytes: Optional[bytes] = None,
+        media_codec_information: bytes | SupportsBytes,
+        service_capabilities_bytes: bytes | None = None,
     ) -> None:
         self.media_type = media_type
         self.media_codec_type = media_codec_type
@@ -553,7 +550,7 @@ class Message:
 
     message_type: MessageType
     signal_identifier: SignalIdentifier
-    _payload: Optional[bytes] = None
+    _payload: bytes | None = None
     fields: ClassVar[hci.Fields] = ()
 
     @property
@@ -607,7 +604,7 @@ class Message:
         instance.signal_identifier = signal_identifier
         return instance
 
-    def to_string(self, details: Union[str, Iterable[str]]) -> str:
+    def to_string(self, details: str | Iterable[str]) -> str:
         base = color(
             f'{self.signal_identifier.name}_{self.message_type.name}',
             'yellow',
@@ -1266,9 +1263,9 @@ class Protocol(utils.EventEmitter):
     local_endpoints: list[LocalStreamEndPoint]
     remote_endpoints: dict[int, DiscoveredStreamEndPoint]
     streams: dict[int, Stream]
-    transaction_results: list[Optional[asyncio.Future[Message]]]
+    transaction_results: list[asyncio.Future[Message] | None]
     channel_connector: Callable[[], Awaitable[l2cap.ClassicChannel]]
-    channel_acceptor: Optional[Stream]
+    channel_acceptor: Stream | None
 
     EVENT_OPEN = "open"
     EVENT_CLOSE = "close"
@@ -1311,7 +1308,7 @@ class Protocol(utils.EventEmitter):
         l2cap_channel.on(l2cap_channel.EVENT_OPEN, self.on_l2cap_channel_open)
         l2cap_channel.on(l2cap_channel.EVENT_CLOSE, self.on_l2cap_channel_close)
 
-    def get_local_endpoint_by_seid(self, seid: int) -> Optional[LocalStreamEndPoint]:
+    def get_local_endpoint_by_seid(self, seid: int) -> LocalStreamEndPoint | None:
         if 0 < seid <= len(self.local_endpoints):
             return self.local_endpoints[seid - 1]
 
@@ -1385,7 +1382,7 @@ class Protocol(utils.EventEmitter):
 
     def find_remote_sink_by_codec(
         self, media_type: int, codec_type: int, vendor_id: int = 0, codec_id: int = 0
-    ) -> Optional[DiscoveredStreamEndPoint]:
+    ) -> DiscoveredStreamEndPoint | None:
         for endpoint in self.remote_endpoints.values():
             if (
                 not endpoint.in_use
@@ -1569,10 +1566,9 @@ class Protocol(utils.EventEmitter):
 
         assert False  # Should never reach this
 
-    async def get_capabilities(self, seid: int) -> Union[
-        Get_Capabilities_Response,
-        Get_All_Capabilities_Response,
-    ]:
+    async def get_capabilities(
+        self, seid: int
+    ) -> Get_Capabilities_Response | Get_All_Capabilities_Response:
         if self.version > (1, 2):
             return await self.send_command(Get_All_Capabilities_Command(seid))
 
@@ -1604,7 +1600,7 @@ class Protocol(utils.EventEmitter):
     async def abort(self, seid: int) -> Abort_Response:
         return await self.send_command(Abort_Command(seid))
 
-    def on_discover_command(self, command: Discover_Command) -> Optional[Message]:
+    def on_discover_command(self, command: Discover_Command) -> Message | None:
         endpoint_infos = [
             EndPointInfo(endpoint.seid, 0, endpoint.media_type, endpoint.tsep)
             for endpoint in self.local_endpoints
@@ -1613,7 +1609,7 @@ class Protocol(utils.EventEmitter):
 
     def on_get_capabilities_command(
         self, command: Get_Capabilities_Command
-    ) -> Optional[Message]:
+    ) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
             return Get_Capabilities_Reject(AVDTP_BAD_ACP_SEID_ERROR)
@@ -1622,7 +1618,7 @@ class Protocol(utils.EventEmitter):
 
     def on_get_all_capabilities_command(
         self, command: Get_All_Capabilities_Command
-    ) -> Optional[Message]:
+    ) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
             return Get_All_Capabilities_Reject(AVDTP_BAD_ACP_SEID_ERROR)
@@ -1631,7 +1627,7 @@ class Protocol(utils.EventEmitter):
 
     def on_set_configuration_command(
         self, command: Set_Configuration_Command
-    ) -> Optional[Message]:
+    ) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
             return Set_Configuration_Reject(error_code=AVDTP_BAD_ACP_SEID_ERROR)
@@ -1649,7 +1645,7 @@ class Protocol(utils.EventEmitter):
 
     def on_get_configuration_command(
         self, command: Get_Configuration_Command
-    ) -> Optional[Message]:
+    ) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
             return Get_Configuration_Reject(AVDTP_BAD_ACP_SEID_ERROR)
@@ -1658,7 +1654,7 @@ class Protocol(utils.EventEmitter):
 
         return endpoint.stream.on_get_configuration_command()
 
-    def on_reconfigure_command(self, command: Reconfigure_Command) -> Optional[Message]:
+    def on_reconfigure_command(self, command: Reconfigure_Command) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
             return Reconfigure_Reject(error_code=AVDTP_BAD_ACP_SEID_ERROR)
@@ -1668,7 +1664,7 @@ class Protocol(utils.EventEmitter):
         result = endpoint.stream.on_reconfigure_command(command.capabilities)
         return result or Reconfigure_Response()
 
-    def on_open_command(self, command: Open_Command) -> Optional[Message]:
+    def on_open_command(self, command: Open_Command) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
             return Open_Reject(AVDTP_BAD_ACP_SEID_ERROR)
@@ -1678,7 +1674,7 @@ class Protocol(utils.EventEmitter):
         result = endpoint.stream.on_open_command()
         return result or Open_Response()
 
-    def on_start_command(self, command: Start_Command) -> Optional[Message]:
+    def on_start_command(self, command: Start_Command) -> Message | None:
         for seid in command.acp_seids:
             endpoint = self.get_local_endpoint_by_seid(seid)
             if endpoint is None:
@@ -1697,7 +1693,7 @@ class Protocol(utils.EventEmitter):
 
         return Start_Response()
 
-    def on_suspend_command(self, command: Suspend_Command) -> Optional[Message]:
+    def on_suspend_command(self, command: Suspend_Command) -> Message | None:
         for seid in command.acp_seids:
             endpoint = self.get_local_endpoint_by_seid(seid)
             if endpoint is None:
@@ -1716,7 +1712,7 @@ class Protocol(utils.EventEmitter):
 
         return Suspend_Response()
 
-    def on_close_command(self, command: Close_Command) -> Optional[Message]:
+    def on_close_command(self, command: Close_Command) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
             return Close_Reject(AVDTP_BAD_ACP_SEID_ERROR)
@@ -1726,7 +1722,7 @@ class Protocol(utils.EventEmitter):
         result = endpoint.stream.on_close_command()
         return result or Close_Response()
 
-    def on_abort_command(self, command: Abort_Command) -> Optional[Message]:
+    def on_abort_command(self, command: Abort_Command) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None or endpoint.stream is None:
             return Abort_Response()
@@ -1736,7 +1732,7 @@ class Protocol(utils.EventEmitter):
 
     def on_security_control_command(
         self, command: Security_Control_Command
-    ) -> Optional[Message]:
+    ) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
             return Security_Control_Reject(AVDTP_BAD_ACP_SEID_ERROR)
@@ -1744,7 +1740,7 @@ class Protocol(utils.EventEmitter):
         result = endpoint.on_security_control_command(command.data)
         return result or Security_Control_Response()
 
-    def on_delayreport_command(self, command: DelayReport_Command) -> Optional[Message]:
+    def on_delayreport_command(self, command: DelayReport_Command) -> Message | None:
         endpoint = self.get_local_endpoint_by_seid(command.acp_seid)
         if endpoint is None:
             return DelayReport_Reject(AVDTP_BAD_ACP_SEID_ERROR)
@@ -1825,7 +1821,7 @@ class Stream:
     Pair of a local and a remote stream endpoint that can stream from one to the other
     '''
 
-    rtp_channel: Optional[l2cap.ClassicChannel]
+    rtp_channel: l2cap.ClassicChannel | None
 
     def change_state(self, state: State) -> None:
         logger.debug(f'{self} state change -> {color(state.name, "cyan")}')
@@ -1914,7 +1910,7 @@ class Stream:
 
     def on_set_configuration_command(
         self, configuration: Iterable[ServiceCapabilities]
-    ) -> Optional[Message]:
+    ) -> Message | None:
         if self.state != State.IDLE:
             return Set_Configuration_Reject(error_code=AVDTP_BAD_STATE_ERROR)
 
@@ -1925,7 +1921,7 @@ class Stream:
         self.change_state(State.CONFIGURED)
         return None
 
-    def on_get_configuration_command(self) -> Optional[Message]:
+    def on_get_configuration_command(self) -> Message | None:
         if self.state not in (
             State.CONFIGURED,
             State.OPEN,
@@ -1937,7 +1933,7 @@ class Stream:
 
     def on_reconfigure_command(
         self, configuration: Iterable[ServiceCapabilities]
-    ) -> Optional[Message]:
+    ) -> Message | None:
         if self.state != State.OPEN:
             return Reconfigure_Reject(error_code=AVDTP_BAD_STATE_ERROR)
 
@@ -1947,7 +1943,7 @@ class Stream:
 
         return None
 
-    def on_open_command(self) -> Optional[Message]:
+    def on_open_command(self) -> Message | None:
         if self.state != State.CONFIGURED:
             return Open_Reject(AVDTP_BAD_STATE_ERROR)
 
@@ -1961,7 +1957,7 @@ class Stream:
         self.change_state(State.OPEN)
         return None
 
-    def on_start_command(self) -> Optional[Message]:
+    def on_start_command(self) -> Message | None:
         if self.state != State.OPEN:
             return Open_Reject(AVDTP_BAD_STATE_ERROR)
 
@@ -1977,7 +1973,7 @@ class Stream:
         self.change_state(State.STREAMING)
         return None
 
-    def on_suspend_command(self) -> Optional[Message]:
+    def on_suspend_command(self) -> Message | None:
         if self.state != State.STREAMING:
             return Open_Reject(AVDTP_BAD_STATE_ERROR)
 
@@ -1988,7 +1984,7 @@ class Stream:
         self.change_state(State.OPEN)
         return None
 
-    def on_close_command(self) -> Optional[Message]:
+    def on_close_command(self) -> Message | None:
         if self.state not in (State.OPEN, State.STREAMING):
             return Open_Reject(AVDTP_BAD_STATE_ERROR)
 
@@ -2007,7 +2003,7 @@ class Stream:
 
         return None
 
-    def on_abort_command(self) -> Optional[Message]:
+    def on_abort_command(self) -> Message | None:
         if self.rtp_channel is None:
             # No need to wait
             self.change_state(State.IDLE)
@@ -2120,7 +2116,7 @@ class DiscoveredStreamEndPoint(StreamEndPoint, StreamEndPointProxy):
 
 # -----------------------------------------------------------------------------
 class LocalStreamEndPoint(StreamEndPoint, utils.EventEmitter):
-    stream: Optional[Stream]
+    stream: Stream | None
 
     EVENT_CONFIGURATION = "configuration"
     EVENT_OPEN = "open"
@@ -2142,7 +2138,7 @@ class LocalStreamEndPoint(StreamEndPoint, utils.EventEmitter):
         media_type: MediaType,
         tsep: StreamEndPointType,
         capabilities: Iterable[ServiceCapabilities],
-        configuration: Optional[Iterable[ServiceCapabilities]] = None,
+        configuration: Iterable[ServiceCapabilities] | None = None,
     ):
         StreamEndPoint.__init__(self, seid, media_type, tsep, 0, capabilities)
         utils.EventEmitter.__init__(self)
@@ -2161,13 +2157,13 @@ class LocalStreamEndPoint(StreamEndPoint, utils.EventEmitter):
 
     def on_reconfigure_command(
         self, command: Iterable[ServiceCapabilities]
-    ) -> Optional[Message]:
+    ) -> Message | None:
         del command  # unused.
         return None
 
     def on_set_configuration_command(
         self, configuration: Iterable[ServiceCapabilities]
-    ) -> Optional[Message]:
+    ) -> Message | None:
         logger.debug(
             '<<< received configuration: '
             f'{",".join([str(capability) for capability in configuration])}'
@@ -2176,34 +2172,34 @@ class LocalStreamEndPoint(StreamEndPoint, utils.EventEmitter):
         self.emit(self.EVENT_CONFIGURATION)
         return None
 
-    def on_get_configuration_command(self) -> Optional[Message]:
+    def on_get_configuration_command(self) -> Message | None:
         return Get_Configuration_Response(self.configuration)
 
-    def on_open_command(self) -> Optional[Message]:
+    def on_open_command(self) -> Message | None:
         self.emit(self.EVENT_OPEN)
         return None
 
-    def on_start_command(self) -> Optional[Message]:
+    def on_start_command(self) -> Message | None:
         self.emit(self.EVENT_START)
         return None
 
-    def on_suspend_command(self) -> Optional[Message]:
+    def on_suspend_command(self) -> Message | None:
         self.emit(self.EVENT_SUSPEND)
         return None
 
-    def on_close_command(self) -> Optional[Message]:
+    def on_close_command(self) -> Message | None:
         self.emit(self.EVENT_CLOSE)
         return None
 
-    def on_abort_command(self) -> Optional[Message]:
+    def on_abort_command(self) -> Message | None:
         self.emit(self.EVENT_ABORT)
         return None
 
-    def on_delayreport_command(self, delay: int) -> Optional[Message]:
+    def on_delayreport_command(self, delay: int) -> Message | None:
         self.emit(self.EVENT_DELAY_REPORT, delay)
         return None
 
-    def on_security_control_command(self, data: bytes) -> Optional[Message]:
+    def on_security_control_command(self, data: bytes) -> Message | None:
         self.emit(self.EVENT_SECURITY_CONTROL, data)
         return None
 
@@ -2255,12 +2251,12 @@ class LocalSource(LocalStreamEndPoint):
         self.emit(self.EVENT_STOP)
 
     @override
-    def on_start_command(self) -> Optional[Message]:
+    def on_start_command(self) -> Message | None:
         asyncio.create_task(self.start())
         return None
 
     @override
-    def on_suspend_command(self) -> Optional[Message]:
+    def on_suspend_command(self) -> Message | None:
         asyncio.create_task(self.stop())
         return None
 

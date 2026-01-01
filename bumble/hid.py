@@ -21,8 +21,8 @@ import enum
 import logging
 import struct
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from typing_extensions import override
 
@@ -195,9 +195,9 @@ class SendHandshakeMessage(Message):
 
 # -----------------------------------------------------------------------------
 class HID(ABC, utils.EventEmitter):
-    l2cap_ctrl_channel: Optional[l2cap.ClassicChannel] = None
-    l2cap_intr_channel: Optional[l2cap.ClassicChannel] = None
-    connection: Optional[device.Connection] = None
+    l2cap_ctrl_channel: l2cap.ClassicChannel | None = None
+    l2cap_intr_channel: l2cap.ClassicChannel | None = None
+    connection: device.Connection | None = None
 
     EVENT_INTERRUPT_DATA = "interrupt_data"
     EVENT_CONTROL_DATA = "control_data"
@@ -212,7 +212,7 @@ class HID(ABC, utils.EventEmitter):
 
     def __init__(self, device: device.Device, role: Role) -> None:
         super().__init__()
-        self.remote_device_bd_address: Optional[Address] = None
+        self.remote_device_bd_address: Address | None = None
         self.device = device
         self.role = role
 
@@ -353,10 +353,10 @@ class Device(HID):
         data: bytes = b''
         status: int = 0
 
-    get_report_cb: Optional[Callable[[int, int, int], GetSetStatus]] = None
-    set_report_cb: Optional[Callable[[int, int, int, bytes], GetSetStatus]] = None
-    get_protocol_cb: Optional[Callable[[], GetSetStatus]] = None
-    set_protocol_cb: Optional[Callable[[int], GetSetStatus]] = None
+    get_report_cb: Callable[[int, int, int], GetSetStatus] | None = None
+    set_report_cb: Callable[[int, int, int, bytes], GetSetStatus] | None = None
+    get_protocol_cb: Callable[[], GetSetStatus] | None = None
+    set_protocol_cb: Callable[[int], GetSetStatus] | None = None
 
     def __init__(self, device: device.Device) -> None:
         super().__init__(device, HID.Role.DEVICE)

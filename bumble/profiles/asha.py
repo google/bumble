@@ -19,7 +19,8 @@
 import enum
 import logging
 import struct
-from typing import Any, Callable, Optional, Union
+from collections.abc import Callable
+from typing import Any
 
 from bumble import data_types, gatt, gatt_client, l2cap, utils
 from bumble.core import AdvertisingData
@@ -90,20 +91,20 @@ class AshaService(gatt.TemplateService):
     EVENT_DISCONNECTED = "disconnected"
     EVENT_VOLUME_CHANGED = "volume_changed"
 
-    audio_sink: Optional[Callable[[bytes], Any]]
-    active_codec: Optional[Codec] = None
-    audio_type: Optional[AudioType] = None
-    volume: Optional[int] = None
-    other_state: Optional[int] = None
-    connection: Optional[Connection] = None
+    audio_sink: Callable[[bytes], Any] | None
+    active_codec: Codec | None = None
+    audio_type: AudioType | None = None
+    volume: int | None = None
+    other_state: int | None = None
+    connection: Connection | None = None
 
     def __init__(
         self,
         capability: int,
-        hisyncid: Union[list[int], bytes],
+        hisyncid: list[int] | bytes,
         device: Device,
         psm: int = 0,
-        audio_sink: Optional[Callable[[bytes], Any]] = None,
+        audio_sink: Callable[[bytes], Any] | None = None,
         feature_map: int = FeatureMap.LE_COC_AUDIO_OUTPUT_STREAMING_SUPPORTED,
         protocol_version: int = 0x01,
         render_delay_milliseconds: int = 0,

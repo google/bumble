@@ -22,7 +22,8 @@ import collections
 import dataclasses
 import logging
 import struct
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Union, cast
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any, cast
 
 from bumble import drivers, hci, utils
 from bumble.colors import color
@@ -198,7 +199,7 @@ class Connection:
         self.peer_address = peer_address
         self.assembler = hci.HCI_AclDataPacketAssembler(self.on_acl_pdu)
         self.transport = transport
-        acl_packet_queue: Optional[DataPacketQueue] = (
+        acl_packet_queue: DataPacketQueue | None = (
             host.le_acl_packet_queue
             if transport == PhysicalTransport.LE
             else host.acl_packet_queue
@@ -241,20 +242,18 @@ class Host(utils.EventEmitter):
     bis_links: dict[int, IsoLink]
     sco_links: dict[int, ScoLink]
     bigs: dict[int, set[int]]
-    acl_packet_queue: Optional[DataPacketQueue] = None
-    le_acl_packet_queue: Optional[DataPacketQueue] = None
-    iso_packet_queue: Optional[DataPacketQueue] = None
-    hci_sink: Optional[TransportSink] = None
+    acl_packet_queue: DataPacketQueue | None = None
+    le_acl_packet_queue: DataPacketQueue | None = None
+    iso_packet_queue: DataPacketQueue | None = None
+    hci_sink: TransportSink | None = None
     hci_metadata: dict[str, Any]
-    long_term_key_provider: Optional[
-        Callable[[int, bytes, int], Awaitable[Optional[bytes]]]
-    ]
-    link_key_provider: Optional[Callable[[hci.Address], Awaitable[Optional[bytes]]]]
+    long_term_key_provider: Callable[[int, bytes, int], Awaitable[bytes | None]] | None
+    link_key_provider: Callable[[hci.Address], Awaitable[bytes | None]] | None
 
     def __init__(
         self,
-        controller_source: Optional[TransportSource] = None,
-        controller_sink: Optional[TransportSink] = None,
+        controller_source: TransportSource | None = None,
+        controller_sink: TransportSink | None = None,
     ) -> None:
         super().__init__()
 
@@ -266,7 +265,7 @@ class Host(utils.EventEmitter):
         self.sco_links = {}  # SCO links, by connection handle
         self.bigs = {}  # BIG Handle to BIS Handles
         self.pending_command = None
-        self.pending_response: Optional[asyncio.Future[Any]] = None
+        self.pending_response: asyncio.Future[Any] | None = None
         self.number_of_supported_advertising_sets = 0
         self.maximum_advertising_data_length = 31
         self.local_version = None
@@ -279,7 +278,7 @@ class Host(utils.EventEmitter):
         self.long_term_key_provider = None
         self.link_key_provider = None
         self.pairing_io_capability_provider = None  # Classic only
-        self.snooper: Optional[Snooper] = None
+        self.snooper: Snooper | None = None
 
         # Connect to the source and sink if specified
         if controller_source:
@@ -290,9 +289,9 @@ class Host(utils.EventEmitter):
     def find_connection_by_bd_addr(
         self,
         bd_addr: hci.Address,
-        transport: Optional[int] = None,
+        transport: int | None = None,
         check_address_type: bool = False,
-    ) -> Optional[Connection]:
+    ) -> Connection | None:
         for connection in self.connections.values():
             if bytes(connection.peer_address) == bytes(bd_addr):
                 if (
@@ -632,7 +631,7 @@ class Host(utils.EventEmitter):
             )
 
     @property
-    def controller(self) -> Optional[TransportSink]:
+    def controller(self) -> TransportSink | None:
         return self.hci_sink
 
     @controller.setter
@@ -641,7 +640,7 @@ class Host(utils.EventEmitter):
         if controller:
             self.set_packet_source(controller)
 
-    def set_packet_sink(self, sink: Optional[TransportSink]) -> None:
+    def set_packet_sink(self, sink: TransportSink | None) -> None:
         self.hci_sink = sink
 
     def set_packet_source(self, source: TransportSource) -> None:
@@ -656,7 +655,7 @@ class Host(utils.EventEmitter):
             self.hci_sink.on_packet(bytes(packet))
 
     async def send_command(
-        self, command, check_result=False, response_timeout: Optional[int] = None
+        self, command, check_result=False, response_timeout: int | None = None
     ):
         # Wait until we can send (only one pending command at a time)
         async with self.command_semaphore:
@@ -899,7 +898,7 @@ class Host(utils.EventEmitter):
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
 
     def on_command_processed(
-        self, event: Union[hci.HCI_Command_Complete_Event, hci.HCI_Command_Status_Event]
+        self, event: hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event
     ):
         if self.pending_response:
             # Check that it is what we were expecting
@@ -962,11 +961,11 @@ class Host(utils.EventEmitter):
 
     def on_hci_le_connection_complete_event(
         self,
-        event: Union[
-            hci.HCI_LE_Connection_Complete_Event,
-            hci.HCI_LE_Enhanced_Connection_Complete_Event,
-            hci.HCI_LE_Enhanced_Connection_Complete_V2_Event,
-        ],
+        event: (
+            hci.HCI_LE_Connection_Complete_Event
+            | hci.HCI_LE_Enhanced_Connection_Complete_Event
+            | hci.HCI_LE_Enhanced_Connection_Complete_V2_Event
+        ),
     ):
         # Check if this is a cancellation
         if event.status == hci.HCI_SUCCESS:
@@ -1011,10 +1010,10 @@ class Host(utils.EventEmitter):
 
     def on_hci_le_enhanced_connection_complete_event(
         self,
-        event: Union[
-            hci.HCI_LE_Enhanced_Connection_Complete_Event,
-            hci.HCI_LE_Enhanced_Connection_Complete_V2_Event,
-        ],
+        event: (
+            hci.HCI_LE_Enhanced_Connection_Complete_Event
+            | hci.HCI_LE_Enhanced_Connection_Complete_V2_Event
+        ),
     ):
         # Just use the same implementation as for the non-enhanced event for now
         self.on_hci_le_connection_complete_event(event)

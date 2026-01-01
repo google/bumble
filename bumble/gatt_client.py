@@ -28,16 +28,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import struct
+from collections.abc import Callable, Iterable
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
-    Iterable,
-    Optional,
     TypeVar,
-    Union,
 )
 
 from bumble import att, core, utils
@@ -192,7 +189,7 @@ class CharacteristicProxy(AttributeProxy[_T]):
         self.descriptors_discovered = False
         self.subscribers = {}  # Map from subscriber to proxy subscriber
 
-    def get_descriptor(self, descriptor_type: UUID) -> Optional[DescriptorProxy]:
+    def get_descriptor(self, descriptor_type: UUID) -> DescriptorProxy | None:
         for descriptor in self.descriptors:
             if descriptor.type == descriptor_type:
                 return descriptor
@@ -204,7 +201,7 @@ class CharacteristicProxy(AttributeProxy[_T]):
 
     async def subscribe(
         self,
-        subscriber: Optional[Callable[[_T], Any]] = None,
+        subscriber: Callable[[_T], Any] | None = None,
         prefer_notify: bool = True,
     ) -> None:
         if subscriber is not None:
@@ -253,7 +250,7 @@ class ProfileServiceProxy:
     SERVICE_CLASS: type[TemplateService]
 
     @classmethod
-    def from_client(cls, client: Client) -> Optional[ProfileServiceProxy]:
+    def from_client(cls, client: Client) -> ProfileServiceProxy | None:
         return ServiceProxy.from_client(cls, client, cls.SERVICE_CLASS.UUID)
 
 
@@ -264,13 +261,11 @@ class Client:
     services: list[ServiceProxy]
     cached_values: dict[int, tuple[datetime, bytes]]
     notification_subscribers: dict[
-        int, set[Union[CharacteristicProxy, Callable[[bytes], Any]]]
+        int, set[CharacteristicProxy | Callable[[bytes], Any]]
     ]
-    indication_subscribers: dict[
-        int, set[Union[CharacteristicProxy, Callable[[bytes], Any]]]
-    ]
-    pending_response: Optional[asyncio.futures.Future[att.ATT_PDU]]
-    pending_request: Optional[att.ATT_PDU]
+    indication_subscribers: dict[int, set[CharacteristicProxy | Callable[[bytes], Any]]]
+    pending_response: asyncio.futures.Future[att.ATT_PDU] | None
+    pending_request: att.ATT_PDU | None
 
     def __init__(self, connection: Connection) -> None:
         self.connection = connection
@@ -360,7 +355,7 @@ class Client:
         return [service for service in self.services if service.uuid == uuid]
 
     def get_characteristics_by_uuid(
-        self, uuid: UUID, service: Optional[ServiceProxy] = None
+        self, uuid: UUID, service: ServiceProxy | None = None
     ) -> list[CharacteristicProxy[bytes]]:
         services = [service] if service else self.services
         return [
@@ -369,13 +364,14 @@ class Client:
             if c.uuid == uuid
         ]
 
-    def get_attribute_grouping(self, attribute_handle: int) -> Optional[
-        Union[
-            ServiceProxy,
-            tuple[ServiceProxy, CharacteristicProxy],
-            tuple[ServiceProxy, CharacteristicProxy, DescriptorProxy],
-        ]
-    ]:
+    def get_attribute_grouping(
+        self, attribute_handle: int
+    ) -> (
+        ServiceProxy
+        | tuple[ServiceProxy, CharacteristicProxy]
+        | tuple[ServiceProxy, CharacteristicProxy, DescriptorProxy]
+        | None
+    ):
         """
         Get the attribute(s) associated with an attribute handle
         """
@@ -478,7 +474,7 @@ class Client:
 
         return services
 
-    async def discover_service(self, uuid: Union[str, UUID]) -> list[ServiceProxy]:
+    async def discover_service(self, uuid: str | UUID) -> list[ServiceProxy]:
         '''
         See Vol 3, Part G - 4.4.2 Discover Primary Service by Service UUID
         '''
@@ -612,7 +608,7 @@ class Client:
         return included_services
 
     async def discover_characteristics(
-        self, uuids, service: Optional[ServiceProxy]
+        self, uuids, service: ServiceProxy | None
     ) -> list[CharacteristicProxy[bytes]]:
         '''
         See Vol 3, Part G - 4.6.1 Discover All Characteristics of a Service and 4.6.2
@@ -699,9 +695,9 @@ class Client:
 
     async def discover_descriptors(
         self,
-        characteristic: Optional[CharacteristicProxy] = None,
-        start_handle: Optional[int] = None,
-        end_handle: Optional[int] = None,
+        characteristic: CharacteristicProxy | None = None,
+        start_handle: int | None = None,
+        end_handle: int | None = None,
     ) -> list[DescriptorProxy]:
         '''
         See Vol 3, Part G - 4.7.1 Discover All Characteristic Descriptors
@@ -810,7 +806,7 @@ class Client:
     async def subscribe(
         self,
         characteristic: CharacteristicProxy,
-        subscriber: Optional[Callable[[Any], Any]] = None,
+        subscriber: Callable[[Any], Any] | None = None,
         prefer_notify: bool = True,
     ) -> None:
         # If we haven't already discovered the descriptors for this characteristic,
@@ -860,7 +856,7 @@ class Client:
     async def unsubscribe(
         self,
         characteristic: CharacteristicProxy,
-        subscriber: Optional[Callable[[Any], Any]] = None,
+        subscriber: Callable[[Any], Any] | None = None,
         force: bool = False,
     ) -> None:
         '''
@@ -925,7 +921,7 @@ class Client:
             await self.write_value(cccd, b'\x00\x00', with_response=True)
 
     async def read_value(
-        self, attribute: Union[int, AttributeProxy], no_long_read: bool = False
+        self, attribute: int | AttributeProxy, no_long_read: bool = False
     ) -> bytes:
         '''
         See Vol 3, Part G - 4.8.1 Read Characteristic Value
@@ -980,7 +976,7 @@ class Client:
         return attribute_value
 
     async def read_characteristics_by_uuid(
-        self, uuid: UUID, service: Optional[ServiceProxy]
+        self, uuid: UUID, service: ServiceProxy | None
     ) -> list[bytes]:
         '''
         See Vol 3, Part G - 4.8.2 Read Using Characteristic UUID
@@ -1038,7 +1034,7 @@ class Client:
 
     async def write_value(
         self,
-        attribute: Union[int, AttributeProxy],
+        attribute: int | AttributeProxy,
         value: bytes,
         with_response: bool = False,
     ) -> None:

@@ -49,9 +49,9 @@ async def handle_command_client(
                 await ams_client.command(RemoteCommandId[command.upper()])
                 continue
         except Exception as error:
-            writer.write(f"ERROR: {error}\n".encode("utf-8"))
+            writer.write(f"ERROR: {error}\n".encode())
 
-        writer.write(f"unknown command {command}\n".encode("utf-8"))
+        writer.write(f"unknown command {command}\n".encode())
 
 
 # -----------------------------------------------------------------------------

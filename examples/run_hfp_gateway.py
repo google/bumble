@@ -20,7 +20,7 @@ import io
 import json
 import logging
 import sys
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 import websockets.asyncio.server
 
@@ -33,9 +33,9 @@ from bumble.transport import open_transport
 
 logger = logging.getLogger(__name__)
 
-ws: Optional[websockets.asyncio.server.ServerConnection] = None
-ag_protocol: Optional[hfp.AgProtocol] = None
-source_file: Optional[io.BufferedReader] = None
+ws: websockets.asyncio.server.ServerConnection | None = None
+ag_protocol: hfp.AgProtocol | None = None
+source_file: io.BufferedReader | None = None
 
 
 def _default_configuration() -> hfp.AgConfiguration:

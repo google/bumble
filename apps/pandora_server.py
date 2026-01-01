@@ -44,7 +44,7 @@ def retrieve_config(config: str) -> dict[str, Any]:
     if not config:
         return {}
 
-    with open(config, 'r') as f:
+    with open(config) as f:
         return json.load(f)
 
 

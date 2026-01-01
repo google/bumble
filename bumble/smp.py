@@ -27,8 +27,9 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Awaitable, Callable, ClassVar, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, ClassVar, TypeVar, cast
 
 from bumble import crypto, utils
 from bumble.colors import color
@@ -204,10 +205,10 @@ class SMP_Command:
     fields: ClassVar[Fields]
     code: int = field(default=0, init=False)
     name: str = field(default='', init=False)
-    _payload: Optional[bytes] = field(default=None, init=False)
+    _payload: bytes | None = field(default=None, init=False)
 
     @classmethod
-    def from_bytes(cls, pdu: bytes) -> "SMP_Command":
+    def from_bytes(cls, pdu: bytes) -> SMP_Command:
         code = pdu[0]
 
         subclass = SMP_Command.smp_classes.get(code)
@@ -545,7 +546,7 @@ class OobContext:
     r: bytes
 
     def __init__(
-        self, ecc_key: Optional[crypto.EccKey] = None, r: Optional[bytes] = None
+        self, ecc_key: crypto.EccKey | None = None, r: bytes | None = None
     ) -> None:
         self.ecc_key = crypto.EccKey.generate() if ecc_key is None else ecc_key
         self.r = crypto.r() if r is None else r
@@ -561,7 +562,7 @@ class OobLegacyContext:
 
     tk: bytes
 
-    def __init__(self, tk: Optional[bytes] = None) -> None:
+    def __init__(self, tk: bytes | None = None) -> None:
         self.tk = crypto.r() if tk is None else tk
 
 
@@ -668,31 +669,31 @@ class Session:
         self.stk = None
         self.ltk_ediv = 0
         self.ltk_rand = bytes(8)
-        self.link_key: Optional[bytes] = None
+        self.link_key: bytes | None = None
         self.maximum_encryption_key_size: int = 0
         self.initiator_key_distribution: int = 0
         self.responder_key_distribution: int = 0
-        self.peer_random_value: Optional[bytes] = None
+        self.peer_random_value: bytes | None = None
         self.peer_public_key_x: bytes = bytes(32)
         self.peer_public_key_y = bytes(32)
         self.peer_ltk = None
         self.peer_ediv = None
-        self.peer_rand: Optional[bytes] = None
+        self.peer_rand: bytes | None = None
         self.peer_identity_resolving_key = None
-        self.peer_bd_addr: Optional[Address] = None
+        self.peer_bd_addr: Address | None = None
         self.peer_signature_key = None
         self.peer_expected_distributions: list[type[SMP_Command]] = []
         self.dh_key = b''
         self.confirm_value = None
-        self.passkey: Optional[int] = None
+        self.passkey: int | None = None
         self.passkey_ready = asyncio.Event()
         self.passkey_step = 0
         self.passkey_display = False
         self.pairing_method: PairingMethod = PairingMethod.JUST_WORKS
         self.pairing_config = pairing_config
-        self.wait_before_continuing: Optional[asyncio.Future[None]] = None
+        self.wait_before_continuing: asyncio.Future[None] | None = None
         self.completed = False
-        self.ctkd_task: Optional[Awaitable[None]] = None
+        self.ctkd_task: Awaitable[None] | None = None
 
         # Decide if we're the initiator or the responder
         self.is_initiator = is_initiator
@@ -711,7 +712,7 @@ class Session:
 
         # Create a future that can be used to wait for the session to complete
         if self.is_initiator:
-            self.pairing_result: Optional[asyncio.Future[None]] = (
+            self.pairing_result: asyncio.Future[None] | None = (
                 asyncio.get_running_loop().create_future()
             )
         else:
@@ -819,7 +820,7 @@ class Session:
     def auth_req(self) -> int:
         return smp_auth_req(self.bonding, self.mitm, self.sc, self.keypress, self.ct2)
 
-    def get_long_term_key(self, rand: bytes, ediv: int) -> Optional[bytes]:
+    def get_long_term_key(self, rand: bytes, ediv: int) -> bytes | None:
         if not self.sc and not self.completed:
             if rand == self.ltk_rand and ediv == self.ltk_ediv:
                 return self.stk
@@ -930,7 +931,7 @@ class Session:
             self.pairing_config.delegate.display_number(self.passkey, digits=6)
         )
 
-    def input_passkey(self, next_steps: Optional[Callable[[], None]] = None) -> None:
+    def input_passkey(self, next_steps: Callable[[], None] | None = None) -> None:
         # Prompt the user for the passkey displayed on the peer
         def after_input(passkey: int) -> None:
             self.passkey = passkey
@@ -947,7 +948,7 @@ class Session:
         self.prompt_user_for_number(after_input)
 
     def display_or_input_passkey(
-        self, next_steps: Optional[Callable[[], None]] = None
+        self, next_steps: Callable[[], None] | None = None
     ) -> None:
         if self.passkey_display:
 
@@ -1918,7 +1919,7 @@ class Manager(utils.EventEmitter):
     sessions: dict[int, Session]
     pairing_config_factory: Callable[[Connection], PairingConfig]
     session_proxy: type[Session]
-    _ecc_key: Optional[crypto.EccKey]
+    _ecc_key: crypto.EccKey | None
 
     def __init__(
         self,
@@ -2011,7 +2012,7 @@ class Manager(utils.EventEmitter):
         self.device.on_pairing_start(session.connection)
 
     async def on_pairing(
-        self, session: Session, identity_address: Optional[Address], keys: PairingKeys
+        self, session: Session, identity_address: Address | None, keys: PairingKeys
     ) -> None:
         # Store the keys in the key store
         if self.device.keystore and identity_address is not None:
@@ -2030,7 +2031,7 @@ class Manager(utils.EventEmitter):
 
     def get_long_term_key(
         self, connection: Connection, rand: bytes, ediv: int
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         if session := self.sessions.get(connection.handle):
             return session.get_long_term_key(rand, ediv)
 

@@ -21,7 +21,6 @@ import asyncio
 import json
 import logging
 import sys
-from typing import Optional
 
 import websockets.asyncio.server
 
@@ -218,7 +217,7 @@ def on_avrcp_start(avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketSe
 
 # -----------------------------------------------------------------------------
 class WebSocketServer:
-    socket: Optional[websockets.asyncio.server.ServerConnection]
+    socket: websockets.asyncio.server.ServerConnection | None
 
     def __init__(
         self, avrcp_protocol: avrcp.Protocol, avrcp_delegate: Delegate

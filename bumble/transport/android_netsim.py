@@ -22,7 +22,6 @@ import os
 import pathlib
 import platform
 import sys
-from typing import Optional
 
 import grpc.aio
 
@@ -66,7 +65,7 @@ DEFAULT_VARIANT = ''
 
 
 # -----------------------------------------------------------------------------
-def get_ini_dir() -> Optional[pathlib.Path]:
+def get_ini_dir() -> pathlib.Path | None:
     if sys.platform == 'darwin':
         if tmpdir := os.getenv('TMPDIR', None):
             return pathlib.Path(tmpdir)
@@ -100,7 +99,7 @@ def find_grpc_port(instance_number: int) -> int:
     ini_file = ini_dir / ini_file_name(instance_number)
     logger.debug(f'Looking for .ini file at {ini_file}')
     if ini_file.is_file():
-        with open(ini_file, 'r') as ini_file_data:
+        with open(ini_file) as ini_file_data:
             for line in ini_file_data.readlines():
                 if '=' in line:
                     key, value = line.split('=')
@@ -146,7 +145,7 @@ def publish_grpc_port(grpc_port: int, instance_number: int) -> bool:
 
 # -----------------------------------------------------------------------------
 async def open_android_netsim_controller_transport(
-    server_host: Optional[str], server_port: int, options: dict[str, str]
+    server_host: str | None, server_port: int, options: dict[str, str]
 ) -> Transport:
     if server_host == '_' or not server_host:
         server_host = 'localhost'
@@ -301,9 +300,9 @@ async def open_android_netsim_controller_transport(
 
 # -----------------------------------------------------------------------------
 async def open_android_netsim_host_transport_with_address(
-    server_host: Optional[str],
+    server_host: str | None,
     server_port: int,
-    options: Optional[dict[str, str]] = None,
+    options: dict[str, str] | None = None,
 ):
     if server_host == '_' or not server_host:
         server_host = 'localhost'
@@ -328,7 +327,7 @@ async def open_android_netsim_host_transport_with_address(
 
 # -----------------------------------------------------------------------------
 async def open_android_netsim_host_transport_with_channel(
-    channel, options: Optional[dict[str, str]] = None
+    channel, options: dict[str, str] | None = None
 ):
     # Wrapper for I/O operations
     class HciDevice:
@@ -408,7 +407,7 @@ async def open_android_netsim_host_transport_with_channel(
 
 
 # -----------------------------------------------------------------------------
-async def open_android_netsim_transport(spec: Optional[str]) -> Transport:
+async def open_android_netsim_transport(spec: str | None) -> Transport:
     '''
     Open a transport connection as a client or server, implementing Android's `netsim`
     simulator protocol over gRPC.

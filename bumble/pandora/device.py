@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from bumble import transport
 from bumble.core import (
@@ -54,7 +54,7 @@ class PandoraDevice:
 
     # HCI transport name & instance.
     _hci_name: str
-    _hci: Optional[transport.Transport]  # type: ignore[name-defined]
+    _hci: transport.Transport | None  # type: ignore[name-defined]
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -98,7 +98,7 @@ class PandoraDevice:
         await self.close()
         await self.open()
 
-    def info(self) -> Optional[dict[str, str]]:
+    def info(self) -> dict[str, str] | None:
         return {
             'public_bd_address': str(self.device.public_address),
             'random_address': str(self.device.random_address),

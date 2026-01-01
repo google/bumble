@@ -17,7 +17,6 @@
 # Imports
 # -----------------------------------------------------------------------------
 import struct
-from typing import Optional
 
 from bumble.gatt import (
     GATT_DEVICE_INFORMATION_SERVICE,
@@ -54,14 +53,14 @@ class DeviceInformationService(TemplateService):
 
     def __init__(
         self,
-        manufacturer_name: Optional[str] = None,
-        model_number: Optional[str] = None,
-        serial_number: Optional[str] = None,
-        hardware_revision: Optional[str] = None,
-        firmware_revision: Optional[str] = None,
-        software_revision: Optional[str] = None,
-        system_id: Optional[tuple[int, int]] = None,  # (OUI, Manufacturer ID)
-        ieee_regulatory_certification_data_list: Optional[bytes] = None,
+        manufacturer_name: str | None = None,
+        model_number: str | None = None,
+        serial_number: str | None = None,
+        hardware_revision: str | None = None,
+        firmware_revision: str | None = None,
+        software_revision: str | None = None,
+        system_id: tuple[int, int] | None = None,  # (OUI, Manufacturer ID)
+        ieee_regulatory_certification_data_list: bytes | None = None,
         # TODO: pnp_id
     ):
         characteristics: list[Characteristic[bytes]] = [
@@ -109,14 +108,14 @@ class DeviceInformationService(TemplateService):
 class DeviceInformationServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = DeviceInformationService
 
-    manufacturer_name: Optional[CharacteristicProxy[str]]
-    model_number: Optional[CharacteristicProxy[str]]
-    serial_number: Optional[CharacteristicProxy[str]]
-    hardware_revision: Optional[CharacteristicProxy[str]]
-    firmware_revision: Optional[CharacteristicProxy[str]]
-    software_revision: Optional[CharacteristicProxy[str]]
-    system_id: Optional[CharacteristicProxy[tuple[int, int]]]
-    ieee_regulatory_certification_data_list: Optional[CharacteristicProxy[bytes]]
+    manufacturer_name: CharacteristicProxy[str] | None
+    model_number: CharacteristicProxy[str] | None
+    serial_number: CharacteristicProxy[str] | None
+    hardware_revision: CharacteristicProxy[str] | None
+    firmware_revision: CharacteristicProxy[str] | None
+    software_revision: CharacteristicProxy[str] | None
+    system_id: CharacteristicProxy[tuple[int, int]] | None
+    ieee_regulatory_certification_data_list: CharacteristicProxy[bytes] | None
 
     def __init__(self, service_proxy: ServiceProxy):
         self.service_proxy = service_proxy

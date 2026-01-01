@@ -24,17 +24,13 @@ import functools
 import logging
 import secrets
 import struct
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import field
 from typing import (
     Any,
-    Callable,
     ClassVar,
-    Iterable,
     Literal,
-    Optional,
     TypeVar,
-    Union,
     cast,
 )
 
@@ -106,7 +102,7 @@ def map_class_of_device(class_of_device):
     )
 
 
-def phy_list_to_bits(phys: Optional[Iterable[Phy]]) -> int:
+def phy_list_to_bits(phys: Iterable[Phy] | None) -> int:
     if phys is None:
         return 0
 
@@ -184,8 +180,8 @@ class SpecableFlag(enum.IntFlag):
 #   - "v" for variable length bytes with a leading length byte
 # - an integer [1, 4] for 1-byte, 2-byte or 4-byte unsigned little-endian integers
 # - an integer [-2, -1] for 1-byte, 2-byte signed little-endian integers
-FieldSpec = Union[dict[str, Any], Callable[[bytes, int], tuple[int, Any]], str, int]
-Fields = Sequence[Union[tuple[str, FieldSpec], 'Fields']]
+FieldSpec = dict[str, Any] | Callable[[bytes, int], tuple[int, Any]] | str | int
+Fields = Sequence['tuple[str, FieldSpec] | Fields']
 
 
 @dataclasses.dataclass
@@ -2156,7 +2152,7 @@ class Address:
 
     def __init__(
         self,
-        address: Union[bytes, str],
+        address: bytes | str,
         address_type: AddressType = RANDOM_DEVICE_ADDRESS,
     ) -> None:
         '''
@@ -2421,9 +2417,9 @@ class HCI_Command(HCI_Packet):
 
     def __init__(
         self,
-        parameters: Optional[bytes] = None,
+        parameters: bytes | None = None,
         *,
-        op_code: Optional[int] = None,
+        op_code: int | None = None,
         **kwargs,
     ) -> None:
         # op_code should be set in cls.
@@ -5714,7 +5710,7 @@ class HCI_Event(HCI_Packet):
     hci_packet_type = HCI_EVENT_PACKET
     event_names: dict[int, str] = {}
     event_classes: dict[int, type[HCI_Event]] = {}
-    vendor_factories: list[Callable[[bytes], Optional[HCI_Event]]] = []
+    vendor_factories: list[Callable[[bytes], HCI_Event | None]] = []
     event_code: int
     fields: Fields = ()
     _parameters: bytes = b''
@@ -5775,14 +5771,12 @@ class HCI_Event(HCI_Packet):
         return event_class
 
     @classmethod
-    def add_vendor_factory(
-        cls, factory: Callable[[bytes], Optional[HCI_Event]]
-    ) -> None:
+    def add_vendor_factory(cls, factory: Callable[[bytes], HCI_Event | None]) -> None:
         cls.vendor_factories.append(factory)
 
     @classmethod
     def remove_vendor_factory(
-        cls, factory: Callable[[bytes], Optional[HCI_Event]]
+        cls, factory: Callable[[bytes], HCI_Event | None]
     ) -> None:
         if factory in cls.vendor_factories:
             cls.vendor_factories.remove(factory)
@@ -5795,7 +5789,7 @@ class HCI_Event(HCI_Packet):
         if len(parameters) != length:
             raise InvalidPacketError('invalid packet length')
 
-        subclass: Optional[type[HCI_Event]]
+        subclass: type[HCI_Event] | None
         if event_code == HCI_LE_META_EVENT:
             # We do this dispatch here and not in the subclass in order to avoid call
             # loops
@@ -5833,9 +5827,9 @@ class HCI_Event(HCI_Packet):
 
     def __init__(
         self,
-        parameters: Optional[bytes] = None,
+        parameters: bytes | None = None,
         *,
-        event_code: Optional[int] = None,
+        event_code: int | None = None,
         **kwargs,
     ):
         if event_code is not None:
@@ -5944,9 +5938,7 @@ class HCI_Extended_Event(HCI_Event):
         cls.subevent_names.update(cls.subevent_map(symbols))
 
     @classmethod
-    def subclass_from_parameters(
-        cls, parameters: bytes
-    ) -> Optional[HCI_Extended_Event]:
+    def subclass_from_parameters(cls, parameters: bytes) -> HCI_Extended_Event | None:
         """
         Factory method that parses the subevent code, finds a registered subclass,
         and creates an instance if found.
@@ -5966,9 +5958,9 @@ class HCI_Extended_Event(HCI_Event):
 
     def __init__(
         self,
-        parameters: Optional[bytes] = None,
+        parameters: bytes | None = None,
         *,
-        subevent_code: Optional[int] = None,
+        subevent_code: int | None = None,
         **kwargs,
     ) -> None:
         if subevent_code is not None:
@@ -6964,7 +6956,7 @@ class HCI_Command_Complete_Event(HCI_Event):
     command_opcode: int = field(
         metadata=metadata({'size': 2, 'mapper': HCI_Command.command_name})
     )
-    return_parameters: Union[bytes, HCI_Object, int] = field(metadata=metadata("*"))
+    return_parameters: bytes | HCI_Object | int = field(metadata=metadata("*"))
 
     def map_return_parameters(self, return_parameters):
         '''Map simple 'status' return parameters to their named constant form'''
@@ -7548,20 +7540,20 @@ class HCI_IsoDataPacket(HCI_Packet):
     iso_sdu_fragment: bytes
     pb_flag: int
     ts_flag: int = 0
-    time_stamp: Optional[int] = None
-    packet_sequence_number: Optional[int] = None
-    iso_sdu_length: Optional[int] = None
-    packet_status_flag: Optional[int] = None
+    time_stamp: int | None = None
+    packet_sequence_number: int | None = None
+    iso_sdu_length: int | None = None
+    packet_status_flag: int | None = None
 
     def __post_init__(self) -> None:
         self.ts_flag = self.time_stamp is not None
 
     @staticmethod
     def from_bytes(packet: bytes) -> HCI_IsoDataPacket:
-        time_stamp: Optional[int] = None
-        packet_sequence_number: Optional[int] = None
-        iso_sdu_length: Optional[int] = None
-        packet_status_flag: Optional[int] = None
+        time_stamp: int | None = None
+        packet_sequence_number: int | None = None
+        iso_sdu_length: int | None = None
+        packet_status_flag: int | None = None
 
         pos = 1
         pdu_info, data_total_length = struct.unpack_from('<HH', packet, pos)
@@ -7644,7 +7636,7 @@ class HCI_IsoDataPacket(HCI_Packet):
 
 # -----------------------------------------------------------------------------
 class HCI_AclDataPacketAssembler:
-    current_data: Optional[bytes]
+    current_data: bytes | None
 
     def __init__(self, callback: Callable[[bytes], Any]) -> None:
         self.callback = callback

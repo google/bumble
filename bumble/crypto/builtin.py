@@ -29,7 +29,6 @@ import dataclasses
 import functools
 import secrets
 import struct
-from typing import Optional
 
 from bumble import core
 
@@ -309,7 +308,7 @@ class _CMAC:
         self.digest_size = mac_len
         self._key = key
         self._block_size = bs = 16
-        self._mac_tag: Optional[bytes] = None
+        self._mac_tag: bytes | None = None
         self._update_after_digest = update_after_digest
 
         # Section 5.3 of NIST SP 800 38B and Appendix B
@@ -348,7 +347,7 @@ class _CMAC:
         self._last_ct = zero_block
 
         # Last block that was encrypted with AES
-        self._last_pt: Optional[bytes] = None
+        self._last_pt: bytes | None = None
 
         # Counter for total message size
         self._data_size = 0

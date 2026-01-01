@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import functools
-from typing import Optional
 
 from typing_extensions import Self
 
@@ -32,7 +31,7 @@ from bumble.transport.common import AsyncPipeSink
 
 # -----------------------------------------------------------------------------
 class Devices:
-    connections: list[Optional[Connection]]
+    connections: list[Connection | None]
 
     def __init__(self, num_devices: int) -> None:
         self.connections = [None for _ in range(num_devices)]

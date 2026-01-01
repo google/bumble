@@ -27,7 +27,7 @@ import dataclasses
 import json
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import Self
 
@@ -51,8 +51,8 @@ class PairingKeys:
     class Key:
         value: bytes
         authenticated: bool = False
-        ediv: Optional[int] = None
-        rand: Optional[bytes] = None
+        ediv: int | None = None
+        rand: bytes | None = None
 
         @classmethod
         def from_dict(cls, key_dict: dict[str, Any]) -> PairingKeys.Key:
@@ -74,17 +74,17 @@ class PairingKeys:
 
             return key_dict
 
-    address_type: Optional[hci.AddressType] = None
-    ltk: Optional[Key] = None
-    ltk_central: Optional[Key] = None
-    ltk_peripheral: Optional[Key] = None
-    irk: Optional[Key] = None
-    csrk: Optional[Key] = None
-    link_key: Optional[Key] = None  # Classic
-    link_key_type: Optional[int] = None  # Classic
+    address_type: hci.AddressType | None = None
+    ltk: Key | None = None
+    ltk_central: Key | None = None
+    ltk_peripheral: Key | None = None
+    irk: Key | None = None
+    csrk: Key | None = None
+    link_key: Key | None = None  # Classic
+    link_key_type: int | None = None  # Classic
 
     @classmethod
-    def key_from_dict(cls, keys_dict: dict[str, Any], key_name: str) -> Optional[Key]:
+    def key_from_dict(cls, keys_dict: dict[str, Any], key_name: str) -> Key | None:
         key_dict = keys_dict.get(key_name)
         if key_dict is None:
             return None
@@ -156,7 +156,7 @@ class KeyStore:
     async def update(self, name: str, keys: PairingKeys) -> None:
         pass
 
-    async def get(self, _name: str) -> Optional[PairingKeys]:
+    async def get(self, _name: str) -> PairingKeys | None:
         return None
 
     async def get_all(self) -> list[tuple[str, PairingKeys]]:
@@ -274,7 +274,7 @@ class JsonKeyStore(KeyStore):
 
     @classmethod
     def from_device(
-        cls: type[Self], device: Device, filename: Optional[str] = None
+        cls: type[Self], device: Device, filename: str | None = None
     ) -> Self:
         if not filename:
             # Extract the filename from the config if there is one
@@ -297,7 +297,7 @@ class JsonKeyStore(KeyStore):
         # Try to open the file, without failing. If the file does not exist, it
         # will be created upon saving.
         try:
-            with open(self.filename, 'r', encoding='utf-8') as json_file:
+            with open(self.filename, encoding='utf-8') as json_file:
                 db = json.load(json_file)
         except FileNotFoundError:
             db = {}
@@ -348,7 +348,7 @@ class JsonKeyStore(KeyStore):
         key_map.clear()
         await self.save(db)
 
-    async def get(self, name: str) -> Optional[PairingKeys]:
+    async def get(self, name: str) -> PairingKeys | None:
         _, key_map = await self.load()
         if name not in key_map:
             return None
@@ -370,7 +370,7 @@ class MemoryKeyStore(KeyStore):
     async def update(self, name: str, keys: PairingKeys) -> None:
         self.all_keys[name] = keys
 
-    async def get(self, name: str) -> Optional[PairingKeys]:
+    async def get(self, name: str) -> PairingKeys | None:
         return self.all_keys.get(name)
 
     async def get_all(self) -> list[tuple[str, PairingKeys]]:

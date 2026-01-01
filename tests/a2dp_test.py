@@ -19,7 +19,7 @@ import asyncio
 import logging
 import os
 import struct
-from typing import Awaitable
+from collections.abc import Awaitable
 
 import pytest
 

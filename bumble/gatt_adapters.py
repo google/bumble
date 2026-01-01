@@ -22,7 +22,8 @@
 from __future__ import annotations
 
 import struct
-from typing import Any, Callable, Generic, Iterable, Literal, Optional, TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, Generic, Literal, TypeVar
 
 from bumble import utils
 from bumble.core import InvalidOperationError
@@ -74,8 +75,8 @@ class DelegatedCharacteristicAdapter(CharacteristicAdapter[_T]):
     def __init__(
         self,
         characteristic: Characteristic,
-        encode: Optional[Callable[[_T], bytes]] = None,
-        decode: Optional[Callable[[bytes], _T]] = None,
+        encode: Callable[[_T], bytes] | None = None,
+        decode: Callable[[bytes], _T] | None = None,
     ):
         super().__init__(characteristic)
         self.encode = encode
@@ -101,8 +102,8 @@ class DelegatedCharacteristicProxyAdapter(CharacteristicProxyAdapter[_T]):
     def __init__(
         self,
         characteristic_proxy: CharacteristicProxy,
-        encode: Optional[Callable[[_T], bytes]] = None,
-        decode: Optional[Callable[[bytes], _T]] = None,
+        encode: Callable[[_T], bytes] | None = None,
+        decode: Callable[[bytes], _T] | None = None,
     ):
         super().__init__(characteristic_proxy)
         self.encode = encode

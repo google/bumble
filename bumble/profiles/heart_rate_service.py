@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import struct
 from enum import IntEnum
-from typing import Optional
 
 from bumble import core
 from bumble.att import ATT_Error
@@ -207,13 +206,13 @@ class HeartRateService(TemplateService):
 class HeartRateServiceProxy(ProfileServiceProxy):
     SERVICE_CLASS = HeartRateService
 
-    heart_rate_measurement: Optional[
-        CharacteristicProxy[HeartRateService.HeartRateMeasurement]
-    ]
-    body_sensor_location: Optional[
-        CharacteristicProxy[HeartRateService.BodySensorLocation]
-    ]
-    heart_rate_control_point: Optional[CharacteristicProxy[int]]
+    heart_rate_measurement: (
+        CharacteristicProxy[HeartRateService.HeartRateMeasurement] | None
+    )
+    body_sensor_location: (
+        CharacteristicProxy[HeartRateService.BodySensorLocation] | None
+    )
+    heart_rate_control_point: CharacteristicProxy[int] | None
 
     def __init__(self, service_proxy):
         self.service_proxy = service_proxy

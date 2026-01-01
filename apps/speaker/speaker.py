@@ -26,7 +26,6 @@ import pathlib
 import subprocess
 import weakref
 from importlib import resources
-from typing import Optional
 
 import aiohttp
 import click
@@ -156,7 +155,7 @@ class QueuedOutput(Output):
 
     packets: asyncio.Queue
     extractor: AudioExtractor
-    packet_pump_task: Optional[asyncio.Task]
+    packet_pump_task: asyncio.Task | None
     started: bool
 
     def __init__(self, extractor):
@@ -230,8 +229,8 @@ class WebSocketOutput(QueuedOutput):
 class FfplayOutput(QueuedOutput):
     MAX_QUEUE_SIZE = 32768
 
-    subprocess: Optional[asyncio.subprocess.Process]
-    ffplay_task: Optional[asyncio.Task]
+    subprocess: asyncio.subprocess.Process | None
+    ffplay_task: asyncio.Task | None
 
     def __init__(self, codec: str) -> None:
         super().__init__(AudioExtractor.create(codec))

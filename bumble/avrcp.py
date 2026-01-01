@@ -24,7 +24,7 @@ import logging
 import struct
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import ClassVar, Optional, SupportsBytes, TypeVar, Union
+from typing import ClassVar, SupportsBytes, TypeVar
 
 from bumble import avc, avctp, core, hci, l2cap, utils
 from bumble.colors import color
@@ -196,7 +196,7 @@ def make_controller_service_sdp_records(
     service_record_handle: int,
     avctp_version: tuple[int, int] = (1, 4),
     avrcp_version: tuple[int, int] = (1, 6),
-    supported_features: Union[int, ControllerFeatures] = 1,
+    supported_features: int | ControllerFeatures = 1,
 ) -> list[ServiceAttribute]:
     avctp_version_int = avctp_version[0] << 8 | avctp_version[1]
     avrcp_version_int = avrcp_version[0] << 8 | avrcp_version[1]
@@ -288,7 +288,7 @@ def make_target_service_sdp_records(
     service_record_handle: int,
     avctp_version: tuple[int, int] = (1, 4),
     avrcp_version: tuple[int, int] = (1, 6),
-    supported_features: Union[int, TargetFeatures] = 0x23,
+    supported_features: int | TargetFeatures = 0x23,
 ) -> list[ServiceAttribute]:
     # TODO: support a way to compute the supported features from a feature list
     avctp_version_int = avctp_version[0] << 8 | avctp_version[1]
@@ -478,7 +478,7 @@ class BrowseableItem:
         MEDIA_ELEMENT = 0x03
 
     item_type: ClassVar[Type]
-    _payload: Optional[bytes] = None
+    _payload: bytes | None = None
 
     subclasses: ClassVar[dict[Type, type[BrowseableItem]]] = {}
     fields: ClassVar[hci.Fields] = ()
@@ -672,7 +672,7 @@ class PduAssembler:
     6.3.1 AVRCP specific AV//C commands
     """
 
-    pdu_id: Optional[PduId]
+    pdu_id: PduId | None
     payload: bytes
 
     def __init__(self, callback: Callable[[PduId, bytes], None]) -> None:
@@ -725,7 +725,7 @@ class PduAssembler:
 # -----------------------------------------------------------------------------
 class Command:
     pdu_id: ClassVar[PduId]
-    _payload: Optional[bytes] = None
+    _payload: bytes | None = None
 
     _Command = TypeVar('_Command', bound='Command')
     subclasses: ClassVar[dict[int, type[Command]]] = {}
@@ -1017,7 +1017,7 @@ class AddToNowPlayingCommand(Command):
 # -----------------------------------------------------------------------------
 class Response:
     pdu_id: PduId
-    _payload: Optional[bytes] = None
+    _payload: bytes | None = None
 
     fields: ClassVar[hci.Fields] = ()
     subclasses: ClassVar[dict[PduId, type[Response]]] = {}
@@ -1079,7 +1079,7 @@ class NotImplementedResponse(Response):
 class GetCapabilitiesResponse(Response):
     pdu_id = PduId.GET_CAPABILITIES
     capability_id: GetCapabilitiesCommand.CapabilityId
-    capabilities: Sequence[Union[SupportsBytes, bytes]]
+    capabilities: Sequence[SupportsBytes | bytes]
 
     @classmethod
     def from_parameters(cls, parameters: bytes) -> Response:
@@ -1092,7 +1092,7 @@ class GetCapabilitiesResponse(Response):
         capability_id = GetCapabilitiesCommand.CapabilityId(parameters[0])
         capability_count = parameters[1]
 
-        capabilities: list[Union[SupportsBytes, bytes]]
+        capabilities: list[SupportsBytes | bytes]
         if capability_id == GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED:
             capabilities = [EventId(parameters[2 + x]) for x in range(capability_count)]
         else:
@@ -1363,7 +1363,7 @@ class AddToNowPlayingResponse(Response):
 # -----------------------------------------------------------------------------
 class Event:
     event_id: EventId
-    _pdu: Optional[bytes] = None
+    _pdu: bytes | None = None
 
     _Event = TypeVar('_Event', bound='Event')
     subclasses: ClassVar[dict[int, type[Event]]] = {}
@@ -1436,13 +1436,13 @@ class PlayerApplicationSettingChangedEvent(Event):
         attribute_id: ApplicationSetting.AttributeId = field(
             metadata=ApplicationSetting.AttributeId.type_metadata(1)
         )
-        value_id: Union[
-            ApplicationSetting.EqualizerOnOffStatus,
-            ApplicationSetting.RepeatModeStatus,
-            ApplicationSetting.ShuffleOnOffStatus,
-            ApplicationSetting.ScanOnOffStatus,
-            ApplicationSetting.GenericValue,
-        ] = field(metadata=hci.metadata(1))
+        value_id: (
+            ApplicationSetting.EqualizerOnOffStatus
+            | ApplicationSetting.RepeatModeStatus
+            | ApplicationSetting.ShuffleOnOffStatus
+            | ApplicationSetting.ScanOnOffStatus
+            | ApplicationSetting.GenericValue
+        ) = field(metadata=hci.metadata(1))
 
         def __post_init__(self) -> None:
             super().__post_init__()
@@ -1628,17 +1628,17 @@ class Protocol(utils.EventEmitter):
     delegate: Delegate
     send_transaction_label: int
     command_pdu_assembler: PduAssembler
-    receive_command_state: Optional[ReceiveCommandState]
+    receive_command_state: ReceiveCommandState | None
     response_pdu_assembler: PduAssembler
-    receive_response_state: Optional[ReceiveResponseState]
-    avctp_protocol: Optional[avctp.Protocol]
+    receive_response_state: ReceiveResponseState | None
+    avctp_protocol: avctp.Protocol | None
     free_commands: asyncio.Queue
     pending_commands: dict[int, PendingCommand]  # Pending commands, by label
     notification_listeners: dict[EventId, NotificationListener]
 
     @staticmethod
     def _check_vendor_dependent_frame(
-        frame: Union[avc.VendorDependentCommandFrame, avc.VendorDependentResponseFrame],
+        frame: avc.VendorDependentCommandFrame | avc.VendorDependentResponseFrame,
     ) -> bool:
         if frame.company_id != AVRCP_BLUETOOTH_SIG_COMPANY_ID:
             logger.debug("unsupported company id, ignoring")
@@ -1650,7 +1650,7 @@ class Protocol(utils.EventEmitter):
 
         return True
 
-    def __init__(self, delegate: Optional[Delegate] = None) -> None:
+    def __init__(self, delegate: Delegate | None = None) -> None:
         super().__init__()
         self.delegate = delegate if delegate else Delegate()
         self.command_pdu_assembler = PduAssembler(self._on_command_pdu)
@@ -2067,9 +2067,7 @@ class Protocol(utils.EventEmitter):
         # TODO handle other types
         self.send_not_implemented_response(transaction_label, command)
 
-    def _on_avctp_response(
-        self, transaction_label: int, payload: Optional[bytes]
-    ) -> None:
+    def _on_avctp_response(self, transaction_label: int, payload: bytes | None) -> None:
         response = avc.ResponseFrame.from_bytes(payload) if payload else None
         if not isinstance(response, avc.ResponseFrame):
             raise core.InvalidPacketError(
@@ -2176,7 +2174,7 @@ class Protocol(utils.EventEmitter):
         # NOTE: with a small number of supported responses, a manual switch like this
         # is Ok, but if/when more responses are supported, a lookup mechanism would be
         # more appropriate.
-        response: Optional[Response] = None
+        response: Response | None = None
         if response_code == avc.ResponseFrame.ResponseCode.REJECTED:
             response = RejectedResponse(pdu_id=pdu_id, status_code=StatusCode(pdu[0]))
         elif response_code == avc.ResponseFrame.ResponseCode.NOT_IMPLEMENTED:

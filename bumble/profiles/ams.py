@@ -25,7 +25,7 @@ import asyncio
 import dataclasses
 import enum
 import logging
-from typing import Iterable, Optional, Union
+from collections.abc import Iterable
 
 from bumble import utils
 from bumble.device import Peer
@@ -230,7 +230,7 @@ class AmsClient(utils.EventEmitter):
         self.supported_commands = set()
 
     @classmethod
-    async def for_peer(cls, peer: Peer) -> Optional[AmsClient]:
+    async def for_peer(cls, peer: Peer) -> AmsClient | None:
         ams_proxy = await peer.discover_service_and_create_proxy(AmsProxy)
         if ams_proxy is None:
             return None
@@ -263,9 +263,7 @@ class AmsClient(utils.EventEmitter):
     async def observe(
         self,
         entity: EntityId,
-        attributes: Iterable[
-            Union[PlayerAttributeId, QueueAttributeId, TrackAttributeId]
-        ],
+        attributes: Iterable[PlayerAttributeId | QueueAttributeId | TrackAttributeId],
     ) -> None:
         await self._ams_proxy.entity_update.write_value(
             bytes([entity] + list(attributes)), with_response=True

@@ -16,7 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 
-from typing import Any, Optional
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -294,7 +294,7 @@ def test_link_key_to_ltk(ct2: bool, expected: str, crypto_backend: Any):
 )
 @pytest.mark.asyncio
 async def test_send_identity_address_command(
-    identity_address_type: Optional[pairing.PairingConfig.AddressType],
+    identity_address_type: pairing.PairingConfig.AddressType | None,
     public_address: Address,
     random_address: Address,
     expected_identity_address: Address,

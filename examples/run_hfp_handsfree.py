@@ -20,7 +20,6 @@ import contextlib
 import functools
 import json
 import sys
-from typing import Optional
 
 import websockets.asyncio.server
 
@@ -30,8 +29,8 @@ from bumble.device import Connection, Device
 from bumble.hfp import HfProtocol
 from bumble.transport import open_transport
 
-ws: Optional[websockets.asyncio.server.ServerConnection] = None
-hf_protocol: Optional[HfProtocol] = None
+ws: websockets.asyncio.server.ServerConnection | None = None
+hf_protocol: HfProtocol | None = None
 
 
 # -----------------------------------------------------------------------------

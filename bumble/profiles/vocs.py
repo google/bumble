@@ -18,7 +18,6 @@
 # -----------------------------------------------------------------------------
 import struct
 from dataclasses import dataclass
-from typing import Optional
 
 from bumble import utils
 from bumble.att import ATT_Error
@@ -69,7 +68,7 @@ class ErrorCode(utils.OpenIntEnum):
 class VolumeOffsetState:
     volume_offset: int = 0
     change_counter: int = 0
-    attribute: Optional[Characteristic] = None
+    attribute: Characteristic | None = None
 
     def __bytes__(self) -> bytes:
         return struct.pack('<hB', self.volume_offset, self.change_counter)
@@ -93,7 +92,7 @@ class VolumeOffsetState:
 @dataclass
 class VocsAudioLocation:
     audio_location: AudioLocation = AudioLocation.NOT_ALLOWED
-    attribute: Optional[Characteristic] = None
+    attribute: Characteristic | None = None
 
     def __bytes__(self) -> bytes:
         return struct.pack('<I', self.audio_location)
@@ -147,7 +146,7 @@ class VolumeOffsetControlPoint:
 @dataclass
 class AudioOutputDescription:
     audio_output_description: str = ''
-    attribute: Optional[Characteristic] = None
+    attribute: Characteristic | None = None
 
     @classmethod
     def from_bytes(cls, data: bytes):
@@ -172,9 +171,9 @@ class VolumeOffsetControlService(TemplateService):
 
     def __init__(
         self,
-        volume_offset_state: Optional[VolumeOffsetState] = None,
-        audio_location: Optional[VocsAudioLocation] = None,
-        audio_output_description: Optional[AudioOutputDescription] = None,
+        volume_offset_state: VolumeOffsetState | None = None,
+        audio_location: VocsAudioLocation | None = None,
+        audio_output_description: AudioOutputDescription | None = None,
     ) -> None:
         self.volume_offset_state = (
             VolumeOffsetState() if volume_offset_state is None else volume_offset_state

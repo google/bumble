@@ -18,7 +18,6 @@
 import asyncio
 import logging
 import sys
-from typing import Optional
 
 import websockets.asyncio.server
 
@@ -29,7 +28,7 @@ from bumble.device import AdvertisingParameters, Device
 from bumble.profiles import asha
 from bumble.transport import open_transport
 
-ws_connection: Optional[websockets.asyncio.server.ServerConnection] = None
+ws_connection: websockets.asyncio.server.ServerConnection | None = None
 g722_decoder = decoder.G722Decoder()
 
 

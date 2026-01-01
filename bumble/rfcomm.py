@@ -22,7 +22,8 @@ import collections
 import dataclasses
 import enum
 import logging
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
@@ -119,7 +120,7 @@ RFCOMM_DYNAMIC_CHANNEL_NUMBER_END   = 30
 
 # -----------------------------------------------------------------------------
 def make_service_sdp_records(
-    service_record_handle: int, channel: int, uuid: Optional[UUID] = None
+    service_record_handle: int, channel: int, uuid: UUID | None = None
 ) -> list[sdp.ServiceAttribute]:
     """
     Create SDP records for an RFComm service given a channel number and an
@@ -186,7 +187,7 @@ async def find_rfcomm_channels(connection: Connection) -> dict[int, list[UUID]]:
         )
         for attribute_lists in search_result:
             service_classes: list[UUID] = []
-            channel: Optional[int] = None
+            channel: int | None = None
             for attribute in attribute_lists:
                 # The layout is [[L2CAP_PROTOCOL], [RFCOMM_PROTOCOL, RFCOMM_CHANNEL]].
                 if attribute.id == sdp.SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID:
@@ -207,7 +208,7 @@ async def find_rfcomm_channels(connection: Connection) -> dict[int, list[UUID]]:
 # -----------------------------------------------------------------------------
 async def find_rfcomm_channel_with_uuid(
     connection: Connection, uuid: str | UUID
-) -> Optional[int]:
+) -> int | None:
     """Searches an RFCOMM channel associated with given UUID from service records.
 
     Args:
@@ -473,15 +474,15 @@ class DLC(utils.EventEmitter):
         self.state = DLC.State.INIT
         self.role = multiplexer.role
         self.c_r = 1 if self.role == Multiplexer.Role.INITIATOR else 0
-        self.connection_result: Optional[asyncio.Future] = None
-        self.disconnection_result: Optional[asyncio.Future] = None
+        self.connection_result: asyncio.Future | None = None
+        self.disconnection_result: asyncio.Future | None = None
         self.drained = asyncio.Event()
         self.drained.set()
         # Queued packets when sink is not set.
         self._enqueued_rx_packets: collections.deque[bytes] = collections.deque(
             maxlen=DEFAULT_RX_QUEUE_SIZE
         )
-        self._sink: Optional[Callable[[bytes], None]] = None
+        self._sink: Callable[[bytes], None] | None = None
 
         # Compute the MTU
         max_overhead = 4 + 1  # header with 2-byte length + fcs
@@ -490,11 +491,11 @@ class DLC(utils.EventEmitter):
         )
 
     @property
-    def sink(self) -> Optional[Callable[[bytes], None]]:
+    def sink(self) -> Callable[[bytes], None] | None:
         return self._sink
 
     @sink.setter
-    def sink(self, sink: Optional[Callable[[bytes], None]]) -> None:
+    def sink(self, sink: Callable[[bytes], None] | None) -> None:
         self._sink = sink
         # Dump queued packets to sink
         if sink:
@@ -712,7 +713,7 @@ class DLC(utils.EventEmitter):
                 self.drained.set()
 
     # Stream protocol
-    def write(self, data: Union[bytes, str]) -> None:
+    def write(self, data: bytes | str) -> None:
         # We can only send bytes
         if not isinstance(data, bytes):
             if isinstance(data, str):
@@ -769,10 +770,10 @@ class Multiplexer(utils.EventEmitter):
 
     EVENT_DLC = "dlc"
 
-    connection_result: Optional[asyncio.Future]
-    disconnection_result: Optional[asyncio.Future]
-    open_result: Optional[asyncio.Future]
-    acceptor: Optional[Callable[[int], Optional[tuple[int, int]]]]
+    connection_result: asyncio.Future | None
+    disconnection_result: asyncio.Future | None
+    open_result: asyncio.Future | None
+    acceptor: Callable[[int], tuple[int, int] | None] | None
     dlcs: dict[int, DLC]
 
     def __init__(self, l2cap_channel: l2cap.ClassicChannel, role: Role) -> None:
@@ -784,7 +785,7 @@ class Multiplexer(utils.EventEmitter):
         self.connection_result = None
         self.disconnection_result = None
         self.open_result = None
-        self.open_pn: Optional[RFCOMM_MCC_PN] = None
+        self.open_pn: RFCOMM_MCC_PN | None = None
         self.open_rx_max_credits = 0
         self.acceptor = None
 
@@ -1031,8 +1032,8 @@ class Multiplexer(utils.EventEmitter):
 
 # -----------------------------------------------------------------------------
 class Client:
-    multiplexer: Optional[Multiplexer]
-    l2cap_channel: Optional[l2cap.ClassicChannel]
+    multiplexer: Multiplexer | None
+    l2cap_channel: l2cap.ClassicChannel | None
 
     def __init__(
         self, connection: Connection, l2cap_mtu: int = RFCOMM_DEFAULT_L2CAP_MTU
@@ -1145,7 +1146,7 @@ class Server(utils.EventEmitter):
         # Notify
         self.emit(self.EVENT_START, multiplexer)
 
-    def accept_dlc(self, channel_number: int) -> Optional[tuple[int, int]]:
+    def accept_dlc(self, channel_number: int) -> tuple[int, int] | None:
         return self.dlc_configs.get(channel_number)
 
     def on_dlc(self, dlc: DLC) -> None:

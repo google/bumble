@@ -20,14 +20,11 @@ from __future__ import annotations
 import dataclasses
 import enum
 import struct
+from collections.abc import Iterable
 from typing import (
     Any,
     ClassVar,
-    Iterable,
     Literal,
-    Optional,
-    Type,
-    Union,
     cast,
     overload,
 )
@@ -102,7 +99,7 @@ class BaseError(BaseBumbleError):
 
     def __init__(
         self,
-        error_code: Optional[int],
+        error_code: int | None,
         error_namespace: str = '',
         error_name: str = '',
         details: str = '',
@@ -215,11 +212,9 @@ class UUID:
     UUIDS: list[UUID] = []  # Registry of all instances created
 
     uuid_bytes: bytes
-    name: Optional[str]
+    name: str | None
 
-    def __init__(
-        self, uuid_str_or_int: Union[str, int], name: Optional[str] = None
-    ) -> None:
+    def __init__(self, uuid_str_or_int: str | int, name: str | None = None) -> None:
         if isinstance(uuid_str_or_int, int):
             self.uuid_bytes = struct.pack('<H', uuid_str_or_int)
         else:
@@ -252,7 +247,7 @@ class UUID:
         return self
 
     @classmethod
-    def from_bytes(cls, uuid_bytes: bytes, name: Optional[str] = None) -> UUID:
+    def from_bytes(cls, uuid_bytes: bytes, name: str | None = None) -> UUID:
         if len(uuid_bytes) in (2, 4, 16):
             self = cls.__new__(cls)
             self.uuid_bytes = uuid_bytes
@@ -263,11 +258,11 @@ class UUID:
         raise InvalidArgumentError('only 2, 4 and 16 bytes are allowed')
 
     @classmethod
-    def from_16_bits(cls, uuid_16: int, name: Optional[str] = None) -> UUID:
+    def from_16_bits(cls, uuid_16: int, name: str | None = None) -> UUID:
         return cls.from_bytes(struct.pack('<H', uuid_16), name)
 
     @classmethod
-    def from_32_bits(cls, uuid_32: int, name: Optional[str] = None) -> UUID:
+    def from_32_bits(cls, uuid_32: int, name: str | None = None) -> UUID:
         return cls.from_bytes(struct.pack('<I', uuid_32), name)
 
     @classmethod
@@ -733,7 +728,7 @@ class ClassOfDevice:
         MajorDeviceClass.HEALTH: HEALTH_MINOR_DEVICE_CLASS_LABELS,
     }
 
-    _MINOR_DEVICE_CLASSES: ClassVar[dict[MajorDeviceClass, Type]] = {
+    _MINOR_DEVICE_CLASSES: ClassVar[dict[MajorDeviceClass, type]] = {
         MajorDeviceClass.COMPUTER: ComputerMinorDeviceClass,
         MajorDeviceClass.PHONE: PhoneMinorDeviceClass,
         MajorDeviceClass.LAN_NETWORK_ACCESS_POINT: LanNetworkMinorDeviceClass,
@@ -748,17 +743,17 @@ class ClassOfDevice:
 
     major_service_classes: MajorServiceClasses
     major_device_class: MajorDeviceClass
-    minor_device_class: Union[
-        ComputerMinorDeviceClass,
-        PhoneMinorDeviceClass,
-        LanNetworkMinorDeviceClass,
-        AudioVideoMinorDeviceClass,
-        PeripheralMinorDeviceClass,
-        WearableMinorDeviceClass,
-        ToyMinorDeviceClass,
-        HealthMinorDeviceClass,
-        int,
-    ]
+    minor_device_class: (
+        ComputerMinorDeviceClass
+        | PhoneMinorDeviceClass
+        | LanNetworkMinorDeviceClass
+        | AudioVideoMinorDeviceClass
+        | PeripheralMinorDeviceClass
+        | WearableMinorDeviceClass
+        | ToyMinorDeviceClass
+        | HealthMinorDeviceClass
+        | int
+    )
 
     @classmethod
     def from_int(cls, class_of_device: int) -> Self:
@@ -1547,7 +1542,7 @@ class DataType:
         return f"{self.__class__.__name__}({self.value_string()})"
 
     @classmethod
-    def from_advertising_data(cls, advertising_data: AdvertisingData) -> Optional[Self]:
+    def from_advertising_data(cls, advertising_data: AdvertisingData) -> Self | None:
         if (data := advertising_data.get(cls.ad_type, raw=True)) is None:
             return None
 
@@ -1575,16 +1570,16 @@ class DataType:
 # -----------------------------------------------------------------------------
 # Advertising Data
 # -----------------------------------------------------------------------------
-AdvertisingDataObject = Union[
-    list[UUID],
-    tuple[UUID, bytes],
-    bytes,
-    str,
-    int,
-    tuple[int, int],
-    tuple[int, bytes],
-    Appearance,
-]
+AdvertisingDataObject = (
+    list[UUID]
+    | tuple[UUID, bytes]
+    | bytes
+    | str
+    | int
+    | tuple[int, int]
+    | tuple[int, bytes]
+    | Appearance
+)
 
 
 class AdvertisingData:
@@ -1721,7 +1716,7 @@ class AdvertisingData:
 
     def __init__(
         self,
-        ad_structures: Optional[Iterable[Union[tuple[int, bytes], DataType]]] = None,
+        ad_structures: Iterable[tuple[int, bytes] | DataType] | None = None,
     ) -> None:
         if ad_structures is None:
             ad_structures = []
@@ -2019,7 +2014,7 @@ class AdvertisingData:
             AdvertisingData.Type.LIST_OF_128_BIT_SERVICE_SOLICITATION_UUIDS,
         ],
         raw: Literal[False] = False,
-    ) -> Optional[list[UUID]]: ...
+    ) -> list[UUID] | None: ...
 
     @overload
     def get(
@@ -2030,7 +2025,7 @@ class AdvertisingData:
             AdvertisingData.Type.SERVICE_DATA_128_BIT_UUID,
         ],
         raw: Literal[False] = False,
-    ) -> Optional[tuple[UUID, bytes]]: ...
+    ) -> tuple[UUID, bytes] | None: ...
 
     @overload
     def get(
@@ -2042,7 +2037,7 @@ class AdvertisingData:
             AdvertisingData.Type.BROADCAST_NAME,
         ],
         raw: Literal[False] = False,
-    ) -> Optional[Optional[str]]: ...
+    ) -> str | None: ...
 
     @overload
     def get(
@@ -2054,38 +2049,36 @@ class AdvertisingData:
             AdvertisingData.Type.CLASS_OF_DEVICE,
         ],
         raw: Literal[False] = False,
-    ) -> Optional[int]: ...
+    ) -> int | None: ...
 
     @overload
     def get(
         self,
         type_id: Literal[AdvertisingData.Type.PERIPHERAL_CONNECTION_INTERVAL_RANGE,],
         raw: Literal[False] = False,
-    ) -> Optional[tuple[int, int]]: ...
+    ) -> tuple[int, int] | None: ...
 
     @overload
     def get(
         self,
         type_id: Literal[AdvertisingData.Type.MANUFACTURER_SPECIFIC_DATA,],
         raw: Literal[False] = False,
-    ) -> Optional[tuple[int, bytes]]: ...
+    ) -> tuple[int, bytes] | None: ...
 
     @overload
     def get(
         self,
         type_id: Literal[AdvertisingData.Type.APPEARANCE,],
         raw: Literal[False] = False,
-    ) -> Optional[Appearance]: ...
+    ) -> Appearance | None: ...
 
     @overload
-    def get(self, type_id: int, raw: Literal[True]) -> Optional[bytes]: ...
+    def get(self, type_id: int, raw: Literal[True]) -> bytes | None: ...
 
     @overload
-    def get(
-        self, type_id: int, raw: bool = False
-    ) -> Optional[AdvertisingDataObject]: ...
+    def get(self, type_id: int, raw: bool = False) -> AdvertisingDataObject | None: ...
 
-    def get(self, type_id: int, raw: bool = False) -> Optional[AdvertisingDataObject]:
+    def get(self, type_id: int, raw: bool = False) -> AdvertisingDataObject | None:
         '''
         Get advertising data as a simple AdvertisingDataObject object.
 

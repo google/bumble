@@ -21,7 +21,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import struct
-from typing import Optional, Sequence, Union
+from collections.abc import Sequence
 
 from bumble import gatt, gatt_adapters, gatt_client, hci
 from bumble.profiles import le_audio
@@ -39,7 +39,7 @@ class PacRecord:
     '''Published Audio Capabilities Service, Table 3.2/3.4.'''
 
     coding_format: hci.CodingFormat
-    codec_specific_capabilities: Union[CodecSpecificCapabilities, bytes]
+    codec_specific_capabilities: CodecSpecificCapabilities | bytes
     metadata: le_audio.Metadata = dataclasses.field(default_factory=le_audio.Metadata)
 
     @classmethod
@@ -56,7 +56,7 @@ class PacRecord:
         offset += 1
         metadata = le_audio.Metadata.from_bytes(data[offset : offset + metadata_size])
 
-        codec_specific_capabilities: Union[CodecSpecificCapabilities, bytes]
+        codec_specific_capabilities: CodecSpecificCapabilities | bytes
         if coding_format.codec_id == hci.CodecID.VENDOR_SPECIFIC:
             codec_specific_capabilities = codec_specific_capabilities_bytes
         else:
@@ -101,10 +101,10 @@ class PacRecord:
 class PublishedAudioCapabilitiesService(gatt.TemplateService):
     UUID = gatt.GATT_PUBLISHED_AUDIO_CAPABILITIES_SERVICE
 
-    sink_pac: Optional[gatt.Characteristic[bytes]]
-    sink_audio_locations: Optional[gatt.Characteristic[bytes]]
-    source_pac: Optional[gatt.Characteristic[bytes]]
-    source_audio_locations: Optional[gatt.Characteristic[bytes]]
+    sink_pac: gatt.Characteristic[bytes] | None
+    sink_audio_locations: gatt.Characteristic[bytes] | None
+    source_pac: gatt.Characteristic[bytes] | None
+    source_audio_locations: gatt.Characteristic[bytes] | None
     available_audio_contexts: gatt.Characteristic[bytes]
     supported_audio_contexts: gatt.Characteristic[bytes]
 
@@ -115,9 +115,9 @@ class PublishedAudioCapabilitiesService(gatt.TemplateService):
         available_source_context: ContextType,
         available_sink_context: ContextType,
         sink_pac: Sequence[PacRecord] = (),
-        sink_audio_locations: Optional[AudioLocation] = None,
+        sink_audio_locations: AudioLocation | None = None,
         source_pac: Sequence[PacRecord] = (),
-        source_audio_locations: Optional[AudioLocation] = None,
+        source_audio_locations: AudioLocation | None = None,
     ) -> None:
         characteristics = []
 
@@ -183,14 +183,10 @@ class PublishedAudioCapabilitiesService(gatt.TemplateService):
 class PublishedAudioCapabilitiesServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = PublishedAudioCapabilitiesService
 
-    sink_pac: Optional[gatt_client.CharacteristicProxy[list[PacRecord]]] = None
-    sink_audio_locations: Optional[gatt_client.CharacteristicProxy[AudioLocation]] = (
-        None
-    )
-    source_pac: Optional[gatt_client.CharacteristicProxy[list[PacRecord]]] = None
-    source_audio_locations: Optional[gatt_client.CharacteristicProxy[AudioLocation]] = (
-        None
-    )
+    sink_pac: gatt_client.CharacteristicProxy[list[PacRecord]] | None = None
+    sink_audio_locations: gatt_client.CharacteristicProxy[AudioLocation] | None = None
+    source_pac: gatt_client.CharacteristicProxy[list[PacRecord]] | None = None
+    source_audio_locations: gatt_client.CharacteristicProxy[AudioLocation] | None = None
     available_audio_contexts: gatt_client.CharacteristicProxy[tuple[ContextType, ...]]
     supported_audio_contexts: gatt_client.CharacteristicProxy[tuple[ContextType, ...]]
 

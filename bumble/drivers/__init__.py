@@ -24,7 +24,8 @@ from __future__ import annotations
 import logging
 import pathlib
 import platform
-from typing import TYPE_CHECKING, Iterable, Optional
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 from bumble.drivers import intel, rtk
 from bumble.drivers.common import Driver
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Functions
 # -----------------------------------------------------------------------------
-async def get_driver_for_host(host: Host) -> Optional[Driver]:
+async def get_driver_for_host(host: Host) -> Driver | None:
     """Probe diver classes until one returns a valid instance for a host, or none is
     found.
     If a "driver" HCI metadata entry is present, only that driver class will be probed.

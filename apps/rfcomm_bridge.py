@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import time
-from typing import Optional
 
 import click
 
@@ -82,14 +81,14 @@ class ServerBridge:
     def __init__(
         self, channel: int, uuid: str, trace: bool, tcp_host: str, tcp_port: int
     ) -> None:
-        self.device: Optional[Device] = None
+        self.device: Device | None = None
         self.channel = channel
         self.uuid = uuid
         self.tcp_host = tcp_host
         self.tcp_port = tcp_port
-        self.rfcomm_channel: Optional[rfcomm.DLC] = None
-        self.tcp_tracer: Optional[Tracer]
-        self.rfcomm_tracer: Optional[Tracer]
+        self.rfcomm_channel: rfcomm.DLC | None = None
+        self.tcp_tracer: Tracer | None
+        self.rfcomm_tracer: Tracer | None
 
         if trace:
             self.tcp_tracer = Tracer(color("RFCOMM->TCP", "cyan"))
@@ -242,14 +241,14 @@ class ClientBridge:
         self.tcp_port = tcp_port
         self.authenticate = authenticate
         self.encrypt = encrypt
-        self.device: Optional[Device] = None
-        self.connection: Optional[Connection] = None
-        self.rfcomm_client: Optional[rfcomm.Client]
-        self.rfcomm_mux: Optional[rfcomm.Multiplexer]
+        self.device: Device | None = None
+        self.connection: Connection | None = None
+        self.rfcomm_client: rfcomm.Client | None
+        self.rfcomm_mux: rfcomm.Multiplexer | None
         self.tcp_connected: bool = False
 
-        self.tcp_tracer: Optional[Tracer]
-        self.rfcomm_tracer: Optional[Tracer]
+        self.tcp_tracer: Tracer | None
+        self.rfcomm_tracer: Tracer | None
 
         if trace:
             self.tcp_tracer = Tracer(color("RFCOMM->TCP", "cyan"))

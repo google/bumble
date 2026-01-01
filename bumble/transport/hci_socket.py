@@ -22,7 +22,6 @@ import logging
 import os
 import socket
 import struct
-from typing import Optional
 
 from bumble.transport.common import ParserSource, Transport
 
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-async def open_hci_socket_transport(spec: Optional[str]) -> Transport:
+async def open_hci_socket_transport(spec: str | None) -> Transport:
     '''
     Open an HCI Socket (only available on some platforms).
     The parameter string is either empty (to use the first/default Bluetooth adapter)
@@ -87,7 +86,7 @@ async def open_hci_socket_transport(spec: Optional[str]) -> Transport:
         )
         != 0
     ):
-        raise IOError(ctypes.get_errno(), os.strerror(ctypes.get_errno()))
+        raise OSError(ctypes.get_errno(), os.strerror(ctypes.get_errno()))
 
     class HciSocketSource(ParserSource):
         def __init__(self, hci_socket):

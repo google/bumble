@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional, Union
 
 import click
 
@@ -190,7 +189,7 @@ class Player:
     def __init__(
         self,
         transport: str,
-        device_config: Optional[str],
+        device_config: str | None,
         authenticate: bool,
         encrypt: bool,
     ) -> None:
@@ -198,8 +197,8 @@ class Player:
         self.device_config = device_config
         self.authenticate = authenticate
         self.encrypt = encrypt
-        self.avrcp_protocol: Optional[AvrcpProtocol] = None
-        self.done: Optional[asyncio.Event]
+        self.avrcp_protocol: AvrcpProtocol | None = None
+        self.done: asyncio.Event | None
 
     async def run(self, workload) -> None:
         self.done = asyncio.Event()
@@ -314,7 +313,7 @@ class Player:
         codec_type: int,
         vendor_id: int,
         codec_id: int,
-        packet_source: Union[SbcPacketSource, AacPacketSource, OpusPacketSource],
+        packet_source: SbcPacketSource | AacPacketSource | OpusPacketSource,
         codec_capabilities: MediaCodecCapabilities,
     ):
         # Discover all endpoints on the remote device
@@ -419,7 +418,7 @@ class Player:
     async def play(
         self,
         device: Device,
-        address: Optional[str],
+        address: str | None,
         audio_format: str,
         audio_file: str,
     ) -> None:
@@ -448,7 +447,7 @@ class Player:
                     return input_file.read(byte_count)
 
                 # Obtain the codec capabilities from the stream
-                packet_source: Union[SbcPacketSource, AacPacketSource, OpusPacketSource]
+                packet_source: SbcPacketSource | AacPacketSource | OpusPacketSource
                 vendor_id = 0
                 codec_id = 0
                 if audio_format == "sbc":

@@ -25,7 +25,8 @@ import enum
 import logging
 import re
 import traceback
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable, Optional, Union
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from typing_extensions import Self
 
@@ -80,7 +81,7 @@ class HfpProtocol:
 
         dlc.sink = self.feed
 
-    def feed(self, data: Union[bytes, str]) -> None:
+    def feed(self, data: bytes | str) -> None:
         # Convert the data to a string if needed
         if isinstance(data, bytes):
             data = data.decode('utf-8')
@@ -324,8 +325,8 @@ class CallInfo:
     status: CallInfoStatus
     mode: CallInfoMode
     multi_party: CallInfoMultiParty
-    number: Optional[str] = None
-    type: Optional[int] = None
+    number: str | None = None
+    type: int | None = None
 
 
 @dataclasses.dataclass
@@ -353,10 +354,10 @@ class CallLineIdentification:
 
     number: str
     type: int
-    subaddr: Optional[str] = None
-    satype: Optional[int] = None
-    alpha: Optional[str] = None
-    cli_validity: Optional[int] = None
+    subaddr: str | None = None
+    satype: int | None = None
+    alpha: str | None = None
+    cli_validity: int | None = None
 
     @classmethod
     def parse_from(cls, parameters: list[bytes]) -> Self:
@@ -584,7 +585,7 @@ class AgIndicatorState:
     indicator: AgIndicator
     supported_values: set[int]
     current_status: int
-    index: Optional[int] = None
+    index: int | None = None
     enabled: bool = True
 
     @property
@@ -728,7 +729,7 @@ class HfProtocol(utils.EventEmitter):
     command_lock: asyncio.Lock
     if TYPE_CHECKING:
         response_queue: asyncio.Queue[AtResponse]
-        unsolicited_queue: asyncio.Queue[Optional[AtResponse]]
+        unsolicited_queue: asyncio.Queue[AtResponse | None]
     else:
         response_queue: asyncio.Queue
         unsolicited_queue: asyncio.Queue
@@ -820,7 +821,7 @@ class HfProtocol(utils.EventEmitter):
         cmd: str,
         timeout: float = 1.0,
         response_type: AtResponseType = AtResponseType.NONE,
-    ) -> Union[None, AtResponse, list[AtResponse]]:
+    ) -> None | AtResponse | list[AtResponse]:
         """
         Sends an AT command and wait for the peer response.
         Wait for the AT responses sent by the peer, to the status code.
@@ -1411,7 +1412,7 @@ class AgProtocol(utils.EventEmitter):
         self.emit(self.EVENT_VOICE_RECOGNITION, VoiceRecognitionState(int(vrec)))
 
     def _on_chld(self, operation_code: bytes) -> None:
-        call_index: Optional[int] = None
+        call_index: int | None = None
         if len(operation_code) > 1:
             call_index = int(operation_code[1:])
             operation_code = operation_code[:1] + b'x'
@@ -1481,8 +1482,8 @@ class AgProtocol(utils.EventEmitter):
     def _on_cmer(
         self,
         mode: bytes,
-        keypad: Optional[bytes] = None,
-        display: Optional[bytes] = None,
+        keypad: bytes | None = None,
+        display: bytes | None = None,
         indicator: bytes = b'',
     ) -> None:
         if (
@@ -1844,7 +1845,7 @@ def make_ag_sdp_records(
 
 async def find_hf_sdp_record(
     connection: device.Connection,
-) -> Optional[tuple[int, ProfileVersion, HfSdpFeature]]:
+) -> tuple[int, ProfileVersion, HfSdpFeature] | None:
     """Searches a Hands-Free SDP record from remote device.
 
     Args:
@@ -1864,9 +1865,9 @@ async def find_hf_sdp_record(
             ],
         )
         for attribute_lists in search_result:
-            channel: Optional[int] = None
-            version: Optional[ProfileVersion] = None
-            features: Optional[HfSdpFeature] = None
+            channel: int | None = None
+            version: ProfileVersion | None = None
+            features: HfSdpFeature | None = None
             for attribute in attribute_lists:
                 # The layout is [[L2CAP_PROTOCOL], [RFCOMM_PROTOCOL, RFCOMM_CHANNEL]].
                 if attribute.id == sdp.SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID:
@@ -1896,7 +1897,7 @@ async def find_hf_sdp_record(
 
 async def find_ag_sdp_record(
     connection: device.Connection,
-) -> Optional[tuple[int, ProfileVersion, AgSdpFeature]]:
+) -> tuple[int, ProfileVersion, AgSdpFeature] | None:
     """Searches an Audio-Gateway SDP record from remote device.
 
     Args:
@@ -1915,9 +1916,9 @@ async def find_ag_sdp_record(
             ],
         )
         for attribute_lists in search_result:
-            channel: Optional[int] = None
-            version: Optional[ProfileVersion] = None
-            features: Optional[AgSdpFeature] = None
+            channel: int | None = None
+            version: ProfileVersion | None = None
+            features: AgSdpFeature | None = None
             for attribute in attribute_lists:
                 # The layout is [[L2CAP_PROTOCOL], [RFCOMM_PROTOCOL, RFCOMM_CHANNEL]].
                 if attribute.id == sdp.SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID:
