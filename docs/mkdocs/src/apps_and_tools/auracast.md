@@ -104,7 +104,8 @@ The `--output` option specifies where to send the decoded audio samples.
 The following outputs are supported:
 
 ### Sound Device
-The `--output` argument is either `device`, to send the audio to the hosts's default sound device, or `device:<DEVICE_ID>` where `<DEVICE_ID>`
+The `--output` argument is either `device`, to send the audio to the hosts's 
+default sound device, or `device:<DEVICE_ID>` where `<DEVICE_ID>`
 is the integer ID of one of the available sound devices.
 When invoked with `--output "device:?"`, a list of available devices and
 their IDs is printed out.
@@ -115,17 +116,24 @@ standard output (currently always as float32 PCM samples)
 
 ### FFPlay
 With `--output ffplay`, the decoded audio samples are piped to `ffplay`
-in a child process. This option is only available if `ffplay` is a command that is available on the host.
+in a child process. This option is only available if `ffplay` is a command 
+that is available on the host.
 
 ### File
 With `--output <filename>` or `--output file:<filename>`, the decoded audio
 samples are written to a file (currently always as float32 PCM)
 
 ## `transmit`
-Broadcast an audio source as a transmitter.
+Broadcast one or more audio sources as a transmitter.
 
 The `--input` and `--input-format` options specify what audio input
 source to transmit.
+
+Optionally, you can use the `--broadcast-list` option, 
+specifying a TOML configuration file, as a convenient way to specify 
+audio source configurations for one or more audio sources.  
+See `examples/auracast_broadcasts.toml` for an example.
+
 The following inputs are supported:
 
 ### Sound Device
@@ -146,7 +154,8 @@ are read from a .wav or raw PCM file.
 Use the `--input-format <FORMAT>` option to specify the format of the audio
 samples in raw PCM files. `<FORMAT>` is expressed as:
 `<sample-type>,<sample-rate>,<channels>`
-(the only supported <sample-type> currently is 'int16le' for 16 bit signed integers with little-endian byte order)
+(the only supported <sample-type> currently is 'int16le' for 16 bit signed 
+integers with little-endian byte order)
 
 ## `scan`
 Scan for public broadcasts.
@@ -164,6 +173,7 @@ be shared to allow better compatibiity with certain products.
 The `receive` command has been tested to successfully receive broadcasts from
 the following transmitters:
 
+  * Android's "Audio Sharing"
   * JBL GO 4
   * Flairmesh FlooGoo FMA120
   * Eppfun AK3040Pro Max
@@ -193,10 +203,12 @@ Use the `--manufacturer-data` option of the `transmit` command in order to inclu
 that will let the speaker recognize the broadcast as a compatible source.
 
 The manufacturer ID for JBL is 87.
-Using an option like `--manufacturer-data 87:00000000000000000000000000000000dffd` should work (tested on the
-JBL GO 4. The `dffd` value at the end of the payload may be different on other models?).
+Using an option like `--manufacturer-data 87:00000000000000000000000000000000dffd` should work 
+(tested on the JBL GO 4. 
+The `dffd` value at the end of the payload may be different on other models?).
 
 
 ### Others
 
+  * Android
   * Nexum Audio VOCE and USB dongle

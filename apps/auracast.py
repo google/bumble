@@ -23,10 +23,14 @@ import contextlib
 import dataclasses
 import functools
 import logging
-from collections.abc import AsyncGenerator, Coroutine
-from typing import Any
+import secrets
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
+from typing import (
+    Any,
+)
 
 import click
+import tomli
 
 try:
     import lc3  # type: ignore  # pylint: disable=E0401
@@ -58,8 +62,11 @@ AURACAST_DEFAULT_DEVICE_ADDRESS = hci.Address('F0:F1:F2:F3:F4:F5')
 AURACAST_DEFAULT_SYNC_TIMEOUT = 5.0
 AURACAST_DEFAULT_ATT_MTU = 256
 AURACAST_DEFAULT_FRAME_DURATION = 10000
-AURACAST_DEFAULT_SAMPLE_RATE = 48000
 AURACAST_DEFAULT_TRANSMIT_BITRATE = 80000
+AURACAST_DEFAULT_BROADCAST_ID = 123456
+AURACAST_DEFAULT_BROADCAST_NAME = 'Bumble Auracast'
+AURACAST_DEFAULT_LANGUAGE = 'en'
+AURACAST_DEFAULT_PROGRAM_INFO = 'Disco'
 
 
 # -----------------------------------------------------------------------------
@@ -103,6 +110,95 @@ def broadcast_code_bytes(broadcast_code: str) -> bytes:
     return broadcast_code_utf8 + padding
 
 
+def parse_broadcast_list(filename: str) -> Sequence[Broadcast]:
+    broadcasts: list[Broadcast] = []
+
+    with open(filename, "rb") as config_file:
+        config = tomli.load(config_file)
+        for broadcast in config.get("broadcasts", []):
+            sources = []
+            for source in broadcast.get("sources", []):
+                sources.append(
+                    BroadcastSource(
+                        input=source["input"],
+                        input_format=source.get("format", "auto"),
+                        bitrate=source.get(
+                            "bitrate", AURACAST_DEFAULT_TRANSMIT_BITRATE
+                        ),
+                    )
+                )
+
+            manufacturer_data = broadcast.get("manufacturer_data")
+            if manufacturer_data is not None:
+                manufacturer_data = (
+                    manufacturer_data.get("company_id"),
+                    bytes.fromhex(manufacturer_data["data"]),
+                )
+            broadcasts.append(
+                Broadcast(
+                    sources=sources,
+                    public=broadcast.get("public", True),
+                    broadcast_id=broadcast.get("id", AURACAST_DEFAULT_BROADCAST_ID),
+                    broadcast_name=broadcast["name"],
+                    broadcast_code=broadcast.get("code"),
+                    manufacturer_data=broadcast.get("manufacturer_data"),
+                    language=broadcast.get("language"),
+                    program_info=broadcast.get("program_info"),
+                )
+            )
+
+    return broadcasts
+
+
+def assign_broadcast_ids(broadcasts: Sequence[Broadcast]) -> None:
+    broadcast_ids = set()
+    for broadcast in broadcasts:
+        if broadcast.broadcast_id:
+            if broadcast.broadcast_id in broadcast_ids:
+                raise ValueError(f'duplicate broadcast ID {broadcast.broadcast_id}')
+            broadcast_ids.add(broadcast.broadcast_id)
+        else:
+            while True:
+                broadcast.broadcast_id = 1 + secrets.randbelow(0xFFFFFF)
+                if broadcast.broadcast_id not in broadcast_ids:
+                    broadcast_ids.add(broadcast.broadcast_id)
+                    break
+
+
+@dataclasses.dataclass
+class Broadcast:
+    sources: list[BroadcastSource]
+    public: bool
+    broadcast_id: int  # 0 means unassigned
+    broadcast_name: str
+    broadcast_code: str | None
+    manufacturer_data: tuple[int, bytes] | None = None
+    language: str | None = None
+    program_info: str | None = None
+    audio_sources: list[AudioSource] = dataclasses.field(default_factory=list)
+    iso_queues: list[bumble.device.IsoPacketStream] = dataclasses.field(
+        default_factory=list
+    )
+
+
+@dataclasses.dataclass
+class BroadcastSource:
+    input: str
+    input_format: str
+    bitrate: int
+
+
+@dataclasses.dataclass
+class AudioSource:
+    audio_input: audio_io.AudioInput
+    pcm_format: audio_io.PcmFormat
+    pcm_bit_depth: int | None
+    lc3_encoder: lc3.Encoder
+    lc3_frame_samples: int
+    lc3_frame_size: int
+    audio_frames: AsyncGenerator
+
+
 # -----------------------------------------------------------------------------
 # Scan For Broadcasts
 # -----------------------------------------------------------------------------
@@ -119,6 +215,7 @@ class BroadcastScanner(bumble.utils.EventEmitter):
         appearance: core.Appearance | None = None
         biginfo: bumble.device.BigInfoAdvertisement | None = None
         manufacturer_data: tuple[str, bytes] | None = None
+        device_name: str | None = None
 
         def __post_init__(self) -> None:
             super().__init__()
@@ -146,6 +243,10 @@ class BroadcastScanner(bumble.utils.EventEmitter):
                     )
                     continue
 
+            self.device_name = advertisement.data.get(
+                core.AdvertisingData.Type.COMPLETE_LOCAL_NAME
+            )
+
             self.appearance = advertisement.data.get(
                 core.AdvertisingData.Type.APPEARANCE
             )
@@ -170,11 +271,13 @@ class BroadcastScanner(bumble.utils.EventEmitter):
                 color(self.sync.state.name, 'green'),
             )
             if self.name is not None:
-                print(f'  {color("Name", "cyan")}:         {self.name}')
+                print(f'  {color("Broadcast Name", "cyan")}: {self.name}')
+            if self.device_name:
+                print(f'  {color("Device Name", "cyan")}:    {self.device_name}')
             if self.appearance:
-                print(f'  {color("Appearance", "cyan")}:   {str(self.appearance)}')
-            print(f'  {color("RSSI", "cyan")}:         {self.rssi}')
-            print(f'  {color("SID", "cyan")}:          {self.sync.sid}')
+                print(f'  {color("Appearance", "cyan")}:     {str(self.appearance)}')
+            print(f'  {color("RSSI", "cyan")}:           {self.rssi}')
+            print(f'  {color("SID", "cyan")}:            {self.sync.sid}')
 
             if self.manufacturer_data:
                 print(
@@ -184,17 +287,22 @@ class BroadcastScanner(bumble.utils.EventEmitter):
 
             if self.broadcast_audio_announcement:
                 print(
-                    f'  {color("Broadcast ID", "cyan")}: '
+                    f'  {color("Broadcast ID", "cyan")}:   '
                     f'{self.broadcast_audio_announcement.broadcast_id}'
                 )
 
             if self.public_broadcast_announcement:
                 print(
-                    f'  {color("Features", "cyan")}:     '
+                    f'  {color("Features", "cyan")}:       '
                     f'{self.public_broadcast_announcement.features.name}'
                 )
-                print(f'  {color("Metadata", "cyan")}:')
-                print(self.public_broadcast_announcement.metadata.pretty_print('    '))
+                if self.public_broadcast_announcement.metadata.entries:
+                    print(f'  {color("Metadata", "cyan")}:  ')
+                    print(
+                        self.public_broadcast_announcement.metadata.pretty_print(
+                            '      '
+                        )
+                    )
 
             if self.basic_audio_announcement:
                 print(color('  Audio:', 'cyan'))
@@ -210,22 +318,24 @@ class BroadcastScanner(bumble.utils.EventEmitter):
                         color('        Coding Format:           ', 'green'),
                         subgroup.codec_id.codec_id.name,
                     )
-                    print(
-                        color('        Company ID:              ', 'green'),
-                        subgroup.codec_id.company_id,
-                    )
-                    print(
-                        color('        Vendor Specific Codec ID:', 'green'),
-                        subgroup.codec_id.vendor_specific_codec_id,
-                    )
+                    if subgroup.codec_id.company_id:
+                        print(
+                            color('        Company ID:              ', 'green'),
+                            subgroup.codec_id.company_id,
+                        )
+                        print(
+                            color('        Vendor Specific Codec ID:', 'green'),
+                            subgroup.codec_id.vendor_specific_codec_id,
+                        )
                     print(color('      Codec Config:', 'yellow'))
                     print(
                         codec_config_string(
                             subgroup.codec_specific_configuration, '        '
                         ),
                     )
-                    print(color('      Metadata:    ', 'yellow'))
-                    print(subgroup.metadata.pretty_print('        '))
+                    if subgroup.metadata.entries:
+                        print(color('      Metadata:    ', 'yellow'))
+                        print(subgroup.metadata.pretty_print('        '))
 
                     for bis in subgroup.bis:
                         print(color(f'      BIS [{bis.index}]:', 'yellow'))
@@ -292,7 +402,7 @@ class BroadcastScanner(bumble.utils.EventEmitter):
         self.device = device
         self.filter_duplicates = filter_duplicates
         self.sync_timeout = sync_timeout
-        self.broadcasts = dict[hci.Address, BroadcastScanner.Broadcast]()
+        self.broadcasts = dict[tuple[hci.Address, int], BroadcastScanner.Broadcast]()
         device.on('advertisement', self.on_advertisement)
 
     async def start(self) -> None:
@@ -310,7 +420,7 @@ class BroadcastScanner(bumble.utils.EventEmitter):
                 core.AdvertisingData.Type.SERVICE_DATA_16_BIT_UUID
             )
         ) or not (
-            broadcast_audio_announcement := next(
+            broadcast_audio_announcement_ad := next(
                 (
                     ad
                     for ad in ads
@@ -325,7 +435,13 @@ class BroadcastScanner(bumble.utils.EventEmitter):
             core.AdvertisingData.Type.BROADCAST_NAME
         )
 
-        if broadcast := self.broadcasts.get(advertisement.address):
+        broadcast_audio_announcement = bap.BroadcastAudioAnnouncement.from_bytes(
+            broadcast_audio_announcement_ad[1]
+        )
+
+        if broadcast := self.broadcasts.get(
+            (advertisement.address, broadcast_audio_announcement.broadcast_id)
+        ):
             broadcast.update(advertisement)
             return
 
@@ -333,9 +449,7 @@ class BroadcastScanner(bumble.utils.EventEmitter):
             self.on_new_broadcast(
                 broadcast_name[0] if broadcast_name else None,
                 advertisement,
-                bap.BroadcastAudioAnnouncement.from_bytes(
-                    broadcast_audio_announcement[1]
-                ).broadcast_id,
+                broadcast_audio_announcement.broadcast_id,
             )
         )
 
@@ -353,12 +467,12 @@ class BroadcastScanner(bumble.utils.EventEmitter):
         )
         broadcast = self.Broadcast(name, periodic_advertising_sync, broadcast_id)
         broadcast.update(advertisement)
-        self.broadcasts[advertisement.address] = broadcast
+        self.broadcasts[(advertisement.address, broadcast_id)] = broadcast
         periodic_advertising_sync.on('loss', lambda: self.on_broadcast_loss(broadcast))
         self.emit('new_broadcast', broadcast)
 
-    def on_broadcast_loss(self, broadcast: Broadcast) -> None:
-        del self.broadcasts[broadcast.sync.advertiser_address]
+    def on_broadcast_loss(self, broadcast: BroadcastScanner.Broadcast) -> None:
+        del self.broadcasts[(broadcast.sync.advertiser_address, broadcast.broadcast_id)]
         bumble.utils.AsyncRunner.spawn(broadcast.sync.terminate())
         self.emit('broadcast_loss', broadcast)
 
@@ -462,203 +576,197 @@ async def find_broadcast_by_name(
 
 
 async def run_scan(
-    filter_duplicates: bool, sync_timeout: float, transport: str
+    device: bumble.device.Device, filter_duplicates: bool, sync_timeout: float
 ) -> None:
-    async with create_device(transport) as device:
-        if not device.supports_le_periodic_advertising:
-            print(color('Periodic advertising not supported', 'red'))
-            return
+    if not device.supports_le_periodic_advertising:
+        print(color('Periodic advertising not supported', 'red'))
+        return
 
-        scanner = PrintingBroadcastScanner(device, filter_duplicates, sync_timeout)
-        await scanner.start()
-        await asyncio.get_running_loop().create_future()
+    scanner = PrintingBroadcastScanner(device, filter_duplicates, sync_timeout)
+    await scanner.start()
+    await asyncio.get_running_loop().create_future()
 
 
 async def run_assist(
+    device: bumble.device.Device,
     broadcast_name: str | None,
     source_id: int | None,
     command: str,
-    transport: str,
     address: str,
 ) -> None:
-    async with create_device(transport) as device:
-        if not device.supports_le_periodic_advertising:
-            print(color('Periodic advertising not supported', 'red'))
-            return
+    if not device.supports_le_periodic_advertising:
+        print(color('Periodic advertising not supported', 'red'))
+        return
 
-        # Connect to the server
-        print(f'=== Connecting to {address}...')
-        connection = await device.connect(address)
-        peer = bumble.device.Peer(connection)
-        print(f'=== Connected to {peer}')
+    # Connect to the server
+    print(f'=== Connecting to {address}...')
+    connection = await device.connect(address)
+    peer = bumble.device.Peer(connection)
+    print(f'=== Connected to {peer}')
 
-        print("+++ Encrypting connection...")
-        await peer.connection.encrypt()
-        print("+++ Connection encrypted")
+    print("+++ Encrypting connection...")
+    await peer.connection.encrypt()
+    print("+++ Connection encrypted")
 
-        # Request a larger MTU
-        mtu = AURACAST_DEFAULT_ATT_MTU
-        print(color(f'$$$ Requesting MTU={mtu}', 'yellow'))
-        await peer.request_mtu(mtu)
+    # Request a larger MTU
+    mtu = AURACAST_DEFAULT_ATT_MTU
+    print(color(f'$$$ Requesting MTU={mtu}', 'yellow'))
+    await peer.request_mtu(mtu)
 
-        # Get the BASS service
-        bass_client = await peer.discover_service_and_create_proxy(
-            bass.BroadcastAudioScanServiceProxy
-        )
+    # Get the BASS service
+    bass_client = await peer.discover_service_and_create_proxy(
+        bass.BroadcastAudioScanServiceProxy
+    )
 
-        # Check that the service was found
-        if not bass_client:
-            print(color('!!! Broadcast Audio Scan Service not found', 'red'))
-            return
+    # Check that the service was found
+    if not bass_client:
+        print(color('!!! Broadcast Audio Scan Service not found', 'red'))
+        return
 
-        # Subscribe to and read the broadcast receive state characteristics
-        def on_broadcast_receive_state_update(
-            value: bass.BroadcastReceiveState, index: int
-        ) -> None:
+    # Subscribe to and read the broadcast receive state characteristics
+    def on_broadcast_receive_state_update(
+        value: bass.BroadcastReceiveState | None, index: int
+    ) -> None:
+        if value is not None:
             print(
                 f"{color(f'Broadcast Receive State Update [{index}]:', 'green')} {value}"
             )
 
-        for i, broadcast_receive_state in enumerate(
-            bass_client.broadcast_receive_states
+    for i, broadcast_receive_state in enumerate(bass_client.broadcast_receive_states):
+        try:
+            await broadcast_receive_state.subscribe(
+                functools.partial(on_broadcast_receive_state_update, index=i)
+            )
+        except core.ProtocolError as error:
+            print(
+                color(
+                    '!!! Failed to subscribe to Broadcast Receive State characteristic',
+                    'red',
+                ),
+                error,
+            )
+        value = await broadcast_receive_state.read_value()
+        print(f'{color(f"Initial Broadcast Receive State [{i}]:", "green")} {value}')
+
+    if command == 'monitor-state':
+        await peer.sustain()
+        return
+
+    if command == 'add-source':
+        # Find the requested broadcast
+        await bass_client.remote_scan_started()
+        if broadcast_name:
+            print(color('Scanning for broadcast:', 'cyan'), broadcast_name)
+        else:
+            print(color('Scanning for any broadcast', 'cyan'))
+        broadcast = await find_broadcast_by_name(device, broadcast_name)
+
+        if broadcast.broadcast_audio_announcement is None:
+            print(color('No broadcast audio announcement found', 'red'))
+            return
+
+        if (
+            broadcast.basic_audio_announcement is None
+            or not broadcast.basic_audio_announcement.subgroups
         ):
-            try:
-                await broadcast_receive_state.subscribe(
-                    functools.partial(on_broadcast_receive_state_update, index=i)
+            print(color('No subgroups found', 'red'))
+            return
+
+        # Add the source
+        print(color('Adding source:', 'blue'), broadcast.sync.advertiser_address)
+        await bass_client.add_source(
+            broadcast.sync.advertiser_address,
+            broadcast.sync.sid,
+            broadcast.broadcast_audio_announcement.broadcast_id,
+            bass.PeriodicAdvertisingSyncParams.SYNCHRONIZE_TO_PA_PAST_AVAILABLE,
+            0xFFFF,
+            [
+                bass.SubgroupInfo(
+                    bass.SubgroupInfo.ANY_BIS,
+                    bytes(broadcast.basic_audio_announcement.subgroups[0].metadata),
                 )
-            except core.ProtocolError as error:
-                print(
-                    color(
-                        '!!! Failed to subscribe to Broadcast Receive State characteristic',
-                        'red',
-                    ),
-                    error,
+            ],
+        )
+
+        # Initiate a PA Sync Transfer
+        await broadcast.sync.transfer(peer.connection)
+
+        # Notify the sink that we're done scanning.
+        await bass_client.remote_scan_stopped()
+
+        await peer.sustain()
+        return
+
+    if command == 'modify-source':
+        if source_id is None:
+            print(color('!!! modify-source requires --source-id'))
+            return
+
+        # Find the requested broadcast
+        await bass_client.remote_scan_started()
+        if broadcast_name:
+            print(color('Scanning for broadcast:', 'cyan'), broadcast_name)
+        else:
+            print(color('Scanning for any broadcast', 'cyan'))
+        broadcast = await find_broadcast_by_name(device, broadcast_name)
+
+        if broadcast.broadcast_audio_announcement is None:
+            print(color('No broadcast audio announcement found', 'red'))
+            return
+
+        if (
+            broadcast.basic_audio_announcement is None
+            or not broadcast.basic_audio_announcement.subgroups
+        ):
+            print(color('No subgroups found', 'red'))
+            return
+
+        # Modify the source
+        print(
+            color('Modifying source:', 'blue'),
+            source_id,
+        )
+        await bass_client.modify_source(
+            source_id,
+            bass.PeriodicAdvertisingSyncParams.SYNCHRONIZE_TO_PA_PAST_NOT_AVAILABLE,
+            0xFFFF,
+            [
+                bass.SubgroupInfo(
+                    bass.SubgroupInfo.ANY_BIS,
+                    bytes(broadcast.basic_audio_announcement.subgroups[0].metadata),
                 )
-            value = await broadcast_receive_state.read_value()
-            print(
-                f'{color(f"Initial Broadcast Receive State [{i}]:", "green")} {value}'
-            )
+            ],
+        )
+        await peer.sustain()
+        return
 
-        if command == 'monitor-state':
-            await peer.sustain()
+    if command == 'remove-source':
+        if source_id is None:
+            print(color('!!! remove-source requires --source-id'))
             return
 
-        if command == 'add-source':
-            # Find the requested broadcast
-            await bass_client.remote_scan_started()
-            if broadcast_name:
-                print(color('Scanning for broadcast:', 'cyan'), broadcast_name)
-            else:
-                print(color('Scanning for any broadcast', 'cyan'))
-            broadcast = await find_broadcast_by_name(device, broadcast_name)
+        # Remove the source
+        print(color('Removing source:', 'blue'), source_id)
+        await bass_client.remove_source(source_id)
+        await peer.sustain()
+        return
 
-            if broadcast.broadcast_audio_announcement is None:
-                print(color('No broadcast audio announcement found', 'red'))
-                return
-
-            if (
-                broadcast.basic_audio_announcement is None
-                or not broadcast.basic_audio_announcement.subgroups
-            ):
-                print(color('No subgroups found', 'red'))
-                return
-
-            # Add the source
-            print(color('Adding source:', 'blue'), broadcast.sync.advertiser_address)
-            await bass_client.add_source(
-                broadcast.sync.advertiser_address,
-                broadcast.sync.sid,
-                broadcast.broadcast_audio_announcement.broadcast_id,
-                bass.PeriodicAdvertisingSyncParams.SYNCHRONIZE_TO_PA_PAST_AVAILABLE,
-                0xFFFF,
-                [
-                    bass.SubgroupInfo(
-                        bass.SubgroupInfo.ANY_BIS,
-                        bytes(broadcast.basic_audio_announcement.subgroups[0].metadata),
-                    )
-                ],
-            )
-
-            # Initiate a PA Sync Transfer
-            await broadcast.sync.transfer(peer.connection)
-
-            # Notify the sink that we're done scanning.
-            await bass_client.remote_scan_stopped()
-
-            await peer.sustain()
-            return
-
-        if command == 'modify-source':
-            if source_id is None:
-                print(color('!!! modify-source requires --source-id'))
-                return
-
-            # Find the requested broadcast
-            await bass_client.remote_scan_started()
-            if broadcast_name:
-                print(color('Scanning for broadcast:', 'cyan'), broadcast_name)
-            else:
-                print(color('Scanning for any broadcast', 'cyan'))
-            broadcast = await find_broadcast_by_name(device, broadcast_name)
-
-            if broadcast.broadcast_audio_announcement is None:
-                print(color('No broadcast audio announcement found', 'red'))
-                return
-
-            if (
-                broadcast.basic_audio_announcement is None
-                or not broadcast.basic_audio_announcement.subgroups
-            ):
-                print(color('No subgroups found', 'red'))
-                return
-
-            # Modify the source
-            print(
-                color('Modifying source:', 'blue'),
-                source_id,
-            )
-            await bass_client.modify_source(
-                source_id,
-                bass.PeriodicAdvertisingSyncParams.SYNCHRONIZE_TO_PA_PAST_NOT_AVAILABLE,
-                0xFFFF,
-                [
-                    bass.SubgroupInfo(
-                        bass.SubgroupInfo.ANY_BIS,
-                        bytes(broadcast.basic_audio_announcement.subgroups[0].metadata),
-                    )
-                ],
-            )
-            await peer.sustain()
-            return
-
-        if command == 'remove-source':
-            if source_id is None:
-                print(color('!!! remove-source requires --source-id'))
-                return
-
-            # Remove the source
-            print(color('Removing source:', 'blue'), source_id)
-            await bass_client.remove_source(source_id)
-            await peer.sustain()
-            return
-
-        print(color(f'!!! invalid command {command}'))
+    print(color(f'!!! invalid command {command}'))
 
 
-async def run_pair(transport: str, address: str) -> None:
-    async with create_device(transport) as device:
-        # Connect to the server
-        print(f'=== Connecting to {address}...')
-        async with device.connect_as_gatt(address) as peer:
-            print(f'=== Connected to {peer}')
+async def run_pair(device: bumble.device.Device, address: str) -> None:
+    # Connect to the server
+    print(f'=== Connecting to {address}...')
+    async with device.connect_as_gatt(address) as peer:
+        print(f'=== Connected to {peer}')
 
-            print("+++ Initiating pairing...")
-            await peer.connection.pair()
-            print("+++ Paired")
+        print("+++ Initiating pairing...")
+        await peer.connection.pair()
+        print("+++ Paired")
 
 
 async def run_receive(
-    transport: str,
+    device: bumble.device.Device,
     broadcast_id: int | None,
     output: str,
     broadcast_code: str | None,
@@ -673,300 +781,425 @@ async def run_receive(
         print(error)
         return
 
-    async with create_device(transport) as device:
-        if not device.supports_le_periodic_advertising:
-            print(color('Periodic advertising not supported', 'red'))
+    if not device.supports_le_periodic_advertising:
+        print(color('Periodic advertising not supported', 'red'))
+        return
+
+    scanner = BroadcastScanner(device, False, sync_timeout)
+    scan_result: asyncio.Future[BroadcastScanner.Broadcast] = (
+        asyncio.get_running_loop().create_future()
+    )
+
+    def on_new_broadcast(broadcast: BroadcastScanner.Broadcast) -> None:
+        if scan_result.done():
             return
+        if broadcast_id is None or broadcast.broadcast_id == broadcast_id:
+            scan_result.set_result(broadcast)
 
-        scanner = BroadcastScanner(device, False, sync_timeout)
-        scan_result: asyncio.Future[BroadcastScanner.Broadcast] = (
-            asyncio.get_running_loop().create_future()
-        )
+    scanner.on('new_broadcast', on_new_broadcast)
+    await scanner.start()
+    print('Start scanning...')
+    broadcast = await scan_result
+    print('Advertisement found:')
+    broadcast.print()
+    basic_audio_announcement_scanned = asyncio.Event()
 
-        def on_new_broadcast(broadcast: BroadcastScanner.Broadcast) -> None:
-            if scan_result.done():
-                return
-            if broadcast_id is None or broadcast.broadcast_id == broadcast_id:
-                scan_result.set_result(broadcast)
+    def on_change() -> None:
+        if (
+            broadcast.basic_audio_announcement and broadcast.biginfo
+        ) and not basic_audio_announcement_scanned.is_set():
+            basic_audio_announcement_scanned.set()
 
-        scanner.on('new_broadcast', on_new_broadcast)
-        await scanner.start()
-        print('Start scanning...')
-        broadcast = await scan_result
-        print('Advertisement found:')
-        broadcast.print()
-        basic_audio_announcement_scanned = asyncio.Event()
+    broadcast.on('change', on_change)
+    if not broadcast.basic_audio_announcement or not broadcast.biginfo:
+        print('Wait for Basic Audio Announcement and BIG Info...')
+        await basic_audio_announcement_scanned.wait()
+    print('Basic Audio Announcement found')
+    broadcast.print()
+    print('Stop scanning')
+    await scanner.stop()
+    print('Start sync to BIG')
 
-        def on_change() -> None:
-            if (
-                broadcast.basic_audio_announcement and broadcast.biginfo
-            ) and not basic_audio_announcement_scanned.is_set():
-                basic_audio_announcement_scanned.set()
+    assert broadcast.basic_audio_announcement
+    subgroup = broadcast.basic_audio_announcement.subgroups[subgroup_index]
+    configuration = subgroup.codec_specific_configuration
+    assert configuration
+    assert (sampling_frequency := configuration.sampling_frequency)
+    assert (frame_duration := configuration.frame_duration)
 
-        broadcast.on('change', on_change)
-        if not broadcast.basic_audio_announcement or not broadcast.biginfo:
-            print('Wait for Basic Audio Announcement and BIG Info...')
-            await basic_audio_announcement_scanned.wait()
-        print('Basic Audio Announcement found')
-        broadcast.print()
-        print('Stop scanning')
-        await scanner.stop()
-        print('Start sync to BIG')
-
-        assert broadcast.basic_audio_announcement
-        subgroup = broadcast.basic_audio_announcement.subgroups[subgroup_index]
-        configuration = subgroup.codec_specific_configuration
-        assert configuration
-        assert (sampling_frequency := configuration.sampling_frequency)
-        assert (frame_duration := configuration.frame_duration)
-
-        big_sync = await device.create_big_sync(
-            broadcast.sync,
-            bumble.device.BigSyncParameters(
-                big_sync_timeout=0x4000,
-                bis=[bis.index for bis in subgroup.bis],
-                broadcast_code=(
-                    broadcast_code_bytes(broadcast_code) if broadcast_code else None
-                ),
+    big_sync = await device.create_big_sync(
+        broadcast.sync,
+        bumble.device.BigSyncParameters(
+            big_sync_timeout=0x4000,
+            bis=[bis.index for bis in subgroup.bis],
+            broadcast_code=(
+                broadcast_code_bytes(broadcast_code) if broadcast_code else None
             ),
-        )
-        num_bis = len(big_sync.bis_links)
-        decoder = lc3.Decoder(
-            frame_duration_us=frame_duration.us,
-            sample_rate_hz=sampling_frequency.hz,
-            num_channels=num_bis,
-        )
-        lc3_queues: list[collections.deque[bytes]] = [
-            collections.deque() for i in range(num_bis)
-        ]
-        packet_stats = [0, 0]
+        ),
+    )
+    num_bis = len(big_sync.bis_links)
+    decoder = lc3.Decoder(
+        frame_duration_us=frame_duration.us,
+        sample_rate_hz=sampling_frequency.hz,
+        num_channels=num_bis,
+    )
+    lc3_queues: list[collections.deque[bytes]] = [
+        collections.deque() for i in range(num_bis)
+    ]
+    packet_stats = [0, 0]
 
-        async with contextlib.AsyncExitStack() as stack:
-            audio_output = await audio_io.create_audio_output(output)
-            stack.push_async_callback(audio_output.aclose)
-            await audio_output.open(
-                audio_io.PcmFormat(
-                    audio_io.PcmFormat.Endianness.LITTLE,
-                    audio_io.PcmFormat.SampleType.FLOAT32,
-                    sampling_frequency.hz,
-                    num_bis,
+    audio_output = await audio_io.create_audio_output(output)
+    # This try should be replaced with contextlib.aclosing() when python 3.9 is no
+    # longer needed.
+    try:
+        await audio_output.open(
+            audio_io.PcmFormat(
+                audio_io.PcmFormat.Endianness.LITTLE,
+                audio_io.PcmFormat.SampleType.FLOAT32,
+                sampling_frequency.hz,
+                num_bis,
+            )
+        )
+
+        def sink(queue: collections.deque[bytes], packet: hci.HCI_IsoDataPacket):
+            # TODO: re-assemble fragments and detect errors
+            queue.append(packet.iso_sdu_fragment)
+
+            while all(lc3_queues):
+                # This assumes SDUs contain one LC3 frame each, which may not
+                # be correct for all cases. TODO: revisit this assumption.
+                frame = b''.join([lc3_queue.popleft() for lc3_queue in lc3_queues])
+                if not frame:
+                    print(color('!!! received empty frame', 'red'))
+                    continue
+
+                packet_stats[0] += len(frame)
+                packet_stats[1] += 1
+                print(
+                    f'\rRECEIVED: {packet_stats[0]} bytes in '
+                    f'{packet_stats[1]} packets',
+                    end='',
                 )
+
+                try:
+                    pcm = decoder.decode(frame).tobytes()
+                except lc3.BaseError as error:
+                    print(color(f'!!! LC3 decoding error: {error}'))
+                    continue
+
+                audio_output.write(pcm)
+
+        for i, bis_link in enumerate(big_sync.bis_links):
+            print(f'Setup ISO for BIS {bis_link.handle}')
+            bis_link.sink = functools.partial(sink, lc3_queues[i])
+            await bis_link.setup_data_path(
+                direction=bis_link.Direction.CONTROLLER_TO_HOST
             )
 
-            def sink(queue: collections.deque[bytes], packet: hci.HCI_IsoDataPacket):
-                # TODO: re-assemble fragments and detect errors
-                queue.append(packet.iso_sdu_fragment)
-
-                while all(lc3_queues):
-                    # This assumes SDUs contain one LC3 frame each, which may not
-                    # be correct for all cases. TODO: revisit this assumption.
-                    frame = b''.join([lc3_queue.popleft() for lc3_queue in lc3_queues])
-                    if not frame:
-                        print(color('!!! received empty frame', 'red'))
-                        continue
-
-                    packet_stats[0] += len(frame)
-                    packet_stats[1] += 1
-                    print(
-                        f'\rRECEIVED: {packet_stats[0]} bytes in '
-                        f'{packet_stats[1]} packets',
-                        end='',
-                    )
-
-                    try:
-                        pcm = decoder.decode(frame).tobytes()
-                    except lc3.BaseError as error:
-                        print(color(f'!!! LC3 decoding error: {error}'))
-                        continue
-
-                    audio_output.write(pcm)
-
-            for i, bis_link in enumerate(big_sync.bis_links):
-                print(f'Setup ISO for BIS {bis_link.handle}')
-                bis_link.sink = functools.partial(sink, lc3_queues[i])
-                await bis_link.setup_data_path(
-                    direction=bis_link.Direction.CONTROLLER_TO_HOST
-                )
-
-            terminated = asyncio.Event()
-            big_sync.on(big_sync.Event.TERMINATION, lambda _: terminated.set())
-            await terminated.wait()
+        terminated = asyncio.Event()
+        big_sync.on(big_sync.Event.TERMINATION, lambda _: terminated.set())
+        await terminated.wait()
+    finally:
+        await audio_output.aclose()
 
 
 async def run_transmit(
-    transport: str,
-    broadcast_id: int,
-    broadcast_code: str | None,
-    broadcast_name: str,
-    bitrate: int,
-    manufacturer_data: tuple[int, bytes] | None,
-    input: str,
-    input_format: str,
+    device: bumble.device.Device, broadcasts: Iterable[Broadcast]
 ) -> None:
-    # Run a pre-flight check for the input.
+    # Run a pre-flight check for the input(s).
     try:
-        if not audio_io.check_audio_input(input):
-            return
+        for broadcast in broadcasts:
+            for source in broadcast.sources:
+                if not audio_io.check_audio_input(source.input):
+                    return
     except ValueError as error:
         print(error)
         return
 
-    async with create_device(transport) as device:
-        if not device.supports_le_periodic_advertising:
-            print(color('Periodic advertising not supported', 'red'))
-            return
+    if not device.supports_le_periodic_advertising:
+        print(color('Periodic advertising not supported', 'red'))
+        return
 
-        basic_audio_announcement = bap.BasicAudioAnnouncement(
-            presentation_delay=40000,
-            subgroups=[
-                bap.BasicAudioAnnouncement.Subgroup(
-                    codec_id=hci.CodingFormat(codec_id=hci.CodecID.LC3),
-                    codec_specific_configuration=bap.CodecSpecificConfiguration(
-                        sampling_frequency=bap.SamplingFrequency.FREQ_48000,
-                        frame_duration=bap.FrameDuration.DURATION_10000_US,
-                        octets_per_codec_frame=100,
-                    ),
-                    metadata=le_audio.Metadata(
-                        [
-                            le_audio.Metadata.Entry(
-                                tag=le_audio.Metadata.Tag.LANGUAGE, data=b'eng'
-                            ),
-                            le_audio.Metadata.Entry(
-                                tag=le_audio.Metadata.Tag.PROGRAM_INFO, data=b'Disco'
-                            ),
-                        ]
-                    ),
-                    bis=[
-                        bap.BasicAudioAnnouncement.BIS(
-                            index=1,
-                            codec_specific_configuration=bap.CodecSpecificConfiguration(
-                                audio_channel_allocation=bap.AudioLocation.FRONT_LEFT
-                            ),
-                        ),
-                        bap.BasicAudioAnnouncement.BIS(
-                            index=2,
-                            codec_specific_configuration=bap.CodecSpecificConfiguration(
-                                audio_channel_allocation=bap.AudioLocation.FRONT_RIGHT
-                            ),
-                        ),
-                    ],
+    def on_flow():
+        pending = []
+        queued = []
+        completed = []
+        for broadcast in broadcasts:
+            for iso_queue in broadcast.iso_queues:
+                data_packet_queue = iso_queue.data_packet_queue
+                pending.append(str(data_packet_queue.pending))
+                queued.append(str(data_packet_queue.queued))
+                completed.append(str(data_packet_queue.completed))
+        print(
+            f'\rPACKETS: '
+            f'pending={",".join(pending)} | '
+            f'queued={",".join(queued)} | '
+            f'completed={",".join(completed)}',
+            end='',
+        )
+
+    audio_inputs: list[audio_io.AudioInput] = []
+    try:
+        # Setup audio sources
+        for broadcast_index, broadcast in enumerate(broadcasts):
+            channel_count = 0
+            max_lc3_frame_size = 0
+            max_sample_rate = 0
+            for source in broadcast.sources:
+                print(f'Setting up audio input: {source.input}')
+
+                # Open the audio input
+                audio_input = await audio_io.create_audio_input(
+                    source.input, source.input_format
                 )
-            ],
-        )
-        broadcast_audio_announcement = bap.BroadcastAudioAnnouncement(broadcast_id)
+                pcm_format = await audio_input.open()
+                audio_inputs.append(audio_input)
 
-        advertising_data_types: list[core.DataType] = [
-            data_types.BroadcastName(broadcast_name)
-        ]
-        if manufacturer_data is not None:
-            advertising_data_types.append(
-                data_types.ManufacturerSpecificData(*manufacturer_data)
-            )
+                # Check that the number of channels is supported
+                if pcm_format.channels not in (1, 2):
+                    print("Only 1 and 2 channels PCM configurations are supported")
+                    return
+                channel_count += pcm_format.channels
 
-        advertising_set = await device.create_advertising_set(
-            advertising_parameters=bumble.device.AdvertisingParameters(
-                advertising_event_properties=bumble.device.AdvertisingEventProperties(
-                    is_connectable=False
-                ),
-                primary_advertising_interval_min=100,
-                primary_advertising_interval_max=200,
-            ),
-            advertising_data=(
-                broadcast_audio_announcement.get_advertising_data()
-                + bytes(core.AdvertisingData(advertising_data_types))
-            ),
-            periodic_advertising_parameters=bumble.device.PeriodicAdvertisingParameters(
-                periodic_advertising_interval_min=80,
-                periodic_advertising_interval_max=160,
-            ),
-            periodic_advertising_data=basic_audio_announcement.get_advertising_data(),
-            auto_restart=True,
-            auto_start=True,
-        )
+                # Check that the sample type is supported
+                if pcm_format.sample_type == audio_io.PcmFormat.SampleType.INT16:
+                    pcm_bit_depth = 16
+                elif pcm_format.sample_type == audio_io.PcmFormat.SampleType.FLOAT32:
+                    pcm_bit_depth = None
+                else:
+                    print("Only INT16 and FLOAT32 sample types are supported")
+                    return
 
-        print('Start Periodic Advertising')
-        await advertising_set.start_periodic()
+                # Check that the sample rate is supported
+                if pcm_format.sample_rate not in (16000, 24000, 48000):
+                    print(f'Sample rate {pcm_format.sample_rate} not supported')
+                    return
+                max_sample_rate = max(max_sample_rate, pcm_format.sample_rate)
 
-        async with contextlib.AsyncExitStack() as stack:
-            audio_input = await audio_io.create_audio_input(input, input_format)
-            pcm_format = await audio_input.open()
-            stack.push_async_callback(audio_input.aclose)
-            if pcm_format.channels != 2:
-                print("Only 2 channels PCM configurations are supported")
-                return
-            if pcm_format.sample_type == audio_io.PcmFormat.SampleType.INT16:
-                pcm_bit_depth = 16
-            elif pcm_format.sample_type == audio_io.PcmFormat.SampleType.FLOAT32:
-                pcm_bit_depth = None
+                # Compute LC3 parameters and create and encoder
+                encoder = lc3.Encoder(
+                    frame_duration_us=AURACAST_DEFAULT_FRAME_DURATION,
+                    sample_rate_hz=pcm_format.sample_rate,
+                    num_channels=pcm_format.channels,
+                    input_sample_rate_hz=pcm_format.sample_rate,
+                )
+                lc3_frame_samples = encoder.get_frame_samples()
+                lc3_frame_size = encoder.get_frame_bytes(source.bitrate)
+                max_lc3_frame_size = max(max_lc3_frame_size, lc3_frame_size)
+                print(
+                    f'Encoding {source.input} with {lc3_frame_samples} '
+                    f'PCM samples per {lc3_frame_size} byte frame'
+                )
+
+                broadcast.audio_sources.append(
+                    AudioSource(
+                        audio_input=audio_input,
+                        pcm_format=pcm_format,
+                        pcm_bit_depth=pcm_bit_depth,
+                        lc3_encoder=encoder,
+                        lc3_frame_samples=lc3_frame_samples,
+                        lc3_frame_size=lc3_frame_size,
+                        audio_frames=audio_input.frames(lc3_frame_samples),
+                    )
+                )
+
+            # Setup advertising and BIGs
+            metadata = le_audio.Metadata()
+            if broadcast.language is not None:
+                metadata.entries.append(
+                    le_audio.Metadata.Entry(
+                        tag=le_audio.Metadata.Tag.LANGUAGE,
+                        data=broadcast.language.encode('utf-8'),
+                    )
+                )
+            if broadcast.program_info is not None:
+                metadata.entries.append(
+                    le_audio.Metadata.Entry(
+                        tag=le_audio.Metadata.Tag.PROGRAM_INFO,
+                        data=broadcast.program_info.encode('utf-8'),
+                    )
+                )
+
+            if broadcast.public:
+                # Infer features from sources
+                features = pbp.PublicBroadcastAnnouncement.Features(0)
+                if broadcast.broadcast_code is not None:
+                    features |= pbp.PublicBroadcastAnnouncement.Features.ENCRYPTED
+                for audio_source in broadcast.audio_sources:
+                    if audio_source.pcm_format.sample_rate == 48000:
+                        features |= (
+                            pbp.PublicBroadcastAnnouncement.Features.HIGH_QUALITY_CONFIGURATION
+                        )
+                    else:
+                        features |= (
+                            pbp.PublicBroadcastAnnouncement.Features.STANDARD_QUALITY_CONFIGURATION
+                        )
+
+                public_broadcast_announcement = pbp.PublicBroadcastAnnouncement(
+                    features=features, metadata=metadata
+                )
             else:
-                print("Only INT16 and FLOAT32 sample types are supported")
-                return
+                public_broadcast_announcement = None
 
-            encoder = lc3.Encoder(
-                frame_duration_us=AURACAST_DEFAULT_FRAME_DURATION,
-                sample_rate_hz=AURACAST_DEFAULT_SAMPLE_RATE,
-                num_channels=pcm_format.channels,
-                input_sample_rate_hz=pcm_format.sample_rate,
+            broadcast_audio_announcement = bap.BroadcastAudioAnnouncement(
+                broadcast.broadcast_id
             )
-            lc3_frame_samples = encoder.get_frame_samples()
-            lc3_frame_size = encoder.get_frame_bytes(bitrate)
+
+            basic_audio_announcement = bap.BasicAudioAnnouncement(
+                presentation_delay=40000,
+                subgroups=[
+                    bap.BasicAudioAnnouncement.Subgroup(
+                        codec_id=hci.CodingFormat(codec_id=hci.CodecID.LC3),
+                        codec_specific_configuration=bap.CodecSpecificConfiguration(
+                            sampling_frequency=bap.SamplingFrequency.from_hz(
+                                audio_source.pcm_format.sample_rate
+                            ),
+                            frame_duration=bap.FrameDuration.DURATION_10000_US,
+                            octets_per_codec_frame=audio_source.lc3_frame_size,
+                        ),
+                        metadata=le_audio.Metadata(),
+                        bis=(
+                            [
+                                bap.BasicAudioAnnouncement.BIS(
+                                    index=1,
+                                    codec_specific_configuration=bap.CodecSpecificConfiguration(
+                                        audio_channel_allocation=bap.AudioLocation.FRONT_LEFT
+                                    ),
+                                ),
+                                bap.BasicAudioAnnouncement.BIS(
+                                    index=2,
+                                    codec_specific_configuration=bap.CodecSpecificConfiguration(
+                                        audio_channel_allocation=bap.AudioLocation.FRONT_RIGHT
+                                    ),
+                                ),
+                            ]
+                            if audio_source.pcm_format.channels == 2
+                            else [
+                                bap.BasicAudioAnnouncement.BIS(
+                                    index=1,
+                                    codec_specific_configuration=bap.CodecSpecificConfiguration(
+                                        audio_channel_allocation=bap.AudioLocation.FRONT_LEFT
+                                    ),
+                                ),
+                            ]
+                        ),
+                    )
+                    for audio_source in broadcast.audio_sources
+                ],
+            )
+
+            advertising_data_types: list[core.DataType] = [
+                data_types.CompleteLocalName(AURACAST_DEFAULT_DEVICE_NAME),
+                data_types.Appearance(
+                    core.Appearance.Category.AUDIO_SOURCE,
+                    core.Appearance.AudioSourceSubcategory.BROADCASTING_DEVICE,
+                ),
+                data_types.BroadcastName(broadcast.broadcast_name),
+            ]
+
+            if broadcast.manufacturer_data is not None:
+                advertising_data_types.append(
+                    data_types.ManufacturerSpecificData(*broadcast.manufacturer_data)
+                )
+
+            advertising_data = bytes(core.AdvertisingData(advertising_data_types))
+            if public_broadcast_announcement:
+                advertising_data += bytes(
+                    public_broadcast_announcement.get_advertising_data()
+                )
+            if broadcast_audio_announcement:
+                advertising_data += broadcast_audio_announcement.get_advertising_data()
+
+            print('Starting Periodic Advertising:')
+            print(f"  Extended Advertising data size: {len(advertising_data)}")
             print(
-                f'Encoding with {lc3_frame_samples} '
-                f'PCM samples per {lc3_frame_size} byte frame'
+                f"  Periodic Advertising data size: {len(basic_audio_announcement.get_advertising_data())}"
             )
+            advertising_set = await device.create_advertising_set(
+                advertising_parameters=bumble.device.AdvertisingParameters(
+                    advertising_event_properties=bumble.device.AdvertisingEventProperties(
+                        is_connectable=False
+                    ),
+                    primary_advertising_interval_min=100,
+                    primary_advertising_interval_max=1000,
+                    advertising_sid=broadcast_index,
+                ),
+                advertising_data=advertising_data,
+                periodic_advertising_parameters=bumble.device.PeriodicAdvertisingParameters(
+                    periodic_advertising_interval_min=100,
+                    periodic_advertising_interval_max=1000,
+                ),
+                periodic_advertising_data=basic_audio_announcement.get_advertising_data(),
+                auto_restart=True,
+                auto_start=True,
+            )
+            await advertising_set.start_periodic()
 
-            print('Setup BIG')
+            print('Setting up BIG')
             big = await device.create_big(
                 advertising_set,
                 parameters=bumble.device.BigParameters(
-                    num_bis=pcm_format.channels,
+                    num_bis=channel_count,
                     sdu_interval=AURACAST_DEFAULT_FRAME_DURATION,
-                    max_sdu=lc3_frame_size,
+                    max_sdu=max_lc3_frame_size,
                     max_transport_latency=65,
                     rtn=4,
                     broadcast_code=(
-                        broadcast_code_bytes(broadcast_code) if broadcast_code else None
+                        broadcast_code_bytes(broadcast.broadcast_code)
+                        if broadcast.broadcast_code
+                        else None
                     ),
                 ),
             )
-            for bis_link in big.bis_links:
+
+            for i, bis_link in enumerate(big.bis_links):
                 print(f'Setup ISO for BIS {bis_link.handle}')
                 await bis_link.setup_data_path(
                     direction=bis_link.Direction.HOST_TO_CONTROLLER
                 )
+                iso_queue = bumble.device.IsoPacketStream(bis_link, 64)
+                iso_queue.data_packet_queue.on('flow', on_flow)
+                broadcast.iso_queues.append(iso_queue)
 
-            iso_queues = [
-                bumble.device.IsoPacketStream(bis_link, 64)
-                for bis_link in big.bis_links
-            ]
+        print('Transmitting audio from source(s)')
+        while True:
+            for broadcast in broadcasts:
+                iso_queue_index = 0
+                for audio_source in broadcast.audio_sources:
+                    pcm_frame = await anext(audio_source.audio_frames)
+                    lc3_frame = audio_source.lc3_encoder.encode(
+                        pcm_frame,
+                        num_bytes=audio_source.pcm_format.channels
+                        * audio_source.lc3_frame_size,
+                        bit_depth=audio_source.pcm_bit_depth,
+                    )
 
-            def on_flow():
-                data_packet_queue = iso_queues[0].data_packet_queue
-                print(
-                    f'\rPACKETS: pending={data_packet_queue.pending}, '
-                    f'queued={data_packet_queue.queued}, '
-                    f'completed={data_packet_queue.completed}',
-                    end='',
-                )
-
-            iso_queues[0].data_packet_queue.on('flow', on_flow)
-
-            frame_count = 0
-            async for pcm_frame in audio_input.frames(lc3_frame_samples):
-                lc3_frame = encoder.encode(
-                    pcm_frame, num_bytes=2 * lc3_frame_size, bit_depth=pcm_bit_depth
-                )
-
-                mid = len(lc3_frame) // 2
-                await iso_queues[0].write(lc3_frame[:mid])
-                await iso_queues[1].write(lc3_frame[mid:])
-
-                frame_count += 1
+                    for lc3_chunk_start in range(
+                        0, len(lc3_frame), audio_source.lc3_frame_size
+                    ):
+                        await broadcast.iso_queues[iso_queue_index].write(
+                            lc3_frame[
+                                lc3_chunk_start : lc3_chunk_start
+                                + audio_source.lc3_frame_size
+                            ]
+                        )
+                        iso_queue_index += 1
+    finally:
+        for audio_input in audio_inputs:
+            await audio_input.aclose()
 
 
-def run_async(async_command: Coroutine) -> None:
+def run_async(
+    async_command: Callable[..., Awaitable[Any]],
+    transport: str,
+    *args,
+) -> None:
+    async def run_with_transport():
+        async with create_device(transport) as device:
+            await async_command(device, *args)
+
     try:
-        asyncio.run(async_command)
+        asyncio.run(run_with_transport())
     except core.ProtocolError as error:
         if error.error_namespace == 'att' and error.error_code in list(
             bass.ApplicationError
@@ -1004,7 +1237,7 @@ def auracast(ctx):
 @click.pass_context
 def scan(ctx, filter_duplicates, sync_timeout, transport):
     """Scan for public broadcasts"""
-    run_async(run_scan(filter_duplicates, sync_timeout, transport))
+    run_async(run_scan, transport, filter_duplicates, sync_timeout)
 
 
 @auracast.command('assist')
@@ -1031,7 +1264,7 @@ def scan(ctx, filter_duplicates, sync_timeout, transport):
 @click.pass_context
 def assist(ctx, broadcast_name, source_id, command, transport, address):
     """Scan for broadcasts on behalf of an audio server"""
-    run_async(run_assist(broadcast_name, source_id, command, transport, address))
+    run_async(run_assist, transport, broadcast_name, source_id, command, address)
 
 
 @auracast.command('pair')
@@ -1040,7 +1273,7 @@ def assist(ctx, broadcast_name, source_id, command, transport, address):
 @click.pass_context
 def pair(ctx, transport, address):
     """Pair with an audio server"""
-    run_async(run_pair(transport, address))
+    run_async(run_pair, transport, address)
 
 
 @auracast.command('receive')
@@ -1095,22 +1328,29 @@ def receive(
 ):
     """Receive a broadcast source"""
     run_async(
-        run_receive(
-            transport,
-            broadcast_id,
-            output,
-            broadcast_code,
-            sync_timeout,
-            subgroup,
-        )
+        run_receive,
+        transport,
+        broadcast_id,
+        output,
+        broadcast_code,
+        sync_timeout,
+        subgroup,
     )
 
 
 @auracast.command('transmit')
 @click.argument('transport')
 @click.option(
+    '--broadcast-list',
+    metavar='BROADCAST_LIST',
+    help=(
+        'Filename of a TOML broadcast list with specification(s) for one or more '
+        'broadcast sources. When used, single-source options, including --input, '
+        '--input-format and others, are ignored.'
+    ),
+)
+@click.option(
     '--input',
-    required=True,
     help=(
         "Audio input. "
         "'device' -> use the host's default sound input device, "
@@ -1139,18 +1379,18 @@ def receive(
     '--broadcast-id',
     metavar='BROADCAST_ID',
     type=int,
-    default=123456,
+    default=AURACAST_DEFAULT_BROADCAST_ID,
     help='Broadcast ID',
 )
 @click.option(
     '--broadcast-code',
     metavar='BROADCAST_CODE',
-    help='Broadcast encryption code in hex format',
+    help='Broadcast encryption code in hex format or as a string',
 )
 @click.option(
     '--broadcast-name',
     metavar='BROADCAST_NAME',
-    default='Bumble Auracast',
+    default=AURACAST_DEFAULT_BROADCAST_NAME,
     help='Broadcast name',
 )
 @click.option(
@@ -1168,39 +1408,73 @@ def receive(
 def transmit(
     ctx,
     transport,
-    broadcast_id,
-    broadcast_code,
-    manufacturer_data,
-    broadcast_name,
-    bitrate,
+    broadcast_list,
     input,
     input_format,
+    broadcast_id,
+    broadcast_code,
+    broadcast_name,
+    bitrate,
+    manufacturer_data,
 ):
     """Transmit a broadcast source"""
-    if manufacturer_data:
-        vendor_id_str, data_hex = manufacturer_data.split(':')
-        vendor_id = int(vendor_id_str)
-        data = bytes.fromhex(data_hex)
-        manufacturer_data_tuple = (vendor_id, data)
+    if broadcast_list:
+        broadcasts = parse_broadcast_list(broadcast_list)
+        if not broadcasts:
+            print(color('!!! Broadcast list is empty or invalid', 'red'))
+            return
+        for broadcast in broadcasts:
+            if not broadcast.sources:
+                print(
+                    color(
+                        f'!!! Broadcast "{broadcast.broadcast_name}" has no sources',
+                        'red',
+                    )
+                )
+                return
     else:
-        manufacturer_data_tuple = None
+        if input is None and broadcast_list is None:
+            print(
+                color('!!! --input is required if --broadcast-list is not used', 'red')
+            )
+            return
 
-    if (input == 'device' or input.startswith('device:')) and input_format == 'auto':
-        # Use a default format for device inputs
-        input_format = 'int16le,48000,1'
+        if (
+            input == 'device' or input.startswith('device:')
+        ) and input_format == 'auto':
+            # Use a default format for device inputs
+            input_format = 'int16le,48000,1'
 
-    run_async(
-        run_transmit(
-            transport=transport,
-            broadcast_id=broadcast_id,
-            broadcast_code=broadcast_code,
-            broadcast_name=broadcast_name,
-            bitrate=bitrate,
-            manufacturer_data=manufacturer_data_tuple,
-            input=input,
-            input_format=input_format,
-        )
-    )
+        if manufacturer_data:
+            vendor_id_str, data_hex = manufacturer_data.split(':')
+            vendor_id = int(vendor_id_str)
+            data = bytes.fromhex(data_hex)
+            manufacturer_data_tuple = (vendor_id, data)
+        else:
+            manufacturer_data_tuple = None
+
+        broadcasts = [
+            Broadcast(
+                sources=[
+                    BroadcastSource(
+                        input=input,
+                        input_format=input_format,
+                        bitrate=bitrate,
+                    )
+                ],
+                public=True,
+                broadcast_id=broadcast_id,
+                broadcast_name=broadcast_name,
+                broadcast_code=broadcast_code,
+                manufacturer_data=manufacturer_data_tuple,
+                language=AURACAST_DEFAULT_LANGUAGE,
+                program_info=AURACAST_DEFAULT_PROGRAM_INFO,
+            )
+        ]
+
+    assign_broadcast_ids(broadcasts)
+
+    run_async(run_transmit, transport, broadcasts)
 
 
 def main():

@@ -22,6 +22,7 @@ import enum
 
 from typing_extensions import Self
 
+from bumble import core, data_types, gatt
 from bumble.profiles import le_audio
 
 
@@ -46,3 +47,18 @@ class PublicBroadcastAnnouncement:
         return cls(
             features=features, metadata=le_audio.Metadata.from_bytes(metadata_ltv)
         )
+
+    def get_advertising_data(self) -> bytes:
+        return bytes(
+            core.AdvertisingData(
+                [
+                    data_types.ServiceData16BitUUID(
+                        gatt.GATT_PUBLIC_BROADCAST_ANNOUNCEMENT_SERVICE, bytes(self)
+                    )
+                ]
+            )
+        )
+
+    def __bytes__(self) -> bytes:
+        metadata_bytes = bytes(self.metadata)
+        return bytes([self.features, len(metadata_bytes)]) + metadata_bytes

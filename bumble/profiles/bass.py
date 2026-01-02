@@ -338,7 +338,12 @@ class BroadcastAudioScanService(gatt.TemplateService):
             b"12",  # TEST
         )
 
-        super().__init__([self.battery_level_characteristic])
+        super().__init__(
+            [
+                self.broadcast_audio_scan_control_point_characteristic,
+                self.broadcast_receive_state_characteristic,
+            ]
+        )
 
     def on_broadcast_audio_scan_control_point_write(
         self, connection: device.Connection, value: bytes
