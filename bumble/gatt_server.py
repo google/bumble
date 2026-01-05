@@ -32,9 +32,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, TypeVar
 
-from bumble import att, utils
+from bumble import att, core, l2cap, utils
 from bumble.colors import color
-from bumble.core import UUID
 from bumble.gatt import (
     GATT_CHARACTERISTIC_ATTRIBUTE_TYPE,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
@@ -44,14 +43,13 @@ from bumble.gatt import (
     GATT_SECONDARY_SERVICE_ATTRIBUTE_TYPE,
     Characteristic,
     CharacteristicDeclaration,
-    CharacteristicValue,
     Descriptor,
     IncludedServiceDeclaration,
     Service,
 )
 
 if TYPE_CHECKING:
-    from bumble.device import Connection, Device
+    from bumble.device import Device
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -66,15 +64,27 @@ GATT_SERVER_DEFAULT_MAX_MTU = 517
 
 
 # -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+
+
+def _bearer_id(bearer: att.Bearer) -> str:
+    if att.is_enhanced_bearer(bearer):
+        return f'[0x{bearer.connection.handle:04X}|CID=0x{bearer.source_cid:04X}]'
+    else:
+        return f'[0x{bearer.handle:04X}]'
+
+
+# -----------------------------------------------------------------------------
 # GATT Server
 # -----------------------------------------------------------------------------
 class Server(utils.EventEmitter):
     attributes: list[att.Attribute]
     services: list[Service]
     attributes_by_handle: dict[int, att.Attribute]
-    subscribers: dict[int, dict[int, bytes]]
-    indication_semaphores: defaultdict[int, asyncio.Semaphore]
-    pending_confirmations: defaultdict[int, asyncio.futures.Future | None]
+    subscribers: dict[att.Bearer, dict[int, bytes]]
+    indication_semaphores: defaultdict[att.Bearer, asyncio.Semaphore]
+    pending_confirmations: defaultdict[att.Bearer, asyncio.futures.Future | None]
 
     EVENT_CHARACTERISTIC_SUBSCRIPTION = "characteristic_subscription"
 
@@ -96,8 +106,29 @@ class Server(utils.EventEmitter):
     def __str__(self) -> str:
         return "\n".join(map(str, self.attributes))
 
-    def send_gatt_pdu(self, connection_handle: int, pdu: bytes) -> None:
-        self.device.send_l2cap_pdu(connection_handle, att.ATT_CID, pdu)
+    def register_eatt(
+        self, spec: l2cap.LeCreditBasedChannelSpec | None = None
+    ) -> l2cap.LeCreditBasedChannelServer:
+        def on_channel(channel: l2cap.LeCreditBasedChannel):
+            logger.debug(
+                "New EATT Bearer Conenction=0x%04X CID=0x%04X",
+                channel.connection.handle,
+                channel.source_cid,
+            )
+            channel.att_mtu = att.ATT_DEFAULT_MTU
+            channel.sink = lambda pdu: self.on_gatt_pdu(
+                channel, att.ATT_PDU.from_bytes(pdu)
+            )
+
+        return self.device.create_l2cap_server(
+            spec or l2cap.LeCreditBasedChannelSpec(psm=att.EATT_PSM), handler=on_channel
+        )
+
+    def send_gatt_pdu(self, bearer: att.Bearer, pdu: bytes) -> None:
+        if att.is_enhanced_bearer(bearer):
+            bearer.write(pdu)
+        else:
+            self.device.send_l2cap_pdu(bearer.handle, att.ATT_CID, pdu)
 
     def next_handle(self) -> int:
         return 1 + len(self.attributes)
@@ -138,7 +169,7 @@ class Server(utils.EventEmitter):
             None,
         )
 
-    def get_service_attribute(self, service_uuid: UUID) -> Service | None:
+    def get_service_attribute(self, service_uuid: core.UUID) -> Service | None:
         return next(
             (
                 attribute
@@ -151,7 +182,7 @@ class Server(utils.EventEmitter):
         )
 
     def get_characteristic_attributes(
-        self, service_uuid: UUID, characteristic_uuid: UUID
+        self, service_uuid: core.UUID, characteristic_uuid: core.UUID
     ) -> tuple[CharacteristicDeclaration, Characteristic] | None:
         service_handle = self.get_service_attribute(service_uuid)
         if not service_handle:
@@ -176,7 +207,10 @@ class Server(utils.EventEmitter):
         )
 
     def get_descriptor_attribute(
-        self, service_uuid: UUID, characteristic_uuid: UUID, descriptor_uuid: UUID
+        self,
+        service_uuid: core.UUID,
+        characteristic_uuid: core.UUID,
+        descriptor_uuid: core.UUID,
     ) -> Descriptor | None:
         characteristics = self.get_characteristic_attributes(
             service_uuid, characteristic_uuid
@@ -257,14 +291,7 @@ class Server(utils.EventEmitter):
                     Descriptor(
                         GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
                         att.Attribute.READABLE | att.Attribute.WRITEABLE,
-                        CharacteristicValue(
-                            read=lambda connection, characteristic=characteristic: self.read_cccd(
-                                connection, characteristic
-                            ),
-                            write=lambda connection, value, characteristic=characteristic: self.write_cccd(
-                                connection, characteristic, value
-                            ),
-                        ),
+                        self.make_descriptor_value(characteristic),
                     )
                 )
 
@@ -280,10 +307,21 @@ class Server(utils.EventEmitter):
         for service in services:
             self.add_service(service)
 
-    def read_cccd(
-        self, connection: Connection, characteristic: Characteristic
-    ) -> bytes:
-        subscribers = self.subscribers.get(connection.handle)
+    def make_descriptor_value(
+        self, characteristic: Characteristic
+    ) -> att.AttributeValueV2:
+        # It is necessary to use Attribute Value V2 here to identify the bearer of CCCD.
+        return att.AttributeValueV2(
+            lambda bearer, characteristic=characteristic: self.read_cccd(
+                bearer, characteristic
+            ),
+            write=lambda bearer, value, characteristic=characteristic: self.write_cccd(
+                bearer, characteristic, value
+            ),
+        )
+
+    def read_cccd(self, bearer: att.Bearer, characteristic: Characteristic) -> bytes:
+        subscribers = self.subscribers.get(bearer)
         cccd = None
         if subscribers:
             cccd = subscribers.get(characteristic.handle)
@@ -292,12 +330,12 @@ class Server(utils.EventEmitter):
 
     def write_cccd(
         self,
-        connection: Connection,
+        bearer: att.Bearer,
         characteristic: Characteristic,
         value: bytes,
     ) -> None:
         logger.debug(
-            f'Subscription update for connection=0x{connection.handle:04X}, '
+            f'Subscription update for connection={_bearer_id(bearer)}, '
             f'handle=0x{characteristic.handle:04X}: {value.hex()}'
         )
 
@@ -306,41 +344,60 @@ class Server(utils.EventEmitter):
             logger.warning('CCCD value not 2 bytes long')
             return
 
-        cccds = self.subscribers.setdefault(connection.handle, {})
+        cccds = self.subscribers.setdefault(bearer, {})
         cccds[characteristic.handle] = value
         logger.debug(f'CCCDs: {cccds}')
         notify_enabled = value[0] & 0x01 != 0
         indicate_enabled = value[0] & 0x02 != 0
         characteristic.emit(
             characteristic.EVENT_SUBSCRIPTION,
-            connection,
+            bearer,
             notify_enabled,
             indicate_enabled,
         )
         self.emit(
             self.EVENT_CHARACTERISTIC_SUBSCRIPTION,
-            connection,
+            bearer,
             characteristic,
             notify_enabled,
             indicate_enabled,
         )
 
-    def send_response(self, connection: Connection, response: att.ATT_PDU) -> None:
-        logger.debug(
-            f'GATT Response from server: [0x{connection.handle:04X}] {response}'
-        )
-        self.send_gatt_pdu(connection.handle, bytes(response))
+    def send_response(self, bearer: att.Bearer, response: att.ATT_PDU) -> None:
+        logger.debug(f'GATT Response from server: {_bearer_id(bearer)} {response}')
+        self.send_gatt_pdu(bearer, bytes(response))
 
     async def notify_subscriber(
         self,
-        connection: Connection,
+        bearer: att.Bearer,
         attribute: att.Attribute,
         value: bytes | None = None,
         force: bool = False,
     ) -> None:
+        if att.is_enhanced_bearer(bearer) or force:
+            return await self._notify_single_subscriber(bearer, attribute, value, force)
+        else:
+            # If API is called to a Connection and not forced, try to notify all subscribed bearers on it.
+            bearers = [
+                channel
+                for channel in self.device.l2cap_channel_manager.le_coc_channels.get(
+                    bearer.handle, {}
+                ).values()
+                if channel.psm == att.EATT_PSM
+            ] + [bearer]
+            for bearer in bearers:
+                await self._notify_single_subscriber(bearer, attribute, value, force)
+
+    async def _notify_single_subscriber(
+        self,
+        bearer: att.Bearer,
+        attribute: att.Attribute,
+        value: bytes | None,
+        force: bool,
+    ) -> None:
         # Check if there's a subscriber
         if not force:
-            subscribers = self.subscribers.get(connection.handle)
+            subscribers = self.subscribers.get(bearer)
             if not subscribers:
                 logger.debug('not notifying, no subscribers')
                 return
@@ -356,34 +413,53 @@ class Server(utils.EventEmitter):
 
         # Get or encode the value
         value = (
-            await attribute.read_value(connection)
+            await attribute.read_value(bearer)
             if value is None
             else attribute.encode_value(value)
         )
 
         # Truncate if needed
-        if len(value) > connection.att_mtu - 3:
-            value = value[: connection.att_mtu - 3]
+        if len(value) > bearer.att_mtu - 3:
+            value = value[: bearer.att_mtu - 3]
 
         # Notify
         notification = att.ATT_Handle_Value_Notification(
             attribute_handle=attribute.handle, attribute_value=value
         )
-        logger.debug(
-            f'GATT Notify from server: [0x{connection.handle:04X}] {notification}'
-        )
-        self.send_gatt_pdu(connection.handle, bytes(notification))
+        logger.debug(f'GATT Notify from server: {_bearer_id(bearer)} {notification}')
+        self.send_gatt_pdu(bearer, bytes(notification))
 
     async def indicate_subscriber(
         self,
-        connection: Connection,
+        bearer: att.Bearer,
         attribute: att.Attribute,
         value: bytes | None = None,
         force: bool = False,
     ) -> None:
+        if att.is_enhanced_bearer(bearer) or force:
+            return await self._notify_single_subscriber(bearer, attribute, value, force)
+        else:
+            # If API is called to a Connection and not forced, try to indicate all subscribed bearers on it.
+            bearers = [
+                channel
+                for channel in self.device.l2cap_channel_manager.le_coc_channels.get(
+                    bearer.handle, {}
+                ).values()
+                if channel.psm == att.EATT_PSM
+            ] + [bearer]
+            for bearer in bearers:
+                await self._indicate_single_bearer(bearer, attribute, value, force)
+
+    async def _indicate_single_bearer(
+        self,
+        bearer: att.Bearer,
+        attribute: att.Attribute,
+        value: bytes | None,
+        force: bool,
+    ) -> None:
         # Check if there's a subscriber
         if not force:
-            subscribers = self.subscribers.get(connection.handle)
+            subscribers = self.subscribers.get(bearer)
             if not subscribers:
                 logger.debug('not indicating, no subscribers')
                 return
@@ -399,40 +475,38 @@ class Server(utils.EventEmitter):
 
         # Get or encode the value
         value = (
-            await attribute.read_value(connection)
+            await attribute.read_value(bearer)
             if value is None
             else attribute.encode_value(value)
         )
 
         # Truncate if needed
-        if len(value) > connection.att_mtu - 3:
-            value = value[: connection.att_mtu - 3]
+        if len(value) > bearer.att_mtu - 3:
+            value = value[: bearer.att_mtu - 3]
 
         # Indicate
         indication = att.ATT_Handle_Value_Indication(
             attribute_handle=attribute.handle, attribute_value=value
         )
-        logger.debug(
-            f'GATT Indicate from server: [0x{connection.handle:04X}] {indication}'
-        )
+        logger.debug(f'GATT Indicate from server: {_bearer_id(bearer)} {indication}')
 
         # Wait until we can send (only one pending indication at a time per connection)
-        async with self.indication_semaphores[connection.handle]:
-            assert self.pending_confirmations[connection.handle] is None
+        async with self.indication_semaphores[bearer]:
+            assert self.pending_confirmations[bearer] is None
 
             # Create a future value to hold the eventual response
-            pending_confirmation = self.pending_confirmations[connection.handle] = (
+            pending_confirmation = self.pending_confirmations[bearer] = (
                 asyncio.get_running_loop().create_future()
             )
 
             try:
-                self.send_gatt_pdu(connection.handle, bytes(indication))
+                self.send_gatt_pdu(bearer, bytes(indication))
                 await asyncio.wait_for(pending_confirmation, GATT_REQUEST_TIMEOUT)
             except asyncio.TimeoutError as error:
                 logger.warning(color('!!! GATT Indicate timeout', 'red'))
                 raise TimeoutError(f'GATT timeout for {indication.name}') from error
             finally:
-                self.pending_confirmations[connection.handle] = None
+                self.pending_confirmations[bearer] = None
 
     async def _notify_or_indicate_subscribers(
         self,
@@ -441,24 +515,24 @@ class Server(utils.EventEmitter):
         value: bytes | None = None,
         force: bool = False,
     ) -> None:
-        # Get all the connections for which there's at least one subscription
-        connections = [
-            connection
-            for connection in [
-                self.device.lookup_connection(connection_handle)
-                for (connection_handle, subscribers) in self.subscribers.items()
-                if force or subscribers.get(attribute.handle)
-            ]
-            if connection is not None
+        # Get all the bearers for which there's at least one subscription
+        bearers: list[att.Bearer] = [
+            bearer
+            for bearer, subscribers in self.subscribers.items()
+            if force or subscribers.get(attribute.handle)
         ]
 
         # Indicate or notify for each connection
-        if connections:
-            coroutine = self.indicate_subscriber if indicate else self.notify_subscriber
+        if bearers:
+            coroutine = (
+                self._indicate_single_bearer
+                if indicate
+                else self._notify_single_subscriber
+            )
             await asyncio.wait(
                 [
-                    asyncio.create_task(coroutine(connection, attribute, value, force))
-                    for connection in connections
+                    asyncio.create_task(coroutine(bearer, attribute, value, force))
+                    for bearer in bearers
                 ]
             )
 
@@ -480,21 +554,18 @@ class Server(utils.EventEmitter):
     ):
         return await self._notify_or_indicate_subscribers(True, attribute, value, force)
 
-    def on_disconnection(self, connection: Connection) -> None:
-        if connection.handle in self.subscribers:
-            del self.subscribers[connection.handle]
-        if connection.handle in self.indication_semaphores:
-            del self.indication_semaphores[connection.handle]
-        if connection.handle in self.pending_confirmations:
-            del self.pending_confirmations[connection.handle]
+    def on_disconnection(self, bearer: att.Bearer) -> None:
+        self.subscribers.pop(bearer, None)
+        self.indication_semaphores.pop(bearer, None)
+        self.pending_confirmations.pop(bearer, None)
 
-    def on_gatt_pdu(self, connection: Connection, att_pdu: att.ATT_PDU) -> None:
-        logger.debug(f'GATT Request to server: [0x{connection.handle:04X}] {att_pdu}')
+    def on_gatt_pdu(self, bearer: att.Bearer, att_pdu: att.ATT_PDU) -> None:
+        logger.debug(f'GATT Request to server: {_bearer_id(bearer)} {att_pdu}')
         handler_name = f'on_{att_pdu.name.lower()}'
         handler = getattr(self, handler_name, None)
         if handler is not None:
             try:
-                handler(connection, att_pdu)
+                handler(bearer, att_pdu)
             except att.ATT_Error as error:
                 logger.debug(f'normal exception returned by handler: {error}')
                 response = att.ATT_Error_Response(
@@ -502,7 +573,7 @@ class Server(utils.EventEmitter):
                     attribute_handle_in_error=error.att_handle,
                     error_code=error.error_code,
                 )
-                self.send_response(connection, response)
+                self.send_response(bearer, response)
             except Exception:
                 logger.exception(color("!!! Exception in handler:", "red"))
                 response = att.ATT_Error_Response(
@@ -510,18 +581,18 @@ class Server(utils.EventEmitter):
                     attribute_handle_in_error=0x0000,
                     error_code=att.ATT_UNLIKELY_ERROR_ERROR,
                 )
-                self.send_response(connection, response)
+                self.send_response(bearer, response)
                 raise
         else:
             # No specific handler registered
             if att_pdu.op_code in att.ATT_REQUESTS:
                 # Invoke the generic handler
-                self.on_att_request(connection, att_pdu)
+                self.on_att_request(bearer, att_pdu)
             else:
                 # Just ignore
                 logger.warning(
                     color(
-                        f'--- Ignoring GATT Request from [0x{connection.handle:04X}]: ',
+                        f'--- Ignoring GATT Request from {_bearer_id(bearer)}: ',
                         'red',
                     )
                     + str(att_pdu)
@@ -530,13 +601,14 @@ class Server(utils.EventEmitter):
     #######################################################
     # ATT handlers
     #######################################################
-    def on_att_request(self, connection: Connection, pdu: att.ATT_PDU) -> None:
+    def on_att_request(self, bearer: att.Bearer, pdu: att.ATT_PDU) -> None:
         '''
         Handler for requests without a more specific handler
         '''
         logger.warning(
             color(
-                f'--- Unsupported ATT Request from [0x{connection.handle:04X}]: ', 'red'
+                f'--- Unsupported ATT Request from {_bearer_id(bearer)}: ',
+                'red',
             )
             + str(pdu)
         )
@@ -545,29 +617,28 @@ class Server(utils.EventEmitter):
             attribute_handle_in_error=0x0000,
             error_code=att.ATT_REQUEST_NOT_SUPPORTED_ERROR,
         )
-        self.send_response(connection, response)
+        self.send_response(bearer, response)
 
     def on_att_exchange_mtu_request(
-        self, connection: Connection, request: att.ATT_Exchange_MTU_Request
+        self, bearer: att.Bearer, request: att.ATT_Exchange_MTU_Request
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.2.1 Exchange MTU Request
         '''
         self.send_response(
-            connection, att.ATT_Exchange_MTU_Response(server_rx_mtu=self.max_mtu)
+            bearer, att.ATT_Exchange_MTU_Response(server_rx_mtu=self.max_mtu)
         )
 
         # Compute the final MTU
         if request.client_rx_mtu >= att.ATT_DEFAULT_MTU:
             mtu = min(self.max_mtu, request.client_rx_mtu)
 
-            # Notify the device
-            self.device.on_connection_att_mtu_update(connection.handle, mtu)
+            bearer.on_att_mtu_update(mtu)
         else:
             logger.warning('invalid client_rx_mtu received, MTU not changed')
 
     def on_att_find_information_request(
-        self, connection: Connection, request: att.ATT_Find_Information_Request
+        self, bearer: att.Bearer, request: att.ATT_Find_Information_Request
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.3.1 Find Information Request
@@ -580,7 +651,7 @@ class Server(utils.EventEmitter):
             or request.starting_handle > request.ending_handle
         ):
             self.send_response(
-                connection,
+                bearer,
                 att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
                     attribute_handle_in_error=request.starting_handle,
@@ -590,7 +661,7 @@ class Server(utils.EventEmitter):
             return
 
         # Build list of returned attributes
-        pdu_space_available = connection.att_mtu - 2
+        pdu_space_available = bearer.att_mtu - 2
         attributes: list[att.Attribute] = []
         uuid_size = 0
         for attribute in (
@@ -632,18 +703,18 @@ class Server(utils.EventEmitter):
                 error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
             )
 
-        self.send_response(connection, response)
+        self.send_response(bearer, response)
 
     @utils.AsyncRunner.run_in_task()
     async def on_att_find_by_type_value_request(
-        self, connection: Connection, request: att.ATT_Find_By_Type_Value_Request
+        self, bearer: att.Bearer, request: att.ATT_Find_By_Type_Value_Request
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.3.3 Find By Type Value Request
         '''
 
         # Build list of returned attributes
-        pdu_space_available = connection.att_mtu - 2
+        pdu_space_available = bearer.att_mtu - 2
         attributes = []
         response: att.ATT_PDU
         async for attribute in (
@@ -652,7 +723,7 @@ class Server(utils.EventEmitter):
             if attribute.handle >= request.starting_handle
             and attribute.handle <= request.ending_handle
             and attribute.type == request.attribute_type
-            and (await attribute.read_value(connection)) == request.attribute_value
+            and (await attribute.read_value(bearer)) == request.attribute_value
             and pdu_space_available >= 4
         ):
             # TODO: check permissions
@@ -688,17 +759,17 @@ class Server(utils.EventEmitter):
                 error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
             )
 
-        self.send_response(connection, response)
+        self.send_response(bearer, response)
 
     @utils.AsyncRunner.run_in_task()
     async def on_att_read_by_type_request(
-        self, connection: Connection, request: att.ATT_Read_By_Type_Request
+        self, bearer: att.Bearer, request: att.ATT_Read_By_Type_Request
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.1 Read By Type Request
         '''
 
-        pdu_space_available = connection.att_mtu - 2
+        pdu_space_available = bearer.att_mtu - 2
 
         response: att.ATT_PDU = att.ATT_Error_Response(
             request_opcode_in_error=request.op_code,
@@ -716,7 +787,7 @@ class Server(utils.EventEmitter):
             and pdu_space_available
         ):
             try:
-                attribute_value = await attribute.read_value(connection)
+                attribute_value = await attribute.read_value(bearer)
             except att.ATT_Error as error:
                 # If the first attribute is unreadable, return an error
                 # Otherwise return attributes up to this point
@@ -729,7 +800,7 @@ class Server(utils.EventEmitter):
                 break
 
             # Check the attribute value size
-            max_attribute_size = min(connection.att_mtu - 4, 253)
+            max_attribute_size = min(bearer.att_mtu - 4, 253)
             if len(attribute_value) > max_attribute_size:
                 # We need to truncate
                 attribute_value = attribute_value[:max_attribute_size]
@@ -756,11 +827,11 @@ class Server(utils.EventEmitter):
         else:
             logging.debug(f"not found {request}")
 
-        self.send_response(connection, response)
+        self.send_response(bearer, response)
 
     @utils.AsyncRunner.run_in_task()
     async def on_att_read_request(
-        self, connection: Connection, request: att.ATT_Read_Request
+        self, bearer: att.Bearer, request: att.ATT_Read_Request
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.3 Read Request
@@ -769,7 +840,7 @@ class Server(utils.EventEmitter):
         response: att.ATT_PDU
         if attribute := self.get_attribute(request.attribute_handle):
             try:
-                value = await attribute.read_value(connection)
+                value = await attribute.read_value(bearer)
             except att.ATT_Error as error:
                 response = att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
@@ -777,7 +848,7 @@ class Server(utils.EventEmitter):
                     error_code=error.error_code,
                 )
             else:
-                value_size = min(connection.att_mtu - 1, len(value))
+                value_size = min(bearer.att_mtu - 1, len(value))
                 response = att.ATT_Read_Response(attribute_value=value[:value_size])
         else:
             response = att.ATT_Error_Response(
@@ -785,11 +856,11 @@ class Server(utils.EventEmitter):
                 attribute_handle_in_error=request.attribute_handle,
                 error_code=att.ATT_INVALID_HANDLE_ERROR,
             )
-        self.send_response(connection, response)
+        self.send_response(bearer, response)
 
     @utils.AsyncRunner.run_in_task()
     async def on_att_read_blob_request(
-        self, connection: Connection, request: att.ATT_Read_Blob_Request
+        self, bearer: att.Bearer, request: att.ATT_Read_Blob_Request
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.5 Read Blob Request
@@ -798,7 +869,7 @@ class Server(utils.EventEmitter):
         response: att.ATT_PDU
         if attribute := self.get_attribute(request.attribute_handle):
             try:
-                value = await attribute.read_value(connection)
+                value = await attribute.read_value(bearer)
             except att.ATT_Error as error:
                 response = att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
@@ -812,7 +883,7 @@ class Server(utils.EventEmitter):
                         attribute_handle_in_error=request.attribute_handle,
                         error_code=att.ATT_INVALID_OFFSET_ERROR,
                     )
-                elif len(value) <= connection.att_mtu - 1:
+                elif len(value) <= bearer.att_mtu - 1:
                     response = att.ATT_Error_Response(
                         request_opcode_in_error=request.op_code,
                         attribute_handle_in_error=request.attribute_handle,
@@ -820,7 +891,7 @@ class Server(utils.EventEmitter):
                     )
                 else:
                     part_size = min(
-                        connection.att_mtu - 1, len(value) - request.value_offset
+                        bearer.att_mtu - 1, len(value) - request.value_offset
                     )
                     response = att.ATT_Read_Blob_Response(
                         part_attribute_value=value[
@@ -833,11 +904,11 @@ class Server(utils.EventEmitter):
                 attribute_handle_in_error=request.attribute_handle,
                 error_code=att.ATT_INVALID_HANDLE_ERROR,
             )
-        self.send_response(connection, response)
+        self.send_response(bearer, response)
 
     @utils.AsyncRunner.run_in_task()
     async def on_att_read_by_group_type_request(
-        self, connection: Connection, request: att.ATT_Read_By_Group_Type_Request
+        self, bearer: att.Bearer, request: att.ATT_Read_By_Group_Type_Request
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.4.9 Read by Group Type Request
@@ -852,10 +923,10 @@ class Server(utils.EventEmitter):
                 attribute_handle_in_error=request.starting_handle,
                 error_code=att.ATT_UNSUPPORTED_GROUP_TYPE_ERROR,
             )
-            self.send_response(connection, response)
+            self.send_response(bearer, response)
             return
 
-        pdu_space_available = connection.att_mtu - 2
+        pdu_space_available = bearer.att_mtu - 2
         attributes: list[tuple[int, int, bytes]] = []
         for attribute in (
             attribute
@@ -867,9 +938,9 @@ class Server(utils.EventEmitter):
         ):
             # No need to catch permission errors here, since these attributes
             # must all be world-readable
-            attribute_value = await attribute.read_value(connection)
+            attribute_value = await attribute.read_value(bearer)
             # Check the attribute value size
-            max_attribute_size = min(connection.att_mtu - 6, 251)
+            max_attribute_size = min(bearer.att_mtu - 6, 251)
             if len(attribute_value) > max_attribute_size:
                 # We need to truncate
                 attribute_value = attribute_value[:max_attribute_size]
@@ -904,11 +975,11 @@ class Server(utils.EventEmitter):
                 error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
             )
 
-        self.send_response(connection, response)
+        self.send_response(bearer, response)
 
     @utils.AsyncRunner.run_in_task()
     async def on_att_write_request(
-        self, connection: Connection, request: att.ATT_Write_Request
+        self, bearer: att.Bearer, request: att.ATT_Write_Request
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.5.1 Write Request
@@ -918,7 +989,7 @@ class Server(utils.EventEmitter):
         attribute = self.get_attribute(request.attribute_handle)
         if attribute is None:
             self.send_response(
-                connection,
+                bearer,
                 att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
                     attribute_handle_in_error=request.attribute_handle,
@@ -932,7 +1003,7 @@ class Server(utils.EventEmitter):
         # Check the request parameters
         if len(request.attribute_value) > GATT_MAX_ATTRIBUTE_VALUE_SIZE:
             self.send_response(
-                connection,
+                bearer,
                 att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
                     attribute_handle_in_error=request.attribute_handle,
@@ -944,7 +1015,7 @@ class Server(utils.EventEmitter):
         response: att.ATT_PDU
         try:
             # Accept the value
-            await attribute.write_value(connection, request.attribute_value)
+            await attribute.write_value(bearer, request.attribute_value)
         except att.ATT_Error as error:
             response = att.ATT_Error_Response(
                 request_opcode_in_error=request.op_code,
@@ -954,11 +1025,11 @@ class Server(utils.EventEmitter):
         else:
             # Done
             response = att.ATT_Write_Response()
-        self.send_response(connection, response)
+        self.send_response(bearer, response)
 
     @utils.AsyncRunner.run_in_task()
     async def on_att_write_command(
-        self, connection: Connection, request: att.ATT_Write_Command
+        self, bearer: att.Bearer, request: att.ATT_Write_Command
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.5.3 Write Command
@@ -977,22 +1048,20 @@ class Server(utils.EventEmitter):
 
         # Accept the value
         try:
-            await attribute.write_value(connection, request.attribute_value)
+            await attribute.write_value(bearer, request.attribute_value)
         except Exception:
             logger.exception('!!! ignoring exception')
 
     def on_att_handle_value_confirmation(
         self,
-        connection: Connection,
+        bearer: att.Bearer,
         confirmation: att.ATT_Handle_Value_Confirmation,
     ):
         '''
         See Bluetooth spec Vol 3, Part F - 3.4.7.3 Handle Value Confirmation
         '''
         del confirmation  # Unused.
-        if (
-            pending_confirmation := self.pending_confirmations[connection.handle]
-        ) is None:
+        if (pending_confirmation := self.pending_confirmations[bearer]) is None:
             # Not expected!
             logger.warning(
                 '!!! unexpected confirmation, there is no pending indication'

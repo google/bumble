@@ -41,6 +41,7 @@ from typing import (
 from typing_extensions import Self
 
 from bumble import (
+    att,
     core,
     data_types,
     gatt,
@@ -53,7 +54,6 @@ from bumble import (
     smp,
     utils,
 )
-from bumble.att import ATT_CID, ATT_DEFAULT_MTU, ATT_PDU
 from bumble.colors import color
 from bumble.core import (
     AdvertisingData,
@@ -1743,7 +1743,6 @@ class Connection(utils.CompositeEventEmitter):
     EVENT_CONNECTION_PARAMETERS_UPDATE_FAILURE = "connection_parameters_update_failure"
     EVENT_CONNECTION_PHY_UPDATE = "connection_phy_update"
     EVENT_CONNECTION_PHY_UPDATE_FAILURE = "connection_phy_update_failure"
-    EVENT_CONNECTION_ATT_MTU_UPDATE = "connection_att_mtu_update"
     EVENT_CONNECTION_DATA_LENGTH_CHANGE = "connection_data_length_change"
     EVENT_CHANNEL_SOUNDING_CAPABILITIES_FAILURE = (
         "channel_sounding_capabilities_failure"
@@ -1846,7 +1845,7 @@ class Connection(utils.CompositeEventEmitter):
         self.encryption_key_size = 0
         self.authenticated = False
         self.sc = False
-        self.att_mtu = ATT_DEFAULT_MTU
+        self.att_mtu = att.ATT_DEFAULT_MTU
         self.data_length = DEVICE_DEFAULT_DATA_LENGTH
         self.gatt_client = gatt_client.Client(self)  # Per-connection client
         self.gatt_server = (
@@ -1996,6 +1995,15 @@ class Connection(utils.CompositeEventEmitter):
         self.peer_le_features = await self.device.get_remote_le_features(self)
         return self.peer_le_features
 
+    def on_att_mtu_update(self, mtu: int):
+        logger.debug(
+            f'*** Connection ATT MTU Update: [0x{self.handle:04X}] '
+            f'{self.peer_address} as {self.role_name}, '
+            f'{mtu}'
+        )
+        self.att_mtu = mtu
+        self.emit(self.EVENT_CONNECTION_ATT_MTU_UPDATE)
+
     @property
     def data_packet_queue(self) -> DataPacketQueue | None:
         return self.device.host.get_data_packet_queue(self.handle)
@@ -2079,6 +2087,7 @@ class DeviceConfiguration:
         l2cap.L2CAP_Information_Request.ExtendedFeatures.FCS_OPTION,
         l2cap.L2CAP_Information_Request.ExtendedFeatures.ENHANCED_RETRANSMISSION_MODE,
     )
+    eatt_enabled: bool = False
 
     def __post_init__(self) -> None:
         self.gatt_services: list[dict[str, Any]] = []
@@ -2497,7 +2506,10 @@ class Device(utils.CompositeEventEmitter):
             add_gap_service=config.gap_service_enabled,
             add_gatt_service=config.gatt_service_enabled,
         )
-        self.l2cap_channel_manager.register_fixed_channel(ATT_CID, self.on_gatt_pdu)
+        self.l2cap_channel_manager.register_fixed_channel(att.ATT_CID, self.on_gatt_pdu)
+
+        if self.config.eatt_enabled:
+            self.gatt_server.register_eatt()
 
         # Forward some events
         utils.setup_event_forwarding(
@@ -5140,7 +5152,11 @@ class Device(utils.CompositeEventEmitter):
         if add_gap_service:
             self.gatt_server.add_service(GenericAccessService(self.name))
         if add_gatt_service:
-            self.gatt_service = gatt_service.GenericAttributeProfileService()
+            self.gatt_service = gatt_service.GenericAttributeProfileService(
+                gatt.ServerSupportedFeatures.EATT_SUPPORTED
+                if self.config.eatt_enabled
+                else None
+            )
             self.gatt_server.add_service(self.gatt_service)
 
     async def notify_subscriber(
@@ -6242,17 +6258,6 @@ class Device(utils.CompositeEventEmitter):
 
     @host_event_handler
     @with_connection_from_handle
-    def on_connection_att_mtu_update(self, connection: Connection, att_mtu: int):
-        logger.debug(
-            f'*** Connection ATT MTU Update: [0x{connection.handle:04X}] '
-            f'{connection.peer_address} as {connection.role_name}, '
-            f'{att_mtu}'
-        )
-        connection.att_mtu = att_mtu
-        connection.emit(connection.EVENT_CONNECTION_ATT_MTU_UPDATE)
-
-    @host_event_handler
-    @with_connection_from_handle
     def on_connection_data_length_change(
         self,
         connection: Connection,
@@ -6437,7 +6442,7 @@ class Device(utils.CompositeEventEmitter):
     @with_connection_from_handle
     def on_gatt_pdu(self, connection: Connection, pdu: bytes):
         # Parse the L2CAP payload into an ATT PDU object
-        att_pdu = ATT_PDU.from_bytes(pdu)
+        att_pdu = att.ATT_PDU.from_bytes(pdu)
 
         # Conveniently, even-numbered op codes are client->server and
         # odd-numbered ones are server->client

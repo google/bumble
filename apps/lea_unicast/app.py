@@ -298,6 +298,7 @@ class Speaker:
                     advertising_interval_max=25,
                     address=Address('F1:F2:F3:F4:F5:F6'),
                     identity_address_type=Address.RANDOM_DEVICE_ADDRESS,
+                    eatt_enabled=True,
                 )
 
             device_config.le_enabled = True
