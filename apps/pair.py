@@ -15,6 +15,8 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -63,7 +65,7 @@ POST_PAIRING_DELAY = 1
 
 # -----------------------------------------------------------------------------
 class Waiter:
-    instance = None
+    instance: Waiter | None = None
 
     def __init__(self, linger=False):
         self.done = asyncio.get_running_loop().create_future()
@@ -327,25 +329,25 @@ async def on_pairing_failure(connection, reason):
 
 # -----------------------------------------------------------------------------
 async def pair(
-    mode,
-    sc,
-    mitm,
-    bond,
-    ctkd,
-    advertising_address,
-    identity_address,
-    linger,
-    io,
-    oob,
-    prompt,
-    request,
-    print_keys,
-    keystore_file,
-    advertise_service_uuids,
-    advertise_appearance,
-    device_config,
-    hci_transport,
-    address_or_name,
+    mode: str,
+    sc: bool,
+    mitm: bool,
+    bond: bool,
+    ctkd: bool,
+    advertising_address: str,
+    identity_address: str,
+    linger: bool,
+    io: str,
+    oob: str,
+    prompt: bool,
+    request: bool,
+    print_keys: bool,
+    keystore_file: str,
+    advertise_service_uuids: str,
+    advertise_appearance: str,
+    device_config: str,
+    hci_transport: str,
+    address_or_name: str,
 ):
     Waiter.instance = Waiter(linger=linger)
 
@@ -403,6 +405,7 @@ async def pair(
         # Create an OOB context if needed
         if oob:
             our_oob_context = OobContext()
+            legacy_context: OobLegacyContext | None
             if oob == '-':
                 shared_data = None
                 legacy_context = OobLegacyContext()
@@ -661,25 +664,25 @@ class LogHandler(logging.Handler):
 @click.argument('hci_transport')
 @click.argument('address-or-name', required=False)
 def main(
-    mode,
-    sc,
-    mitm,
-    bond,
-    ctkd,
-    advertising_address,
-    identity_address,
-    linger,
-    io,
-    oob,
-    prompt,
-    request,
-    print_keys,
-    keystore_file,
-    advertise_service_uuid,
-    advertise_appearance,
-    device_config,
-    hci_transport,
-    address_or_name,
+    mode: str,
+    sc: bool,
+    mitm: bool,
+    bond: bool,
+    ctkd: bool,
+    advertising_address: str,
+    identity_address: str,
+    linger: bool,
+    io: str,
+    oob: str,
+    prompt: bool,
+    request: bool,
+    print_keys: bool,
+    keystore_file: str,
+    advertise_service_uuid: str,
+    advertise_appearance: str,
+    device_config: str,
+    hci_transport: str,
+    address_or_name: str,
 ):
     # Setup logging
     log_handler = LogHandler()

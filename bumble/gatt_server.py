@@ -111,7 +111,7 @@ class Server(utils.EventEmitter):
     ) -> l2cap.LeCreditBasedChannelServer:
         def on_channel(channel: l2cap.LeCreditBasedChannel):
             logger.debug(
-                "New EATT Bearer Conenction=0x%04X CID=0x%04X",
+                "New EATT Bearer Connection=0x%04X CID=0x%04X",
                 channel.connection.handle,
                 channel.source_cid,
             )

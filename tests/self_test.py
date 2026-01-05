@@ -57,15 +57,13 @@ async def test_self_disconnection():
     await two_devices.setup_connection()
     await two_devices.connections[0].disconnect()
     await async_barrier()
-    assert two_devices.connections[0] is None
-    assert two_devices.connections[1] is None
+    assert not two_devices.connections
 
     two_devices = TwoDevices()
     await two_devices.setup_connection()
     await two_devices.connections[1].disconnect()
     await async_barrier()
-    assert two_devices.connections[0] is None
-    assert two_devices.connections[1] is None
+    assert not two_devices.connections
 
 
 # -----------------------------------------------------------------------------

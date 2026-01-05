@@ -292,9 +292,9 @@ async def test_legacy_advertising_disconnection(auto_restart):
     await devices[0].start_advertising(
         auto_restart=auto_restart, advertising_interval_min=1.0
     )
-    connecion = await devices[1].connect(devices[0].random_address)
+    connection = await devices[1].connect(devices[0].random_address)
 
-    await connecion.disconnect()
+    await connection.disconnect()
 
     await async_barrier()
     await async_barrier()

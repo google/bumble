@@ -171,6 +171,7 @@ class Advertisement:
     )
     sid: int = 0
     data_bytes: bytes = b''
+    data: AdvertisingData = field(init=False)
 
     # Constants
     TX_POWER_NOT_AVAILABLE: ClassVar[int] = (
@@ -480,6 +481,7 @@ class PeriodicAdvertisement:
     rssi: int = hci.HCI_LE_Periodic_Advertising_Report_Event.RSSI_NOT_AVAILABLE
     is_truncated: bool = False
     data_bytes: bytes = b''
+    data: AdvertisingData | None = field(init=False)
 
     # Constants
     TX_POWER_NOT_AVAILABLE: ClassVar[int] = (
@@ -1099,6 +1101,7 @@ class Big(utils.EventEmitter):
     max_pdu: int = 0
     iso_interval: float = 0.0  # ISO interval, in milliseconds
     bis_links: Sequence[BisLink] = ()
+    device: Device = field(init=False)
 
     def __post_init__(self) -> None:
         super().__init__()
@@ -1160,6 +1163,7 @@ class BigSync(utils.EventEmitter):
     max_pdu: int = 0
     iso_interval: float = 0.0
     bis_links: Sequence[BisLink] = ()
+    device: Device = field(init=False)
 
     def __post_init__(self) -> None:
         super().__init__()
@@ -1655,6 +1659,7 @@ class BisLink(_IsoLink):
     handle: int
     big: Big | BigSync
     sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
+    device: Device = field(init=False)
 
     def __post_init__(self) -> None:
         super().__init__()
@@ -2088,9 +2093,10 @@ class DeviceConfiguration:
         l2cap.L2CAP_Information_Request.ExtendedFeatures.ENHANCED_RETRANSMISSION_MODE,
     )
     eatt_enabled: bool = False
+    gatt_services: list[dict[str, Any]] = field(init=False)
 
     def __post_init__(self) -> None:
-        self.gatt_services: list[dict[str, Any]] = []
+        self.gatt_services = []
 
     def load_from_dict(self, config: dict[str, Any]) -> None:
         config = copy.deepcopy(config)
@@ -2270,6 +2276,7 @@ class Device(utils.CompositeEventEmitter):
     big_syncs: dict[int, BigSync]
     _pending_cis: dict[int, tuple[int, int]]
     gatt_service: gatt_service.GenericAttributeProfileService | None = None
+    keystore: KeyStore | None = None
 
     EVENT_ADVERTISEMENT = "advertisement"
     EVENT_PERIODIC_ADVERTISING_SYNC_TRANSFER = "periodic_advertising_sync_transfer"
@@ -4527,8 +4534,8 @@ class Device(utils.CompositeEventEmitter):
                     ediv = 0
                 elif keys.ltk_central is not None:
                     ltk = keys.ltk_central.value
-                    rand = keys.ltk_central.rand
-                    ediv = keys.ltk_central.ediv
+                    rand = keys.ltk_central.rand or b''
+                    ediv = keys.ltk_central.ediv or 0
                 else:
                     raise InvalidOperationError('no LTK found for peer')
 
