@@ -239,20 +239,7 @@ async def transfer_payload(
     channels[1].sink = received.put_nowait
     sdu_lengths = (21, 70, 700, 5523)
 
-    if isinstance(channels[1], l2cap.LeCreditBasedChannel):
-        mps = channels[1].mps
-    elif isinstance(
-        processor := channels[1].processor, l2cap.EnhancedRetransmissionProcessor
-    ):
-        mps = processor.mps
-    else:
-        mps = channels[1].mtu
-
-    messages = [
-        bytes([i % 8 for i in range(sdu_length)])
-        for sdu_length in sdu_lengths
-        if sdu_length <= mps
-    ]
+    messages = [bytes([i % 8 for i in range(sdu_length)]) for sdu_length in sdu_lengths]
     for message in messages:
         channels[0].write(message)
         if isinstance(channels[0], l2cap.LeCreditBasedChannel):
@@ -334,20 +321,26 @@ async def test_mtu():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_enhanced_retransmission_mode():
+@pytest.mark.parametrize("mtu,", (50, 255, 256, 1000))
+async def test_enhanced_retransmission_mode(mtu: int):
     devices = TwoDevices()
     await devices.setup_connection()
 
     server_channels = asyncio.Queue[l2cap.ClassicChannel]()
     server = devices.devices[1].create_l2cap_server(
         spec=l2cap.ClassicChannelSpec(
-            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION
+            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION,
+            mtu=mtu,
+            mps=256,
         ),
         handler=server_channels.put_nowait,
     )
     client_channel = await devices.connections[0].create_l2cap_channel(
         spec=l2cap.ClassicChannelSpec(
-            server.psm, mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION
+            server.psm,
+            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION,
+            mtu=mtu,
+            mps=1024,
         )
     )
     server_channel = await server_channels.get()
