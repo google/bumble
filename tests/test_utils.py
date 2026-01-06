@@ -31,10 +31,10 @@ from bumble.transport.common import AsyncPipeSink
 
 # -----------------------------------------------------------------------------
 class Devices:
-    connections: list[Connection | None]
+    connections: dict[int, Connection]
 
     def __init__(self, num_devices: int) -> None:
-        self.connections = [None for _ in range(num_devices)]
+        self.connections = {}
 
         self.link = LocalLink()
         addresses = [":".join([f"F{i}"] * 6) for i in range(num_devices)]
@@ -60,12 +60,14 @@ class Devices:
             asyncio.get_event_loop().create_future() for _ in range(num_devices)
         ]
 
-    def on_connection(self, which, connection):
+    def on_connection(self, which: int, connection: Connection) -> None:
         self.connections[which] = connection
-        connection.on('disconnection', lambda code: self.on_disconnection(which))
+        connection.on(
+            connection.EVENT_DISCONNECTION, lambda *_: self.on_disconnection(which)
+        )
 
-    def on_disconnection(self, which):
-        self.connections[which] = None
+    def on_disconnection(self, which: int) -> None:
+        self.connections.pop(which, None)
 
     def on_paired(self, which: int, keys: PairingKeys) -> None:
         self.paired[which].set_result(keys)
