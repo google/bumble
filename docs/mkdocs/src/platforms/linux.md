@@ -63,7 +63,7 @@ HCI sockets provide a way to send/receive HCI packets to/from a Bluetooth contro
 See the [HCI Socket Transport page](../transports/hci_socket.md) for details on the `hci-socket` tansport syntax.
 
 The HCI device referenced by an `hci-socket` transport (`hci<X>`, where `<X>` is an integer, with `hci0` being the first controller device, and so on) must be in the `DOWN` state before it can be opened as a transport.
-You can bring a HCI controller `UP` or `DOWN` with `hciconfig hci<X> up` and `hciconfig hci<X> up`.
+You can bring a HCI controller `UP` or `DOWN` with `hciconfig hci<X> up` and `hciconfig hci<X> down`.
 
 !!! tip "HCI Socket Permissions"
     By default, when running as a regular user, you won't have the permission to use
