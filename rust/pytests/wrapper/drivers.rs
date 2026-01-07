@@ -17,6 +17,6 @@ use pyo3::PyResult;
 
 #[pyo3_asyncio::tokio::test]
 async fn realtek_driver_info_all_drivers() -> PyResult<()> {
-    assert_eq!(12, DriverInfo::all_drivers()?.len());
+    assert_eq!(13, DriverInfo::all_drivers()?.len());
     Ok(())
 }
