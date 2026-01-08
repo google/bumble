@@ -51,16 +51,14 @@ class BatteryService(gatt.TemplateService):
 class BatteryServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = BatteryService
 
-    battery_level: gatt_client.CharacteristicProxy[int] | None
+    battery_level: gatt_client.CharacteristicProxy[int]
 
     def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        if characteristics := service_proxy.get_characteristics_by_uuid(
-            gatt.GATT_BATTERY_LEVEL_CHARACTERISTIC
-        ):
-            self.battery_level = gatt_adapters.PackedCharacteristicProxyAdapter(
-                characteristics[0], pack_format=BatteryService.BATTERY_LEVEL_FORMAT
-            )
-        else:
-            self.battery_level = None
+        self.battery_level = gatt_adapters.PackedCharacteristicProxyAdapter(
+            service_proxy.get_required_characteristic_by_uuid(
+                gatt.GATT_BATTERY_LEVEL_CHARACTERISTIC
+            ),
+            pack_format=BatteryService.BATTERY_LEVEL_FORMAT,
+        )
