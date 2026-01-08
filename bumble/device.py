@@ -1406,7 +1406,7 @@ class Peer:
     async def request_name(self) -> str:
         return await self.connection.request_remote_name()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
         await self.discover_services()
         for service in self.services:
             await service.discover_characteristics()

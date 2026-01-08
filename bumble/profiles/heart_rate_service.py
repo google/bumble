@@ -60,14 +60,14 @@ class HeartRateService(gatt.TemplateService):
         heart_rate: int
         sensor_contact_detected: bool | None = None
         energy_expended: int | None = None
-        rr_intervals: Sequence[int] | None = None
+        rr_intervals: Sequence[float] | None = None
 
         class Flag(enum.IntFlag):
             INT16_HEART_RATE = 1 << 0
             SENSOR_CONTACT_DETECTED = 1 << 1
             SENSOR_CONTACT_SUPPORTED = 1 << 2
             ENERGY_EXPENDED_STATUS = 1 << 3
-            RR_INTERVAL = 1 << 3
+            RR_INTERVAL = 1 << 4
 
         def __post_init__(self) -> None:
             if self.heart_rate < 0 or self.heart_rate > 0xFFFF:
@@ -106,13 +106,12 @@ class HeartRateService(gatt.TemplateService):
             else:
                 energy_expended = None
 
+            rr_intervals: Sequence[float] | None = None
             if flags & cls.Flag.RR_INTERVAL:
                 rr_intervals = tuple(
-                    struct.unpack_from('<H', data, offset + i * 2)[0] / 1024
-                    for i in range((len(data) - offset) // 2)
+                    struct.unpack_from('<H', data, i)[0] / 1024
+                    for i in range(offset, len(data), 2)
                 )
-            else:
-                rr_intervals = ()
 
             return cls(
                 heart_rate=heart_rate,
@@ -189,7 +188,9 @@ class HeartRateService(gatt.TemplateService):
 
         if reset_energy_expended:
 
-            def write_heart_rate_control_point_value(connection, value):
+            def write_heart_rate_control_point_value(
+                connection: device.Connection, value: bytes
+            ) -> None:
                 if value == self.RESET_ENERGY_EXPENDED:
                     if reset_energy_expended is not None:
                         reset_energy_expended(connection)
@@ -218,9 +219,9 @@ class HeartRateService(gatt.TemplateService):
 class HeartRateServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = HeartRateService
 
-    heart_rate_measurement: (
-        gatt_client.CharacteristicProxy[HeartRateService.HeartRateMeasurement] | None
-    )
+    heart_rate_measurement: gatt_client.CharacteristicProxy[
+        HeartRateService.HeartRateMeasurement
+    ]
     body_sensor_location: (
         gatt_client.CharacteristicProxy[HeartRateService.BodySensorLocation] | None
     )
@@ -229,25 +230,20 @@ class HeartRateServiceProxy(gatt_client.ProfileServiceProxy):
     def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
-        if characteristics := service_proxy.get_characteristics_by_uuid(
-            gatt.GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC
-        ):
-            self.heart_rate_measurement = (
-                gatt_adapters.SerializableCharacteristicProxyAdapter(
-                    characteristics[0], HeartRateService.HeartRateMeasurement
-                )
+        self.heart_rate_measurement = (
+            gatt_adapters.SerializableCharacteristicProxyAdapter(
+                service_proxy.get_required_characteristic_by_uuid(
+                    gatt.GATT_HEART_RATE_MEASUREMENT_CHARACTERISTIC
+                ),
+                HeartRateService.HeartRateMeasurement,
             )
-        else:
-            self.heart_rate_measurement = None
+        )
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
             gatt.GATT_BODY_SENSOR_LOCATION_CHARACTERISTIC
         ):
-            self.body_sensor_location = (
-                gatt_adapters.DelegatedCharacteristicProxyAdapter(
-                    characteristics[0],
-                    decode=lambda value: HeartRateService.BodySensorLocation(value[0]),
-                )
+            self.body_sensor_location = gatt_adapters.EnumCharacteristicProxyAdapter(
+                characteristics[0], cls=HeartRateService.BodySensorLocation, length=1
             )
         else:
             self.body_sensor_location = None
