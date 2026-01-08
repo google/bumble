@@ -71,8 +71,8 @@ async def main() -> None:
                 rr_intervals=random.choice(
                     (
                         (
-                            random.randint(900, 1100) / 1000,
-                            random.randint(900, 1100) / 1000,
+                            random.randint(900, 1100) // 1000,
+                            random.randint(900, 1100) // 1000,
                         ),
                         None,
                     )

@@ -16,35 +16,31 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from collections.abc import Callable
 
-from bumble.gatt import (
-    GATT_BATTERY_LEVEL_CHARACTERISTIC,
-    GATT_BATTERY_SERVICE,
-    Characteristic,
-    CharacteristicValue,
-    TemplateService,
-)
-from bumble.gatt_adapters import (
-    PackedCharacteristicAdapter,
-    PackedCharacteristicProxyAdapter,
-)
-from bumble.gatt_client import CharacteristicProxy, ProfileServiceProxy
+from bumble import device
+from bumble import gatt
+from bumble import gatt_adapters
+from bumble import gatt_client
 
 
 # -----------------------------------------------------------------------------
-class BatteryService(TemplateService):
-    UUID = GATT_BATTERY_SERVICE
+class BatteryService(gatt.TemplateService):
+    UUID = gatt.GATT_BATTERY_SERVICE
     BATTERY_LEVEL_FORMAT = 'B'
 
-    battery_level_characteristic: Characteristic[int]
+    battery_level_characteristic: gatt.Characteristic[int]
 
-    def __init__(self, read_battery_level):
-        self.battery_level_characteristic = PackedCharacteristicAdapter(
-            Characteristic(
-                GATT_BATTERY_LEVEL_CHARACTERISTIC,
-                Characteristic.Properties.READ | Characteristic.Properties.NOTIFY,
-                Characteristic.READABLE,
-                CharacteristicValue(read=read_battery_level),
+    def __init__(self, read_battery_level: Callable[[device.Connection], int]) -> None:
+        self.battery_level_characteristic = gatt_adapters.PackedCharacteristicAdapter(
+            gatt.Characteristic(
+                gatt.GATT_BATTERY_LEVEL_CHARACTERISTIC,
+                properties=(
+                    gatt.Characteristic.Properties.READ
+                    | gatt.Characteristic.Properties.NOTIFY
+                ),
+                permissions=gatt.Characteristic.READABLE,
+                value=gatt.CharacteristicValue(read=read_battery_level),
             ),
             pack_format=BatteryService.BATTERY_LEVEL_FORMAT,
         )
@@ -52,18 +48,18 @@ class BatteryService(TemplateService):
 
 
 # -----------------------------------------------------------------------------
-class BatteryServiceProxy(ProfileServiceProxy):
+class BatteryServiceProxy(gatt_client.ProfileServiceProxy):
     SERVICE_CLASS = BatteryService
 
-    battery_level: CharacteristicProxy[int] | None
+    battery_level: gatt_client.CharacteristicProxy[int] | None
 
-    def __init__(self, service_proxy):
+    def __init__(self, service_proxy: gatt_client.ServiceProxy) -> None:
         self.service_proxy = service_proxy
 
         if characteristics := service_proxy.get_characteristics_by_uuid(
-            GATT_BATTERY_LEVEL_CHARACTERISTIC
+            gatt.GATT_BATTERY_LEVEL_CHARACTERISTIC
         ):
-            self.battery_level = PackedCharacteristicProxyAdapter(
+            self.battery_level = gatt_adapters.PackedCharacteristicProxyAdapter(
                 characteristics[0], pack_format=BatteryService.BATTERY_LEVEL_FORMAT
             )
         else:
