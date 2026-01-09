@@ -866,7 +866,7 @@ class Controller:
 
     ############################################################
     # Classic link connections
-    ############################################################
+    ############################################################        
 
     def send_lmp_packet(
         self, receiver_address: hci.Address, packet: lmp.Packet
@@ -1329,6 +1329,56 @@ class Controller:
         self.send_lmp_packet(command.bd_addr, lmp.LmpNameReq(0))
 
         return None
+
+    def on_classic_link_key_request_reply_command(self, command: hci.HCI_Link_Key_Request_Reply_Command) -> Optional[bytes]:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.10 Link Key Request Reply command
+        '''
+        bd_addr = (
+            bytes(self._public_address)
+            if self._public_address is not None
+            else bytes(6)
+        )
+        return bytes([HCI_SUCCESS]) + bd_addr
+
+    def on_classic_link_key_request_negative_reply_command(self, command: hci.HCI_Link_Key_Request_Negative_Reply_Command) -> Optional[bytes]:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.11 Link Key Request Negative Reply command
+        '''
+        bd_addr = (
+            bytes(self._public_address)
+            if self._public_address is not None
+            else bytes(6)
+        )
+        return bytes([HCI_SUCCESS]) + bd_addr
+
+    def on_classic_authentication_requested_command(self, command: hci.HCI_Authentication_Requested_Command) -> Optional[bytes]:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.15 Authentication Requested command
+        '''
+        if connection := self.find_classic_connection_by_handle(
+                command.connection_handle
+        ):
+            self.send_hci_packet(
+                HCI_Command_Status_Event(
+                    status=HCI_SUCCESS,
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                )
+            )
+
+            self.send_hci_packet(
+                HCI_Link_Key_Request_Event(
+                    bd_addr=connection.peer_address
+                )
+            )
+        else:
+            logger.warning(
+                f'!!! no connection for handle 0x{command.connection_handle:04X}'
+            )
+        return None
+
+
 
     def on_hci_enhanced_setup_synchronous_connection_command(
         self, command: hci.HCI_Enhanced_Setup_Synchronous_Connection_Command
