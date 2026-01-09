@@ -166,10 +166,10 @@ def is_bluetooth_hci(device):
 # -----------------------------------------------------------------------------
 @click.command()
 @click.option('--verbose', is_flag=True, default=False, help='Print more details')
-@click.option('--manufacturer', default="", help='filter by manufacturer')
-@click.option('--product', default="", help='filter by product')
-@click.option('-hci-only', default=False, is_flag=True, help='filter by hci device')
-def main(verbose:bool, manufacturer:str, product:str, hci_only:bool):
+@click.option('--hci-only', is_flag=True, default=False, help='only show HCI device')
+@click.option('--manufacturer', help='filter by manufacturer')
+@click.option('--product', help='filter by product')
+def main(verbose: bool, manufacturer: str, product: str, hci_only: bool):
     bumble.logging.setup_basic_logging('WARNING')
 
     load_libusb()
@@ -238,13 +238,10 @@ def main(verbose:bool, manufacturer:str, product:str, hci_only:bool):
                     )
 
             # Filter
-            if product != "":
-                if device_product != product:
-                    continue
-            if manufacturer != "":
-                if device_manufacturer != manufacturer:
-                    continue
-
+            if product and device_product != product:
+                continue
+            if manufacturer and device_manufacturer != manufacturer:
+                continue
             if not is_bluetooth_hci(device) and hci_only:
                 continue
 
