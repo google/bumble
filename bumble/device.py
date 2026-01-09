@@ -1455,6 +1455,10 @@ class ScoLink(utils.CompositeEventEmitter):
     ) -> None:
         await self.device.disconnect(self, reason)
 
+    @property
+    def is_connected(self) -> bool:
+        return self in self.device.sco_links.values()
+
 
 # -----------------------------------------------------------------------------
 class _IsoLink:
@@ -1651,6 +1655,10 @@ class CisLink(utils.EventEmitter, _IsoLink):
         self, reason: int = hci.HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
     ) -> None:
         await self.device.disconnect(self, reason)
+
+    @property
+    def is_connected(self) -> bool:
+        return self in self.device.cis_links.values()
 
 
 # -----------------------------------------------------------------------------
@@ -1878,7 +1886,11 @@ class Connection(utils.CompositeEventEmitter):
 
     @property
     def is_incomplete(self) -> bool:
-        return self.handle is None
+        return self.handle == 0
+
+    @property
+    def is_connected(self) -> bool:
+        return self in self.device.connections.values()
 
     def send_l2cap_pdu(self, cid: int, pdu: bytes) -> None:
         self.device.send_l2cap_pdu(self.handle, cid, pdu)
@@ -1921,6 +1933,8 @@ class Connection(utils.CompositeEventEmitter):
 
     async def sustain(self, timeout: float | None = None) -> None:
         """Idles the current task waiting for a disconnect or timeout"""
+        if not self.is_connected:
+            return
 
         abort = asyncio.get_running_loop().create_future()
         with closing(utils.EventWatcher()) as watcher:
