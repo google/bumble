@@ -77,6 +77,7 @@ class RtlProjectId(enum.IntEnum):
     PROJECT_ID_8852A = 18
     PROJECT_ID_8852B = 20
     PROJECT_ID_8852C = 25
+    PROJECT_ID_8761C = 51
 
 
 RTK_PROJECT_ID_TO_ROM = {
@@ -92,6 +93,7 @@ RTK_PROJECT_ID_TO_ROM = {
     18: RTK_ROM_LMP_8852A,
     20: RTK_ROM_LMP_8852A,
     25: RTK_ROM_LMP_8852A,
+    51: RTK_ROM_LMP_8761A,
 }
 
 # List of USB (VendorID, ProductID) for Realtek-based devices.
@@ -123,6 +125,10 @@ RTK_USB_PRODUCTS = {
     (0x2550, 0x8761),
     (0x2B89, 0x8761),
     (0x7392, 0xC611),
+    # Realtek 8761CUV
+    (0x0B05, 0x1BF6),
+    (0x0BDA, 0xC761),
+    (0x7392, 0xF611),
     # Realtek 8821AE
     (0x0B05, 0x17DC),
     (0x13D3, 0x3414),
@@ -363,6 +369,15 @@ class Driver(common.Driver):
             fw_name="rtl8761bu_fw.bin",
             config_name="rtl8761bu_config.bin",
         ),
+        # 8761CU
+        DriverInfo(
+            rom=RTK_ROM_LMP_8761A,
+            hci=(0x0E, 0x00),
+            config_needed=False,
+            has_rom_version=True,
+            fw_name="rtl8761cu_fw.bin",
+            config_name="rtl8761cu_config.bin",
+        ),
         # 8822C
         DriverInfo(
             rom=RTK_ROM_LMP_8822B,
@@ -420,9 +435,17 @@ class Driver(common.Driver):
     @staticmethod
     def find_driver_info(hci_version, hci_subversion, lmp_subversion):
         for driver_info in Driver.DRIVER_INFOS:
-            if driver_info.rom == lmp_subversion and driver_info.hci == (
-                hci_subversion,
-                hci_version,
+            if driver_info.rom == lmp_subversion and (
+                driver_info.hci
+                == (
+                    hci_subversion,
+                    hci_version,
+                )
+                or driver_info.hci
+                == (
+                    hci_subversion,
+                    0x0,
+                )
             ):
                 return driver_info
 

@@ -17,3 +17,6 @@ venv/
 .venv/
 # snoop logs
 out/
+# macOS
+.DS_Store
+._*
