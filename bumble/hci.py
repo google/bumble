@@ -398,8 +398,9 @@ HCI_LE_CS_SUBEVENT_RESULT_EVENT                             = 0x31
 HCI_LE_CS_SUBEVENT_RESULT_CONTINUE_EVENT                    = 0x32
 HCI_LE_CS_TEST_END_COMPLETE_EVENT                           = 0x33
 HCI_LE_MONITORED_ADVERTISERS_REPORT_EVENT                   = 0x34
-HCI_LE_FRAME_SPACE_UPDATE_EVENT                             = 0x35
-
+HCI_LE_FRAME_SPACE_UPDATE_COMPLETE_EVENT                    = 0x35
+HCI_LE_UTP_RECEIVE_EVENT                                    = 0x36
+HCI_LE_CONNECTION_RATE_CHANGE_EVENT                         = 0x37
 
 
 # HCI Command
@@ -736,6 +737,12 @@ HCI_LE_CLEAR_MONITORED_ADVERTISERS_LIST_COMMAND                          = hci_c
 HCI_LE_READ_MONITORED_ADVERTISERS_LIST_SIZE_COMMAND                      = hci_command_op_code(0x08, 0x009B)
 HCI_LE_ENABLE_MONITORING_ADVERTISERS_COMMAND                             = hci_command_op_code(0x08, 0x009C)
 HCI_LE_FRAME_SPACE_UPDATE_COMMAND                                        = hci_command_op_code(0x08, 0x009D)
+HCI_LE_SET_RESOLVABLE_PRIVATE_ADDRESS_TIMEOUT_V2_COMMAND                 = hci_command_op_code(0x08, 0x009E)
+HCI_LE_ENABLE_UTP_OTA_MODE_COMMAND                                       = hci_command_op_code(0x08, 0x009F)
+HCI_LE_UTP_SEND_COMMAND                                                  = hci_command_op_code(0x08, 0x00A0)
+HCI_LE_CONNECTION_RATE_REQUEST_COMMAND                                   = hci_command_op_code(0x08, 0x00A1)
+HCI_LE_SET_DEFAULT_RATE_PARAMETERS_COMMAND                               = hci_command_op_code(0x08, 0x00A2)
+HCI_LE_READ_MINIMUM_SUPPORTED_CONNECTION_INTERVAL_COMMAND                = hci_command_op_code(0x08, 0x00A3)
 
 
 # HCI Error Codes
@@ -1398,6 +1405,12 @@ HCI_SUPPORTED_COMMANDS_MASKS = {
     HCI_LE_CLEAR_MONITORED_ADVERTISERS_LIST_COMMAND                           : 1 << (47*8+7),
     HCI_LE_READ_MONITORED_ADVERTISERS_LIST_SIZE_COMMAND                       : 1 << (48*8+0),
     HCI_LE_FRAME_SPACE_UPDATE_COMMAND                                         : 1 << (48*8+1),
+    HCI_LE_SET_RESOLVABLE_PRIVATE_ADDRESS_TIMEOUT_V2_COMMAND                  : 1 << (48*8+2),
+    HCI_LE_ENABLE_UTP_OTA_MODE_COMMAND                                        : 1 << (48*8+3),
+    HCI_LE_UTP_SEND_COMMAND                                                   : 1 << (48*8+4),
+    HCI_LE_CONNECTION_RATE_REQUEST_COMMAND                                    : 1 << (48*8+5),
+    HCI_LE_SET_DEFAULT_RATE_PARAMETERS_COMMAND                                : 1 << (48*8+6),
+    HCI_LE_READ_MINIMUM_SUPPORTED_CONNECTION_INTERVAL_COMMAND                 : 1 << (48*8+7)
 }
 
 # LE Supported Features
@@ -1455,6 +1468,14 @@ class LeFeature(SpecableEnum):
     LL_EXTENDED_FEATURE_SET                        = 63
     MONITORING_ADVERTISERS                         = 64
     FRAME_SPACE_UPDATE                             = 65
+    UTP_OTA_MODE                                   = 66
+    UTP_HCI_MODE                                   = 67
+    LL_OTA_UTP_IND_MAXIMUM_LENGTH_0                = 68
+    LL_OTA_UTP_IND_MAXIMUM_LENGTH_1                = 69
+    SHORTER_CONNECTION_INTERVALS                   = 72
+    SHORTER_CONNECTION_INTERVALS_HOST_SUPPORT      = 73
+    LE_FLUSHABLE_ACL_DATA                          = 74
+
 
 class LeFeatureMask(utils.CompatibleIntFlag):
     LE_ENCRYPTION                                  = 1 << LeFeature.LE_ENCRYPTION
@@ -1509,6 +1530,13 @@ class LeFeatureMask(utils.CompatibleIntFlag):
     LL_EXTENDED_FEATURE_SET                        = 1 << LeFeature.LL_EXTENDED_FEATURE_SET
     MONITORING_ADVERTISERS                         = 1 << LeFeature.MONITORING_ADVERTISERS
     FRAME_SPACE_UPDATE                             = 1 << LeFeature.FRAME_SPACE_UPDATE
+    UTP_OTA_MODE                                   = 1 << LeFeature.UTP_OTA_MODE
+    UTP_HCI_MODE                                   = 1 << LeFeature.UTP_HCI_MODE
+    LL_OTA_UTP_IND_MAXIMUM_LENGTH_0                = 1 << LeFeature.LL_OTA_UTP_IND_MAXIMUM_LENGTH_0
+    LL_OTA_UTP_IND_MAXIMUM_LENGTH_1                = 1 << LeFeature.LL_OTA_UTP_IND_MAXIMUM_LENGTH_1
+    SHORTER_CONNECTION_INTERVALS                   = 1 << LeFeature.SHORTER_CONNECTION_INTERVALS
+    SHORTER_CONNECTION_INTERVALS_HOST_SUPPORT      = 1 << LeFeature.SHORTER_CONNECTION_INTERVALS_HOST_SUPPORT
+    LE_FLUSHABLE_ACL_DATA                          = 1 << LeFeature.LE_FLUSHABLE_ACL_DATA
 
 class LmpFeature(SpecableEnum):
     # Page 0 (Legacy LMP features)
@@ -3746,7 +3774,7 @@ class HCI_Write_Extended_Inquiry_Response_Command(
     '''
 
     fec_required: int = field(metadata=metadata(1))
-    extended_inquiry_response: int = field(
+    extended_inquiry_response: bytes = field(
         metadata=metadata({'size': 240, 'serializer': lambda x: padded_bytes(x, 240)})
     )
 
@@ -5796,7 +5824,25 @@ class HCI_LE_Subrate_Request_Command(HCI_AsyncCommand):
 
 # -----------------------------------------------------------------------------
 @dataclasses.dataclass
-class HHCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters(
+class HCI_LE_Read_All_Local_Supported_Features_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    max_page: int = field(metadata=metadata(1))
+    le_features: bytes = field(metadata=metadata(248))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_All_Local_Supported_Features_ReturnParameters)
+class HCI_LE_Read_All_Local_Supported_Features_Command(
+    HCI_SyncCommand[HCI_LE_Read_All_Local_Supported_Features_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.128 LE Read All Local Supported Features Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters(
     HCI_StatusReturnParameters
 ):
     num_config_supported: int = field(metadata=metadata(1))
@@ -5822,11 +5868,11 @@ class HHCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters(
 
 
 @HCI_SyncCommand.sync_command(
-    HHCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters
+    HCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters
 )
 @dataclasses.dataclass
 class HCI_LE_CS_Read_Local_Supported_Capabilities_Command(
-    HCI_SyncCommand[HHCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters]
+    HCI_SyncCommand[HCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters]
 ):
     '''
     See Bluetooth spec @ 7.8.130 LE CS Read Local Supported Capabilities command
@@ -6070,6 +6116,92 @@ class HCI_LE_CS_Test_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
 class HCI_LE_CS_Test_End_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.143 LE CS Test End command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Frame_Space_Update_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.151 LE Frame Space Update command
+    '''
+
+    class SpacingType(SpecableFlag):
+        T_IFS_ACL_CP = 1 << 0
+        T_IFS_ACL_PC = 1 << 1
+        T_MCES = 1 << 2
+        T_IFS_CIS = 1 << 3
+        T_MSS_CIS = 1 << 4
+
+    connection_handle: int = field(metadata=metadata(2))
+    frame_space_min: int = field(metadata=metadata(2))
+    frame_space_max: int = field(metadata=metadata(2))
+    phys: int = field(metadata=PhyBit.type_metadata(1))
+    spacing_types: int = field(metadata=SpacingType.type_metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Connection_Rate_Request_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.154 LE Connection Rate Request command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    connection_interval_min: int = field(metadata=metadata(2))
+    connection_interval_max: int = field(metadata=metadata(2))
+    subrate_min: int = field(metadata=metadata(2))
+    subrate_max: int = field(metadata=metadata(2))
+    max_latency: int = field(metadata=metadata(2))
+    continuation_number: int = field(metadata=metadata(2))
+    supervision_timeout: int = field(metadata=metadata(2))
+    min_ce_length: int = field(metadata=metadata(2))
+    max_ce_length: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Default_Rate_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.155 LE Set Default Rate Parameters command
+    '''
+
+    connection_interval_min: int = field(metadata=metadata(2))
+    connection_interval_max: int = field(metadata=metadata(2))
+    subrate_min: int = field(metadata=metadata(2))
+    subrate_max: int = field(metadata=metadata(2))
+    max_latency: int = field(metadata=metadata(2))
+    continuation_number: int = field(metadata=metadata(2))
+    supervision_timeout: int = field(metadata=metadata(2))
+    min_ce_length: int = field(metadata=metadata(2))
+    max_ce_length: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_Minimum_Supported_Connection_Interval_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    minimum_supported_connection_interval: int = field(metadata=metadata(1))
+    group_min: Sequence[int] = field(metadata=metadata(2, list_begin=True))
+    group_max: Sequence[int] = field(metadata=metadata(2))
+    group_stride: Sequence[int] = field(metadata=metadata(2, list_end=True))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Read_Minimum_Supported_Connection_Interval_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Read_Minimum_Supported_Connection_Interval_Command(
+    HCI_SyncCommand[HCI_LE_Read_Minimum_Supported_Connection_Interval_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.156 LE Read Minimum Supported Connection Interval command
     '''
 
 
@@ -7140,6 +7272,23 @@ class HCI_LE_CS_Test_End_Complete_Event(HCI_LE_Meta_Event):
 
     connection_handle: int = field(metadata=metadata(2))
     status: int = field(metadata=metadata(STATUS_SPEC))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Connection_Rate_Change_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.50 LE Connection Rate Change event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    connection_interval: int = field(metadata=metadata(2))
+    subrate_factor: int = field(metadata=metadata(2))
+    peripheral_latency: int = field(metadata=metadata(2))
+    continuation_number: int = field(metadata=metadata(2))
+    supervision_timeout: int = field(metadata=metadata(2))
 
 
 # -----------------------------------------------------------------------------

@@ -1898,6 +1898,19 @@ class Controller:
         '''
         return bytes([hci.HCI_SUCCESS]) + self.le_features.value.to_bytes(8, 'little')
 
+    def on_hci_le_read_all_local_supported_features_command(
+        self, _command: hci.HCI_LE_Read_All_Local_Supported_Features_Command
+    ) -> bytes | None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.128 LE Read All Local Supported Features
+        Command
+        '''
+        return (
+            bytes([hci.HCI_SUCCESS])
+            + bytes([0])
+            + self.le_features.value.to_bytes(248, 'little')
+        )
+
     def on_hci_le_set_random_address_command(
         self, command: hci.HCI_LE_Set_Random_Address_Command
     ) -> bytes | None:

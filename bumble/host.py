@@ -21,7 +21,6 @@ import asyncio
 import collections
 import dataclasses
 import logging
-import struct
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
@@ -278,7 +277,7 @@ class Host(utils.EventEmitter):
             hci.HCI_Read_Local_Version_Information_ReturnParameters | None
         ) = None
         self.local_supported_commands = 0
-        self.local_le_features = 0
+        self.local_le_features = hci.LeFeatureMask(0)  # LE features
         self.local_lmp_features = hci.LmpFeatureMask(0)  # Classic LMP features
         self.suggested_max_tx_octets = 251  # Max allowed
         self.suggested_max_tx_time = 2120  # Max allowed
@@ -348,15 +347,24 @@ class Host(utils.EventEmitter):
             response1.supported_commands, 'little'
         )
 
-        if self.supports_command(hci.HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND):
-            response2 = await self.send_sync_command(
-                hci.HCI_LE_Read_Local_Supported_Features_Command()
-            )
-            self.local_le_features = struct.unpack('<Q', response2.le_features)[0]
-
         if self.supports_command(hci.HCI_READ_LOCAL_VERSION_INFORMATION_COMMAND):
             self.local_version = await self.send_sync_command(
                 hci.HCI_Read_Local_Version_Information_Command()
+            )
+
+        if self.supports_command(hci.HCI_LE_READ_ALL_LOCAL_SUPPORTED_FEATURES_COMMAND):
+            response2 = await self.send_sync_command(
+                hci.HCI_LE_Read_All_Local_Supported_Features_Command()
+            )
+            self.local_le_features = hci.LeFeatureMask(
+                int.from_bytes(response2.le_features, 'little')
+            )
+        elif self.supports_command(hci.HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND):
+            response3 = await self.send_sync_command(
+                hci.HCI_LE_Read_Local_Supported_Features_Command()
+            )
+            self.local_le_features = hci.LeFeatureMask(
+                int.from_bytes(response3.le_features, 'little')
             )
 
         if self.supports_command(hci.HCI_READ_LOCAL_EXTENDED_FEATURES_COMMAND):
@@ -375,7 +383,6 @@ class Host(utils.EventEmitter):
                 max_page_number = response4.maximum_page_number
                 page_number += 1
             self.local_lmp_features = hci.LmpFeatureMask(lmp_features)
-
         elif self.supports_command(hci.HCI_READ_LOCAL_SUPPORTED_FEATURES_COMMAND):
             response5 = await self.send_sync_command(
                 hci.HCI_Read_Local_Supported_Features_Command()
@@ -494,12 +501,17 @@ class Host(utils.EventEmitter):
                     hci.HCI_LE_TRANSMIT_POWER_REPORTING_EVENT,
                     hci.HCI_LE_BIGINFO_ADVERTISING_REPORT_EVENT,
                     hci.HCI_LE_SUBRATE_CHANGE_EVENT,
+                    hci.HCI_LE_READ_ALL_REMOTE_FEATURES_COMPLETE_EVENT,
                     hci.HCI_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE_EVENT,
                     hci.HCI_LE_CS_PROCEDURE_ENABLE_COMPLETE_EVENT,
                     hci.HCI_LE_CS_SECURITY_ENABLE_COMPLETE_EVENT,
                     hci.HCI_LE_CS_CONFIG_COMPLETE_EVENT,
                     hci.HCI_LE_CS_SUBEVENT_RESULT_EVENT,
                     hci.HCI_LE_CS_SUBEVENT_RESULT_CONTINUE_EVENT,
+                    hci.HCI_LE_MONITORED_ADVERTISERS_REPORT_EVENT,
+                    hci.HCI_LE_FRAME_SPACE_UPDATE_COMPLETE_EVENT,
+                    hci.HCI_LE_UTP_RECEIVE_EVENT,
+                    hci.HCI_LE_CONNECTION_RATE_CHANGE_EVENT,
                 ]
             )
 
@@ -889,16 +901,18 @@ class Host(utils.EventEmitter):
             if self.local_supported_commands & mask
         )
 
-    def supports_le_features(self, feature: hci.LeFeatureMask) -> bool:
-        return (self.local_le_features & feature) == feature
+    def supports_le_features(self, features: hci.LeFeatureMask) -> bool:
+        return (self.local_le_features & features) == features
 
-    def supports_lmp_features(self, feature: hci.LmpFeatureMask) -> bool:
-        return self.local_lmp_features & (feature) == feature
+    def supports_lmp_features(self, features: hci.LmpFeatureMask) -> bool:
+        return self.local_lmp_features & (features) == features
 
     @property
-    def supported_le_features(self):
+    def supported_le_features(self) -> list[hci.LeFeature]:
         return [
-            feature for feature in range(64) if self.local_le_features & (1 << feature)
+            feature
+            for feature in hci.LeFeature
+            if self.local_le_features & (1 << feature)
         ]
 
     # Packet Sink protocol (packets coming from the controller via HCI)
@@ -1179,7 +1193,7 @@ class Host(utils.EventEmitter):
         self, event: hci.HCI_LE_Connection_Update_Complete_Event
     ):
         if (connection := self.connections.get(event.connection_handle)) is None:
-            logger.warning('!!! CONNECTION PARAMETERS UPDATE COMPLETE: unknown handle')
+            logger.warning('!!! CONNECTION UPDATE COMPLETE: unknown handle')
             return
 
         # Notify the client
@@ -1194,6 +1208,29 @@ class Host(utils.EventEmitter):
         else:
             self.emit(
                 'connection_parameters_update_failure', connection.handle, event.status
+            )
+
+    def on_hci_le_connection_rate_change_event(
+        self, event: hci.HCI_LE_Connection_Rate_Change_Event
+    ):
+        if (connection := self.connections.get(event.connection_handle)) is None:
+            logger.warning('!!! CONNECTION RATE CHANGE: unknown handle')
+            return
+
+        # Notify the client
+        if event.status == hci.HCI_SUCCESS:
+            self.emit(
+                'le_connection_rate_change',
+                connection.handle,
+                event.connection_interval,
+                event.subrate_factor,
+                event.peripheral_latency,
+                event.continuation_number,
+                event.supervision_timeout,
+            )
+        else:
+            self.emit(
+                'le_connection_rate_change_failure', connection.handle, event.status
             )
 
     def on_hci_le_phy_update_complete_event(
@@ -1755,12 +1792,13 @@ class Host(utils.EventEmitter):
             self.emit(
                 'le_remote_features_failure', event.connection_handle, event.status
             )
-        else:
-            self.emit(
-                'le_remote_features',
-                event.connection_handle,
-                int.from_bytes(event.le_features, 'little'),
-            )
+            return
+
+        self.emit(
+            'le_remote_features',
+            event.connection_handle,
+            hci.LeFeatureMask(int.from_bytes(event.le_features, 'little')),
+        )
 
     def on_hci_le_cs_read_remote_supported_capabilities_complete_event(
         self, event: hci.HCI_LE_CS_Read_Remote_Supported_Capabilities_Complete_Event
@@ -1793,6 +1831,12 @@ class Host(utils.EventEmitter):
         self.emit('cs_subevent_result_continue', event)
 
     def on_hci_le_subrate_change_event(self, event: hci.HCI_LE_Subrate_Change_Event):
+        if event.status != hci.HCI_SUCCESS:
+            self.emit(
+                'le_subrate_change_failure', event.connection_handle, event.status
+            )
+            return
+
         self.emit(
             'le_subrate_change',
             event.connection_handle,
