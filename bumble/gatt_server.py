@@ -978,6 +978,94 @@ class Server(utils.EventEmitter):
         self.send_response(bearer, response)
 
     @utils.AsyncRunner.run_in_task()
+    async def on_att_read_multiple_request(
+        self, bearer: att.Bearer, request: att.ATT_Read_Multiple_Request
+    ):
+        '''
+        See Bluetooth spec Vol 3, Part F - 3.4.4.7 Read Multiple Request.
+        '''
+        response: att.ATT_PDU
+
+        pdu_space_available = bearer.att_mtu - 1
+        values: list[bytes] = []
+
+        for handle in request.set_of_handles:
+            if not (attribute := self.get_attribute(handle)):
+                response = att.ATT_Error_Response(
+                    request_opcode_in_error=request.op_code,
+                    attribute_handle_in_error=handle,
+                    error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
+                )
+                self.send_response(bearer, response)
+                return
+            # No need to catch permission errors here, since these attributes
+            # must all be world-readable
+            attribute_value = await attribute.read_value(bearer)
+            # Check the attribute value size
+            max_attribute_size = min(bearer.att_mtu - 1, 251)
+            if len(attribute_value) > max_attribute_size:
+                # We need to truncate
+                attribute_value = attribute_value[:max_attribute_size]
+
+            # Check if there is enough space
+            entry_size = len(attribute_value)
+            if pdu_space_available < entry_size:
+                break
+
+            # Add the attribute to the list
+            values.append(attribute_value)
+            pdu_space_available -= entry_size
+
+        response = att.ATT_Read_Multiple_Response(set_of_values=b''.join(values))
+        self.send_response(bearer, response)
+
+    @utils.AsyncRunner.run_in_task()
+    async def on_att_read_multiple_variable_request(
+        self, bearer: att.Bearer, request: att.ATT_Read_Multiple_Variable_Request
+    ):
+        '''
+        See Bluetooth spec Vol 3, Part F - 3.4.4.11 Read Multiple Variable Request.
+        '''
+        response: att.ATT_PDU
+
+        pdu_space_available = bearer.att_mtu - 1
+        length_value_tuple_list: list[tuple[int, bytes]] = []
+
+        for handle in request.set_of_handles:
+            if not (attribute := self.get_attribute(handle)):
+                response = att.ATT_Error_Response(
+                    request_opcode_in_error=request.op_code,
+                    attribute_handle_in_error=handle,
+                    error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
+                )
+                self.send_response(bearer, response)
+                return
+            # No need to catch permission errors here, since these attributes
+            # must all be world-readable
+            attribute_value = await attribute.read_value(bearer)
+            length = len(attribute_value)
+            # Check the attribute value size
+            max_attribute_size = min(bearer.att_mtu - 3, 251)
+            if len(attribute_value) > max_attribute_size:
+                # We need to truncate
+                attribute_value = attribute_value[:max_attribute_size]
+
+            # Check if there is enough space
+            entry_size = 2 + len(attribute_value)
+
+            # Add the attribute to the list
+            length_value_tuple_list.append((length, attribute_value))
+            pdu_space_available -= entry_size
+
+            if pdu_space_available <= 0:
+                break
+
+        response = att.ATT_Read_Multiple_Variable_Response(
+            length_value_tuple_list=length_value_tuple_list
+        )
+        self.send_response(bearer, response)
+
+    @utils.AsyncRunner.run_in_task()
     async def on_att_write_request(
         self, bearer: att.Bearer, request: att.ATT_Write_Request
     ):

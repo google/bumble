@@ -29,7 +29,7 @@ import enum
 import functools
 import inspect
 import struct
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import (
     TYPE_CHECKING,
     ClassVar,
@@ -72,34 +72,36 @@ ATT_PSM = 0x001F
 EATT_PSM = 0x0027
 
 class Opcode(hci.SpecableEnum):
-    ATT_ERROR_RESPONSE              = 0x01
-    ATT_EXCHANGE_MTU_REQUEST        = 0x02
-    ATT_EXCHANGE_MTU_RESPONSE       = 0x03
-    ATT_FIND_INFORMATION_REQUEST    = 0x04
-    ATT_FIND_INFORMATION_RESPONSE   = 0x05
-    ATT_FIND_BY_TYPE_VALUE_REQUEST  = 0x06
-    ATT_FIND_BY_TYPE_VALUE_RESPONSE = 0x07
-    ATT_READ_BY_TYPE_REQUEST        = 0x08
-    ATT_READ_BY_TYPE_RESPONSE       = 0x09
-    ATT_READ_REQUEST                = 0x0A
-    ATT_READ_RESPONSE               = 0x0B
-    ATT_READ_BLOB_REQUEST           = 0x0C
-    ATT_READ_BLOB_RESPONSE          = 0x0D
-    ATT_READ_MULTIPLE_REQUEST       = 0x0E
-    ATT_READ_MULTIPLE_RESPONSE      = 0x0F
-    ATT_READ_BY_GROUP_TYPE_REQUEST  = 0x10
-    ATT_READ_BY_GROUP_TYPE_RESPONSE = 0x11
-    ATT_WRITE_REQUEST               = 0x12
-    ATT_WRITE_RESPONSE              = 0x13
-    ATT_WRITE_COMMAND               = 0x52
-    ATT_SIGNED_WRITE_COMMAND        = 0xD2
-    ATT_PREPARE_WRITE_REQUEST       = 0x16
-    ATT_PREPARE_WRITE_RESPONSE      = 0x17
-    ATT_EXECUTE_WRITE_REQUEST       = 0x18
-    ATT_EXECUTE_WRITE_RESPONSE      = 0x19
-    ATT_HANDLE_VALUE_NOTIFICATION   = 0x1B
-    ATT_HANDLE_VALUE_INDICATION     = 0x1D
-    ATT_HANDLE_VALUE_CONFIRMATION   = 0x1E
+    ATT_ERROR_RESPONSE                  = 0x01
+    ATT_EXCHANGE_MTU_REQUEST            = 0x02
+    ATT_EXCHANGE_MTU_RESPONSE           = 0x03
+    ATT_FIND_INFORMATION_REQUEST        = 0x04
+    ATT_FIND_INFORMATION_RESPONSE       = 0x05
+    ATT_FIND_BY_TYPE_VALUE_REQUEST      = 0x06
+    ATT_FIND_BY_TYPE_VALUE_RESPONSE     = 0x07
+    ATT_READ_BY_TYPE_REQUEST            = 0x08
+    ATT_READ_BY_TYPE_RESPONSE           = 0x09
+    ATT_READ_REQUEST                    = 0x0A
+    ATT_READ_RESPONSE                   = 0x0B
+    ATT_READ_BLOB_REQUEST               = 0x0C
+    ATT_READ_BLOB_RESPONSE              = 0x0D
+    ATT_READ_MULTIPLE_REQUEST           = 0x0E
+    ATT_READ_MULTIPLE_RESPONSE          = 0x0F
+    ATT_READ_BY_GROUP_TYPE_REQUEST      = 0x10
+    ATT_READ_BY_GROUP_TYPE_RESPONSE     = 0x11
+    ATT_READ_MULTIPLE_VARIABLE_REQUEST  = 0x20
+    ATT_READ_MULTIPLE_VARIABLE_RESPONSE = 0x21
+    ATT_WRITE_REQUEST                   = 0x12
+    ATT_WRITE_RESPONSE                  = 0x13
+    ATT_WRITE_COMMAND                   = 0x52
+    ATT_SIGNED_WRITE_COMMAND            = 0xD2
+    ATT_PREPARE_WRITE_REQUEST           = 0x16
+    ATT_PREPARE_WRITE_RESPONSE          = 0x17
+    ATT_EXECUTE_WRITE_REQUEST           = 0x18
+    ATT_EXECUTE_WRITE_RESPONSE          = 0x19
+    ATT_HANDLE_VALUE_NOTIFICATION       = 0x1B
+    ATT_HANDLE_VALUE_INDICATION         = 0x1D
+    ATT_HANDLE_VALUE_CONFIRMATION       = 0x1E
 
 ATT_REQUESTS = [
     Opcode.ATT_EXCHANGE_MTU_REQUEST,
@@ -110,9 +112,10 @@ ATT_REQUESTS = [
     Opcode.ATT_READ_BLOB_REQUEST,
     Opcode.ATT_READ_MULTIPLE_REQUEST,
     Opcode.ATT_READ_BY_GROUP_TYPE_REQUEST,
+    Opcode.ATT_READ_MULTIPLE_VARIABLE_REQUEST,
     Opcode.ATT_WRITE_REQUEST,
     Opcode.ATT_PREPARE_WRITE_REQUEST,
-    Opcode.ATT_EXECUTE_WRITE_REQUEST
+    Opcode.ATT_EXECUTE_WRITE_REQUEST,
 ]
 
 ATT_RESPONSES = [
@@ -125,9 +128,10 @@ ATT_RESPONSES = [
     Opcode.ATT_READ_BLOB_RESPONSE,
     Opcode.ATT_READ_MULTIPLE_RESPONSE,
     Opcode.ATT_READ_BY_GROUP_TYPE_RESPONSE,
+    Opcode.ATT_READ_MULTIPLE_VARIABLE_RESPONSE,
     Opcode.ATT_WRITE_RESPONSE,
     Opcode.ATT_PREPARE_WRITE_RESPONSE,
-    Opcode.ATT_EXECUTE_WRITE_RESPONSE
+    Opcode.ATT_EXECUTE_WRITE_RESPONSE,
 ]
 
 class ErrorCode(hci.SpecableEnum):
@@ -185,6 +189,18 @@ ATT_INSUFFICIENT_RESOURCES_ERROR           = ErrorCode.INSUFFICIENT_RESOURCES
 ATT_DEFAULT_MTU = 23
 
 HANDLE_FIELD_SPEC    = {'size': 2, 'mapper': lambda x: f'0x{x:04X}'}
+_SET_OF_HANDLES_METADATA = hci.metadata({
+                'parser': lambda data, offset: (
+                    len(data),
+                    [
+                        struct.unpack_from('<H', data, i)[0]
+                        for i in range(offset, len(data), 2)
+                    ],
+                ),
+                'serializer': lambda handles: b''.join(
+                    [struct.pack('<H', handle) for handle in handles]
+                ),
+            })
 
 # fmt: on
 # pylint: enable=line-too-long
@@ -554,7 +570,7 @@ class ATT_Read_Multiple_Request(ATT_PDU):
     See Bluetooth spec @ Vol 3, Part F - 3.4.4.7 Read Multiple Request
     '''
 
-    set_of_handles: bytes = dataclasses.field(metadata=hci.metadata("*"))
+    set_of_handles: Sequence[int] = dataclasses.field(metadata=_SET_OF_HANDLES_METADATA)
 
 
 # -----------------------------------------------------------------------------
@@ -633,6 +649,55 @@ class ATT_Read_By_Group_Type_Response(ATT_PDU):
             '  ',
         )
         return result
+
+
+# -----------------------------------------------------------------------------
+@ATT_PDU.subclass
+@dataclasses.dataclass
+class ATT_Read_Multiple_Variable_Request(ATT_PDU):
+    '''
+    See Bluetooth spec @ Vol 3, Part F - 3.4.4.11 Read Multiple Variable Request
+    '''
+
+    set_of_handles: Sequence[int] = dataclasses.field(metadata=_SET_OF_HANDLES_METADATA)
+
+
+# -----------------------------------------------------------------------------
+@ATT_PDU.subclass
+@dataclasses.dataclass
+class ATT_Read_Multiple_Variable_Response(ATT_PDU):
+    '''
+    See Bluetooth spec @ Vol 3, Part F - 3.4.4.12 Read Multiple Variable Response
+    '''
+
+    @classmethod
+    def _parse_length_value_tuples(
+        cls, data: bytes, offset: int
+    ) -> tuple[int, list[tuple[int, bytes]]]:
+        length_value_tuple_list: list[tuple[int, bytes]] = []
+        while offset < len(data):
+            length = struct.unpack_from('<H', data, offset)[0]
+            length_value_tuple_list.append(
+                (length, data[offset + 2 : offset + 2 + length])
+            )
+            offset += 2 + length
+        return (len(data), length_value_tuple_list)
+
+    length_value_tuple_list: Sequence[tuple[int, bytes]] = dataclasses.field(
+        metadata=hci.metadata(
+            {
+                'parser': lambda data, offset: ATT_Read_Multiple_Variable_Response._parse_length_value_tuples(
+                    data, offset
+                ),
+                'serializer': lambda length_value_tuple_list: b''.join(
+                    [
+                        struct.pack('<H', length) + value
+                        for length, value in length_value_tuple_list
+                    ]
+                ),
+            }
+        )
+    )
 
 
 # -----------------------------------------------------------------------------
