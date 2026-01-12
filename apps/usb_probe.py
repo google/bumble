@@ -26,6 +26,8 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from typing import Any
+
 import click
 import usb1
 
@@ -175,7 +177,7 @@ def main(verbose: bool, manufacturer: str, product: str, hci_only: bool):
     load_libusb()
     with usb1.USBContext() as context:
         bluetooth_device_count = 0
-        devices = {}
+        devices: dict[tuple[Any, Any], list[str|None]] = {}
 
         for device in context.getDeviceIterator(skip_on_error=True):
             device_class = device.getDeviceClass()
