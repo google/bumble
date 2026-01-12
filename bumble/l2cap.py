@@ -1647,7 +1647,9 @@ class LeCreditBasedChannel(utils.EventEmitter):
         self.connection_result = None
         self.disconnection_result = None
         self.drained = asyncio.Event()
-        self.att_mtu = 0  # Filled by GATT client or server later.
+        # Core Specification Vol 3, Part G, 5.3.1 ATT_MTU
+        # ATT_MTU shall be set to the minimum of the MTU field values of the two devices.
+        self.att_mtu = min(mtu, peer_mtu)
 
         self.drained.set()
 
