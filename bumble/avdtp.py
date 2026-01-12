@@ -268,7 +268,7 @@ class MediaPacketPump:
                         await self.clock.sleep(delay)
 
                     # Emit
-                    rtp_channel.send_pdu(bytes(packet))
+                    rtp_channel.write(bytes(packet))
                     logger.debug(
                         f'{color(">>> sending RTP packet:", "green")} {packet}'
                     )
@@ -1519,7 +1519,7 @@ class Protocol(utils.EventEmitter):
                 header = bytes([first_header_byte])
 
             # Send one packet
-            self.l2cap_channel.send_pdu(header + payload[:max_fragment_size])
+            self.l2cap_channel.write(header + payload[:max_fragment_size])
 
             # Prepare for the next packet
             payload = payload[max_fragment_size:]
@@ -1829,7 +1829,7 @@ class Stream:
 
     def send_media_packet(self, packet: MediaPacket) -> None:
         assert self.rtp_channel
-        self.rtp_channel.send_pdu(bytes(packet))
+        self.rtp_channel.write(bytes(packet))
 
     async def configure(self) -> None:
         if self.state != State.IDLE:

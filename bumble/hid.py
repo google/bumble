@@ -312,11 +312,11 @@ class HID(ABC, utils.EventEmitter):
 
     def send_pdu_on_ctrl(self, msg: bytes) -> None:
         assert self.l2cap_ctrl_channel
-        self.l2cap_ctrl_channel.send_pdu(msg)
+        self.l2cap_ctrl_channel.write(msg)
 
     def send_pdu_on_intr(self, msg: bytes) -> None:
         assert self.l2cap_intr_channel
-        self.l2cap_intr_channel.send_pdu(msg)
+        self.l2cap_intr_channel.write(msg)
 
     def send_data(self, data: bytes) -> None:
         if self.role == HID.Role.HOST:
