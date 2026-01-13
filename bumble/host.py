@@ -732,6 +732,16 @@ class Host(utils.EventEmitter):
             )
             packet_queue.enqueue(acl_packet, connection_handle)
 
+    def send_sco_sdu(self, connection_handle: int, sdu: bytes) -> None:
+        self.send_hci_packet(
+            hci.HCI_SynchronousDataPacket(
+                connection_handle=connection_handle,
+                packet_status=0,
+                data_total_length=len(sdu),
+                data=sdu,
+            )
+        )
+
     def send_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes) -> None:
         self.send_acl_sdu(connection_handle, bytes(L2CAP_PDU(cid, pdu)))
 

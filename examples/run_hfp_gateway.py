@@ -100,13 +100,9 @@ def on_sco_packet(packet: hci.HCI_SynchronousDataPacket):
     if source_file and (pcm_data := source_file.read(packet.data_total_length)):
         assert ag_protocol
         host = ag_protocol.dlc.multiplexer.l2cap_channel.connection.device.host
-        host.send_hci_packet(
-            hci.HCI_SynchronousDataPacket(
-                connection_handle=packet.connection_handle,
-                packet_status=0,
-                data_total_length=len(pcm_data),
-                data=pcm_data,
-            )
+        host.send_sco_sdu(
+            connection_handle=packet.connection_handle,
+            sdu=pcm_data,
         )
 
 
