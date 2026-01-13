@@ -26,6 +26,8 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+from typing import Any
+
 import click
 import usb1
 
@@ -166,13 +168,16 @@ def is_bluetooth_hci(device):
 # -----------------------------------------------------------------------------
 @click.command()
 @click.option('--verbose', is_flag=True, default=False, help='Print more details')
-def main(verbose):
+@click.option('--hci-only', is_flag=True, default=False, help='only show HCI device')
+@click.option('--manufacturer', help='filter by manufacturer')
+@click.option('--product', help='filter by product')
+def main(verbose: bool, manufacturer: str, product: str, hci_only: bool):
     bumble.logging.setup_basic_logging('WARNING')
 
     load_libusb()
     with usb1.USBContext() as context:
         bluetooth_device_count = 0
-        devices = {}
+        devices: dict[tuple[Any, Any], list[str | None]] = {}
 
         for device in context.getDeviceIterator(skip_on_error=True):
             device_class = device.getDeviceClass()
@@ -233,6 +238,14 @@ def main(verbose):
                     bumble_transport_names.append(
                         f'{basic_transport_name}/{device_serial_number}'
                     )
+
+            # Filter
+            if product and device_product != product:
+                continue
+            if manufacturer and device_manufacturer != manufacturer:
+                continue
+            if not is_bluetooth_hci(device) and hci_only:
+                continue
 
             # Print the results
             print(
