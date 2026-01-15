@@ -116,21 +116,26 @@ class PcapSnooper(Snooper):
     Snooper that saves or streames HCI packets using the PCAP format.
     """
 
-    PCAP_MAGIC = 0xa1b2c3d4
+    PCAP_MAGIC = 0xA1B2C3D4
     DLT_BLUETOOTH_HCI_H4_WITH_PHDR = 201
 
     def __init__(self, fifo):
         self.output = fifo
 
         # Write the header
-        self.output.write(struct.pack("<IHHIIII",
-            self.PCAP_MAGIC,
-            2, 4, # Major and Minor PCAP Version
-            0, 0, # Reserved 1 and 2
-            65535, # SnapLen
-            # FCS and f are set to 0 implicitly by the next line
-            self.DLT_BLUETOOTH_HCI_H4_WITH_PHDR # The DLT in this PCAP
-        ))
+        self.output.write(
+            struct.pack(
+                "<IHHIIII",
+                self.PCAP_MAGIC,
+                2,
+                4,  # Major and Minor PCAP Version
+                0,
+                0,  # Reserved 1 and 2
+                65535,  # SnapLen
+                # FCS and f are set to 0 implicitly by the next line
+                self.DLT_BLUETOOTH_HCI_H4_WITH_PHDR,  # The DLT in this PCAP
+            )
+        )
 
     def snoop(self, hci_packet: bytes, direction: Snooper.Direction):
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -139,16 +144,18 @@ class PcapSnooper(Snooper):
 
         # Emit the record
         self.output.write(
-            struct.pack("<IIII",
-                sec, # Timestamp (Seconds)
-                usec, # Timestamp (Microseconds)
-                len(hci_packet)+4,
-                len(hci_packet)+4 # +4 because of the addtional direction info...
+            struct.pack(
+                "<IIII",
+                sec,  # Timestamp (Seconds)
+                usec,  # Timestamp (Microseconds)
+                len(hci_packet) + 4,
+                len(hci_packet) + 4,  # +4 because of the addtional direction info...
             )
-            + struct.pack(">I", int(direction)) # ...thats being added here
+            + struct.pack(">I", int(direction))  # ...thats being added here
             + hci_packet
         )
-        self.output.flush() # flush after every packet for live logging
+        self.output.flush()  # flush after every packet for live logging
+
 
 # -----------------------------------------------------------------------------
 _SNOOPER_INSTANCE_COUNT = 0
@@ -179,7 +186,7 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
             utcnow: the value of `datetime.now(tz=datetime.timezone.utc)`
             pid: the current process ID.
             instance: the instance ID in the current process.
-        
+
       pcapsnoop
         The syntax for the type-specific arguments for this type is:
         <io-type>:<io-type-specific-arguments>
@@ -195,11 +202,11 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
             utcnow: the value of `datetime.now(tz=datetime.timezone.utc)`
             pid: the current process ID.
             instance: the instance ID in the current process.
-        
+
         pipe
           The type-specific arguments for this I/O type is a string that is converted
           to a path using the python `str.format()` string formatting. The log
-          records will be written to the named pipe referenced by this path 
+          records will be written to the named pipe referenced by this path
           if it can be opened. The keyword args that may be referenced by the
           string pattern are:
             now: the value of `datetime.now()`
