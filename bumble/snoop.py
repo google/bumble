@@ -127,10 +127,10 @@ class PcapSnooper(Snooper):
             struct.pack(
                 "<IHHIIII",
                 self.PCAP_MAGIC,
-                2,
-                4,  # Major and Minor PCAP Version
-                0,
-                0,  # Reserved 1 and 2
+                2,  # Major PCAP Version
+                4,  # Minor PCAP Version
+                0,  # Reserved 1
+                0,  # Reserved 2
                 65535,  # SnapLen
                 # FCS and f are set to 0 implicitly by the next line
                 self.DLT_BLUETOOTH_HCI_H4_WITH_PHDR,  # The DLT in this PCAP
