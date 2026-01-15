@@ -29,7 +29,7 @@ import functools
 import logging
 import struct
 from collections.abc import Iterable, Sequence
-from typing import TypeVar
+from typing import ClassVar, TypeVar
 
 from bumble.att import Attribute, AttributeValue, AttributeValueV2
 from bumble.colors import color
@@ -403,7 +403,7 @@ class TemplateService(Service):
     to expose their UUID as a class property
     '''
 
-    UUID: UUID
+    UUID: ClassVar[UUID]
 
     def __init__(
         self,

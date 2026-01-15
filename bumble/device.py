@@ -1383,10 +1383,7 @@ class Peer:
     def create_service_proxy(
         self, proxy_class: type[_PROXY_CLASS]
     ) -> _PROXY_CLASS | None:
-        if proxy := proxy_class.from_client(self.gatt_client):
-            return cast(_PROXY_CLASS, proxy)
-
-        return None
+        return proxy_class.from_client(self.gatt_client)
 
     async def discover_service_and_create_proxy(
         self, proxy_class: type[_PROXY_CLASS]
