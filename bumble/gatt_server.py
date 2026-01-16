@@ -115,7 +115,6 @@ class Server(utils.EventEmitter):
                 channel.connection.handle,
                 channel.source_cid,
             )
-            channel.att_mtu = att.ATT_DEFAULT_MTU
             channel.sink = lambda pdu: self.on_gatt_pdu(
                 channel, att.ATT_PDU.from_bytes(pdu)
             )

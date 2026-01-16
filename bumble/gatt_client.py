@@ -288,8 +288,6 @@ class Client:
             self._bearer_id = (
                 f'[0x{bearer.connection.handle:04X}|CID=0x{bearer.source_cid:04X}]'
             )
-            # Fill the mtu.
-            bearer.on_att_mtu_update(att.ATT_DEFAULT_MTU)
             self.connection = bearer.connection
         else:
             bearer.on(bearer.EVENT_DISCONNECTION, self.on_disconnection)
