@@ -2090,9 +2090,9 @@ class Address:
     RANDOM_IDENTITY_ADDRESS = AddressType.RANDOM_IDENTITY
 
     # Type declarations
-    NIL: Address
-    ANY: Address
-    ANY_RANDOM: Address
+    NIL: ClassVar[Address]
+    ANY: ClassVar[Address]
+    ANY_RANDOM: ClassVar[Address]
 
     # pylint: disable-next=unnecessary-lambda
     ADDRESS_TYPE_SPEC = {'size': 1, 'mapper': lambda x: Address.address_type_name(x)}
@@ -2204,38 +2204,38 @@ class Address:
 
         self.address_type = address_type
 
-    def clone(self):
+    def clone(self) -> Address:
         return Address(self.address_bytes, self.address_type)
 
     @property
-    def is_public(self):
+    def is_public(self) -> bool:
         return self.address_type in (
             self.PUBLIC_DEVICE_ADDRESS,
             self.PUBLIC_IDENTITY_ADDRESS,
         )
 
     @property
-    def is_random(self):
+    def is_random(self) -> bool:
         return not self.is_public
 
     @property
-    def is_resolved(self):
+    def is_resolved(self) -> bool:
         return self.address_type in (
             self.PUBLIC_IDENTITY_ADDRESS,
             self.RANDOM_IDENTITY_ADDRESS,
         )
 
     @property
-    def is_resolvable(self):
+    def is_resolvable(self) -> bool:
         return self.address_type == self.RANDOM_DEVICE_ADDRESS and (
             self.address_bytes[5] >> 6 == 1
         )
 
     @property
-    def is_static(self):
+    def is_static(self) -> bool:
         return self.is_random and (self.address_bytes[5] >> 6 == 3)
 
-    def to_string(self, with_type_qualifier=True):
+    def to_string(self, with_type_qualifier: bool = True) -> str:
         '''
         String representation of the address, MSB first, with an optional type
         qualifier.
@@ -2245,23 +2245,23 @@ class Address:
             return result
         return result + '/P'
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         return self.address_bytes
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.address_bytes)
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         return (
             isinstance(other, Address)
             and self.address_bytes == other.address_bytes
             and self.is_public == other.is_public
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.to_string()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'Address({self.to_string(False)}/{self.address_type_name(self.address_type)})'
 
 
