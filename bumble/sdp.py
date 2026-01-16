@@ -847,7 +847,7 @@ class Client:
             self.pending_request = request
 
             try:
-                self.channel.send_pdu(bytes(request))
+                self.channel.write(bytes(request))
                 return await self.pending_response
             finally:
                 self.pending_request = None
@@ -1061,7 +1061,7 @@ class Server:
 
     def send_response(self, response):
         logger.debug(f'{color(">>> Sending SDP Response", "blue")}: {response}')
-        self.channel.send_pdu(response)
+        self.channel.write(response)
 
     def match_services(self, search_pattern: DataElement) -> dict[int, Service]:
         # Find the services for which the attributes in the pattern is a subset of the

@@ -235,7 +235,7 @@ class Protocol:
             )
             + payload
         )
-        self.l2cap_channel.send_pdu(pdu)
+        self.l2cap_channel.write(pdu)
 
     def send_command(self, transaction_label: int, pid: int, payload: bytes) -> None:
         logger.debug(

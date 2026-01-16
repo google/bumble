@@ -278,7 +278,7 @@ class L2CAPService(L2CAPServicer):
             if not l2cap_channel:
                 return SendResponse(error=COMMAND_NOT_UNDERSTOOD)
             if isinstance(l2cap_channel, ClassicChannel):
-                l2cap_channel.send_pdu(request.data)
+                l2cap_channel.write(request.data)
             else:
                 l2cap_channel.write(request.data)
             return SendResponse(success=empty_pb2.Empty())

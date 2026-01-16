@@ -800,7 +800,7 @@ class Multiplexer(utils.EventEmitter):
 
     def send_frame(self, frame: RFCOMM_Frame) -> None:
         logger.debug(f'>>> Multiplexer sending {frame}')
-        self.l2cap_channel.send_pdu(frame)
+        self.l2cap_channel.write(bytes(frame))
 
     def on_pdu(self, pdu: bytes) -> None:
         frame = RFCOMM_Frame.from_bytes(pdu)
