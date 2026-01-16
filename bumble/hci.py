@@ -28,6 +28,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import field
 from typing import (
     Any,
+    ClassVar,
     Literal,
     TypeVar,
     cast,
