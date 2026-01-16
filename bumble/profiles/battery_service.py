@@ -18,10 +18,7 @@
 # -----------------------------------------------------------------------------
 from collections.abc import Callable
 
-from bumble import device
-from bumble import gatt
-from bumble import gatt_adapters
-from bumble import gatt_client
+from bumble import device, gatt, gatt_adapters, gatt_client
 
 
 # -----------------------------------------------------------------------------

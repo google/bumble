@@ -34,10 +34,13 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Generic,
     TypeVar,
     overload,
 )
+
+from typing_extensions import Self
 
 from bumble import att, core, l2cap, utils
 from bumble.colors import color
@@ -249,10 +252,10 @@ class ProfileServiceProxy:
     Base class for profile-specific service proxies
     '''
 
-    SERVICE_CLASS: type[TemplateService]
+    SERVICE_CLASS: ClassVar[type[TemplateService]]
 
     @classmethod
-    def from_client(cls, client: Client) -> ProfileServiceProxy | None:
+    def from_client(cls, client: Client) -> Self | None:
         return ServiceProxy.from_client(cls, client, cls.SERVICE_CLASS.UUID)
 
 
