@@ -28,7 +28,7 @@ from unittest.mock import ANY, AsyncMock, Mock
 import pytest
 from typing_extensions import Self
 
-from bumble import gatt_client, l2cap
+from bumble import att, gatt_client, l2cap
 from bumble.att import (
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     ATT_PDU,
@@ -1636,6 +1636,104 @@ async def test_eatt_connection_failure():
 
     with pytest.raises(l2cap.L2capError):
         await gatt_client.Client.connect_eatt(devices.connections[0])
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_read_multiple() -> None:
+    devices = await TwoDevices.create_with_connection()
+
+    characteristic1 = Characteristic(
+        '0001', Characteristic.Properties.READ, Characteristic.READABLE, b'1234'
+    )
+
+    characteristic2 = Characteristic(
+        '0002',
+        Characteristic.Properties.READ,
+        Characteristic.READABLE,
+        b'5678',
+    )
+
+    service = Service('0000', [characteristic1, characteristic2])
+    devices[1].add_service(service)
+
+    client = devices.connections[0].gatt_client
+    server = devices[1].gatt_server
+
+    await client.discover_services()
+    characteristics = await client.discover_characteristics(
+        [characteristic1.uuid, characteristic2.uuid], None
+    )
+    response = await client.send_request(
+        att.ATT_Read_Multiple_Request(
+            set_of_handles=[c.handle for c in characteristics]
+        )
+    )
+    assert isinstance(response, att.ATT_Read_Multiple_Response)
+    assert response.set_of_values == b'12345678'
+
+    response = await client.send_request(
+        att.ATT_Read_Multiple_Request(
+            set_of_handles=[
+                next(
+                    handle
+                    for handle in range(0x0001, 0xFFFF)
+                    if not server.get_attribute(handle)
+                )
+            ]
+        )
+    )
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_ATTRIBUTE_NOT_FOUND_ERROR
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_read_multiple_variable() -> None:
+    devices = await TwoDevices.create_with_connection()
+
+    characteristic1 = Characteristic(
+        '0001', Characteristic.Properties.READ, Characteristic.READABLE, b'1234'
+    )
+
+    characteristic2 = Characteristic(
+        '0002',
+        Characteristic.Properties.READ,
+        Characteristic.READABLE,
+        b'99',
+    )
+
+    service = Service('0000', [characteristic1, characteristic2])
+    devices[1].add_service(service)
+
+    client = devices.connections[0].gatt_client
+    server = devices[1].gatt_server
+
+    await client.discover_services()
+    characteristics = await client.discover_characteristics(
+        [characteristic1.uuid, characteristic2.uuid], None
+    )
+    response = await client.send_request(
+        att.ATT_Read_Multiple_Variable_Request(
+            set_of_handles=[c.handle for c in characteristics]
+        )
+    )
+    assert isinstance(response, att.ATT_Read_Multiple_Variable_Response)
+    assert response.length_value_tuple_list == [(4, b'1234'), (2, b'99')]
+
+    response = await client.send_request(
+        att.ATT_Read_Multiple_Variable_Request(
+            set_of_handles=[
+                next(
+                    handle
+                    for handle in range(0x0001, 0xFFFF)
+                    if not server.get_attribute(handle)
+                )
+            ]
+        )
+    )
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_ATTRIBUTE_NOT_FOUND_ERROR
 
 
 # -----------------------------------------------------------------------------
