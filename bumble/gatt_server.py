@@ -776,6 +776,18 @@ class Server(utils.EventEmitter):
             error_code=att.ATT_ATTRIBUTE_NOT_FOUND_ERROR,
         )
 
+        if (
+            request.starting_handle == 0x0000
+            or request.starting_handle > request.ending_handle
+        ):
+            response = att.ATT_Error_Response(
+                request_opcode_in_error=request.op_code,
+                attribute_handle_in_error=request.starting_handle,
+                error_code=att.ATT_INVALID_HANDLE_ERROR,
+            )
+            self.send_response(bearer, response)
+            return
+
         attributes: list[tuple[int, bytes]] = []
         for attribute in (
             attribute
