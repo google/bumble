@@ -43,44 +43,53 @@ hci.HCI_Command.register_commands(globals())
 
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Get_Vendor_Capabilities_Command(hci.HCI_Command):
+class HCI_LE_Get_Vendor_Capabilities_ReturnParameters(hci.HCI_StatusReturnParameters):
+    max_advt_instances: int = field(metadata=hci.metadata(1), default=0)
+    offloaded_resolution_of_private_address: int = field(
+        metadata=hci.metadata(1), default=0
+    )
+    total_scan_results_storage: int = field(metadata=hci.metadata(2), default=0)
+    max_irk_list_sz: int = field(metadata=hci.metadata(1), default=0)
+    filtering_support: int = field(metadata=hci.metadata(1), default=0)
+    max_filter: int = field(metadata=hci.metadata(1), default=0)
+    activity_energy_info_support: int = field(metadata=hci.metadata(1), default=0)
+    version_supported: int = field(metadata=hci.metadata(2), default=0)
+    total_num_of_advt_tracked: int = field(metadata=hci.metadata(2), default=0)
+    extended_scan_support: int = field(metadata=hci.metadata(1), default=0)
+    debug_logging_supported: int = field(metadata=hci.metadata(1), default=0)
+    le_address_generation_offloading_support: int = field(
+        metadata=hci.metadata(1), default=0
+    )
+    a2dp_source_offload_capability_mask: int = field(
+        metadata=hci.metadata(4), default=0
+    )
+    bluetooth_quality_report_support: int = field(metadata=hci.metadata(1), default=0)
+    dynamic_audio_buffer_support: int = field(metadata=hci.metadata(4), default=0)
+
+
+@hci.HCI_SyncCommand.sync_command(HCI_LE_Get_Vendor_Capabilities_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Get_Vendor_Capabilities_Command(
+    hci.HCI_SyncCommand[HCI_LE_Get_Vendor_Capabilities_ReturnParameters]
+):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#vendor-specific-capabilities
     '''
 
-    return_parameters_fields = [
-        ('status', hci.STATUS_SPEC),
-        ('max_advt_instances', 1),
-        ('offloaded_resolution_of_private_address', 1),
-        ('total_scan_results_storage', 2),
-        ('max_irk_list_sz', 1),
-        ('filtering_support', 1),
-        ('max_filter', 1),
-        ('activity_energy_info_support', 1),
-        ('version_supported', 2),
-        ('total_num_of_advt_tracked', 2),
-        ('extended_scan_support', 1),
-        ('debug_logging_supported', 1),
-        ('le_address_generation_offloading_support', 1),
-        ('a2dp_source_offload_capability_mask', 4),
-        ('bluetooth_quality_report_support', 1),
-        ('dynamic_audio_buffer_support', 4),
-    ]
-
     @classmethod
     def parse_return_parameters(cls, parameters):
         # There are many versions of this data structure, so we need to parse until
-        # there are no more bytes to parse, and leave un-signal parameters set to
-        # None (older versions)
-        nones = {field: None for field, _ in cls.return_parameters_fields}
-        return_parameters = hci.HCI_Object(cls.return_parameters_fields, **nones)
+        # there are no more bytes to parse, and leave un-signaled parameters set to
+        # 0
+        return_parameters = HCI_LE_Get_Vendor_Capabilities_ReturnParameters(
+            hci.HCI_ErrorCode.SUCCESS
+        )
 
         try:
             offset = 0
-            for field in cls.return_parameters_fields:
+            for field in cls.return_parameters_class.fields:
                 field_name, field_type = field
                 field_value, field_size = hci.HCI_Object.parse_field(
                     parameters, offset, field_type
@@ -94,9 +103,30 @@ class HCI_LE_Get_Vendor_Capabilities_Command(hci.HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command
+# APCF Subcommands
+class LeApcfOpcode(hci.SpecableEnum):
+    ENABLE = 0x00
+    SET_FILTERING_PARAMETERS = 0x01
+    BROADCASTER_ADDRESS = 0x02
+    SERVICE_UUID = 0x03
+    SERVICE_SOLICITATION_UUID = 0x04
+    LOCAL_NAME = 0x05
+    MANUFACTURER_DATA = 0x06
+    SERVICE_DATA = 0x07
+    TRANSPORT_DISCOVERY_SERVICE = 0x08
+    AD_TYPE_FILTER = 0x09
+    READ_EXTENDED_FEATURES = 0xFF
+
+
 @dataclasses.dataclass
-class HCI_LE_APCF_Command(hci.HCI_Command):
+class HCI_LE_APCF_ReturnParameters(hci.HCI_StatusReturnParameters):
+    opcode: int = field(metadata=LeApcfOpcode.type_metadata(1))
+    payload: bytes = field(metadata=hci.metadata('*'))
+
+
+@hci.HCI_SyncCommand.sync_command(HCI_LE_APCF_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_APCF_Command(hci.HCI_SyncCommand[HCI_LE_APCF_ReturnParameters]):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#le_apcf_command
@@ -105,52 +135,52 @@ class HCI_LE_APCF_Command(hci.HCI_Command):
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
 
-    # APCF Subcommands
-    class Opcode(hci.SpecableEnum):
-        ENABLE = 0x00
-        SET_FILTERING_PARAMETERS = 0x01
-        BROADCASTER_ADDRESS = 0x02
-        SERVICE_UUID = 0x03
-        SERVICE_SOLICITATION_UUID = 0x04
-        LOCAL_NAME = 0x05
-        MANUFACTURER_DATA = 0x06
-        SERVICE_DATA = 0x07
-        TRANSPORT_DISCOVERY_SERVICE = 0x08
-        AD_TYPE_FILTER = 0x09
-        READ_EXTENDED_FEATURES = 0xFF
-
-    opcode: int = dataclasses.field(metadata=Opcode.type_metadata(1))
+    opcode: int = dataclasses.field(metadata=LeApcfOpcode.type_metadata(1))
     payload: bytes = dataclasses.field(metadata=hci.metadata("*"))
-
-    return_parameters_fields = [
-        ('status', hci.STATUS_SPEC),
-        ('opcode', Opcode.type_spec(1)),
-        ('payload', '*'),
-    ]
 
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command
 @dataclasses.dataclass
-class HCI_Get_Controller_Activity_Energy_Info_Command(hci.HCI_Command):
+class HCI_Get_Controller_Activity_Energy_Info_ReturnParameters(
+    hci.HCI_StatusReturnParameters
+):
+    total_tx_time_ms: int = field(metadata=hci.metadata(4))
+    total_rx_time_ms: int = field(metadata=hci.metadata(4))
+    total_idle_time_ms: int = field(metadata=hci.metadata(4))
+    total_energy_used: int = field(metadata=hci.metadata(4))
+
+
+@hci.HCI_SyncCommand.sync_command(
+    HCI_Get_Controller_Activity_Energy_Info_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_Get_Controller_Activity_Energy_Info_Command(
+    hci.HCI_SyncCommand[HCI_Get_Controller_Activity_Energy_Info_ReturnParameters]
+):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#le_get_controller_activity_energy_info
     '''
 
-    return_parameters_fields = [
-        ('status', hci.STATUS_SPEC),
-        ('total_tx_time_ms', 4),
-        ('total_rx_time_ms', 4),
-        ('total_idle_time_ms', 4),
-        ('total_energy_used', 4),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command
+# A2DP Hardware Offload Subcommands
+class A2dpHardwareOffloadOpcode(hci.SpecableEnum):
+    START_A2DP_OFFLOAD = 0x01
+    STOP_A2DP_OFFLOAD = 0x02
+
+
 @dataclasses.dataclass
-class HCI_A2DP_Hardware_Offload_Command(hci.HCI_Command):
+class HCI_A2DP_Hardware_Offload_ReturnParameters(hci.HCI_StatusReturnParameters):
+    opcode: int = dataclasses.field(metadata=A2dpHardwareOffloadOpcode.type_metadata(1))
+    payload: bytes = dataclasses.field(metadata=hci.metadata("*"))
+
+
+@hci.HCI_SyncCommand.sync_command(HCI_A2DP_Hardware_Offload_ReturnParameters)
+@dataclasses.dataclass
+class HCI_A2DP_Hardware_Offload_Command(
+    hci.HCI_SyncCommand[HCI_A2DP_Hardware_Offload_ReturnParameters]
+):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#a2dp-hardware-offload-support
@@ -159,25 +189,27 @@ class HCI_A2DP_Hardware_Offload_Command(hci.HCI_Command):
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
 
-    # A2DP Hardware Offload Subcommands
-    class Opcode(hci.SpecableEnum):
-        START_A2DP_OFFLOAD = 0x01
-        STOP_A2DP_OFFLOAD = 0x02
-
-    opcode: int = dataclasses.field(metadata=Opcode.type_metadata(1))
+    opcode: int = dataclasses.field(metadata=A2dpHardwareOffloadOpcode.type_metadata(1))
     payload: bytes = dataclasses.field(metadata=hci.metadata("*"))
-
-    return_parameters_fields = [
-        ('status', hci.STATUS_SPEC),
-        ('opcode', Opcode.type_spec(1)),
-        ('payload', '*'),
-    ]
 
 
 # -----------------------------------------------------------------------------
-@hci.HCI_Command.command
+# Dynamic Audio Buffer Subcommands
+class DynamicAudioBufferOpcode(hci.SpecableEnum):
+    GET_AUDIO_BUFFER_TIME_CAPABILITY = 0x01
+
+
 @dataclasses.dataclass
-class HCI_Dynamic_Audio_Buffer_Command(hci.HCI_Command):
+class HCI_Dynamic_Audio_Buffer_ReturnParameters(hci.HCI_StatusReturnParameters):
+    opcode: int = dataclasses.field(metadata=DynamicAudioBufferOpcode.type_metadata(1))
+    payload: bytes = dataclasses.field(metadata=hci.metadata("*"))
+
+
+@hci.HCI_SyncCommand.sync_command(HCI_Dynamic_Audio_Buffer_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Dynamic_Audio_Buffer_Command(
+    hci.HCI_SyncCommand[HCI_Dynamic_Audio_Buffer_ReturnParameters]
+):
     # pylint: disable=line-too-long
     '''
     See https://source.android.com/docs/core/connect/bluetooth/hci_requirements#dynamic-audio-buffer-command
@@ -186,18 +218,8 @@ class HCI_Dynamic_Audio_Buffer_Command(hci.HCI_Command):
     implementation. A future enhancement may define subcommand-specific data structures.
     '''
 
-    # Dynamic Audio Buffer Subcommands
-    class Opcode(hci.SpecableEnum):
-        GET_AUDIO_BUFFER_TIME_CAPABILITY = 0x01
-
-    opcode: int = dataclasses.field(metadata=Opcode.type_metadata(1))
+    opcode: int = dataclasses.field(metadata=DynamicAudioBufferOpcode.type_metadata(1))
     payload: bytes = dataclasses.field(metadata=hci.metadata("*"))
-
-    return_parameters_fields = [
-        ('status', hci.STATUS_SPEC),
-        ('opcode', Opcode.type_spec(1)),
-        ('payload', '*'),
-    ]
 
 
 # -----------------------------------------------------------------------------

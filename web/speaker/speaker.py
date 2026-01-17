@@ -311,7 +311,7 @@ class Speaker:
 
     async def stop(self):
         # TODO: replace this once a proper reset is implemented in the lib.
-        await self.device.host.send_command(HCI_Reset_Command())
+        await self.device.host.send_sync_command(HCI_Reset_Command())
         await self.device.power_off()
         print('Speaker stopped')
 

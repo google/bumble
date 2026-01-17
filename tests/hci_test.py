@@ -20,7 +20,7 @@ import struct
 
 import pytest
 
-from bumble import hci
+from bumble import hci, utils
 
 # -----------------------------------------------------------------------------
 # pylint: disable=invalid-name
@@ -136,43 +136,25 @@ def test_HCI_LE_Channel_Selection_Algorithm_Event():
 # -----------------------------------------------------------------------------
 def test_HCI_Command_Complete_Event():
     # With a serializable object
-    event = hci.HCI_Command_Complete_Event(
+    event1 = hci.HCI_Command_Complete_Event(
         num_hci_command_packets=34,
         command_opcode=hci.HCI_LE_READ_BUFFER_SIZE_COMMAND,
-        return_parameters=hci.HCI_LE_Read_Buffer_Size_Command.create_return_parameters(
+        return_parameters=hci.HCI_LE_Read_Buffer_Size_Command.return_parameters_class(
             status=0,
             le_acl_data_packet_length=1234,
             total_num_le_acl_data_packets=56,
         ),
     )
-    basic_check(event)
-
-    # With an arbitrary byte array
-    event = hci.HCI_Command_Complete_Event(
-        num_hci_command_packets=1,
-        command_opcode=hci.HCI_RESET_COMMAND,
-        return_parameters=bytes([1, 2, 3, 4]),
-    )
-    basic_check(event)
-
-    # With a simple status as a 1-byte array
-    event = hci.HCI_Command_Complete_Event(
-        num_hci_command_packets=1,
-        command_opcode=hci.HCI_RESET_COMMAND,
-        return_parameters=bytes([7]),
-    )
-    basic_check(event)
-    event = hci.HCI_Packet.from_bytes(bytes(event))
-    assert event.return_parameters == 7
+    basic_check(event1)
 
     # With a simple status as an integer status
-    event = hci.HCI_Command_Complete_Event(
+    event3 = hci.HCI_Command_Complete_Event(
         num_hci_command_packets=1,
         command_opcode=hci.HCI_RESET_COMMAND,
-        return_parameters=9,
+        return_parameters=hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode(9)),
     )
-    basic_check(event)
-    assert event.return_parameters == 9
+    basic_check(event3)
+    assert event3.return_parameters.status == 9
 
 
 # -----------------------------------------------------------------------------
@@ -227,6 +209,28 @@ def test_HCI_Vendor_Event():
     parsed = hci.HCI_Packet.from_bytes(event_bytes)
     assert not isinstance(parsed, HCI_Custom_Event)
     assert isinstance(parsed, hci.HCI_Vendor_Event)
+
+
+# -----------------------------------------------------------------------------
+def test_return_parameters() -> None:
+    params = hci.HCI_Reset_Command.parse_return_parameters(bytes.fromhex('3C'))
+    assert params.status == hci.HCI_ErrorCode.ADVERTISING_TIMEOUT_ERROR
+    assert isinstance(params.status, utils.OpenIntEnum)
+
+    params = hci.HCI_Read_BD_ADDR_Command.parse_return_parameters(
+        bytes.fromhex('3C001122334455')
+    )
+    assert params.status == hci.HCI_ErrorCode.ADVERTISING_TIMEOUT_ERROR
+    assert isinstance(params.status, utils.OpenIntEnum)
+    assert isinstance(params.bd_addr, hci.Address)
+
+    params = hci.HCI_Read_Local_Name_Command.parse_return_parameters(
+        bytes.fromhex('0068656c6c6f') + bytes(248 - 5)
+    )
+    assert params.status == hci.HCI_ErrorCode.SUCCESS
+    assert isinstance(params.local_name, bytes)
+    assert len(params.local_name) == 248
+    assert hci.map_null_terminated_utf8_string(params.local_name) == 'hello'
 
 
 # -----------------------------------------------------------------------------
@@ -291,7 +295,7 @@ def test_custom_le_meta_event():
         for clazz in inspect.getmembers(hci)
         if isinstance(clazz[1], type)
         and issubclass(clazz[1], hci.HCI_Command)
-        and clazz[1] is not hci.HCI_Command
+        and clazz[1] not in (hci.HCI_Command, hci.HCI_SyncCommand, hci.HCI_AsyncCommand)
     ],
 )
 def test_hci_command_subclasses_op_code(clazz: type[hci.HCI_Command]):
@@ -620,21 +624,19 @@ def test_HCI_Read_Local_Supported_Codecs_Command_Complete():
 
 # -----------------------------------------------------------------------------
 def test_HCI_Read_Local_Supported_Codecs_V2_Command_Complete():
-    returned_parameters = (
-        hci.HCI_Read_Local_Supported_Codecs_V2_Command.parse_return_parameters(
-            bytes(
-                [
-                    hci.HCI_SUCCESS,
-                    3,
-                    hci.CodecID.A_LOG,
-                    hci.HCI_Read_Local_Supported_Codecs_V2_Command.Transport.BR_EDR_ACL,
-                    hci.CodecID.CVSD,
-                    hci.HCI_Read_Local_Supported_Codecs_V2_Command.Transport.BR_EDR_SCO,
-                    hci.CodecID.LINEAR_PCM,
-                    hci.HCI_Read_Local_Supported_Codecs_V2_Command.Transport.LE_CIS,
-                    0,
-                ]
-            )
+    returned_parameters = hci.HCI_Read_Local_Supported_Codecs_V2_Command.parse_return_parameters(
+        bytes(
+            [
+                hci.HCI_SUCCESS,
+                3,
+                hci.CodecID.A_LOG,
+                hci.HCI_Read_Local_Supported_Codecs_V2_ReturnParameters.Transport.BR_EDR_ACL,
+                hci.CodecID.CVSD,
+                hci.HCI_Read_Local_Supported_Codecs_V2_ReturnParameters.Transport.BR_EDR_SCO,
+                hci.CodecID.LINEAR_PCM,
+                hci.HCI_Read_Local_Supported_Codecs_V2_ReturnParameters.Transport.LE_CIS,
+                0,
+            ]
         )
     )
     assert returned_parameters.standard_codec_ids == [
@@ -643,9 +645,9 @@ def test_HCI_Read_Local_Supported_Codecs_V2_Command_Complete():
         hci.CodecID.LINEAR_PCM,
     ]
     assert returned_parameters.standard_codec_transports == [
-        hci.HCI_Read_Local_Supported_Codecs_V2_Command.Transport.BR_EDR_ACL,
-        hci.HCI_Read_Local_Supported_Codecs_V2_Command.Transport.BR_EDR_SCO,
-        hci.HCI_Read_Local_Supported_Codecs_V2_Command.Transport.LE_CIS,
+        hci.HCI_Read_Local_Supported_Codecs_V2_ReturnParameters.Transport.BR_EDR_ACL,
+        hci.HCI_Read_Local_Supported_Codecs_V2_ReturnParameters.Transport.BR_EDR_SCO,
+        hci.HCI_Read_Local_Supported_Codecs_V2_ReturnParameters.Transport.LE_CIS,
     ]
 
 
@@ -737,6 +739,7 @@ def run_test_commands():
 if __name__ == '__main__':
     run_test_events()
     run_test_commands()
+    test_return_parameters()
     test_address()
     test_custom()
     test_iso_data_packet()

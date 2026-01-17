@@ -923,7 +923,7 @@ class DeviceClass:
     # pylint: enable=line-too-long
 
     @staticmethod
-    def split_class_of_device(class_of_device):
+    def split_class_of_device(class_of_device: int) -> tuple[int, int, int]:
         # Split the bit fields of the composite class of device value into:
         # (service_classes, major_device_class, minor_device_class)
         return (

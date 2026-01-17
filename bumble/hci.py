@@ -29,6 +29,7 @@ from dataclasses import field
 from typing import (
     Any,
     ClassVar,
+    Generic,
     Literal,
     TypeVar,
     cast,
@@ -77,7 +78,7 @@ def indent_lines(string):
     return '\n'.join(['  ' + line for line in string.split('\n')])
 
 
-def map_null_terminated_utf8_string(utf8_bytes):
+def map_null_terminated_utf8_string(utf8_bytes: bytes) -> str | bytes:
     try:
         terminator = utf8_bytes.find(0)
         if terminator < 0:
@@ -87,7 +88,7 @@ def map_null_terminated_utf8_string(utf8_bytes):
         return utf8_bytes
 
 
-def map_class_of_device(class_of_device):
+def map_class_of_device(class_of_device: int) -> str:
     (
         service_classes,
         major_device_class,
@@ -208,7 +209,7 @@ def metadata(
 HCI_VENDOR_OGF = 0x3F
 
 # Specification Version
-class SpecificationVersion(utils.OpenIntEnum):
+class SpecificationVersion(SpecableEnum):
     BLUETOOTH_CORE_1_0B    = 0
     BLUETOOTH_CORE_1_1     = 1
     BLUETOOTH_CORE_1_2     = 2
@@ -739,6 +740,76 @@ HCI_LE_FRAME_SPACE_UPDATE_COMMAND                                        = hci_c
 
 # HCI Error Codes
 # See Bluetooth spec Vol 2, Part D - 1.3 LIST OF ERROR CODES
+class HCI_ErrorCode(SpecableEnum):
+    SUCCESS                                                                            = 0x00
+    UNKNOWN_HCI_COMMAND_ERROR                                                          = 0x01
+    UNKNOWN_CONNECTION_IDENTIFIER_ERROR                                                = 0x02
+    HARDWARE_FAILURE_ERROR                                                             = 0x03
+    PAGE_TIMEOUT_ERROR                                                                 = 0x04
+    AUTHENTICATION_FAILURE_ERROR                                                       = 0x05
+    PIN_OR_KEY_MISSING_ERROR                                                           = 0x06
+    MEMORY_CAPACITY_EXCEEDED_ERROR                                                     = 0x07
+    CONNECTION_TIMEOUT_ERROR                                                           = 0x08
+    CONNECTION_LIMIT_EXCEEDED_ERROR                                                    = 0x09
+    SYNCHRONOUS_CONNECTION_LIMIT_TO_A_DEVICE_EXCEEDED_ERROR                            = 0x0A
+    CONNECTION_ALREADY_EXISTS_ERROR                                                    = 0x0B
+    COMMAND_DISALLOWED_ERROR                                                           = 0x0C
+    CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR                                 = 0x0D
+    CONNECTION_REJECTED_DUE_TO_SECURITY_REASONS_ERROR                                  = 0x0E
+    CONNECTION_REJECTED_DUE_TO_UNACCEPTABLE_BD_ADDR_ERROR                              = 0x0F
+    CONNECTION_ACCEPT_TIMEOUT_ERROR                                                    = 0x10
+    UNSUPPORTED_FEATURE_OR_PARAMETER_VALUE_ERROR                                       = 0x11
+    INVALID_COMMAND_PARAMETERS_ERROR                                                   = 0x12
+    REMOTE_USER_TERMINATED_CONNECTION_ERROR                                            = 0x13
+    REMOTE_DEVICE_TERMINATED_CONNECTION_DUE_TO_LOW_RESOURCES_ERROR                     = 0x14
+    REMOTE_DEVICE_TERMINATED_CONNECTION_DUE_TO_POWER_OFF_ERROR                         = 0x15
+    CONNECTION_TERMINATED_BY_LOCAL_HOST_ERROR                                          = 0x16
+    REPEATED_ATTEMPTS_ERROR                                                            = 0X17
+    PAIRING_NOT_ALLOWED_ERROR                                                          = 0X18
+    UNKNOWN_LMP_PDU_ERROR                                                              = 0X19
+    UNSUPPORTED_REMOTE_FEATURE_ERROR                                                   = 0X1A
+    SCO_OFFSET_REJECTED_ERROR                                                          = 0X1B
+    SCO_INTERVAL_REJECTED_ERROR                                                        = 0X1C
+    SCO_AIR_MODE_REJECTED_ERROR                                                        = 0X1D
+    INVALID_LMP_OR_LL_PARAMETERS_ERROR                                                 = 0X1E
+    UNSPECIFIED_ERROR_ERROR                                                            = 0X1F
+    UNSUPPORTED_LMP_OR_LL_PARAMETER_VALUE_ERROR                                        = 0X20
+    ROLE_CHANGE_NOT_ALLOWED_ERROR                                                      = 0X21
+    LMP_OR_LL_RESPONSE_TIMEOUT_ERROR                                                   = 0X22
+    LMP_ERROR_TRANSACTION_COLLISION_OR_LL_PROCEDURE_COLLISION_ERROR                    = 0X23
+    LMP_PDU_NOT_ALLOWED_ERROR                                                          = 0X24
+    ENCRYPTION_MODE_NOT_ACCEPTABLE_ERROR                                               = 0X25
+    LINK_KEY_CANNOT_BE_CHANGED_ERROR                                                   = 0X26
+    REQUESTED_QOS_NOT_SUPPORTED_ERROR                                                  = 0X27
+    INSTANT_PASSED_ERROR                                                               = 0X28
+    PAIRING_WITH_UNIT_KEY_NOT_SUPPORTED_ERROR                                          = 0X29
+    DIFFERENT_TRANSACTION_COLLISION_ERROR                                              = 0X2A
+    RESERVED_FOR_FUTURE_USE                                                            = 0X2B
+    QOS_UNACCEPTABLE_PARAMETER_ERROR                                                   = 0X2C
+    QOS_REJECTED_ERROR                                                                 = 0X2D
+    CHANNEL_CLASSIFICATION_NOT_SUPPORTED_ERROR                                         = 0X2E
+    INSUFFICIENT_SECURITY_ERROR                                                        = 0X2F
+    PARAMETER_OUT_OF_MANDATORY_RANGE_ERROR                                             = 0X30
+    ROLE_SWITCH_PENDING_ERROR                                                          = 0X32
+    RESERVED_SLOT_VIOLATION_ERROR                                                      = 0X34
+    ROLE_SWITCH_FAILED_ERROR                                                           = 0X35
+    EXTENDED_INQUIRY_RESPONSE_TOO_LARGE_ERROR                                          = 0X36
+    SECURE_SIMPLE_PAIRING_NOT_SUPPORTED_BY_HOST_ERROR                                  = 0X37
+    HOST_BUSY_PAIRING_ERROR                                                            = 0X38
+    CONNECTION_REJECTED_DUE_TO_NO_SUITABLE_CHANNEL_FOUND_ERROR                         = 0X39
+    CONTROLLER_BUSY_ERROR                                                              = 0X3A
+    UNACCEPTABLE_CONNECTION_PARAMETERS_ERROR                                           = 0X3B
+    ADVERTISING_TIMEOUT_ERROR                                                          = 0X3C
+    CONNECTION_TERMINATED_DUE_TO_MIC_FAILURE_ERROR                                     = 0X3D
+    CONNECTION_FAILED_TO_BE_ESTABLISHED_ERROR                                          = 0X3E
+    COARSE_CLOCK_ADJUSTMENT_REJECTED_BUT_WILL_TRY_TO_ADJUST_USING_CLOCK_DRAGGING_ERROR = 0X40
+    TYPE0_SUBMAP_NOT_DEFINED_ERROR                                                     = 0X41
+    UNKNOWN_ADVERTISING_IDENTIFIER_ERROR                                               = 0X42
+    LIMIT_REACHED_ERROR                                                                = 0X43
+    OPERATION_CANCELLED_BY_HOST_ERROR                                                  = 0X44
+    PACKET_TOO_LONG_ERROR                                                              = 0X45
+
+# For backwards compatibility.
 HCI_SUCCESS                                                                            = 0x00
 HCI_UNKNOWN_HCI_COMMAND_ERROR                                                          = 0x01
 HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR                                                = 0x02
@@ -808,13 +879,15 @@ HCI_OPERATION_CANCELLED_BY_HOST_ERROR                                           
 HCI_PACKET_TOO_LONG_ERROR                                                              = 0X45
 
 HCI_ERROR_NAMES = {
-    error_code: error_name for (error_name, error_code) in globals().items()
-    if error_name.startswith('HCI_') and error_name.endswith('_ERROR')
+    error_code: error_code.name for error_code in HCI_ErrorCode
 }
-HCI_ERROR_NAMES[HCI_SUCCESS] = 'HCI_SUCCESS'
 
 # Command Status codes
-HCI_COMMAND_STATUS_PENDING = 0
+class HCI_CommandStatus(SpecableEnum):
+    PENDING = 0x00
+
+# For backward compatibility
+HCI_COMMAND_STATUS_PENDING = HCI_CommandStatus.PENDING
 
 
 class Phy(SpecableEnum):
@@ -1727,6 +1800,8 @@ class HCI_StatusError(ProtocolError):
 # Generic HCI object
 # -----------------------------------------------------------------------------
 class HCI_Object:
+    fields: Fields
+
     @staticmethod
     def init_from_fields(hci_object, fields, values):
         if isinstance(values, dict):
@@ -2355,7 +2430,6 @@ class HCI_Command(HCI_Packet):
     command_classes: dict[int, type[HCI_Command]] = {}
     op_code: int
     fields: Fields = ()
-    return_parameters_fields: Fields = ()
     _parameters: bytes = b''
 
     _Command = TypeVar("_Command", bound="HCI_Command")
@@ -2424,20 +2498,6 @@ class HCI_Command(HCI_Packet):
             return subclass.name
         return f'[OGF=0x{op_code >> 10:02x}, OCF=0x{op_code & 0x3FF:04x}]'
 
-    @classmethod
-    def create_return_parameters(cls, **kwargs):
-        return HCI_Object(cls.return_parameters_fields, **kwargs)
-
-    @classmethod
-    def parse_return_parameters(cls, parameters):
-        if not cls.return_parameters_fields:
-            return None
-        return_parameters = HCI_Object.from_bytes(
-            parameters, 0, cls.return_parameters_fields
-        )
-        return_parameters.fields = cls.return_parameters_fields
-        return return_parameters
-
     def __init__(
         self,
         parameters: bytes | None = None,
@@ -2486,9 +2546,82 @@ HCI_Command.register_commands(globals())
 
 
 # -----------------------------------------------------------------------------
+class HCI_AsyncCommand(HCI_Command):
+    '''
+    HCI Commands for which the expected response is an HCI_Command_Status_Event.
+    '''
+
+
+# -----------------------------------------------------------------------------
+class HCI_ReturnParameters(HCI_Object):
+    @classmethod
+    def from_parameters(cls, parameters: bytes) -> Self:
+        return cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
+
+
+@dataclasses.dataclass
+class HCI_GenericReturnParameters(HCI_ReturnParameters):
+    fields = [('data', '*')]
+    data: bytes = field(metadata=metadata('*'))
+
+
+@dataclasses.dataclass
+class HCI_StatusReturnParameters(HCI_ReturnParameters):
+    status: HCI_ErrorCode = field(metadata=HCI_ErrorCode.type_metadata(1))
+
+
+@dataclasses.dataclass
+class HCI_StatusAndAddressReturnParameters(HCI_StatusReturnParameters):
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+
+
+@dataclasses.dataclass
+class HCI_StatusAndConnectionHandleReturnParameters(HCI_StatusReturnParameters):
+    connection_handle: int = field(metadata=metadata(2))
+
+
+_RP = TypeVar('_RP', bound=HCI_ReturnParameters)
+
+
+class HCI_SyncCommand(HCI_Command, Generic[_RP]):
+    '''
+    HCI Commands for which the expected response is an HCI_Command_Complete_Event.
+    '''
+
+    return_parameters_class: type[_RP]
+
+    _SyncCommand = TypeVar("_SyncCommand", bound="HCI_SyncCommand")
+
+    @classmethod
+    def sync_command(
+        cls: type[_SyncCommand], return_parameters_class: type[_RP]
+    ) -> Callable[[type[_SyncCommand]], type[_SyncCommand]]:
+        '''
+        Decorator used to declare and register subclasses and setup their
+        `return_parameters_class` attribute.
+        '''
+
+        _SyncCommand = TypeVar("_SyncCommand", bound="HCI_SyncCommand")
+
+        def inner(cls: type[_SyncCommand]) -> type[_SyncCommand]:
+            cls = HCI_Command.command(cls)
+            cls.return_parameters_class = return_parameters_class
+            return_parameters_class.fields = HCI_Object.fields_from_dataclass(
+                cls.return_parameters_class
+            )
+            return cls
+
+        return inner
+
+    @classmethod
+    def parse_return_parameters(cls, parameters: bytes) -> _RP:
+        return cls.return_parameters_class.from_parameters(parameters)
+
+
+# -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Inquiry_Command(HCI_Command):
+class HCI_Inquiry_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.1 Inquiry Command
     '''
@@ -2501,9 +2634,9 @@ class HCI_Inquiry_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Inquiry_Cancel_Command(HCI_Command):
+class HCI_Inquiry_Cancel_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.1.2 Inquiry Cancel Command
     '''
@@ -2512,7 +2645,7 @@ class HCI_Inquiry_Cancel_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Create_Connection_Command(HCI_Command):
+class HCI_Create_Connection_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.5 Create Connection Command
     '''
@@ -2528,7 +2661,7 @@ class HCI_Create_Connection_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Disconnect_Command(HCI_Command):
+class HCI_Disconnect_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.6 Disconnect Command
     '''
@@ -2538,25 +2671,22 @@ class HCI_Disconnect_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_Create_Connection_Cancel_Command(HCI_Command):
+class HCI_Create_Connection_Cancel_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.7 Create Connection Cancel Command
     '''
 
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Accept_Connection_Request_Command(HCI_Command):
+class HCI_Accept_Connection_Request_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.8 Accept Connection Request Command
     '''
@@ -2568,7 +2698,7 @@ class HCI_Accept_Connection_Request_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Reject_Connection_Request_Command(HCI_Command):
+class HCI_Reject_Connection_Request_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.9 Reject Connection Request Command
     '''
@@ -2578,9 +2708,11 @@ class HCI_Reject_Connection_Request_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_Link_Key_Request_Reply_Command(HCI_Command):
+class HCI_Link_Key_Request_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.10 Link Key Request Reply Command
     '''
@@ -2590,25 +2722,24 @@ class HCI_Link_Key_Request_Reply_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_Link_Key_Request_Negative_Reply_Command(HCI_Command):
+class HCI_Link_Key_Request_Negative_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.11 Link Key Request Negative Reply Command
     '''
 
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_PIN_Code_Request_Reply_Command(HCI_Command):
+class HCI_PIN_Code_Request_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.12 PIN Code Request Reply Command
     '''
@@ -2617,32 +2748,24 @@ class HCI_PIN_Code_Request_Reply_Command(HCI_Command):
     pin_code_length: int = field(metadata=metadata(1))
     pin_code: bytes = field(metadata=metadata(16))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_PIN_Code_Request_Negative_Reply_Command(HCI_Command):
+class HCI_PIN_Code_Request_Negative_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.13 PIN Code Request Negative Reply Command
     '''
 
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Change_Connection_Packet_Type_Command(HCI_Command):
+class HCI_Change_Connection_Packet_Type_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.14 Change Connection Packet Type Command
     '''
@@ -2654,7 +2777,7 @@ class HCI_Change_Connection_Packet_Type_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Authentication_Requested_Command(HCI_Command):
+class HCI_Authentication_Requested_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.15 Authentication Requested Command
     '''
@@ -2665,7 +2788,7 @@ class HCI_Authentication_Requested_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Set_Connection_Encryption_Command(HCI_Command):
+class HCI_Set_Connection_Encryption_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.16 Set Connection Encryption Command
     '''
@@ -2677,7 +2800,7 @@ class HCI_Set_Connection_Encryption_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Remote_Name_Request_Command(HCI_Command):
+class HCI_Remote_Name_Request_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.19 Remote Name Request Command
     '''
@@ -2695,7 +2818,7 @@ class HCI_Remote_Name_Request_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Remote_Supported_Features_Command(HCI_Command):
+class HCI_Read_Remote_Supported_Features_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.21 Read Remote Supported Features Command
     '''
@@ -2706,7 +2829,7 @@ class HCI_Read_Remote_Supported_Features_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Remote_Extended_Features_Command(HCI_Command):
+class HCI_Read_Remote_Extended_Features_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.22 Read Remote Extended Features Command
     '''
@@ -2718,7 +2841,7 @@ class HCI_Read_Remote_Extended_Features_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Remote_Version_Information_Command(HCI_Command):
+class HCI_Read_Remote_Version_Information_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.23 Read Remote Version Information Command
     '''
@@ -2729,9 +2852,9 @@ class HCI_Read_Remote_Version_Information_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Clock_Offset_Command(HCI_Command):
+class HCI_Read_Clock_Offset_Command(HCI_AsyncCommand):
     '''
-    See Bluetooth spec @ 7.1.23 Read Clock Offset Command
+    See Bluetooth spec @ 7.1.24 Read Clock Offset Command
     '''
 
     connection_handle: int = field(metadata=metadata(2))
@@ -2740,7 +2863,7 @@ class HCI_Read_Clock_Offset_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Reject_Synchronous_Connection_Request_Command(HCI_Command):
+class HCI_Reject_Synchronous_Connection_Request_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.28 Reject Synchronous Connection Request Command
     '''
@@ -2750,9 +2873,11 @@ class HCI_Reject_Synchronous_Connection_Request_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_IO_Capability_Request_Reply_Command(HCI_Command):
+class HCI_IO_Capability_Request_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.29 IO Capability Request Reply Command
     '''
@@ -2764,48 +2889,39 @@ class HCI_IO_Capability_Request_Reply_Command(HCI_Command):
         metadata=AuthenticationRequirements.type_metadata(1)
     )
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_User_Confirmation_Request_Reply_Command(HCI_Command):
+class HCI_User_Confirmation_Request_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.30 User Confirmation Request Reply Command
     '''
 
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_User_Confirmation_Request_Negative_Reply_Command(HCI_Command):
+class HCI_User_Confirmation_Request_Negative_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.31 User Confirmation Request Negative Reply Command
     '''
 
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_User_Passkey_Request_Reply_Command(HCI_Command):
+class HCI_User_Passkey_Request_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.32 User Passkey Request Reply Command
     '''
@@ -2813,32 +2929,26 @@ class HCI_User_Passkey_Request_Reply_Command(HCI_Command):
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
     numeric_value: int = field(metadata=metadata(4))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_User_Passkey_Request_Negative_Reply_Command(HCI_Command):
+class HCI_User_Passkey_Request_Negative_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.33 User Passkey Request Negative Reply Command
     '''
 
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_Remote_OOB_Data_Request_Reply_Command(HCI_Command):
+class HCI_Remote_OOB_Data_Request_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.34 Remote OOB Data Request Reply Command
     '''
@@ -2847,32 +2957,26 @@ class HCI_Remote_OOB_Data_Request_Reply_Command(HCI_Command):
     c: bytes = field(metadata=metadata(16))
     r: bytes = field(metadata=metadata(16))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_Remote_OOB_Data_Request_Negative_Reply_Command(HCI_Command):
+class HCI_Remote_OOB_Data_Request_Negative_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.35 Remote OOB Data Request Negative Reply Command
     '''
 
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_IO_Capability_Request_Negative_Reply_Command(HCI_Command):
+class HCI_IO_Capability_Request_Negative_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.36 IO Capability Request Negative Reply Command
     '''
@@ -2880,16 +2984,11 @@ class HCI_IO_Capability_Request_Negative_Reply_Command(HCI_Command):
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
     reason: int = field(metadata=metadata(1))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_Command):
+class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.45 Enhanced Setup Synchronous Connection Command
     '''
@@ -2954,7 +3053,7 @@ class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(HCI_Command):
+class HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.46 Enhanced Accept Synchronous Connection Request Command
     '''
@@ -2990,7 +3089,7 @@ class HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Truncated_Page_Command(HCI_Command):
+class HCI_Truncated_Page_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.47 Truncated Page Command
     '''
@@ -3001,25 +3100,34 @@ class HCI_Truncated_Page_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndAddressReturnParameters)
 @dataclasses.dataclass
-class HCI_Truncated_Page_Cancel_Command(HCI_Command):
+class HCI_Truncated_Page_Cancel_Command(
+    HCI_SyncCommand[HCI_StatusAndAddressReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.48 Truncated Page Cancel Command
     '''
 
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Set_Connectionless_Peripheral_Broadcast_Command(HCI_Command):
+class HCI_Set_Connectionless_Peripheral_Broadcast_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    lt_addr: int = field(metadata=metadata(1))
+    interval: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_Set_Connectionless_Peripheral_Broadcast_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_Set_Connectionless_Peripheral_Broadcast_Command(
+    HCI_SyncCommand[HCI_Set_Connectionless_Peripheral_Broadcast_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.49 Set Connectionless Peripheral Broadcast Command
     '''
@@ -3032,17 +3140,25 @@ class HCI_Set_Connectionless_Peripheral_Broadcast_Command(HCI_Command):
     interval_max: int = field(metadata=metadata(2))
     supervision_timeout: int = field(metadata=metadata(2))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('lt_addr', 1),
-        ('interval', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Set_Connectionless_Peripheral_Broadcast_Receive_Command(HCI_Command):
+class HCI_Set_Connectionless_Peripheral_Broadcast_Receive_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    lt_addr: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_Set_Connectionless_Peripheral_Broadcast_Receive_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_Set_Connectionless_Peripheral_Broadcast_Receive_Command(
+    HCI_SyncCommand[
+        HCI_Set_Connectionless_Peripheral_Broadcast_Receive_ReturnParameters
+    ]
+):
     '''
     See Bluetooth spec @ 7.1.50 Set Connectionless Peripheral Broadcast Receive Command
     '''
@@ -3059,17 +3175,11 @@ class HCI_Set_Connectionless_Peripheral_Broadcast_Receive_Command(HCI_Command):
     packet_type: int = field(metadata=metadata(2))
     afh_channel_map: bytes = field(metadata=metadata(10))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-        ('lt_addr', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Start_Synchronization_Train_Command(HCI_Command):
+class HCI_Start_Synchronization_Train_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.51 Start Synchronization Train Command
     '''
@@ -3078,7 +3188,7 @@ class HCI_Start_Synchronization_Train_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Receive_Synchronization_Train_Command(HCI_Command):
+class HCI_Receive_Synchronization_Train_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.52 Receive Synchronization Train Command
     '''
@@ -3090,9 +3200,11 @@ class HCI_Receive_Synchronization_Train_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Remote_OOB_Extended_Data_Request_Reply_Command(HCI_Command):
+class HCI_Remote_OOB_Extended_Data_Request_Reply_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.1.53 Remote OOB Extended Data Request Reply Command
     '''
@@ -3103,16 +3215,11 @@ class HCI_Remote_OOB_Extended_Data_Request_Reply_Command(HCI_Command):
     c_256: bytes = field(metadata=metadata(16))
     r_256: bytes = field(metadata=metadata(16))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Sniff_Mode_Command(HCI_Command):
+class HCI_Sniff_Mode_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.2.2 Sniff Mode Command
     '''
@@ -3127,7 +3234,7 @@ class HCI_Sniff_Mode_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Exit_Sniff_Mode_Command(HCI_Command):
+class HCI_Exit_Sniff_Mode_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.2.3 Exit Sniff Mode Command
     '''
@@ -3138,7 +3245,7 @@ class HCI_Exit_Sniff_Mode_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_Switch_Role_Command(HCI_Command):
+class HCI_Switch_Role_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.2.8 Switch Role Command
     '''
@@ -3148,9 +3255,11 @@ class HCI_Switch_Role_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Link_Policy_Settings_Command(HCI_Command):
+class HCI_Write_Link_Policy_Settings_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.2.10 Write Link Policy Settings Command
     '''
@@ -3160,9 +3269,11 @@ class HCI_Write_Link_Policy_Settings_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Default_Link_Policy_Settings_Command(HCI_Command):
+class HCI_Write_Default_Link_Policy_Settings_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.2.12 Write Default Link Policy Settings Command
     '''
@@ -3171,9 +3282,11 @@ class HCI_Write_Default_Link_Policy_Settings_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_Sniff_Subrating_Command(HCI_Command):
+class HCI_Sniff_Subrating_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.2.14 Sniff Subrating Command
     '''
@@ -3185,9 +3298,9 @@ class HCI_Sniff_Subrating_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Set_Event_Mask_Command(HCI_Command):
+class HCI_Set_Event_Mask_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.1 Set Event Mask Command
     '''
@@ -3210,18 +3323,18 @@ class HCI_Set_Event_Mask_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Reset_Command(HCI_Command):
+class HCI_Reset_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.2 Reset Command
     '''
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Set_Event_Filter_Command(HCI_Command):
+class HCI_Set_Event_Filter_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.3 Set Event Filter Command
     '''
@@ -3231,9 +3344,17 @@ class HCI_Set_Event_Filter_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Stored_Link_Key_Command(HCI_Command):
+class HCI_Read_Stored_Link_Key_ReturnParameters(HCI_StatusReturnParameters):
+    max_num_keys: int = field(metadata=metadata(2))
+    num_keys_read: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Stored_Link_Key_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Stored_Link_Key_Command(
+    HCI_SyncCommand[HCI_Read_Stored_Link_Key_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.8 Read Stored Link Key Command
     '''
@@ -3241,17 +3362,18 @@ class HCI_Read_Stored_Link_Key_Command(HCI_Command):
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
     read_all_flag: int = field(metadata=metadata(1))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('max_num_keys', 2),
-        ('num_keys_read', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Delete_Stored_Link_Key_Command(HCI_Command):
+class HCI_Delete_Stored_Link_Key_ReturnParameters(HCI_StatusReturnParameters):
+    num_keys_deleted: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_Delete_Stored_Link_Key_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Delete_Stored_Link_Key_Command(
+    HCI_SyncCommand[HCI_Delete_Stored_Link_Key_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.10 Delete Stored Link Key Command
     '''
@@ -3259,13 +3381,11 @@ class HCI_Delete_Stored_Link_Key_Command(HCI_Command):
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
     delete_all_flag: int = field(metadata=metadata(1))
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('num_keys_deleted', 2)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Local_Name_Command(HCI_Command):
+class HCI_Write_Local_Name_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.11 Write Local Name Command
     '''
@@ -3276,23 +3396,29 @@ class HCI_Write_Local_Name_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Local_Name_Command(HCI_Command):
+class HCI_Read_Local_Name_ReturnParameters(HCI_StatusReturnParameters):
+    local_name: bytes = field(
+        metadata=metadata({'size': 248, 'mapper': map_null_terminated_utf8_string})
+    )
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Local_Name_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Local_Name_Command(
+    HCI_SyncCommand[HCI_Read_Local_Name_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.12 Read Local Name Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('local_name', {'size': 248, 'mapper': map_null_terminated_utf8_string}),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Connection_Accept_Timeout_Command(HCI_Command):
+class HCI_Write_Connection_Accept_Timeout_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.14 Write Connection Accept Timeout Command
     '''
@@ -3301,9 +3427,9 @@ class HCI_Write_Connection_Accept_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Page_Timeout_Command(HCI_Command):
+class HCI_Write_Page_Timeout_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.16 Write Page Timeout Command
     '''
@@ -3312,9 +3438,9 @@ class HCI_Write_Page_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Scan_Enable_Command(HCI_Command):
+class HCI_Write_Scan_Enable_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.18 Write Scan Enable Command
     '''
@@ -3323,24 +3449,26 @@ class HCI_Write_Scan_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Page_Scan_Activity_Command(HCI_Command):
+class HCI_Read_Page_Scan_Activity_ReturnParameters(HCI_StatusReturnParameters):
+    page_scan_interval: int = field(metadata=metadata(2))
+    page_scan_window: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Page_Scan_Activity_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Page_Scan_Activity_Command(
+    HCI_SyncCommand[HCI_Read_Page_Scan_Activity_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.19 Read Page Scan Activity Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('page_scan_interval', 2),
-        ('page_scan_window', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Page_Scan_Activity_Command(HCI_Command):
+class HCI_Write_Page_Scan_Activity_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.20 Write Page Scan Activity Command
     '''
@@ -3350,9 +3478,11 @@ class HCI_Write_Page_Scan_Activity_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Inquiry_Scan_Activity_Command(HCI_Command):
+class HCI_Write_Inquiry_Scan_Activity_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.22 Write Inquiry Scan Activity Command
     '''
@@ -3362,23 +3492,27 @@ class HCI_Write_Inquiry_Scan_Activity_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Authentication_Enable_Command(HCI_Command):
+class HCI_Read_Authentication_Enable_ReturnParameters(HCI_StatusReturnParameters):
+    authentication_enable: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Authentication_Enable_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Authentication_Enable_Command(
+    HCI_SyncCommand[HCI_Read_Authentication_Enable_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.23 Read Authentication Enable Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('authentication_enable', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Authentication_Enable_Command(HCI_Command):
+class HCI_Write_Authentication_Enable_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.24 Write Authentication Enable Command
     '''
@@ -3387,23 +3521,27 @@ class HCI_Write_Authentication_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Class_Of_Device_Command(HCI_Command):
+class HCI_Read_Class_Of_Device_ReturnParameters(HCI_StatusReturnParameters):
+    class_of_device: int = field(
+        metadata=metadata({'size': 3, 'mapper': map_class_of_device})
+    )
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Class_Of_Device_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Class_Of_Device_Command(
+    HCI_SyncCommand[HCI_Read_Class_Of_Device_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.25 Read Class of Device Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('class_of_device', COD_SPEC),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Class_Of_Device_Command(HCI_Command):
+class HCI_Write_Class_Of_Device_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.26 Write Class of Device Command
     '''
@@ -3412,20 +3550,25 @@ class HCI_Write_Class_Of_Device_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Voice_Setting_Command(HCI_Command):
+class HCI_Read_Voice_Setting_ReturnParameters(HCI_StatusReturnParameters):
+    voice_setting: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Voice_Setting_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Voice_Setting_Command(
+    HCI_SyncCommand[HCI_Read_Voice_Setting_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.27 Read Voice Setting Command
     '''
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('voice_setting', 2)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Voice_Setting_Command(HCI_Command):
+class HCI_Write_Voice_Setting_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.28 Write Voice Setting Command
     '''
@@ -3434,23 +3577,29 @@ class HCI_Write_Voice_Setting_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Synchronous_Flow_Control_Enable_Command(HCI_Command):
+class HCI_Read_Synchronous_Flow_Control_Enable_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    synchronous_flow_control_enable: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Synchronous_Flow_Control_Enable_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Synchronous_Flow_Control_Enable_Command(
+    HCI_SyncCommand[HCI_Read_Synchronous_Flow_Control_Enable_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.36 Read Synchronous Flow Control Enable Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('synchronous_flow_control_enable', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Synchronous_Flow_Control_Enable_Command(HCI_Command):
+class HCI_Write_Synchronous_Flow_Control_Enable_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.37 Write Synchronous Flow Control Enable Command
     '''
@@ -3459,9 +3608,11 @@ class HCI_Write_Synchronous_Flow_Control_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Set_Controller_To_Host_Flow_Control_Command(HCI_Command):
+class HCI_Set_Controller_To_Host_Flow_Control_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.38 Set Controller To Host Flow Control command
     '''
@@ -3470,9 +3621,9 @@ class HCI_Set_Controller_To_Host_Flow_Control_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Host_Buffer_Size_Command(HCI_Command):
+class HCI_Host_Buffer_Size_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.39 Host Buffer Size Command
     '''
@@ -3484,9 +3635,16 @@ class HCI_Host_Buffer_Size_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Write_Link_Supervision_Timeout_Command(HCI_Command):
+class HCI_Write_Link_Supervision_Timeout_ReturnParameters(HCI_StatusReturnParameters):
+    handle: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_Write_Link_Supervision_Timeout_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Write_Link_Supervision_Timeout_Command(
+    HCI_SyncCommand[HCI_Write_Link_Supervision_Timeout_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.42 Write Link Supervision Timeout Command
     '''
@@ -3494,42 +3652,44 @@ class HCI_Write_Link_Supervision_Timeout_Command(HCI_Command):
     handle: int = field(metadata=metadata(2))
     link_supervision_timeout: int = field(metadata=metadata(2))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('handle', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Number_Of_Supported_IAC_Command(HCI_Command):
+class HCI_Read_Number_Of_Supported_IAC_ReturnParameters(HCI_StatusReturnParameters):
+    num_support_iac: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Number_Of_Supported_IAC_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Number_Of_Supported_IAC_Command(
+    HCI_SyncCommand[HCI_Read_Number_Of_Supported_IAC_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.43 Read Number Of Supported IAC Command
     '''
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('num_support_iac', 1)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Current_IAC_LAP_Command(HCI_Command):
+class HCI_Read_Current_IAC_LAP_ReturnParameters(HCI_StatusReturnParameters):
+    num_support_iac: int = field(metadata=metadata(1))
+    iac_lap: bytes = field(metadata=metadata('*'))  # TODO: should be parsed as an array
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Current_IAC_LAP_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Current_IAC_LAP_Command(
+    HCI_SyncCommand[HCI_Read_Current_IAC_LAP_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.44 Read Current IAC LAP Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('num_current_iac', 1),
-        ('iac_lap', '*'),  # TODO: this should be parsed as an array
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Inquiry_Scan_Type_Command(HCI_Command):
+class HCI_Write_Inquiry_Scan_Type_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.48 Write Inquiry Scan Type Command
     '''
@@ -3538,9 +3698,9 @@ class HCI_Write_Inquiry_Scan_Type_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Inquiry_Mode_Command(HCI_Command):
+class HCI_Write_Inquiry_Mode_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.50 Write Inquiry Mode Command
     '''
@@ -3549,20 +3709,25 @@ class HCI_Write_Inquiry_Mode_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Page_Scan_Type_Command(HCI_Command):
+class HCI_Read_Page_Scan_Type_ReturnParameters(HCI_StatusReturnParameters):
+    page_scan_type: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Page_Scan_Type_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Page_Scan_Type_Command(
+    HCI_SyncCommand[HCI_Read_Page_Scan_Type_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.51 Read Page Scan Type Command
     '''
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('page_scan_type', 1)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Page_Scan_Type_Command(HCI_Command):
+class HCI_Write_Page_Scan_Type_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.52 Write Page Scan Type Command
     '''
@@ -3571,9 +3736,11 @@ class HCI_Write_Page_Scan_Type_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Extended_Inquiry_Response_Command(HCI_Command):
+class HCI_Write_Extended_Inquiry_Response_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.56 Write Extended Inquiry Response Command
     '''
@@ -3585,9 +3752,11 @@ class HCI_Write_Extended_Inquiry_Response_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Simple_Pairing_Mode_Command(HCI_Command):
+class HCI_Write_Simple_Pairing_Mode_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.59 Write Simple Pairing Mode Command
     '''
@@ -3596,49 +3765,62 @@ class HCI_Write_Simple_Pairing_Mode_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Local_OOB_Data_Command(HCI_Command):
+class HCI_Read_Local_OOB_Data_ReturnParameters(HCI_StatusReturnParameters):
+    c: bytes = field(metadata=metadata(16))
+    r: bytes = field(metadata=metadata(16))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Local_OOB_Data_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Local_OOB_Data_Command(
+    HCI_SyncCommand[HCI_Read_Local_OOB_Data_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.60 Read Local OOB Data Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('c', 16),
-        ('r', 16),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Inquiry_Response_Transmit_Power_Level_Command(HCI_Command):
+class HCI_Read_Inquiry_Response_Transmit_Power_Level_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    tx_power: int = field(metadata=metadata(-1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_Read_Inquiry_Response_Transmit_Power_Level_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_Read_Inquiry_Response_Transmit_Power_Level_Command(
+    HCI_SyncCommand[HCI_Read_Inquiry_Response_Transmit_Power_Level_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.61 Read Inquiry Response Transmit Power Level Command
     '''
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('tx_power', -1)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Default_Erroneous_Data_Reporting_Command(HCI_Command):
+class HCI_Read_Default_Erroneous_Data_ReturnParameters(HCI_StatusReturnParameters):
+    erroneous_data_reporting: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Default_Erroneous_Data_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Default_Erroneous_Data_Reporting_Command(
+    HCI_SyncCommand[HCI_Read_Default_Erroneous_Data_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.64 Read Default Erroneous Data Reporting Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('erroneous_data_reporting', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Set_Event_Mask_Page_2_Command(HCI_Command):
+class HCI_Set_Event_Mask_Page_2_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.69 Set Event Mask Page 2 Command
     '''
@@ -3661,24 +3843,26 @@ class HCI_Set_Event_Mask_Page_2_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_LE_Host_Support_Command(HCI_Command):
+class HCI_Read_LE_Host_Support_ReturnParameters(HCI_StatusReturnParameters):
+    le_supported_host: int = field(metadata=metadata(1))
+    unused: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_LE_Host_Support_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_LE_Host_Support_Command(
+    HCI_SyncCommand[HCI_Read_LE_Host_Support_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.78 Read LE Host Support Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('le_supported_host', 1),
-        ('unused', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_LE_Host_Support_Command(HCI_Command):
+class HCI_Write_LE_Host_Support_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.3.79 Write LE Host Support Command
     '''
@@ -3688,9 +3872,11 @@ class HCI_Write_LE_Host_Support_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Secure_Connections_Host_Support_Command(HCI_Command):
+class HCI_Write_Secure_Connections_Host_Support_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.92 Write Secure Connections Host Support Command
     '''
@@ -3699,9 +3885,11 @@ class HCI_Write_Secure_Connections_Host_Support_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Authenticated_Payload_Timeout_Command(HCI_Command):
+class HCI_Write_Authenticated_Payload_Timeout_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.94 Write Authenticated Payload Timeout Command
     '''
@@ -3711,209 +3899,251 @@ class HCI_Write_Authenticated_Payload_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Local_OOB_Extended_Data_Command(HCI_Command):
+class HCI_Read_Local_OOB_Extended_Data_ReturnParameters(HCI_StatusReturnParameters):
+    le_supported_host: int = field(metadata=metadata(1))
+    c_192: bytes = field(metadata=metadata(16))
+    r_192: bytes = field(metadata=metadata(16))
+    c_256: bytes = field(metadata=metadata(16))
+    r_256: bytes = field(metadata=metadata(16))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Local_OOB_Extended_Data_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Local_OOB_Extended_Data_Command(
+    HCI_SyncCommand[HCI_Read_Local_OOB_Extended_Data_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.3.95 Read Local OOB Extended Data Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('c_192', 16),
-        ('r_192', 16),
-        ('c_256', 16),
-        ('r_256', 16),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Local_Version_Information_Command(HCI_Command):
+class HCI_Read_Local_Version_Information_ReturnParameters(HCI_StatusReturnParameters):
+    hci_version: int = field(metadata=SpecificationVersion.type_metadata(1))
+    hci_subversion: int = field(metadata=metadata(2))
+    lmp_version: int = field(metadata=SpecificationVersion.type_metadata(1))
+    company_identifier: int = field(metadata=metadata(2))
+    lmp_subversion: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Local_Version_Information_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Local_Version_Information_Command(
+    HCI_SyncCommand[HCI_Read_Local_Version_Information_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.4.1 Read Local Version Information Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('hci_version', 1),
-        ('hci_subversion', 2),
-        ('lmp_version', 1),
-        ('company_identifier', 2),
-        ('lmp_subversion', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Local_Supported_Commands_Command(HCI_Command):
+class HCI_Read_Local_Supported_Commands_ReturnParameters(HCI_StatusReturnParameters):
+    supported_commands: bytes = field(metadata=metadata(64))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Local_Supported_Commands_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Local_Supported_Commands_Command(
+    HCI_SyncCommand[HCI_Read_Local_Supported_Commands_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.4.2 Read Local Supported Commands Command
     '''
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('supported_commands', 64)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Local_Supported_Features_Command(HCI_Command):
+class HCI_Read_Local_Supported_Features_ReturnParameters(HCI_StatusReturnParameters):
+    lmp_features: bytes = field(metadata=metadata(8))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Local_Supported_Features_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Local_Supported_Features_Command(
+    HCI_SyncCommand[HCI_Read_Local_Supported_Features_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.4.3 Read Local Supported Features Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('lmp_features', 8),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Local_Extended_Features_Command(HCI_Command):
+class HCI_Read_Local_Extended_Features_ReturnParameters(HCI_StatusReturnParameters):
+    page_number: int = field(metadata=metadata(1))
+    maximum_page_number: int = field(metadata=metadata(1))
+    extended_lmp_features: bytes = field(metadata=metadata(8))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Local_Extended_Features_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Local_Extended_Features_Command(
+    HCI_SyncCommand[HCI_Read_Local_Extended_Features_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.4.4 Read Local Extended Features Command
     '''
 
     page_number: int = field(metadata=metadata(1))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('page_number', 1),
-        ('maximum_page_number', 1),
-        ('extended_lmp_features', 8),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Buffer_Size_Command(HCI_Command):
+class HCI_Read_Buffer_Size_ReturnParameters(HCI_StatusReturnParameters):
+    hc_acl_data_packet_length: int = field(metadata=metadata(2))
+    hc_synchronous_data_packet_length: int = field(metadata=metadata(1))
+    hc_total_num_acl_data_packets: int = field(metadata=metadata(2))
+    hc_total_num_synchronous_data_packets: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Buffer_Size_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Buffer_Size_Command(
+    HCI_SyncCommand[HCI_Read_Buffer_Size_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.4.5 Read Buffer Size Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('hc_acl_data_packet_length', 2),
-        ('hc_synchronous_data_packet_length', 1),
-        ('hc_total_num_acl_data_packets', 2),
-        ('hc_total_num_synchronous_data_packets', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_BD_ADDR_Command(HCI_Command):
+class HCI_Read_BD_ADDR_ReturnParameters(HCI_StatusReturnParameters):
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_BD_ADDR_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_BD_ADDR_Command(HCI_SyncCommand[HCI_Read_BD_ADDR_ReturnParameters]):
     '''
     See Bluetooth spec @ 7.4.6 Read BD_ADDR Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('bd_addr', Address.parse_address),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Local_Supported_Codecs_Command(HCI_Command):
+class HCI_Read_Local_Supported_Codecs_ReturnParameters(HCI_StatusReturnParameters):
+    standard_codec_ids: Sequence[CodecID] = field(
+        metadata=CodecID.type_metadata(1, list_begin=True, list_end=True)
+    )
+    vendor_specific_codec_ids: Sequence[int] = field(
+        metadata=metadata(4, list_begin=True, list_end=True)
+    )
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Local_Supported_Codecs_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Local_Supported_Codecs_Command(
+    HCI_SyncCommand[HCI_Read_Local_Supported_Codecs_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.4.8 Read Local Supported Codecs Command
     '''
 
-    return_parameters_fields = [
-        ("status", STATUS_SPEC),
-        [("standard_codec_ids", 1)],
-        [("vendor_specific_codec_ids", 4)],
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Local_Supported_Codecs_V2_Command(HCI_Command):
-    '''
-    See Bluetooth spec @ 7.4.8 Read Local Supported Codecs Command
-    '''
-
-    return_parameters_fields = [
-        ("status", STATUS_SPEC),
-        [("standard_codec_ids", 1), ("standard_codec_transports", 1)],
-        [("vendor_specific_codec_ids", 4), ("vendor_specific_codec_transports", 1)],
-    ]
-
+class HCI_Read_Local_Supported_Codecs_V2_ReturnParameters(HCI_StatusReturnParameters):
     class Transport(SpecableFlag):
         BR_EDR_ACL = 1 << 0
         BR_EDR_SCO = 1 << 1
         LE_CIS = 1 << 2
         LE_BIS = 1 << 3
 
+    standard_codec_ids: Sequence[CodecID] = field(
+        metadata=CodecID.type_metadata(1, list_begin=True)
+    )
+    standard_codec_transports: Sequence[Transport] = field(
+        metadata=Transport.type_metadata(1, list_end=True)
+    )
+    vendor_specific_codec_ids: Sequence[int] = field(
+        metadata=metadata(4, list_begin=True)
+    )
+    vendor_specific_codec_transports: Sequence[Transport] = field(
+        metadata=Transport.type_metadata(1, list_end=True)
+    )
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Local_Supported_Codecs_V2_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Local_Supported_Codecs_V2_Command(
+    HCI_SyncCommand[HCI_Read_Local_Supported_Codecs_V2_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.4.8 Read Local Supported Codecs Command
+    '''
+
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_RSSI_Command(HCI_Command):
+class HCI_Read_RSSI_ReturnParameters(HCI_StatusReturnParameters):
+    handle: int = field(metadata=metadata(2))
+    rssi: int = field(metadata=metadata(-1))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_RSSI_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_RSSI_Command(HCI_SyncCommand[HCI_Read_RSSI_ReturnParameters]):
     '''
     See Bluetooth spec @ 7.5.4 Read RSSI Command
     '''
 
     handle: int = field(metadata=metadata(2))
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('handle', 2), ('rssi', -1)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Encryption_Key_Size_Command(HCI_Command):
+class HCI_Read_Encryption_Key_Size_ReturnParameters(HCI_StatusReturnParameters):
+    connection_handle: int = field(metadata=metadata(2))
+    key_size: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Encryption_Key_Size_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Encryption_Key_Size_Command(
+    HCI_SyncCommand[HCI_Read_Encryption_Key_Size_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.5.7 Read Encryption Key Size Command
     '''
 
     connection_handle: int = field(metadata=metadata(2))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('key_size', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_Read_Loopback_Mode_Command(HCI_Command):
+class HCI_Read_Loopback_Mode_ReturnParameters(HCI_StatusReturnParameters):
+    loopback_mode: LoopbackMode = field(metadata=LoopbackMode.type_metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Loopback_Mode_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Loopback_Mode_Command(
+    HCI_SyncCommand[HCI_Read_Loopback_Mode_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.6.1 Read Loopback Mode Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('loopback_mode', LoopbackMode.type_spec(1)),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_Write_Loopback_Mode_Command(HCI_Command):
+class HCI_Write_Loopback_Mode_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.6.2 Write Loopback Mode Command
     '''
 
-    loopback_mode: int = field(metadata=metadata(1))
+    loopback_mode: LoopbackMode = field(metadata=LoopbackMode.type_metadata(1))
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Event_Mask_Command(HCI_Command):
+class HCI_LE_Set_Event_Mask_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.1 LE Set Event Mask Command
     '''
@@ -3936,52 +4166,61 @@ class HCI_LE_Set_Event_Mask_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Buffer_Size_Command(HCI_Command):
+class HCI_LE_Read_Buffer_Size_ReturnParameters(HCI_StatusReturnParameters):
+    le_acl_data_packet_length: int = field(metadata=metadata(2))
+    total_num_le_acl_data_packets: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Buffer_Size_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Buffer_Size_Command(
+    HCI_SyncCommand[HCI_LE_Read_Buffer_Size_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.2 LE Read Buffer Size Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('le_acl_data_packet_length', 2),
-        ('total_num_le_acl_data_packets', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Buffer_Size_V2_Command(HCI_Command):
+class HCI_LE_Read_Buffer_Size_V2_ReturnParameters(HCI_StatusReturnParameters):
+    le_acl_data_packet_length: int = field(metadata=metadata(2))
+    total_num_le_acl_data_packets: int = field(metadata=metadata(1))
+    iso_data_packet_length: int = field(metadata=metadata(2))
+    total_num_iso_data_packets: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Buffer_Size_V2_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Buffer_Size_V2_Command(
+    HCI_SyncCommand[HCI_LE_Read_Buffer_Size_V2_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.2 LE Read Buffer Size V2 Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('le_acl_data_packet_length', 2),
-        ('total_num_le_acl_data_packets', 1),
-        ('iso_data_packet_length', 2),
-        ('total_num_iso_data_packets', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Local_Supported_Features_Command(HCI_Command):
+class HCI_LE_Read_Local_Supported_Features_ReturnParameters(HCI_StatusReturnParameters):
+    le_features: bytes = field(metadata=metadata(8))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Local_Supported_Features_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Local_Supported_Features_Command(
+    HCI_SyncCommand[HCI_LE_Read_Local_Supported_Features_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.3 LE Read Local Supported Features Command
     '''
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('le_features', 8)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Random_Address_Command(HCI_Command):
+class HCI_LE_Set_Random_Address_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.4 LE Set Random Address Command
     '''
@@ -3996,9 +4235,11 @@ class HCI_LE_Set_Random_Address_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Advertising_Parameters_Command(HCI_Command):
+class HCI_LE_Set_Advertising_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.5 LE Set Advertising Parameters Command
     '''
@@ -4023,23 +4264,29 @@ class HCI_LE_Set_Advertising_Parameters_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Advertising_Physical_Channel_Tx_Power_Command(HCI_Command):
+class HCI_LE_Read_Advertising_Physical_Channel_Tx_Power_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    tx_power_level: int = field(metadata=metadata(-1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Read_Advertising_Physical_Channel_Tx_Power_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Read_Advertising_Physical_Channel_Tx_Power_Command(
+    HCI_SyncCommand[HCI_LE_Read_Advertising_Physical_Channel_Tx_Power_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.6 LE Read Advertising Physical Channel Tx Power Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('tx_power_level', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Advertising_Data_Command(HCI_Command):
+class HCI_LE_Set_Advertising_Data_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.7 LE Set Advertising Data Command
     '''
@@ -4057,9 +4304,11 @@ class HCI_LE_Set_Advertising_Data_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Scan_Response_Data_Command(HCI_Command):
+class HCI_LE_Set_Scan_Response_Data_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.8 LE Set Scan Response Data Command
     '''
@@ -4077,9 +4326,11 @@ class HCI_LE_Set_Scan_Response_Data_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Advertising_Enable_Command(HCI_Command):
+class HCI_LE_Set_Advertising_Enable_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.9 LE Set Advertising Enable Command
     '''
@@ -4088,9 +4339,9 @@ class HCI_LE_Set_Advertising_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Scan_Parameters_Command(HCI_Command):
+class HCI_LE_Set_Scan_Parameters_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.10 LE Set Scan Parameters Command
     '''
@@ -4111,9 +4362,9 @@ class HCI_LE_Set_Scan_Parameters_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Scan_Enable_Command(HCI_Command):
+class HCI_LE_Set_Scan_Enable_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.11 LE Set Scan Enable Command
     '''
@@ -4125,7 +4376,7 @@ class HCI_LE_Set_Scan_Enable_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Create_Connection_Command(HCI_Command):
+class HCI_LE_Create_Connection_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.12 LE Create Connection Command
     '''
@@ -4147,41 +4398,49 @@ class HCI_LE_Create_Connection_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Create_Connection_Cancel_Command(HCI_Command):
+class HCI_LE_Create_Connection_Cancel_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.13 LE Create Connection Cancel Command
     '''
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Filter_Accept_List_Size_Command(HCI_Command):
+class HCI_LE_Read_Filter_Accept_List_Size_ReturnParameters(HCI_StatusReturnParameters):
+    filter_accept_list_size: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Filter_Accept_List_Size_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Filter_Accept_List_Size_Command(
+    HCI_SyncCommand[HCI_LE_Read_Filter_Accept_List_Size_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.14 LE Read Filter Accept List Size Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('filter_accept_list_size', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Clear_Filter_Accept_List_Command(HCI_Command):
+class HCI_LE_Clear_Filter_Accept_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.15 LE Clear Filter Accept List Command
     '''
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Add_Device_To_Filter_Accept_List_Command(HCI_Command):
+class HCI_LE_Add_Device_To_Filter_Accept_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.16 LE Add Device To Filter Accept List Command
     '''
@@ -4191,9 +4450,11 @@ class HCI_LE_Add_Device_To_Filter_Accept_List_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Remove_Device_From_Filter_Accept_List_Command(HCI_Command):
+class HCI_LE_Remove_Device_From_Filter_Accept_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.17 LE Remove Device From Filter Accept List Command
     '''
@@ -4205,7 +4466,7 @@ class HCI_LE_Remove_Device_From_Filter_Accept_List_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Connection_Update_Command(HCI_Command):
+class HCI_LE_Connection_Update_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.18 LE Connection Update Command
     '''
@@ -4222,7 +4483,7 @@ class HCI_LE_Connection_Update_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Remote_Features_Command(HCI_Command):
+class HCI_LE_Read_Remote_Features_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.21 LE Read Remote Features Command
     '''
@@ -4231,20 +4492,23 @@ class HCI_LE_Read_Remote_Features_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Rand_Command(HCI_Command):
+class HCI_LE_Rand_ReturnParameters(HCI_StatusReturnParameters):
+    random_number: bytes = field(metadata=metadata(8))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Rand_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Rand_Command(HCI_SyncCommand[HCI_LE_Rand_ReturnParameters]):
     """
     See Bluetooth spec @ 7.8.23 LE Rand Command
     """
-
-    return_parameters_fields = [("status", STATUS_SPEC), ("random_number", 8)]
 
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Enable_Encryption_Command(HCI_Command):
+class HCI_LE_Enable_Encryption_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.24 LE Enable Encryption Command
     (renamed from "LE Start Encryption Command" in version prior to 5.2 of the
@@ -4258,9 +4522,11 @@ class HCI_LE_Enable_Encryption_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Long_Term_Key_Request_Reply_Command(HCI_Command):
+class HCI_LE_Long_Term_Key_Request_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.25 LE Long Term Key Request Reply Command
     '''
@@ -4270,9 +4536,11 @@ class HCI_LE_Long_Term_Key_Request_Reply_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Long_Term_Key_Request_Negative_Reply_Command(HCI_Command):
+class HCI_LE_Long_Term_Key_Request_Negative_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.26 LE Long Term Key Request Negative Reply Command
     '''
@@ -4281,23 +4549,27 @@ class HCI_LE_Long_Term_Key_Request_Negative_Reply_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Supported_States_Command(HCI_Command):
+class HCI_LE_Read_Supported_States_ReturnParameters(HCI_StatusReturnParameters):
+    le_states: bytes = field(metadata=metadata(8))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Supported_States_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Supported_States_Command(
+    HCI_SyncCommand[HCI_LE_Read_Supported_States_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.27 LE Read Supported States Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('le_states', 8),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Remote_Connection_Parameter_Request_Reply_Command(HCI_Command):
+class HCI_LE_Remote_Connection_Parameter_Request_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.31 LE Remote Connection Parameter Request Reply Command
     '''
@@ -4312,9 +4584,11 @@ class HCI_LE_Remote_Connection_Parameter_Request_Reply_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Remote_Connection_Parameter_Request_Negative_Reply_Command(HCI_Command):
+class HCI_LE_Remote_Connection_Parameter_Request_Negative_Reply_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.32 LE Remote Connection Parameter Request Negative Reply
     Command
@@ -4325,9 +4599,11 @@ class HCI_LE_Remote_Connection_Parameter_Request_Negative_Reply_Command(HCI_Comm
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Data_Length_Command(HCI_Command):
+class HCI_LE_Set_Data_Length_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.33 LE Set Data Length Command
     '''
@@ -4336,28 +4612,34 @@ class HCI_LE_Set_Data_Length_Command(HCI_Command):
     tx_octets: int = field(metadata=metadata(2))
     tx_time: int = field(metadata=metadata(2))
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('connection_handle', 2)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Suggested_Default_Data_Length_Command(HCI_Command):
+class HCI_LE_Read_Suggested_Default_Data_Length_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    suggested_max_tx_octets: int = field(metadata=metadata(2))
+    suggested_max_tx_time: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Read_Suggested_Default_Data_Length_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Read_Suggested_Default_Data_Length_Command(
+    HCI_SyncCommand[HCI_LE_Read_Suggested_Default_Data_Length_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.34 LE Read Suggested Default Data Length Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('suggested_max_tx_octets', 2),
-        ('suggested_max_tx_time', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Write_Suggested_Default_Data_Length_Command(HCI_Command):
+class HCI_LE_Write_Suggested_Default_Data_Length_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.35 LE Write Suggested Default Data Length Command
     '''
@@ -4369,16 +4651,18 @@ class HCI_LE_Write_Suggested_Default_Data_Length_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Local_P_256_Public_Key_Command(HCI_Command):
+class HCI_LE_Read_Local_P_256_Public_Key_Command(HCI_AsyncCommand):
     '''
-    See Bluetooth spec @ 7.8.36 LE LE Read Local P-256 Public Key command
+    See Bluetooth spec @ 7.8.36 LE Read Local P-256 Public Key command
     '''
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Add_Device_To_Resolving_List_Command(HCI_Command):
+class HCI_LE_Add_Device_To_Resolving_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.38 LE Add Device To Resolving List Command
     '''
@@ -4394,27 +4678,36 @@ class HCI_LE_Add_Device_To_Resolving_List_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Clear_Resolving_List_Command(HCI_Command):
+class HCI_LE_Clear_Resolving_List_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.40 LE Clear Resolving List Command
     '''
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Resolving_List_Size_Command(HCI_Command):
+class HCI_LE_Read_Resolving_List_Size_ReturnParameters(HCI_StatusReturnParameters):
+    resolving_list_size: bytes = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Resolving_List_Size_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Resolving_List_Size_Command(
+    HCI_SyncCommand[HCI_LE_Read_Resolving_List_Size_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.41 LE Read Resolving List Size command
     '''
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Address_Resolution_Enable_Command(HCI_Command):
+class HCI_LE_Set_Address_Resolution_Enable_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.44 LE Set Address Resolution Enable Command
     '''
@@ -4423,9 +4716,11 @@ class HCI_LE_Set_Address_Resolution_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Resolvable_Private_Address_Timeout_Command(HCI_Command):
+class HCI_LE_Set_Resolvable_Private_Address_Timeout_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.45 LE Set Resolvable Private Address Timeout Command
     '''
@@ -4434,44 +4729,45 @@ class HCI_LE_Set_Resolvable_Private_Address_Timeout_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Maximum_Data_Length_Command(HCI_Command):
+class HCI_LE_Read_Maximum_Data_Length_ReturnParameters(HCI_StatusReturnParameters):
+    supported_max_tx_octets: int = field(metadata=metadata(2))
+    supported_max_tx_time: int = field(metadata=metadata(2))
+    supported_max_rx_octets: int = field(metadata=metadata(2))
+    supported_max_rx_time: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Maximum_Data_Length_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Maximum_Data_Length_Command(
+    HCI_SyncCommand[HCI_LE_Read_Maximum_Data_Length_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.46 LE Read Maximum Data Length Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('supported_max_tx_octets', 2),
-        ('supported_max_tx_time', 2),
-        ('supported_max_rx_octets', 2),
-        ('supported_max_rx_time', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_PHY_Command(HCI_Command):
+class HCI_LE_Read_PHY_ReturnParameters(HCI_StatusAndConnectionHandleReturnParameters):
+    tx_phy: Phy = field(metadata=Phy.type_metadata(1))
+    rx_phy: Phy = field(metadata=Phy.type_metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_PHY_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_PHY_Command(HCI_SyncCommand[HCI_LE_Read_PHY_ReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.47 LE Read PHY Command
     '''
 
     connection_handle: int = field(metadata=metadata(2))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('tx_phy', Phy.type_spec(1)),
-        ('rx_phy', Phy.type_spec(1)),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Default_PHY_Command(HCI_Command):
+class HCI_LE_Set_Default_PHY_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.48 LE Set Default PHY Command
     '''
@@ -4488,7 +4784,7 @@ class HCI_LE_Set_Default_PHY_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Set_PHY_Command(HCI_Command):
+class HCI_LE_Set_PHY_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.49 LE Set PHY Command
     '''
@@ -4503,9 +4799,11 @@ class HCI_LE_Set_PHY_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
+class HCI_LE_Set_Advertising_Set_Random_Address_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.52 LE Set Advertising Set Random Address Command
     '''
@@ -4521,14 +4819,23 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
+class HCI_LE_Set_Extended_Advertising_Parameters_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    selected_tx_power: int = field(metadata=metadata(-1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Set_Extended_Advertising_Parameters_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Set_Extended_Advertising_Parameters_Command(
+    HCI_SyncCommand[HCI_LE_Set_Extended_Advertising_Parameters_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.53 LE Set Extended Advertising Parameters Command
     '''
-
-    return_parameters_fields = [('status', STATUS_SPEC), ('selected_tx_power', 1)]
 
     TX_POWER_NO_PREFERENCE = 0x7F
     SHOULD_NOT_FRAGMENT = 0x01
@@ -4583,9 +4890,11 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Extended_Advertising_Data_Command(HCI_Command):
+class HCI_LE_Set_Extended_Advertising_Data_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.54 LE Set Extended Advertising Data Command
     '''
@@ -4604,9 +4913,11 @@ class HCI_LE_Set_Extended_Advertising_Data_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Extended_Scan_Response_Data_Command(HCI_Command):
+class HCI_LE_Set_Extended_Scan_Response_Data_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.55 LE Set Extended Scan Response Data Command
     '''
@@ -4620,9 +4931,11 @@ class HCI_LE_Set_Extended_Scan_Response_Data_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Extended_Advertising_Enable_Command(HCI_Command):
+class HCI_LE_Set_Extended_Advertising_Enable_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.56 LE Set Extended Advertising Enable Command
     '''
@@ -4636,37 +4949,51 @@ class HCI_LE_Set_Extended_Advertising_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Maximum_Advertising_Data_Length_Command(HCI_Command):
+class HCI_LE_Read_Maximum_Advertising_Data_Length_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    max_advertising_data_length: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Read_Maximum_Advertising_Data_Length_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Read_Maximum_Advertising_Data_Length_Command(
+    HCI_SyncCommand[HCI_LE_Read_Maximum_Advertising_Data_Length_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.57 LE Read Maximum Advertising Data Length Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('max_advertising_data_length', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command(HCI_Command):
+class HCI_LE_Read_Number_Of_Supported_Advertising_Sets_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    num_supported_advertising_sets: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Read_Number_Of_Supported_Advertising_Sets_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command(
+    HCI_SyncCommand[HCI_LE_Read_Number_Of_Supported_Advertising_Sets_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.58 LE Read Number of Supported Advertising Sets Command
     '''
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('num_supported_advertising_sets', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Remove_Advertising_Set_Command(HCI_Command):
+class HCI_LE_Remove_Advertising_Set_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.59 LE Remove Advertising Set Command
     '''
@@ -4675,18 +5002,22 @@ class HCI_LE_Remove_Advertising_Set_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Clear_Advertising_Sets_Command(HCI_Command):
+class HCI_LE_Clear_Advertising_Sets_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.60 LE Clear Advertising Sets Command
     '''
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Periodic_Advertising_Parameters_Command(HCI_Command):
+class HCI_LE_Set_Periodic_Advertising_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.61 LE Set Periodic Advertising Parameters command
     '''
@@ -4701,9 +5032,11 @@ class HCI_LE_Set_Periodic_Advertising_Parameters_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Periodic_Advertising_Data_Command(HCI_Command):
+class HCI_LE_Set_Periodic_Advertising_Data_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.62 LE Set Periodic Advertising Data command
     '''
@@ -4716,9 +5049,11 @@ class HCI_LE_Set_Periodic_Advertising_Data_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Periodic_Advertising_Enable_Command(HCI_Command):
+class HCI_LE_Set_Periodic_Advertising_Enable_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.63 LE Set Periodic Advertising Enable Command
     '''
@@ -4728,8 +5063,10 @@ class HCI_LE_Set_Periodic_Advertising_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
-class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+class HCI_LE_Set_Extended_Scan_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.64 LE Set Extended Scan Parameters Command
     '''
@@ -4839,9 +5176,11 @@ class HCI_LE_Set_Extended_Scan_Parameters_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Extended_Scan_Enable_Command(HCI_Command):
+class HCI_LE_Set_Extended_Scan_Enable_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.65 LE Set Extended Scan Enable Command
     '''
@@ -4854,7 +5193,7 @@ class HCI_LE_Set_Extended_Scan_Enable_Command(HCI_Command):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
-class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
+class HCI_LE_Extended_Create_Connection_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.66 LE Extended Create Connection Command
     '''
@@ -5026,7 +5365,7 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Periodic_Advertising_Create_Sync_Command(HCI_Command):
+class HCI_LE_Periodic_Advertising_Create_Sync_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.67 LE Periodic Advertising Create Sync command
     '''
@@ -5055,18 +5394,22 @@ class HCI_LE_Periodic_Advertising_Create_Sync_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command(HCI_Command):
+class HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.68 LE Periodic Advertising Create Sync Cancel Command
     '''
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Periodic_Advertising_Terminate_Sync_Command(HCI_Command):
+class HCI_LE_Periodic_Advertising_Terminate_Sync_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.69 LE Periodic Advertising Terminate Sync Command
     '''
@@ -5075,18 +5418,26 @@ class HCI_LE_Periodic_Advertising_Terminate_Sync_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_Transmit_Power_Command(HCI_Command):
+class HCI_LE_Read_Transmit_Power_ReturnParameters(HCI_StatusReturnParameters):
+    min_tx_power: int = field(metadata=metadata(1))
+    max_tx_power: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Transmit_Power_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Transmit_Power_Command(
+    HCI_SyncCommand[HCI_LE_Read_Transmit_Power_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.74 LE Read Transmit Power command
     '''
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Privacy_Mode_Command(HCI_Command):
+class HCI_LE_Set_Privacy_Mode_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.77 LE Set Privacy Mode Command
     '''
@@ -5105,9 +5456,11 @@ class HCI_LE_Set_Privacy_Mode_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Periodic_Advertising_Receive_Enable_Command(HCI_Command):
+class HCI_LE_Set_Periodic_Advertising_Receive_Enable_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.88 LE Set Periodic Advertising Receive Enable Command
     '''
@@ -5121,9 +5474,11 @@ class HCI_LE_Set_Periodic_Advertising_Receive_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Periodic_Advertising_Sync_Transfer_Command(HCI_Command):
+class HCI_LE_Periodic_Advertising_Sync_Transfer_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.89 LE Periodic Advertising Sync Transfer Command
     '''
@@ -5132,16 +5487,13 @@ class HCI_LE_Periodic_Advertising_Sync_Transfer_Command(HCI_Command):
     service_data: int = field(metadata=metadata(2))
     sync_handle: int = field(metadata=metadata(2))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Periodic_Advertising_Set_Info_Transfer_Command(HCI_Command):
+class HCI_LE_Periodic_Advertising_Set_Info_Transfer_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.90 LE Periodic Advertising Set Info Transfer Command
     '''
@@ -5150,16 +5502,13 @@ class HCI_LE_Periodic_Advertising_Set_Info_Transfer_Command(HCI_Command):
     service_data: int = field(metadata=metadata(2))
     advertising_handle: int = field(metadata=metadata(1))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Periodic_Advertising_Sync_Transfer_Parameters_Command(HCI_Command):
+class HCI_LE_Set_Periodic_Advertising_Sync_Transfer_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.91 LE Set Periodic Advertising Sync Transfer Parameters command
     '''
@@ -5170,17 +5519,12 @@ class HCI_LE_Set_Periodic_Advertising_Sync_Transfer_Parameters_Command(HCI_Comma
     sync_timeout: int = field(metadata=metadata(2))
     cte_type: int = field(metadata=CteType.type_metadata(1))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
 class HCI_LE_Set_Default_Periodic_Advertising_Sync_Transfer_Parameters_Command(
-    HCI_Command
+    HCI_SyncCommand[HCI_StatusReturnParameters]
 ):
     '''
     See Bluetooth spec @ 7.8.92 LE Set Default Periodic Advertising Sync Transfer Parameters command
@@ -5191,34 +5535,43 @@ class HCI_LE_Set_Default_Periodic_Advertising_Sync_Transfer_Parameters_Command(
     sync_timeout: int = field(metadata=metadata(2))
     cte_type: int = field(metadata=CteType.type_metadata(1))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Read_ISO_TX_Sync_Command(HCI_Command):
+class HCI_LE_Read_ISO_TX_Sync_ReturnParameters(
+    HCI_StatusAndConnectionHandleReturnParameters
+):
+    packet_sequence_number: int = field(metadata=metadata(2))
+    tx_time_stamp: int = field(metadata=metadata(4))
+    time_offset: int = field(metadata=metadata(4))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_ISO_TX_Sync_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_ISO_TX_Sync_Command(
+    HCI_SyncCommand[HCI_LE_Read_ISO_TX_Sync_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.96 LE Read ISO TX Sync command
     '''
 
     connection_handle: int = field(metadata=metadata(2))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-        ('packet_sequence_number', 2),
-        ('tx_time_stamp', 4),
-        ('time_offset', 3),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Set_CIG_Parameters_Command(HCI_Command):
+class HCI_LE_Set_CIG_Parameters_ReturnParameters(HCI_StatusReturnParameters):
+    cig_id: int = field(metadata=metadata(1))
+    connection_handle: Sequence[int] = field(
+        metadata=metadata(2, list_begin=True, list_end=True)
+    )
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Set_CIG_Parameters_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_CIG_Parameters_Command(
+    HCI_SyncCommand[HCI_LE_Set_CIG_Parameters_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.97 LE Set CIG Parameters Command
     '''
@@ -5239,17 +5592,11 @@ class HCI_LE_Set_CIG_Parameters_Command(HCI_Command):
     rtn_c_to_p: Sequence[int] = field(metadata=metadata(1))
     rtn_p_to_c: Sequence[int] = field(metadata=metadata(1, list_end=True))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('cig_id', 1),
-        [('connection_handle', 2)],
-    ]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Create_CIS_Command(HCI_Command):
+class HCI_LE_Create_CIS_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.99 LE Create CIS command
     '''
@@ -5259,22 +5606,25 @@ class HCI_LE_Create_CIS_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Remove_CIG_Command(HCI_Command):
+class HCI_LE_Remove_CIG_ReturnParameters(HCI_StatusReturnParameters):
+    cig_id: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Remove_CIG_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Remove_CIG_Command(HCI_SyncCommand[HCI_LE_Remove_CIG_ReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.100 LE Remove CIG command
     '''
 
     cig_id: int = field(metadata=metadata(1))
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('cig_id', 1)]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Accept_CIS_Request_Command(HCI_Command):
+class HCI_LE_Accept_CIS_Request_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.101 LE Accept CIS Request command
     '''
@@ -5283,9 +5633,11 @@ class HCI_LE_Accept_CIS_Request_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Reject_CIS_Request_Command(HCI_Command):
+class HCI_LE_Reject_CIS_Request_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.102 LE Reject CIS Request command
     '''
@@ -5297,7 +5649,7 @@ class HCI_LE_Reject_CIS_Request_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Create_BIG_Command(HCI_Command):
+class HCI_LE_Create_BIG_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.103 LE Create BIG command
     '''
@@ -5319,7 +5671,7 @@ class HCI_LE_Create_BIG_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Terminate_BIG_Command(HCI_Command):
+class HCI_LE_Terminate_BIG_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.105 LE Terminate BIG command
     '''
@@ -5331,7 +5683,7 @@ class HCI_LE_Terminate_BIG_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_BIG_Create_Sync_Command(HCI_Command):
+class HCI_LE_BIG_Create_Sync_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.106 LE BIG Create Sync command
     '''
@@ -5346,25 +5698,29 @@ class HCI_LE_BIG_Create_Sync_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_BIG_Terminate_Sync_Command(HCI_Command):
+class HCI_LE_BIG_Terminate_Sync_ReturnParameters(HCI_StatusReturnParameters):
+    big_handle: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_BIG_Terminate_Sync_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_BIG_Terminate_Sync_Command(
+    HCI_SyncCommand[HCI_LE_BIG_Terminate_Sync_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.107. LE BIG Terminate Sync command
     '''
 
     big_handle: int = field(metadata=metadata(1))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('big_handle', 1),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Setup_ISO_Data_Path_Command(HCI_Command):
+class HCI_LE_Setup_ISO_Data_Path_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.109 LE Setup ISO Data Path command
     '''
@@ -5380,16 +5736,13 @@ class HCI_LE_Setup_ISO_Data_Path_Command(HCI_Command):
     controller_delay: int = field(metadata=metadata(3))
     codec_configuration: bytes = field(metadata=metadata("v"))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Remove_ISO_Data_Path_Command(HCI_Command):
+class HCI_LE_Remove_ISO_Data_Path_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.110 LE Remove ISO Data Path command
     '''
@@ -5397,16 +5750,11 @@ class HCI_LE_Remove_ISO_Data_Path_Command(HCI_Command):
     connection_handle: int = field(metadata=metadata(2))
     data_path_direction: int = field(metadata=metadata(1))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Host_Feature_Command(HCI_Command):
+class HCI_LE_Set_Host_Feature_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.115 LE Set Host Feature Command
     '''
@@ -5416,9 +5764,9 @@ class HCI_LE_Set_Host_Feature_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_Set_Default_Subrate_Command(HCI_Command):
+class HCI_LE_Set_Default_Subrate_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.123 LE Set Default Subrate command
     '''
@@ -5433,7 +5781,7 @@ class HCI_LE_Set_Default_Subrate_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_Subrate_Request_Command(HCI_Command):
+class HCI_LE_Subrate_Request_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.124 LE Subrate Request command
     '''
@@ -5447,42 +5795,48 @@ class HCI_LE_Subrate_Request_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_CS_Read_Local_Supported_Capabilities_Command(HCI_Command):
+class HHCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    num_config_supported: int = field(metadata=metadata(1))
+    max_consecutive_procedures_supported: int = field(metadata=metadata(2))
+    num_antennas_supported: int = field(metadata=metadata(1))
+    max_antenna_paths_supported: int = field(metadata=metadata(1))
+    roles_supported: int = field(metadata=metadata(1))
+    modes_supported: int = field(metadata=metadata(1))
+    rtt_capability: int = field(metadata=metadata(1))
+    rtt_aa_only_n: int = field(metadata=metadata(1))
+    rtt_sounding_n: int = field(metadata=metadata(1))
+    rtt_random_payload_n: int = field(metadata=metadata(1))
+    nadm_sounding_capability: int = field(metadata=metadata(2))
+    nadm_random_capability: int = field(metadata=metadata(2))
+    cs_sync_phys_supported: int = field(metadata=metadata(CS_SYNC_PHY_SUPPORTED_SPEC))
+    subfeatures_supported: int = field(metadata=metadata(2))
+    t_ip1_times_supported: int = field(metadata=metadata(2))
+    t_ip2_times_supported: int = field(metadata=metadata(2))
+    t_fcs_times_supported: int = field(metadata=metadata(2))
+    t_pm_times_supported: int = field(metadata=metadata(2))
+    t_sw_time_supported: int = field(metadata=metadata(1))
+    tx_snr_capability: int = field(metadata=metadata(CS_SNR_SPEC))
+
+
+@HCI_SyncCommand.sync_command(
+    HHCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_CS_Read_Local_Supported_Capabilities_Command(
+    HCI_SyncCommand[HHCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.130 LE CS Read Local Supported Capabilities command
     '''
-
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('num_config_supported', 1),
-        ('max_consecutive_procedures_supported', 2),
-        ('num_antennas_supported', 1),
-        ('max_antenna_paths_supported', 1),
-        ('roles_supported', 1),
-        ('modes_supported', 1),
-        ('rtt_capability', 1),
-        ('rtt_aa_only_n', 1),
-        ('rtt_sounding_n', 1),
-        ('rtt_random_payload_n', 1),
-        ('nadm_sounding_capability', 2),
-        ('nadm_random_capability', 2),
-        ('cs_sync_phys_supported', CS_SYNC_PHY_SUPPORTED_SPEC),
-        ('subfeatures_supported', 2),
-        ('t_ip1_times_supported', 2),
-        ('t_ip2_times_supported', 2),
-        ('t_fcs_times_supported', 2),
-        ('t_pm_times_supported', 2),
-        ('t_sw_time_supported', 1),
-        ('tx_snr_capability', CS_SNR_SPEC),
-    ]
 
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_CS_Read_Remote_Supported_Capabilities_Command(HCI_Command):
+class HCI_LE_CS_Read_Remote_Supported_Capabilities_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.131 LE CS Read Remote Supported Capabilities command
     '''
@@ -5491,9 +5845,11 @@ class HCI_LE_CS_Read_Remote_Supported_Capabilities_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_CS_Write_Cached_Remote_Supported_Capabilities_Command(HCI_Command):
+class HCI_LE_CS_Write_Cached_Remote_Supported_Capabilities_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.132 LE CS Write Cached Remote Supported Capabilities command
     '''
@@ -5520,16 +5876,11 @@ class HCI_LE_CS_Write_Cached_Remote_Supported_Capabilities_Command(HCI_Command):
     t_sw_time_supported: int = field(metadata=metadata(1))
     tx_snr_capability: int = field(metadata=metadata(CS_SNR_SPEC))
 
-    return_parameters_fields = [
-        ('status', STATUS_SPEC),
-        ('connection_handle', 2),
-    ]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_CS_Security_Enable_Command(HCI_Command):
+class HCI_LE_CS_Security_Enable_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.133 LE CS Security Enable command
     '''
@@ -5538,9 +5889,11 @@ class HCI_LE_CS_Security_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_CS_Set_Default_Settings_Command(HCI_Command):
+class HCI_LE_CS_Set_Default_Settings_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.134 LE CS Security Enable command
     '''
@@ -5550,13 +5903,11 @@ class HCI_LE_CS_Set_Default_Settings_Command(HCI_Command):
     cs_sync_antenna_selection: int = field(metadata=metadata(1))
     max_tx_power: int = field(metadata=metadata(1))
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('connection_handle', 2)]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_CS_Read_Remote_FAE_Table_Command(HCI_Command):
+class HCI_LE_CS_Read_Remote_FAE_Table_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.135 LE CS Read Remote FAE Table command
     '''
@@ -5565,9 +5916,11 @@ class HCI_LE_CS_Read_Remote_FAE_Table_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_CS_Write_Cached_Remote_FAE_Table_Command(HCI_Command):
+class HCI_LE_CS_Write_Cached_Remote_FAE_Table_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.136  LE CS Write Cached Remote FAE Table command
     '''
@@ -5575,13 +5928,11 @@ class HCI_LE_CS_Write_Cached_Remote_FAE_Table_Command(HCI_Command):
     connection_handle: int = field(metadata=metadata(2))
     remote_fae_table: bytes = field(metadata=metadata(72))
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('connection_handle', 2)]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_CS_Create_Config_Command(HCI_Command):
+class HCI_LE_CS_Create_Config_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.137 LE CS Create Config command
     '''
@@ -5617,7 +5968,7 @@ class HCI_LE_CS_Create_Config_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_CS_Remove_Config_Command(HCI_Command):
+class HCI_LE_CS_Remove_Config_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.138 LE CS Remove Config command
     '''
@@ -5627,22 +5978,24 @@ class HCI_LE_CS_Remove_Config_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_CS_Set_Channel_Classification_Command(HCI_Command):
+class HCI_LE_CS_Set_Channel_Classification_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.139 LE CS Set Channel Classification command
     '''
 
     channel_classification: bytes = field(metadata=metadata(10))
 
-    return_parameters_fields = [('status', STATUS_SPEC)]
-
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_CS_Set_Procedure_Parameters_Command(HCI_Command):
+class HCI_LE_CS_Set_Procedure_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
     '''
     See Bluetooth spec @ 7.8.140 LE CS Set Procedure Parameters command
     '''
@@ -5662,13 +6015,11 @@ class HCI_LE_CS_Set_Procedure_Parameters_Command(HCI_Command):
     snr_control_initiator: int = field(metadata=metadata(CS_SNR_SPEC))
     snr_control_reflector: int = field(metadata=metadata(CS_SNR_SPEC))
 
-    return_parameters_fields = [('status', STATUS_SPEC), ('connection_handle', 2)]
-
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_CS_Procedure_Enable_Command(HCI_Command):
+class HCI_LE_CS_Procedure_Enable_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.141 LE CS Procedure Enable command
     '''
@@ -5679,9 +6030,9 @@ class HCI_LE_CS_Procedure_Enable_Command(HCI_Command):
 
 
 # -----------------------------------------------------------------------------
-@HCI_Command.command
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class HCI_LE_CS_Test_Command(HCI_Command):
+class HCI_LE_CS_Test_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     '''
     See Bluetooth spec @ 7.8.142 LE CS Test command
     '''
@@ -5716,7 +6067,7 @@ class HCI_LE_CS_Test_Command(HCI_Command):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
-class HCI_LE_CS_Test_End_Command(HCI_Command):
+class HCI_LE_CS_Test_End_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.143 LE CS Test End command
     '''
@@ -5807,10 +6158,19 @@ class HCI_Event(HCI_Packet):
     @classmethod
     def from_bytes(cls, packet: bytes) -> HCI_Event:
         event_code = packet[1]
-        length = packet[2]
-        parameters = packet[3:]
-        if len(parameters) != length:
-            raise InvalidPacketError('invalid packet length')
+        parameters_length = packet[2]
+        if len(packet) < 3 + parameters_length:
+            raise InvalidPacketError(
+                f'invalid parameters length (packet={packet.hex()}): '
+                f'expected {parameters_length}, got {len(packet) - 3})'
+            )
+        if len(packet) > 3 + parameters_length:
+            logger.warning(
+                f'truncating parameters (packet={packet.hex()}): '
+                f'from {len(packet) - 3} to {parameters_length}'
+            )
+
+        parameters = packet[3 : 3 + parameters_length]
 
         subclass: type[HCI_Event] | None
         if event_code == HCI_LE_META_EVENT:
@@ -6970,7 +7330,7 @@ class HCI_QOS_Setup_Complete_Event(HCI_Event):
 # -----------------------------------------------------------------------------
 @HCI_Event.event
 @dataclasses.dataclass
-class HCI_Command_Complete_Event(HCI_Event):
+class HCI_Command_Complete_Event(HCI_Event, Generic[_RP]):
     '''
     See Bluetooth spec @ 7.7.14 Command Complete Event
     '''
@@ -6979,42 +7339,35 @@ class HCI_Command_Complete_Event(HCI_Event):
     command_opcode: int = field(
         metadata=metadata({'size': 2, 'mapper': HCI_Command.command_name})
     )
-    return_parameters: bytes | HCI_Object | int = field(metadata=metadata("*"))
-
-    def map_return_parameters(self, return_parameters):
-        '''Map simple 'status' return parameters to their named constant form'''
-
-        if isinstance(return_parameters, bytes) and len(return_parameters) == 1:
-            # Byte-array form
-            return HCI_Constant.status_name(return_parameters[0])
-
-        if isinstance(return_parameters, int):
-            # Already converted to an integer status code
-            return HCI_Constant.status_name(return_parameters)
-
-        return return_parameters
+    return_parameters: _RP = field(metadata=metadata("*"))
 
     @classmethod
     def from_parameters(cls, parameters: bytes) -> Self:
         event = cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
         event.parameters = parameters
-        # Parse the return parameters
-        if (
-            isinstance(event.return_parameters, bytes)
-            and len(event.return_parameters) == 1
-        ):
-            # All commands with 1-byte return parameters return a 'status' field,
-            # convert it to an integer
-            event.return_parameters = event.return_parameters[0]
-        else:
-            subclass = HCI_Command.command_classes.get(event.command_opcode)
-            if subclass:
-                # Try to parse the return parameters bytes into an object.
-                return_parameters = subclass.parse_return_parameters(
-                    event.return_parameters
+
+        # Find the class for the matching command.
+        subclass = HCI_Command.command_classes.get(event.command_opcode)
+
+        # Deal with unknown commands.
+        if subclass is None or not issubclass(subclass, HCI_SyncCommand):
+            if subclass is not None:
+                # Check that the subclass is one that has return parameters.
+                logger.warning(
+                    'HCI Command Complete event with opcode for a class that is not'
+                    ' an HCI_SyncCommand subclass: '
+                    f'opcode={event.command_opcode:#04x}, '
+                    f'type={type(subclass).__name__}'
                 )
-                if return_parameters is not None:
-                    event.return_parameters = return_parameters
+            event.return_parameters = HCI_GenericReturnParameters(
+                data=event.return_parameters  # type: ignore[arg-type]
+            )  # type: ignore[assignment]
+            return event
+
+        # Parse the return parameters bytes into an object.
+        event.return_parameters = subclass.parse_return_parameters(
+            event.return_parameters  # type: ignore[arg-type]
+        )  # type: ignore[assignment]
 
         return event
 
@@ -7023,7 +7376,7 @@ class HCI_Command_Complete_Event(HCI_Event):
             self.__dict__,
             self.fields,
             '  ',
-            {'return_parameters': self.map_return_parameters},
+            {'return_parameters': lambda x: "\n" + x.to_string(indentation='    ')},
         )
 
 

@@ -15,6 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+import asyncio
 import logging
 import unittest
 import unittest.mock
@@ -22,9 +23,17 @@ import unittest.mock
 import pytest
 
 from bumble.controller import Controller
-from bumble.hci import HCI_AclDataPacket
+from bumble.hci import (
+    HCI_AclDataPacket,
+    HCI_Command_Complete_Event,
+    HCI_Error,
+    HCI_ErrorCode,
+    HCI_Event,
+    HCI_Reset_Command,
+    HCI_StatusReturnParameters,
+)
 from bumble.host import DataPacketQueue, Host
-from bumble.transport.common import AsyncPipeSink
+from bumble.transport.common import AsyncPipeSink, TransportSink
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -151,3 +160,58 @@ def test_data_packet_queue():
     assert drain_listener.on_flow.call_count == 1
     assert queue.queued == 15
     assert queue.completed == 15
+
+
+# -----------------------------------------------------------------------------
+class Source:
+    terminated: asyncio.Future[None]
+    sink: TransportSink
+
+    def set_packet_sink(self, sink: TransportSink) -> None:
+        self.sink = sink
+
+
+class Sink:
+    response: HCI_Event
+
+    def __init__(self, source: Source, response: HCI_Event) -> None:
+        self.source = source
+        self.response = response
+
+    def on_packet(self, packet: bytes) -> None:
+        self.source.sink.on_packet(bytes(self.response))
+
+
+@pytest.mark.asyncio
+async def test_send_sync_command() -> None:
+    source = Source()
+    sink = Sink(
+        source,
+        HCI_Command_Complete_Event(
+            1,
+            HCI_Reset_Command.op_code,
+            HCI_StatusReturnParameters(status=HCI_ErrorCode.SUCCESS),
+        ),
+    )
+
+    host = Host(source, sink)
+
+    # Sync command with success
+    response1 = await host.send_sync_command(HCI_Reset_Command())
+    assert response1.status == HCI_ErrorCode.SUCCESS
+
+    # Sync command with error status should raise
+    error_response = HCI_Command_Complete_Event(
+        1,
+        HCI_Reset_Command.op_code,
+        HCI_StatusReturnParameters(status=HCI_ErrorCode.COMMAND_DISALLOWED_ERROR),
+    )
+    sink.response = error_response
+    with pytest.raises(HCI_Error) as excinfo:
+        await host.send_sync_command(HCI_Reset_Command())
+
+    assert excinfo.value.error_code == error_response.return_parameters.status
+
+    # Sync command with error status should not raise when `check_status` is False
+    response2 = await host.send_sync_command(HCI_Reset_Command(), check_status=False)
+    assert response2.status == HCI_ErrorCode.COMMAND_DISALLOWED_ERROR

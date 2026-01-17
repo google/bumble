@@ -89,51 +89,54 @@ HCI_INTEL_WRITE_BOOT_PARAMS_COMMAND = hci.hci_vendor_command_op_code(0x000E)
 hci.HCI_Command.register_commands(globals())
 
 
-@hci.HCI_Command.command
 @dataclasses.dataclass
-class HCI_Intel_Read_Version_Command(hci.HCI_Command):
+class HCI_Intel_Read_Version_ReturnParameters(hci.HCI_StatusReturnParameters):
+    tlv: bytes = hci.field(metadata=hci.metadata('*'))
+
+
+@hci.HCI_SyncCommand.sync_command(HCI_Intel_Read_Version_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Intel_Read_Version_Command(
+    hci.HCI_SyncCommand[HCI_Intel_Read_Version_ReturnParameters]
+):
     param0: int = dataclasses.field(metadata=hci.metadata(1))
 
-    return_parameters_fields = [
-        ("status", hci.STATUS_SPEC),
-        ("tlv", "*"),
-    ]
 
-
-@hci.HCI_Command.command
+@hci.HCI_SyncCommand.sync_command(hci.HCI_StatusReturnParameters)
 @dataclasses.dataclass
-class Hci_Intel_Secure_Send_Command(hci.HCI_Command):
+class Hci_Intel_Secure_Send_Command(
+    hci.HCI_SyncCommand[hci.HCI_StatusReturnParameters]
+):
     data_type: int = dataclasses.field(metadata=hci.metadata(1))
     data: bytes = dataclasses.field(metadata=hci.metadata("*"))
 
-    return_parameters_fields = [
-        ("status", 1),
-    ]
 
-
-@hci.HCI_Command.command
 @dataclasses.dataclass
-class HCI_Intel_Reset_Command(hci.HCI_Command):
+class HCI_Intel_Reset_ReturnParameters(hci.HCI_ReturnParameters):
+    data: bytes = hci.field(metadata=hci.metadata('*'))
+
+
+@hci.HCI_SyncCommand.sync_command(HCI_Intel_Reset_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Intel_Reset_Command(hci.HCI_SyncCommand[HCI_Intel_Reset_ReturnParameters]):
     reset_type: int = dataclasses.field(metadata=hci.metadata(1))
     patch_enable: int = dataclasses.field(metadata=hci.metadata(1))
     ddc_reload: int = dataclasses.field(metadata=hci.metadata(1))
     boot_option: int = dataclasses.field(metadata=hci.metadata(1))
     boot_address: int = dataclasses.field(metadata=hci.metadata(4))
 
-    return_parameters_fields = [
-        ("data", "*"),
-    ]
 
-
-@hci.HCI_Command.command
 @dataclasses.dataclass
-class Hci_Intel_Write_Device_Config_Command(hci.HCI_Command):
-    data: bytes = dataclasses.field(metadata=hci.metadata("*"))
+class HCI_Intel_Write_Device_Config_ReturnParameters(hci.HCI_StatusReturnParameters):
+    params: bytes = hci.field(metadata=hci.metadata('*'))
 
-    return_parameters_fields = [
-        ("status", hci.STATUS_SPEC),
-        ("params", "*"),
-    ]
+
+@hci.HCI_SyncCommand.sync_command(HCI_Intel_Write_Device_Config_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Intel_Write_Device_Config_Command(
+    hci.HCI_SyncCommand[HCI_Intel_Write_Device_Config_ReturnParameters]
+):
+    data: bytes = dataclasses.field(metadata=hci.metadata("*"))
 
 
 # -----------------------------------------------------------------------------
@@ -402,7 +405,7 @@ class Driver(common.Driver):
             self.host.on_hci_event_packet(event)
             return
 
-        if not event.return_parameters == hci.HCI_SUCCESS:
+        if not event.return_parameters.status == hci.HCI_SUCCESS:
             raise DriverError("HCI_Command_Complete_Event error")
 
         if self.max_in_flight_firmware_load_commands != event.num_hci_command_packets:
@@ -641,8 +644,8 @@ class Driver(common.Driver):
         while ddc_data:
             ddc_len = 1 + ddc_data[0]
             ddc_payload = ddc_data[:ddc_len]
-            await self.host.send_command(
-                Hci_Intel_Write_Device_Config_Command(data=ddc_payload)
+            await self.host.send_sync_command(
+                HCI_Intel_Write_Device_Config_Command(data=ddc_payload)
             )
             ddc_data = ddc_data[ddc_len:]
 
@@ -660,31 +663,26 @@ class Driver(common.Driver):
 
     async def read_device_info(self) -> dict[ValueType, Any]:
         self.host.ready = True
-        response = await self.host.send_command(hci.HCI_Reset_Command())
-        if not (
-            isinstance(response, hci.HCI_Command_Complete_Event)
-            and response.return_parameters
-            in (hci.HCI_UNKNOWN_HCI_COMMAND_ERROR, hci.HCI_SUCCESS)
-        ):
+        response1 = await self.host.send_sync_command(
+            hci.HCI_Reset_Command(), check_status=False
+        )
+        if response1.status not in (hci.HCI_UNKNOWN_HCI_COMMAND_ERROR, hci.HCI_SUCCESS):
             # When the controller is in operational mode, the response is a
             # successful response.
             # When the controller is in bootloader mode,
             # HCI_UNKNOWN_HCI_COMMAND_ERROR is the expected response. Anything
             # else is a failure.
-            logger.warning(f"unexpected response: {response}")
+            logger.warning(f"unexpected response: {response1}")
             raise DriverError("unexpected HCI response")
 
         # Read the firmware version.
-        response = await self.host.send_command(
-            HCI_Intel_Read_Version_Command(param0=0xFF)
+        response2 = await self.host.send_sync_command(
+            HCI_Intel_Read_Version_Command(param0=0xFF), check_status=False
         )
-        if not isinstance(response, hci.HCI_Command_Complete_Event):
-            raise DriverError("unexpected HCI response")
-
-        if response.return_parameters.status != 0:  # type: ignore
+        if response2.status != 0:  # type: ignore
             raise DriverError("HCI_Intel_Read_Version_Command error")
 
-        tlvs = _parse_tlv(response.return_parameters.tlv)  # type: ignore
+        tlvs = _parse_tlv(response2.tlv)  # type: ignore
 
         # Convert the list to a dict. That's Ok here because we only expect each type
         # to appear just once.

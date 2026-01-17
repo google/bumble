@@ -85,7 +85,7 @@ class Loopback:
             print(color('@@@ Received last packet', 'green'))
             self.done.set()
 
-    async def run(self):
+    async def run(self) -> None:
         """Run a loopback throughput test"""
         print(color('>>> Connecting to HCI...', 'green'))
         async with await open_transport(self.transport) as (
@@ -100,11 +100,15 @@ class Loopback:
             # make sure data can fit in one l2cap pdu
             l2cap_header_size = 4
 
-            max_packet_size = (
+            packet_queue = (
                 host.acl_packet_queue
                 if host.acl_packet_queue
                 else host.le_acl_packet_queue
-            ).max_packet_size - l2cap_header_size
+            )
+            if packet_queue is None:
+                print(color('!!! No packet queue', 'red'))
+                return
+            max_packet_size = packet_queue.max_packet_size - l2cap_header_size
             if self.packet_size > max_packet_size:
                 print(
                     color(
@@ -128,20 +132,18 @@ class Loopback:
             loopback_mode = LoopbackMode.LOCAL
 
             print(color('### Setting loopback mode', 'blue'))
-            await host.send_command(
+            await host.send_sync_command(
                 HCI_Write_Loopback_Mode_Command(loopback_mode=LoopbackMode.LOCAL),
-                check_result=True,
             )
 
             print(color('### Checking loopback mode', 'blue'))
-            response = await host.send_command(
-                HCI_Read_Loopback_Mode_Command(), check_result=True
-            )
-            if response.return_parameters.loopback_mode != loopback_mode:
+            response = await host.send_sync_command(HCI_Read_Loopback_Mode_Command())
+            if response.loopback_mode != loopback_mode:
                 print(color('!!! Loopback mode mismatch', 'red'))
                 return
 
             await self.connection_event.wait()
+            assert self.connection_handle is not None
             print(color('### Connected', 'cyan'))
 
             print(color('=== Start sending', 'magenta'))
