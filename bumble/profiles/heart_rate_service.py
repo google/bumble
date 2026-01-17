@@ -19,19 +19,14 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any
-from typing_extensions import Self
-from collections.abc import Sequence, Callable
-import struct
 import enum
+import struct
+from collections.abc import Callable, Sequence
+from typing import Any
 
-from bumble import core
-from bumble import device
-from bumble import utils
-from bumble import att
-from bumble import gatt
-from bumble import gatt_adapters
-from bumble import gatt_client
+from typing_extensions import Self
+
+from bumble import att, core, device, gatt, gatt_adapters, gatt_client, utils
 
 
 # -----------------------------------------------------------------------------

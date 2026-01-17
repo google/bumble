@@ -79,6 +79,7 @@ if TYPE_CHECKING:
     from bumble.transport.common import TransportSink, TransportSource
 
 _T = TypeVar('_T')
+_RP = TypeVar('_RP', bound=hci.HCI_ReturnParameters)
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -373,24 +374,22 @@ class LegacyAdvertiser:
     async def start(self) -> None:
         # Set/update the advertising data if the advertising type allows it
         if self.advertising_type.has_data:
-            await self.device.send_command(
+            await self.device.send_sync_command(
                 hci.HCI_LE_Set_Advertising_Data_Command(
                     advertising_data=self.device.advertising_data
-                ),
-                check_result=True,
+                )
             )
 
         # Set/update the scan response data if the advertising is scannable
         if self.advertising_type.is_scannable:
-            await self.device.send_command(
+            await self.device.send_sync_command(
                 hci.HCI_LE_Set_Scan_Response_Data_Command(
                     scan_response_data=self.device.scan_response_data
-                ),
-                check_result=True,
+                )
             )
 
         # Set the advertising parameters
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Advertising_Parameters_Command(
                 advertising_interval_min=int(
                     self.device.advertising_interval_min / 0.625
@@ -404,21 +403,18 @@ class LegacyAdvertiser:
                 peer_address=self.peer_address,
                 advertising_channel_map=7,
                 advertising_filter_policy=0,
-            ),
-            check_result=True,
+            )
         )
 
         # Enable advertising
-        await self.device.send_command(
-            hci.HCI_LE_Set_Advertising_Enable_Command(advertising_enable=1),
-            check_result=True,
+        await self.device.send_sync_command(
+            hci.HCI_LE_Set_Advertising_Enable_Command(advertising_enable=1)
         )
 
     async def stop(self) -> None:
         # Disable advertising
-        await self.device.send_command(
-            hci.HCI_LE_Set_Advertising_Enable_Command(advertising_enable=0),
-            check_result=True,
+        await self.device.send_sync_command(
+            hci.HCI_LE_Set_Advertising_Enable_Command(advertising_enable=0)
         )
 
 
@@ -635,7 +631,7 @@ class AdvertisingSet(utils.EventEmitter):
                 "connectable and scannable"
             )
 
-        response = await self.device.send_command(
+        response = await self.device.send_sync_command(
             hci.HCI_LE_Set_Extended_Advertising_Parameters_Command(
                 advertising_handle=self.advertising_handle,
                 advertising_event_properties=int(
@@ -668,22 +664,20 @@ class AdvertisingSet(utils.EventEmitter):
                 scan_request_notification_enable=(
                     1 if advertising_parameters.enable_scan_request_notifications else 0
                 ),
-            ),
-            check_result=True,
+            )
         )
-        self.selected_tx_power = response.return_parameters.selected_tx_power
+        self.selected_tx_power = response.selected_tx_power
         self.advertising_parameters = advertising_parameters
 
     async def set_advertising_data(self, advertising_data: bytes) -> None:
         # pylint: disable=line-too-long
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Extended_Advertising_Data_Command(
                 advertising_handle=self.advertising_handle,
                 operation=hci.HCI_LE_Set_Extended_Advertising_Data_Command.Operation.COMPLETE_DATA,
                 fragment_preference=hci.HCI_LE_Set_Extended_Advertising_Parameters_Command.SHOULD_NOT_FRAGMENT,
                 advertising_data=advertising_data,
-            ),
-            check_result=True,
+            )
         )
         self.advertising_data = advertising_data
 
@@ -699,21 +693,20 @@ class AdvertisingSet(utils.EventEmitter):
             )
             return
 
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Extended_Scan_Response_Data_Command(
                 advertising_handle=self.advertising_handle,
                 operation=hci.HCI_LE_Set_Extended_Advertising_Data_Command.Operation.COMPLETE_DATA,
                 fragment_preference=hci.HCI_LE_Set_Extended_Advertising_Parameters_Command.SHOULD_NOT_FRAGMENT,
                 scan_response_data=scan_response_data,
-            ),
-            check_result=True,
+            )
         )
         self.scan_response_data = scan_response_data
 
     async def set_periodic_advertising_parameters(
         self, advertising_parameters: PeriodicAdvertisingParameters
     ) -> None:
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Periodic_Advertising_Parameters_Command(
                 advertising_handle=self.advertising_handle,
                 periodic_advertising_interval_min=int(
@@ -723,29 +716,26 @@ class AdvertisingSet(utils.EventEmitter):
                     advertising_parameters.periodic_advertising_interval_max / 1.25
                 ),
                 periodic_advertising_properties=advertising_parameters.periodic_advertising_properties,
-            ),
-            check_result=True,
+            )
         )
         self.periodic_advertising_parameters = advertising_parameters
 
     async def set_periodic_advertising_data(self, advertising_data: bytes) -> None:
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Periodic_Advertising_Data_Command(
                 advertising_handle=self.advertising_handle,
                 operation=hci.HCI_LE_Set_Extended_Advertising_Data_Command.Operation.COMPLETE_DATA,
                 advertising_data=advertising_data,
-            ),
-            check_result=True,
+            )
         )
         self.periodic_advertising_data = advertising_data
 
     async def set_random_address(self, random_address: hci.Address) -> None:
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Advertising_Set_Random_Address_Command(
                 advertising_handle=self.advertising_handle,
                 random_address=(random_address or self.device.random_address),
-            ),
-            check_result=True,
+            )
         )
 
     async def start(
@@ -761,28 +751,26 @@ class AdvertisingSet(utils.EventEmitter):
           max_advertising_events: Maximum number of events to advertise for. Use 0
           (the default) for an unlimited number of advertisements.
         """
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Extended_Advertising_Enable_Command(
                 enable=1,
                 advertising_handles=[self.advertising_handle],
                 durations=[round(duration * 100)],
                 max_extended_advertising_events=[max_advertising_events],
-            ),
-            check_result=True,
+            )
         )
         self.enabled = True
 
         self.emit(self.EVENT_START)
 
     async def stop(self) -> None:
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Extended_Advertising_Enable_Command(
                 enable=0,
                 advertising_handles=[self.advertising_handle],
                 durations=[0],
                 max_extended_advertising_events=[0],
-            ),
-            check_result=True,
+            )
         )
         self.enabled = False
 
@@ -791,12 +779,11 @@ class AdvertisingSet(utils.EventEmitter):
     async def start_periodic(self, include_adi: bool = False) -> None:
         if self.periodic_enabled:
             return
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Periodic_Advertising_Enable_Command(
                 enable=1 | (2 if include_adi else 0),
                 advertising_handle=self.advertising_handle,
-            ),
-            check_result=True,
+            )
         )
         self.periodic_enabled = True
 
@@ -805,23 +792,21 @@ class AdvertisingSet(utils.EventEmitter):
     async def stop_periodic(self) -> None:
         if not self.periodic_enabled:
             return
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Set_Periodic_Advertising_Enable_Command(
                 enable=0,
                 advertising_handle=self.advertising_handle,
-            ),
-            check_result=True,
+            )
         )
         self.periodic_enabled = False
 
         self.emit(self.EVENT_STOP_PERIODIC)
 
     async def remove(self) -> None:
-        await self.device.send_command(
+        await self.device.send_sync_command(
             hci.HCI_LE_Remove_Advertising_Set_Command(
                 advertising_handle=self.advertising_handle
-            ),
-            check_result=True,
+            )
         )
         del self.device.extended_advertising_sets[self.advertising_handle]
 
@@ -916,7 +901,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
                 hci.HCI_LE_Periodic_Advertising_Create_Sync_Command.Options.DUPLICATE_FILTERING_INITIALLY_ENABLED
             )
 
-        await self.device.send_command(
+        await self.device.send_async_command(
             hci.HCI_LE_Periodic_Advertising_Create_Sync_Command(
                 options=options,
                 advertising_sid=self.sid,
@@ -925,8 +910,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
                 skip=self.skip,
                 sync_timeout=int(self.sync_timeout * 100),
                 sync_cte_type=0,
-            ),
-            check_result=True,
+            )
         )
 
         self.state = self.State.PENDING
@@ -937,18 +921,20 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
 
         if self.state == self.State.PENDING:
             self.state = self.State.CANCELLED
-            response = await self.device.send_command(
-                hci.HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command(),
-            )
-            if response.return_parameters == hci.HCI_SUCCESS:
+            try:
+                await self.device.send_sync_command(
+                    hci.HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command()
+                )
                 if self in self.device.periodic_advertising_syncs:
                     self.device.periodic_advertising_syncs.remove(self)
+            except hci.HCI_Error:
+                pass
             return
 
         if self.state in (self.State.ESTABLISHED, self.State.ERROR, self.State.LOST):
             self.state = self.State.TERMINATED
             if self.sync_handle is not None:
-                await self.device.send_command(
+                await self.device.send_sync_command(
                     hci.HCI_LE_Periodic_Advertising_Terminate_Sync_Command(
                         sync_handle=self.sync_handle
                     )
@@ -1118,11 +1104,10 @@ class Big(utils.EventEmitter):
         with closing(utils.EventWatcher()) as watcher:
             terminated = asyncio.Event()
             watcher.once(self, Big.Event.TERMINATION, lambda _: terminated.set())
-            await self.device.send_command(
+            await self.device.send_async_command(
                 hci.HCI_LE_Terminate_BIG_Command(
                     big_handle=self.big_handle, reason=reason
-                ),
-                check_result=True,
+                )
             )
             await terminated.wait()
 
@@ -1174,9 +1159,8 @@ class BigSync(utils.EventEmitter):
             logger.error('BIG Sync %d is not active.', self.big_handle)
             return
 
-        await self.device.send_command(
-            hci.HCI_LE_BIG_Terminate_Sync_Command(big_handle=self.big_handle),
-            check_result=True,
+        await self.device.send_sync_command(
+            hci.HCI_LE_BIG_Terminate_Sync_Command(big_handle=self.big_handle)
         )
         self.state = BigSync.State.TERMINATED
 
@@ -1499,7 +1483,7 @@ class _IsoLink:
         async with self._data_path_lock:
             if direction in self.data_paths:
                 return
-            await self.device.send_command(
+            await self.device.send_sync_command(
                 hci.HCI_LE_Setup_ISO_Data_Path_Command(
                     connection_handle=self.handle,
                     data_path_direction=direction,
@@ -1507,8 +1491,7 @@ class _IsoLink:
                     codec_id=codec_id or hci.CodingFormat(hci.CodecID.TRANSPARENT),
                     controller_delay=controller_delay,
                     codec_configuration=codec_configuration,
-                ),
-                check_result=True,
+                )
             )
             self.data_paths.add(direction)
 
@@ -1525,14 +1508,13 @@ class _IsoLink:
             directions_to_remove = set(directions).intersection(self.data_paths)
             if not directions_to_remove:
                 return
-            await self.device.send_command(
+            await self.device.send_sync_command(
                 hci.HCI_LE_Remove_ISO_Data_Path_Command(
                     connection_handle=self.handle,
                     data_path_direction=sum(
                         1 << direction for direction in directions_to_remove
                     ),
-                ),
-                check_result=True,
+                )
             )
             self.data_paths.difference_update(directions_to_remove)
 
@@ -1541,14 +1523,13 @@ class _IsoLink:
         self.device.host.send_iso_sdu(connection_handle=self.handle, sdu=sdu)
 
     async def get_tx_time_stamp(self) -> tuple[int, int, int]:
-        response = await self.device.host.send_command(
-            hci.HCI_LE_Read_ISO_TX_Sync_Command(connection_handle=self.handle),
-            check_result=True,
+        response = await self.device.host.send_sync_command(
+            hci.HCI_LE_Read_ISO_TX_Sync_Command(connection_handle=self.handle)
         )
         return (
-            response.return_parameters.packet_sequence_number,
-            response.return_parameters.tx_time_stamp,
-            response.return_parameters.time_offset,
+            response.packet_sequence_number,
+            response.tx_time_stamp,
+            response.time_offset,
         )
 
     @property
@@ -2371,7 +2352,7 @@ class Device(utils.CompositeEventEmitter):
         self._host = None
         self.powered_on = False
         self.auto_restart_inquiry = True
-        self.command_timeout = 10  # seconds
+        self.command_timeout = 10.0  # seconds
         self.gatt_server = gatt_server.Server(self)
         self.sdp_server = sdp.Server(self)
         self.l2cap_channel_manager = l2cap.ChannelManager(
@@ -2677,10 +2658,73 @@ class Device(utils.CompositeEventEmitter):
     def send_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes) -> None:
         self.host.send_l2cap_pdu(connection_handle, cid, pdu)
 
-    async def send_command(self, command: hci.HCI_Command, check_result: bool = False):
+    @overload
+    async def send_command(
+        self, command: hci.HCI_SyncCommand, check_result: bool = False
+    ) -> hci.HCI_Command_Complete_Event: ...
+
+    @overload
+    async def send_command(
+        self, command: hci.HCI_AsyncCommand, check_result: bool = False
+    ) -> hci.HCI_Command_Status_Event: ...
+
+    async def send_command(
+        self,
+        command: hci.HCI_SyncCommand | hci.HCI_AsyncCommand,
+        check_result: bool = False,
+    ) -> hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event:
+        '''
+        Send a synchronous or asynchronous command via the host.
+
+        NOTE: use `send_sync_command` instead for synchronous commands.
+        '''
         try:
-            return await asyncio.wait_for(
-                self.host.send_command(command, check_result), self.command_timeout
+            return await self.host.send_command(
+                command, check_result, self.command_timeout
+            )
+        except asyncio.TimeoutError as error:
+            logger.warning(f'!!! Command {command.name} timed out')
+            raise CommandTimeoutError() from error
+
+    async def send_sync_command(
+        self, command: hci.HCI_SyncCommand[_RP], check_status: bool = True
+    ) -> _RP:
+        '''
+        Send a synchronous command via the host.
+
+        Params:
+          command: the command to send.
+          check_status: If `True`, check the `status` field of the response's
+          `return_parameters` and raise and exception if not equal to `SUCCESS`.
+
+        Returns:
+          An instance of the return parameters class associated with the command class.
+        '''
+        try:
+            return await self.host.send_sync_command(
+                command, check_status, self.command_timeout
+            )
+        except asyncio.TimeoutError as error:
+            logger.warning(f'!!! Command {command.name} timed out')
+            raise CommandTimeoutError() from error
+
+    async def send_async_command(
+        self, command: hci.HCI_AsyncCommand, check_status: bool = True
+    ) -> hci.HCI_ErrorCode:
+        '''
+        Send an asynchronous command via the host.
+
+        Params:
+          command: the command to send.
+          check_status: If `True`, check the `status` field of the response and
+          raise and exception if not equal to `PENDING`.
+
+        Returns:
+          An instance of the return parameters class associated with the command class.
+        '''
+        try:
+            return await self.host.send_async_command(
+                command, check_status, self.command_timeout
             )
         except asyncio.TimeoutError as error:
             logger.warning(f'!!! Command {command.name} timed out')
@@ -2691,12 +2735,12 @@ class Device(utils.CompositeEventEmitter):
         await self.host.reset()
 
         # Try to get the public address from the controller
-        response = await self.send_command(hci.HCI_Read_BD_ADDR_Command())
-        if response.return_parameters.status == hci.HCI_SUCCESS:
-            logger.debug(
-                color(f'BD_ADDR: {response.return_parameters.bd_addr}', 'yellow')
-            )
-            self.public_address = response.return_parameters.bd_addr
+        response = await self.host.send_sync_command(
+            hci.HCI_Read_BD_ADDR_Command(), check_status=False
+        )
+        if response.status == hci.HCI_SUCCESS:
+            logger.debug(color(f'BD_ADDR: {response.bd_addr}', 'yellow'))
+            self.public_address = response.bd_addr
 
         # Instantiate the Key Store (we do this here rather than at __init__ time
         # because some Key Store implementations use the public address as a namespace)
@@ -2710,12 +2754,11 @@ class Device(utils.CompositeEventEmitter):
             )
 
         if self.host.supports_command(hci.HCI_WRITE_LE_HOST_SUPPORT_COMMAND):
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_Write_LE_Host_Support_Command(
                     le_supported_host=int(self.le_enabled),
                     simultaneous_le_host=int(self.le_simultaneous_enabled),
-                ),
-                check_result=True,
+                )
             )
 
         if self.le_enabled:
@@ -2742,11 +2785,10 @@ class Device(utils.CompositeEventEmitter):
                         'yellow',
                     )
                 )
-                await self.send_command(
+                await self.send_sync_command(
                     hci.HCI_LE_Set_Random_Address_Command(
                         random_address=self.random_address
-                    ),
-                    check_result=True,
+                    )
                 )
 
             # Load the address resolving list
@@ -2755,84 +2797,83 @@ class Device(utils.CompositeEventEmitter):
 
             # Enable address resolution
             if self.address_resolution_offload:
-                await self.send_command(
+                await self.send_sync_command(
                     hci.HCI_LE_Set_Address_Resolution_Enable_Command(
                         address_resolution_enable=1
-                    ),
-                    check_result=True,
+                    )
                 )
 
             if self.cis_enabled:
-                await self.send_command(
+                await self.send_sync_command(
                     hci.HCI_LE_Set_Host_Feature_Command(
                         bit_number=hci.LeFeature.CONNECTED_ISOCHRONOUS_STREAM,
                         bit_value=1,
-                    ),
-                    check_result=True,
+                    )
                 )
 
             if self.le_subrate_enabled:
-                await self.send_command(
+                await self.send_sync_command(
                     hci.HCI_LE_Set_Host_Feature_Command(
                         bit_number=hci.LeFeature.CONNECTION_SUBRATING_HOST_SUPPORT,
                         bit_value=1,
-                    ),
-                    check_result=True,
+                    )
                 )
 
             if self.config.channel_sounding_enabled:
-                await self.send_command(
+                await self.send_sync_command(
                     hci.HCI_LE_Set_Host_Feature_Command(
                         bit_number=hci.LeFeature.CHANNEL_SOUNDING_HOST_SUPPORT,
                         bit_value=1,
-                    ),
-                    check_result=True,
+                    )
                 )
-                result = await self.send_command(
-                    hci.HCI_LE_CS_Read_Local_Supported_Capabilities_Command(),
-                    check_result=True,
+                result = await self.send_sync_command(
+                    hci.HCI_LE_CS_Read_Local_Supported_Capabilities_Command()
                 )
                 self.cs_capabilities = ChannelSoundingCapabilities(
-                    num_config_supported=result.return_parameters.num_config_supported,
-                    max_consecutive_procedures_supported=result.return_parameters.max_consecutive_procedures_supported,
-                    num_antennas_supported=result.return_parameters.num_antennas_supported,
-                    max_antenna_paths_supported=result.return_parameters.max_antenna_paths_supported,
-                    roles_supported=result.return_parameters.roles_supported,
-                    modes_supported=result.return_parameters.modes_supported,
-                    rtt_capability=result.return_parameters.rtt_capability,
-                    rtt_aa_only_n=result.return_parameters.rtt_aa_only_n,
-                    rtt_sounding_n=result.return_parameters.rtt_sounding_n,
-                    rtt_random_payload_n=result.return_parameters.rtt_random_payload_n,
-                    nadm_sounding_capability=result.return_parameters.nadm_sounding_capability,
-                    nadm_random_capability=result.return_parameters.nadm_random_capability,
-                    cs_sync_phys_supported=result.return_parameters.cs_sync_phys_supported,
-                    subfeatures_supported=result.return_parameters.subfeatures_supported,
-                    t_ip1_times_supported=result.return_parameters.t_ip1_times_supported,
-                    t_ip2_times_supported=result.return_parameters.t_ip2_times_supported,
-                    t_fcs_times_supported=result.return_parameters.t_fcs_times_supported,
-                    t_pm_times_supported=result.return_parameters.t_pm_times_supported,
-                    t_sw_time_supported=result.return_parameters.t_sw_time_supported,
-                    tx_snr_capability=result.return_parameters.tx_snr_capability,
+                    num_config_supported=result.num_config_supported,
+                    max_consecutive_procedures_supported=result.max_consecutive_procedures_supported,
+                    num_antennas_supported=result.num_antennas_supported,
+                    max_antenna_paths_supported=result.max_antenna_paths_supported,
+                    roles_supported=result.roles_supported,
+                    modes_supported=result.modes_supported,
+                    rtt_capability=result.rtt_capability,
+                    rtt_aa_only_n=result.rtt_aa_only_n,
+                    rtt_sounding_n=result.rtt_sounding_n,
+                    rtt_random_payload_n=result.rtt_random_payload_n,
+                    nadm_sounding_capability=result.nadm_sounding_capability,
+                    nadm_random_capability=result.nadm_random_capability,
+                    cs_sync_phys_supported=result.cs_sync_phys_supported,
+                    subfeatures_supported=result.subfeatures_supported,
+                    t_ip1_times_supported=result.t_ip1_times_supported,
+                    t_ip2_times_supported=result.t_ip2_times_supported,
+                    t_fcs_times_supported=result.t_fcs_times_supported,
+                    t_pm_times_supported=result.t_pm_times_supported,
+                    t_sw_time_supported=result.t_sw_time_supported,
+                    tx_snr_capability=result.tx_snr_capability,
                 )
 
         if self.classic_enabled:
-            await self.send_command(
-                hci.HCI_Write_Local_Name_Command(local_name=self.name.encode('utf8'))
+            await self.send_sync_command(
+                hci.HCI_Write_Local_Name_Command(local_name=self.name.encode('utf8')),
+                check_status=False,
             )
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_Write_Class_Of_Device_Command(
                     class_of_device=self.class_of_device
-                )
+                ),
+                check_status=False,
             )
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_Write_Simple_Pairing_Mode_Command(
                     simple_pairing_mode=int(self.classic_ssp_enabled)
-                )
+                ),
+                check_status=False,
             )
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_Write_Secure_Connections_Host_Support_Command(
                     secure_connections_host_support=int(self.classic_sc_enabled)
-                )
+                ),
+                check_status=False,
             )
             await self.set_connectable(self.connectable)
             await self.set_discoverable(self.discoverable)
@@ -2841,17 +2882,15 @@ class Device(utils.CompositeEventEmitter):
                 if self.host.supports_lmp_features(
                     hci.LmpFeatureMask.INTERLACED_PAGE_SCAN
                 ):
-                    await self.send_command(
-                        hci.HCI_Write_Page_Scan_Type_Command(page_scan_type=1),
-                        check_result=True,
+                    await self.send_sync_command(
+                        hci.HCI_Write_Page_Scan_Type_Command(page_scan_type=1)
                     )
 
                 if self.host.supports_lmp_features(
                     hci.LmpFeatureMask.INTERLACED_INQUIRY_SCAN
                 ):
-                    await self.send_command(
-                        hci.HCI_Write_Inquiry_Scan_Type_Command(scan_type=1),
-                        check_result=True,
+                    await self.send_sync_command(
+                        hci.HCI_Write_Inquiry_Scan_Type_Command(scan_type=1)
                     )
 
         # Done
@@ -2883,15 +2922,17 @@ class Device(utils.CompositeEventEmitter):
             return False
 
         random_address = hci.Address.generate_private_address(self.irk)
-        response = await self.send_command(
-            hci.HCI_LE_Set_Random_Address_Command(random_address=self.random_address)
-        )
-        if response.return_parameters == hci.HCI_SUCCESS:
+        try:
+            await self.send_sync_command(
+                hci.HCI_LE_Set_Random_Address_Command(
+                    random_address=self.random_address
+                )
+            )
             logger.info(f'new RPA: {random_address}')
             self.random_address = random_address
             return True
-        else:
-            logger.warning(f'failed to set RPA: {response.return_parameters}')
+        except hci.HCI_Error as error:
+            logger.warning(f'failed to set RPA: {error.error_code!r}')
             return False
 
     async def _run_rpa_periodic_update(self) -> None:
@@ -2909,30 +2950,26 @@ class Device(utils.CompositeEventEmitter):
         self.address_resolver = smp.AddressResolver(resolving_keys)
 
         if self.address_resolution_offload or self.address_generation_offload:
-            await self.send_command(
-                hci.HCI_LE_Clear_Resolving_List_Command(), check_result=True
-            )
+            await self.send_sync_command(hci.HCI_LE_Clear_Resolving_List_Command())
 
             # Add an empty entry for non-directed address generation.
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_LE_Add_Device_To_Resolving_List_Command(
                     peer_identity_address_type=hci.Address.ANY.address_type,
                     peer_identity_address=hci.Address.ANY,
                     peer_irk=bytes(16),
                     local_irk=self.irk,
-                ),
-                check_result=True,
+                )
             )
 
             for irk, address in resolving_keys:
-                await self.send_command(
+                await self.send_sync_command(
                     hci.HCI_LE_Add_Device_To_Resolving_List_Command(
                         peer_identity_address_type=address.address_type,
                         peer_identity_address=address,
                         peer_irk=irk,
                         local_irk=self.irk,
-                    ),
-                    check_result=True,
+                    )
                 )
 
     def supports_le_features(self, feature: hci.LeFeatureMask) -> bool:
@@ -3200,11 +3237,10 @@ class Device(utils.CompositeEventEmitter):
         except hci.HCI_Error as error:
             # Remove the advertising set so that it doesn't stay dangling in the
             # controller.
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_LE_Remove_Advertising_Set_Command(
                     advertising_handle=advertising_handle
-                ),
-                check_result=False,
+                )
             )
             raise error
 
@@ -3287,7 +3323,7 @@ class Device(utils.CompositeEventEmitter):
             if scanning_phy_count == 0:
                 raise InvalidArgumentError('at least one scanning PHY must be enabled')
 
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_LE_Set_Extended_Scan_Parameters_Command(
                     own_address_type=own_address_type,
                     scanning_filter_policy=scanning_filter_policy,
@@ -3295,19 +3331,17 @@ class Device(utils.CompositeEventEmitter):
                     scan_types=[scan_type] * scanning_phy_count,
                     scan_intervals=[int(scan_interval / 0.625)] * scanning_phy_count,
                     scan_windows=[int(scan_window / 0.625)] * scanning_phy_count,
-                ),
-                check_result=True,
+                )
             )
 
             # Enable scanning
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_LE_Set_Extended_Scan_Enable_Command(
                     enable=1,
                     filter_duplicates=1 if filter_duplicates else 0,
                     duration=0,  # TODO allow other values
                     period=0,  # TODO allow other values
-                ),
-                check_result=True,
+                )
             )
         else:
             # Set the scanning parameters
@@ -3316,7 +3350,7 @@ class Device(utils.CompositeEventEmitter):
                 if active
                 else hci.HCI_LE_Set_Scan_Parameters_Command.PASSIVE_SCANNING
             )
-            await self.send_command(
+            await self.send_sync_command(
                 # pylint: disable=line-too-long
                 hci.HCI_LE_Set_Scan_Parameters_Command(
                     le_scan_type=scan_type,
@@ -3324,16 +3358,14 @@ class Device(utils.CompositeEventEmitter):
                     le_scan_window=int(scan_window / 0.625),
                     own_address_type=own_address_type,
                     scanning_filter_policy=hci.HCI_LE_Set_Scan_Parameters_Command.BASIC_UNFILTERED_POLICY,
-                ),
-                check_result=True,
+                )
             )
 
             # Enable scanning
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_LE_Set_Scan_Enable_Command(
                     le_scan_enable=1, filter_duplicates=1 if filter_duplicates else 0
-                ),
-                check_result=True,
+                )
             )
 
         self.scanning_is_passive = not active
@@ -3342,18 +3374,16 @@ class Device(utils.CompositeEventEmitter):
     async def stop_scanning(self, legacy: bool = False) -> None:
         # Disable scanning
         if not legacy and self.supports_le_extended_advertising:
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_LE_Set_Extended_Scan_Enable_Command(
                     enable=0, filter_duplicates=0, duration=0, period=0
-                ),
-                check_result=True,
+                )
             )
         else:
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_LE_Set_Scan_Enable_Command(
                     le_scan_enable=0, filter_duplicates=0
-                ),
-                check_result=True,
+                )
             )
 
         self.scanning = False
@@ -3526,21 +3556,19 @@ class Device(utils.CompositeEventEmitter):
         periodic_advertising_sync.on_biginfo_advertising_report(report)
 
     async def start_discovery(self, auto_restart: bool = True) -> None:
-        await self.send_command(
+        await self.send_sync_command(
             hci.HCI_Write_Inquiry_Mode_Command(
                 inquiry_mode=hci.HCI_EXTENDED_INQUIRY_MODE
-            ),
-            check_result=True,
+            )
         )
 
         self.discovering = False
-        await self.send_command(
+        await self.send_async_command(
             hci.HCI_Inquiry_Command(
                 lap=hci.HCI_GENERAL_INQUIRY_LAP,
                 inquiry_length=DEVICE_DEFAULT_INQUIRY_LENGTH,
                 num_responses=0,  # Unlimited number of responses.
-            ),
-            check_result=True,
+            )
         )
 
         self.auto_restart_inquiry = auto_restart
@@ -3548,7 +3576,7 @@ class Device(utils.CompositeEventEmitter):
 
     async def stop_discovery(self) -> None:
         if self.discovering:
-            await self.send_command(hci.HCI_Inquiry_Cancel_Command(), check_result=True)
+            await self.send_sync_command(hci.HCI_Inquiry_Cancel_Command())
         self.auto_restart_inquiry = True
         self.discovering = False
 
@@ -3576,9 +3604,8 @@ class Device(utils.CompositeEventEmitter):
         else:
             scan_enable = 0x00
 
-        return await self.send_command(
-            hci.HCI_Write_Scan_Enable_Command(scan_enable=scan_enable),
-            check_result=True,
+        return await self.send_sync_command(
+            hci.HCI_Write_Scan_Enable_Command(scan_enable=scan_enable)
         )
 
     async def set_discoverable(self, discoverable: bool = True) -> None:
@@ -3591,11 +3618,10 @@ class Device(utils.CompositeEventEmitter):
                 )
 
             # Update the controller
-            await self.send_command(
+            await self.send_sync_command(
                 hci.HCI_Write_Extended_Inquiry_Response_Command(
                     fec_required=0, extended_inquiry_response=self.inquiry_response
-                ),
-                check_result=True,
+                )
             )
             await self.set_scan_enable(
                 inquiry_scan_enabled=self.discoverable,
@@ -3807,7 +3833,7 @@ class Device(utils.CompositeEventEmitter):
                         for phy in phys
                     ]
 
-                    await self.send_command(
+                    await self.send_async_command(
                         hci.HCI_LE_Extended_Create_Connection_Command(
                             initiator_filter_policy=0,
                             own_address_type=own_address_type,
@@ -3828,15 +3854,14 @@ class Device(utils.CompositeEventEmitter):
                             supervision_timeouts=supervision_timeouts,
                             min_ce_lengths=min_ce_lengths,
                             max_ce_lengths=max_ce_lengths,
-                        ),
-                        check_result=True,
+                        )
                     )
                 else:
                     if hci.HCI_LE_1M_PHY not in connection_parameters_preferences:
                         raise InvalidArgumentError('1M PHY preferences required')
 
                     prefs = connection_parameters_preferences[hci.HCI_LE_1M_PHY]
-                    await self.send_command(
+                    await self.send_async_command(
                         hci.HCI_LE_Create_Connection_Command(
                             le_scan_interval=int(
                                 DEVICE_DEFAULT_CONNECT_SCAN_INTERVAL / 0.625
@@ -3858,8 +3883,7 @@ class Device(utils.CompositeEventEmitter):
                             supervision_timeout=int(prefs.supervision_timeout / 10),
                             min_ce_length=int(prefs.min_ce_length / 0.625),
                             max_ce_length=int(prefs.max_ce_length / 0.625),
-                        ),
-                        check_result=True,
+                        )
                     )
             else:
                 # Save pending connection
@@ -3876,7 +3900,7 @@ class Device(utils.CompositeEventEmitter):
                 )
 
                 # TODO: allow passing other settings
-                await self.send_command(
+                await self.send_async_command(
                     hci.HCI_Create_Connection_Command(
                         bd_addr=peer_address,
                         packet_type=0xCC18,  # FIXME: change
@@ -3884,8 +3908,7 @@ class Device(utils.CompositeEventEmitter):
                         clock_offset=0x0000,
                         allow_role_switch=0x01,
                         reserved=0,
-                    ),
-                    check_result=True,
+                    )
                 )
 
             # Wait for the connection process to complete
@@ -3903,11 +3926,11 @@ class Device(utils.CompositeEventEmitter):
                 )
             except asyncio.TimeoutError:
                 if transport == PhysicalTransport.LE:
-                    await self.send_command(
+                    await self.send_sync_command(
                         hci.HCI_LE_Create_Connection_Cancel_Command()
                     )
                 else:
-                    await self.send_command(
+                    await self.send_sync_command(
                         hci.HCI_Create_Connection_Cancel_Command(bd_addr=peer_address)
                     )
 
@@ -4036,11 +4059,10 @@ class Device(utils.CompositeEventEmitter):
 
         try:
             # Accept connection request
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_Accept_Connection_Request_Command(
                     bd_addr=peer_address, role=role
-                ),
-                check_result=True,
+                )
             )
 
             # Wait for connection complete
@@ -4076,9 +4098,7 @@ class Device(utils.CompositeEventEmitter):
         if peer_address is None:
             if not self.is_le_connecting:
                 return
-            await self.send_command(
-                hci.HCI_LE_Create_Connection_Cancel_Command(), check_result=True
-            )
+            await self.send_sync_command(hci.HCI_LE_Create_Connection_Cancel_Command())
 
         # BR/EDR: try to cancel to ongoing connection
         # NOTE: This API does not prevent from trying to cancel a connection which is
@@ -4095,9 +4115,8 @@ class Device(utils.CompositeEventEmitter):
                         peer_address, PhysicalTransport.BR_EDR
                     )  # TODO: timeout
 
-            await self.send_command(
-                hci.HCI_Create_Connection_Cancel_Command(bd_addr=peer_address),
-                check_result=True,
+            await self.send_sync_command(
+                hci.HCI_Create_Connection_Cancel_Command(bd_addr=peer_address)
             )
 
     async def disconnect(
@@ -4115,11 +4134,10 @@ class Device(utils.CompositeEventEmitter):
             self.disconnecting = True
 
             # Request a disconnection
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_Disconnect_Command(
                     connection_handle=connection.handle, reason=reason
-                ),
-                check_result=True,
+                )
             )
             return await utils.cancel_on_event(
                 self, Device.EVENT_FLUSH, pending_disconnection
@@ -4143,13 +4161,12 @@ class Device(utils.CompositeEventEmitter):
         if tx_time < 0x0148 or tx_time > 0x4290:
             raise InvalidArgumentError('tx_time must be between 0x0148 and 0x4290')
 
-        return await self.send_command(
+        await self.send_sync_command(
             hci.HCI_LE_Set_Data_Length_Command(
                 connection_handle=connection.handle,
                 tx_octets=tx_octets,
                 tx_time=tx_time,
-            ),
-            check_result=True,
+            )
         )
 
     async def update_connection_parameters(
@@ -4206,7 +4223,7 @@ class Device(utils.CompositeEventEmitter):
 
             return
 
-        await self.send_command(
+        await self.send_async_command(
             hci.HCI_LE_Connection_Update_Command(
                 connection_handle=connection.handle,
                 connection_interval_min=connection_interval_min,
@@ -4215,27 +4232,23 @@ class Device(utils.CompositeEventEmitter):
                 supervision_timeout=supervision_timeout,
                 min_ce_length=min_ce_length,
                 max_ce_length=max_ce_length,
-            ),
-            check_result=True,
+            )
         )
 
     async def get_connection_rssi(self, connection):
-        result = await self.send_command(
-            hci.HCI_Read_RSSI_Command(handle=connection.handle), check_result=True
+        result = await self.send_sync_command(
+            hci.HCI_Read_RSSI_Command(handle=connection.handle)
         )
-        return result.return_parameters.rssi
+        return result.rssi
 
     async def get_connection_phy(self, connection: Connection) -> ConnectionPHY:
         if not self.host.supports_command(hci.HCI_LE_READ_PHY_COMMAND):
             return ConnectionPHY(hci.Phy.LE_1M, hci.Phy.LE_1M)
 
-        result = await self.send_command(
-            hci.HCI_LE_Read_PHY_Command(connection_handle=connection.handle),
-            check_result=True,
+        result = await self.send_sync_command(
+            hci.HCI_LE_Read_PHY_Command(connection_handle=connection.handle)
         )
-        return ConnectionPHY(
-            result.return_parameters.tx_phy, result.return_parameters.rx_phy
-        )
+        return ConnectionPHY(result.tx_phy, result.rx_phy)
 
     async def set_connection_phy(
         self,
@@ -4252,57 +4265,53 @@ class Device(utils.CompositeEventEmitter):
             (1 if rx_phys is None else 0) << 1
         )
 
-        await self.send_command(
+        await self.send_async_command(
             hci.HCI_LE_Set_PHY_Command(
                 connection_handle=connection.handle,
                 all_phys=all_phys_bits,
                 tx_phys=hci.phy_list_to_bits(tx_phys),
                 rx_phys=hci.phy_list_to_bits(rx_phys),
                 phy_options=phy_options,
-            ),
-            check_result=True,
+            )
         )
 
     async def set_default_phy(
         self,
         tx_phys: Iterable[hci.Phy] | None = None,
         rx_phys: Iterable[hci.Phy] | None = None,
-    ):
+    ) -> None:
         all_phys_bits = (1 if tx_phys is None else 0) | (
             (1 if rx_phys is None else 0) << 1
         )
 
-        return await self.send_command(
+        await self.send_sync_command(
             hci.HCI_LE_Set_Default_PHY_Command(
                 all_phys=all_phys_bits,
                 tx_phys=hci.phy_list_to_bits(tx_phys),
                 rx_phys=hci.phy_list_to_bits(rx_phys),
-            ),
-            check_result=True,
+            )
         )
 
     async def transfer_periodic_sync(
         self, connection: Connection, sync_handle: int, service_data: int = 0
     ) -> None:
-        return await self.send_command(
+        await self.send_sync_command(
             hci.HCI_LE_Periodic_Advertising_Sync_Transfer_Command(
                 connection_handle=connection.handle,
                 service_data=service_data,
                 sync_handle=sync_handle,
-            ),
-            check_result=True,
+            )
         )
 
     async def transfer_periodic_set_info(
         self, connection: Connection, advertising_handle: int, service_data: int = 0
     ) -> None:
-        return await self.send_command(
+        await self.send_sync_command(
             hci.HCI_LE_Periodic_Advertising_Set_Info_Transfer_Command(
                 connection_handle=connection.handle,
                 service_data=service_data,
                 advertising_handle=advertising_handle,
-            ),
-            check_result=True,
+            )
         )
 
     async def find_peer_by_name(self, name: str, transport=PhysicalTransport.LE):
@@ -4490,11 +4499,10 @@ class Device(utils.CompositeEventEmitter):
                 pending_authentication.set_exception(hci.HCI_Error(error_code))
 
             # Request the authentication
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_Authentication_Requested_Command(
                     connection_handle=connection.handle
-                ),
-                check_result=True,
+                )
             )
 
             # Wait for the authentication to complete
@@ -4542,22 +4550,20 @@ class Device(utils.CompositeEventEmitter):
                 if connection.role != hci.Role.CENTRAL:
                     raise InvalidStateError('only centrals can start encryption')
 
-                await self.send_command(
+                await self.send_async_command(
                     hci.HCI_LE_Enable_Encryption_Command(
                         connection_handle=connection.handle,
                         random_number=rand,
                         encrypted_diversifier=ediv,
                         long_term_key=ltk,
-                    ),
-                    check_result=True,
+                    )
                 )
             else:
-                await self.send_command(
+                await self.send_async_command(
                     hci.HCI_Set_Connection_Encryption_Command(
                         connection_handle=connection.handle,
                         encryption_enable=0x01 if enable else 0x00,
-                    ),
-                    check_result=True,
+                    )
                 )
 
             # Wait for the result
@@ -4589,9 +4595,8 @@ class Device(utils.CompositeEventEmitter):
             def _(error_code: int):
                 pending_role_change.set_exception(hci.HCI_Error(error_code))
 
-            await self.send_command(
-                hci.HCI_Switch_Role_Command(bd_addr=connection.peer_address, role=role),
-                check_result=True,
+            await self.send_async_command(
+                hci.HCI_Switch_Role_Command(bd_addr=connection.peer_address, role=role)
             )
             await connection.cancel_on_disconnection(pending_role_change)
 
@@ -4616,14 +4621,13 @@ class Device(utils.CompositeEventEmitter):
                 if address == peer_address:
                     pending_name.set_exception(hci.HCI_Error(error_code))
 
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_Remote_Name_Request_Command(
                     bd_addr=peer_address,
                     page_scan_repetition_mode=hci.HCI_Remote_Name_Request_Command.R2,
                     reserved=0,
                     clock_offset=0,  # TODO investigate non-0 values
-                ),
-                check_result=True,
+                )
             )
 
             # Wait for the result
@@ -4634,7 +4638,7 @@ class Device(utils.CompositeEventEmitter):
     async def setup_cig(
         self,
         parameters: CigParameters,
-    ) -> list[int]:
+    ) -> Sequence[int]:
         """Sends hci.HCI_LE_Set_CIG_Parameters_Command.
 
         Args:
@@ -4643,7 +4647,7 @@ class Device(utils.CompositeEventEmitter):
         Returns:
             List of created CIS handles corresponding to the same order of [cid_id].
         """
-        response = await self.send_command(
+        response = await self.send_sync_command(
             hci.HCI_LE_Set_CIG_Parameters_Command(
                 cig_id=parameters.cig_id,
                 sdu_interval_c_to_p=parameters.sdu_interval_c_to_p,
@@ -4664,13 +4668,12 @@ class Device(utils.CompositeEventEmitter):
                 phy_p_to_c=[cis.phy_p_to_c for cis in parameters.cis_parameters],
                 rtn_c_to_p=[cis.rtn_c_to_p for cis in parameters.cis_parameters],
                 rtn_p_to_c=[cis.rtn_p_to_c for cis in parameters.cis_parameters],
-            ),
-            check_result=True,
+            )
         )
 
         # Ideally, we should manage CIG lifecycle, but they are not useful for Unicast
         # Server, so here it only provides a basic functionality for testing.
-        cis_handles = response.return_parameters.connection_handle[:]
+        cis_handles = response.connection_handle[:]
         for cis, cis_handle in zip(parameters.cis_parameters, cis_handles):
             self._pending_cis[cis_handle] = (cis.cis_id, parameters.cig_id)
 
@@ -4710,12 +4713,11 @@ class Device(utils.CompositeEventEmitter):
             watcher.on(
                 self, self.EVENT_CIS_ESTABLISHMENT_FAILURE, on_cis_establishment_failure
             )
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_LE_Create_CIS_Command(
                     cis_connection_handle=[p[0] for p in cis_acl_pairs],
                     acl_connection_handle=[p[1].handle for p in cis_acl_pairs],
-                ),
-                check_result=True,
+                )
             )
 
             return await asyncio.gather(*pending_cis_establishments.values())
@@ -4754,11 +4756,10 @@ class Device(utils.CompositeEventEmitter):
                     on_establishment_failure,
                 )
 
-                await self.send_command(
+                await self.send_async_command(
                     hci.HCI_LE_Accept_CIS_Request_Command(
                         connection_handle=cis_link.handle
-                    ),
-                    check_result=True,
+                    )
                 )
 
                 await pending_establishment
@@ -4770,11 +4771,10 @@ class Device(utils.CompositeEventEmitter):
         cis_link: CisLink,
         reason: int = hci.HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR,
     ) -> None:
-        await self.send_command(
+        await self.send_sync_command(
             hci.HCI_LE_Reject_CIS_Request_Command(
                 connection_handle=cis_link.handle, reason=reason
-            ),
-            check_result=True,
+            )
         )
 
     # [LE only]
@@ -4803,7 +4803,7 @@ class Device(utils.CompositeEventEmitter):
             )
 
             try:
-                await self.send_command(
+                await self.send_async_command(
                     hci.HCI_LE_Create_BIG_Command(
                         big_handle=big_handle,
                         advertising_handle=advertising_set.advertising_handle,
@@ -4817,8 +4817,7 @@ class Device(utils.CompositeEventEmitter):
                         framing=parameters.framing,
                         encryption=1 if parameters.broadcast_code else 0,
                         broadcast_code=parameters.broadcast_code or bytes(16),
-                    ),
-                    check_result=True,
+                    )
                 )
                 await established
             except hci.HCI_Error:
@@ -4858,7 +4857,7 @@ class Device(utils.CompositeEventEmitter):
             )
 
             try:
-                await self.send_command(
+                await self.send_async_command(
                     hci.HCI_LE_BIG_Create_Sync_Command(
                         big_handle=big_handle,
                         sync_handle=pa_sync_handle,
@@ -4867,8 +4866,7 @@ class Device(utils.CompositeEventEmitter):
                         mse=parameters.mse,
                         big_sync_timeout=parameters.big_sync_timeout,
                         bis=parameters.bis,
-                    ),
-                    check_result=True,
+                    )
                 )
                 await established
             except hci.HCI_Error:
@@ -4901,11 +4899,10 @@ class Device(utils.CompositeEventEmitter):
 
             watcher.on(self.host, 'le_remote_features', on_le_remote_features)
             watcher.on(self.host, 'le_remote_features_failure', on_failure)
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_LE_Read_Remote_Features_Command(
                     connection_handle=connection.handle
-                ),
-                check_result=True,
+                )
             )
             return await read_feature_future
 
@@ -4926,11 +4923,10 @@ class Device(utils.CompositeEventEmitter):
                 'channel_sounding_capabilities_failure',
                 lambda status: complete_future.set_exception(hci.HCI_Error(status)),
             )
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_LE_CS_Read_Remote_Supported_Capabilities_Command(
                     connection_handle=connection.handle
-                ),
-                check_result=True,
+                )
             )
             return await complete_future
 
@@ -4944,14 +4940,13 @@ class Device(utils.CompositeEventEmitter):
         cs_sync_antenna_selection: int = 0xFF,  # No Preference
         max_tx_power: int = 0x04,  # 4 dB
     ) -> None:
-        await self.send_command(
+        await self.send_sync_command(
             hci.HCI_LE_CS_Set_Default_Settings_Command(
                 connection_handle=connection.handle,
                 role_enable=role_enable,
                 cs_sync_antenna_selection=cs_sync_antenna_selection,
                 max_tx_power=max_tx_power,
-            ),
-            check_result=True,
+            )
         )
 
     @utils.experimental('Only for testing.')
@@ -5000,7 +4995,7 @@ class Device(utils.CompositeEventEmitter):
                 'channel_sounding_config_failure',
                 lambda status: complete_future.set_exception(hci.HCI_Error(status)),
             )
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_LE_CS_Create_Config_Command(
                     connection_handle=connection.handle,
                     config_id=config_id,
@@ -5020,8 +5015,7 @@ class Device(utils.CompositeEventEmitter):
                     ch3c_shape=ch3c_shape,
                     ch3c_jump=ch3c_jump,
                     reserved=0x00,
-                ),
-                check_result=True,
+                )
             )
             return await complete_future
 
@@ -5041,11 +5035,10 @@ class Device(utils.CompositeEventEmitter):
                     complete_future.set_exception(hci.HCI_Error(event.status))
 
             watcher.once(self.host, 'cs_security', on_event)
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_LE_CS_Security_Enable_Command(
                     connection_handle=connection.handle
-                ),
-                check_result=True,
+                )
             )
             return await complete_future
 
@@ -5067,7 +5060,7 @@ class Device(utils.CompositeEventEmitter):
         snr_control_initiator=hci.CsSnr.NOT_APPLIED,
         snr_control_reflector=hci.CsSnr.NOT_APPLIED,
     ) -> None:
-        await self.send_command(
+        await self.send_sync_command(
             hci.HCI_LE_CS_Set_Procedure_Parameters_Command(
                 connection_handle=connection.handle,
                 config_id=config.config_id,
@@ -5083,8 +5076,7 @@ class Device(utils.CompositeEventEmitter):
                 preferred_peer_antenna=preferred_peer_antenna,
                 snr_control_initiator=snr_control_initiator,
                 snr_control_reflector=snr_control_reflector,
-            ),
-            check_result=True,
+            )
         )
 
     @utils.experimental('Only for testing.')
@@ -5106,13 +5098,12 @@ class Device(utils.CompositeEventEmitter):
                 'channel_sounding_procedure_failure',
                 lambda x: complete_future.set_exception(hci.HCI_Error(x)),
             )
-            await self.send_command(
+            await self.send_async_command(
                 hci.HCI_LE_CS_Procedure_Enable_Command(
                     connection_handle=connection.handle,
                     config_id=config.config_id,
                     enable=enabled,
-                ),
-                check_result=True,
+                )
             )
             return await complete_future
 
@@ -5743,12 +5734,14 @@ class Device(utils.CompositeEventEmitter):
         )[1 if pairing_config.bonding else 0][1 if pairing_config.mitm else 0]
 
         # Respond
-        self.host.send_command_sync(
-            hci.HCI_IO_Capability_Request_Reply_Command(
-                bd_addr=connection.peer_address,
-                io_capability=pairing_config.delegate.classic_io_capability,
-                oob_data_present=0x00,  # Not present
-                authentication_requirements=authentication_requirements,
+        utils.AsyncRunner.spawn(
+            self.host.send_sync_command(
+                hci.HCI_IO_Capability_Request_Reply_Command(
+                    bd_addr=connection.peer_address,
+                    io_capability=pairing_config.delegate.classic_io_capability,
+                    oob_data_present=0x00,  # Not present
+                    authentication_requirements=authentication_requirements,
+                )
             )
         )
 
@@ -5832,7 +5825,7 @@ class Device(utils.CompositeEventEmitter):
         async def reply() -> None:
             try:
                 if await connection.cancel_on_disconnection(method()):
-                    await self.host.send_command(
+                    await self.host.send_sync_command(
                         hci.HCI_User_Confirmation_Request_Reply_Command(
                             bd_addr=connection.peer_address
                         )
@@ -5841,7 +5834,7 @@ class Device(utils.CompositeEventEmitter):
             except Exception:
                 logger.exception('exception while confirming')
 
-            await self.host.send_command(
+            await self.host.send_sync_command(
                 hci.HCI_User_Confirmation_Request_Negative_Reply_Command(
                     bd_addr=connection.peer_address
                 )
@@ -5862,7 +5855,7 @@ class Device(utils.CompositeEventEmitter):
                     pairing_config.delegate.get_number()
                 )
                 if number is not None:
-                    await self.host.send_command(
+                    await self.host.send_sync_command(
                         hci.HCI_User_Passkey_Request_Reply_Command(
                             bd_addr=connection.peer_address, numeric_value=number
                         )
@@ -5871,7 +5864,7 @@ class Device(utils.CompositeEventEmitter):
             except Exception:
                 logger.exception('exception while asking for pass-key')
 
-            await self.host.send_command(
+            await self.host.send_sync_command(
                 hci.HCI_User_Passkey_Request_Negative_Reply_Command(
                     bd_addr=connection.peer_address
                 )
@@ -5914,7 +5907,7 @@ class Device(utils.CompositeEventEmitter):
                     pin_code_len = len(pin_code)
                     if not 1 <= pin_code_len <= 16:
                         raise core.InvalidArgumentError("pin_code should be 1-16 bytes")
-                    await self.host.send_command(
+                    await self.host.send_sync_command(
                         hci.HCI_PIN_Code_Request_Reply_Command(
                             bd_addr=connection.peer_address,
                             pin_code_length=pin_code_len,
@@ -5923,17 +5916,19 @@ class Device(utils.CompositeEventEmitter):
                     )
                 else:
                     logger.debug("delegate.get_string() returned None")
-                    await self.host.send_command(
+                    await self.host.send_sync_command(
                         hci.HCI_PIN_Code_Request_Negative_Reply_Command(
                             bd_addr=connection.peer_address
                         )
                     )
 
-            asyncio.create_task(get_pin_code())
+            utils.AsyncRunner.spawn(get_pin_code())
         else:
-            self.host.send_command_sync(
-                hci.HCI_PIN_Code_Request_Negative_Reply_Command(
-                    bd_addr=connection.peer_address
+            utils.AsyncRunner.spawn(
+                self.host.send_sync_command(
+                    hci.HCI_PIN_Code_Request_Negative_Reply_Command(
+                        bd_addr=connection.peer_address
+                    )
                 )
             )
 
