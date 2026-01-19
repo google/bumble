@@ -421,7 +421,7 @@ class Controller:
                 hci.HCI_Command_Complete_Event(
                     num_hci_command_packets=1,
                     command_opcode=command.op_code,
-                    return_parameters=result,
+                    return_parameters=hci.HCI_GenericReturnParameters(data=result),
                 )
             )
 
