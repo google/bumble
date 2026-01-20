@@ -22,7 +22,7 @@ import click
 import bumble.logging
 from bumble import data_types
 from bumble.colors import color
-from bumble.device import Advertisement, Device
+from bumble.device import Advertisement, Device, DeviceConfiguration
 from bumble.hci import HCI_LE_1M_PHY, HCI_LE_CODED_PHY, Address, HCI_Constant
 from bumble.keys import JsonKeyStore
 from bumble.smp import AddressResolver
@@ -144,8 +144,14 @@ async def scan(
                 device_config, hci_source, hci_sink
             )
         else:
-            device = Device.with_hci(
-                'Bumble', 'F0:F1:F2:F3:F4:F5', hci_source, hci_sink
+            device = Device.from_config_with_hci(
+                DeviceConfiguration(
+                    name='Bumble',
+                    address=Address('F0:F1:F2:F3:F4:F5'),
+                    keystore='JsonKeyStore',
+                ),
+                hci_source,
+                hci_sink,
             )
 
         await device.power_on()
