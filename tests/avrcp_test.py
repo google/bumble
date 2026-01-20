@@ -233,7 +233,21 @@ def test_event(event: avrcp.Event):
                     feature_bitmask=avrcp.MediaPlayerItem.Features.ADD_TO_NOW_PLAYING,
                     character_set_id=avrcp.CharacterSetId.UTF_8,
                     displayable_name="Woo",
-                )
+                ),
+                avrcp.FolderItem(
+                    folder_uid=1,
+                    folder_type=avrcp.FolderItem.FolderType.ALBUMS,
+                    is_playable=avrcp.FolderItem.Playable.PLAYABLE,
+                    character_set_id=avrcp.CharacterSetId.UTF_8,
+                    displayable_name="Album",
+                ),
+                avrcp.MediaElementItem(
+                    media_element_uid=1,
+                    media_type=avrcp.MediaElementItem.MediaType.AUDIO,
+                    character_set_id=avrcp.CharacterSetId.UTF_8,
+                    displayable_name="Song",
+                    attribute_value_entry_list=[],
+                ),
             ],
         ),
         avrcp.ChangePathResponse(

@@ -55,13 +55,15 @@ AVRCP_PID = 0x110E
 AVRCP_BLUETOOTH_SIG_COMPANY_ID = 0x001958
 
 
-_UINT64_BE_METADATA = {
-    'parser': lambda data, offset: (
-        offset + 8,
-        int.from_bytes(data[offset : offset + 8], byteorder='big'),
-    ),
-    'serializer': lambda x: x.to_bytes(8, byteorder='big'),
-}
+_UINT64_BE_METADATA = hci.metadata(
+    {
+        'parser': lambda data, offset: (
+            offset + 8,
+            int.from_bytes(data[offset : offset + 8], byteorder='big'),
+        ),
+        'serializer': lambda x: x.to_bytes(8, byteorder='big'),
+    }
+)
 
 
 class PduId(utils.OpenIntEnum):
@@ -92,7 +94,7 @@ class PduId(utils.OpenIntEnum):
 
 
 class CharacterSetId(hci.SpecableEnum):
-    UTF_8 = 0x06
+    UTF_8 = 0x6A
 
 
 class MediaAttributeId(hci.SpecableEnum):
@@ -491,14 +493,12 @@ class BrowseableItem:
             **hci.HCI_Object.dict_from_bytes(data, offset + 3, subclass.fields)
         )
         instance._payload = data[3:]
-        return offset + length, instance
+        return offset + length + 3, instance
 
     def __bytes__(self) -> bytes:
         if self._payload is None:
             self._payload = hci.HCI_Object.dict_to_bytes(self.__dict__, self.fields)
-        return (
-            struct.pack('>BH', self.item_type, len(self._payload) + 3) + self._payload
-        )
+        return struct.pack('>BH', self.item_type, len(self._payload)) + self._payload
 
     _Item = TypeVar('_Item', bound='BrowseableItem')
 
@@ -601,11 +601,11 @@ class MediaPlayerItem(BrowseableItem):
         metadata=MajorPlayerType.type_metadata(1)
     )
     player_sub_type: PlayerSubType = field(
-        metadata=PlayerSubType.type_metadata(4, byteorder='big')
+        metadata=PlayerSubType.type_metadata(4, byteorder='little')
     )
     play_status: PlayStatus = field(metadata=PlayStatus.type_metadata(1))
     feature_bitmask: Features = field(
-        metadata=Features.type_metadata(16, byteorder='big')
+        metadata=Features.type_metadata(16, byteorder='little')
     )
     character_set_id: CharacterSetId = field(
         metadata=CharacterSetId.type_metadata(2, byteorder='big')
@@ -634,7 +634,7 @@ class FolderItem(BrowseableItem):
 
     folder_uid: int = field(metadata=_UINT64_BE_METADATA)
     folder_type: FolderType = field(metadata=FolderType.type_metadata(1))
-    is_playable: FolderType = field(metadata=Playable.type_metadata(1))
+    is_playable: Playable = field(metadata=Playable.type_metadata(1))
     character_set_id: CharacterSetId = field(
         metadata=CharacterSetId.type_metadata(2, byteorder='big')
     )
@@ -876,7 +876,7 @@ class GetPlayStatusCommand(Command):
 class GetElementAttributesCommand(Command):
     pdu_id = PduId.GET_ELEMENT_ATTRIBUTES
 
-    identifier: int = field(metadata=hci.metadata(_UINT64_BE_METADATA))
+    identifier: int = field(metadata=_UINT64_BE_METADATA)
     attribute_ids: Sequence[MediaAttributeId] = field(
         metadata=MediaAttributeId.type_metadata(
             4, list_begin=True, list_end=True, byteorder='big'
@@ -951,7 +951,7 @@ class ChangePathCommand(Command):
 
     uid_counter: int = field(metadata=hci.metadata('>2'))
     direction: Direction = field(metadata=Direction.type_metadata(1))
-    folder_uid: int = field(metadata=hci.metadata(_UINT64_BE_METADATA))
+    folder_uid: int = field(metadata=_UINT64_BE_METADATA)
 
 
 # -----------------------------------------------------------------------------
@@ -961,7 +961,7 @@ class GetItemAttributesCommand(Command):
     pdu_id = PduId.GET_ITEM_ATTRIBUTES
 
     scope: Scope = field(metadata=Scope.type_metadata(1))
-    uid: int = field(metadata=hci.metadata(_UINT64_BE_METADATA))
+    uid: int = field(metadata=_UINT64_BE_METADATA)
     uid_counter: int = field(metadata=hci.metadata('>2'))
     start_item: int = field(metadata=hci.metadata('>4'))
     end_item: int = field(metadata=hci.metadata('>4'))
@@ -999,7 +999,7 @@ class PlayItemCommand(Command):
     pdu_id = PduId.PLAY_ITEM
 
     scope: Scope = field(metadata=Scope.type_metadata(1))
-    uid: int = field(metadata=hci.metadata(_UINT64_BE_METADATA))
+    uid: int = field(metadata=_UINT64_BE_METADATA)
     uid_counter: int = field(metadata=hci.metadata('>2'))
 
 
@@ -1010,7 +1010,7 @@ class AddToNowPlayingCommand(Command):
     pdu_id = PduId.ADD_TO_NOW_PLAYING
 
     scope: Scope = field(metadata=Scope.type_metadata(1))
-    uid: int = field(metadata=hci.metadata(_UINT64_BE_METADATA))
+    uid: int = field(metadata=_UINT64_BE_METADATA)
     uid_counter: int = field(metadata=hci.metadata('>2'))
 
 
