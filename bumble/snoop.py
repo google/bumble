@@ -272,7 +272,7 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
             # Pipes we have to open with unbuffered binary I/O
             # so we pass ``buffering`` for pipes but not for files
             pcap_file: BinaryIO
-            if io_type == 'pipe':   
+            if io_type == 'pipe':
                 pcap_file = open(file_path, 'wb', buffering=0)
             else:
                 pcap_file = open(file_path, 'wb')
