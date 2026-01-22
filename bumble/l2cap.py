@@ -2342,8 +2342,8 @@ class ChannelManager:
                     cid,
                     L2CAP_Connection_Response(
                         identifier=request.identifier,
-                        destination_cid=request.source_cid,
-                        source_cid=0,
+                        destination_cid=0,
+                        source_cid=request.source_cid,
                         result=L2CAP_Connection_Response.Result.CONNECTION_REFUSED_NO_RESOURCES_AVAILABLE,
                         status=0x0000,
                     ),
@@ -2355,7 +2355,12 @@ class ChannelManager:
                 f'creating server channel with cid={source_cid} for psm {request.psm}'
             )
             channel = ClassicChannel(
-                self, connection, cid, request.psm, source_cid, server.spec
+                manager=self,
+                connection=connection,
+                signaling_cid=cid,
+                psm=request.psm,
+                source_cid=source_cid,
+                spec=server.spec,
             )
             connection_channels[source_cid] = channel
 
@@ -2372,8 +2377,8 @@ class ChannelManager:
                 cid,
                 L2CAP_Connection_Response(
                     identifier=request.identifier,
-                    destination_cid=request.source_cid,
-                    source_cid=0,
+                    destination_cid=0,
+                    source_cid=request.source_cid,
                     result=L2CAP_Connection_Response.Result.CONNECTION_REFUSED_PSM_NOT_SUPPORTED,
                     status=0x0000,
                 ),
