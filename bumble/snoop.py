@@ -119,8 +119,8 @@ class PcapSnooper(Snooper):
     PCAP_MAGIC = 0xA1B2C3D4
     DLT_BLUETOOTH_HCI_H4_WITH_PHDR = 201
 
-    def __init__(self, fifo):
-        self.output = fifo
+    def __init__(self, output: BinaryIO):
+        self.output = output
 
         # Write the header
         self.output.write(
@@ -226,6 +226,8 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
 
     snooper_type, snooper_args = spec.split(':', maxsplit=1)
 
+    global _SNOOPER_INSTANCE_COUNT
+
     if snooper_type == 'btsnoop':
         if ':' not in snooper_args:
             raise core.InvalidArgumentError('I/O type for btsnoop snooper type missing')
@@ -233,7 +235,6 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
         io_type, io_name = snooper_args.split(':', maxsplit=1)
         if io_type == 'file':
             # Process the file name string pattern.
-            global _SNOOPER_INSTANCE_COUNT
             file_path = io_name.format(
                 now=datetime.datetime.now(),
                 utcnow=datetime.datetime.now(tz=datetime.timezone.utc),
@@ -265,17 +266,20 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
                 instance=_SNOOPER_INSTANCE_COUNT,
             )
 
-            # Pipes we have to open with unbuffered binary I/O
-            kwargs = {}
-            if io_type == 'pipe':
-                kwargs["buffering"] = 0
-
             # Open a file or pipe
             logger.debug(f'PCAP file: {file_path}')
-            # Pass ``buffering`` for pipes but not for files
-            with open(file_path, 'wb', **kwargs) as snoop_file:
+
+            # Pipes we have to open with unbuffered binary I/O
+            # so we pass ``buffering`` for pipes but not for files
+            pcap_file: BinaryIO
+            if io_type == 'pipe':   
+                pcap_file = open(file_path, 'wb', buffering=0)
+            else:
+                pcap_file = open(file_path, 'wb')
+
+            with pcap_file:
                 _SNOOPER_INSTANCE_COUNT += 1
-                yield PcapSnooper(snoop_file)
+                yield PcapSnooper(pcap_file)
                 _SNOOPER_INSTANCE_COUNT -= 1
                 return
 
