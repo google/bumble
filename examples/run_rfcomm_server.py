@@ -153,7 +153,7 @@ async def main() -> None:
         await device.set_discoverable(True)
         await device.set_connectable(True)
 
-        await hci_transport.source.wait_for_termination()
+        await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------

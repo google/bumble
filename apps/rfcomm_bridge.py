@@ -421,7 +421,7 @@ async def run(device_config, hci_transport, bridge):
             await bridge.start(device)
 
             # Wait until the transport terminates
-            await hci_source.wait_for_termination()
+            await hci_source.terminated
         except core.ConnectionError as error:
             print(color(f"!!! Bluetooth connection failed: {error}", "red"))
         except Exception as error:

@@ -352,7 +352,7 @@ async def run(
         await bridge.start()
 
         # Wait until the source terminates
-        await hci_source.wait_for_termination()
+        await hci_source.terminated
 
 
 @click.command()

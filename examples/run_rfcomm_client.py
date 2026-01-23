@@ -227,7 +227,7 @@ async def main() -> None:
             tcp_port = int(sys.argv[5])
             asyncio.create_task(tcp_server(tcp_port, session))
 
-        await hci_transport.source.wait_for_termination()
+        await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------

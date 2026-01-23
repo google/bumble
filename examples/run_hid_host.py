@@ -556,7 +556,7 @@ async def main() -> None:
             # Interrupt Channel
             await hid_host.connect_interrupt_channel()
 
-        await hci_transport.source.wait_for_termination()
+        await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------

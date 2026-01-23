@@ -65,7 +65,7 @@ async def main() -> None:
         # Go!
         await device.power_on()
         await device.start_advertising(auto_restart=True)
-        await hci_transport.source.wait_for_termination()
+        await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------
