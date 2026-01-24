@@ -1409,8 +1409,8 @@ class ConnectionParametersPreferences:
     connection_interval_max: float = DEVICE_DEFAULT_CONNECTION_INTERVAL_MAX
     max_latency: int = DEVICE_DEFAULT_CONNECTION_MAX_LATENCY
     supervision_timeout: int = DEVICE_DEFAULT_CONNECTION_SUPERVISION_TIMEOUT
-    min_ce_length: int = DEVICE_DEFAULT_CONNECTION_MIN_CE_LENGTH
-    max_ce_length: int = DEVICE_DEFAULT_CONNECTION_MAX_CE_LENGTH
+    min_ce_length: float = DEVICE_DEFAULT_CONNECTION_MIN_CE_LENGTH
+    max_ce_length: float = DEVICE_DEFAULT_CONNECTION_MAX_CE_LENGTH
 
 
 ConnectionParametersPreferences.default = ConnectionParametersPreferences()
@@ -1520,7 +1520,7 @@ class _IsoLink:
         self.device.host.send_iso_sdu(connection_handle=self.handle, sdu=sdu)
 
     async def get_tx_time_stamp(self) -> tuple[int, int, int]:
-        response = await self.device.host.send_sync_command(
+        response = await self.device.send_sync_command(
             hci.HCI_LE_Read_ISO_TX_Sync_Command(connection_handle=self.handle)
         )
         return (
@@ -1697,7 +1697,7 @@ class Connection(utils.CompositeEventEmitter):
     peer_address: hci.Address
     peer_name: str | None
     peer_resolvable_address: hci.Address | None
-    peer_le_features: hci.LeFeatureMask | None
+    peer_le_features: hci.LeFeatureMask
     role: hci.Role
     parameters: Parameters
     encryption: int
@@ -1750,8 +1750,8 @@ class Connection(utils.CompositeEventEmitter):
     EVENT_CIS_REQUEST = "cis_request"
     EVENT_CIS_ESTABLISHMENT = "cis_establishment"
     EVENT_CIS_ESTABLISHMENT_FAILURE = "cis_establishment_failure"
-    EVENT_LE_SUBRATE_CHANGE = "le_subrate_change"
-    EVENT_LE_SUBRATE_CHANGE_FAILURE = "le_subrate_change_failure"
+    EVENT_LE_REMOTE_FEATURES_CHANGE = "le_remote_features_change"
+    EVENT_LE_REMOTE_FEATURES_CHANGE_FAILURE = "le_remote_features_change_failure"
 
     @utils.composite_listener
     class Listener:
@@ -1829,14 +1829,14 @@ class Connection(utils.CompositeEventEmitter):
         self.authenticated = False
         self.sc = False
         self.att_mtu = att.ATT_DEFAULT_MTU
-        self.data_length = DEVICE_DEFAULT_DATA_LENGTH
+        self.data_length: tuple[int, int, int, int] = DEVICE_DEFAULT_DATA_LENGTH
         self.gatt_client = gatt_client.Client(self)  # Per-connection client
         self.gatt_server = (
             device.gatt_server
         )  # By default, use the device's shared server
         self.pairing_peer_io_capability = None
         self.pairing_peer_authentication_requirements = None
-        self.peer_le_features = None
+        self.peer_le_features = hci.LeFeatureMask(0)
         self.cs_configs = {}
         self.cs_procedures = {}
 
@@ -1918,16 +1918,21 @@ class Connection(utils.CompositeEventEmitter):
         connection_interval_max: float,
         max_latency: int,
         supervision_timeout: float,
+        min_ce_length: float = 0.0,
+        max_ce_length: float = 0.0,
         use_l2cap=False,
     ) -> None:
         """
-        Request an update of the connection parameters.
+        Request a change of the connection parameters.
+
+        For short connection intervals (below 7.5ms, introduced in Bluetooth 6.2),
+        use the `update_parameters_with_subrate` method instead.
 
         Args:
           connection_interval_min: Minimum interval, in milliseconds.
           connection_interval_max: Maximum interval, in milliseconds.
-          max_latency: Latency, in number of intervals.
-          supervision_timeout: Timeout, in milliseconds.
+          max_latency: Max latency, in number of intervals.
+          supervision_timeout: Supervision Timeout, in milliseconds.
           use_l2cap: Request the update via L2CAP.
         """
         return await self.device.update_connection_parameters(
@@ -1937,6 +1942,77 @@ class Connection(utils.CompositeEventEmitter):
             max_latency,
             supervision_timeout,
             use_l2cap=use_l2cap,
+            min_ce_length=min_ce_length,
+            max_ce_length=max_ce_length,
+        )
+
+    async def update_parameters_with_subrate(
+        self,
+        connection_interval_min: float,
+        connection_interval_max: float,
+        subrate_min: int,
+        subrate_max: int,
+        max_latency: int,
+        continuation_number: int,
+        supervision_timeout: float,
+        min_ce_length: float,
+        max_ce_length: float,
+    ) -> None:
+        """
+        Request a change of the connection parameters.
+        This is similar to `update_parameters` but also allows specifying
+        the subrate parameters and supports shorter connection intervals (below
+        7.5ms, as introduced in Bluetooth 6.2).
+
+        Args:
+          connection_interval_min: Minimum interval, in milliseconds.
+          connection_interval_max: Maximum interval, in milliseconds.
+          subrate_min: Minimum subrate factor.
+          subrate_max: Maximum subrate factor.
+          max_latency: Max latency, in number of intervals.
+          continuation_number: Continuation number.
+          supervision_timeout: Supervision Timeout, in milliseconds.
+          min_ce_length: Minimum connection event length, in milliseconds.
+          max_ce_length: Maximumsub connection event length, in milliseconds.
+        """
+        return await self.device.update_connection_parameters_with_subrate(
+            self,
+            connection_interval_min,
+            connection_interval_max,
+            subrate_min,
+            subrate_max,
+            max_latency,
+            continuation_number,
+            supervision_timeout,
+            min_ce_length,
+            max_ce_length,
+        )
+
+    async def update_subrate(
+        self,
+        subrate_min: int,
+        subrate_max: int,
+        max_latency: int,
+        continuation_number: int,
+        supervision_timeout: float,
+    ) -> None:
+        """
+        Request request a change to the subrating factor and/or other parameters.
+
+        Args:
+          subrate_min: Minimum subrate factor.
+          subrate_max: Maximum subrate factor.
+          max_latency: Max latency, in number of intervals.
+          continuation_number: Continuation number.
+          supervision_timeout: Supervision Timeout, in milliseconds.
+        """
+        return await self.device.update_connection_subrate(
+            self,
+            subrate_min,
+            subrate_max,
+            max_latency,
+            continuation_number,
+            supervision_timeout,
         )
 
     async def set_phy(
@@ -2043,6 +2119,7 @@ class DeviceConfiguration:
     le_privacy_enabled: bool = False
     le_rpa_timeout: int = DEVICE_DEFAULT_LE_RPA_TIMEOUT
     le_subrate_enabled: bool = False
+    le_shorter_connection_intervals_enabled: bool = False
     classic_enabled: bool = False
     classic_sc_enabled: bool = True
     classic_ssp_enabled: bool = True
@@ -2397,6 +2474,9 @@ class Device(utils.CompositeEventEmitter):
         self.le_rpa_timeout = config.le_rpa_timeout
         self.le_rpa_periodic_update_task: asyncio.Task | None = None
         self.le_subrate_enabled = config.le_subrate_enabled
+        self.le_shorter_connection_intervals_enabled = (
+            config.le_shorter_connection_intervals_enabled
+        )
         self.classic_enabled = config.classic_enabled
         self.cis_enabled = config.cis_enabled
         self.classic_sc_enabled = config.classic_sc_enabled
@@ -2800,7 +2880,9 @@ class Device(utils.CompositeEventEmitter):
                     )
                 )
 
-            if self.cis_enabled:
+            if self.cis_enabled and self.host.supports_command(
+                hci.HCI_LE_SET_HOST_FEATURE_COMMAND
+            ):
                 await self.send_sync_command(
                     hci.HCI_LE_Set_Host_Feature_Command(
                         bit_number=hci.LeFeature.CONNECTED_ISOCHRONOUS_STREAM,
@@ -2808,7 +2890,13 @@ class Device(utils.CompositeEventEmitter):
                     )
                 )
 
-            if self.le_subrate_enabled:
+            if (
+                self.le_subrate_enabled
+                and self.host.supports_command(hci.HCI_LE_SET_HOST_FEATURE_COMMAND)
+                and self.host.supports_le_features(
+                    hci.LeFeatureMask.CONNECTION_SUBRATING
+                )
+            ):
                 await self.send_sync_command(
                     hci.HCI_LE_Set_Host_Feature_Command(
                         bit_number=hci.LeFeature.CONNECTION_SUBRATING_HOST_SUPPORT,
@@ -2816,7 +2904,9 @@ class Device(utils.CompositeEventEmitter):
                     )
                 )
 
-            if self.config.channel_sounding_enabled:
+            if self.config.channel_sounding_enabled and self.host.supports_command(
+                hci.HCI_LE_SET_HOST_FEATURE_COMMAND
+            ):
                 await self.send_sync_command(
                     hci.HCI_LE_Set_Host_Feature_Command(
                         bit_number=hci.LeFeature.CHANNEL_SOUNDING_HOST_SUPPORT,
@@ -2847,6 +2937,20 @@ class Device(utils.CompositeEventEmitter):
                     t_pm_times_supported=result.t_pm_times_supported,
                     t_sw_time_supported=result.t_sw_time_supported,
                     tx_snr_capability=result.tx_snr_capability,
+                )
+
+            if (
+                self.le_shorter_connection_intervals_enabled
+                and self.host.supports_command(hci.HCI_LE_SET_HOST_FEATURE_COMMAND)
+                and self.host.supports_le_features(
+                    hci.LeFeatureMask.SHORTER_CONNECTION_INTERVALS
+                )
+            ):
+                await self.send_sync_command(
+                    hci.HCI_LE_Set_Host_Feature_Command(
+                        bit_number=hci.LeFeature.SHORTER_CONNECTION_INTERVALS_HOST_SUPPORT,
+                        bit_value=1,
+                    )
                 )
 
         if self.classic_enabled:
@@ -4180,6 +4284,9 @@ class Device(utils.CompositeEventEmitter):
         '''
         Request an update of the connection parameters.
 
+        For short connection intervals (below 7.5 ms, introduced in Bluetooth 6.2),
+        use `update_connection_parameters_with_subrate` instead.
+
         Args:
           connection: The connection to update
           connection_interval_min: Minimum interval, in milliseconds.
@@ -4220,17 +4327,148 @@ class Device(utils.CompositeEventEmitter):
 
             return
 
-        await self.send_async_command(
-            hci.HCI_LE_Connection_Update_Command(
-                connection_handle=connection.handle,
-                connection_interval_min=connection_interval_min,
-                connection_interval_max=connection_interval_max,
-                max_latency=max_latency,
-                supervision_timeout=supervision_timeout,
-                min_ce_length=min_ce_length,
-                max_ce_length=max_ce_length,
+        pending_result = asyncio.get_running_loop().create_future()
+        with closing(utils.EventWatcher()) as watcher:
+
+            @watcher.on(connection, connection.EVENT_CONNECTION_PARAMETERS_UPDATE)
+            def _():
+                pending_result.set_result(None)
+
+            @watcher.on(
+                connection, connection.EVENT_CONNECTION_PARAMETERS_UPDATE_FAILURE
             )
-        )
+            def _(error_code: int):
+                pending_result.set_exception(hci.HCI_Error(error_code))
+
+            await self.send_async_command(
+                hci.HCI_LE_Connection_Update_Command(
+                    connection_handle=connection.handle,
+                    connection_interval_min=connection_interval_min,
+                    connection_interval_max=connection_interval_max,
+                    max_latency=max_latency,
+                    supervision_timeout=supervision_timeout,
+                    min_ce_length=min_ce_length,
+                    max_ce_length=max_ce_length,
+                )
+            )
+
+            await connection.cancel_on_disconnection(pending_result)
+
+    async def update_connection_parameters_with_subrate(
+        self,
+        connection: Connection,
+        connection_interval_min: float,
+        connection_interval_max: float,
+        subrate_min: int,
+        subrate_max: int,
+        max_latency: int,
+        continuation_number: int,
+        supervision_timeout: float,
+        min_ce_length: float = 0.0,
+        max_ce_length: float = 0.0,
+    ) -> None:
+        '''
+        Request a change of the connection parameters.
+        This is similar to `update_connection_parameters` but also allows specifying
+        the subrate parameters and supports shorter connection intervals (below
+        7.5ms, as introduced in Bluetooth 6.2).
+
+        Args:
+          connection: The connection to update
+          connection_interval_min: Minimum interval, in milliseconds.
+          connection_interval_max: Maximum interval, in milliseconds.
+          subrate_min: Minimum subrate factor.
+          subrate_max: Maximum subrate factor.
+          max_latency: Max latency, in number of intervals.
+          continuation_number: Continuation number.
+          supervision_timeout: Supervision Timeout, in milliseconds.
+          min_ce_length: Minimum connection event length, in milliseconds.
+          max_ce_length: Maximum connection event length, in milliseconds.
+        '''
+
+        # Convert the input parameters
+        connection_interval_min = int(connection_interval_min / 0.125)
+        connection_interval_max = int(connection_interval_max / 0.125)
+        supervision_timeout = int(supervision_timeout / 10)
+        min_ce_length = int(min_ce_length / 0.125)
+        max_ce_length = int(max_ce_length / 0.125)
+
+        pending_result = asyncio.get_running_loop().create_future()
+        with closing(utils.EventWatcher()) as watcher:
+
+            @watcher.on(connection, connection.EVENT_CONNECTION_PARAMETERS_UPDATE)
+            def _():
+                pending_result.set_result(None)
+
+            @watcher.on(
+                connection, connection.EVENT_CONNECTION_PARAMETERS_UPDATE_FAILURE
+            )
+            def _(error_code: int):
+                pending_result.set_exception(hci.HCI_Error(error_code))
+
+            await self.send_async_command(
+                hci.HCI_LE_Connection_Rate_Request_Command(
+                    connection_handle=connection.handle,
+                    connection_interval_min=connection_interval_min,
+                    connection_interval_max=connection_interval_max,
+                    subrate_min=subrate_min,
+                    subrate_max=subrate_max,
+                    max_latency=max_latency,
+                    continuation_number=continuation_number,
+                    supervision_timeout=supervision_timeout,
+                    min_ce_length=min_ce_length,
+                    max_ce_length=max_ce_length,
+                )
+            )
+
+            await connection.cancel_on_disconnection(pending_result)
+
+    async def update_connection_subrate(
+        self,
+        connection: Connection,
+        subrate_min: int,
+        subrate_max: int,
+        max_latency: int,
+        continuation_number: int,
+        supervision_timeout: float,
+    ) -> None:
+        '''
+        Request a change to the subrating factor and/or other parameters.
+
+        Args:
+          connection: The connection to update
+          subrate_min: Minimum subrate factor.
+          subrate_max: Maximum subrate factor.
+          max_latency: Max latency, in number of intervals.
+          continuation_number: Continuation number.
+          supervision_timeout: Supervision Timeout, in milliseconds.
+        '''
+
+        pending_result = asyncio.get_running_loop().create_future()
+        with closing(utils.EventWatcher()) as watcher:
+
+            @watcher.on(connection, connection.EVENT_CONNECTION_PARAMETERS_UPDATE)
+            def _():
+                pending_result.set_result(None)
+
+            @watcher.on(
+                connection, connection.EVENT_CONNECTION_PARAMETERS_UPDATE_FAILURE
+            )
+            def _(error_code: int):
+                pending_result.set_exception(hci.HCI_Error(error_code))
+
+            await self.send_async_command(
+                hci.HCI_LE_Subrate_Request_Command(
+                    connection_handle=connection.handle,
+                    subrate_min=subrate_min,
+                    subrate_max=subrate_max,
+                    max_latency=max_latency,
+                    continuation_number=continuation_number,
+                    supervision_timeout=int(supervision_timeout / 10),
+                )
+            )
+
+            await connection.cancel_on_disconnection(pending_result)
 
     async def get_connection_rssi(self, connection):
         result = await self.send_sync_command(
@@ -4289,6 +4527,87 @@ class Device(utils.CompositeEventEmitter):
             )
         )
 
+    async def set_default_connection_subrate(
+        self,
+        subrate_min: int,
+        subrate_max: int,
+        max_latency: int,
+        continuation_number: int,
+        supervision_timeout: float,
+    ) -> None:
+        '''
+        Set the default subrate parameters for new connections.
+
+        Args:
+          subrate_min: Minimum subrate factor.
+          subrate_max: Maximum subrate factor.
+          max_latency: Max latency, in number of intervals.
+          continuation_number: Continuation number.
+          supervision_timeout: Supervision Timeout, in milliseconds.
+        '''
+
+        # Convert the input parameters
+        supervision_timeout = int(supervision_timeout / 10)
+
+        await self.send_command(
+            hci.HCI_LE_Set_Default_Subrate_Command(
+                subrate_min=subrate_min,
+                subrate_max=subrate_max,
+                max_latency=max_latency,
+                continuation_number=continuation_number,
+                supervision_timeout=supervision_timeout,
+            ),
+            check_result=True,
+        )
+
+    async def set_default_connection_parameters(
+        self,
+        connection_interval_min: float,
+        connection_interval_max: float,
+        subrate_min: int,
+        subrate_max: int,
+        max_latency: int,
+        continuation_number: int,
+        supervision_timeout: float,
+        min_ce_length: float = 0.0,
+        max_ce_length: float = 0.0,
+    ) -> None:
+        '''
+        Set the default connection parameters for new connections.
+
+        Args:
+          connection_interval_min: Minimum interval, in milliseconds.
+          connection_interval_max: Maximum interval, in milliseconds.
+          subrate_min: Minimum subrate factor.
+          subrate_max: Maximum subrate factor.
+          max_latency: Max latency, in number of intervals.
+          continuation_number: Continuation number.
+          supervision_timeout: Supervision Timeout, in milliseconds.
+          min_ce_length: Minimum connection event length, in milliseconds.
+          max_ce_length: Maximum connection event length, in milliseconds.
+        '''
+
+        # Convert the input parameters
+        connection_interval_min = int(connection_interval_min / 0.125)
+        connection_interval_max = int(connection_interval_max / 0.125)
+        supervision_timeout = int(supervision_timeout / 10)
+        min_ce_length = int(min_ce_length / 0.125)
+        max_ce_length = int(max_ce_length / 0.125)
+
+        await self.send_sync_command(
+            hci.HCI_LE_Set_Default_Rate_Parameters_Command(
+                connection_interval_min=connection_interval_min,
+                connection_interval_max=connection_interval_max,
+                subrate_min=subrate_min,
+                subrate_max=subrate_max,
+                max_latency=max_latency,
+                continuation_number=continuation_number,
+                supervision_timeout=supervision_timeout,
+                min_ce_length=min_ce_length,
+                max_ce_length=max_ce_length,
+            )
+        )
+
     async def transfer_periodic_sync(
         self, connection: Connection, sync_handle: int, service_data: int = 0
     ) -> None:
@@ -4311,7 +4630,9 @@ class Device(utils.CompositeEventEmitter):
             )
         )
 
-    async def find_peer_by_name(self, name: str, transport=PhysicalTransport.LE):
+    async def find_peer_by_name(
+        self, name: str, transport=PhysicalTransport.LE
+    ) -> hci.Address:
         """
         Scan for a peer with a given name and return its address.
         """
@@ -4329,6 +4650,7 @@ class Device(utils.CompositeEventEmitter):
         listener: Callable[..., None] | None = None
         was_scanning = self.scanning
         was_discovering = self.discovering
+        event_name: str | None = None
         try:
             if transport == PhysicalTransport.LE:
                 event_name = 'advertisement'
@@ -4354,11 +4676,11 @@ class Device(utils.CompositeEventEmitter):
                 if not self.discovering:
                     await self.start_discovery()
             else:
-                return None
+                raise ValueError('invalid transport')
 
             return await utils.cancel_on_event(self, Device.EVENT_FLUSH, peer_address)
         finally:
-            if listener is not None:
+            if listener is not None and event_name is not None:
                 self.remove_listener(event_name, listener)
 
             if transport == PhysicalTransport.LE and not was_scanning:
@@ -4384,7 +4706,7 @@ class Device(utils.CompositeEventEmitter):
                     peer_address.set_result(address)
                 return
 
-            if address.is_resolvable:
+            if address.is_resolvable and self.address_resolver is not None:
                 resolved_address = self.address_resolver.resolve(address)
                 if resolved_address == identity_address:
                     if not peer_address.done():
@@ -4599,7 +4921,6 @@ class Device(utils.CompositeEventEmitter):
 
     # [Classic only]
     async def request_remote_name(self, remote: hci.Address | Connection) -> str:
-        # Set up event handlers
         pending_name: asyncio.Future[str] = asyncio.get_running_loop().create_future()
 
         peer_address = (
@@ -6186,7 +6507,7 @@ class Device(utils.CompositeEventEmitter):
     ):
         logger.debug(
             f'*** Connection Parameters Update: [0x{connection.handle:04X}] '
-            f'{connection.peer_address} as {connection.role_name}, '
+            f'{connection.peer_address} as {connection.role_name}'
         )
         if connection.parameters.connection_interval != connection_interval * 1.25:
             connection.parameters = Connection.Parameters(
@@ -6210,7 +6531,41 @@ class Device(utils.CompositeEventEmitter):
         self, connection: Connection, error: int
     ):
         logger.debug(
-            f'*** Connection Parameters Update Failed: [0x{connection.handle:04X}] '
+            f'*** Connection Parameters Update failed: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}, '
+            f'error={error}'
+        )
+        connection.emit(connection.EVENT_CONNECTION_PARAMETERS_UPDATE_FAILURE, error)
+
+    @host_event_handler
+    @with_connection_from_handle
+    def on_le_connection_rate_change(
+        self,
+        connection: Connection,
+        connection_interval: int,
+        subrate_factor: int,
+        peripheral_latency: int,
+        continuation_number: int,
+        supervision_timeout: int,
+    ):
+        logger.debug(
+            f'*** Connection Rate Change: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}'
+        )
+        connection.parameters = Connection.Parameters(
+            connection_interval=connection_interval * 0.125,
+            subrate_factor=subrate_factor,
+            peripheral_latency=peripheral_latency,
+            continuation_number=continuation_number,
+            supervision_timeout=supervision_timeout * 10.0,
+        )
+        connection.emit(connection.EVENT_CONNECTION_PARAMETERS_UPDATE)
+
+    @host_event_handler
+    @with_connection_from_handle
+    def on_le_connection_rate_change_failure(self, connection: Connection, error: int):
+        logger.debug(
+            f'*** Connection Rate Change failed: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}, '
             f'error={error}'
         )
@@ -6253,7 +6608,25 @@ class Device(utils.CompositeEventEmitter):
             subrate_factor,
             continuation_number,
         )
-        connection.emit(connection.EVENT_LE_SUBRATE_CHANGE)
+        connection.emit(connection.EVENT_CONNECTION_PARAMETERS_UPDATE)
+
+    @host_event_handler
+    @with_connection_from_handle
+    def on_le_subrate_change_failure(self, connection: Connection, status: int):
+        connection.emit(connection.EVENT_CONNECTION_PARAMETERS_UPDATE_FAILURE, status)
+
+    @host_event_handler
+    @with_connection_from_handle
+    def on_le_remote_features(
+        self, connection: Connection, le_features: hci.LeFeatureMask
+    ):
+        connection.peer_le_features = le_features
+        connection.emit(connection.EVENT_LE_REMOTE_FEATURES_CHANGE)
+
+    @host_event_handler
+    @with_connection_from_handle
+    def on_le_remote_features_failure(self, connection: Connection, status: int):
+        connection.emit(connection.EVENT_LE_REMOTE_FEATURES_CHANGE_FAILURE, status)
 
     @host_event_handler
     @with_connection_from_handle

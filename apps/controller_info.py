@@ -27,9 +27,8 @@ from bumble.core import name_or_number
 from bumble.hci import (
     HCI_LE_READ_BUFFER_SIZE_COMMAND,
     HCI_LE_READ_BUFFER_SIZE_V2_COMMAND,
-    HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND,
     HCI_LE_READ_MAXIMUM_DATA_LENGTH_COMMAND,
-    HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND,
+    HCI_LE_READ_MINIMUM_SUPPORTED_CONNECTION_INTERVAL_COMMAND,
     HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
     HCI_READ_BD_ADDR_COMMAND,
     HCI_READ_BUFFER_SIZE_COMMAND,
@@ -37,9 +36,8 @@ from bumble.hci import (
     HCI_Command,
     HCI_LE_Read_Buffer_Size_Command,
     HCI_LE_Read_Buffer_Size_V2_Command,
-    HCI_LE_Read_Maximum_Advertising_Data_Length_Command,
     HCI_LE_Read_Maximum_Data_Length_Command,
-    HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command,
+    HCI_LE_Read_Minimum_Supported_Connection_Interval_Command,
     HCI_LE_Read_Suggested_Default_Data_Length_Command,
     HCI_Read_BD_ADDR_Command,
     HCI_Read_Buffer_Size_Command,
@@ -78,51 +76,60 @@ async def get_classic_info(host: Host) -> None:
 async def get_le_info(host: Host) -> None:
     print()
 
-    if host.supports_command(HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND):
-        response1 = await host.send_sync_command(
-            HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command()
-        )
-        print(
-            color('LE Number Of Supported Advertising Sets:', 'yellow'),
-            response1.num_supported_advertising_sets,
-            '\n',
-        )
+    print(
+        color('LE Number Of Supported Advertising Sets:', 'yellow'),
+        host.number_of_supported_advertising_sets,
+        '\n',
+    )
 
-    if host.supports_command(HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND):
-        response2 = await host.send_sync_command(
-            HCI_LE_Read_Maximum_Advertising_Data_Length_Command()
-        )
-        print(
-            color('LE Maximum Advertising Data Length:', 'yellow'),
-            response2.max_advertising_data_length,
-            '\n',
-        )
+    print(
+        color('LE Maximum Advertising Data Length:', 'yellow'),
+        host.maximum_advertising_data_length,
+        '\n',
+    )
 
     if host.supports_command(HCI_LE_READ_MAXIMUM_DATA_LENGTH_COMMAND):
-        response3 = await host.send_sync_command(
+        response1 = await host.send_sync_command(
             HCI_LE_Read_Maximum_Data_Length_Command()
         )
         print(
-            color('Maximum Data Length:', 'yellow'),
+            color('LE Maximum Data Length:', 'yellow'),
             (
-                f'tx:{response3.supported_max_tx_octets}/'
-                f'{response3.supported_max_tx_time}, '
-                f'rx:{response3.supported_max_rx_octets}/'
-                f'{response3.supported_max_rx_time}'
+                f'tx:{response1.supported_max_tx_octets}/'
+                f'{response1.supported_max_tx_time}, '
+                f'rx:{response1.supported_max_rx_octets}/'
+                f'{response1.supported_max_rx_time}'
             ),
-            '\n',
         )
 
     if host.supports_command(HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND):
-        response4 = await host.send_sync_command(
+        response2 = await host.send_sync_command(
             HCI_LE_Read_Suggested_Default_Data_Length_Command()
         )
         print(
-            color('Suggested Default Data Length:', 'yellow'),
-            f'{response4.suggested_max_tx_octets}/'
-            f'{response4.suggested_max_tx_time}',
+            color('LE Suggested Default Data Length:', 'yellow'),
+            f'{response2.suggested_max_tx_octets}/'
+            f'{response2.suggested_max_tx_time}',
             '\n',
         )
+
+    if host.supports_command(HCI_LE_READ_MINIMUM_SUPPORTED_CONNECTION_INTERVAL_COMMAND):
+        response3 = await host.send_sync_command(
+            HCI_LE_Read_Minimum_Supported_Connection_Interval_Command()
+        )
+        print(
+            color('LE Minimum Supported Connection Interval:', 'yellow'),
+            f'{response3.minimum_supported_connection_interval * 125} µs',
+        )
+        for group in range(len(response3.group_min)):
+            print(
+                f'  Group {group}: '
+                f'{response3.group_min[group] * 125} µs to '
+                f'{response3.group_max[group] * 125} µs '
+                'by increments of '
+                f'{response3.group_stride[group] * 125} µs',
+                '\n',
+            )
 
     print(color('LE Features:', 'yellow'))
     for feature in host.supported_le_features:
