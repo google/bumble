@@ -2407,24 +2407,28 @@ class HCI_Packet:
 
     @classmethod
     def from_bytes(cls, packet: bytes) -> HCI_Packet:
-        packet_type = packet[0]
+        try:
+            packet_type = packet[0]
 
-        if packet_type == HCI_COMMAND_PACKET:
-            return HCI_Command.from_bytes(packet)
+            if packet_type == HCI_COMMAND_PACKET:
+                return HCI_Command.from_bytes(packet)
 
-        if packet_type == HCI_ACL_DATA_PACKET:
-            return HCI_AclDataPacket.from_bytes(packet)
+            if packet_type == HCI_ACL_DATA_PACKET:
+                return HCI_AclDataPacket.from_bytes(packet)
 
-        if packet_type == HCI_SYNCHRONOUS_DATA_PACKET:
-            return HCI_SynchronousDataPacket.from_bytes(packet)
+            if packet_type == HCI_SYNCHRONOUS_DATA_PACKET:
+                return HCI_SynchronousDataPacket.from_bytes(packet)
 
-        if packet_type == HCI_EVENT_PACKET:
-            return HCI_Event.from_bytes(packet)
+            if packet_type == HCI_EVENT_PACKET:
+                return HCI_Event.from_bytes(packet)
 
-        if packet_type == HCI_ISO_DATA_PACKET:
-            return HCI_IsoDataPacket.from_bytes(packet)
+            if packet_type == HCI_ISO_DATA_PACKET:
+                return HCI_IsoDataPacket.from_bytes(packet)
 
-        return HCI_CustomPacket(packet)
+            return HCI_CustomPacket(packet)
+        except Exception as e:
+            logger.error(f'error parsing HCI packet [{packet.hex()}]: {e}')
+            raise
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -5854,7 +5858,7 @@ class HCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters(
     rtt_capability: int = field(metadata=metadata(1))
     rtt_aa_only_n: int = field(metadata=metadata(1))
     rtt_sounding_n: int = field(metadata=metadata(1))
-    rtt_random_payload_n: int = field(metadata=metadata(1))
+    rtt_random_sequence_n: int = field(metadata=metadata(1))
     nadm_sounding_capability: int = field(metadata=metadata(2))
     nadm_random_capability: int = field(metadata=metadata(2))
     cs_sync_phys_supported: int = field(metadata=metadata(CS_SYNC_PHY_SUPPORTED_SPEC))
@@ -5910,7 +5914,7 @@ class HCI_LE_CS_Write_Cached_Remote_Supported_Capabilities_Command(
     rtt_capability: int = field(metadata=metadata(1))
     rtt_aa_only_n: int = field(metadata=metadata(1))
     rtt_sounding_n: int = field(metadata=metadata(1))
-    rtt_random_payload_n: int = field(metadata=metadata(1))
+    rtt_random_sequence_n: int = field(metadata=metadata(1))
     nadm_sounding_capability: int = field(metadata=metadata(2))
     nadm_random_capability: int = field(metadata=metadata(2))
     cs_sync_phys_supported: int = field(metadata=metadata(CS_SYNC_PHY_SUPPORTED_SPEC))
@@ -7118,7 +7122,7 @@ class HCI_LE_CS_Read_Remote_Supported_Capabilities_Complete_Event(HCI_LE_Meta_Ev
     rtt_capability: int = field(metadata=metadata(1))
     rtt_aa_only_n: int = field(metadata=metadata(1))
     rtt_sounding_n: int = field(metadata=metadata(1))
-    rtt_random_payload_n: int = field(metadata=metadata(1))
+    rtt_random_sequence_n: int = field(metadata=metadata(1))
     nadm_sounding_capability: int = field(metadata=metadata(2))
     nadm_random_capability: int = field(metadata=metadata(2))
     cs_sync_phys_supported: int = field(metadata=metadata(CS_SYNC_PHY_SUPPORTED_SPEC))

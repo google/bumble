@@ -1177,7 +1177,7 @@ class ChannelSoundingCapabilities:
     rtt_capability: int
     rtt_aa_only_n: int
     rtt_sounding_n: int
-    rtt_random_payload_n: int
+    rtt_random_sequence_n: int
     nadm_sounding_capability: int
     nadm_random_capability: int
     cs_sync_phys_supported: int
@@ -2926,7 +2926,7 @@ class Device(utils.CompositeEventEmitter):
                     rtt_capability=result.rtt_capability,
                     rtt_aa_only_n=result.rtt_aa_only_n,
                     rtt_sounding_n=result.rtt_sounding_n,
-                    rtt_random_payload_n=result.rtt_random_payload_n,
+                    rtt_random_sequence_n=result.rtt_random_sequence_n,
                     nadm_sounding_capability=result.nadm_sounding_capability,
                     nadm_random_capability=result.nadm_random_capability,
                     cs_sync_phys_supported=result.cs_sync_phys_supported,
@@ -6673,7 +6673,7 @@ class Device(utils.CompositeEventEmitter):
             rtt_capability=event.rtt_capability,
             rtt_aa_only_n=event.rtt_aa_only_n,
             rtt_sounding_n=event.rtt_sounding_n,
-            rtt_random_payload_n=event.rtt_random_payload_n,
+            rtt_random_sequence_n=event.rtt_random_sequence_n,
             nadm_sounding_capability=event.nadm_sounding_capability,
             nadm_random_capability=event.nadm_random_capability,
             cs_sync_phys_supported=event.cs_sync_phys_supported,

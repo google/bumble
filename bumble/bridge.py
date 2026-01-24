@@ -37,7 +37,12 @@ class HCI_Bridge:
 
         def on_packet(self, packet):
             # Convert the packet bytes to an object
-            hci_packet = HCI_Packet.from_bytes(packet)
+            try:
+                hci_packet = HCI_Packet.from_bytes(packet)
+            except Exception:
+                logger.warning('forwarding unparsed packet as-is')
+                self.hci_sink.on_packet(packet)
+                return
 
             # Filter the packet
             if self.packet_filter is not None:
