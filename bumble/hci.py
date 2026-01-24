@@ -6138,7 +6138,7 @@ class HCI_LE_Frame_Space_Update_Command(HCI_AsyncCommand):
     frame_space_min: int = field(metadata=metadata(2))
     frame_space_max: int = field(metadata=metadata(2))
     phys: int = field(metadata=PhyBit.type_metadata(1))
-    spacing_types: int = field(metadata=SpacingType.type_metadata(1))
+    spacing_types: int = field(metadata=SpacingType.type_metadata(2))
 
 
 # -----------------------------------------------------------------------------
