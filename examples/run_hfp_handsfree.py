@@ -167,7 +167,7 @@ async def main() -> None:
 
         await websockets.asyncio.server.serve(serve, 'localhost', 8989)
 
-        await hci_transport.source.wait_for_termination()
+        await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------

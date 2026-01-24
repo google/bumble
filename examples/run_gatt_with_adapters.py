@@ -422,7 +422,7 @@ async def main() -> None:
             # Setup a server
             await server(device)
 
-        await hci_transport.source.wait_for_termination()
+        await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------

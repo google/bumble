@@ -190,7 +190,7 @@ async def scan(
             scanning_phys=scanning_phys,
         )
 
-        await hci_source.wait_for_termination()
+        await hci_source.terminated
 
 
 # -----------------------------------------------------------------------------

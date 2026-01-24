@@ -726,7 +726,7 @@ class Speaker:
                 print("Waiting for connection...")
                 await self.advertise()
 
-            await hci_source.wait_for_termination()
+            await hci_source.terminated
 
         for output in self.outputs:
             await output.stop()

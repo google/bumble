@@ -735,7 +735,7 @@ async def main() -> None:
             print("Executing in Web mode")
             await keyboard_device(hid_device)
 
-        await hci_transport.source.wait_for_termination()
+        await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------

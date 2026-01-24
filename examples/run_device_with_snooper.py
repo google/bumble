@@ -48,7 +48,7 @@ async def main() -> None:
             await device.power_on()
             await device.start_scanning()
 
-            await hci_transport.source.wait_for_termination()
+            await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------

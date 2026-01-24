@@ -101,7 +101,7 @@ async def main() -> None:
         await device.start_advertising()
         await device.start_scanning()
 
-        await hci_transport.source.wait_for_termination()
+        await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------

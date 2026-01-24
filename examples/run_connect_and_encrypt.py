@@ -57,7 +57,7 @@ async def main() -> None:
             print(f'!!! Encryption failed: {error}')
             return
 
-        await hci_transport.source.wait_for_termination()
+        await hci_transport.source.terminated
 
 
 # -----------------------------------------------------------------------------
