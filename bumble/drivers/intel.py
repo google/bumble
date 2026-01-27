@@ -663,10 +663,13 @@ class Driver(common.Driver):
 
     async def read_device_info(self) -> dict[ValueType, Any]:
         self.host.ready = True
-        response1 = await self.host.send_sync_command(
-            hci.HCI_Reset_Command(), check_status=False
-        )
-        if response1.status not in (hci.HCI_UNKNOWN_HCI_COMMAND_ERROR, hci.HCI_SUCCESS):
+        response1 = await self.host.send_sync_command_raw(hci.HCI_Reset_Command())
+        if not isinstance(
+            response1.return_parameters, hci.HCI_StatusReturnParameters
+        ) or response1.return_parameters.status not in (
+            hci.HCI_UNKNOWN_HCI_COMMAND_ERROR,
+            hci.HCI_SUCCESS,
+        ):
             # When the controller is in operational mode, the response is a
             # successful response.
             # When the controller is in bootloader mode,
@@ -676,13 +679,18 @@ class Driver(common.Driver):
             raise DriverError("unexpected HCI response")
 
         # Read the firmware version.
-        response2 = await self.host.send_sync_command(
-            HCI_Intel_Read_Version_Command(param0=0xFF), check_status=False
+        response2 = await self.host.send_sync_command_raw(
+            HCI_Intel_Read_Version_Command(param0=0xFF)
         )
-        if response2.status != 0:  # type: ignore
+        if (
+            not isinstance(
+                response2.return_parameters, HCI_Intel_Read_Version_ReturnParameters
+            )
+            or response2.return_parameters.status != 0
+        ):
             raise DriverError("HCI_Intel_Read_Version_Command error")
 
-        tlvs = _parse_tlv(response2.tlv)  # type: ignore
+        tlvs = _parse_tlv(response2.return_parameters.tlv)  # type: ignore
 
         # Convert the list to a dict. That's Ok here because we only expect each type
         # to appear just once.

@@ -26,9 +26,11 @@ from bumble.controller import Controller
 from bumble.hci import (
     HCI_AclDataPacket,
     HCI_Command_Complete_Event,
+    HCI_Disconnect_Command,
     HCI_Error,
     HCI_ErrorCode,
     HCI_Event,
+    HCI_GenericReturnParameters,
     HCI_Reset_Command,
     HCI_StatusReturnParameters,
 )
@@ -195,6 +197,7 @@ async def test_send_sync_command() -> None:
     )
 
     host = Host(source, sink)
+    host.ready = True
 
     # Sync command with success
     response1 = await host.send_sync_command(HCI_Reset_Command())
@@ -212,6 +215,17 @@ async def test_send_sync_command() -> None:
 
     assert excinfo.value.error_code == error_response.return_parameters.status
 
-    # Sync command with error status should not raise when `check_status` is False
-    response2 = await host.send_sync_command(HCI_Reset_Command(), check_status=False)
-    assert response2.status == HCI_ErrorCode.COMMAND_DISALLOWED_ERROR
+    # Sync command with raw result
+    response2 = await host.send_sync_command_raw(HCI_Reset_Command())
+    assert response2.return_parameters.status == HCI_ErrorCode.COMMAND_DISALLOWED_ERROR
+
+    # Sync command with a command that's not an HCI_SyncCommand
+    # (here, for convenience, we use an HCI_AsyncCommand instance)
+    command = HCI_Disconnect_Command(connection_handle=0x1234, reason=0x13)
+    sink.response = HCI_Command_Complete_Event(
+        1,
+        command.op_code,
+        HCI_GenericReturnParameters(data=bytes.fromhex("00112233")),
+    )
+    response3 = await host.send_sync_command_raw(command)  # type: ignore
+    assert isinstance(response3.return_parameters, HCI_GenericReturnParameters)
