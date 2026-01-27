@@ -2601,6 +2601,21 @@ class HCI_GenericReturnParameters(HCI_ReturnParameters):
 class HCI_StatusReturnParameters(HCI_ReturnParameters):
     status: HCI_ErrorCode = field(metadata=HCI_ErrorCode.type_metadata(1))
 
+    @classmethod
+    def from_parameters(cls, parameters: bytes) -> Self | HCI_StatusReturnParameters:
+        status = HCI_ErrorCode(parameters[0])
+
+        if status != HCI_ErrorCode.SUCCESS:
+            # Don't parse further, just return the status.
+            return HCI_StatusReturnParameters(status=status)
+
+        return cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
+
+
+@dataclasses.dataclass
+class HCI_GenericStatusReturnParameters(HCI_StatusReturnParameters):
+    data: bytes = field(metadata=metadata('*'))
+
 
 @dataclasses.dataclass
 class HCI_StatusAndAddressReturnParameters(HCI_StatusReturnParameters):
@@ -7498,6 +7513,7 @@ class HCI_Command_Complete_Event(HCI_Event, Generic[_RP]):
     def from_parameters(cls, parameters: bytes) -> Self:
         event = cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
         event.parameters = parameters
+        return_parameters_bytes = parameters[3:]
 
         # Find the class for the matching command.
         subclass = HCI_Command.command_classes.get(event.command_opcode)
@@ -7510,16 +7526,16 @@ class HCI_Command_Complete_Event(HCI_Event, Generic[_RP]):
                     'HCI Command Complete event with opcode for a class that is not'
                     ' an HCI_SyncCommand subclass: '
                     f'opcode={event.command_opcode:#04x}, '
-                    f'type={type(subclass).__name__}'
+                    f'type={subclass.__name__}'
                 )
             event.return_parameters = HCI_GenericReturnParameters(
-                data=event.return_parameters  # type: ignore[arg-type]
+                data=return_parameters_bytes
             )  # type: ignore[assignment]
             return event
 
         # Parse the return parameters bytes into an object.
         event.return_parameters = subclass.parse_return_parameters(
-            event.return_parameters  # type: ignore[arg-type]
+            return_parameters_bytes
         )  # type: ignore[assignment]
 
         return event

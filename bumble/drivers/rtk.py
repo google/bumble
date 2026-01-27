@@ -534,11 +534,13 @@ class Driver(common.Driver):
 
     @staticmethod
     async def get_loaded_firmware_version(host: Host) -> int | None:
-        response1 = await host.send_sync_command(
-            HCI_RTK_Read_ROM_Version_Command(), check_status=False
-        )
-
-        if response1.status != hci.HCI_SUCCESS:
+        response1 = await host.send_sync_command_raw(HCI_RTK_Read_ROM_Version_Command())
+        if (
+            not isinstance(
+                response1.return_parameters, HCI_RTK_Read_ROM_Version_ReturnParameters
+            )
+            or response1.return_parameters.status != hci.HCI_SUCCESS
+        ):
             return None
 
         response2 = await host.send_sync_command(
@@ -559,13 +561,20 @@ class Driver(common.Driver):
             await host.send_sync_command(hci.HCI_Reset_Command())
             host.ready = True
 
-        command = hci.HCI_Read_Local_Version_Information_Command()
-        response = await host.send_sync_command(command, check_status=False)
-        if response.status != hci.HCI_SUCCESS:
+        response = await host.send_sync_command_raw(
+            hci.HCI_Read_Local_Version_Information_Command()
+        )
+        if (
+            not isinstance(
+                response.return_parameters,
+                hci.HCI_Read_Local_Version_Information_ReturnParameters,
+            )
+            or response.return_parameters.status != hci.HCI_SUCCESS
+        ):
             logger.error("failed to probe local version information")
             return None
 
-        local_version = response
+        local_version = response.return_parameters
 
         logger.debug(
             f"looking for a driver: 0x{local_version.lmp_subversion:04X} "
@@ -641,15 +650,21 @@ class Driver(common.Driver):
 
         # TODO: load the firmware
 
-    async def download_for_rtl8723b(self):
+    async def download_for_rtl8723b(self) -> int | None:
         if self.driver_info.has_rom_version:
-            response1 = await self.host.send_sync_command(
-                HCI_RTK_Read_ROM_Version_Command(), check_status=False
+            response1 = await self.host.send_sync_command_raw(
+                HCI_RTK_Read_ROM_Version_Command()
             )
-            if response1.status != hci.HCI_SUCCESS:
+            if (
+                not isinstance(
+                    response1.return_parameters,
+                    HCI_RTK_Read_ROM_Version_ReturnParameters,
+                )
+                or response1.return_parameters.status != hci.HCI_SUCCESS
+            ):
                 logger.warning("can't get ROM version")
                 return None
-            rom_version = response1.version
+            rom_version = response1.return_parameters.version
             logger.debug(f"ROM version before download: {rom_version:04X}")
         else:
             rom_version = 0
@@ -691,13 +706,18 @@ class Driver(common.Driver):
         logger.debug("download complete!")
 
         # Read the version again
-        response2 = await self.host.send_sync_command(
-            HCI_RTK_Read_ROM_Version_Command(), check_status=False
+        response2 = await self.host.send_sync_command_raw(
+            HCI_RTK_Read_ROM_Version_Command()
         )
-        if response2.status != hci.HCI_SUCCESS:
+        if (
+            not isinstance(
+                response2.return_parameters, HCI_RTK_Read_ROM_Version_ReturnParameters
+            )
+            or response2.return_parameters.status != hci.HCI_SUCCESS
+        ):
             logger.warning("can't get ROM version")
         else:
-            rom_version = response2.version
+            rom_version = response2.return_parameters.version
             logger.debug(f"ROM version after download: {rom_version:02X}")
 
         return firmware.version

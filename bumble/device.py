@@ -2763,24 +2763,39 @@ class Device(utils.CompositeEventEmitter):
             logger.warning(f'!!! Command {command.name} timed out')
             raise CommandTimeoutError() from error
 
-    async def send_sync_command(
-        self, command: hci.HCI_SyncCommand[_RP], check_status: bool = True
-    ) -> _RP:
+    async def send_sync_command(self, command: hci.HCI_SyncCommand[_RP]) -> _RP:
         '''
         Send a synchronous command via the host.
 
+        If the `status` field of the response's `return_parameters` is not equal to
+        `SUCCESS` an exception is raised.
+
         Params:
           command: the command to send.
-          check_status: If `True`, check the `status` field of the response's
-          `return_parameters` and raise and exception if not equal to `SUCCESS`.
 
         Returns:
           An instance of the return parameters class associated with the command class.
         '''
         try:
-            return await self.host.send_sync_command(
-                command, check_status, self.command_timeout
-            )
+            return await self.host.send_sync_command(command, self.command_timeout)
+        except asyncio.TimeoutError as error:
+            logger.warning(f'!!! Command {command.name} timed out')
+            raise CommandTimeoutError() from error
+
+    async def send_sync_command_raw(
+        self, command: hci.HCI_SyncCommand[_RP]
+    ) -> hci.HCI_Command_Complete_Event[_RP]:
+        '''
+        Send a synchronous command via the host without checking the response.
+
+        Params:
+          command: the command to send.
+
+        Returns:
+          An HCI_Command_Complete_Event instance.
+        '''
+        try:
+            return await self.host.send_sync_command_raw(command, self.command_timeout)
         except asyncio.TimeoutError as error:
             logger.warning(f'!!! Command {command.name} timed out')
             raise CommandTimeoutError() from error
@@ -2812,12 +2827,13 @@ class Device(utils.CompositeEventEmitter):
         await self.host.reset()
 
         # Try to get the public address from the controller
-        response = await self.host.send_sync_command(
-            hci.HCI_Read_BD_ADDR_Command(), check_status=False
-        )
-        if response.status == hci.HCI_SUCCESS:
+        try:
+            response = await self.host.send_sync_command(hci.HCI_Read_BD_ADDR_Command())
             logger.debug(color(f'BD_ADDR: {response.bd_addr}', 'yellow'))
             self.public_address = response.bd_addr
+        except hci.HCI_Error:
+            logger.debug('Controller has no public address')
+            pass
 
         # Instantiate the Key Store (we do this here rather than at __init__ time
         # because some Key Store implementations use the public address as a namespace)
@@ -2954,27 +2970,23 @@ class Device(utils.CompositeEventEmitter):
                 )
 
         if self.classic_enabled:
-            await self.send_sync_command(
-                hci.HCI_Write_Local_Name_Command(local_name=self.name.encode('utf8')),
-                check_status=False,
+            await self.send_sync_command_raw(
+                hci.HCI_Write_Local_Name_Command(local_name=self.name.encode('utf8'))
             )
-            await self.send_sync_command(
+            await self.send_sync_command_raw(
                 hci.HCI_Write_Class_Of_Device_Command(
                     class_of_device=self.class_of_device
-                ),
-                check_status=False,
+                )
             )
-            await self.send_sync_command(
+            await self.send_sync_command_raw(
                 hci.HCI_Write_Simple_Pairing_Mode_Command(
                     simple_pairing_mode=int(self.classic_ssp_enabled)
-                ),
-                check_status=False,
+                )
             )
-            await self.send_sync_command(
+            await self.send_sync_command_raw(
                 hci.HCI_Write_Secure_Connections_Host_Support_Command(
                     secure_connections_host_support=int(self.classic_sc_enabled)
-                ),
-                check_status=False,
+                )
             )
             await self.set_connectable(self.connectable)
             await self.set_discoverable(self.discoverable)
