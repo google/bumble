@@ -55,7 +55,10 @@ class HCI_Bridge:
                         return
 
             # Analyze the packet
-            self.trace(hci_packet)
+            try:
+                self.trace(hci_packet)
+            except Exception:
+                logger.exception('Exception while tracing packet')
 
             # Bridge the packet
             self.hci_sink.on_packet(packet)
