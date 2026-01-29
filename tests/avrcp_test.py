@@ -16,8 +16,8 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
-import asyncio
 
+import asyncio
 import struct
 from collections.abc import Sequence
 
@@ -564,6 +564,21 @@ async def test_get_playback_status():
         two_devices.protocols[0].delegate.playback_status = status
         response = await two_devices.protocols[1].get_play_status()
         assert response.play_status == status
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_get_supported_company_ids():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    for status in avrcp.PlayStatus:
+        two_devices.protocols[0].delegate = avrcp.Delegate(
+            supported_company_ids=[avrcp.AVRCP_BLUETOOTH_SIG_COMPANY_ID]
+        )
+        supported_company_ids = await two_devices.protocols[
+            1
+        ].get_supported_company_ids()
+        assert supported_company_ids == [avrcp.AVRCP_BLUETOOTH_SIG_COMPANY_ID]
 
 
 # -----------------------------------------------------------------------------
