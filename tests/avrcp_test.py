@@ -542,6 +542,85 @@ async def test_passthrough_key_event_exception():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_set_volume():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    for volume in range(avrcp.SetAbsoluteVolumeCommand.MAXIMUM_VOLUME + 1):
+        response = await two_devices.protocols[1].send_avrcp_command(
+            avc.CommandFrame.CommandType.CONTROL, avrcp.SetAbsoluteVolumeCommand(volume)
+        )
+        assert isinstance(response.response, avrcp.SetAbsoluteVolumeResponse)
+        assert response.response.volume == volume
+        assert two_devices.protocols[0].delegate.volume == volume
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_get_playback_status():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    for status in avrcp.PlayStatus:
+        two_devices.protocols[0].delegate.playback_status = status
+        response = await two_devices.protocols[1].get_play_status()
+        assert response.play_status == status
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_volume():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    two_devices.protocols[1].delegate = avrcp.Delegate([avrcp.EventId.VOLUME_CHANGED])
+    volume_iter = two_devices.protocols[0].monitor_volume()
+
+    for volume in range(avrcp.SetAbsoluteVolumeCommand.MAXIMUM_VOLUME + 1):
+        # Interim
+        two_devices.protocols[1].delegate.volume = 0
+        assert (await anext(volume_iter)) == 0
+        # Changed
+        two_devices.protocols[1].notify_volume_changed(volume)
+        assert (await anext(volume_iter)) == volume
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_playback_status():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.PLAYBACK_STATUS_CHANGED]
+    )
+    playback_status_iter = two_devices.protocols[0].monitor_playback_status()
+
+    for playback_status in avrcp.PlayStatus:
+        # Interim
+        two_devices.protocols[1].delegate.playback_status = avrcp.PlayStatus.STOPPED
+        assert (await anext(playback_status_iter)) == avrcp.PlayStatus.STOPPED
+        # Changed
+        two_devices.protocols[1].notify_playback_status_changed(playback_status)
+        assert (await anext(playback_status_iter)) == playback_status
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_now_playing_content():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.NOW_PLAYING_CONTENT_CHANGED]
+    )
+    now_playing_iter = two_devices.protocols[0].monitor_now_playing_content()
+
+    for _ in range(2):
+        # Interim
+        await anext(now_playing_iter)
+        # Changed
+        two_devices.protocols[1].notify_now_playing_content_changed()
+        await anext(now_playing_iter)
+
+
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     test_frame_parser()
     test_vendor_dependent_command()

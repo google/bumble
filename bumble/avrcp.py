@@ -1290,6 +1290,10 @@ class InformBatteryStatusOfCtResponse(Response):
 @dataclass
 class GetPlayStatusResponse(Response):
     pdu_id = PduId.GET_PLAY_STATUS
+
+    # TG doesn't support Song Length or Position.
+    UNAVAILABLE = 0xFFFFFFFF
+
     song_length: int = field(metadata=hci.metadata(">4"))
     song_position: int = field(metadata=hci.metadata(">4"))
     play_status: PlayStatus = field(metadata=PlayStatus.type_metadata(1))
@@ -1615,10 +1619,12 @@ class Delegate:
 
     supported_events: list[EventId]
     volume: int
+    playback_status: PlayStatus
 
     def __init__(self, supported_events: Iterable[EventId] = ()) -> None:
         self.supported_events = list(supported_events)
         self.volume = 0
+        self.playback_status = PlayStatus.STOPPED
 
     async def get_supported_events(self) -> list[EventId]:
         return self.supported_events
@@ -1644,6 +1650,9 @@ class Delegate:
         logger.debug(
             "@@@ on_key_event: key=%s, pressed=%s, data=%s", key, pressed, data.hex()
         )
+
+    async def get_playback_status(self) -> PlayStatus:
+        return self.playback_status
 
     # TODO add other delegate methods
 
@@ -2255,6 +2264,8 @@ class Protocol(utils.EventEmitter):
                 self._on_set_absolute_volume_command(transaction_label, command)
             elif isinstance(command, RegisterNotificationCommand):
                 self._on_register_notification_command(transaction_label, command)
+            elif isinstance(command, GetPlayStatusCommand):
+                self._on_get_play_status_command(transaction_label, command)
             else:
                 # Not supported.
                 # TODO: check that this is the right way to respond in this case.
@@ -2509,6 +2520,26 @@ class Protocol(utils.EventEmitter):
 
         self._delegate_command(transaction_label, command, set_absolute_volume())
 
+    def _on_get_play_status_command(
+        self, transaction_label: int, command: GetPlayStatusCommand
+    ) -> None:
+        logger.debug("<<< AVRCP command PDU: %s", command)
+
+        async def get_playback_status() -> None:
+            play_status: PlayStatus = await self.delegate.get_playback_status()
+            self.send_avrcp_response(
+                transaction_label,
+                avc.ResponseFrame.ResponseCode.IMPLEMENTED_OR_STABLE,
+                GetPlayStatusResponse(
+                    # TODO: Delegate this.
+                    song_length=GetPlayStatusResponse.UNAVAILABLE,
+                    song_position=GetPlayStatusResponse.UNAVAILABLE,
+                    play_status=play_status,
+                ),
+            )
+
+        self._delegate_command(transaction_label, command, get_playback_status())
+
     def _on_register_notification_command(
         self, transaction_label: int, command: RegisterNotificationCommand
     ) -> None:
@@ -2524,28 +2555,27 @@ class Protocol(utils.EventEmitter):
                 )
                 return
 
+            response: Response
             if command.event_id == EventId.VOLUME_CHANGED:
                 volume = await self.delegate.get_absolute_volume()
                 response = RegisterNotificationResponse(VolumeChangedEvent(volume))
-                self.send_avrcp_response(
-                    transaction_label,
-                    avc.ResponseFrame.ResponseCode.INTERIM,
-                    response,
+            elif command.event_id == EventId.PLAYBACK_STATUS_CHANGED:
+                playback_status = await self.delegate.get_playback_status()
+                response = RegisterNotificationResponse(
+                    PlaybackStatusChangedEvent(play_status=playback_status)
                 )
-                self._register_notification_listener(transaction_label, command)
+            elif command.event_id == EventId.NOW_PLAYING_CONTENT_CHANGED:
+                playback_status = await self.delegate.get_playback_status()
+                response = RegisterNotificationResponse(NowPlayingContentChangedEvent())
+            else:
+                logger.warning("Event supported but not handled %s", command.event_id)
                 return
 
-            if command.event_id == EventId.PLAYBACK_STATUS_CHANGED:
-                # TODO: testing only, use delegate
-                response = RegisterNotificationResponse(
-                    PlaybackStatusChangedEvent(play_status=PlayStatus.PLAYING)
-                )
-                self.send_avrcp_response(
-                    transaction_label,
-                    avc.ResponseFrame.ResponseCode.INTERIM,
-                    response,
-                )
-                self._register_notification_listener(transaction_label, command)
-                return
+            self.send_avrcp_response(
+                transaction_label,
+                avc.ResponseFrame.ResponseCode.INTERIM,
+                response,
+            )
+            self._register_notification_listener(transaction_label, command)
 
         self._delegate_command(transaction_label, command, register_notification())
