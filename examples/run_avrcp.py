@@ -44,10 +44,10 @@ def sdp_records():
             a2dp_sink_service_record_handle
         ),
         avrcp_controller_service_record_handle: avrcp.make_controller_service_sdp_records(
-            avrcp_controller_service_record_handle
+            avrcp.ControllerServiceSdpRecord(avrcp_controller_service_record_handle)
         ),
         avrcp_target_service_record_handle: avrcp.make_target_service_sdp_records(
-            avrcp_controller_service_record_handle
+            avrcp.TargetServiceSdpRecord(avrcp_target_service_record_handle)
         ),
     }
 
