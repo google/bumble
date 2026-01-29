@@ -26,7 +26,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequen
 from dataclasses import dataclass, field
 from typing import ClassVar, SupportsBytes, TypeVar
 
-from bumble import avc, avctp, core, hci, l2cap, utils
+from bumble import avc, avctp, core, hci, l2cap, sdp, utils
 from bumble.colors import color
 from bumble.device import Connection, Device
 from bumble.sdp import (
@@ -194,82 +194,43 @@ class TargetFeatures(enum.IntFlag):
 
 
 # -----------------------------------------------------------------------------
-def make_controller_service_sdp_records(
-    service_record_handle: int,
-    avctp_version: tuple[int, int] = (1, 4),
-    avrcp_version: tuple[int, int] = (1, 6),
-    supported_features: int | ControllerFeatures = 1,
-) -> list[ServiceAttribute]:
-    avctp_version_int = avctp_version[0] << 8 | avctp_version[1]
-    avrcp_version_int = avrcp_version[0] << 8 | avrcp_version[1]
+@dataclass
+class ControllerServiceSdpRecord:
+    service_record_handle: int
+    avctp_version: tuple[int, int] = (1, 4)
+    avrcp_version: tuple[int, int] = (1, 6)
+    supported_features: int | ControllerFeatures = ControllerFeatures(1)
 
-    attributes = [
-        ServiceAttribute(
-            SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-            DataElement.unsigned_integer_32(service_record_handle),
-        ),
-        ServiceAttribute(
-            SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-            DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
-        ),
-        ServiceAttribute(
-            SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-            DataElement.sequence(
-                [
-                    DataElement.uuid(core.BT_AV_REMOTE_CONTROL_SERVICE),
-                    DataElement.uuid(core.BT_AV_REMOTE_CONTROL_CONTROLLER_SERVICE),
-                ]
-            ),
-        ),
-        ServiceAttribute(
-            SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            DataElement.sequence(
-                [
-                    DataElement.sequence(
-                        [
-                            DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
-                            DataElement.unsigned_integer_16(avctp.AVCTP_PSM),
-                        ]
-                    ),
-                    DataElement.sequence(
-                        [
-                            DataElement.uuid(core.BT_AVCTP_PROTOCOL_ID),
-                            DataElement.unsigned_integer_16(avctp_version_int),
-                        ]
-                    ),
-                ]
-            ),
-        ),
-        ServiceAttribute(
-            SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            DataElement.sequence(
-                [
-                    DataElement.sequence(
-                        [
-                            DataElement.uuid(core.BT_AV_REMOTE_CONTROL_SERVICE),
-                            DataElement.unsigned_integer_16(avrcp_version_int),
-                        ]
-                    ),
-                ]
-            ),
-        ),
-        ServiceAttribute(
-            SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID,
-            DataElement.unsigned_integer_16(supported_features),
-        ),
-    ]
-    if supported_features & ControllerFeatures.SUPPORTS_BROWSING:
-        attributes.append(
+    def to_service_attributes(self) -> list[ServiceAttribute]:
+        avctp_version_int = self.avctp_version[0] << 8 | self.avctp_version[1]
+        avrcp_version_int = self.avrcp_version[0] << 8 | self.avrcp_version[1]
+
+        attributes = [
             ServiceAttribute(
-                SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+                DataElement.unsigned_integer_32(self.service_record_handle),
+            ),
+            ServiceAttribute(
+                SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+                DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
+            ),
+            ServiceAttribute(
+                SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+                DataElement.sequence(
+                    [
+                        DataElement.uuid(core.BT_AV_REMOTE_CONTROL_SERVICE),
+                        DataElement.uuid(core.BT_AV_REMOTE_CONTROL_CONTROLLER_SERVICE),
+                    ]
+                ),
+            ),
+            ServiceAttribute(
+                SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
                 DataElement.sequence(
                     [
                         DataElement.sequence(
                             [
                                 DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
-                                DataElement.unsigned_integer_16(
-                                    avctp.AVCTP_BROWSING_PSM
-                                ),
+                                DataElement.unsigned_integer_16(avctp.AVCTP_PSM),
                             ]
                         ),
                         DataElement.sequence(
@@ -281,87 +242,130 @@ def make_controller_service_sdp_records(
                     ]
                 ),
             ),
-        )
-    return attributes
+            ServiceAttribute(
+                SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                DataElement.sequence(
+                    [
+                        DataElement.sequence(
+                            [
+                                DataElement.uuid(core.BT_AV_REMOTE_CONTROL_SERVICE),
+                                DataElement.unsigned_integer_16(avrcp_version_int),
+                            ]
+                        ),
+                    ]
+                ),
+            ),
+            ServiceAttribute(
+                SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID,
+                DataElement.unsigned_integer_16(self.supported_features),
+            ),
+        ]
+        if self.supported_features & ControllerFeatures.SUPPORTS_BROWSING:
+            attributes.append(
+                ServiceAttribute(
+                    SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                    DataElement.sequence(
+                        [
+                            DataElement.sequence(
+                                [
+                                    DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
+                                    DataElement.unsigned_integer_16(
+                                        avctp.AVCTP_BROWSING_PSM
+                                    ),
+                                ]
+                            ),
+                            DataElement.sequence(
+                                [
+                                    DataElement.uuid(core.BT_AVCTP_PROTOCOL_ID),
+                                    DataElement.unsigned_integer_16(avctp_version_int),
+                                ]
+                            ),
+                        ]
+                    ),
+                ),
+            )
+        return attributes
+
+    @classmethod
+    async def find(cls, connection: Connection) -> list[ControllerServiceSdpRecord]:
+        async with sdp.Client(connection) as sdp_client:
+            search_result = await sdp_client.search_attributes(
+                uuids=[core.BT_AV_REMOTE_CONTROL_CONTROLLER_SERVICE],
+                attribute_ids=[
+                    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+                    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                    SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID,
+                ],
+            )
+
+            records: list[ControllerServiceSdpRecord] = []
+            for attribute_lists in search_result:
+                record = cls(0)
+                for attribute in attribute_lists:
+                    if attribute.id == SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID:
+                        record.service_record_handle = attribute.value.value
+                    elif attribute.id == SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID:
+                        # [[L2CAP, PSM], [AVCTP, version]]
+                        record.avctp_version = (
+                            attribute.value.value[1].value[1].value >> 8,
+                            attribute.value.value[1].value[1].value & 0xFF,
+                        )
+                    elif (
+                        attribute.id
+                        == SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID
+                    ):
+                        # [[AV_REMOTE_CONTROL, version]]
+                        record.avrcp_version = (
+                            attribute.value.value[0].value[1].value >> 8,
+                            attribute.value.value[0].value[1].value & 0xFF,
+                        )
+                    elif attribute.id == SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID:
+                        record.supported_features = ControllerFeatures(
+                            attribute.value.value
+                        )
+                records.append(record)
+            return records
 
 
 # -----------------------------------------------------------------------------
-def make_target_service_sdp_records(
-    service_record_handle: int,
-    avctp_version: tuple[int, int] = (1, 4),
-    avrcp_version: tuple[int, int] = (1, 6),
-    supported_features: int | TargetFeatures = 0x23,
-) -> list[ServiceAttribute]:
-    # TODO: support a way to compute the supported features from a feature list
-    avctp_version_int = avctp_version[0] << 8 | avctp_version[1]
-    avrcp_version_int = avrcp_version[0] << 8 | avrcp_version[1]
+@dataclass
+class TargetServiceSdpRecord:
+    service_record_handle: int
+    avctp_version: tuple[int, int] = (1, 4)
+    avrcp_version: tuple[int, int] = (1, 6)
+    supported_features: int | TargetFeatures = TargetFeatures(0x23)
 
-    attributes = [
-        ServiceAttribute(
-            SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-            DataElement.unsigned_integer_32(service_record_handle),
-        ),
-        ServiceAttribute(
-            SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-            DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
-        ),
-        ServiceAttribute(
-            SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-            DataElement.sequence(
-                [
-                    DataElement.uuid(core.BT_AV_REMOTE_CONTROL_TARGET_SERVICE),
-                ]
-            ),
-        ),
-        ServiceAttribute(
-            SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            DataElement.sequence(
-                [
-                    DataElement.sequence(
-                        [
-                            DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
-                            DataElement.unsigned_integer_16(avctp.AVCTP_PSM),
-                        ]
-                    ),
-                    DataElement.sequence(
-                        [
-                            DataElement.uuid(core.BT_AVCTP_PROTOCOL_ID),
-                            DataElement.unsigned_integer_16(avctp_version_int),
-                        ]
-                    ),
-                ]
-            ),
-        ),
-        ServiceAttribute(
-            SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-            DataElement.sequence(
-                [
-                    DataElement.sequence(
-                        [
-                            DataElement.uuid(core.BT_AV_REMOTE_CONTROL_SERVICE),
-                            DataElement.unsigned_integer_16(avrcp_version_int),
-                        ]
-                    ),
-                ]
-            ),
-        ),
-        ServiceAttribute(
-            SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID,
-            DataElement.unsigned_integer_16(supported_features),
-        ),
-    ]
-    if supported_features & TargetFeatures.SUPPORTS_BROWSING:
-        attributes.append(
+    def to_service_attributes(self) -> list[ServiceAttribute]:
+        # TODO: support a way to compute the supported features from a feature list
+        avctp_version_int = self.avctp_version[0] << 8 | self.avctp_version[1]
+        avrcp_version_int = self.avrcp_version[0] << 8 | self.avrcp_version[1]
+
+        attributes = [
             ServiceAttribute(
-                SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+                DataElement.unsigned_integer_32(self.service_record_handle),
+            ),
+            ServiceAttribute(
+                SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
+                DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
+            ),
+            ServiceAttribute(
+                SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
+                DataElement.sequence(
+                    [
+                        DataElement.uuid(core.BT_AV_REMOTE_CONTROL_TARGET_SERVICE),
+                    ]
+                ),
+            ),
+            ServiceAttribute(
+                SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
                 DataElement.sequence(
                     [
                         DataElement.sequence(
                             [
                                 DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
-                                DataElement.unsigned_integer_16(
-                                    avctp.AVCTP_BROWSING_PSM
-                                ),
+                                DataElement.unsigned_integer_16(avctp.AVCTP_PSM),
                             ]
                         ),
                         DataElement.sequence(
@@ -373,8 +377,90 @@ def make_target_service_sdp_records(
                     ]
                 ),
             ),
-        )
-    return attributes
+            ServiceAttribute(
+                SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                DataElement.sequence(
+                    [
+                        DataElement.sequence(
+                            [
+                                DataElement.uuid(core.BT_AV_REMOTE_CONTROL_SERVICE),
+                                DataElement.unsigned_integer_16(avrcp_version_int),
+                            ]
+                        ),
+                    ]
+                ),
+            ),
+            ServiceAttribute(
+                SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID,
+                DataElement.unsigned_integer_16(self.supported_features),
+            ),
+        ]
+        if self.supported_features & TargetFeatures.SUPPORTS_BROWSING:
+            attributes.append(
+                ServiceAttribute(
+                    SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                    DataElement.sequence(
+                        [
+                            DataElement.sequence(
+                                [
+                                    DataElement.uuid(core.BT_L2CAP_PROTOCOL_ID),
+                                    DataElement.unsigned_integer_16(
+                                        avctp.AVCTP_BROWSING_PSM
+                                    ),
+                                ]
+                            ),
+                            DataElement.sequence(
+                                [
+                                    DataElement.uuid(core.BT_AVCTP_PROTOCOL_ID),
+                                    DataElement.unsigned_integer_16(avctp_version_int),
+                                ]
+                            ),
+                        ]
+                    ),
+                ),
+            )
+        return attributes
+
+    @classmethod
+    async def find(cls, connection: Connection) -> list[TargetServiceSdpRecord]:
+        async with sdp.Client(connection) as sdp_client:
+            search_result = await sdp_client.search_attributes(
+                uuids=[core.BT_AV_REMOTE_CONTROL_TARGET_SERVICE],
+                attribute_ids=[
+                    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
+                    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
+                    SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID,
+                ],
+            )
+
+            records: list[TargetServiceSdpRecord] = []
+            for attribute_lists in search_result:
+                record = cls(0)
+                for attribute in attribute_lists:
+                    if attribute.id == SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID:
+                        record.service_record_handle = attribute.value.value
+                    elif attribute.id == SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID:
+                        # [[L2CAP, PSM], [AVCTP, version]]
+                        record.avctp_version = (
+                            attribute.value.value[1].value[1].value >> 8,
+                            attribute.value.value[1].value[1].value & 0xFF,
+                        )
+                    elif (
+                        attribute.id
+                        == SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID
+                    ):
+                        # [[AV_REMOTE_CONTROL, version]]
+                        record.avrcp_version = (
+                            attribute.value.value[0].value[1].value >> 8,
+                            attribute.value.value[0].value[1].value & 0xFF,
+                        )
+                    elif attribute.id == SDP_SUPPORTED_FEATURES_ATTRIBUTE_ID:
+                        record.supported_features = TargetFeatures(
+                            attribute.value.value
+                        )
+                records.append(record)
+            return records
 
 
 # -----------------------------------------------------------------------------
