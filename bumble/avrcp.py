@@ -1521,6 +1521,12 @@ class Delegate:
         def __init__(self, status_code: StatusCode) -> None:
             self.status_code = status_code
 
+    class AvcError(Exception):
+        """The delegate AVC method failed, with a specified status code."""
+
+        def __init__(self, status_code: avc.ResponseFrame.ResponseCode) -> None:
+            self.status_code = status_code
+
     supported_events: list[EventId]
     volume: int
 
@@ -1542,6 +1548,16 @@ class Delegate:
 
     async def get_absolute_volume(self) -> int:
         return self.volume
+
+    async def on_key_event(
+        self,
+        key: avc.PassThroughFrame.OperationId,
+        pressed: bool,
+        data: bytes,
+    ) -> None:
+        logger.debug(
+            "@@@ on_key_event: key=%s, pressed=%s, data=%s", key, pressed, data.hex()
+        )
 
     # TODO add other delegate methods
 
@@ -2052,16 +2068,28 @@ class Protocol(utils.EventEmitter):
             return
 
         if isinstance(command, avc.PassThroughCommandFrame):
-            # TODO: delegate
-            response = avc.PassThroughResponseFrame(
-                avc.ResponseFrame.ResponseCode.ACCEPTED,
-                command.subunit_type,
-                command.subunit_id,
-                command.state_flag,
-                command.operation_id,
-                command.operation_data,
-            )
-            self.send_response(transaction_label, response)
+
+            async def dispatch_key_event() -> None:
+                try:
+                    await self.delegate.on_key_event(
+                        command.operation_id,
+                        command.state_flag == avc.PassThroughFrame.StateFlag.PRESSED,
+                        command.operation_data,
+                    )
+                    response_code = avc.ResponseFrame.ResponseCode.ACCEPTED
+                except Delegate.AvcError as error:
+                    logger.exception("delegate method raised exception")
+                    response_code = error.status_code
+                except Exception:
+                    logger.exception("delegate method raised exception")
+                    response_code = avc.ResponseFrame.ResponseCode.REJECTED
+                self.send_passthrough_response(
+                    transaction_label=transaction_label,
+                    command=command,
+                    response_code=response_code,
+                )
+
+            utils.AsyncRunner.spawn(dispatch_key_event())
             return
 
         # TODO handle other types

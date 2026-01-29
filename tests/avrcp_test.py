@@ -16,6 +16,7 @@
 # Imports
 # -----------------------------------------------------------------------------
 from __future__ import annotations
+import asyncio
 
 import struct
 from collections.abc import Sequence
@@ -434,6 +435,69 @@ async def test_get_supported_events():
     two_devices.protocols[0].delegate = delegate1
     supported_events = await two_devices.protocols[1].get_supported_events()
     assert supported_events == [avrcp.EventId.VOLUME_CHANGED]
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_passthrough_key_event():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    q = asyncio.Queue[tuple[avc.PassThroughFrame.OperationId, bool, bytes]]()
+
+    class Delegate(avrcp.Delegate):
+        async def on_key_event(
+            self, key: avc.PassThroughFrame.OperationId, pressed: bool, data: bytes
+        ) -> None:
+            q.put_nowait((key, pressed, data))
+
+    two_devices.protocols[1].delegate = Delegate()
+
+    for key, pressed in [
+        (avc.PassThroughFrame.OperationId.PLAY, True),
+        (avc.PassThroughFrame.OperationId.PLAY, False),
+        (avc.PassThroughFrame.OperationId.PAUSE, True),
+        (avc.PassThroughFrame.OperationId.PAUSE, False),
+    ]:
+        await two_devices.protocols[0].send_key_event(key, pressed)
+        assert (await q.get()) == (key, pressed, b'')
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_passthrough_key_event_rejected():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    class Delegate(avrcp.Delegate):
+        async def on_key_event(
+            self, key: avc.PassThroughFrame.OperationId, pressed: bool, data: bytes
+        ) -> None:
+            raise avrcp.Delegate.AvcError(avc.ResponseFrame.ResponseCode.REJECTED)
+
+    two_devices.protocols[1].delegate = Delegate()
+
+    response = await two_devices.protocols[0].send_key_event(
+        avc.PassThroughFrame.OperationId.PLAY, True
+    )
+    assert response.response == avc.ResponseFrame.ResponseCode.REJECTED
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_passthrough_key_event_exception():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    class Delegate(avrcp.Delegate):
+        async def on_key_event(
+            self, key: avc.PassThroughFrame.OperationId, pressed: bool, data: bytes
+        ) -> None:
+            raise Exception()
+
+    two_devices.protocols[1].delegate = Delegate()
+
+    response = await two_devices.protocols[0].send_key_event(
+        avc.PassThroughFrame.OperationId.PLAY, True
+    )
+    assert response.response == avc.ResponseFrame.ResponseCode.REJECTED
 
 
 # -----------------------------------------------------------------------------
