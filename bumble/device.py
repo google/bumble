@@ -2812,7 +2812,7 @@ class Device(utils.CompositeEventEmitter):
           raise and exception if not equal to `PENDING`.
 
         Returns:
-          An instance of the return parameters class associated with the command class.
+          A status code.
         '''
         try:
             return await self.host.send_async_command(
