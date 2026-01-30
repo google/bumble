@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
+import asyncio
 import struct
 from collections.abc import Sequence
 
@@ -424,6 +425,47 @@ def test_passthrough_commands():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_find_sdp_records():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    # Add SDP records to device 1
+    controller_record = avrcp.ControllerServiceSdpRecord(
+        service_record_handle=0x10001,
+        avctp_version=(1, 4),
+        avrcp_version=(1, 6),
+        supported_features=(
+            avrcp.ControllerFeatures.CATEGORY_1
+            | avrcp.ControllerFeatures.SUPPORTS_BROWSING
+        ),
+    )
+    target_record = avrcp.TargetServiceSdpRecord(
+        service_record_handle=0x10002,
+        avctp_version=(1, 4),
+        avrcp_version=(1, 6),
+        supported_features=(
+            avrcp.TargetFeatures.CATEGORY_1 | avrcp.TargetFeatures.SUPPORTS_BROWSING
+        ),
+    )
+
+    two_devices.devices[1].sdp_service_records = {
+        0x10001: controller_record.to_service_attributes(),
+        0x10002: target_record.to_service_attributes(),
+    }
+
+    # Find records from device 0
+    controller_records = await avrcp.ControllerServiceSdpRecord.find(
+        two_devices.connections[0]
+    )
+    assert len(controller_records) == 1
+    assert controller_records[0] == controller_record
+
+    target_records = await avrcp.TargetServiceSdpRecord.find(two_devices.connections[0])
+    assert len(target_records) == 1
+    assert target_records[0] == target_record
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_get_supported_events():
     two_devices = await TwoDevices.create_with_avdtp()
 
@@ -434,6 +476,163 @@ async def test_get_supported_events():
     two_devices.protocols[0].delegate = delegate1
     supported_events = await two_devices.protocols[1].get_supported_events()
     assert supported_events == [avrcp.EventId.VOLUME_CHANGED]
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_passthrough_key_event():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    q = asyncio.Queue[tuple[avc.PassThroughFrame.OperationId, bool, bytes]]()
+
+    class Delegate(avrcp.Delegate):
+        async def on_key_event(
+            self, key: avc.PassThroughFrame.OperationId, pressed: bool, data: bytes
+        ) -> None:
+            q.put_nowait((key, pressed, data))
+
+    two_devices.protocols[1].delegate = Delegate()
+
+    for key, pressed in [
+        (avc.PassThroughFrame.OperationId.PLAY, True),
+        (avc.PassThroughFrame.OperationId.PLAY, False),
+        (avc.PassThroughFrame.OperationId.PAUSE, True),
+        (avc.PassThroughFrame.OperationId.PAUSE, False),
+    ]:
+        await two_devices.protocols[0].send_key_event(key, pressed)
+        assert (await q.get()) == (key, pressed, b'')
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_passthrough_key_event_rejected():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    class Delegate(avrcp.Delegate):
+        async def on_key_event(
+            self, key: avc.PassThroughFrame.OperationId, pressed: bool, data: bytes
+        ) -> None:
+            raise avrcp.Delegate.AvcError(avc.ResponseFrame.ResponseCode.REJECTED)
+
+    two_devices.protocols[1].delegate = Delegate()
+
+    response = await two_devices.protocols[0].send_key_event(
+        avc.PassThroughFrame.OperationId.PLAY, True
+    )
+    assert response.response == avc.ResponseFrame.ResponseCode.REJECTED
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_passthrough_key_event_exception():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    class Delegate(avrcp.Delegate):
+        async def on_key_event(
+            self, key: avc.PassThroughFrame.OperationId, pressed: bool, data: bytes
+        ) -> None:
+            raise Exception()
+
+    two_devices.protocols[1].delegate = Delegate()
+
+    response = await two_devices.protocols[0].send_key_event(
+        avc.PassThroughFrame.OperationId.PLAY, True
+    )
+    assert response.response == avc.ResponseFrame.ResponseCode.REJECTED
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_set_volume():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    for volume in range(avrcp.SetAbsoluteVolumeCommand.MAXIMUM_VOLUME + 1):
+        response = await two_devices.protocols[1].send_avrcp_command(
+            avc.CommandFrame.CommandType.CONTROL, avrcp.SetAbsoluteVolumeCommand(volume)
+        )
+        assert isinstance(response.response, avrcp.SetAbsoluteVolumeResponse)
+        assert response.response.volume == volume
+        assert two_devices.protocols[0].delegate.volume == volume
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_get_playback_status():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    for status in avrcp.PlayStatus:
+        two_devices.protocols[0].delegate.playback_status = status
+        response = await two_devices.protocols[1].get_play_status()
+        assert response.play_status == status
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_get_supported_company_ids():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    for status in avrcp.PlayStatus:
+        two_devices.protocols[0].delegate = avrcp.Delegate(
+            supported_company_ids=[avrcp.AVRCP_BLUETOOTH_SIG_COMPANY_ID]
+        )
+        supported_company_ids = await two_devices.protocols[
+            1
+        ].get_supported_company_ids()
+        assert supported_company_ids == [avrcp.AVRCP_BLUETOOTH_SIG_COMPANY_ID]
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_volume():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    two_devices.protocols[1].delegate = avrcp.Delegate([avrcp.EventId.VOLUME_CHANGED])
+    volume_iter = two_devices.protocols[0].monitor_volume()
+
+    for volume in range(avrcp.SetAbsoluteVolumeCommand.MAXIMUM_VOLUME + 1):
+        # Interim
+        two_devices.protocols[1].delegate.volume = 0
+        assert (await anext(volume_iter)) == 0
+        # Changed
+        two_devices.protocols[1].notify_volume_changed(volume)
+        assert (await anext(volume_iter)) == volume
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_playback_status():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.PLAYBACK_STATUS_CHANGED]
+    )
+    playback_status_iter = two_devices.protocols[0].monitor_playback_status()
+
+    for playback_status in avrcp.PlayStatus:
+        # Interim
+        two_devices.protocols[1].delegate.playback_status = avrcp.PlayStatus.STOPPED
+        assert (await anext(playback_status_iter)) == avrcp.PlayStatus.STOPPED
+        # Changed
+        two_devices.protocols[1].notify_playback_status_changed(playback_status)
+        assert (await anext(playback_status_iter)) == playback_status
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_now_playing_content():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.NOW_PLAYING_CONTENT_CHANGED]
+    )
+    now_playing_iter = two_devices.protocols[0].monitor_now_playing_content()
+
+    for _ in range(2):
+        # Interim
+        await anext(now_playing_iter)
+        # Changed
+        two_devices.protocols[1].notify_now_playing_content_changed()
+        await anext(now_playing_iter)
 
 
 # -----------------------------------------------------------------------------
