@@ -25,7 +25,7 @@ import sys
 import websockets.asyncio.server
 
 import bumble.logging
-from bumble import a2dp, avc, avdtp, avrcp, utils
+from bumble import a2dp, avc, avdtp, avrcp, sdp, utils
 from bumble.core import PhysicalTransport
 from bumble.device import Device
 from bumble.transport import open_transport
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
-def sdp_records():
+def sdp_records() -> dict[int, list[sdp.ServiceAttribute]]:
     a2dp_sink_service_record_handle = 0x00010001
     avrcp_controller_service_record_handle = 0x00010002
     avrcp_target_service_record_handle = 0x00010003
@@ -43,17 +43,17 @@ def sdp_records():
         a2dp_sink_service_record_handle: a2dp.make_audio_sink_service_sdp_records(
             a2dp_sink_service_record_handle
         ),
-        avrcp_controller_service_record_handle: avrcp.make_controller_service_sdp_records(
-            avrcp.ControllerServiceSdpRecord(avrcp_controller_service_record_handle)
-        ),
-        avrcp_target_service_record_handle: avrcp.make_target_service_sdp_records(
-            avrcp.TargetServiceSdpRecord(avrcp_target_service_record_handle)
-        ),
+        avrcp_controller_service_record_handle: avrcp.ControllerServiceSdpRecord(
+            avrcp_controller_service_record_handle
+        ).to_service_attributes(),
+        avrcp_target_service_record_handle: avrcp.TargetServiceSdpRecord(
+            avrcp_target_service_record_handle
+        ).to_service_attributes(),
     }
 
 
 # -----------------------------------------------------------------------------
-def codec_capabilities():
+def codec_capabilities() -> avdtp.MediaCodecCapabilities:
     return avdtp.MediaCodecCapabilities(
         media_type=avdtp.AVDTP_AUDIO_MEDIA_TYPE,
         media_codec_type=a2dp.A2DP_SBC_CODEC_TYPE,
@@ -81,20 +81,22 @@ def codec_capabilities():
 
 
 # -----------------------------------------------------------------------------
-def on_avdtp_connection(server):
+def on_avdtp_connection(server: avdtp.Protocol) -> None:
     # Add a sink endpoint to the server
     sink = server.add_sink(codec_capabilities())
-    sink.on('rtp_packet', on_rtp_packet)
+    sink.on(sink.EVENT_RTP_PACKET, on_rtp_packet)
 
 
 # -----------------------------------------------------------------------------
-def on_rtp_packet(packet):
+def on_rtp_packet(packet: avdtp.MediaPacket) -> None:
     print(f'RTP: {packet}')
 
 
 # -----------------------------------------------------------------------------
-def on_avrcp_start(avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketServer):
-    async def get_supported_events():
+def on_avrcp_start(
+    avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketServer
+) -> None:
+    async def get_supported_events() -> None:
         events = await avrcp_protocol.get_supported_events()
         print("SUPPORTED EVENTS:", events)
         websocket_server.send_message(
@@ -130,14 +132,14 @@ def on_avrcp_start(avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketSe
 
     utils.AsyncRunner.spawn(get_supported_events())
 
-    async def monitor_track_changed():
+    async def monitor_track_changed() -> None:
         async for identifier in avrcp_protocol.monitor_track_changed():
             print("TRACK CHANGED:", identifier.hex())
             websocket_server.send_message(
                 {"type": "track-changed", "params": {"identifier": identifier.hex()}}
             )
 
-    async def monitor_playback_status():
+    async def monitor_playback_status() -> None:
         async for playback_status in avrcp_protocol.monitor_playback_status():
             print("PLAYBACK STATUS CHANGED:", playback_status.name)
             websocket_server.send_message(
@@ -147,7 +149,7 @@ def on_avrcp_start(avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketSe
                 }
             )
 
-    async def monitor_playback_position():
+    async def monitor_playback_position() -> None:
         async for playback_position in avrcp_protocol.monitor_playback_position(
             playback_interval=1
         ):
@@ -159,7 +161,7 @@ def on_avrcp_start(avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketSe
                 }
             )
 
-    async def monitor_player_application_settings():
+    async def monitor_player_application_settings() -> None:
         async for settings in avrcp_protocol.monitor_player_application_settings():
             print("PLAYER APPLICATION SETTINGS:", settings)
             settings_as_dict = [
@@ -173,14 +175,14 @@ def on_avrcp_start(avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketSe
                 }
             )
 
-    async def monitor_available_players():
+    async def monitor_available_players() -> None:
         async for _ in avrcp_protocol.monitor_available_players():
             print("AVAILABLE PLAYERS CHANGED")
             websocket_server.send_message(
                 {"type": "available-players-changed", "params": {}}
             )
 
-    async def monitor_addressed_player():
+    async def monitor_addressed_player() -> None:
         async for player in avrcp_protocol.monitor_addressed_player():
             print("ADDRESSED PLAYER CHANGED")
             websocket_server.send_message(
@@ -195,7 +197,7 @@ def on_avrcp_start(avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketSe
                 }
             )
 
-    async def monitor_uids():
+    async def monitor_uids() -> None:
         async for uid_counter in avrcp_protocol.monitor_uids():
             print("UIDS CHANGED")
             websocket_server.send_message(
@@ -207,7 +209,7 @@ def on_avrcp_start(avrcp_protocol: avrcp.Protocol, websocket_server: WebSocketSe
                 }
             )
 
-    async def monitor_volume():
+    async def monitor_volume() -> None:
         async for volume in avrcp_protocol.monitor_volume():
             print("VOLUME CHANGED:", volume)
             websocket_server.send_message(
@@ -360,7 +362,7 @@ async def main() -> None:
 
         # Create a listener to wait for AVDTP connections
         listener = avdtp.Listener(avdtp.Listener.create_registrar(device))
-        listener.on('connection', on_avdtp_connection)
+        listener.on(listener.EVENT_CONNECTION, on_avdtp_connection)
 
         avrcp_delegate = Delegate()
         avrcp_protocol = avrcp.Protocol(avrcp_delegate)
