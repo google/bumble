@@ -27,7 +27,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar, TypeVar, cast
 
@@ -507,10 +507,15 @@ def smp_auth_req(bonding: bool, mitm: bool, sc: bool, keypress: bool, ct2: bool)
 
 # -----------------------------------------------------------------------------
 class AddressResolver:
-    def __init__(self, resolving_keys):
+    def __init__(self, resolving_keys: Sequence[tuple[bytes, Address]]) -> None:
         self.resolving_keys = resolving_keys
 
-    def resolve(self, address):
+    def can_resolve_to(self, address: Address) -> bool:
+        return any(
+            resolved_address == address for _, resolved_address in self.resolving_keys
+        )
+
+    def resolve(self, address: Address) -> Address | None:
         address_bytes = bytes(address)
         hash_part = address_bytes[0:3]
         prand = address_bytes[3:6]
