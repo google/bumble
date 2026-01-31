@@ -3750,7 +3750,7 @@ class Device(utils.CompositeEventEmitter):
         if self.is_le_connecting:
             raise InvalidStateError('connection already pending')
 
-        try_resolve = True
+        try_resolve = not self.address_resolution_offload
         if isinstance(peer_address, str):
             try:
                 peer_address = hci.Address.from_string_for_transport(
@@ -4073,10 +4073,6 @@ class Device(utils.CompositeEventEmitter):
             [deprecated] (ignore)
         '''
 
-        # Check parameters
-        if transport not in (PhysicalTransport.LE, PhysicalTransport.BR_EDR):
-            raise InvalidArgumentError('invalid transport')
-
         # Connect using the appropriate transport
         # (auto-correct the transport based on declared capabilities)
         if transport == PhysicalTransport.LE or (
@@ -4088,14 +4084,15 @@ class Device(utils.CompositeEventEmitter):
                 own_address_type=own_address_type,
                 timeout=timeout,
             )
-        elif transport == PhysicalTransport.BR_EDR or (
+
+        if transport == PhysicalTransport.BR_EDR or (
             self.classic_enabled and not self.le_enabled
         ):
             return await self.connect_classic(
                 peer_address=peer_address, timeout=timeout
             )
-        else:
-            raise InvalidArgumentError('no supported transport for request')
+
+        raise ValueError('invalid transport')
 
     async def accept(
         self,
