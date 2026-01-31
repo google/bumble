@@ -803,7 +803,9 @@ class Host(utils.EventEmitter):
                 data=pdu,
             )
             logger.debug(
-                '>>> ACL packet enqueue: (Handle=0x%04X) %s', connection_handle, pdu
+                '>>> ACL packet enqueue: (handle=0x%04X) %s',
+                connection_handle,
+                pdu.hex(),
             )
             packet_queue.enqueue(acl_packet, connection_handle)
 
