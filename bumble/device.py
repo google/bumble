@@ -2833,7 +2833,6 @@ class Device(utils.CompositeEventEmitter):
             self.public_address = response.bd_addr
         except hci.HCI_Error:
             logger.debug('Controller has no public address')
-            pass
 
         # Instantiate the Key Store (we do this here rather than at __init__ time
         # because some Key Store implementations use the public address as a namespace)
