@@ -218,9 +218,9 @@ def test_return_parameters() -> None:
     assert isinstance(params.status, utils.OpenIntEnum)
 
     params = hci.HCI_Read_BD_ADDR_Command.parse_return_parameters(
-        bytes.fromhex('3C001122334455')
+        bytes.fromhex('00001122334455')
     )
-    assert params.status == hci.HCI_ErrorCode.ADVERTISING_TIMEOUT_ERROR
+    assert params.status == hci.HCI_ErrorCode.SUCCESS
     assert isinstance(params.status, utils.OpenIntEnum)
     assert isinstance(params.bd_addr, hci.Address)
 

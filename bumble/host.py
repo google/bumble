@@ -270,7 +270,12 @@ class Host(utils.EventEmitter):
         self.sco_links = {}  # SCO links, by connection handle
         self.bigs = {}  # BIG Handle to BIS Handles
         self.pending_command: hci.HCI_SyncCommand | hci.HCI_AsyncCommand | None = None
-        self.pending_response: asyncio.Future[Any] | None = None
+        self.pending_response: (
+            asyncio.Future[
+                hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event
+            ]
+            | None
+        ) = None
         self.number_of_supported_advertising_sets = 0
         self.maximum_advertising_data_length = 31
         self.local_version: (
@@ -658,25 +663,35 @@ class Host(utils.EventEmitter):
         response_timeout: float | None = None,
     ) -> hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event:
         # Wait until we can send (only one pending command at a time)
-        async with self.command_semaphore:
-            assert self.pending_command is None
-            assert self.pending_response is None
+        await self.command_semaphore.acquire()
 
-            # Create a future value to hold the eventual response
-            self.pending_response = asyncio.get_running_loop().create_future()
-            self.pending_command = command
+        # Create a future value to hold the eventual response
+        assert self.pending_command is None
+        assert self.pending_response is None
+        self.pending_response = asyncio.get_running_loop().create_future()
+        self.pending_command = command
 
-            try:
-                self.send_hci_packet(command)
-                return await asyncio.wait_for(
-                    self.pending_response, timeout=response_timeout
-                )
-            except Exception:
-                logger.exception(color("!!! Exception while sending command:", "red"))
-                raise
-            finally:
-                self.pending_command = None
-                self.pending_response = None
+        response: (
+            hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event | None
+        ) = None
+        try:
+            self.send_hci_packet(command)
+            response = await asyncio.wait_for(
+                self.pending_response, timeout=response_timeout
+            )
+            return response
+        except Exception:
+            logger.exception(color("!!! Exception while sending command:", "red"))
+            raise
+        finally:
+            self.pending_command = None
+            self.pending_response = None
+            if (
+                response is not None
+                and response.num_hci_command_packets
+                and self.command_semaphore.locked()
+            ):
+                self.command_semaphore.release()
 
     @overload
     async def send_command(
@@ -729,30 +744,42 @@ class Host(utils.EventEmitter):
         return response
 
     async def send_sync_command(
+        self, command: hci.HCI_SyncCommand[_RP], response_timeout: float | None = None
+    ) -> _RP:
+        response = await self.send_sync_command_raw(command, response_timeout)
+        return_parameters = response.return_parameters
+
+        # Check the return parameters's status
+        if isinstance(return_parameters, hci.HCI_StatusReturnParameters):
+            status = return_parameters.status
+        elif isinstance(return_parameters, hci.HCI_GenericReturnParameters):
+            # if the payload has at least one byte, assume the first byte is the status
+            if not return_parameters.data:
+                raise RuntimeError('no status byte in return parameters')
+            status = hci.HCI_ErrorCode(return_parameters.data[0])
+        else:
+            raise RuntimeError(
+                f'unexpected return parameters type ({type(return_parameters)})'
+            )
+        if status != hci.HCI_ErrorCode.SUCCESS:
+            logger.warning(
+                f'{command.name} failed ' f'({hci.HCI_Constant.error_name(status)})'
+            )
+            raise hci.HCI_Error(status)
+
+        return return_parameters
+
+    async def send_sync_command_raw(
         self,
         command: hci.HCI_SyncCommand[_RP],
-        check_status: bool = True,
         response_timeout: float | None = None,
-    ) -> _RP:
+    ) -> hci.HCI_Command_Complete_Event[_RP]:
         response = await self._send_command(command, response_timeout)
 
         # Check that the response is of the expected type
         assert isinstance(response, hci.HCI_Command_Complete_Event)
-        return_parameters: _RP = response.return_parameters
-        assert isinstance(return_parameters, command.return_parameters_class)
 
-        # Check the return parameters if required
-        if check_status:
-            if isinstance(return_parameters, hci.HCI_StatusReturnParameters):
-                status = return_parameters.status
-                if status != hci.HCI_SUCCESS:
-                    logger.warning(
-                        f'{command.name} failed '
-                        f'({hci.HCI_Constant.error_name(status)})'
-                    )
-                    raise hci.HCI_Error(status)
-
-        return return_parameters
+        return response
 
     async def send_async_command(
         self,
@@ -1003,6 +1030,8 @@ class Host(utils.EventEmitter):
             self.pending_response.set_result(event)
         else:
             logger.warning('!!! no pending response future to set')
+            if event.num_hci_command_packets and self.command_semaphore.locked():
+                self.command_semaphore.release()
 
     ############################################################
     # HCI handlers
@@ -1014,7 +1043,13 @@ class Host(utils.EventEmitter):
         if event.command_opcode == 0:
             # This is used just for the Num_HCI_Command_Packets field, not related to
             # an actual command
-            logger.debug('no-command event')
+            logger.debug('no-command event for flow control')
+
+            # Release the command semaphore if needed
+            if event.num_hci_command_packets and self.command_semaphore.locked():
+                logger.debug('command complete event releasing semaphore')
+                self.command_semaphore.release()
+
             return
 
         return self.on_command_processed(event)

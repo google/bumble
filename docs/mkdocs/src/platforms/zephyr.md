@@ -42,8 +42,7 @@ response = await host.send_sync_command(
         handle_type=HCI_Write_Tx_Power_Level_Command.TX_POWER_HANDLE_TYPE_ADV,
         connection_handle=0,
         tx_power_level=-4,
-    ),
-    check_status=False
+    )
 )
 
 if response.status == HCI_SUCCESS:

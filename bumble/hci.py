@@ -2407,24 +2407,28 @@ class HCI_Packet:
 
     @classmethod
     def from_bytes(cls, packet: bytes) -> HCI_Packet:
-        packet_type = packet[0]
+        try:
+            packet_type = packet[0]
 
-        if packet_type == HCI_COMMAND_PACKET:
-            return HCI_Command.from_bytes(packet)
+            if packet_type == HCI_COMMAND_PACKET:
+                return HCI_Command.from_bytes(packet)
 
-        if packet_type == HCI_ACL_DATA_PACKET:
-            return HCI_AclDataPacket.from_bytes(packet)
+            if packet_type == HCI_ACL_DATA_PACKET:
+                return HCI_AclDataPacket.from_bytes(packet)
 
-        if packet_type == HCI_SYNCHRONOUS_DATA_PACKET:
-            return HCI_SynchronousDataPacket.from_bytes(packet)
+            if packet_type == HCI_SYNCHRONOUS_DATA_PACKET:
+                return HCI_SynchronousDataPacket.from_bytes(packet)
 
-        if packet_type == HCI_EVENT_PACKET:
-            return HCI_Event.from_bytes(packet)
+            if packet_type == HCI_EVENT_PACKET:
+                return HCI_Event.from_bytes(packet)
 
-        if packet_type == HCI_ISO_DATA_PACKET:
-            return HCI_IsoDataPacket.from_bytes(packet)
+            if packet_type == HCI_ISO_DATA_PACKET:
+                return HCI_IsoDataPacket.from_bytes(packet)
 
-        return HCI_CustomPacket(packet)
+            return HCI_CustomPacket(packet)
+        except Exception as e:
+            logger.error(f'error parsing HCI packet [{packet.hex()}]: {e}')
+            raise
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -2596,6 +2600,21 @@ class HCI_GenericReturnParameters(HCI_ReturnParameters):
 @dataclasses.dataclass
 class HCI_StatusReturnParameters(HCI_ReturnParameters):
     status: HCI_ErrorCode = field(metadata=HCI_ErrorCode.type_metadata(1))
+
+    @classmethod
+    def from_parameters(cls, parameters: bytes) -> Self | HCI_StatusReturnParameters:
+        status = HCI_ErrorCode(parameters[0])
+
+        if status != HCI_ErrorCode.SUCCESS:
+            # Don't parse further, just return the status.
+            return HCI_StatusReturnParameters(status=status)
+
+        return cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
+
+
+@dataclasses.dataclass
+class HCI_GenericStatusReturnParameters(HCI_StatusReturnParameters):
+    data: bytes = field(metadata=metadata('*'))
 
 
 @dataclasses.dataclass
@@ -5854,7 +5873,7 @@ class HCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters(
     rtt_capability: int = field(metadata=metadata(1))
     rtt_aa_only_n: int = field(metadata=metadata(1))
     rtt_sounding_n: int = field(metadata=metadata(1))
-    rtt_random_payload_n: int = field(metadata=metadata(1))
+    rtt_random_sequence_n: int = field(metadata=metadata(1))
     nadm_sounding_capability: int = field(metadata=metadata(2))
     nadm_random_capability: int = field(metadata=metadata(2))
     cs_sync_phys_supported: int = field(metadata=metadata(CS_SYNC_PHY_SUPPORTED_SPEC))
@@ -5910,7 +5929,7 @@ class HCI_LE_CS_Write_Cached_Remote_Supported_Capabilities_Command(
     rtt_capability: int = field(metadata=metadata(1))
     rtt_aa_only_n: int = field(metadata=metadata(1))
     rtt_sounding_n: int = field(metadata=metadata(1))
-    rtt_random_payload_n: int = field(metadata=metadata(1))
+    rtt_random_sequence_n: int = field(metadata=metadata(1))
     nadm_sounding_capability: int = field(metadata=metadata(2))
     nadm_random_capability: int = field(metadata=metadata(2))
     cs_sync_phys_supported: int = field(metadata=metadata(CS_SYNC_PHY_SUPPORTED_SPEC))
@@ -7118,7 +7137,7 @@ class HCI_LE_CS_Read_Remote_Supported_Capabilities_Complete_Event(HCI_LE_Meta_Ev
     rtt_capability: int = field(metadata=metadata(1))
     rtt_aa_only_n: int = field(metadata=metadata(1))
     rtt_sounding_n: int = field(metadata=metadata(1))
-    rtt_random_payload_n: int = field(metadata=metadata(1))
+    rtt_random_sequence_n: int = field(metadata=metadata(1))
     nadm_sounding_capability: int = field(metadata=metadata(2))
     nadm_random_capability: int = field(metadata=metadata(2))
     cs_sync_phys_supported: int = field(metadata=metadata(CS_SYNC_PHY_SUPPORTED_SPEC))
@@ -7494,6 +7513,7 @@ class HCI_Command_Complete_Event(HCI_Event, Generic[_RP]):
     def from_parameters(cls, parameters: bytes) -> Self:
         event = cls(**HCI_Object.dict_from_bytes(parameters, 0, cls.fields))
         event.parameters = parameters
+        return_parameters_bytes = parameters[3:]
 
         # Find the class for the matching command.
         subclass = HCI_Command.command_classes.get(event.command_opcode)
@@ -7506,16 +7526,16 @@ class HCI_Command_Complete_Event(HCI_Event, Generic[_RP]):
                     'HCI Command Complete event with opcode for a class that is not'
                     ' an HCI_SyncCommand subclass: '
                     f'opcode={event.command_opcode:#04x}, '
-                    f'type={type(subclass).__name__}'
+                    f'type={subclass.__name__}'
                 )
             event.return_parameters = HCI_GenericReturnParameters(
-                data=event.return_parameters  # type: ignore[arg-type]
+                data=return_parameters_bytes
             )  # type: ignore[assignment]
             return event
 
         # Parse the return parameters bytes into an object.
         event.return_parameters = subclass.parse_return_parameters(
-            event.return_parameters  # type: ignore[arg-type]
+            return_parameters_bytes
         )  # type: ignore[assignment]
 
         return event

@@ -81,7 +81,9 @@ async def async_main():
                     response = hci.HCI_Command_Complete_Event(
                         num_hci_command_packets=1,
                         command_opcode=hci_packet.op_code,
-                        return_parameters=bytes([hci.HCI_SUCCESS]),
+                        return_parameters=hci.HCI_StatusReturnParameters(
+                            status=hci.HCI_ErrorCode.SUCCESS
+                        ),
                     )
                     # Return a packet with 'respond to sender' set to True
                     return (bytes(response), True)

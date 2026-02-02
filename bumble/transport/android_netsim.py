@@ -194,7 +194,7 @@ async def open_android_netsim_controller_transport(
 
                         # We only accept BLUETOOTH
                         if request.initial_info.chip.kind != ChipKind.BLUETOOTH:
-                            logger.warning('Unsupported chip type')
+                            logger.debug('Request for unsupported chip type')
                             error = PacketResponse(error='Unsupported chip type')
                             await self.context.write(error)
                             # return
