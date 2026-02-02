@@ -616,22 +616,28 @@ class Host(utils.EventEmitter):
         if self.supports_command(
             hci.HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND
         ):
-            response10 = await self.send_sync_command(
-                hci.HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command()
-            )
-            self.number_of_supported_advertising_sets = (
-                response10.num_supported_advertising_sets
-            )
+            try:
+                response10 = await self.send_sync_command(
+                    hci.HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command()
+                )
+                self.number_of_supported_advertising_sets = (
+                    response10.num_supported_advertising_sets
+                )
+            except hci.HCI_Error:
+                logger.warning('Failed to read number of supported advertising sets')
 
         if self.supports_command(
             hci.HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND
         ):
-            response11 = await self.send_sync_command(
-                hci.HCI_LE_Read_Maximum_Advertising_Data_Length_Command()
-            )
-            self.maximum_advertising_data_length = (
-                response11.max_advertising_data_length
-            )
+            try:
+                response11 = await self.send_sync_command(
+                    hci.HCI_LE_Read_Maximum_Advertising_Data_Length_Command()
+                )
+                self.maximum_advertising_data_length = (
+                    response11.max_advertising_data_length
+                )
+            except hci.HCI_Error:
+                logger.warning('Failed to read maximum advertising data length')
 
     @property
     def controller(self) -> TransportSink | None:
@@ -775,6 +781,20 @@ class Host(utils.EventEmitter):
         response_timeout: float | None = None,
     ) -> hci.HCI_Command_Complete_Event[_RP]:
         response = await self._send_command(command, response_timeout)
+
+        # Some buggy controllers return Command Status instead of Command Complete...
+        if isinstance(response, hci.HCI_Command_Status_Event):
+            logger.warning(
+                f'expected Command Complete for {command.name}, '
+                'but got Command Status instead'
+            )
+            return hci.HCI_Command_Complete_Event(
+                num_hci_command_packets=response.num_hci_command_packets,
+                command_opcode=command.op_code,
+                return_parameters=hci.HCI_StatusReturnParameters(
+                    status=hci.HCI_ErrorCode(response.status)
+                ),  # type: ignore
+            )
 
         # Check that the response is of the expected type
         assert isinstance(response, hci.HCI_Command_Complete_Event)
