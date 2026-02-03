@@ -232,6 +232,14 @@ def test_return_parameters() -> None:
     assert len(params.local_name) == 248
     assert hci.map_null_terminated_utf8_string(params.local_name) == 'hello'
 
+    # Some return parameters may be shorter than the full length
+    # (for Command Complete events with errors)
+    params = hci.HCI_Read_BD_ADDR_Command.parse_return_parameters(
+        bytes.fromhex('010011223344')
+    )
+    assert isinstance(params, hci.HCI_StatusReturnParameters)
+    assert params.status == hci.HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR
+
 
 # -----------------------------------------------------------------------------
 def test_HCI_Command():

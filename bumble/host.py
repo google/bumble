@@ -782,12 +782,12 @@ class Host(utils.EventEmitter):
     ) -> hci.HCI_Command_Complete_Event[_RP]:
         response = await self._send_command(command, response_timeout)
 
-        # Some buggy controllers return Command Status instead of Command Complete...
-        if isinstance(response, hci.HCI_Command_Status_Event):
-            logger.warning(
-                f'expected Command Complete for {command.name}, '
-                'but got Command Status instead'
-            )
+        # For unknown HCI commands, some controllers return Command Status instead of
+        # Command Complete.
+        if (
+            isinstance(response, hci.HCI_Command_Status_Event)
+            and response.status == hci.HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR
+        ):
             return hci.HCI_Command_Complete_Event(
                 num_hci_command_packets=response.num_hci_command_packets,
                 command_opcode=command.op_code,
@@ -809,19 +809,25 @@ class Host(utils.EventEmitter):
     ) -> hci.HCI_ErrorCode:
         response = await self._send_command(command, response_timeout)
 
-        # Check that the response is of the expected type
-        assert isinstance(response, hci.HCI_Command_Status_Event)
+        # For unknown HCI commands, some controllers return Command Complete instead of
+        # Command Status.
+        if isinstance(response, hci.HCI_Command_Complete_Event):
+            # Assume the first byte of the return parameters is the status
+            if (
+                status := hci.HCI_ErrorCode(response.parameters[3])
+            ) != hci.HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR:
+                logger.warning(f'unexpected return paramerers status {status}')
+        else:
+            assert isinstance(response, hci.HCI_Command_Status_Event)
+            status = hci.HCI_ErrorCode(response.status)
 
-        # Check the return parameters if required
-        status = response.status
+        # Check the status if required
         if check_status:
             if status != hci.HCI_CommandStatus.PENDING:
-                logger.warning(
-                    f'{command.name} failed ' f'({hci.HCI_Constant.error_name(status)})'
-                )
+                logger.warning(f'{command.name} failed ' f'({status.name})')
                 raise hci.HCI_Error(status)
 
-        return hci.HCI_ErrorCode(status)
+        return status
 
     @utils.deprecated("Use utils.AsyncRunner.spawn() instead.")
     def send_command_sync(self, command: hci.HCI_AsyncCommand) -> None:

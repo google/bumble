@@ -26,11 +26,14 @@ from bumble.controller import Controller
 from bumble.hci import (
     HCI_AclDataPacket,
     HCI_Command_Complete_Event,
+    HCI_Command_Status_Event,
+    HCI_CommandStatus,
     HCI_Disconnect_Command,
     HCI_Error,
     HCI_ErrorCode,
     HCI_Event,
     HCI_GenericReturnParameters,
+    HCI_LE_Terminate_BIG_Command,
     HCI_Reset_Command,
     HCI_StatusReturnParameters,
 )
@@ -229,3 +232,47 @@ async def test_send_sync_command() -> None:
     )
     response3 = await host.send_sync_command_raw(command)  # type: ignore
     assert isinstance(response3.return_parameters, HCI_GenericReturnParameters)
+
+
+@pytest.mark.asyncio
+async def test_send_async_command() -> None:
+    source = Source()
+    sink = Sink(
+        source,
+        HCI_Command_Status_Event(
+            HCI_CommandStatus.PENDING,
+            1,
+            HCI_Reset_Command.op_code,
+        ),
+    )
+
+    host = Host(source, sink)
+    host.ready = True
+
+    # Normal pending status
+    response = await host.send_async_command(
+        HCI_LE_Terminate_BIG_Command(big_handle=0, reason=0)
+    )
+    assert response == HCI_CommandStatus.PENDING
+
+    # Unknown HCI command result returned as a Command Status
+    sink.response = HCI_Command_Status_Event(
+        HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR,
+        1,
+        HCI_LE_Terminate_BIG_Command.op_code,
+    )
+    response = await host.send_async_command(
+        HCI_LE_Terminate_BIG_Command(big_handle=0, reason=0), check_status=False
+    )
+    assert response == HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR
+
+    # Unknown HCI command result returned as a Command Complete
+    sink.response = HCI_Command_Complete_Event(
+        1,
+        HCI_LE_Terminate_BIG_Command.op_code,
+        HCI_StatusReturnParameters(HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR),
+    )
+    response = await host.send_async_command(
+        HCI_LE_Terminate_BIG_Command(big_handle=0, reason=0), check_status=False
+    )
+    assert response == HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR
