@@ -616,22 +616,28 @@ class Host(utils.EventEmitter):
         if self.supports_command(
             hci.HCI_LE_READ_NUMBER_OF_SUPPORTED_ADVERTISING_SETS_COMMAND
         ):
-            response10 = await self.send_sync_command(
-                hci.HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command()
-            )
-            self.number_of_supported_advertising_sets = (
-                response10.num_supported_advertising_sets
-            )
+            try:
+                response10 = await self.send_sync_command(
+                    hci.HCI_LE_Read_Number_Of_Supported_Advertising_Sets_Command()
+                )
+                self.number_of_supported_advertising_sets = (
+                    response10.num_supported_advertising_sets
+                )
+            except hci.HCI_Error:
+                logger.warning('Failed to read number of supported advertising sets')
 
         if self.supports_command(
             hci.HCI_LE_READ_MAXIMUM_ADVERTISING_DATA_LENGTH_COMMAND
         ):
-            response11 = await self.send_sync_command(
-                hci.HCI_LE_Read_Maximum_Advertising_Data_Length_Command()
-            )
-            self.maximum_advertising_data_length = (
-                response11.max_advertising_data_length
-            )
+            try:
+                response11 = await self.send_sync_command(
+                    hci.HCI_LE_Read_Maximum_Advertising_Data_Length_Command()
+                )
+                self.maximum_advertising_data_length = (
+                    response11.max_advertising_data_length
+                )
+            except hci.HCI_Error:
+                logger.warning('Failed to read maximum advertising data length')
 
     @property
     def controller(self) -> TransportSink | None:
@@ -776,6 +782,20 @@ class Host(utils.EventEmitter):
     ) -> hci.HCI_Command_Complete_Event[_RP]:
         response = await self._send_command(command, response_timeout)
 
+        # For unknown HCI commands, some controllers return Command Status instead of
+        # Command Complete.
+        if (
+            isinstance(response, hci.HCI_Command_Status_Event)
+            and response.status == hci.HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR
+        ):
+            return hci.HCI_Command_Complete_Event(
+                num_hci_command_packets=response.num_hci_command_packets,
+                command_opcode=command.op_code,
+                return_parameters=hci.HCI_StatusReturnParameters(
+                    status=hci.HCI_ErrorCode(response.status)
+                ),  # type: ignore
+            )
+
         # Check that the response is of the expected type
         assert isinstance(response, hci.HCI_Command_Complete_Event)
 
@@ -789,19 +809,25 @@ class Host(utils.EventEmitter):
     ) -> hci.HCI_ErrorCode:
         response = await self._send_command(command, response_timeout)
 
-        # Check that the response is of the expected type
-        assert isinstance(response, hci.HCI_Command_Status_Event)
+        # For unknown HCI commands, some controllers return Command Complete instead of
+        # Command Status.
+        if isinstance(response, hci.HCI_Command_Complete_Event):
+            # Assume the first byte of the return parameters is the status
+            if (
+                status := hci.HCI_ErrorCode(response.parameters[3])
+            ) != hci.HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR:
+                logger.warning(f'unexpected return paramerers status {status}')
+        else:
+            assert isinstance(response, hci.HCI_Command_Status_Event)
+            status = hci.HCI_ErrorCode(response.status)
 
-        # Check the return parameters if required
-        status = response.status
+        # Check the status if required
         if check_status:
             if status != hci.HCI_CommandStatus.PENDING:
-                logger.warning(
-                    f'{command.name} failed ' f'({hci.HCI_Constant.error_name(status)})'
-                )
+                logger.warning(f'{command.name} failed ' f'({status.name})')
                 raise hci.HCI_Error(status)
 
-        return hci.HCI_ErrorCode(status)
+        return status
 
     @utils.deprecated("Use utils.AsyncRunner.spawn() instead.")
     def send_command_sync(self, command: hci.HCI_AsyncCommand) -> None:
