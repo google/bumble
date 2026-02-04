@@ -1049,11 +1049,9 @@ class GetItemAttributesCommand(Command):
     scope: Scope = field(metadata=Scope.type_metadata(1))
     uid: int = field(metadata=_UINT64_BE_METADATA)
     uid_counter: int = field(metadata=hci.metadata('>2'))
-    start_item: int = field(metadata=hci.metadata('>4'))
-    end_item: int = field(metadata=hci.metadata('>4'))
     # When attributes is empty, all attributes will be requested.
     attributes: Sequence[MediaAttributeId] = field(
-        metadata=MediaAttributeId.type_metadata(1, list_begin=True, list_end=True)
+        metadata=MediaAttributeId.type_metadata(4, list_begin=True, list_end=True)
     )
 
 
