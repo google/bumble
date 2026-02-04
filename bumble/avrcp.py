@@ -1534,16 +1534,19 @@ class PlayerApplicationSettingChangedEvent(Event):
 
         def __post_init__(self) -> None:
             super().__post_init__()
-            if self.attribute_id == ApplicationSetting.AttributeId.EQUALIZER_ON_OFF:
-                self.value_id = ApplicationSetting.EqualizerOnOffStatus(self.value_id)
-            elif self.attribute_id == ApplicationSetting.AttributeId.REPEAT_MODE:
-                self.value_id = ApplicationSetting.RepeatModeStatus(self.value_id)
-            elif self.attribute_id == ApplicationSetting.AttributeId.SHUFFLE_ON_OFF:
-                self.value_id = ApplicationSetting.ShuffleOnOffStatus(self.value_id)
-            elif self.attribute_id == ApplicationSetting.AttributeId.SCAN_ON_OFF:
-                self.value_id = ApplicationSetting.ScanOnOffStatus(self.value_id)
-            else:
-                self.value_id = ApplicationSetting.GenericValue(self.value_id)
+            match self.attribute_id:
+                case ApplicationSetting.AttributeId.EQUALIZER_ON_OFF:
+                    self.value_id = ApplicationSetting.EqualizerOnOffStatus(
+                        self.value_id
+                    )
+                case ApplicationSetting.AttributeId.REPEAT_MODE:
+                    self.value_id = ApplicationSetting.RepeatModeStatus(self.value_id)
+                case ApplicationSetting.AttributeId.SHUFFLE_ON_OFF:
+                    self.value_id = ApplicationSetting.ShuffleOnOffStatus(self.value_id)
+                case ApplicationSetting.AttributeId.SCAN_ON_OFF:
+                    self.value_id = ApplicationSetting.ScanOnOffStatus(self.value_id)
+                case _:
+                    self.value_id = ApplicationSetting.GenericValue(self.value_id)
 
     player_application_settings: Sequence[Setting] = field(
         metadata=hci.metadata(Setting.parse_from_bytes, list_begin=True, list_end=True)
@@ -2278,21 +2281,22 @@ class Protocol(utils.EventEmitter):
         ):
             # TODO: catch exceptions from delegates
             command = Command.from_bytes(pdu_id, pdu)
-            if isinstance(command, GetCapabilitiesCommand):
-                self._on_get_capabilities_command(transaction_label, command)
-            elif isinstance(command, SetAbsoluteVolumeCommand):
-                self._on_set_absolute_volume_command(transaction_label, command)
-            elif isinstance(command, RegisterNotificationCommand):
-                self._on_register_notification_command(transaction_label, command)
-            elif isinstance(command, GetPlayStatusCommand):
-                self._on_get_play_status_command(transaction_label, command)
-            else:
-                # Not supported.
-                # TODO: check that this is the right way to respond in this case.
-                logger.debug("unsupported PDU ID")
-                self.send_rejected_avrcp_response(
-                    transaction_label, pdu_id, StatusCode.INVALID_PARAMETER
-                )
+            match command:
+                case GetCapabilitiesCommand():
+                    self._on_get_capabilities_command(transaction_label, command)
+                case SetAbsoluteVolumeCommand():
+                    self._on_set_absolute_volume_command(transaction_label, command)
+                case RegisterNotificationCommand():
+                    self._on_register_notification_command(transaction_label, command)
+                case GetPlayStatusCommand():
+                    self._on_get_play_status_command(transaction_label, command)
+                case _:
+                    # Not supported.
+                    # TODO: check that this is the right way to respond in this case.
+                    logger.debug("unsupported PDU ID")
+                    self.send_rejected_avrcp_response(
+                        transaction_label, pdu_id, StatusCode.INVALID_PARAMETER
+                    )
         else:
             logger.debug("unsupported command type")
             self.send_rejected_avrcp_response(
@@ -2320,26 +2324,29 @@ class Protocol(utils.EventEmitter):
         # is Ok, but if/when more responses are supported, a lookup mechanism would be
         # more appropriate.
         response: Response | None = None
-        if response_code == avc.ResponseFrame.ResponseCode.REJECTED:
-            response = RejectedResponse(pdu_id=pdu_id, status_code=StatusCode(pdu[0]))
-        elif response_code == avc.ResponseFrame.ResponseCode.NOT_IMPLEMENTED:
-            response = NotImplementedResponse(pdu_id=pdu_id, parameters=pdu)
-        elif response_code in (
-            avc.ResponseFrame.ResponseCode.IMPLEMENTED_OR_STABLE,
-            avc.ResponseFrame.ResponseCode.INTERIM,
-            avc.ResponseFrame.ResponseCode.CHANGED,
-            avc.ResponseFrame.ResponseCode.ACCEPTED,
-        ):
-            response = Response.from_bytes(pdu=pdu, pdu_id=PduId(pdu_id))
-        else:
-            logger.debug("unexpected response code")
-            pending_command.response.set_exception(
-                core.ProtocolError(
-                    error_code=None,
-                    error_namespace="avrcp",
-                    details="unexpected response code",
+        match response_code:
+            case avc.ResponseFrame.ResponseCode.REJECTED:
+                response = RejectedResponse(
+                    pdu_id=pdu_id, status_code=StatusCode(pdu[0])
                 )
-            )
+            case avc.ResponseFrame.ResponseCode.NOT_IMPLEMENTED:
+                response = NotImplementedResponse(pdu_id=pdu_id, parameters=pdu)
+            case (
+                avc.ResponseFrame.ResponseCode.IMPLEMENTED_OR_STABLE
+                | avc.ResponseFrame.ResponseCode.INTERIM
+                | avc.ResponseFrame.ResponseCode.CHANGED
+                | avc.ResponseFrame.ResponseCode.ACCEPTED
+            ):
+                response = Response.from_bytes(pdu=pdu, pdu_id=PduId(pdu_id))
+            case _:
+                logger.debug("unexpected response code")
+                pending_command.response.set_exception(
+                    core.ProtocolError(
+                        error_code=None,
+                        error_namespace="avrcp",
+                        details="unexpected response code",
+                    )
+                )
 
         if response is None:
             self.recycle_pending_command(pending_command)
@@ -2510,22 +2517,18 @@ class Protocol(utils.EventEmitter):
 
         async def get_supported_events() -> None:
             capabilities: Sequence[bytes | SupportsBytes]
-            if (
-                command.capability_id
-                == GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED
-            ):
-                capabilities = await self.delegate.get_supported_events()
-            elif (
-                command.capability_id == GetCapabilitiesCommand.CapabilityId.COMPANY_ID
-            ):
-                company_ids = await self.delegate.get_supported_company_ids()
-                capabilities = [
-                    company_id.to_bytes(3, 'big') for company_id in company_ids
-                ]
-            else:
-                raise core.InvalidArgumentError(
-                    f"Unsupported capability: {command.capability_id}"
-                )
+            match command.capability_id:
+                case GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED:
+                    capabilities = await self.delegate.get_supported_events()
+                case GetCapabilitiesCommand.CapabilityId.EVENTS_SUPPORTED.COMPANY_ID:
+                    company_ids = await self.delegate.get_supported_company_ids()
+                    capabilities = [
+                        company_id.to_bytes(3, 'big') for company_id in company_ids
+                    ]
+                case _:
+                    raise core.InvalidArgumentError(
+                        f"Unsupported capability: {command.capability_id}"
+                    )
             self.send_avrcp_response(
                 transaction_label,
                 avc.ResponseFrame.ResponseCode.IMPLEMENTED_OR_STABLE,
@@ -2585,26 +2588,26 @@ class Protocol(utils.EventEmitter):
                 )
                 return
 
-            response: Response
-            if command.event_id == EventId.VOLUME_CHANGED:
-                volume = await self.delegate.get_absolute_volume()
-                response = RegisterNotificationResponse(VolumeChangedEvent(volume))
-            elif command.event_id == EventId.PLAYBACK_STATUS_CHANGED:
-                playback_status = await self.delegate.get_playback_status()
-                response = RegisterNotificationResponse(
-                    PlaybackStatusChangedEvent(play_status=playback_status)
-                )
-            elif command.event_id == EventId.NOW_PLAYING_CONTENT_CHANGED:
-                playback_status = await self.delegate.get_playback_status()
-                response = RegisterNotificationResponse(NowPlayingContentChangedEvent())
-            else:
-                logger.warning("Event supported but not handled %s", command.event_id)
-                return
+            event: Event
+            match command.event_id:
+                case EventId.VOLUME_CHANGED:
+                    volume = await self.delegate.get_absolute_volume()
+                    event = VolumeChangedEvent(volume)
+                case EventId.PLAYBACK_STATUS_CHANGED:
+                    playback_status = await self.delegate.get_playback_status()
+                    event = PlaybackStatusChangedEvent(play_status=playback_status)
+                case EventId.NOW_PLAYING_CONTENT_CHANGED:
+                    event = NowPlayingContentChangedEvent()
+                case _:
+                    logger.warning(
+                        "Event supported but not handled %s", command.event_id
+                    )
+                    return
 
             self.send_avrcp_response(
                 transaction_label,
                 avc.ResponseFrame.ResponseCode.INTERIM,
-                response,
+                RegisterNotificationResponse(event),
             )
             self._register_notification_listener(transaction_label, command)
 
