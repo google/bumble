@@ -1517,7 +1517,7 @@ class PlaybackPositionChangedEvent(Event):
 @dataclass
 class TrackChangedEvent(Event):
     event_id = EventId.TRACK_CHANGED
-    identifier: bytes = field(metadata=hci.metadata('*'))
+    uid: int = field(metadata=_UINT64_BE_METADATA)
 
 
 # -----------------------------------------------------------------------------
@@ -1651,6 +1651,8 @@ class Delegate:
             else {}
         )
         self.player_app_settings = {}
+        self.uid_counter = 0
+        self.addressed_player_id = 0
 
     async def get_supported_events(self) -> list[EventId]:
         return self.supported_events
@@ -1705,6 +1707,12 @@ class Delegate:
             uid,
             uid_counter,
         )
+
+    async def get_uid_counter(self) -> int:
+        return self.uid_counter
+
+    async def get_addressed_player_id(self) -> int:
+        return self.addressed_player_id
 
     # TODO add other delegate methods
 
@@ -2049,13 +2057,13 @@ class Protocol(utils.EventEmitter):
 
     async def monitor_track_changed(
         self,
-    ) -> AsyncIterator[bytes]:
+    ) -> AsyncIterator[int]:
         """Monitor Track changes from the connected peer."""
         async for event in self.monitor_events(EventId.TRACK_CHANGED, 0):
             if not isinstance(event, TrackChangedEvent):
                 logger.warning("unexpected event class")
                 continue
-            yield event.identifier
+            yield event.uid
 
     async def monitor_playback_position(
         self, playback_interval: int
@@ -2148,11 +2156,9 @@ class Protocol(utils.EventEmitter):
         """Notify the connected peer of a Playback Status change."""
         self.notify_event(PlaybackStatusChangedEvent(status))
 
-    def notify_track_changed(self, identifier: bytes) -> None:
+    def notify_track_changed(self, uid: int) -> None:
         """Notify the connected peer of a Track change."""
-        if len(identifier) != 8:
-            raise core.InvalidArgumentError("identifier must be 8 bytes")
-        self.notify_event(TrackChangedEvent(identifier))
+        self.notify_event(TrackChangedEvent(uid))
 
     def notify_playback_position_changed(self, position: int) -> None:
         """Notify the connected peer of a Position change."""
@@ -2830,6 +2836,15 @@ class Protocol(utils.EventEmitter):
                     )
                 case EventId.AVAILABLE_PLAYERS_CHANGED:
                     event = AvailablePlayersChangedEvent()
+                case EventId.ADDRESSED_PLAYER_CHANGED:
+                    event = AddressedPlayerChangedEvent(
+                        AddressedPlayerChangedEvent.Player(
+                            player_id=await self.delegate.get_addressed_player_id(),
+                            uid_counter=await self.delegate.get_uid_counter(),
+                        )
+                    )
+                case EventId.UIDS_CHANGED:
+                    event = UidsChangedEvent(await self.delegate.get_uid_counter())
                 case _:
                     logger.warning(
                         "Event supported but not handled %s", command.event_id

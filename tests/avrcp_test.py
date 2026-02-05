@@ -598,7 +598,7 @@ async def test_list_player_application_settings():
             avrcp.ApplicationSetting.ShuffleOnOffStatus.GROUP_SHUFFLE,
         ],
     }
-    delegate = two_devices.protocols[1].delegate = avrcp.Delegate(
+    two_devices.protocols[1].delegate = avrcp.Delegate(
         supported_player_app_settings=expected_settings
     )
     actual_settings = await two_devices.protocols[
@@ -713,6 +713,50 @@ async def test_monitor_now_playing_content():
         # Changed
         two_devices.protocols[1].notify_now_playing_content_changed()
         await anext(now_playing_iter)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_uid_changed():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.UIDS_CHANGED]
+    )
+    delegate.uid_counter = 0
+    uid_iter = two_devices.protocols[0].monitor_uids()
+
+    # Interim
+    assert (await anext(uid_iter)) == 0
+    # Changed
+    # Changed
+    two_devices.protocols[1].notify_uids_changed(1)
+    assert (await anext(uid_iter)) == 1
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_addressed_player():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.ADDRESSED_PLAYER_CHANGED]
+    )
+    delegate.uid_counter = 0
+    delegate.addressed_player_id = 0
+    addressed_player_iter = two_devices.protocols[0].monitor_addressed_player()
+
+    # Interim
+    assert (
+        await anext(addressed_player_iter)
+    ) == avrcp.AddressedPlayerChangedEvent.Player(player_id=0, uid_counter=0)
+    # Changed
+    two_devices.protocols[1].notify_addressed_player_changed(
+        avrcp.AddressedPlayerChangedEvent.Player(player_id=1, uid_counter=1)
+    )
+    assert (
+        await anext(addressed_player_iter)
+    ) == avrcp.AddressedPlayerChangedEvent.Player(player_id=1, uid_counter=1)
 
 
 # -----------------------------------------------------------------------------
