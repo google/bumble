@@ -2798,6 +2798,8 @@ class Protocol(utils.EventEmitter):
                             for attribute, value in settings.items()
                         ]
                     )
+                case EventId.AVAILABLE_PLAYERS_CHANGED:
+                    event = AvailablePlayersChangedEvent()
                 case _:
                     logger.warning(
                         "Event supported but not handled %s", command.event_id
