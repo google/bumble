@@ -31,6 +31,7 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
+    SupportsBytes,
     TypeVar,
     cast,
 )
@@ -1860,44 +1861,46 @@ class HCI_Object:
                 field_type = field_type['parser']
 
         # Parse the field
-        if field_type == '*':
-            # The rest of the bytes
-            field_value = data[offset:]
-            return (field_value, len(field_value))
-        if field_type == 'v':
-            # Variable-length bytes field, with 1-byte length at the beginning
-            field_length = data[offset]
-            offset += 1
-            field_value = data[offset : offset + field_length]
-            return (field_value, field_length + 1)
-        if field_type == 1:
-            # 8-bit unsigned
-            return (data[offset], 1)
-        if field_type == -1:
-            # 8-bit signed
-            return (struct.unpack_from('b', data, offset)[0], 1)
-        if field_type == 2:
-            # 16-bit unsigned
-            return (struct.unpack_from('<H', data, offset)[0], 2)
-        if field_type == '>2':
-            # 16-bit unsigned big-endian
-            return (struct.unpack_from('>H', data, offset)[0], 2)
-        if field_type == -2:
-            # 16-bit signed
-            return (struct.unpack_from('<h', data, offset)[0], 2)
-        if field_type == 3:
-            # 24-bit unsigned
-            padded = data[offset : offset + 3] + bytes([0])
-            return (struct.unpack('<I', padded)[0], 3)
-        if field_type == 4:
-            # 32-bit unsigned
-            return (struct.unpack_from('<I', data, offset)[0], 4)
-        if field_type == '>4':
-            # 32-bit unsigned big-endian
-            return (struct.unpack_from('>I', data, offset)[0], 4)
-        if isinstance(field_type, int) and 4 < field_type <= 256:
-            # Byte array (from 5 up to 256 bytes)
-            return (data[offset : offset + field_type], field_type)
+        match field_type:
+            case '*':
+                # The rest of the bytes
+                field_value = data[offset:]
+                return (field_value, len(field_value))
+            case 'v':
+                # Variable-length bytes field, with 1-byte length at the beginning
+                field_length = data[offset]
+                offset += 1
+                field_value = data[offset : offset + field_length]
+                return (field_value, field_length + 1)
+            case 1:
+                # 8-bit unsigned
+                return (data[offset], 1)
+            case -1:
+                # 8-bit signed
+                return (struct.unpack_from('b', data, offset)[0], 1)
+            case 2:
+                # 16-bit unsigned
+                return (struct.unpack_from('<H', data, offset)[0], 2)
+            case '>2':
+                # 16-bit unsigned big-endian
+                return (struct.unpack_from('>H', data, offset)[0], 2)
+            case -2:
+                # 16-bit signed
+                return (struct.unpack_from('<h', data, offset)[0], 2)
+            case 3:
+                # 24-bit unsigned
+                padded = data[offset : offset + 3] + bytes([0])
+                return (struct.unpack('<I', padded)[0], 3)
+            case 4:
+                # 32-bit unsigned
+                return (struct.unpack_from('<I', data, offset)[0], 4)
+            case '>4':
+                # 32-bit unsigned big-endian
+                return (struct.unpack_from('>I', data, offset)[0], 4)
+            case int() if 4 < field_type <= 256:
+                # Byte array (from 5 up to 256 bytes)
+                return (data[offset : offset + field_type], field_type)
+
         if callable(field_type):
             new_offset, field_value = field_type(data, offset)
             return (field_value, new_offset - offset)
@@ -1954,60 +1957,58 @@ class HCI_Object:
 
         # Serialize the field
         if serializer:
-            field_bytes = serializer(field_value)
-        elif field_type == 1:
-            # 8-bit unsigned
-            field_bytes = bytes([field_value])
-        elif field_type == -1:
-            # 8-bit signed
-            field_bytes = struct.pack('b', field_value)
-        elif field_type == 2:
-            # 16-bit unsigned
-            field_bytes = struct.pack('<H', field_value)
-        elif field_type == '>2':
-            # 16-bit unsigned big-endian
-            field_bytes = struct.pack('>H', field_value)
-        elif field_type == -2:
-            # 16-bit signed
-            field_bytes = struct.pack('<h', field_value)
-        elif field_type == 3:
-            # 24-bit unsigned
-            field_bytes = struct.pack('<I', field_value)[0:3]
-        elif field_type == 4:
-            # 32-bit unsigned
-            field_bytes = struct.pack('<I', field_value)
-        elif field_type == '>4':
-            # 32-bit unsigned big-endian
-            field_bytes = struct.pack('>I', field_value)
-        elif field_type == '*':
-            if isinstance(field_value, int):
-                if 0 <= field_value <= 255:
-                    field_bytes = bytes([field_value])
+            return serializer(field_value)
+        match field_type:
+            case 1:
+                # 8-bit unsigned
+                return bytes([field_value])
+            case -1:
+                # 8-bit signed
+                return struct.pack('b', field_value)
+            case 2:
+                # 16-bit unsigned
+                return struct.pack('<H', field_value)
+            case '>2':
+                # 16-bit unsigned big-endian
+                return struct.pack('>H', field_value)
+            case -2:
+                # 16-bit signed
+                return struct.pack('<h', field_value)
+            case 3:
+                # 24-bit unsigned
+                return struct.pack('<I', field_value)[0:3]
+            case 4:
+                # 32-bit unsigned
+                return struct.pack('<I', field_value)
+            case '>4':
+                # 32-bit unsigned big-endian
+                return struct.pack('>I', field_value)
+            case '*':
+                if isinstance(field_value, int):
+                    if 0 <= field_value <= 255:
+                        return bytes([field_value])
+                    else:
+                        raise InvalidArgumentError('value too large for *-typed field')
                 else:
-                    raise InvalidArgumentError('value too large for *-typed field')
-            else:
+                    return bytes(field_value)
+            case 'v':
+                # Variable-length bytes field, with 1-byte length at the beginning
                 field_bytes = bytes(field_value)
-        elif field_type == 'v':
-            # Variable-length bytes field, with 1-byte length at the beginning
-            field_bytes = bytes(field_value)
-            field_length = len(field_bytes)
-            field_bytes = bytes([field_length]) + field_bytes
-        elif isinstance(field_value, (bytes, bytearray)) or hasattr(
-            field_value, '__bytes__'
-        ):
+                field_length = len(field_bytes)
+                return bytes([field_length]) + field_bytes
+        if isinstance(field_value, (bytes, bytearray, SupportsBytes)):
             field_bytes = bytes(field_value)
             if isinstance(field_type, int) and 4 < field_type <= 256:
                 # Truncate or pad with zeros if the field is too long or too short
                 if len(field_bytes) < field_type:
-                    field_bytes += bytes(field_type - len(field_bytes))
+                    return field_bytes + bytes(field_type - len(field_bytes))
                 elif len(field_bytes) > field_type:
-                    field_bytes = field_bytes[:field_type]
-        else:
-            raise InvalidArgumentError(
-                f"don't know how to serialize type {type(field_value)}"
-            )
+                    return field_bytes[:field_type]
+            return field_bytes
 
-        return field_bytes
+        raise InvalidArgumentError(
+            f"don't know how to serialize type {type(field_value)}"
+        )
 
     @staticmethod
     def dict_to_bytes(hci_object, object_fields):

@@ -333,17 +333,18 @@ class CodecSpecificCapabilities:
             value = int.from_bytes(data[offset : offset + length - 1], 'little')
             offset += length - 1
 
-            if type == CodecSpecificCapabilities.Type.SAMPLING_FREQUENCY:
-                supported_sampling_frequencies = SupportedSamplingFrequency(value)
-            elif type == CodecSpecificCapabilities.Type.FRAME_DURATION:
-                supported_frame_durations = SupportedFrameDuration(value)
-            elif type == CodecSpecificCapabilities.Type.AUDIO_CHANNEL_COUNT:
-                supported_audio_channel_count = bits_to_channel_counts(value)
-            elif type == CodecSpecificCapabilities.Type.OCTETS_PER_FRAME:
-                min_octets_per_sample = value & 0xFFFF
-                max_octets_per_sample = value >> 16
-            elif type == CodecSpecificCapabilities.Type.CODEC_FRAMES_PER_SDU:
-                supported_max_codec_frames_per_sdu = value
+            match type:
+                case CodecSpecificCapabilities.Type.SAMPLING_FREQUENCY:
+                    supported_sampling_frequencies = SupportedSamplingFrequency(value)
+                case CodecSpecificCapabilities.Type.FRAME_DURATION:
+                    supported_frame_durations = SupportedFrameDuration(value)
+                case CodecSpecificCapabilities.Type.AUDIO_CHANNEL_COUNT:
+                    supported_audio_channel_count = bits_to_channel_counts(value)
+                case CodecSpecificCapabilities.Type.OCTETS_PER_FRAME:
+                    min_octets_per_sample = value & 0xFFFF
+                    max_octets_per_sample = value >> 16
+                case CodecSpecificCapabilities.Type.CODEC_FRAMES_PER_SDU:
+                    supported_max_codec_frames_per_sdu = value
 
         # It is expected here that if some fields are missing, an error should be raised.
         # pylint: disable=possibly-used-before-assignment,used-before-assignment

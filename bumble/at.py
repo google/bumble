@@ -27,7 +27,7 @@ def tokenize_parameters(buffer: bytes) -> list[bytes]:
     are ignored [..], unless they are embedded in numeric or string constants"
     Raises AtParsingError in case of invalid input string."""
 
-    tokens = []
+    tokens: list[bytearray] = []
     in_quotes = False
     token = bytearray()
     for b in buffer:
@@ -40,23 +40,24 @@ def tokenize_parameters(buffer: bytes) -> list[bytes]:
                 tokens.append(token[1:-1])
                 token = bytearray()
         else:
-            if char == b' ':
-                pass
-            elif char == b',' or char == b')':
-                tokens.append(token)
-                tokens.append(char)
-                token = bytearray()
-            elif char == b'(':
-                if len(token) > 0:
-                    raise AtParsingError("open_paren following regular character")
-                tokens.append(char)
-            elif char == b'"':
-                if len(token) > 0:
-                    raise AtParsingError("quote following regular character")
-                in_quotes = True
-                token.extend(char)
-            else:
-                token.extend(char)
+            match char:
+                case b' ':
+                    pass
+                case b',' | b')':
+                    tokens.append(token)
+                    tokens.append(char)
+                    token = bytearray()
+                case b'(':
+                    if len(token) > 0:
+                        raise AtParsingError("open_paren following regular character")
+                    tokens.append(char)
+                case b'"':
+                    if len(token) > 0:
+                        raise AtParsingError("quote following regular character")
+                    in_quotes = True
+                    token.extend(char)
+                case _:
+                    token.extend(char)
 
     tokens.append(token)
     return [bytes(token) for token in tokens if len(token) > 0]
@@ -71,18 +72,19 @@ def parse_parameters(buffer: bytes) -> list[bytes | list]:
     current: bytes | list = b''
 
     for token in tokens:
-        if token == b',':
-            accumulator[-1].append(current)
-            current = b''
-        elif token == b'(':
-            accumulator.append([])
-        elif token == b')':
-            if len(accumulator) < 2:
-                raise AtParsingError("close_paren without matching open_paren")
-            accumulator[-1].append(current)
-            current = accumulator.pop()
-        else:
-            current = token
+        match token:
+            case b',':
+                accumulator[-1].append(current)
+                current = b''
+            case b'(':
+                accumulator.append([])
+            case b')':
+                if len(accumulator) < 2:
+                    raise AtParsingError("close_paren without matching open_paren")
+                accumulator[-1].append(current)
+                current = accumulator.pop()
+            case _:
+                current = token
 
     accumulator[-1].append(current)
     if len(accumulator) > 1:

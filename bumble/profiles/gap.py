@@ -55,14 +55,15 @@ class GenericAccessService(TemplateService):
     def __init__(
         self, device_name: str, appearance: Appearance | tuple[int, int] | int = 0
     ):
-        if isinstance(appearance, int):
-            appearance_int = appearance
-        elif isinstance(appearance, tuple):
-            appearance_int = (appearance[0] << 6) | appearance[1]
-        elif isinstance(appearance, Appearance):
-            appearance_int = int(appearance)
-        else:
-            raise TypeError()
+        match appearance:
+            case int():
+                appearance_int = appearance
+            case tuple():
+                appearance_int = (appearance[0] << 6) | appearance[1]
+            case Appearance():
+                appearance_int = int(appearance)
+            case _:
+                raise TypeError()
 
         self.device_name_characteristic = Characteristic(
             GATT_DEVICE_NAME_CHARACTERISTIC,
