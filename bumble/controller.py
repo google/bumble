@@ -604,6 +604,8 @@ class Controller:
             )
         )
 
+        del self.le_connections[connection.peer_address]
+
     def create_le_connection(self, peer_address: hci.Address) -> None:
         '''
         Called when we receive advertisement matching connection filter.
@@ -1217,6 +1219,7 @@ class Controller:
             else:
                 # Remove the connection
                 del self.classic_connections[connection.peer_address]
+                del self.le_connections[connection.peer_address]
         elif sco_link := self.find_classic_sco_link_by_handle(handle):
             if self.link:
                 if (
