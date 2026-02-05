@@ -1517,6 +1517,8 @@ class PlaybackPositionChangedEvent(Event):
 @dataclass
 class TrackChangedEvent(Event):
     event_id = EventId.TRACK_CHANGED
+    NO_TRACK = 0xFFFFFFFFFFFFFFFF
+
     uid: int = field(metadata=_UINT64_BE_METADATA)
 
 
@@ -1653,6 +1655,7 @@ class Delegate:
         self.player_app_settings = {}
         self.uid_counter = 0
         self.addressed_player_id = 0
+        self.current_track_uid = TrackChangedEvent.NO_TRACK
 
     async def get_supported_events(self) -> list[EventId]:
         return self.supported_events
@@ -1713,6 +1716,9 @@ class Delegate:
 
     async def get_addressed_player_id(self) -> int:
         return self.addressed_player_id
+
+    async def get_current_track_uid(self) -> int:
+        return self.current_track_uid
 
     # TODO add other delegate methods
 
@@ -2845,6 +2851,10 @@ class Protocol(utils.EventEmitter):
                     )
                 case EventId.UIDS_CHANGED:
                     event = UidsChangedEvent(await self.delegate.get_uid_counter())
+                case EventId.TRACK_CHANGED:
+                    event = TrackChangedEvent(
+                        await self.delegate.get_current_track_uid()
+                    )
                 case _:
                     logger.warning(
                         "Event supported but not handled %s", command.event_id

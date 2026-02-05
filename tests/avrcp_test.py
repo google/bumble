@@ -135,7 +135,7 @@ def test_command(command: avrcp.Command):
     "event,",
     [
         avrcp.UidsChangedEvent(uid_counter=7),
-        avrcp.TrackChangedEvent(identifier=b'12356'),
+        avrcp.TrackChangedEvent(uid=12356),
         avrcp.VolumeChangedEvent(volume=9),
         avrcp.PlaybackStatusChangedEvent(play_status=avrcp.PlayStatus.PLAYING),
         avrcp.AddressedPlayerChangedEvent(
@@ -717,6 +717,24 @@ async def test_monitor_now_playing_content():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_monitor_track_changed():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.TRACK_CHANGED]
+    )
+    delegate.current_track_uid = avrcp.TrackChangedEvent.NO_TRACK
+    track_iter = two_devices.protocols[0].monitor_track_changed()
+
+    # Interim
+    assert (await anext(track_iter)) == avrcp.TrackChangedEvent.NO_TRACK
+    # Changed
+    two_devices.protocols[1].notify_track_changed(1)
+    assert (await anext(track_iter)) == 1
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_monitor_uid_changed():
     two_devices = await TwoDevices.create_with_avdtp()
 
@@ -728,7 +746,6 @@ async def test_monitor_uid_changed():
 
     # Interim
     assert (await anext(uid_iter)) == 0
-    # Changed
     # Changed
     two_devices.protocols[1].notify_uids_changed(1)
     assert (await anext(uid_iter)) == 1
