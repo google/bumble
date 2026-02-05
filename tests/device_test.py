@@ -329,6 +329,7 @@ async def test_le_multiple_connects():
     connection = await devices[1].connect(devices[0].random_address)
     await connection.disconnect()
 
+
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_advertising_and_scanning():

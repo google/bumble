@@ -481,6 +481,18 @@ class Controller:
                 return connection
         return None
 
+    def find_le_connection_by_handle(self, handle: int) -> Connection | None:
+        for connection in self.le_connections.values():
+            if connection.handle == handle:
+                return connection
+        return None
+
+    def find_classic_connection_by_handle(self, handle: int) -> Connection | None:
+        for connection in self.classic_connections.values():
+            if connection.handle == handle:
+                return connection
+        return None
+
     def find_classic_sco_link_by_handle(self, handle: int) -> ScoLink | None:
         for connection in self.sco_links.values():
             if connection.handle == handle:
@@ -1203,22 +1215,22 @@ class Controller:
 
         # Notify the link of the disconnection
         handle = command.connection_handle
-        if connection := self.find_connection_by_handle(handle):
+        if connection := self.find_classic_connection_by_handle(handle):
             if self.link:
-                if connection.transport == PhysicalTransport.BR_EDR:
-                    self.send_lmp_packet(
-                        connection.peer_address,
-                        lmp.LmpDetach(command.reason),
-                    )
-                    self.on_classic_disconnected(
-                        connection.peer_address, command.reason
-                    )
-                else:
-                    connection.send_ll_control_pdu(ll.TerminateInd(command.reason))
-                    self.on_le_disconnected(connection, command.reason)
+                self.send_lmp_packet(
+                    connection.peer_address,
+                    lmp.LmpDetach(command.reason),
+                )
+                self.on_classic_disconnected(connection.peer_address, command.reason)
             else:
                 # Remove the connection
                 del self.classic_connections[connection.peer_address]
+        elif connection := self.find_le_connection_by_handle(handle):
+            if self.link:
+                connection.send_ll_control_pdu(ll.TerminateInd(command.reason))
+                self.on_le_disconnected(connection, command.reason)
+            else:
+                # Remove the connection
                 del self.le_connections[connection.peer_address]
         elif sco_link := self.find_classic_sco_link_by_handle(handle):
             if self.link:
