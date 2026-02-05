@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import struct
 from collections.abc import Sequence
+from unittest import mock
 
 import pytest
 
@@ -638,6 +639,26 @@ async def test_get_set_player_app_settings():
         ]
     )
     assert actual_settings == expected_settings
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_play_item():
+    two_devices: TwoDevices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate
+
+    with mock.patch.object(delegate, delegate.play_item.__name__) as play_item_mock:
+        await two_devices.protocols[0].send_avrcp_command(
+            avc.CommandFrame.CommandType.CONTROL,
+            avrcp.PlayItemCommand(
+                scope=avrcp.Scope.MEDIA_PLAYER_LIST, uid=0, uid_counter=1
+            ),
+        )
+
+        play_item_mock.assert_called_once_with(
+            scope=avrcp.Scope.MEDIA_PLAYER_LIST, uid=0, uid_counter=1
+        )
 
 
 # -----------------------------------------------------------------------------

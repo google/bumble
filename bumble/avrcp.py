@@ -1698,6 +1698,14 @@ class Delegate:
     ) -> None:
         self.player_app_settings[attribute] = value
 
+    async def play_item(self, scope: Scope, uid: int, uid_counter: int) -> None:
+        logger.debug(
+            "@@@ play_item: scope=%s, uid=%s, uid_counter=%s",
+            scope,
+            uid,
+            uid_counter,
+        )
+
     # TODO add other delegate methods
 
 
@@ -2385,6 +2393,8 @@ class Protocol(utils.EventEmitter):
                     self._on_get_current_player_application_setting_value_command(
                         transaction_label, command
                     )
+                case PlayItemCommand():
+                    self._on_play_item_command(transaction_label, command)
                 case _:
                     # Not supported.
                     # TODO: check that this is the right way to respond in this case.
@@ -2762,6 +2772,26 @@ class Protocol(utils.EventEmitter):
             )
 
         self._delegate_command(transaction_label, command, set_player_app_settings())
+
+    def _on_play_item_command(
+        self,
+        transaction_label: int,
+        command: PlayItemCommand,
+    ) -> None:
+        logger.debug("<<< AVRCP command PDU: %s", command)
+
+        async def play_item() -> None:
+            await self.delegate.play_item(
+                scope=command.scope, uid=command.uid, uid_counter=command.uid_counter
+            )
+
+            self.send_avrcp_response(
+                transaction_label,
+                avc.ResponseFrame.ResponseCode.IMPLEMENTED_OR_STABLE,
+                PlayItemResponse(status=StatusCode.OPERATION_COMPLETED),
+            )
+
+        self._delegate_command(transaction_label, command, play_item())
 
     def _on_register_notification_command(
         self, transaction_label: int, command: RegisterNotificationCommand
