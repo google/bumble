@@ -1539,7 +1539,6 @@ class PlayerApplicationSettingChangedEvent(Event):
             | ApplicationSetting.ShuffleOnOffStatus
             | ApplicationSetting.ScanOnOffStatus
             | ApplicationSetting.GenericValue
-            | int
         ) = field(metadata=hci.metadata(1))
 
         def __post_init__(self) -> None:
@@ -2835,7 +2834,7 @@ class Protocol(utils.EventEmitter):
                     event = PlayerApplicationSettingChangedEvent(
                         [
                             PlayerApplicationSettingChangedEvent.Setting(
-                                attribute, value
+                                attribute, value  # type: ignore
                             )
                             for attribute, value in settings.items()
                         ]
