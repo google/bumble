@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import struct
 from collections.abc import Sequence
+from unittest import mock
 
 import pytest
 
@@ -118,8 +119,6 @@ class TwoDevices(test_utils.TwoDevices):
             scope=avrcp.Scope.NOW_PLAYING,
             uid=0,
             uid_counter=1,
-            start_item=0,
-            end_item=0,
             attributes=[avrcp.MediaAttributeId.DEFAULT_COVER_ART],
         ),
         avrcp.GetTotalNumberOfItemsCommand(scope=avrcp.Scope.NOW_PLAYING),
@@ -136,7 +135,7 @@ def test_command(command: avrcp.Command):
     "event,",
     [
         avrcp.UidsChangedEvent(uid_counter=7),
-        avrcp.TrackChangedEvent(identifier=b'12356'),
+        avrcp.TrackChangedEvent(uid=12356),
         avrcp.VolumeChangedEvent(volume=9),
         avrcp.PlaybackStatusChangedEvent(play_status=avrcp.PlayStatus.PLAYING),
         avrcp.AddressedPlayerChangedEvent(
@@ -583,6 +582,87 @@ async def test_get_supported_company_ids():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_list_player_application_settings():
+    two_devices: TwoDevices = await TwoDevices.create_with_avdtp()
+
+    expected_settings = {
+        avrcp.ApplicationSetting.AttributeId.REPEAT_MODE: [
+            avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT,
+            avrcp.ApplicationSetting.RepeatModeStatus.GROUP_REPEAT,
+            avrcp.ApplicationSetting.RepeatModeStatus.SINGLE_TRACK_REPEAT,
+            avrcp.ApplicationSetting.RepeatModeStatus.OFF,
+        ],
+        avrcp.ApplicationSetting.AttributeId.SHUFFLE_ON_OFF: [
+            avrcp.ApplicationSetting.ShuffleOnOffStatus.OFF,
+            avrcp.ApplicationSetting.ShuffleOnOffStatus.ALL_TRACKS_SHUFFLE,
+            avrcp.ApplicationSetting.ShuffleOnOffStatus.GROUP_SHUFFLE,
+        ],
+    }
+    two_devices.protocols[1].delegate = avrcp.Delegate(
+        supported_player_app_settings=expected_settings
+    )
+    actual_settings = await two_devices.protocols[
+        0
+    ].list_supported_player_app_settings()
+    assert actual_settings == expected_settings
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_get_set_player_app_settings():
+    two_devices: TwoDevices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate
+    await two_devices.protocols[0].send_avrcp_command(
+        avc.CommandFrame.CommandType.CONTROL,
+        avrcp.SetPlayerApplicationSettingValueCommand(
+            attribute=[
+                avrcp.ApplicationSetting.AttributeId.REPEAT_MODE,
+                avrcp.ApplicationSetting.AttributeId.SHUFFLE_ON_OFF,
+            ],
+            value=[
+                avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT,
+                avrcp.ApplicationSetting.ShuffleOnOffStatus.GROUP_SHUFFLE,
+            ],
+        ),
+    )
+    expected_settings = {
+        avrcp.ApplicationSetting.AttributeId.REPEAT_MODE: avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT,
+        avrcp.ApplicationSetting.AttributeId.SHUFFLE_ON_OFF: avrcp.ApplicationSetting.ShuffleOnOffStatus.GROUP_SHUFFLE,
+    }
+    assert delegate.player_app_settings == expected_settings
+
+    actual_settings = await two_devices.protocols[0].get_player_app_settings(
+        [
+            avrcp.ApplicationSetting.AttributeId.REPEAT_MODE,
+            avrcp.ApplicationSetting.AttributeId.SHUFFLE_ON_OFF,
+        ]
+    )
+    assert actual_settings == expected_settings
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_play_item():
+    two_devices: TwoDevices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate
+
+    with mock.patch.object(delegate, delegate.play_item.__name__) as play_item_mock:
+        await two_devices.protocols[0].send_avrcp_command(
+            avc.CommandFrame.CommandType.CONTROL,
+            avrcp.PlayItemCommand(
+                scope=avrcp.Scope.MEDIA_PLAYER_LIST, uid=0, uid_counter=1
+            ),
+        )
+
+        play_item_mock.assert_called_once_with(
+            scope=avrcp.Scope.MEDIA_PLAYER_LIST, uid=0, uid_counter=1
+        )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_monitor_volume():
     two_devices = await TwoDevices.create_with_avdtp()
 
@@ -633,6 +713,102 @@ async def test_monitor_now_playing_content():
         # Changed
         two_devices.protocols[1].notify_now_playing_content_changed()
         await anext(now_playing_iter)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_track_changed():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.TRACK_CHANGED]
+    )
+    delegate.current_track_uid = avrcp.TrackChangedEvent.NO_TRACK
+    track_iter = two_devices.protocols[0].monitor_track_changed()
+
+    # Interim
+    assert (await anext(track_iter)) == avrcp.TrackChangedEvent.NO_TRACK
+    # Changed
+    two_devices.protocols[1].notify_track_changed(1)
+    assert (await anext(track_iter)) == 1
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_uid_changed():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.UIDS_CHANGED]
+    )
+    delegate.uid_counter = 0
+    uid_iter = two_devices.protocols[0].monitor_uids()
+
+    # Interim
+    assert (await anext(uid_iter)) == 0
+    # Changed
+    two_devices.protocols[1].notify_uids_changed(1)
+    assert (await anext(uid_iter)) == 1
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_addressed_player():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate = avrcp.Delegate(
+        [avrcp.EventId.ADDRESSED_PLAYER_CHANGED]
+    )
+    delegate.uid_counter = 0
+    delegate.addressed_player_id = 0
+    addressed_player_iter = two_devices.protocols[0].monitor_addressed_player()
+
+    # Interim
+    assert (
+        await anext(addressed_player_iter)
+    ) == avrcp.AddressedPlayerChangedEvent.Player(player_id=0, uid_counter=0)
+    # Changed
+    two_devices.protocols[1].notify_addressed_player_changed(
+        avrcp.AddressedPlayerChangedEvent.Player(player_id=1, uid_counter=1)
+    )
+    assert (
+        await anext(addressed_player_iter)
+    ) == avrcp.AddressedPlayerChangedEvent.Player(player_id=1, uid_counter=1)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_monitor_player_app_settings():
+    two_devices = await TwoDevices.create_with_avdtp()
+
+    delegate = two_devices.protocols[1].delegate = avrcp.Delegate(
+        supported_events=[avrcp.EventId.PLAYER_APPLICATION_SETTING_CHANGED]
+    )
+    delegate.player_app_settings = {
+        avrcp.ApplicationSetting.AttributeId.REPEAT_MODE: avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT
+    }
+    settings_iter = two_devices.protocols[0].monitor_player_application_settings()
+
+    # Interim
+    interim = await anext(settings_iter)
+    assert interim[0].attribute_id == avrcp.ApplicationSetting.AttributeId.REPEAT_MODE
+    assert (
+        interim[0].value_id
+        == avrcp.ApplicationSetting.RepeatModeStatus.ALL_TRACK_REPEAT
+    )
+
+    # Changed
+    two_devices.protocols[1].notify_player_application_settings_changed(
+        [
+            avrcp.PlayerApplicationSettingChangedEvent.Setting(
+                avrcp.ApplicationSetting.AttributeId.REPEAT_MODE,
+                avrcp.ApplicationSetting.RepeatModeStatus.GROUP_REPEAT,
+            )
+        ]
+    )
+    changed = await anext(settings_iter)
+    assert changed[0].attribute_id == avrcp.ApplicationSetting.AttributeId.REPEAT_MODE
+    assert changed[0].value_id == avrcp.ApplicationSetting.RepeatModeStatus.GROUP_REPEAT
 
 
 # -----------------------------------------------------------------------------
