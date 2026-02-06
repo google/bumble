@@ -311,6 +311,27 @@ async def test_legacy_advertising_disconnection(auto_restart):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_le_multiple_connects():
+    devices = TwoDevices()
+    for controller in devices.controllers:
+        controller.le_features |= hci.LeFeatureMask.LE_EXTENDED_ADVERTISING
+    for dev in devices:
+        await dev.power_on()
+    await devices[0].start_advertising(auto_restart=True, advertising_interval_min=1.0)
+
+    connection = await devices[1].connect(devices[0].random_address)
+    await connection.disconnect()
+
+    await async_barrier()
+    await async_barrier()
+
+    # a second connection attempt is working
+    connection = await devices[1].connect(devices[0].random_address)
+    await connection.disconnect()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_advertising_and_scanning():
     devices = TwoDevices()
     for dev in devices:
