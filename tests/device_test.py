@@ -16,14 +16,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import contextlib
 import functools
+import itertools
 import logging
 import os
 from unittest import mock
 
 import pytest
 
-from bumble import gatt, hci, utils
+from bumble import gatt, hci, keys, pairing, utils
 from bumble.core import PhysicalTransport
 from bumble.device import (
     Advertisement,
@@ -58,6 +60,13 @@ from .test_utils import TwoDevices, async_barrier
 # Constants
 # -----------------------------------------------------------------------------
 _TIMEOUT = 0.1
+
+_CLASSIC_IO_CAPABILITIES = (
+    pairing.PairingDelegate.IoCapability.DISPLAY_OUTPUT_ONLY,
+    pairing.PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_YES_NO_INPUT,
+    pairing.PairingDelegate.IoCapability.KEYBOARD_INPUT_ONLY,
+    pairing.PairingDelegate.IoCapability.NO_OUTPUT_NO_INPUT,
+)
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -822,6 +831,368 @@ async def test_remote_name_request():
     await devices[1].power_on()
     actual_name = await devices[0].request_remote_name(devices[1].public_address)
     assert actual_name == expected_name
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "link_keys, expected_raises",
+    [
+        ((bytes(range(16)), bytes(range(16))), ()),
+        ((bytes(range(16)), bytes(16)), (hci.HCI_Error)),
+        ((bytes(range(16)), None), (hci.HCI_Error)),
+    ],
+)
+@pytest.mark.asyncio
+async def test_authentication(link_keys, expected_raises):
+    devices = TwoDevices()
+
+    for device in devices:
+        device.classic_enabled = True
+        await device.power_on()
+
+    if link_keys[0]:
+        assert devices[0].keystore
+        await devices[0].keystore.update(
+            str(devices[1].public_address),
+            keys.PairingKeys(link_key=keys.PairingKeys.Key(link_keys[0])),
+        )
+
+    if link_keys[1]:
+        assert devices[1].keystore
+        await devices[1].keystore.update(
+            str(devices[0].public_address),
+            keys.PairingKeys(link_key=keys.PairingKeys.Key(link_keys[1])),
+        )
+
+    connections = await asyncio.gather(
+        devices[0].connect_classic(devices[1].public_address),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    with contextlib.ExitStack() as stack:
+        if expected_raises:
+            stack.enter_context(pytest.raises(expected_raises))
+        await connections[0].authenticate()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "io_capabilities,",
+    itertools.product(_CLASSIC_IO_CAPABILITIES, _CLASSIC_IO_CAPABILITIES),
+)
+@pytest.mark.asyncio
+async def test_ssp(io_capabilities):
+    devices = TwoDevices()
+
+    for device, io_cap in zip(devices, io_capabilities):
+        device.classic_enabled = True
+        device.pairing_config_factory = lambda _: pairing.PairingConfig(
+            delegate=pairing.PairingDelegate(io_capability=io_cap)
+        )
+        await device.power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect_classic(devices[1].public_address),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    await connections[0].authenticate()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "io_cap_a, io_cap_b, expected_authenticated, expected_key_type",
+    [
+        (
+            pairing.PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_YES_NO_INPUT,
+            pairing.PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_YES_NO_INPUT,
+            True,
+            hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256,
+        ),
+        (
+            pairing.PairingDelegate.IoCapability.NO_OUTPUT_NO_INPUT,
+            pairing.PairingDelegate.IoCapability.NO_OUTPUT_NO_INPUT,
+            False,
+            hci.LinkKeyType.UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256,
+        ),
+        (
+            pairing.PairingDelegate.IoCapability.KEYBOARD_INPUT_ONLY,
+            pairing.PairingDelegate.IoCapability.DISPLAY_OUTPUT_ONLY,
+            True,
+            hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256,
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_ssp_levels(
+    io_cap_a, io_cap_b, expected_authenticated, expected_key_type
+):
+    devices = TwoDevices()
+
+    def make_factory(io_cap):
+        return lambda _: pairing.PairingConfig(
+            delegate=pairing.PairingDelegate(io_capability=io_cap)
+        )
+
+    for device, io_cap in zip(devices, [io_cap_a, io_cap_b]):
+        device.classic_enabled = True
+        device.pairing_config_factory = make_factory(io_cap)
+        await device.power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect_classic(devices[1].public_address),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    # Listen for link key notification
+    link_key_future = asyncio.get_running_loop().create_future()
+    devices[0].host.on(
+        'link_key', lambda address, key, key_type: link_key_future.set_result(key_type)
+    )
+
+    await connections[0].authenticate()
+
+    actual_key_type = await asyncio.wait_for(link_key_future, _TIMEOUT)
+    assert actual_key_type == expected_key_type
+
+    # Check controller connection state
+    ctrl_conn = devices.controllers[0].classic_connections[devices[1].public_address]
+    assert ctrl_conn.ssp_authenticated_pairing == expected_authenticated
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_ssp_io_cap_negative_reply():
+    devices = TwoDevices()
+
+    for device in devices:
+        device.classic_enabled = True
+        await device.power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect_classic(devices[1].public_address),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    # Mock the IO Capability Request to send a negative reply
+    def on_hci_io_capability_request_event(event):
+        devices.controllers[0].on_hci_packet(
+            hci.HCI_IO_Capability_Request_Negative_Reply_Command(
+                bd_addr=event.bd_addr,
+                reason=hci.HCI_ErrorCode.PAIRING_NOT_ALLOWED_ERROR,
+            )
+        )
+
+    devices[0].host.on_hci_io_capability_request_event = (
+        on_hci_io_capability_request_event
+    )
+
+    with pytest.raises(hci.HCI_Error) as excinfo:
+        await connections[0].authenticate()
+    assert excinfo.value.error_code == hci.HCI_ErrorCode.PAIRING_NOT_ALLOWED_ERROR
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_ssp_user_confirmation_negative_reply():
+    devices = TwoDevices()
+
+    for device in devices:
+        device.classic_enabled = True
+
+    class NegativePairingDelegate(pairing.PairingDelegate):
+        def __init__(self):
+            super().__init__(
+                pairing.PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_YES_NO_INPUT
+            )
+
+        async def confirm(self, auto=False):
+            return False
+
+        async def compare_numbers(self, number, digits):
+            return False
+
+    for device in devices:
+        await device.power_on()
+
+    devices[0].pairing_config_factory = lambda _: pairing.PairingConfig(
+        delegate=NegativePairingDelegate()
+    )
+
+    connections = await asyncio.gather(
+        devices[0].connect_classic(devices[1].public_address),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    with pytest.raises(hci.HCI_Error) as excinfo:
+        await connections[0].authenticate()
+    assert excinfo.value.error_code == hci.HCI_ErrorCode.AUTHENTICATION_FAILURE_ERROR
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_ssp_link_key_match():
+    devices = TwoDevices()
+
+    for device in devices:
+        device.classic_enabled = True
+        await device.power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect_classic(devices[1].public_address),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    link_keys = asyncio.Queue()
+
+    def on_link_key(device_index, address, key, key_type):
+        link_keys.put_nowait((device_index, key))
+
+    devices[0].host.on('link_key', functools.partial(on_link_key, 0))
+    devices[1].host.on('link_key', functools.partial(on_link_key, 1))
+
+    await connections[0].authenticate()
+
+    # Wait for both link keys
+    keys_received = {}
+    for _ in range(2):
+        device_index, key = await asyncio.wait_for(link_keys.get(), _TIMEOUT)
+        keys_received[device_index] = key
+
+    assert keys_received[0] == keys_received[1]
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_ssp_numeric_value_match():
+    devices = TwoDevices()
+
+    numeric_values = asyncio.Queue()
+
+    class TestPairingDelegate(pairing.PairingDelegate):
+        def __init__(self, device_index):
+            super().__init__(
+                pairing.PairingDelegate.IoCapability.DISPLAY_OUTPUT_AND_YES_NO_INPUT
+            )
+            self.device_index = device_index
+
+        async def compare_numbers(self, number, digits):
+            numeric_values.put_nowait((self.device_index, number))
+            return True
+
+    for i, device in enumerate(devices):
+        device.classic_enabled = True
+        device.pairing_config_factory = lambda _, index=i: pairing.PairingConfig(
+            delegate=TestPairingDelegate(index)
+        )
+        await device.power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect_classic(devices[1].public_address),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    await connections[0].authenticate()
+
+    # Wait for both numeric values
+    values_received = {}
+    for _ in range(2):
+        device_index, value = await asyncio.wait_for(numeric_values.get(), _TIMEOUT)
+        values_received[device_index] = value
+
+    assert values_received[0] == values_received[1]
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_classic_encryption():
+    devices = TwoDevices()
+    for device in devices:
+        device.classic_enabled = True
+        await device.power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect_classic(devices[1].public_address),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    # Must authenticate before encrypting
+    await connections[0].authenticate()
+
+    # Enable encryption
+    encryption_change_events = asyncio.Queue()
+
+    def on_encryption_change(connection_handle, encryption_enabled, key_size):
+        encryption_change_events.put_nowait((connection_handle, encryption_enabled))
+
+    devices[0].host.on('connection_encryption_change', on_encryption_change)
+    devices[1].host.on('connection_encryption_change', on_encryption_change)
+
+    await devices[0].host.send_command(
+        hci.HCI_Set_Connection_Encryption_Command(
+            connection_handle=connections[0].handle, encryption_enable=1
+        )
+    )
+
+    # Wait for encryption change events
+    for _ in range(2):
+        _handle, enabled = await asyncio.wait_for(
+            encryption_change_events.get(), _TIMEOUT
+        )
+        assert enabled != 0
+
+    assert connections[0].is_encrypted
+    assert connections[1].is_encrypted
+
+    # Disable encryption
+    await devices[0].host.send_command(
+        hci.HCI_Set_Connection_Encryption_Command(
+            connection_handle=connections[0].handle, encryption_enable=0
+        )
+    )
+
+    # Wait for encryption change events
+    for _ in range(2):
+        _handle, enabled = await asyncio.wait_for(
+            encryption_change_events.get(), _TIMEOUT
+        )
+        assert enabled == 0
+
+    assert not connections[0].is_encrypted
+    assert not connections[1].is_encrypted
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_classic_encryption_failure_not_authenticated():
+    devices = TwoDevices()
+    for device in devices:
+        device.classic_enabled = True
+        await device.power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect_classic(devices[1].public_address),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    # Do NOT authenticate
+
+    # Try to enable encryption
+    encryption_failure_events = asyncio.Queue()
+
+    def on_encryption_failure(_connection_handle, status):
+        encryption_failure_events.put_nowait(status)
+
+    devices[0].host.on('connection_encryption_failure', on_encryption_failure)
+
+    await devices[0].host.send_command(
+        hci.HCI_Set_Connection_Encryption_Command(
+            connection_handle=connections[0].handle, encryption_enable=1
+        )
+    )
+
+    status = await asyncio.wait_for(encryption_failure_events.get(), _TIMEOUT)
+    assert status == hci.HCI_ErrorCode.AUTHENTICATION_FAILURE_ERROR
 
 
 # -----------------------------------------------------------------------------

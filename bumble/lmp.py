@@ -322,3 +322,91 @@ class LmpNameRes(Packet):
     name_offset: int = field(metadata=hci.metadata(2))
     name_length: int = field(metadata=hci.metadata(3))
     name_fregment: bytes = field(metadata=hci.metadata('*'))
+
+
+@Packet.subclass
+@dataclass
+class LmpSres(Packet):
+    opcode = Opcode.LMP_SRES
+
+    authentication_response_data: bytes = field(metadata=hci.metadata(4))
+
+
+@Packet.subclass
+@dataclass
+class LmpIoCapabilityReq(Packet):
+    opcode = Opcode.LMP_IO_CAPABILITY_REQ
+
+    io_capability: int = field(metadata=hci.metadata(1))
+    oob_data_present: int = field(metadata=hci.metadata(1))
+    authentication_requirements: int = field(metadata=hci.metadata(1))
+
+
+@Packet.subclass
+@dataclass
+class LmpIoCapabilityRes(Packet):
+    opcode = Opcode.LMP_IO_CAPABILITY_RES
+
+    io_capability: int = field(metadata=hci.metadata(1))
+    oob_data_present: int = field(metadata=hci.metadata(1))
+    authentication_requirements: int = field(metadata=hci.metadata(1))
+
+
+@Packet.subclass
+@dataclass
+class LmpSimplePairingConfirm(Packet):
+    opcode = Opcode.LMP_SIMPLE_PAIRING_CONFIRM
+
+    commitment_value: bytes = field(metadata=hci.metadata(16))
+
+
+@Packet.subclass
+@dataclass
+class LmpSimplePairingNumber(Packet):
+    opcode = Opcode.LMP_SIMPLE_PAIRING_NUMBER
+
+    nonce: bytes = field(metadata=hci.metadata(16))
+
+
+@Packet.subclass
+@dataclass
+class LmpDhkeyCheck(Packet):
+    opcode = Opcode.LMP_DHKEY_CHECK
+
+    confirmation_value: bytes = field(metadata=hci.metadata(16))
+
+
+@Packet.subclass
+@dataclass
+class LmpEncryptionModeReq(Packet):
+    opcode = Opcode.LMP_ENCRYPTION_MODE_REQ
+
+    encryption_mode: int = field(metadata=hci.metadata(1))
+
+
+@Packet.subclass
+@dataclass
+class LmpEncryptionKeySizeReq(Packet):
+    opcode = Opcode.LMP_ENCRYPTION_KEY_SIZE_REQ
+
+    key_size: int = field(metadata=hci.metadata(1))
+
+
+@Packet.subclass
+@dataclass
+class LmpStartEncryptionReq(Packet):
+    opcode = Opcode.LMP_START_ENCRYPTION_REQ
+
+    random_number: bytes = field(metadata=hci.metadata(16))
+
+
+@Packet.subclass
+@dataclass
+class LmpStopEncryptionReq(Packet):
+    opcode = Opcode.LMP_STOP_ENCRYPTION_REQ
+
+
+@Packet.subclass
+@dataclass
+class LmpNumericComparisonFailed(Packet):
+    opcode = Opcode.LMP_NUMERIC_COMPARISON_FAILED
