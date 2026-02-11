@@ -133,10 +133,10 @@ def on_avrcp_start(
     utils.AsyncRunner.spawn(get_supported_events())
 
     async def monitor_track_changed() -> None:
-        async for identifier in avrcp_protocol.monitor_track_changed():
-            print("TRACK CHANGED:", identifier.hex())
+        async for uid in avrcp_protocol.monitor_track_changed():
+            print("TRACK CHANGED:", hex(uid))
             websocket_server.send_message(
-                {"type": "track-changed", "params": {"identifier": identifier.hex()}}
+                {"type": "track-changed", "params": {"identifier": hex(uid)}}
             )
 
     async def monitor_playback_status() -> None:
