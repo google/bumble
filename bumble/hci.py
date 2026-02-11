@@ -4715,7 +4715,7 @@ class HCI_LE_Clear_Resolving_List_Command(HCI_SyncCommand[HCI_StatusReturnParame
 # -----------------------------------------------------------------------------
 @dataclasses.dataclass
 class HCI_LE_Read_Resolving_List_Size_ReturnParameters(HCI_StatusReturnParameters):
-    resolving_list_size: bytes = field(metadata=metadata(1))
+    resolving_list_size: int = field(metadata=metadata(1))
 
 
 @HCI_SyncCommand.sync_command(HCI_LE_Read_Resolving_List_Size_ReturnParameters)
