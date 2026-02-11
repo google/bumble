@@ -20,11 +20,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from typing import ClassVar
 
 import click
 from prompt_toolkit.shortcuts import PromptSession
 
-from bumble import data_types
+from bumble import data_types, smp
 from bumble.a2dp import make_audio_sink_service_sdp_records
 from bumble.att import (
     ATT_INSUFFICIENT_AUTHENTICATION_ERROR,
@@ -40,7 +41,7 @@ from bumble.core import (
     PhysicalTransport,
     ProtocolError,
 )
-from bumble.device import Device, Peer
+from bumble.device import Connection, Device, Peer
 from bumble.gatt import (
     GATT_DEVICE_NAME_CHARACTERISTIC,
     GATT_GENERIC_ACCESS_SERVICE,
@@ -53,7 +54,6 @@ from bumble.hci import OwnAddressType
 from bumble.keys import JsonKeyStore
 from bumble.pairing import OobData, PairingConfig, PairingDelegate
 from bumble.smp import OobContext, OobLegacyContext
-from bumble.smp import error_name as smp_error_name
 from bumble.transport import open_transport
 from bumble.utils import AsyncRunner
 
@@ -65,7 +65,7 @@ POST_PAIRING_DELAY = 1
 
 # -----------------------------------------------------------------------------
 class Waiter:
-    instance: Waiter | None = None
+    instance: ClassVar[Waiter | None] = None
 
     def __init__(self, linger=False):
         self.done = asyncio.get_running_loop().create_future()
@@ -319,12 +319,13 @@ async def on_classic_pairing(connection):
 
 # -----------------------------------------------------------------------------
 @AsyncRunner.run_in_task()
-async def on_pairing_failure(connection, reason):
+async def on_pairing_failure(connection: Connection, reason: smp.ErrorCode):
     print(color('***-----------------------------------', 'red'))
-    print(color(f'*** Pairing failed: {smp_error_name(reason)}', 'red'))
+    print(color(f'*** Pairing failed: {reason.name}', 'red'))
     print(color('***-----------------------------------', 'red'))
     await connection.disconnect()
-    Waiter.instance.terminate()
+    if Waiter.instance:
+        Waiter.instance.terminate()
 
 
 # -----------------------------------------------------------------------------

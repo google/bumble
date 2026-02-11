@@ -21,18 +21,9 @@ import enum
 import secrets
 from dataclasses import dataclass
 
-from bumble import hci
+from bumble import hci, smp
 from bumble.core import AdvertisingData, LeRole
 from bumble.smp import (
-    SMP_DISPLAY_ONLY_IO_CAPABILITY,
-    SMP_DISPLAY_YES_NO_IO_CAPABILITY,
-    SMP_ENC_KEY_DISTRIBUTION_FLAG,
-    SMP_ID_KEY_DISTRIBUTION_FLAG,
-    SMP_KEYBOARD_DISPLAY_IO_CAPABILITY,
-    SMP_KEYBOARD_ONLY_IO_CAPABILITY,
-    SMP_LINK_KEY_DISTRIBUTION_FLAG,
-    SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY,
-    SMP_SIGN_KEY_DISTRIBUTION_FLAG,
     OobContext,
     OobLegacyContext,
     OobSharedData,
@@ -96,11 +87,11 @@ class PairingDelegate:
     # These are defined abstractly, and can be mapped to specific Classic pairing
     # and/or SMP constants.
     class IoCapability(enum.IntEnum):
-        NO_OUTPUT_NO_INPUT = SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
-        KEYBOARD_INPUT_ONLY = SMP_KEYBOARD_ONLY_IO_CAPABILITY
-        DISPLAY_OUTPUT_ONLY = SMP_DISPLAY_ONLY_IO_CAPABILITY
-        DISPLAY_OUTPUT_AND_YES_NO_INPUT = SMP_DISPLAY_YES_NO_IO_CAPABILITY
-        DISPLAY_OUTPUT_AND_KEYBOARD_INPUT = SMP_KEYBOARD_DISPLAY_IO_CAPABILITY
+        NO_OUTPUT_NO_INPUT = smp.IoCapability.NO_INPUT_NO_OUTPUT
+        KEYBOARD_INPUT_ONLY = smp.IoCapability.KEYBOARD_ONLY
+        DISPLAY_OUTPUT_ONLY = smp.IoCapability.DISPLAY_ONLY
+        DISPLAY_OUTPUT_AND_YES_NO_INPUT = smp.IoCapability.DISPLAY_YES_NO
+        DISPLAY_OUTPUT_AND_KEYBOARD_INPUT = smp.IoCapability.KEYBOARD_DISPLAY
 
     # Direct names for backward compatibility.
     NO_OUTPUT_NO_INPUT = IoCapability.NO_OUTPUT_NO_INPUT
@@ -111,10 +102,10 @@ class PairingDelegate:
 
     # Key Distribution [LE only]
     class KeyDistribution(enum.IntFlag):
-        DISTRIBUTE_ENCRYPTION_KEY = SMP_ENC_KEY_DISTRIBUTION_FLAG
-        DISTRIBUTE_IDENTITY_KEY = SMP_ID_KEY_DISTRIBUTION_FLAG
-        DISTRIBUTE_SIGNING_KEY = SMP_SIGN_KEY_DISTRIBUTION_FLAG
-        DISTRIBUTE_LINK_KEY = SMP_LINK_KEY_DISTRIBUTION_FLAG
+        DISTRIBUTE_ENCRYPTION_KEY = smp.KeyDistribution.ENC_KEY
+        DISTRIBUTE_IDENTITY_KEY = smp.KeyDistribution.ID_KEY
+        DISTRIBUTE_SIGNING_KEY = smp.KeyDistribution.SIGN_KEY
+        DISTRIBUTE_LINK_KEY = smp.KeyDistribution.LINK_KEY
 
     DEFAULT_KEY_DISTRIBUTION: KeyDistribution = (
         KeyDistribution.DISTRIBUTE_ENCRYPTION_KEY

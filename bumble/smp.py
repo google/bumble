@@ -31,14 +31,13 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar, TypeVar, cast
 
-from bumble import crypto, utils
+from bumble import crypto, hci, utils
 from bumble.colors import color
 from bumble.core import (
     AdvertisingData,
     InvalidArgumentError,
     PhysicalTransport,
     ProtocolError,
-    name_or_number,
 )
 from bumble.hci import (
     Address,
@@ -46,7 +45,6 @@ from bumble.hci import (
     HCI_LE_Enable_Encryption_Command,
     HCI_Object,
     Role,
-    key_with_value,
     metadata,
 )
 from bumble.keys import PairingKeys
@@ -71,110 +69,110 @@ logger = logging.getLogger(__name__)
 SMP_CID = 0x06
 SMP_BR_CID = 0x07
 
-SMP_PAIRING_REQUEST_COMMAND               = 0x01
-SMP_PAIRING_RESPONSE_COMMAND              = 0x02
-SMP_PAIRING_CONFIRM_COMMAND               = 0x03
-SMP_PAIRING_RANDOM_COMMAND                = 0x04
-SMP_PAIRING_FAILED_COMMAND                = 0x05
-SMP_ENCRYPTION_INFORMATION_COMMAND        = 0x06
-SMP_MASTER_IDENTIFICATION_COMMAND         = 0x07
-SMP_IDENTITY_INFORMATION_COMMAND          = 0x08
-SMP_IDENTITY_ADDRESS_INFORMATION_COMMAND  = 0x09
-SMP_SIGNING_INFORMATION_COMMAND           = 0x0A
-SMP_SECURITY_REQUEST_COMMAND              = 0x0B
-SMP_PAIRING_PUBLIC_KEY_COMMAND            = 0x0C
-SMP_PAIRING_DHKEY_CHECK_COMMAND           = 0x0D
-SMP_PAIRING_KEYPRESS_NOTIFICATION_COMMAND = 0x0E
+class CommandCode(hci.SpecableEnum):
+    PAIRING_REQUEST               = 0x01
+    PAIRING_RESPONSE              = 0x02
+    PAIRING_CONFIRM               = 0x03
+    PAIRING_RANDOM                = 0x04
+    PAIRING_FAILED                = 0x05
+    ENCRYPTION_INFORMATION        = 0x06
+    MASTER_IDENTIFICATION         = 0x07
+    IDENTITY_INFORMATION          = 0x08
+    IDENTITY_ADDRESS_INFORMATION  = 0x09
+    SIGNING_INFORMATION           = 0x0A
+    SECURITY_REQUEST              = 0x0B
+    PAIRING_PUBLIC_KEY            = 0x0C
+    PAIRING_DHKEY_CHECK           = 0x0D
+    PAIRING_KEYPRESS_NOTIFICATION = 0x0E
 
-SMP_COMMAND_NAMES = {
-    SMP_PAIRING_REQUEST_COMMAND:               'SMP_PAIRING_REQUEST_COMMAND',
-    SMP_PAIRING_RESPONSE_COMMAND:              'SMP_PAIRING_RESPONSE_COMMAND',
-    SMP_PAIRING_CONFIRM_COMMAND:               'SMP_PAIRING_CONFIRM_COMMAND',
-    SMP_PAIRING_RANDOM_COMMAND:                'SMP_PAIRING_RANDOM_COMMAND',
-    SMP_PAIRING_FAILED_COMMAND:                'SMP_PAIRING_FAILED_COMMAND',
-    SMP_ENCRYPTION_INFORMATION_COMMAND:        'SMP_ENCRYPTION_INFORMATION_COMMAND',
-    SMP_MASTER_IDENTIFICATION_COMMAND:         'SMP_MASTER_IDENTIFICATION_COMMAND',
-    SMP_IDENTITY_INFORMATION_COMMAND:          'SMP_IDENTITY_INFORMATION_COMMAND',
-    SMP_IDENTITY_ADDRESS_INFORMATION_COMMAND:  'SMP_IDENTITY_ADDRESS_INFORMATION_COMMAND',
-    SMP_SIGNING_INFORMATION_COMMAND:           'SMP_SIGNING_INFORMATION_COMMAND',
-    SMP_SECURITY_REQUEST_COMMAND:              'SMP_SECURITY_REQUEST_COMMAND',
-    SMP_PAIRING_PUBLIC_KEY_COMMAND:            'SMP_PAIRING_PUBLIC_KEY_COMMAND',
-    SMP_PAIRING_DHKEY_CHECK_COMMAND:           'SMP_PAIRING_DHKEY_CHECK_COMMAND',
-    SMP_PAIRING_KEYPRESS_NOTIFICATION_COMMAND: 'SMP_PAIRING_KEYPRESS_NOTIFICATION_COMMAND'
-}
 
-SMP_DISPLAY_ONLY_IO_CAPABILITY       = 0x00
-SMP_DISPLAY_YES_NO_IO_CAPABILITY     = 0x01
-SMP_KEYBOARD_ONLY_IO_CAPABILITY      = 0x02
-SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY = 0x03
-SMP_KEYBOARD_DISPLAY_IO_CAPABILITY   = 0x04
+class IoCapability(hci.SpecableEnum):
+    DISPLAY_ONLY       = 0x00
+    DISPLAY_YES_NO     = 0x01
+    KEYBOARD_ONLY      = 0x02
+    NO_INPUT_NO_OUTPUT = 0x03
+    KEYBOARD_DISPLAY   = 0x04
 
-SMP_IO_CAPABILITY_NAMES = {
-    SMP_DISPLAY_ONLY_IO_CAPABILITY:       'SMP_DISPLAY_ONLY_IO_CAPABILITY',
-    SMP_DISPLAY_YES_NO_IO_CAPABILITY:     'SMP_DISPLAY_YES_NO_IO_CAPABILITY',
-    SMP_KEYBOARD_ONLY_IO_CAPABILITY:      'SMP_KEYBOARD_ONLY_IO_CAPABILITY',
-    SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY: 'SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY',
-    SMP_KEYBOARD_DISPLAY_IO_CAPABILITY:   'SMP_KEYBOARD_DISPLAY_IO_CAPABILITY'
-}
+SMP_DISPLAY_ONLY_IO_CAPABILITY       = IoCapability.DISPLAY_ONLY
+SMP_DISPLAY_YES_NO_IO_CAPABILITY     = IoCapability.DISPLAY_YES_NO
+SMP_KEYBOARD_ONLY_IO_CAPABILITY      = IoCapability.KEYBOARD_ONLY
+SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY = IoCapability.NO_INPUT_NO_OUTPUT
+SMP_KEYBOARD_DISPLAY_IO_CAPABILITY   = IoCapability.KEYBOARD_DISPLAY
 
-SMP_PASSKEY_ENTRY_FAILED_ERROR                       = 0x01
-SMP_OOB_NOT_AVAILABLE_ERROR                          = 0x02
-SMP_AUTHENTICATION_REQUIREMENTS_ERROR                = 0x03
-SMP_CONFIRM_VALUE_FAILED_ERROR                       = 0x04
-SMP_PAIRING_NOT_SUPPORTED_ERROR                      = 0x05
-SMP_ENCRYPTION_KEY_SIZE_ERROR                        = 0x06
-SMP_COMMAND_NOT_SUPPORTED_ERROR                      = 0x07
-SMP_UNSPECIFIED_REASON_ERROR                         = 0x08
-SMP_REPEATED_ATTEMPTS_ERROR                          = 0x09
-SMP_INVALID_PARAMETERS_ERROR                         = 0x0A
-SMP_DHKEY_CHECK_FAILED_ERROR                         = 0x0B
-SMP_NUMERIC_COMPARISON_FAILED_ERROR                  = 0x0C
-SMP_BD_EDR_PAIRING_IN_PROGRESS_ERROR                 = 0x0D
-SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR = 0x0E
+class ErrorCode(hci.SpecableEnum):
+    PASSKEY_ENTRY_FAILED                       = 0x01
+    OOB_NOT_AVAILABLE                          = 0x02
+    AUTHENTICATION_REQUIREMENTS                = 0x03
+    CONFIRM_VALUE_FAILED                       = 0x04
+    PAIRING_NOT_SUPPORTED                      = 0x05
+    ENCRYPTION_KEY_SIZE                        = 0x06
+    COMMAND_NOT_SUPPORTED                      = 0x07
+    UNSPECIFIED_REASON                         = 0x08
+    REPEATED_ATTEMPTS                          = 0x09
+    INVALID_PARAMETERS                         = 0x0A
+    DHKEY_CHECK_FAILED                         = 0x0B
+    NUMERIC_COMPARISON_FAILED                  = 0x0C
+    BD_EDR_PAIRING_IN_PROGRESS                 = 0x0D
+    CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED = 0x0E
 
-SMP_ERROR_NAMES = {
-    SMP_PASSKEY_ENTRY_FAILED_ERROR:                       'SMP_PASSKEY_ENTRY_FAILED_ERROR',
-    SMP_OOB_NOT_AVAILABLE_ERROR:                          'SMP_OOB_NOT_AVAILABLE_ERROR',
-    SMP_AUTHENTICATION_REQUIREMENTS_ERROR:                'SMP_AUTHENTICATION_REQUIREMENTS_ERROR',
-    SMP_CONFIRM_VALUE_FAILED_ERROR:                       'SMP_CONFIRM_VALUE_FAILED_ERROR',
-    SMP_PAIRING_NOT_SUPPORTED_ERROR:                      'SMP_PAIRING_NOT_SUPPORTED_ERROR',
-    SMP_ENCRYPTION_KEY_SIZE_ERROR:                        'SMP_ENCRYPTION_KEY_SIZE_ERROR',
-    SMP_COMMAND_NOT_SUPPORTED_ERROR:                      'SMP_COMMAND_NOT_SUPPORTED_ERROR',
-    SMP_UNSPECIFIED_REASON_ERROR:                         'SMP_UNSPECIFIED_REASON_ERROR',
-    SMP_REPEATED_ATTEMPTS_ERROR:                          'SMP_REPEATED_ATTEMPTS_ERROR',
-    SMP_INVALID_PARAMETERS_ERROR:                         'SMP_INVALID_PARAMETERS_ERROR',
-    SMP_DHKEY_CHECK_FAILED_ERROR:                         'SMP_DHKEY_CHECK_FAILED_ERROR',
-    SMP_NUMERIC_COMPARISON_FAILED_ERROR:                  'SMP_NUMERIC_COMPARISON_FAILED_ERROR',
-    SMP_BD_EDR_PAIRING_IN_PROGRESS_ERROR:                 'SMP_BD_EDR_PAIRING_IN_PROGRESS_ERROR',
-    SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR: 'SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR'
-}
+SMP_PASSKEY_ENTRY_FAILED_ERROR                       = ErrorCode.PASSKEY_ENTRY_FAILED
+SMP_OOB_NOT_AVAILABLE_ERROR                          = ErrorCode.OOB_NOT_AVAILABLE
+SMP_AUTHENTICATION_REQUIREMENTS_ERROR                = ErrorCode.AUTHENTICATION_REQUIREMENTS
+SMP_CONFIRM_VALUE_FAILED_ERROR                       = ErrorCode.CONFIRM_VALUE_FAILED
+SMP_PAIRING_NOT_SUPPORTED_ERROR                      = ErrorCode.PAIRING_NOT_SUPPORTED
+SMP_ENCRYPTION_KEY_SIZE_ERROR                        = ErrorCode.ENCRYPTION_KEY_SIZE
+SMP_COMMAND_NOT_SUPPORTED_ERROR                      = ErrorCode.COMMAND_NOT_SUPPORTED
+SMP_UNSPECIFIED_REASON_ERROR                         = ErrorCode.UNSPECIFIED_REASON
+SMP_REPEATED_ATTEMPTS_ERROR                          = ErrorCode.REPEATED_ATTEMPTS
+SMP_INVALID_PARAMETERS_ERROR                         = ErrorCode.INVALID_PARAMETERS
+SMP_DHKEY_CHECK_FAILED_ERROR                         = ErrorCode.DHKEY_CHECK_FAILED
+SMP_NUMERIC_COMPARISON_FAILED_ERROR                  = ErrorCode.NUMERIC_COMPARISON_FAILED
+SMP_BD_EDR_PAIRING_IN_PROGRESS_ERROR                 = ErrorCode.BD_EDR_PAIRING_IN_PROGRESS
+SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR = ErrorCode.CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED
 
-SMP_PASSKEY_ENTRY_STARTED_KEYPRESS_NOTIFICATION_TYPE   = 0
-SMP_PASSKEY_DIGIT_ENTERED_KEYPRESS_NOTIFICATION_TYPE   = 1
-SMP_PASSKEY_DIGIT_ERASED_KEYPRESS_NOTIFICATION_TYPE    = 2
-SMP_PASSKEY_CLEARED_KEYPRESS_NOTIFICATION_TYPE         = 3
-SMP_PASSKEY_ENTRY_COMPLETED_KEYPRESS_NOTIFICATION_TYPE = 4
-
-SMP_KEYPRESS_NOTIFICATION_TYPE_NAMES = {
-    SMP_PASSKEY_ENTRY_STARTED_KEYPRESS_NOTIFICATION_TYPE:   'SMP_PASSKEY_ENTRY_STARTED_KEYPRESS_NOTIFICATION_TYPE',
-    SMP_PASSKEY_DIGIT_ENTERED_KEYPRESS_NOTIFICATION_TYPE:   'SMP_PASSKEY_DIGIT_ENTERED_KEYPRESS_NOTIFICATION_TYPE',
-    SMP_PASSKEY_DIGIT_ERASED_KEYPRESS_NOTIFICATION_TYPE:    'SMP_PASSKEY_DIGIT_ERASED_KEYPRESS_NOTIFICATION_TYPE',
-    SMP_PASSKEY_CLEARED_KEYPRESS_NOTIFICATION_TYPE:         'SMP_PASSKEY_CLEARED_KEYPRESS_NOTIFICATION_TYPE',
-    SMP_PASSKEY_ENTRY_COMPLETED_KEYPRESS_NOTIFICATION_TYPE: 'SMP_PASSKEY_ENTRY_COMPLETED_KEYPRESS_NOTIFICATION_TYPE'
-}
+class KeypressNotificationType(hci.SpecableEnum):
+    PASSKEY_ENTRY_STARTED   = 0
+    PASSKEY_DIGIT_ENTERED   = 1
+    PASSKEY_DIGIT_ERASED    = 2
+    PASSKEY_CLEARED         = 3
+    PASSKEY_ENTRY_COMPLETED = 4
 
 # Bit flags for key distribution/generation
-SMP_ENC_KEY_DISTRIBUTION_FLAG  = 0b0001
-SMP_ID_KEY_DISTRIBUTION_FLAG   = 0b0010
-SMP_SIGN_KEY_DISTRIBUTION_FLAG = 0b0100
-SMP_LINK_KEY_DISTRIBUTION_FLAG = 0b1000
+class KeyDistribution(hci.SpecableFlag):
+    ENC_KEY  = 0b0001
+    ID_KEY   = 0b0010
+    SIGN_KEY = 0b0100
+    LINK_KEY = 0b1000
 
 # AuthReq fields
-SMP_BONDING_AUTHREQ  = 0b00000001
-SMP_MITM_AUTHREQ     = 0b00000100
-SMP_SC_AUTHREQ       = 0b00001000
-SMP_KEYPRESS_AUTHREQ = 0b00010000
-SMP_CT2_AUTHREQ      = 0b00100000
+class AuthReq(hci.SpecableFlag):
+    BONDING  = 0b00000001
+    MITM     = 0b00000100
+    SC       = 0b00001000
+    KEYPRESS = 0b00010000
+    CT2      = 0b00100000
+
+    @classmethod
+    def from_booleans(
+        cls,
+        bonding: bool = False,
+        sc: bool = False,
+        mitm: bool = False,
+        keypress: bool = False,
+        ct2: bool = False,
+    ) -> AuthReq:
+        auth_req = AuthReq(0)
+        if bonding:
+            auth_req |= AuthReq.BONDING
+        if sc:
+            auth_req |= AuthReq.SC
+        if mitm:
+            auth_req |= AuthReq.MITM
+        if keypress:
+            auth_req |= AuthReq.KEYPRESS
+        if ct2:
+            auth_req |= AuthReq.CT2
+        return auth_req
 
 # Crypto salt
 SMP_CTKD_H7_LEBR_SALT = bytes.fromhex('000000000000000000000000746D7031')
@@ -188,8 +186,6 @@ SMP_CTKD_H7_BRLE_SALT = bytes.fromhex('000000000000000000000000746D7032')
 # -----------------------------------------------------------------------------
 # Utils
 # -----------------------------------------------------------------------------
-def error_name(error_code: int) -> str:
-    return name_or_number(SMP_ERROR_NAMES, error_code)
 
 
 # -----------------------------------------------------------------------------
@@ -201,20 +197,20 @@ class SMP_Command:
     See Bluetooth spec @ Vol 3, Part H - 3 SECURITY MANAGER PROTOCOL
     '''
 
-    smp_classes: ClassVar[dict[int, type[SMP_Command]]] = {}
+    smp_classes: ClassVar[dict[CommandCode, type[SMP_Command]]] = {}
     fields: ClassVar[Fields]
-    code: int = field(default=0, init=False)
+    code: CommandCode = field(default=CommandCode(0), init=False)
     name: str = field(default='', init=False)
     _payload: bytes | None = field(default=None, init=False)
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> SMP_Command:
-        code = pdu[0]
+        code = CommandCode(pdu[0])
 
         subclass = SMP_Command.smp_classes.get(code)
         if subclass is None:
             instance = SMP_Command()
-            instance.name = SMP_Command.command_name(code)
+            instance.name = code.name
             instance.code = code
             instance.payload = pdu
             return instance
@@ -222,59 +218,14 @@ class SMP_Command:
         instance.payload = pdu[1:]
         return instance
 
-    @staticmethod
-    def command_name(code: int) -> str:
-        return name_or_number(SMP_COMMAND_NAMES, code)
-
-    @staticmethod
-    def auth_req_str(value: int) -> str:
-        bonding_flags = value & 3
-        mitm = (value >> 2) & 1
-        sc = (value >> 3) & 1
-        keypress = (value >> 4) & 1
-        ct2 = (value >> 5) & 1
-
-        return (
-            f'bonding_flags={bonding_flags}, '
-            f'MITM={mitm}, sc={sc}, keypress={keypress}, ct2={ct2}'
-        )
-
-    @staticmethod
-    def io_capability_name(io_capability: int) -> str:
-        return name_or_number(SMP_IO_CAPABILITY_NAMES, io_capability)
-
-    @staticmethod
-    def key_distribution_str(value: int) -> str:
-        key_types: list[str] = []
-        if value & SMP_ENC_KEY_DISTRIBUTION_FLAG:
-            key_types.append('ENC')
-        if value & SMP_ID_KEY_DISTRIBUTION_FLAG:
-            key_types.append('ID')
-        if value & SMP_SIGN_KEY_DISTRIBUTION_FLAG:
-            key_types.append('SIGN')
-        if value & SMP_LINK_KEY_DISTRIBUTION_FLAG:
-            key_types.append('LINK')
-        return ','.join(key_types)
-
-    @staticmethod
-    def keypress_notification_type_name(notification_type: int) -> str:
-        return name_or_number(SMP_KEYPRESS_NOTIFICATION_TYPE_NAMES, notification_type)
-
     _Command = TypeVar("_Command", bound="SMP_Command")
 
     @classmethod
     def subclass(cls, subclass: type[_Command]) -> type[_Command]:
-        subclass.name = subclass.__name__.upper()
-        subclass.code = key_with_value(SMP_COMMAND_NAMES, subclass.name)
-        if subclass.code is None:
-            raise KeyError(
-                f'Command name {subclass.name} not found in SMP_COMMAND_NAMES'
-            )
         subclass.fields = HCI_Object.fields_from_dataclass(subclass)
-
+        subclass.name = subclass.__name__.upper()
         # Register a factory for this class
         SMP_Command.smp_classes[subclass.code] = subclass
-
         return subclass
 
     @property
@@ -308,19 +259,17 @@ class SMP_Pairing_Request_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.1 Pairing Request
     '''
 
-    io_capability: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.io_capability_name})
-    )
+    code = CommandCode.PAIRING_REQUEST
+
+    io_capability: IoCapability = field(metadata=IoCapability.type_metadata(1))
     oob_data_flag: int = field(metadata=metadata(1))
-    auth_req: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.auth_req_str})
-    )
+    auth_req: AuthReq = field(metadata=AuthReq.type_metadata(1))
     maximum_encryption_key_size: int = field(metadata=metadata(1))
-    initiator_key_distribution: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.key_distribution_str})
+    initiator_key_distribution: KeyDistribution = field(
+        metadata=KeyDistribution.type_metadata(1)
     )
-    responder_key_distribution: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.key_distribution_str})
+    responder_key_distribution: KeyDistribution = field(
+        metadata=KeyDistribution.type_metadata(1)
     )
 
 
@@ -332,19 +281,17 @@ class SMP_Pairing_Response_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.2 Pairing Response
     '''
 
-    io_capability: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.io_capability_name})
-    )
+    code = CommandCode.PAIRING_RESPONSE
+
+    io_capability: IoCapability = field(metadata=IoCapability.type_metadata(1))
     oob_data_flag: int = field(metadata=metadata(1))
-    auth_req: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.auth_req_str})
-    )
+    auth_req: AuthReq = field(metadata=AuthReq.type_metadata(1))
     maximum_encryption_key_size: int = field(metadata=metadata(1))
-    initiator_key_distribution: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.key_distribution_str})
+    initiator_key_distribution: KeyDistribution = field(
+        metadata=KeyDistribution.type_metadata(1)
     )
-    responder_key_distribution: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.key_distribution_str})
+    responder_key_distribution: KeyDistribution = field(
+        metadata=KeyDistribution.type_metadata(1)
     )
 
 
@@ -355,6 +302,8 @@ class SMP_Pairing_Confirm_Command(SMP_Command):
     '''
     See Bluetooth spec @ Vol 3, Part H - 3.5.3 Pairing Confirm
     '''
+
+    code = CommandCode.PAIRING_CONFIRM
 
     confirm_value: bytes = field(metadata=metadata(16))
 
@@ -367,6 +316,8 @@ class SMP_Pairing_Random_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.4 Pairing Random
     '''
 
+    code = CommandCode.PAIRING_RANDOM
+
     random_value: bytes = field(metadata=metadata(16))
 
 
@@ -378,7 +329,9 @@ class SMP_Pairing_Failed_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.5 Pairing Failed
     '''
 
-    reason: int = field(metadata=metadata({'size': 1, 'mapper': error_name}))
+    code = CommandCode.PAIRING_FAILED
+
+    reason: ErrorCode = field(metadata=ErrorCode.type_metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -388,6 +341,8 @@ class SMP_Pairing_Public_Key_Command(SMP_Command):
     '''
     See Bluetooth spec @ Vol 3, Part H - 3.5.6 Pairing Public Key
     '''
+
+    code = CommandCode.PAIRING_PUBLIC_KEY
 
     public_key_x: bytes = field(metadata=metadata(32))
     public_key_y: bytes = field(metadata=metadata(32))
@@ -401,6 +356,8 @@ class SMP_Pairing_DHKey_Check_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.7 Pairing DHKey Check
     '''
 
+    code = CommandCode.PAIRING_DHKEY_CHECK
+
     dhkey_check: bytes = field(metadata=metadata(16))
 
 
@@ -412,10 +369,10 @@ class SMP_Pairing_Keypress_Notification_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.5.8 Keypress Notification
     '''
 
-    notification_type: int = field(
-        metadata=metadata(
-            {'size': 1, 'mapper': SMP_Command.keypress_notification_type_name}
-        )
+    code = CommandCode.PAIRING_KEYPRESS_NOTIFICATION
+
+    notification_type: KeypressNotificationType = field(
+        metadata=KeypressNotificationType.type_metadata(1)
     )
 
 
@@ -427,6 +384,8 @@ class SMP_Encryption_Information_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.6.2 Encryption Information
     '''
 
+    code = CommandCode.ENCRYPTION_INFORMATION
+
     long_term_key: bytes = field(metadata=metadata(16))
 
 
@@ -437,6 +396,8 @@ class SMP_Master_Identification_Command(SMP_Command):
     '''
     See Bluetooth spec @ Vol 3, Part H - 3.6.3 Master Identification
     '''
+
+    code = CommandCode.MASTER_IDENTIFICATION
 
     ediv: int = field(metadata=metadata(2))
     rand: bytes = field(metadata=metadata(8))
@@ -450,6 +411,8 @@ class SMP_Identity_Information_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.6.4 Identity Information
     '''
 
+    code = CommandCode.IDENTITY_INFORMATION
+
     identity_resolving_key: bytes = field(metadata=metadata(16))
 
 
@@ -460,6 +423,8 @@ class SMP_Identity_Address_Information_Command(SMP_Command):
     '''
     See Bluetooth spec @ Vol 3, Part H - 3.6.5 Identity Address Information
     '''
+
+    code = CommandCode.IDENTITY_ADDRESS_INFORMATION
 
     addr_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
     bd_addr: Address = field(metadata=metadata(Address.parse_address_preceded_by_type))
@@ -473,6 +438,8 @@ class SMP_Signing_Information_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.6.6 Signing Information
     '''
 
+    code = CommandCode.SIGNING_INFORMATION
+
     signature_key: bytes = field(metadata=metadata(16))
 
 
@@ -484,25 +451,9 @@ class SMP_Security_Request_Command(SMP_Command):
     See Bluetooth spec @ Vol 3, Part H - 3.6.7 Security Request
     '''
 
-    auth_req: int = field(
-        metadata=metadata({'size': 1, 'mapper': SMP_Command.auth_req_str})
-    )
+    code = CommandCode.SECURITY_REQUEST
 
-
-# -----------------------------------------------------------------------------
-def smp_auth_req(bonding: bool, mitm: bool, sc: bool, keypress: bool, ct2: bool) -> int:
-    value = 0
-    if bonding:
-        value |= SMP_BONDING_AUTHREQ
-    if mitm:
-        value |= SMP_MITM_AUTHREQ
-    if sc:
-        value |= SMP_SC_AUTHREQ
-    if keypress:
-        value |= SMP_KEYPRESS_AUTHREQ
-    if ct2:
-        value |= SMP_CT2_AUTHREQ
-    return value
+    auth_req: AuthReq = field(metadata=AuthReq.type_metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -676,8 +627,8 @@ class Session:
         self.ltk_rand = bytes(8)
         self.link_key: bytes | None = None
         self.maximum_encryption_key_size: int = 0
-        self.initiator_key_distribution: int = 0
-        self.responder_key_distribution: int = 0
+        self.initiator_key_distribution: KeyDistribution = KeyDistribution(0)
+        self.responder_key_distribution: KeyDistribution = KeyDistribution(0)
         self.peer_random_value: bytes | None = None
         self.peer_public_key_x: bytes = bytes(32)
         self.peer_public_key_y = bytes(32)
@@ -728,10 +679,10 @@ class Session:
         )
 
         # Key Distribution (default values before negotiation)
-        self.initiator_key_distribution = (
+        self.initiator_key_distribution = KeyDistribution(
             pairing_config.delegate.local_initiator_key_distribution
         )
-        self.responder_key_distribution = (
+        self.responder_key_distribution = KeyDistribution(
             pairing_config.delegate.local_responder_key_distribution
         )
 
@@ -743,7 +694,7 @@ class Session:
         self.ct2: bool = False
 
         # I/O Capabilities
-        self.io_capability = pairing_config.delegate.io_capability
+        self.io_capability = IoCapability(pairing_config.delegate.io_capability)
         self.peer_io_capability = SMP_NO_INPUT_NO_OUTPUT_IO_CAPABILITY
 
         # OOB
@@ -822,8 +773,14 @@ class Session:
         return self.nx[0 if self.is_responder else 1]
 
     @property
-    def auth_req(self) -> int:
-        return smp_auth_req(self.bonding, self.mitm, self.sc, self.keypress, self.ct2)
+    def auth_req(self) -> AuthReq:
+        return AuthReq.from_booleans(
+            bonding=self.bonding,
+            sc=self.sc,
+            mitm=self.mitm,
+            keypress=self.keypress,
+            ct2=self.ct2,
+        )
 
     def get_long_term_key(self, rand: bytes, ediv: int) -> bytes | None:
         if not self.sc and not self.completed:
@@ -843,7 +800,7 @@ class Session:
         if self.connection.transport == PhysicalTransport.BR_EDR:
             self.pairing_method = PairingMethod.CTKD_OVER_CLASSIC
             return
-        if (not self.mitm) and (auth_req & SMP_MITM_AUTHREQ == 0):
+        if (not self.mitm) and (auth_req & AuthReq.MITM == 0):
             self.pairing_method = PairingMethod.JUST_WORKS
             return
 
@@ -861,7 +818,7 @@ class Session:
             self.passkey_display = details[1 if self.is_initiator else 2]
 
     def check_expected_value(
-        self, expected: bytes, received: bytes, error: int
+        self, expected: bytes, received: bytes, error: ErrorCode
     ) -> bool:
         logger.debug(f'expected={expected.hex()} got={received.hex()}')
         if expected != received:
@@ -881,7 +838,7 @@ class Session:
             except Exception:
                 logger.exception('exception while confirm')
 
-            self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
+            self.send_pairing_failed(ErrorCode.CONFIRM_VALUE_FAILED)
 
         self.connection.cancel_on_disconnection(prompt())
 
@@ -900,7 +857,7 @@ class Session:
             except Exception:
                 logger.exception('exception while prompting')
 
-            self.send_pairing_failed(SMP_CONFIRM_VALUE_FAILED_ERROR)
+            self.send_pairing_failed(ErrorCode.CONFIRM_VALUE_FAILED)
 
         self.connection.cancel_on_disconnection(prompt())
 
@@ -911,13 +868,13 @@ class Session:
                 passkey = await self.pairing_config.delegate.get_number()
                 if passkey is None:
                     logger.debug('Passkey request rejected')
-                    self.send_pairing_failed(SMP_PASSKEY_ENTRY_FAILED_ERROR)
+                    self.send_pairing_failed(ErrorCode.PASSKEY_ENTRY_FAILED)
                     return
                 logger.debug(f'user input: {passkey}')
                 next_steps(passkey)
             except Exception:
                 logger.exception('exception while prompting')
-                self.send_pairing_failed(SMP_PASSKEY_ENTRY_FAILED_ERROR)
+                self.send_pairing_failed(ErrorCode.PASSKEY_ENTRY_FAILED)
 
         self.connection.cancel_on_disconnection(prompt())
 
@@ -972,7 +929,7 @@ class Session:
     def send_command(self, command: SMP_Command) -> None:
         self.manager.send_command(self.connection, command)
 
-    def send_pairing_failed(self, error: int) -> None:
+    def send_pairing_failed(self, error: ErrorCode) -> None:
         self.send_command(SMP_Pairing_Failed_Command(reason=error))
         self.on_pairing_failure(error)
 
@@ -1144,7 +1101,7 @@ class Session:
                 'Try to derive LTK but host does not have the LK. Send a SMP_PAIRING_FAILED but the procedure will not be paused!'
             )
             self.send_pairing_failed(
-                SMP_CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED_ERROR
+                ErrorCode.CROSS_TRANSPORT_KEY_DERIVATION_NOT_ALLOWED
             )
         else:
             self.ltk = self.derive_ltk(self.link_key, self.ct2)
@@ -1155,14 +1112,14 @@ class Session:
             # CTKD: Derive LTK from LinkKey
             if (
                 self.connection.transport == PhysicalTransport.BR_EDR
-                and self.initiator_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
+                and self.initiator_key_distribution & KeyDistribution.ENC_KEY
             ):
                 self.ctkd_task = self.connection.cancel_on_disconnection(
                     self.get_link_key_and_derive_ltk()
                 )
             elif not self.sc:
                 # Distribute the LTK, EDIV and RAND
-                if self.initiator_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG:
+                if self.initiator_key_distribution & KeyDistribution.ENC_KEY:
                     self.send_command(
                         SMP_Encryption_Information_Command(long_term_key=self.ltk)
                     )
@@ -1173,7 +1130,7 @@ class Session:
                     )
 
             # Distribute IRK & BD ADDR
-            if self.initiator_key_distribution & SMP_ID_KEY_DISTRIBUTION_FLAG:
+            if self.initiator_key_distribution & KeyDistribution.ID_KEY:
                 self.send_command(
                     SMP_Identity_Information_Command(
                         identity_resolving_key=self.manager.device.irk
@@ -1183,25 +1140,25 @@ class Session:
 
             # Distribute CSRK
             csrk = bytes(16)  # FIXME: testing
-            if self.initiator_key_distribution & SMP_SIGN_KEY_DISTRIBUTION_FLAG:
+            if self.initiator_key_distribution & KeyDistribution.SIGN_KEY:
                 self.send_command(SMP_Signing_Information_Command(signature_key=csrk))
 
             # CTKD, calculate BR/EDR link key
-            if self.initiator_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
+            if self.initiator_key_distribution & KeyDistribution.LINK_KEY:
                 self.link_key = self.derive_link_key(self.ltk, self.ct2)
 
         else:
             # CTKD: Derive LTK from LinkKey
             if (
                 self.connection.transport == PhysicalTransport.BR_EDR
-                and self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG
+                and self.responder_key_distribution & KeyDistribution.ENC_KEY
             ):
                 self.ctkd_task = self.connection.cancel_on_disconnection(
                     self.get_link_key_and_derive_ltk()
                 )
             # Distribute the LTK, EDIV and RAND
             elif not self.sc:
-                if self.responder_key_distribution & SMP_ENC_KEY_DISTRIBUTION_FLAG:
+                if self.responder_key_distribution & KeyDistribution.ENC_KEY:
                     self.send_command(
                         SMP_Encryption_Information_Command(long_term_key=self.ltk)
                     )
@@ -1212,7 +1169,7 @@ class Session:
                     )
 
             # Distribute IRK & BD ADDR
-            if self.responder_key_distribution & SMP_ID_KEY_DISTRIBUTION_FLAG:
+            if self.responder_key_distribution & KeyDistribution.ID_KEY:
                 self.send_command(
                     SMP_Identity_Information_Command(
                         identity_resolving_key=self.manager.device.irk
@@ -1222,30 +1179,30 @@ class Session:
 
             # Distribute CSRK
             csrk = bytes(16)  # FIXME: testing
-            if self.responder_key_distribution & SMP_SIGN_KEY_DISTRIBUTION_FLAG:
+            if self.responder_key_distribution & KeyDistribution.SIGN_KEY:
                 self.send_command(SMP_Signing_Information_Command(signature_key=csrk))
 
             # CTKD, calculate BR/EDR link key
-            if self.responder_key_distribution & SMP_LINK_KEY_DISTRIBUTION_FLAG:
+            if self.responder_key_distribution & KeyDistribution.LINK_KEY:
                 self.link_key = self.derive_link_key(self.ltk, self.ct2)
 
     def compute_peer_expected_distributions(self, key_distribution_flags: int) -> None:
         # Set our expectations for what to wait for in the key distribution phase
         self.peer_expected_distributions = []
         if not self.sc and self.connection.transport == PhysicalTransport.LE:
-            if key_distribution_flags & SMP_ENC_KEY_DISTRIBUTION_FLAG != 0:
+            if key_distribution_flags & KeyDistribution.ENC_KEY != 0:
                 self.peer_expected_distributions.append(
                     SMP_Encryption_Information_Command
                 )
                 self.peer_expected_distributions.append(
                     SMP_Master_Identification_Command
                 )
-        if key_distribution_flags & SMP_ID_KEY_DISTRIBUTION_FLAG != 0:
+        if key_distribution_flags & KeyDistribution.ID_KEY != 0:
             self.peer_expected_distributions.append(SMP_Identity_Information_Command)
             self.peer_expected_distributions.append(
                 SMP_Identity_Address_Information_Command
             )
-        if key_distribution_flags & SMP_SIGN_KEY_DISTRIBUTION_FLAG != 0:
+        if key_distribution_flags & KeyDistribution.SIGN_KEY != 0:
             self.peer_expected_distributions.append(SMP_Signing_Information_Command)
         logger.debug(
             'expecting distributions: '
@@ -1258,7 +1215,7 @@ class Session:
             logger.warning(
                 color('received key distribution on a non-encrypted connection', 'red')
             )
-            self.send_pairing_failed(SMP_UNSPECIFIED_REASON_ERROR)
+            self.send_pairing_failed(ErrorCode.UNSPECIFIED_REASON)
             return
 
         # Check that this command class is expected
@@ -1278,7 +1235,7 @@ class Session:
                     'red',
                 )
             )
-            self.send_pairing_failed(SMP_UNSPECIFIED_REASON_ERROR)
+            self.send_pairing_failed(ErrorCode.UNSPECIFIED_REASON)
 
     async def pair(self) -> None:
         # Start pairing as an initiator
@@ -1389,34 +1346,56 @@ class Session:
             )
         await self.manager.on_pairing(self, peer_address, keys)
 
-    def on_pairing_failure(self, reason: int) -> None:
-        logger.warning(f'pairing failure ({error_name(reason)})')
+    def on_pairing_failure(self, reason: ErrorCode) -> None:
+        logger.warning('pairing failure (%s)', reason.name)
 
         if self.completed:
             return
 
         self.completed = True
 
-        error = ProtocolError(reason, 'smp', error_name(reason))
+        error = ProtocolError(reason, 'smp', reason.name)
         if self.pairing_result is not None and not self.pairing_result.done():
             self.pairing_result.set_exception(error)
         self.manager.on_pairing_failure(self, reason)
 
     def on_smp_command(self, command: SMP_Command) -> None:
-        # Find the handler method
-        handler_name = f'on_{command.name.lower()}'
-        handler = getattr(self, handler_name, None)
-        if handler is not None:
-            try:
-                handler(command)
-            except Exception:
-                logger.exception(color("!!! Exception in handler:", "red"))
-                response = SMP_Pairing_Failed_Command(
-                    reason=SMP_UNSPECIFIED_REASON_ERROR
-                )
-                self.send_command(response)
-        else:
-            logger.error(color('SMP command not handled???', 'red'))
+        try:
+            match command:
+                case SMP_Pairing_Request_Command():
+                    self.on_smp_pairing_request_command(command)
+                case SMP_Pairing_Response_Command():
+                    self.on_smp_pairing_response_command(command)
+                case SMP_Pairing_Confirm_Command():
+                    self.on_smp_pairing_confirm_command(command)
+                case SMP_Pairing_Random_Command():
+                    self.on_smp_pairing_random_command(command)
+                case SMP_Pairing_Failed_Command():
+                    self.on_smp_pairing_failed_command(command)
+                case SMP_Encryption_Information_Command():
+                    self.on_smp_encryption_information_command(command)
+                case SMP_Master_Identification_Command():
+                    self.on_smp_master_identification_command(command)
+                case SMP_Identity_Information_Command():
+                    self.on_smp_identity_information_command(command)
+                case SMP_Identity_Address_Information_Command():
+                    self.on_smp_identity_address_information_command(command)
+                case SMP_Signing_Information_Command():
+                    self.on_smp_signing_information_command(command)
+                case SMP_Pairing_Public_Key_Command():
+                    self.on_smp_pairing_public_key_command(command)
+                case SMP_Pairing_DHKey_Check_Command():
+                    self.on_smp_pairing_dhkey_check_command(command)
+                # case SMP_Security_Request_Command():
+                #     self.on_smp_security_request_command(command)
+                # case SMP_Pairing_Keypress_Notification_Command():
+                #     self.on_smp_pairing_keypress_notification_command(command)
+                case _:
+                    logger.error(color('SMP command not handled', 'red'))
+        except Exception:
+            logger.exception(color("!!! Exception in handler:", "red"))
+            response = SMP_Pairing_Failed_Command(reason=ErrorCode.UNSPECIFIED_REASON)
+            self.send_command(response)
 
     def on_smp_pairing_request_command(
         self, command: SMP_Pairing_Request_Command
@@ -1436,16 +1415,16 @@ class Session:
             accepted = False
         if not accepted:
             logger.debug('pairing rejected by delegate')
-            self.send_pairing_failed(SMP_PAIRING_NOT_SUPPORTED_ERROR)
+            self.send_pairing_failed(ErrorCode.PAIRING_NOT_SUPPORTED)
             return
 
         # Save the request
         self.preq = bytes(command)
 
         # Bonding and SC require both sides to request/support it
-        self.bonding = self.bonding and (command.auth_req & SMP_BONDING_AUTHREQ != 0)
-        self.sc = self.sc and (command.auth_req & SMP_SC_AUTHREQ != 0)
-        self.ct2 = self.ct2 and (command.auth_req & SMP_CT2_AUTHREQ != 0)
+        self.bonding = self.bonding and (command.auth_req & AuthReq.BONDING != 0)
+        self.sc = self.sc and (command.auth_req & AuthReq.SC != 0)
+        self.ct2 = self.ct2 and (command.auth_req & AuthReq.CT2 != 0)
 
         # Infer the pairing method
         if (self.sc and (self.oob_data_flag != 0 or command.oob_data_flag != 0)) or (
@@ -1456,7 +1435,7 @@ class Session:
             if not self.sc and self.tk is None:
                 # For legacy OOB, TK is required.
                 logger.warning("legacy OOB without TK")
-                self.send_pairing_failed(SMP_OOB_NOT_AVAILABLE_ERROR)
+                self.send_pairing_failed(ErrorCode.OOB_NOT_AVAILABLE)
                 return
             if command.oob_data_flag == 0:
                 # The peer doesn't have OOB data, use r=0
@@ -1475,8 +1454,11 @@ class Session:
         (
             self.initiator_key_distribution,
             self.responder_key_distribution,
-        ) = await self.pairing_config.delegate.key_distribution_response(
-            command.initiator_key_distribution, command.responder_key_distribution
+        ) = map(
+            KeyDistribution,
+            await self.pairing_config.delegate.key_distribution_response(
+                command.initiator_key_distribution, command.responder_key_distribution
+            ),
         )
         self.compute_peer_expected_distributions(self.initiator_key_distribution)
 
@@ -1514,8 +1496,8 @@ class Session:
         self.peer_io_capability = command.io_capability
 
         # Bonding and SC require both sides to request/support it
-        self.bonding = self.bonding and (command.auth_req & SMP_BONDING_AUTHREQ != 0)
-        self.sc = self.sc and (command.auth_req & SMP_SC_AUTHREQ != 0)
+        self.bonding = self.bonding and (command.auth_req & AuthReq.BONDING != 0)
+        self.sc = self.sc and (command.auth_req & AuthReq.SC != 0)
 
         # Infer the pairing method
         if (self.sc and (self.oob_data_flag != 0 or command.oob_data_flag != 0)) or (
@@ -1526,7 +1508,7 @@ class Session:
             if not self.sc and self.tk is None:
                 # For legacy OOB, TK is required.
                 logger.warning("legacy OOB without TK")
-                self.send_pairing_failed(SMP_OOB_NOT_AVAILABLE_ERROR)
+                self.send_pairing_failed(ErrorCode.OOB_NOT_AVAILABLE)
                 return
             if command.oob_data_flag == 0:
                 # The peer doesn't have OOB data, use r=0
@@ -1546,7 +1528,7 @@ class Session:
             command.responder_key_distribution & ~self.responder_key_distribution != 0
         ):
             # The response isn't a subset of the request
-            self.send_pairing_failed(SMP_INVALID_PARAMETERS_ERROR)
+            self.send_pairing_failed(ErrorCode.INVALID_PARAMETERS)
             return
         self.initiator_key_distribution = command.initiator_key_distribution
         self.responder_key_distribution = command.responder_key_distribution
@@ -1624,7 +1606,7 @@ class Session:
         )
         assert self.confirm_value
         if not self.check_expected_value(
-            self.confirm_value, confirm_verifier, SMP_CONFIRM_VALUE_FAILED_ERROR
+            self.confirm_value, confirm_verifier, ErrorCode.CONFIRM_VALUE_FAILED
         ):
             return
 
@@ -1665,7 +1647,7 @@ class Session:
                     self.pkb, self.pka, command.random_value, bytes([0])
                 )
                 if not self.check_expected_value(
-                    self.confirm_value, confirm_verifier, SMP_CONFIRM_VALUE_FAILED_ERROR
+                    self.confirm_value, confirm_verifier, ErrorCode.CONFIRM_VALUE_FAILED
                 ):
                     return
             elif self.pairing_method == PairingMethod.PASSKEY:
@@ -1678,7 +1660,7 @@ class Session:
                     bytes([0x80 + ((self.passkey >> self.passkey_step) & 1)]),
                 )
                 if not self.check_expected_value(
-                    self.confirm_value, confirm_verifier, SMP_CONFIRM_VALUE_FAILED_ERROR
+                    self.confirm_value, confirm_verifier, ErrorCode.CONFIRM_VALUE_FAILED
                 ):
                     return
 
@@ -1707,7 +1689,7 @@ class Session:
                     bytes([0x80 + ((self.passkey >> self.passkey_step) & 1)]),
                 )
                 if not self.check_expected_value(
-                    self.confirm_value, confirm_verifier, SMP_CONFIRM_VALUE_FAILED_ERROR
+                    self.confirm_value, confirm_verifier, ErrorCode.CONFIRM_VALUE_FAILED
                 ):
                     return
 
@@ -1824,7 +1806,7 @@ class Session:
                 if not self.check_expected_value(
                     self.peer_oob_data.c,
                     confirm_verifier,
-                    SMP_CONFIRM_VALUE_FAILED_ERROR,
+                    ErrorCode.CONFIRM_VALUE_FAILED,
                 ):
                     return
 
@@ -1858,7 +1840,7 @@ class Session:
         expected = self.eb if self.is_initiator else self.ea
         assert expected
         if not self.check_expected_value(
-            expected, command.dhkey_check, SMP_DHKEY_CHECK_FAILED_ERROR
+            expected, command.dhkey_check, ErrorCode.DHKEY_CHECK_FAILED
         ):
             return
 
@@ -1962,7 +1944,7 @@ class Manager(utils.EventEmitter):
         )
 
         # Security request is more than just pairing, so let applications handle them
-        if command.code == SMP_SECURITY_REQUEST_COMMAND:
+        if command.code == CommandCode.SECURITY_REQUEST:
             self.on_smp_security_request_command(
                 connection, cast(SMP_Security_Request_Command, command)
             )
@@ -2002,15 +1984,13 @@ class Manager(utils.EventEmitter):
     def request_pairing(self, connection: Connection) -> None:
         pairing_config = self.pairing_config_factory(connection)
         if pairing_config:
-            auth_req = smp_auth_req(
-                pairing_config.bonding,
-                pairing_config.mitm,
-                pairing_config.sc,
-                False,
-                False,
+            auth_req = AuthReq.from_booleans(
+                bonding=pairing_config.bonding,
+                sc=pairing_config.sc,
+                mitm=pairing_config.mitm,
             )
         else:
-            auth_req = 0
+            auth_req = AuthReq(0)
         self.send_command(connection, SMP_Security_Request_Command(auth_req=auth_req))
 
     def on_session_start(self, session: Session) -> None:
@@ -2026,7 +2006,7 @@ class Manager(utils.EventEmitter):
         # Notify the device
         self.device.on_pairing(session.connection, identity_address, keys, session.sc)
 
-    def on_pairing_failure(self, session: Session, reason: int) -> None:
+    def on_pairing_failure(self, session: Session, reason: ErrorCode) -> None:
         self.device.on_pairing_failure(session.connection, reason)
 
     def on_session_end(self, session: Session) -> None:
