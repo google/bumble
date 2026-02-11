@@ -201,50 +201,51 @@ def _parse_tlv(data: bytes) -> list[tuple[ValueType, Any]]:
         value = data[2 : 2 + value_length]
         typed_value: Any
 
-        if value_type == ValueType.END:
-            break
+        match value_type:
+            case ValueType.END:
+                break
 
-        if value_type in (ValueType.CNVI, ValueType.CNVR):
-            (v,) = struct.unpack("<I", value)
-            typed_value = (
-                (((v >> 0) & 0xF) << 12)
-                | (((v >> 4) & 0xF) << 0)
-                | (((v >> 8) & 0xF) << 4)
-                | (((v >> 24) & 0xF) << 8)
-            )
-        elif value_type == ValueType.HARDWARE_INFO:
-            (v,) = struct.unpack("<I", value)
-            typed_value = HardwareInfo(
-                HardwarePlatform((v >> 8) & 0xFF), HardwareVariant((v >> 16) & 0x3F)
-            )
-        elif value_type in (
-            ValueType.USB_VENDOR_ID,
-            ValueType.USB_PRODUCT_ID,
-            ValueType.DEVICE_REVISION,
-        ):
-            (typed_value,) = struct.unpack("<H", value)
-        elif value_type == ValueType.CURRENT_MODE_OF_OPERATION:
-            typed_value = ModeOfOperation(value[0])
-        elif value_type in (
-            ValueType.BUILD_TYPE,
-            ValueType.BUILD_NUMBER,
-            ValueType.SECURE_BOOT,
-            ValueType.OTP_LOCK,
-            ValueType.API_LOCK,
-            ValueType.DEBUG_LOCK,
-            ValueType.SECURE_BOOT_ENGINE_TYPE,
-        ):
-            typed_value = value[0]
-        elif value_type == ValueType.TIMESTAMP:
-            typed_value = Timestamp(value[0], value[1])
-        elif value_type == ValueType.FIRMWARE_BUILD:
-            typed_value = FirmwareBuild(value[0], Timestamp(value[1], value[2]))
-        elif value_type == ValueType.BLUETOOTH_ADDRESS:
-            typed_value = hci.Address(
-                value, address_type=hci.Address.PUBLIC_DEVICE_ADDRESS
-            )
-        else:
-            typed_value = value
+            case ValueType.CNVI | ValueType.CNVR:
+                (v,) = struct.unpack("<I", value)
+                typed_value = (
+                    (((v >> 0) & 0xF) << 12)
+                    | (((v >> 4) & 0xF) << 0)
+                    | (((v >> 8) & 0xF) << 4)
+                    | (((v >> 24) & 0xF) << 8)
+                )
+            case ValueType.HARDWARE_INFO:
+                (v,) = struct.unpack("<I", value)
+                typed_value = HardwareInfo(
+                    HardwarePlatform((v >> 8) & 0xFF), HardwareVariant((v >> 16) & 0x3F)
+                )
+            case (
+                ValueType.USB_VENDOR_ID
+                | ValueType.USB_PRODUCT_ID
+                | ValueType.DEVICE_REVISION
+            ):
+                (typed_value,) = struct.unpack("<H", value)
+            case ValueType.CURRENT_MODE_OF_OPERATION:
+                typed_value = ModeOfOperation(value[0])
+            case (
+                ValueType.BUILD_TYPE
+                | ValueType.BUILD_NUMBER
+                | ValueType.SECURE_BOOT
+                | ValueType.OTP_LOCK
+                | ValueType.API_LOCK
+                | ValueType.DEBUG_LOCK
+                | ValueType.SECURE_BOOT_ENGINE_TYPE
+            ):
+                typed_value = value[0]
+            case ValueType.TIMESTAMP:
+                typed_value = Timestamp(value[0], value[1])
+            case ValueType.FIRMWARE_BUILD:
+                typed_value = FirmwareBuild(value[0], Timestamp(value[1], value[2]))
+            case ValueType.BLUETOOTH_ADDRESS:
+                typed_value = hci.Address(
+                    value, address_type=hci.Address.PUBLIC_DEVICE_ADDRESS
+                )
+            case _:
+                typed_value = value
 
         result.append((value_type, typed_value))
         data = data[2 + value_length :]

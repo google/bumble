@@ -280,14 +280,15 @@ class UUID:
         if not force_128:
             return self.uuid_bytes
 
-        if len(self.uuid_bytes) == 2:
-            return self.BASE_UUID + self.uuid_bytes + bytes([0, 0])
-        elif len(self.uuid_bytes) == 4:
-            return self.BASE_UUID + self.uuid_bytes
-        elif len(self.uuid_bytes) == 16:
-            return self.uuid_bytes
-        else:
-            assert False, "unreachable"
+        match len(self.uuid_bytes):
+            case 2:
+                return self.BASE_UUID + self.uuid_bytes + bytes([0, 0])
+            case 4:
+                return self.BASE_UUID + self.uuid_bytes
+            case 16:
+                return self.uuid_bytes
+            case _:
+                assert False, "unreachable"
 
     def to_pdu_bytes(self) -> bytes:
         '''
@@ -1769,66 +1770,71 @@ class AdvertisingData:
 
     @classmethod
     def ad_data_to_string(cls, ad_type: int, ad_data: bytes) -> str:
-        if ad_type == AdvertisingData.FLAGS:
-            ad_type_str = 'Flags'
-            ad_data_str = AdvertisingData.flags_to_string(ad_data[0], short=True)
-        elif ad_type == AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:
-            ad_type_str = 'Complete List of 16-bit Service Class UUIDs'
-            ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 2)
-        elif ad_type == AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:
-            ad_type_str = 'Incomplete List of 16-bit Service Class UUIDs'
-            ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 2)
-        elif ad_type == AdvertisingData.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:
-            ad_type_str = 'Complete List of 32-bit Service Class UUIDs'
-            ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 4)
-        elif ad_type == AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:
-            ad_type_str = 'Incomplete List of 32-bit Service Class UUIDs'
-            ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 4)
-        elif ad_type == AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS:
-            ad_type_str = 'Complete List of 128-bit Service Class UUIDs'
-            ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 16)
-        elif ad_type == AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS:
-            ad_type_str = 'Incomplete List of 128-bit Service Class UUIDs'
-            ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 16)
-        elif ad_type == AdvertisingData.SERVICE_DATA_16_BIT_UUID:
-            ad_type_str = 'Service Data'
-            uuid = UUID.from_bytes(ad_data[:2])
-            ad_data_str = f'service={uuid}, data={ad_data[2:].hex()}'
-        elif ad_type == AdvertisingData.SERVICE_DATA_32_BIT_UUID:
-            ad_type_str = 'Service Data'
-            uuid = UUID.from_bytes(ad_data[:4])
-            ad_data_str = f'service={uuid}, data={ad_data[4:].hex()}'
-        elif ad_type == AdvertisingData.SERVICE_DATA_128_BIT_UUID:
-            ad_type_str = 'Service Data'
-            uuid = UUID.from_bytes(ad_data[:16])
-            ad_data_str = f'service={uuid}, data={ad_data[16:].hex()}'
-        elif ad_type == AdvertisingData.SHORTENED_LOCAL_NAME:
-            ad_type_str = 'Shortened Local Name'
-            ad_data_str = f'"{ad_data.decode("utf-8")}"'
-        elif ad_type == AdvertisingData.COMPLETE_LOCAL_NAME:
-            ad_type_str = 'Complete Local Name'
-            try:
+        match ad_type:
+            case AdvertisingData.FLAGS:
+                ad_type_str = 'Flags'
+                ad_data_str = AdvertisingData.flags_to_string(ad_data[0], short=True)
+            case AdvertisingData.COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:
+                ad_type_str = 'Complete List of 16-bit Service Class UUIDs'
+                ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 2)
+            case AdvertisingData.INCOMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS:
+                ad_type_str = 'Incomplete List of 16-bit Service Class UUIDs'
+                ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 2)
+            case AdvertisingData.COMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:
+                ad_type_str = 'Complete List of 32-bit Service Class UUIDs'
+                ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 4)
+            case AdvertisingData.INCOMPLETE_LIST_OF_32_BIT_SERVICE_CLASS_UUIDS:
+                ad_type_str = 'Incomplete List of 32-bit Service Class UUIDs'
+                ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 4)
+            case AdvertisingData.COMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS:
+                ad_type_str = 'Complete List of 128-bit Service Class UUIDs'
+                ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 16)
+            case AdvertisingData.INCOMPLETE_LIST_OF_128_BIT_SERVICE_CLASS_UUIDS:
+                ad_type_str = 'Incomplete List of 128-bit Service Class UUIDs'
+                ad_data_str = AdvertisingData.uuid_list_to_string(ad_data, 16)
+            case AdvertisingData.SERVICE_DATA_16_BIT_UUID:
+                ad_type_str = 'Service Data'
+                uuid = UUID.from_bytes(ad_data[:2])
+                ad_data_str = f'service={uuid}, data={ad_data[2:].hex()}'
+            case AdvertisingData.SERVICE_DATA_32_BIT_UUID:
+                ad_type_str = 'Service Data'
+                uuid = UUID.from_bytes(ad_data[:4])
+                ad_data_str = f'service={uuid}, data={ad_data[4:].hex()}'
+            case AdvertisingData.SERVICE_DATA_128_BIT_UUID:
+                ad_type_str = 'Service Data'
+                uuid = UUID.from_bytes(ad_data[:16])
+                ad_data_str = f'service={uuid}, data={ad_data[16:].hex()}'
+            case AdvertisingData.SHORTENED_LOCAL_NAME:
+                ad_type_str = 'Shortened Local Name'
                 ad_data_str = f'"{ad_data.decode("utf-8")}"'
-            except UnicodeDecodeError:
+            case AdvertisingData.COMPLETE_LOCAL_NAME:
+                ad_type_str = 'Complete Local Name'
+                try:
+                    ad_data_str = f'"{ad_data.decode("utf-8")}"'
+                except UnicodeDecodeError:
+                    ad_data_str = ad_data.hex()
+            case AdvertisingData.TX_POWER_LEVEL:
+                ad_type_str = 'TX Power Level'
+                ad_data_str = str(ad_data[0])
+            case AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
+                ad_type_str = 'Manufacturer Specific Data'
+                company_id = struct.unpack_from('<H', ad_data, 0)[0]
+                company_name = COMPANY_IDENTIFIERS.get(
+                    company_id, f'0x{company_id:04X}'
+                )
+                ad_data_str = f'company={company_name}, data={ad_data[2:].hex()}'
+            case AdvertisingData.APPEARANCE:
+                ad_type_str = 'Appearance'
+                appearance = Appearance.from_int(
+                    struct.unpack_from('<H', ad_data, 0)[0]
+                )
+                ad_data_str = str(appearance)
+            case AdvertisingData.BROADCAST_NAME:
+                ad_type_str = 'Broadcast Name'
+                ad_data_str = ad_data.decode('utf-8')
+            case _:
+                ad_type_str = AdvertisingData.Type(ad_type).name
                 ad_data_str = ad_data.hex()
-        elif ad_type == AdvertisingData.TX_POWER_LEVEL:
-            ad_type_str = 'TX Power Level'
-            ad_data_str = str(ad_data[0])
-        elif ad_type == AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
-            ad_type_str = 'Manufacturer Specific Data'
-            company_id = struct.unpack_from('<H', ad_data, 0)[0]
-            company_name = COMPANY_IDENTIFIERS.get(company_id, f'0x{company_id:04X}')
-            ad_data_str = f'company={company_name}, data={ad_data[2:].hex()}'
-        elif ad_type == AdvertisingData.APPEARANCE:
-            ad_type_str = 'Appearance'
-            appearance = Appearance.from_int(struct.unpack_from('<H', ad_data, 0)[0])
-            ad_data_str = str(appearance)
-        elif ad_type == AdvertisingData.BROADCAST_NAME:
-            ad_type_str = 'Broadcast Name'
-            ad_data_str = ad_data.decode('utf-8')
-        else:
-            ad_type_str = AdvertisingData.Type(ad_type).name
-            ad_data_str = ad_data.hex()
 
         return f'[{ad_type_str}]: {ad_data_str}'
 

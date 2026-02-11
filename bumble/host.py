@@ -22,7 +22,7 @@ import collections
 import dataclasses
 import logging
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from bumble import drivers, hci, utils
 from bumble.colors import color
@@ -1002,18 +1002,19 @@ class Host(utils.EventEmitter):
             self.snooper.snoop(bytes(packet), Snooper.Direction.CONTROLLER_TO_HOST)
 
         # If the packet is a command, invoke the handler for this packet
-        if packet.hci_packet_type == hci.HCI_COMMAND_PACKET:
-            self.on_hci_command_packet(cast(hci.HCI_Command, packet))
-        elif packet.hci_packet_type == hci.HCI_EVENT_PACKET:
-            self.on_hci_event_packet(cast(hci.HCI_Event, packet))
-        elif packet.hci_packet_type == hci.HCI_ACL_DATA_PACKET:
-            self.on_hci_acl_data_packet(cast(hci.HCI_AclDataPacket, packet))
-        elif packet.hci_packet_type == hci.HCI_SYNCHRONOUS_DATA_PACKET:
-            self.on_hci_sco_data_packet(cast(hci.HCI_SynchronousDataPacket, packet))
-        elif packet.hci_packet_type == hci.HCI_ISO_DATA_PACKET:
-            self.on_hci_iso_data_packet(cast(hci.HCI_IsoDataPacket, packet))
-        else:
-            logger.warning(f'!!! unknown packet type {packet.hci_packet_type}')
+        match packet:
+            case hci.HCI_Command():
+                self.on_hci_command_packet(packet)
+            case hci.HCI_Event():
+                self.on_hci_event_packet(packet)
+            case hci.HCI_AclDataPacket():
+                self.on_hci_acl_data_packet(packet)
+            case hci.HCI_SynchronousDataPacket():
+                self.on_hci_sco_data_packet(packet)
+            case hci.HCI_IsoDataPacket():
+                self.on_hci_iso_data_packet(packet)
+            case _:
+                logger.warning(f'!!! unknown packet type {packet.hci_packet_type}')
 
     def on_hci_command_packet(self, command: hci.HCI_Command) -> None:
         logger.warning(f'!!! unexpected command packet: {command}')

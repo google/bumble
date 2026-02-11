@@ -954,12 +954,13 @@ class Attribute(utils.EventEmitter, Generic[_T]):
             self.permissions = permissions
 
         # Convert the type to a UUID object if it isn't already
-        if isinstance(attribute_type, str):
-            self.type = UUID(attribute_type)
-        elif isinstance(attribute_type, bytes):
-            self.type = UUID.from_bytes(attribute_type)
-        else:
-            self.type = attribute_type
+        match attribute_type:
+            case str():
+                self.type = UUID(attribute_type)
+            case bytes():
+                self.type = UUID.from_bytes(attribute_type)
+            case _:
+                self.type = attribute_type
 
         self.value = value
 
@@ -994,30 +995,31 @@ class Attribute(utils.EventEmitter, Generic[_T]):
             )
 
         value: _T | None
-        if isinstance(self.value, AttributeValue):
-            try:
-                read_value = self.value.read(connection)
-                if inspect.isawaitable(read_value):
-                    value = await read_value
-                else:
-                    value = read_value
-            except ATT_Error as error:
-                raise ATT_Error(
-                    error_code=error.error_code, att_handle=self.handle
-                ) from error
-        elif isinstance(self.value, AttributeValueV2):
-            try:
-                read_value = self.value.read(bearer)
-                if inspect.isawaitable(read_value):
-                    value = await read_value
-                else:
-                    value = read_value
-            except ATT_Error as error:
-                raise ATT_Error(
-                    error_code=error.error_code, att_handle=self.handle
-                ) from error
-        else:
-            value = self.value
+        match self.value:
+            case AttributeValue():
+                try:
+                    read_value = self.value.read(connection)
+                    if inspect.isawaitable(read_value):
+                        value = await read_value
+                    else:
+                        value = read_value
+                except ATT_Error as error:
+                    raise ATT_Error(
+                        error_code=error.error_code, att_handle=self.handle
+                    ) from error
+            case AttributeValueV2():
+                try:
+                    read_value = self.value.read(bearer)
+                    if inspect.isawaitable(read_value):
+                        value = await read_value
+                    else:
+                        value = read_value
+                except ATT_Error as error:
+                    raise ATT_Error(
+                        error_code=error.error_code, att_handle=self.handle
+                    ) from error
+            case _:
+                value = self.value
 
         self.emit(self.EVENT_READ, connection, b'' if value is None else value)
 
@@ -1049,26 +1051,27 @@ class Attribute(utils.EventEmitter, Generic[_T]):
 
         decoded_value = self.decode_value(value)
 
-        if isinstance(self.value, AttributeValue):
-            try:
-                result = self.value.write(connection, decoded_value)
-                if inspect.isawaitable(result):
-                    await result
-            except ATT_Error as error:
-                raise ATT_Error(
-                    error_code=error.error_code, att_handle=self.handle
-                ) from error
-        elif isinstance(self.value, AttributeValueV2):
-            try:
-                result = self.value.write(bearer, decoded_value)
-                if inspect.isawaitable(result):
-                    await result
-            except ATT_Error as error:
-                raise ATT_Error(
-                    error_code=error.error_code, att_handle=self.handle
-                ) from error
-        else:
-            self.value = decoded_value
+        match self.value:
+            case AttributeValue():
+                try:
+                    result = self.value.write(connection, decoded_value)
+                    if inspect.isawaitable(result):
+                        await result
+                except ATT_Error as error:
+                    raise ATT_Error(
+                        error_code=error.error_code, att_handle=self.handle
+                    ) from error
+            case AttributeValueV2():
+                try:
+                    result = self.value.write(bearer, decoded_value)
+                    if inspect.isawaitable(result):
+                        await result
+                except ATT_Error as error:
+                    raise ATT_Error(
+                        error_code=error.error_code, att_handle=self.handle
+                    ) from error
+            case _:
+                self.value = decoded_value
 
         self.emit(self.EVENT_WRITE, connection, decoded_value)
 

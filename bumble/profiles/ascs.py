@@ -664,46 +664,44 @@ class AudioStreamControlService(gatt.TemplateService):
         responses = []
         logger.debug(f'*** ASCS Write {operation} ***')
 
-        if isinstance(operation, ASE_Config_Codec):
-            for ase_id, *args in zip(
-                operation.ase_id,
-                operation.target_latency,
-                operation.target_phy,
-                operation.codec_id,
-                operation.codec_specific_configuration,
+        match operation:
+            case ASE_Config_Codec():
+                for ase_id, *args in zip(
+                    operation.ase_id,
+                    operation.target_latency,
+                    operation.target_phy,
+                    operation.codec_id,
+                    operation.codec_specific_configuration,
+                ):
+                    responses.append(self.on_operation(operation.op_code, ase_id, args))
+            case ASE_Config_QOS():
+                for ase_id, *args in zip(
+                    operation.ase_id,
+                    operation.cig_id,
+                    operation.cis_id,
+                    operation.sdu_interval,
+                    operation.framing,
+                    operation.phy,
+                    operation.max_sdu,
+                    operation.retransmission_number,
+                    operation.max_transport_latency,
+                    operation.presentation_delay,
+                ):
+                    responses.append(self.on_operation(operation.op_code, ase_id, args))
+            case ASE_Enable() | ASE_Update_Metadata():
+                for ase_id, *args in zip(
+                    operation.ase_id,
+                    operation.metadata,
+                ):
+                    responses.append(self.on_operation(operation.op_code, ase_id, args))
+            case (
+                ASE_Receiver_Start_Ready()
+                | ASE_Disable()
+                | ASE_Receiver_Stop_Ready()
+                | ASE_Release()
             ):
-                responses.append(self.on_operation(operation.op_code, ase_id, args))
-        elif isinstance(operation, ASE_Config_QOS):
-            for ase_id, *args in zip(
-                operation.ase_id,
-                operation.cig_id,
-                operation.cis_id,
-                operation.sdu_interval,
-                operation.framing,
-                operation.phy,
-                operation.max_sdu,
-                operation.retransmission_number,
-                operation.max_transport_latency,
-                operation.presentation_delay,
-            ):
-                responses.append(self.on_operation(operation.op_code, ase_id, args))
-        elif isinstance(operation, (ASE_Enable, ASE_Update_Metadata)):
-            for ase_id, *args in zip(
-                operation.ase_id,
-                operation.metadata,
-            ):
-                responses.append(self.on_operation(operation.op_code, ase_id, args))
-        elif isinstance(
-            operation,
-            (
-                ASE_Receiver_Start_Ready,
-                ASE_Disable,
-                ASE_Receiver_Stop_Ready,
-                ASE_Release,
-            ),
-        ):
-            for ase_id in operation.ase_id:
-                responses.append(self.on_operation(operation.op_code, ase_id, []))
+                for ase_id in operation.ase_id:
+                    responses.append(self.on_operation(operation.op_code, ase_id, []))
 
         control_point_notification = bytes(
             [operation.op_code, len(responses)]

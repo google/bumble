@@ -403,14 +403,15 @@ class Controller:
         )
 
         # If the packet is a command, invoke the handler for this packet
-        if isinstance(packet, hci.HCI_Command):
-            self.on_hci_command_packet(packet)
-        elif isinstance(packet, hci.HCI_AclDataPacket):
-            self.on_hci_acl_data_packet(packet)
-        elif isinstance(packet, hci.HCI_Event):
-            self.on_hci_event_packet(packet)
-        else:
-            logger.warning(f'!!! unknown packet type {packet.hci_packet_type}')
+        match packet:
+            case hci.HCI_Command():
+                self.on_hci_command_packet(packet)
+            case hci.HCI_AclDataPacket():
+                self.on_hci_acl_data_packet(packet)
+            case hci.HCI_Event():
+                self.on_hci_event_packet(packet)
+            case _:
+                logger.warning(f'!!! unknown packet type {packet.hci_packet_type}')
 
     def on_hci_command_packet(self, command: hci.HCI_Command) -> None:
         handler_name = f'on_{command.name.lower()}'
@@ -517,26 +518,28 @@ class Controller:
             logger.error("Cannot find a connection for %s", sender_address)
             return
 
-        if isinstance(packet, ll.TerminateInd):
-            self.on_le_disconnected(connection, packet.error_code)
-        elif isinstance(packet, ll.CisReq):
-            self.on_le_cis_request(connection, packet.cig_id, packet.cis_id)
-        elif isinstance(packet, ll.CisRsp):
-            self.on_le_cis_established(packet.cig_id, packet.cis_id)
-            connection.send_ll_control_pdu(ll.CisInd(packet.cig_id, packet.cis_id))
-        elif isinstance(packet, ll.CisInd):
-            self.on_le_cis_established(packet.cig_id, packet.cis_id)
-        elif isinstance(packet, ll.CisTerminateInd):
-            self.on_le_cis_disconnected(packet.cig_id, packet.cis_id)
-        elif isinstance(packet, ll.EncReq):
-            self.on_le_encrypted(connection)
+        match packet:
+            case ll.TerminateInd():
+                self.on_le_disconnected(connection, packet.error_code)
+            case ll.CisReq():
+                self.on_le_cis_request(connection, packet.cig_id, packet.cis_id)
+            case ll.CisRsp():
+                self.on_le_cis_established(packet.cig_id, packet.cis_id)
+                connection.send_ll_control_pdu(ll.CisInd(packet.cig_id, packet.cis_id))
+            case ll.CisInd():
+                self.on_le_cis_established(packet.cig_id, packet.cis_id)
+            case ll.CisTerminateInd():
+                self.on_le_cis_disconnected(packet.cig_id, packet.cis_id)
+            case ll.EncReq():
+                self.on_le_encrypted(connection)
 
     def on_ll_advertising_pdu(self, packet: ll.AdvertisingPdu) -> None:
         logger.debug("[%s] <<< Advertising PDU: %s", self.name, packet)
-        if isinstance(packet, ll.ConnectInd):
-            self.on_le_connect_ind(packet)
-        elif isinstance(packet, (ll.AdvInd, ll.AdvExtInd)):
-            self.on_advertising_pdu(packet)
+        match packet:
+            case ll.ConnectInd():
+                self.on_le_connect_ind(packet)
+            case ll.AdvInd() | ll.AdvExtInd():
+                self.on_advertising_pdu(packet)
 
     def on_le_connect_ind(self, packet: ll.ConnectInd) -> None:
         '''
@@ -894,51 +897,52 @@ class Controller:
         return future
 
     def on_lmp_packet(self, sender_address: hci.Address, packet: lmp.Packet):
-        if isinstance(packet, (lmp.LmpAccepted, lmp.LmpAcceptedExt)):
-            if future := self.classic_pending_commands.setdefault(
-                sender_address, {}
-            ).get(packet.response_opcode):
-                future.set_result(hci.HCI_SUCCESS)
-            else:
+        match packet:
+            case lmp.LmpAccepted() | lmp.LmpAcceptedExt():
+                if future := self.classic_pending_commands.setdefault(
+                    sender_address, {}
+                ).get(packet.response_opcode):
+                    future.set_result(hci.HCI_SUCCESS)
+                else:
+                    logger.error("!!! Unhandled packet: %s", packet)
+            case lmp.LmpNotAccepted() | lmp.LmpNotAcceptedExt():
+                if future := self.classic_pending_commands.setdefault(
+                    sender_address, {}
+                ).get(packet.response_opcode):
+                    future.set_result(packet.error_code)
+                else:
+                    logger.error("!!! Unhandled packet: %s", packet)
+            case lmp.LmpHostConnectionReq():
+                self.on_classic_connection_request(
+                    sender_address, hci.HCI_Connection_Complete_Event.LinkType.ACL
+                )
+            case lmp.LmpScoLinkReq():
+                self.on_classic_connection_request(
+                    sender_address, hci.HCI_Connection_Complete_Event.LinkType.SCO
+                )
+            case lmp.LmpEscoLinkReq():
+                self.on_classic_connection_request(
+                    sender_address, hci.HCI_Connection_Complete_Event.LinkType.ESCO
+                )
+            case lmp.LmpDetach():
+                self.on_classic_disconnected(
+                    sender_address, hci.HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
+                )
+            case lmp.LmpSwitchReq():
+                self.on_classic_role_change_request(sender_address)
+            case lmp.LmpRemoveScoLinkReq() | lmp.LmpRemoveEscoLinkReq():
+                self.on_classic_sco_disconnected(sender_address, packet.error_code)
+            case lmp.LmpNameReq():
+                self.on_classic_remote_name_request(sender_address, packet.name_offset)
+            case lmp.LmpNameRes():
+                self.on_classic_remote_name_response(
+                    sender_address,
+                    packet.name_offset,
+                    packet.name_length,
+                    packet.name_fregment,
+                )
+            case _:
                 logger.error("!!! Unhandled packet: %s", packet)
-        elif isinstance(packet, (lmp.LmpNotAccepted, lmp.LmpNotAcceptedExt)):
-            if future := self.classic_pending_commands.setdefault(
-                sender_address, {}
-            ).get(packet.response_opcode):
-                future.set_result(packet.error_code)
-            else:
-                logger.error("!!! Unhandled packet: %s", packet)
-        elif isinstance(packet, (lmp.LmpHostConnectionReq)):
-            self.on_classic_connection_request(
-                sender_address, hci.HCI_Connection_Complete_Event.LinkType.ACL
-            )
-        elif isinstance(packet, (lmp.LmpScoLinkReq)):
-            self.on_classic_connection_request(
-                sender_address, hci.HCI_Connection_Complete_Event.LinkType.SCO
-            )
-        elif isinstance(packet, (lmp.LmpEscoLinkReq)):
-            self.on_classic_connection_request(
-                sender_address, hci.HCI_Connection_Complete_Event.LinkType.ESCO
-            )
-        elif isinstance(packet, (lmp.LmpDetach)):
-            self.on_classic_disconnected(
-                sender_address, hci.HCI_REMOTE_USER_TERMINATED_CONNECTION_ERROR
-            )
-        elif isinstance(packet, (lmp.LmpSwitchReq)):
-            self.on_classic_role_change_request(sender_address)
-        elif isinstance(packet, (lmp.LmpRemoveScoLinkReq, lmp.LmpRemoveEscoLinkReq)):
-            self.on_classic_sco_disconnected(sender_address, packet.error_code)
-        elif isinstance(packet, lmp.LmpNameReq):
-            self.on_classic_remote_name_request(sender_address, packet.name_offset)
-        elif isinstance(packet, lmp.LmpNameRes):
-            self.on_classic_remote_name_response(
-                sender_address,
-                packet.name_offset,
-                packet.name_length,
-                packet.name_fregment,
-            )
-        else:
-            logger.error("!!! Unhandled packet: %s", packet)
 
     def on_classic_connection_request(
         self, peer_address: hci.Address, link_type: int

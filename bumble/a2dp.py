@@ -267,26 +267,27 @@ class MediaCodecInformation:
     def create(
         cls, media_codec_type: int, data: bytes
     ) -> MediaCodecInformation | bytes:
-        if media_codec_type == CodecType.SBC:
-            return SbcMediaCodecInformation.from_bytes(data)
-        elif media_codec_type == CodecType.MPEG_2_4_AAC:
-            return AacMediaCodecInformation.from_bytes(data)
-        elif media_codec_type == CodecType.NON_A2DP:
-            vendor_media_codec_information = (
-                VendorSpecificMediaCodecInformation.from_bytes(data)
-            )
-            if (
-                vendor_class_map := A2DP_VENDOR_MEDIA_CODEC_INFORMATION_CLASSES.get(
-                    vendor_media_codec_information.vendor_id
+        match media_codec_type:
+            case CodecType.SBC:
+                return SbcMediaCodecInformation.from_bytes(data)
+            case CodecType.MPEG_2_4_AAC:
+                return AacMediaCodecInformation.from_bytes(data)
+            case CodecType.NON_A2DP:
+                vendor_media_codec_information = (
+                    VendorSpecificMediaCodecInformation.from_bytes(data)
                 )
-            ) and (
-                media_codec_information_class := vendor_class_map.get(
-                    vendor_media_codec_information.codec_id
-                )
-            ):
-                return media_codec_information_class.from_bytes(
-                    vendor_media_codec_information.value
-                )
+                if (
+                    vendor_class_map := A2DP_VENDOR_MEDIA_CODEC_INFORMATION_CLASSES.get(
+                        vendor_media_codec_information.vendor_id
+                    )
+                ) and (
+                    media_codec_information_class := vendor_class_map.get(
+                        vendor_media_codec_information.codec_id
+                    )
+                ):
+                    return media_codec_information_class.from_bytes(
+                        vendor_media_codec_information.value
+                    )
         return vendor_media_codec_information
 
     @classmethod
