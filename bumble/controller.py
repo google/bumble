@@ -22,6 +22,7 @@ import dataclasses
 import itertools
 import logging
 import random
+import secrets
 import struct
 from typing import TYPE_CHECKING, Any, cast
 
@@ -194,6 +195,21 @@ class Connection:
     transport: PhysicalTransport
     link_type: int
     classic_allow_role_switch: bool = False
+    authenticated: bool = False
+    encryption_enabled: bool = False
+    link_key: bytes | None = None
+    challenge_rand: bytes | None = None
+    response_rand: bytes | None = None
+    sres: bytes | None = None
+    local_io_capability: int | None = None
+    peer_io_capability: int | None = None
+    local_auth_requirements: int | None = None
+    peer_auth_requirements: int | None = None
+    local_oob_data_present: int | None = None
+    peer_oob_data_present: int | None = None
+    ssp_authenticated_pairing: bool = False
+    local_ssp_nonce: bytes | None = None
+    peer_ssp_nonce: bytes | None = None
 
     def __post_init__(self) -> None:
         self.assembler = hci.HCI_AclDataPacketAssembler(self.on_acl_pdu)
@@ -296,6 +312,7 @@ class Controller:
     advertising_timer_handle: asyncio.Handle | None = None
     classic_scan_enable: int = 0
     classic_allow_role_switch: bool = True
+    classic_sc_host_supported: bool = False
     pending_le_connection: (
         hci.HCI_LE_Create_Connection_Command
         | hci.HCI_LE_Extended_Create_Connection_Command
@@ -954,6 +971,24 @@ class Controller:
                     packet.name_length,
                     packet.name_fregment,
                 )
+            case lmp.LmpAuRand():
+                self.on_lmp_au_rand(sender_address, packet)
+            case lmp.LmpSres():
+                self.on_lmp_sres(sender_address, packet)
+            case lmp.LmpIoCapabilityReq():
+                self.on_lmp_io_capability_req(sender_address, packet)
+            case lmp.LmpIoCapabilityRes():
+                self.on_lmp_io_capability_res(sender_address, packet)
+            case lmp.LmpSimplePairingNumber():
+                self.on_lmp_simple_pairing_number(sender_address, packet)
+            case lmp.LmpEncryptionModeReq():
+                self.on_lmp_encryption_mode_req(sender_address, packet)
+            case lmp.LmpEncryptionKeySizeReq():
+                self.on_lmp_encryption_key_size_req(sender_address, packet)
+            case lmp.LmpStartEncryptionReq():
+                self.on_lmp_start_encryption_req(sender_address, packet)
+            case lmp.LmpStopEncryptionReq():
+                self.on_lmp_stop_encryption_req(sender_address, packet)
             case _:
                 logger.error("!!! Unhandled packet: %s", packet)
 
@@ -1149,6 +1184,77 @@ class Controller:
             )
         )
 
+    def start_classic_authentication(self, connection: Connection) -> None:
+        if connection.link_key:
+            # We have a link key, send challenge
+            connection.challenge_rand = secrets.token_bytes(16)
+            future = self.send_lmp_packet(
+                connection.peer_address, lmp.LmpAuRand(connection.challenge_rand)
+            )
+
+            def on_response(future: asyncio.Future[int]) -> None:
+                self.send_hci_packet(
+                    hci.HCI_Authentication_Complete_Event(
+                        status=future.result(), connection_handle=connection.handle
+                    )
+                )
+                connection.challenge_rand = None
+
+            future.add_done_callback(on_response)
+        else:
+            # Request link key from host
+            self.send_hci_packet(
+                hci.HCI_Link_Key_Request_Event(bd_addr=connection.peer_address)
+            )
+
+    def on_lmp_au_rand(
+        self, sender_address: hci.Address, packet: lmp.LmpAuRand
+    ) -> None:
+        if connection := self.classic_connections.get(sender_address):
+            if connection.link_key:
+                # Calculate SRES
+                sres = self.calculate_sres(
+                    connection.link_key, packet.random_number, connection.self_address
+                )
+                self.send_lmp_packet(sender_address, lmp.LmpSres(sres))
+            else:
+                # We don't have a link key. Request it from host.
+                # Save the AU_RAND to reply later.
+                connection.response_rand = packet.random_number
+                self.send_hci_packet(
+                    hci.HCI_Link_Key_Request_Event(bd_addr=sender_address)
+                )
+
+    def on_lmp_sres(self, sender_address: hci.Address, packet: lmp.LmpSres) -> None:
+        if connection := self.classic_connections.get(sender_address):
+            # Check SRES
+            if (challenge_rand := connection.challenge_rand) is None:
+                logger.warning("Received LMP_SRES but no challenge pending")
+                return
+            assert (link_key := connection.link_key)
+
+            expected_sres = self.calculate_sres(
+                link_key, challenge_rand, sender_address
+            )
+            future = self.classic_pending_commands[sender_address][
+                lmp.Opcode.LMP_AU_RAND
+            ]
+            if packet.authentication_response_data == expected_sres:
+                connection.authenticated = True
+                future.set_result(hci.HCI_ErrorCode.SUCCESS)
+            else:
+                future.set_result(hci.HCI_ErrorCode.AUTHENTICATION_FAILURE_ERROR)
+
+    def calculate_sres(
+        self, link_key: bytes, au_rand: bytes, bd_addr: hci.Address
+    ) -> bytes:
+        # Dummy E1 implementation: just XOR some parts so it's consistent if keys match.
+        # SRES is 4 bytes.
+        bd_addr_bytes = bytes(bd_addr)
+        return bytes(
+            [link_key[i] ^ au_rand[i] ^ bd_addr_bytes[i % 6] for i in range(4)]
+        )
+
     ############################################################
     # Advertising support
     ############################################################
@@ -1334,6 +1440,570 @@ class Controller:
         self.send_lmp_packet(command.bd_addr, lmp.LmpNameReq(0))
 
         return None
+
+    def on_hci_set_connection_encryption_command(
+        self, command: hci.HCI_Set_Connection_Encryption_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.16 Set Connection Encryption command
+        '''
+        if not (
+            connection := self.find_connection_by_handle(command.connection_handle)
+        ):
+            self.send_hci_packet(
+                hci.HCI_Command_Status_Event(
+                    status=hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                )
+            )
+            return
+
+        self.send_hci_packet(
+            hci.HCI_Command_Status_Event(
+                status=hci.HCI_COMMAND_STATUS_PENDING,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
+
+        if command.encryption_enable:
+            # Start encryption
+            # In simple emulator, we just exchange mode and start
+            # Master initiates
+            future = self.send_lmp_packet(
+                connection.peer_address, lmp.LmpEncryptionModeReq(encryption_mode=1)
+            )
+
+            def on_mode_accepted(future: asyncio.Future[int]) -> None:
+                if future.result() == hci.HCI_ErrorCode.SUCCESS:
+                    # Exchange key size
+                    f = self.send_lmp_packet(
+                        connection.peer_address,
+                        lmp.LmpEncryptionKeySizeReq(key_size=16),
+                    )
+
+                    def on_key_size_accepted(future: asyncio.Future[int]) -> None:
+                        if future.result() == hci.HCI_ErrorCode.SUCCESS:
+                            # Start encryption
+                            f2 = self.send_lmp_packet(
+                                connection.peer_address,
+                                lmp.LmpStartEncryptionReq(
+                                    random_number=secrets.token_bytes(16)
+                                ),
+                            )
+
+                            def on_encryption_started(
+                                future: asyncio.Future[int],
+                            ) -> None:
+                                status = future.result()
+                                if status == hci.HCI_ErrorCode.SUCCESS:
+                                    connection.encryption_enabled = True
+                                self.send_hci_packet(
+                                    hci.HCI_Encryption_Change_Event(
+                                        status=status,
+                                        connection_handle=connection.handle,
+                                        encryption_enabled=(
+                                            1
+                                            if status == hci.HCI_ErrorCode.SUCCESS
+                                            else 0
+                                        ),
+                                    )
+                                )
+
+                            f2.add_done_callback(on_encryption_started)
+                        else:
+                            self.send_hci_packet(
+                                hci.HCI_Encryption_Change_Event(
+                                    status=future.result(),
+                                    connection_handle=connection.handle,
+                                    encryption_enabled=0,
+                                )
+                            )
+
+                    f.add_done_callback(on_key_size_accepted)
+                else:
+                    self.send_hci_packet(
+                        hci.HCI_Encryption_Change_Event(
+                            status=future.result(),
+                            connection_handle=connection.handle,
+                            encryption_enabled=0,
+                        )
+                    )
+
+            future.add_done_callback(on_mode_accepted)
+        else:
+            # Stop encryption
+            self.send_lmp_packet(connection.peer_address, lmp.LmpStopEncryptionReq())
+            connection.encryption_enabled = False
+            self.send_hci_packet(
+                hci.HCI_Encryption_Change_Event(
+                    status=hci.HCI_ErrorCode.SUCCESS,
+                    connection_handle=connection.handle,
+                    encryption_enabled=0,
+                )
+            )
+
+    def on_lmp_encryption_mode_req(
+        self, sender_address: hci.Address, packet: lmp.LmpEncryptionModeReq
+    ) -> None:
+        if connection := self.classic_connections.get(sender_address):
+            # Accept if authenticated
+            if connection.authenticated:
+                self.send_lmp_packet(
+                    sender_address, lmp.LmpAccepted(lmp.Opcode.LMP_ENCRYPTION_MODE_REQ)
+                )
+            else:
+                self.send_lmp_packet(
+                    sender_address,
+                    lmp.LmpNotAccepted(
+                        lmp.Opcode.LMP_ENCRYPTION_MODE_REQ,
+                        hci.HCI_ErrorCode.AUTHENTICATION_FAILURE_ERROR,
+                    ),
+                )
+
+    def on_lmp_encryption_key_size_req(
+        self, sender_address: hci.Address, packet: lmp.LmpEncryptionKeySizeReq
+    ) -> None:
+        if sender_address in self.classic_connections:
+            # Just accept any key size for now
+            self.send_lmp_packet(
+                sender_address, lmp.LmpAccepted(lmp.Opcode.LMP_ENCRYPTION_KEY_SIZE_REQ)
+            )
+
+    def on_lmp_start_encryption_req(
+        self, sender_address: hci.Address, packet: lmp.LmpStartEncryptionReq
+    ) -> None:
+        if connection := self.classic_connections.get(sender_address):
+            connection.encryption_enabled = True
+            # Respond with LMP_ACCEPTED if we're slave
+            if connection.role == hci.Role.PERIPHERAL:
+                self.send_lmp_packet(
+                    sender_address, lmp.LmpAccepted(lmp.Opcode.LMP_START_ENCRYPTION_REQ)
+                )
+
+            self.send_hci_packet(
+                hci.HCI_Encryption_Change_Event(
+                    status=hci.HCI_ErrorCode.SUCCESS,
+                    connection_handle=connection.handle,
+                    encryption_enabled=1,
+                )
+            )
+
+    def on_lmp_stop_encryption_req(
+        self, sender_address: hci.Address, packet: lmp.LmpStopEncryptionReq
+    ) -> None:
+        if connection := self.classic_connections.get(sender_address):
+            connection.encryption_enabled = False
+            # Respond with LMP_ACCEPTED if we're slave
+            if connection.role == hci.Role.PERIPHERAL:
+                self.send_lmp_packet(
+                    sender_address, lmp.LmpAccepted(lmp.Opcode.LMP_STOP_ENCRYPTION_REQ)
+                )
+
+            self.send_hci_packet(
+                hci.HCI_Encryption_Change_Event(
+                    status=hci.HCI_ErrorCode.SUCCESS,
+                    connection_handle=connection.handle,
+                    encryption_enabled=0,
+                )
+            )
+
+    def on_hci_authentication_requested_command(
+        self, command: hci.HCI_Authentication_Requested_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.15 Authentication Requested command
+        '''
+        if not (
+            connection := self.find_classic_connection_by_handle(
+                command.connection_handle
+            )
+        ):
+            self.send_hci_packet(
+                hci.HCI_Command_Status_Event(
+                    status=hci.HCI_UNKNOWN_CONNECTION_IDENTIFIER_ERROR,
+                    num_hci_command_packets=1,
+                    command_opcode=command.op_code,
+                )
+            )
+            return
+
+        self.send_hci_packet(
+            hci.HCI_Command_Status_Event(
+                status=hci.HCI_COMMAND_STATUS_PENDING,
+                num_hci_command_packets=1,
+                command_opcode=command.op_code,
+            )
+        )
+
+        self.start_classic_authentication(connection)
+
+    def on_hci_link_key_request_reply_command(
+        self, command: hci.HCI_Link_Key_Request_Reply_Command
+    ) -> hci.HCI_StatusAndAddressReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.10 Link Key Request Reply command
+        '''
+        if connection := self.classic_connections.get(command.bd_addr):
+            connection.link_key = command.link_key
+            if connection.response_rand is not None:
+                # We were waiting for a link key to respond to a challenge
+                sres = self.calculate_sres(
+                    connection.link_key,
+                    connection.response_rand,
+                    connection.self_address,
+                )
+                self.send_lmp_packet(command.bd_addr, lmp.LmpSres(sres))
+                connection.response_rand = None
+            else:
+                # We were waiting for a link key to start a challenge
+                self.start_classic_authentication(connection)
+
+        return hci.HCI_StatusAndAddressReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS, bd_addr=command.bd_addr
+        )
+
+    def on_hci_link_key_request_negative_reply_command(
+        self, command: hci.HCI_Link_Key_Request_Negative_Reply_Command
+    ) -> hci.HCI_StatusAndAddressReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.11 Link Key Request Negative Reply command
+        '''
+        if not (connection := self.classic_connections.get(command.bd_addr)):
+            return hci.HCI_StatusAndAddressReturnParameters(
+                status=hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR,
+                bd_addr=command.bd_addr,
+            )
+        if connection.response_rand is not None:
+            self.send_lmp_packet(
+                command.bd_addr,
+                lmp.LmpNotAccepted(
+                    lmp.Opcode.LMP_AU_RAND,
+                    hci.HCI_ErrorCode.PIN_OR_KEY_MISSING_ERROR,
+                ),
+            )
+            connection.response_rand = None
+        else:
+            # Start SSP
+            self.send_hci_packet(
+                hci.HCI_IO_Capability_Request_Event(bd_addr=command.bd_addr)
+            )
+
+        return hci.HCI_StatusAndAddressReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS, bd_addr=command.bd_addr
+        )
+
+    def on_hci_io_capability_request_negative_reply_command(
+        self, command: hci.HCI_IO_Capability_Request_Negative_Reply_Command
+    ) -> hci.HCI_StatusAndAddressReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.34 IO Capability Request Negative Reply command
+        '''
+        if connection := self.classic_connections.get(command.bd_addr):
+            self.send_hci_packet(
+                hci.HCI_Simple_Pairing_Complete_Event(
+                    status=command.reason, bd_addr=command.bd_addr
+                )
+            )
+            self.send_hci_packet(
+                hci.HCI_Authentication_Complete_Event(
+                    status=command.reason,
+                    connection_handle=connection.handle,
+                )
+            )
+
+        return hci.HCI_StatusAndAddressReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS, bd_addr=command.bd_addr
+        )
+
+    def on_hci_io_capability_request_reply_command(
+        self, command: hci.HCI_IO_Capability_Request_Reply_Command
+    ) -> hci.HCI_StatusAndAddressReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.29 IO Capability Request Reply command
+        '''
+        if connection := self.classic_connections.get(command.bd_addr):
+            connection.local_io_capability = command.io_capability
+            connection.local_auth_requirements = command.authentication_requirements
+            connection.local_oob_data_present = command.oob_data_present
+
+            # Generate and send local nonce for SSP
+            connection.local_ssp_nonce = secrets.token_bytes(16)
+            self.send_lmp_packet(
+                command.bd_addr,
+                lmp.LmpSimplePairingNumber(nonce=connection.local_ssp_nonce),
+            )
+
+            if connection.peer_io_capability is not None:
+                self.send_lmp_packet(
+                    command.bd_addr,
+                    lmp.LmpIoCapabilityRes(
+                        io_capability=command.io_capability,
+                        oob_data_present=command.oob_data_present,
+                        authentication_requirements=command.authentication_requirements,
+                    ),
+                )
+                self.on_ssp_auth_stage_1(connection)
+            else:
+                self.send_lmp_packet(
+                    command.bd_addr,
+                    lmp.LmpIoCapabilityReq(
+                        io_capability=command.io_capability,
+                        oob_data_present=command.oob_data_present,
+                        authentication_requirements=command.authentication_requirements,
+                    ),
+                )
+        return hci.HCI_StatusAndAddressReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS, bd_addr=command.bd_addr
+        )
+
+    def on_ssp_auth_stage_1(self, connection: Connection) -> None:
+        if (
+            connection.local_io_capability is None
+            or connection.peer_io_capability is None
+            or connection.local_auth_requirements is None
+            or connection.peer_auth_requirements is None
+        ):
+            return
+
+        mitm_required = (connection.local_auth_requirements & 0x01) or (
+            connection.peer_auth_requirements & 0x01
+        )
+
+        # Vol 3, Part C, Table 5.7
+        if not mitm_required:
+            model = 'JUST_WORKS'
+            connection.ssp_authenticated_pairing = False
+        elif (
+            connection.local_io_capability == hci.IoCapability.NO_INPUT_NO_OUTPUT
+            or connection.peer_io_capability == hci.IoCapability.NO_INPUT_NO_OUTPUT
+        ):
+            model = 'JUST_WORKS'
+            connection.ssp_authenticated_pairing = False
+        elif (
+            connection.local_io_capability == hci.IoCapability.KEYBOARD_ONLY
+            or connection.peer_io_capability == hci.IoCapability.KEYBOARD_ONLY
+        ):
+            model = 'PASSKEY_ENTRY'
+            connection.ssp_authenticated_pairing = True
+        elif (
+            connection.local_io_capability == hci.IoCapability.DISPLAY_YES_NO
+            and connection.peer_io_capability == hci.IoCapability.DISPLAY_YES_NO
+        ):
+            model = 'NUMERIC_COMPARISON'
+            connection.ssp_authenticated_pairing = True
+        else:
+            model = 'JUST_WORKS'
+            connection.ssp_authenticated_pairing = False
+
+        if model == 'JUST_WORKS':
+            self.send_hci_packet(
+                hci.HCI_User_Confirmation_Request_Event(
+                    bd_addr=connection.peer_address, numeric_value=0
+                )
+            )
+        elif model == 'PASSKEY_ENTRY':
+            if connection.local_io_capability == hci.IoCapability.KEYBOARD_ONLY:
+                # Local inputs
+                self.send_hci_packet(
+                    hci.HCI_User_Passkey_Request_Event(bd_addr=connection.peer_address)
+                )
+            else:
+                # Local displays
+                self.send_hci_packet(
+                    hci.HCI_User_Passkey_Notification_Event(
+                        bd_addr=connection.peer_address,
+                        passkey=secrets.randbelow(1000000),
+                    )
+                )
+        elif model == 'NUMERIC_COMPARISON':
+            if connection.local_ssp_nonce and connection.peer_ssp_nonce:
+                numeric_value = (
+                    int.from_bytes(connection.local_ssp_nonce, 'little')
+                    ^ int.from_bytes(connection.peer_ssp_nonce, 'little')
+                ) % 1000000
+            else:
+                numeric_value = secrets.randbelow(1000000)
+
+            self.send_hci_packet(
+                hci.HCI_User_Confirmation_Request_Event(
+                    bd_addr=connection.peer_address,
+                    numeric_value=numeric_value,
+                )
+            )
+
+    def on_hci_user_confirmation_request_reply_command(
+        self, command: hci.HCI_User_Confirmation_Request_Reply_Command
+    ) -> hci.HCI_StatusAndAddressReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.30 User Confirmation Request Reply command
+        '''
+        if connection := self.classic_connections.get(command.bd_addr):
+            connection.link_key = self.calculate_ssp_link_key(connection)
+            key_type = (
+                hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256
+                if connection.ssp_authenticated_pairing
+                else hci.LinkKeyType.UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256
+            )
+            self.send_hci_packet(
+                hci.HCI_Link_Key_Notification_Event(
+                    bd_addr=command.bd_addr,
+                    link_key=connection.link_key,
+                    key_type=key_type,
+                )
+            )
+            self.send_hci_packet(
+                hci.HCI_Simple_Pairing_Complete_Event(
+                    status=hci.HCI_SUCCESS, bd_addr=command.bd_addr
+                )
+            )
+            connection.authenticated = True
+            self.send_hci_packet(
+                hci.HCI_Authentication_Complete_Event(
+                    status=hci.HCI_SUCCESS, connection_handle=connection.handle
+                )
+            )
+
+        return hci.HCI_StatusAndAddressReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS, bd_addr=command.bd_addr
+        )
+
+    def on_hci_user_confirmation_request_negative_reply_command(
+        self, command: hci.HCI_User_Confirmation_Request_Negative_Reply_Command
+    ) -> hci.HCI_StatusAndAddressReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.31 User Confirmation Request Negative Reply command
+        '''
+        if connection := self.classic_connections.get(command.bd_addr):
+            self.send_hci_packet(
+                hci.HCI_Simple_Pairing_Complete_Event(
+                    status=hci.HCI_AUTHENTICATION_FAILURE_ERROR, bd_addr=command.bd_addr
+                )
+            )
+            self.send_hci_packet(
+                hci.HCI_Authentication_Complete_Event(
+                    status=hci.HCI_AUTHENTICATION_FAILURE_ERROR,
+                    connection_handle=connection.handle,
+                )
+            )
+
+        return hci.HCI_StatusAndAddressReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS, bd_addr=command.bd_addr
+        )
+
+    def on_hci_user_passkey_request_reply_command(
+        self, command: hci.HCI_User_Passkey_Request_Reply_Command
+    ) -> hci.HCI_StatusAndAddressReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.32 User Passkey Request Reply command
+        '''
+        if connection := self.classic_connections.get(command.bd_addr):
+            connection.link_key = self.calculate_ssp_link_key(connection)
+            key_type = (
+                hci.LinkKeyType.AUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256
+                if connection.ssp_authenticated_pairing
+                else hci.LinkKeyType.UNAUTHENTICATED_COMBINATION_KEY_GENERATED_FROM_P_256
+            )
+            self.send_hci_packet(
+                hci.HCI_Link_Key_Notification_Event(
+                    bd_addr=command.bd_addr,
+                    link_key=connection.link_key,
+                    key_type=key_type,
+                )
+            )
+            self.send_hci_packet(
+                hci.HCI_Simple_Pairing_Complete_Event(
+                    status=hci.HCI_SUCCESS, bd_addr=command.bd_addr
+                )
+            )
+            connection.authenticated = True
+            self.send_hci_packet(
+                hci.HCI_Authentication_Complete_Event(
+                    status=hci.HCI_SUCCESS, connection_handle=connection.handle
+                )
+            )
+
+        return hci.HCI_StatusAndAddressReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS, bd_addr=command.bd_addr
+        )
+
+    def calculate_ssp_link_key(self, connection: Connection) -> bytes:
+        if connection.local_ssp_nonce and connection.peer_ssp_nonce:
+            # XOR nonces to get a shared secret
+            return bytes(
+                [
+                    connection.local_ssp_nonce[i] ^ connection.peer_ssp_nonce[i]
+                    for i in range(16)
+                ]
+            )
+        # Fallback to random if nonces were not exchanged (e.g. against non-bumble peer)
+        return secrets.token_bytes(16)
+
+    def on_hci_user_passkey_request_negative_reply_command(
+        self, command: hci.HCI_User_Passkey_Request_Negative_Reply_Command
+    ) -> hci.HCI_StatusAndAddressReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.33 User Passkey Request Negative Reply command
+        '''
+        if connection := self.classic_connections.get(command.bd_addr):
+            self.send_hci_packet(
+                hci.HCI_Simple_Pairing_Complete_Event(
+                    status=hci.HCI_AUTHENTICATION_FAILURE_ERROR, bd_addr=command.bd_addr
+                )
+            )
+            self.send_hci_packet(
+                hci.HCI_Authentication_Complete_Event(
+                    status=hci.HCI_AUTHENTICATION_FAILURE_ERROR,
+                    connection_handle=connection.handle,
+                )
+            )
+
+        return hci.HCI_StatusAndAddressReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS, bd_addr=command.bd_addr
+        )
+
+    def on_lmp_io_capability_req(
+        self, sender_address: hci.Address, packet: lmp.LmpIoCapabilityReq
+    ):
+        if connection := self.classic_connections.get(sender_address):
+            connection.peer_io_capability = packet.io_capability
+            connection.peer_auth_requirements = packet.authentication_requirements
+            connection.peer_oob_data_present = packet.oob_data_present
+            self.send_hci_packet(
+                hci.HCI_IO_Capability_Response_Event(
+                    bd_addr=sender_address,
+                    io_capability=packet.io_capability,
+                    oob_data_present=packet.oob_data_present,
+                    authentication_requirements=packet.authentication_requirements,
+                )
+            )
+            self.send_hci_packet(
+                hci.HCI_IO_Capability_Request_Event(bd_addr=sender_address)
+            )
+
+    def on_lmp_io_capability_res(
+        self, sender_address: hci.Address, packet: lmp.LmpIoCapabilityRes
+    ):
+        if connection := self.classic_connections.get(sender_address):
+            connection.peer_io_capability = packet.io_capability
+            connection.peer_auth_requirements = packet.authentication_requirements
+            connection.peer_oob_data_present = packet.oob_data_present
+            self.send_hci_packet(
+                hci.HCI_IO_Capability_Response_Event(
+                    bd_addr=sender_address,
+                    io_capability=packet.io_capability,
+                    oob_data_present=packet.oob_data_present,
+                    authentication_requirements=packet.authentication_requirements,
+                )
+            )
+            self.on_ssp_auth_stage_1(connection)
+
+    def on_lmp_simple_pairing_number(
+        self, sender_address: hci.Address, packet: lmp.LmpSimplePairingNumber
+    ):
+        if connection := self.classic_connections.get(sender_address):
+            connection.peer_ssp_nonce = packet.nonce
 
     def on_hci_enhanced_setup_synchronous_connection_command(
         self, command: hci.HCI_Enhanced_Setup_Synchronous_Connection_Command
@@ -1666,6 +2336,15 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.3.79 Write LE Host Support Command
         '''
         # TODO / Just ignore for now
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def on_hci_write_secure_connections_host_support_command(
+        self, command: hci.HCI_Write_Secure_Connections_Host_Support_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.3.92 Write Secure Connections Host Support Command
+        '''
+        self.classic_sc_host_supported = bool(command.secure_connections_host_support)
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_write_authenticated_payload_timeout_command(
