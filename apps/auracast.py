@@ -24,13 +24,18 @@ import dataclasses
 import functools
 import logging
 import secrets
+import sys
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from typing import (
     Any,
 )
 
 import click
-import tomli
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 try:
     import lc3  # type: ignore  # pylint: disable=E0401
@@ -114,7 +119,7 @@ def parse_broadcast_list(filename: str) -> Sequence[Broadcast]:
     broadcasts: list[Broadcast] = []
 
     with open(filename, "rb") as config_file:
-        config = tomli.load(config_file)
+        config = tomllib.load(config_file)
         for broadcast in config.get("broadcasts", []):
             sources = []
             for source in broadcast.get("sources", []):

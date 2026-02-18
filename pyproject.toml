@@ -37,7 +37,7 @@ dependencies = [
     "pyserial-asyncio >= 0.5; platform_system!='Emscripten'",
     "pyserial >= 3.5; platform_system!='Emscripten'",
     "pyusb >= 1.2; platform_system!='Emscripten'",
-    "tomli ~= 2.2.1; platform_system!='Emscripten'",    
+    "tomli ~= 2.2.1; platform_system!='Emscripten'; python_version<'3.11'",
     "websockets >= 15.0.1; platform_system!='Emscripten'",
 ]
 
