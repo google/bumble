@@ -27,8 +27,8 @@ from collections.abc import (
     Awaitable,
     Callable,
     Iterable,
-    Sequence,
     Mapping,
+    Sequence,
 )
 from dataclasses import dataclass, field
 from typing import ClassVar, SupportsBytes, TypeVar

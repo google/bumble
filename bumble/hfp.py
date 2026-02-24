@@ -26,7 +26,7 @@ import logging
 import re
 import traceback
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any, ClassVar, Literal, overload
 
 from typing_extensions import Self
 
@@ -420,61 +420,6 @@ class CmeError(enum.IntEnum):
 # Hands-Free Control Interoperability Requirements
 # -----------------------------------------------------------------------------
 
-# Response codes.
-RESPONSE_CODES = {
-    "+APLSIRI",
-    "+BAC",
-    "+BCC",
-    "+BCS",
-    "+BIA",
-    "+BIEV",
-    "+BIND",
-    "+BINP",
-    "+BLDN",
-    "+BRSF",
-    "+BTRH",
-    "+BVRA",
-    "+CCWA",
-    "+CHLD",
-    "+CHUP",
-    "+CIND",
-    "+CLCC",
-    "+CLIP",
-    "+CMEE",
-    "+CMER",
-    "+CNUM",
-    "+COPS",
-    "+IPHONEACCEV",
-    "+NREC",
-    "+VGM",
-    "+VGS",
-    "+VTS",
-    "+XAPL",
-    "A",
-    "D",
-}
-
-# Unsolicited responses and statuses.
-UNSOLICITED_CODES = {
-    "+APLSIRI",
-    "+BCS",
-    "+BIND",
-    "+BSIR",
-    "+BTRH",
-    "+BVRA",
-    "+CCWA",
-    "+CIEV",
-    "+CLIP",
-    "+VGM",
-    "+VGS",
-    "BLACKLISTED",
-    "BUSY",
-    "DELAYED",
-    "NO ANSWER",
-    "NO CARRIER",
-    "RING",
-}
-
 # Status codes
 STATUS_CODES = {
     "+CME ERROR",
@@ -727,12 +672,9 @@ class HfProtocol(utils.EventEmitter):
 
     dlc: rfcomm.DLC
     command_lock: asyncio.Lock
-    if TYPE_CHECKING:
-        response_queue: asyncio.Queue[AtResponse]
-        unsolicited_queue: asyncio.Queue[AtResponse | None]
-    else:
-        response_queue: asyncio.Queue
-        unsolicited_queue: asyncio.Queue
+    pending_command: str | None = None
+    response_queue: asyncio.Queue[AtResponse]
+    unsolicited_queue: asyncio.Queue[AtResponse | None]
     read_buffer: bytearray
     active_codec: AudioCodec
 
@@ -805,16 +747,39 @@ class HfProtocol(utils.EventEmitter):
             self.read_buffer = self.read_buffer[trailer + 2 :]
 
             # Forward the received code to the correct queue.
-            if self.command_lock.locked() and (
-                response.code in STATUS_CODES or response.code in RESPONSE_CODES
+            if self.pending_command and (
+                response.code in STATUS_CODES or response.code in self.pending_command
             ):
                 self.response_queue.put_nowait(response)
-            elif response.code in UNSOLICITED_CODES:
-                self.unsolicited_queue.put_nowait(response)
             else:
-                logger.warning(
-                    f"dropping unexpected response with code '{response.code}'"
-                )
+                self.unsolicited_queue.put_nowait(response)
+
+    @overload
+    async def execute_command(
+        self,
+        cmd: str,
+        timeout: float = 1.0,
+        *,
+        response_type: Literal[AtResponseType.NONE] = AtResponseType.NONE,
+    ) -> None: ...
+
+    @overload
+    async def execute_command(
+        self,
+        cmd: str,
+        timeout: float = 1.0,
+        *,
+        response_type: Literal[AtResponseType.SINGLE],
+    ) -> AtResponse: ...
+
+    @overload
+    async def execute_command(
+        self,
+        cmd: str,
+        timeout: float = 1.0,
+        *,
+        response_type: Literal[AtResponseType.MULTIPLE],
+    ) -> list[AtResponse]: ...
 
     async def execute_command(
         self,
@@ -835,27 +800,34 @@ class HfProtocol(utils.EventEmitter):
             asyncio.TimeoutError: the status is not received after a timeout (default 1 second).
             ProtocolError: the status is not OK.
         """
-        async with self.command_lock:
-            logger.debug(f">>> {cmd}")
-            self.dlc.write(cmd + '\r')
-            responses: list[AtResponse] = []
+        try:
+            async with self.command_lock:
+                self.pending_command = cmd
+                logger.debug(f">>> {cmd}")
+                self.dlc.write(cmd + '\r')
+                responses: list[AtResponse] = []
 
-            while True:
-                result = await asyncio.wait_for(
-                    self.response_queue.get(), timeout=timeout
-                )
-                if result.code == 'OK':
-                    if response_type == AtResponseType.SINGLE and len(responses) != 1:
-                        raise HfpProtocolError("NO ANSWER")
+                while True:
+                    result = await asyncio.wait_for(
+                        self.response_queue.get(), timeout=timeout
+                    )
+                    if result.code == 'OK':
+                        if (
+                            response_type == AtResponseType.SINGLE
+                            and len(responses) != 1
+                        ):
+                            raise HfpProtocolError("NO ANSWER")
 
-                    if response_type == AtResponseType.MULTIPLE:
-                        return responses
-                    if response_type == AtResponseType.SINGLE:
-                        return responses[0]
-                    return None
-                if result.code in STATUS_CODES:
-                    raise HfpProtocolError(result.code)
-                responses.append(result)
+                        if response_type == AtResponseType.MULTIPLE:
+                            return responses
+                        if response_type == AtResponseType.SINGLE:
+                            return responses[0]
+                        return None
+                    if result.code in STATUS_CODES:
+                        raise HfpProtocolError(result.code)
+                    responses.append(result)
+        finally:
+            self.pending_command = None
 
     async def initiate_slc(self):
         """4.2.1 Service Level Connection Initialization."""
@@ -1067,7 +1039,6 @@ class HfProtocol(utils.EventEmitter):
         responses = await self.execute_command(
             "AT+CLCC", response_type=AtResponseType.MULTIPLE
         )
-        assert isinstance(responses, list)
 
         calls = []
         for response in responses:
