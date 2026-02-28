@@ -198,3 +198,24 @@ class CisTerminateInd(ControlPdu):
     cig_id: int
     cis_id: int
     error_code: int
+
+
+@dataclasses.dataclass
+class FeatureReq(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_FEATURE_REQ
+
+    feature_set: bytes
+
+
+@dataclasses.dataclass
+class FeatureRsp(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_FEATURE_RSP
+
+    feature_set: bytes
+
+
+@dataclasses.dataclass
+class PeripheralFeatureReq(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_PERIPHERAL_FEATURE_REQ
+
+    feature_set: bytes
