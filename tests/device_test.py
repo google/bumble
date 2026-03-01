@@ -466,7 +466,9 @@ async def test_get_remote_le_features():
     devices = TwoDevices()
     await devices.setup_connection()
 
-    assert (await devices.connections[0].get_remote_le_features()) is not None
+    assert (
+        await devices.connections[0].get_remote_le_features()
+    ) == devices.controllers[1].le_features
 
 
 # -----------------------------------------------------------------------------

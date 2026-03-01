@@ -544,6 +544,20 @@ class Controller:
                 self.on_le_cis_disconnected(packet.cig_id, packet.cis_id)
             case ll.EncReq():
                 self.on_le_encrypted(connection)
+            case ll.FeatureReq() | ll.PeripheralFeatureReq():
+                connection.send_ll_control_pdu(
+                    ll.FeatureRsp(
+                        feature_set=self.le_features.value.to_bytes(8, 'little')
+                    )
+                )
+            case ll.FeatureRsp(feature_set):
+                self.send_hci_packet(
+                    hci.HCI_LE_Read_Remote_Features_Complete_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                        le_features=feature_set,
+                    )
+                )
 
     def on_ll_advertising_pdu(self, packet: ll.AdvertisingPdu) -> None:
         logger.debug("[%s] <<< Advertising PDU: %s", self.name, packet)
@@ -2084,7 +2098,7 @@ class Controller:
 
         handle = command.connection_handle
 
-        if not self.find_connection_by_handle(handle):
+        if not (connection := self.find_le_connection_by_handle(handle)):
             self._send_hci_command_status(
                 hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR, command.op_code
             )
@@ -2093,14 +2107,16 @@ class Controller:
         # First, say that the command is pending
         self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
 
-        # Then send the remote features
-        self.send_hci_packet(
-            hci.HCI_LE_Read_Remote_Features_Complete_Event(
-                status=hci.HCI_ErrorCode.SUCCESS,
-                connection_handle=handle,
-                le_features=bytes.fromhex('dd40000000000000'),
+        if connection.role == hci.Role.CENTRAL:
+            connection.send_ll_control_pdu(
+                ll.FeatureReq(feature_set=self.le_features.value.to_bytes(8, 'little'))
             )
-        )
+        else:
+            connection.send_ll_control_pdu(
+                ll.PeripheralFeatureReq(
+                    feature_set=self.le_features.value.to_bytes(8, 'little')
+                )
+            )
         return None
 
     def on_hci_le_rand_command(
