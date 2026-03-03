@@ -74,6 +74,14 @@ def test_uuid_to_hex_str() -> None:
 
 
 # -----------------------------------------------------------------------------
+def test_uuid_hash() -> None:
+    uuid = UUID("1234")
+    uuid_128_bytes = UUID.from_bytes(uuid.to_bytes(force_128=True))
+    assert uuid in {uuid_128_bytes}
+    assert uuid_128_bytes in {uuid}
+
+
+# -----------------------------------------------------------------------------
 def test_appearance() -> None:
     a = Appearance(Appearance.Category.COMPUTER, Appearance.ComputerSubcategory.LAPTOP)
     assert str(a) == 'COMPUTER/LAPTOP'

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import dataclasses
 import enum
+import functools
 import struct
 from collections.abc import Iterable
 from typing import (
@@ -273,13 +274,8 @@ class UUID:
     def parse_uuid_2(cls, uuid_as_bytes: bytes, offset: int) -> tuple[int, UUID]:
         return offset + 2, cls.from_bytes(uuid_as_bytes[offset : offset + 2])
 
-    def to_bytes(self, force_128: bool = False) -> bytes:
-        '''
-        Serialize UUID in little-endian byte-order
-        '''
-        if not force_128:
-            return self.uuid_bytes
-
+    @functools.cached_property
+    def uuid_128_bytes(self) -> bytes:
         match len(self.uuid_bytes):
             case 2:
                 return self.BASE_UUID + self.uuid_bytes + bytes([0, 0])
@@ -289,6 +285,15 @@ class UUID:
                 return self.uuid_bytes
             case _:
                 assert False, "unreachable"
+
+    def to_bytes(self, force_128: bool = False) -> bytes:
+        '''
+        Serialize UUID in little-endian byte-order
+        '''
+        if not force_128:
+            return self.uuid_bytes
+
+        return self.uuid_128_bytes
 
     def to_pdu_bytes(self) -> bytes:
         '''
@@ -318,7 +323,7 @@ class UUID:
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, UUID):
-            return self.to_bytes(force_128=True) == other.to_bytes(force_128=True)
+            return self.uuid_128_bytes == other.uuid_128_bytes
 
         if isinstance(other, str):
             return UUID(other) == self
@@ -326,7 +331,7 @@ class UUID:
         return False
 
     def __hash__(self) -> int:
-        return hash(self.uuid_bytes)
+        return hash(self.uuid_128_bytes)
 
     def __str__(self) -> str:
         result = self.to_hex_str(separator='-')
