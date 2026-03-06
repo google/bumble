@@ -71,6 +71,12 @@ $ python3 -m pip install git+https://github.com/google/bumble.git@27c0551
 When you work on the Bumble code itself, and run some of the tests or example apps, or import the
 module in your own code, you typically either install the package from source in "development mode" as described above, or you may choose to skip the install phase.
 
+!!! tip "Installing Development Dependencies"
+    To install all optional dependencies and development tools (like `pytest`, `black`, `invoke`, etc.), run:
+    ```bash
+    python3 -m pip install -e ".[all]" --group dev
+    ```
+
 If you plan on contributing to the project, please read the [contributing](development/contributing.md) section.
 
 ## Without Installing

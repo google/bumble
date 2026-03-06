@@ -28,13 +28,18 @@ from bumble.transport.common import (
 )
 
 # pylint: disable=no-name-in-module
-from bumble.transport.grpc_protobuf.emulated_bluetooth_packets_pb2 import HCIPacket
-from bumble.transport.grpc_protobuf.emulated_bluetooth_pb2_grpc import (
-    EmulatedBluetoothServiceStub,
-)
-from bumble.transport.grpc_protobuf.emulated_bluetooth_vhci_pb2_grpc import (
-    VhciForwardingServiceStub,
-)
+try:
+    from bumble.transport.grpc_protobuf.emulated_bluetooth_packets_pb2 import HCIPacket
+    from bumble.transport.grpc_protobuf.emulated_bluetooth_pb2_grpc import (
+        EmulatedBluetoothServiceStub,
+    )
+    from bumble.transport.grpc_protobuf.emulated_bluetooth_vhci_pb2_grpc import (
+        VhciForwardingServiceStub,
+    )
+except ImportError as e:
+    raise ImportError(
+        'The bumble[android] extra is required to use the Android emulator transport'
+    ) from e
 
 # -----------------------------------------------------------------------------
 # Logging
