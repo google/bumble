@@ -27,6 +27,7 @@ import dataclasses
 import json
 import logging
 import os
+import pathlib
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import Self
@@ -248,29 +249,26 @@ class JsonKeyStore(KeyStore):
     DEFAULT_NAMESPACE = '__DEFAULT__'
     DEFAULT_BASE_NAME = "keys"
 
-    def __init__(self, namespace, filename=None):
-        self.namespace = namespace if namespace is not None else self.DEFAULT_NAMESPACE
+    def __init__(
+        self, namespace: str | None = None, filename: str | None = None
+    ) -> None:
+        self.namespace = namespace or self.DEFAULT_NAMESPACE
 
-        if filename is None:
-            # Use a default for the current user
-
-            # Import here because this may not exist on all platforms
-            # pylint: disable=import-outside-toplevel
-            import appdirs
-
-            self.directory_name = os.path.join(
-                appdirs.user_data_dir(self.APP_NAME, self.APP_AUTHOR), self.KEYS_DIR
-            )
-            base_name = self.DEFAULT_BASE_NAME if namespace is None else self.namespace
-            json_filename = (
-                f'{base_name}.json'.lower().replace(':', '-').replace('/p', '-p')
-            )
-            self.filename = os.path.join(self.directory_name, json_filename)
+        if filename:
+            self.filename = pathlib.Path(filename).resolve()
+            self.directory_name = self.filename.parent
         else:
-            self.filename = filename
-            self.directory_name = os.path.dirname(os.path.abspath(self.filename))
+            import platformdirs  # Deferred import
 
-        logger.debug(f'JSON keystore: {self.filename}')
+            base_dir = platformdirs.user_data_path(self.APP_NAME, self.APP_AUTHOR)
+            self.directory_name = base_dir / self.KEYS_DIR
+
+            base_name = self.namespace if namespace else self.DEFAULT_BASE_NAME
+            safe_name = base_name.lower().replace(':', '-').replace('/', '-')
+
+            self.filename = self.directory_name / f"{safe_name}.json"
+
+        logger.debug('JSON keystore: %s', self.filename)
 
     @classmethod
     def from_device(
@@ -293,7 +291,9 @@ class JsonKeyStore(KeyStore):
 
         return cls(namespace, filename)
 
-    async def load(self):
+    async def load(
+        self,
+    ) -> tuple[dict[str, dict[str, dict[str, Any]]], dict[str, dict[str, Any]]]:
         # Try to open the file, without failing. If the file does not exist, it
         # will be created upon saving.
         try:
@@ -312,17 +312,17 @@ class JsonKeyStore(KeyStore):
             return next(iter(db.items()))
 
         # Finally, just create an empty key map for the namespace
-        key_map = {}
+        key_map: dict[str, dict[str, Any]] = {}
         db[self.namespace] = key_map
         return (db, key_map)
 
-    async def save(self, db):
+    async def save(self, db: dict[str, dict[str, dict[str, Any]]]) -> None:
         # Create the directory if it doesn't exist
         if not os.path.exists(self.directory_name):
             os.makedirs(self.directory_name, exist_ok=True)
 
         # Save to a temporary file
-        temp_filename = self.filename + '.tmp'
+        temp_filename = self.filename.with_name(self.filename.name + ".tmp")
         with open(temp_filename, 'w', encoding='utf-8') as output:
             json.dump(db, output, sort_keys=True, indent=4)
 
@@ -334,16 +334,16 @@ class JsonKeyStore(KeyStore):
         del key_map[name]
         await self.save(db)
 
-    async def update(self, name, keys):
+    async def update(self, name: str, keys: PairingKeys) -> None:
         db, key_map = await self.load()
         key_map.setdefault(name, {}).update(keys.to_dict())
         await self.save(db)
 
-    async def get_all(self):
+    async def get_all(self) -> list[tuple[str, PairingKeys]]:
         _, key_map = await self.load()
         return [(name, PairingKeys.from_dict(keys)) for (name, keys) in key_map.items()]
 
-    async def delete_all(self):
+    async def delete_all(self) -> None:
         db, key_map = await self.load()
         key_map.clear()
         await self.save(db)
