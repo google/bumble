@@ -222,9 +222,8 @@ def find_endpoints(device, forced_mode, sco_alternate=None):
 
 
 class UsbPacketSink:
-    def __init__(self, device, bulk_out, isochronous_out):
+    def __init__(self, device, bulk_out, isochronous_out) -> None:
         self.device = device
-        self.packets = asyncio.Queue[bytes]()  # Queue of packets waiting to be sent
         self.bulk_out = bulk_out
         self.isochronous_out = isochronous_out
         self.bulk_or_control_out_transfer = device.getTransfer()
