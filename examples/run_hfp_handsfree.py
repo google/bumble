@@ -275,18 +275,17 @@ async def main() -> None:
         output_file_name = sys.argv[5]
 
     global input_wav, output_wav
-    with (
-        (
-            wave.open(input_file_name, "rb")
-            if input_file_name
-            else contextlib.nullcontext(None)
-        ) as input_wav,
-        (
-            wave.open(output_file_name, "wb")
-            if output_file_name
-            else contextlib.nullcontext(None)
-        ) as output_wav,
-    ):
+    input_cm: contextlib.AbstractContextManager[wave.Wave_read | None] = (
+        wave.open(input_file_name, "rb")
+        if input_file_name
+        else contextlib.nullcontext(None)
+    )
+    output_cm: contextlib.AbstractContextManager[wave.Wave_write | None] = (
+        wave.open(output_file_name, "wb")
+        if output_file_name
+        else contextlib.nullcontext(None)
+    )
+    with input_cm as input_wav, output_cm as output_wav:
         if input_wav and input_wav.getnchannels() != 1:
             print("Mono input required")
             return
