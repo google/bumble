@@ -669,35 +669,28 @@ class Host(utils.EventEmitter):
         response_timeout: float | None = None,
     ) -> hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event:
         # Wait until we can send (only one pending command at a time)
-        await self.command_semaphore.acquire()
+        async with self.command_semaphore:
+            # Create a future value to hold the eventual response
+            assert self.pending_command is None
+            assert self.pending_response is None
+            self.pending_response = asyncio.get_running_loop().create_future()
+            self.pending_command = command
 
-        # Create a future value to hold the eventual response
-        assert self.pending_command is None
-        assert self.pending_response is None
-        self.pending_response = asyncio.get_running_loop().create_future()
-        self.pending_command = command
-
-        response: (
-            hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event | None
-        ) = None
-        try:
-            self.send_hci_packet(command)
-            response = await asyncio.wait_for(
-                self.pending_response, timeout=response_timeout
-            )
-            return response
-        except Exception:
-            logger.exception(color("!!! Exception while sending command:", "red"))
-            raise
-        finally:
-            self.pending_command = None
-            self.pending_response = None
-            if (
-                response is not None
-                and response.num_hci_command_packets
-                and self.command_semaphore.locked()
-            ):
-                self.command_semaphore.release()
+            response: (
+                hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event | None
+            ) = None
+            try:
+                self.send_hci_packet(command)
+                response = await asyncio.wait_for(
+                    self.pending_response, timeout=response_timeout
+                )
+                return response
+            except Exception:
+                logger.exception(color("!!! Exception while sending command:", "red"))
+                raise
+            finally:
+                self.pending_command = None
+                self.pending_response = None
 
     @overload
     async def send_command(
@@ -990,8 +983,9 @@ class Host(utils.EventEmitter):
 
     def on_transport_lost(self):
         # Called by the source when the transport has been lost.
-        if self.pending_response:
+        if self.pending_response and not self.pending_response.done():
             self.pending_response.set_exception(TransportLostError('transport lost'))
+            self.pending_response = None
 
         self.emit('flush')
 
@@ -1054,11 +1048,13 @@ class Host(utils.EventEmitter):
                     f'0x{event.command_opcode:X}'
                 )
 
-            self.pending_response.set_result(event)
+            if self.pending_response.done():
+                logger.warning('!!! pending response already set')
+            else:
+                self.pending_response.set_result(event)
+                self.pending_response = None
         else:
             logger.warning('!!! no pending response future to set')
-            if event.num_hci_command_packets and self.command_semaphore.locked():
-                self.command_semaphore.release()
 
     ############################################################
     # HCI handlers
@@ -1072,10 +1068,10 @@ class Host(utils.EventEmitter):
             # an actual command
             logger.debug('no-command event for flow control')
 
-            # Release the command semaphore if needed
-            if event.num_hci_command_packets and self.command_semaphore.locked():
-                logger.debug('command complete event releasing semaphore')
-                self.command_semaphore.release()
+            if self.pending_response and not self.pending_response.done():
+                logger.debug('Cancel pending response')
+                self.pending_response.cancel()
+                self.pending_response = None
 
             return
 
