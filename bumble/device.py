@@ -4836,11 +4836,21 @@ class Device(utils.CompositeEventEmitter):
                 if keys.ltk:
                     return keys.ltk.value
 
-                if connection.role == hci.Role.CENTRAL and keys.ltk_central:
-                    return keys.ltk_central.value
+            # Check both ltk_central and ltk_peripheral by matching EDIV+Rand
+            if (
+                keys.ltk_central
+                and keys.ltk_central.ediv == ediv
+                and keys.ltk_central.rand == rand
+            ):
+                return keys.ltk_central.value
 
-                if connection.role == hci.Role.PERIPHERAL and keys.ltk_peripheral:
-                    return keys.ltk_peripheral.value
+            if (
+                keys.ltk_peripheral
+                and keys.ltk_peripheral.ediv == ediv
+                and keys.ltk_peripheral.rand == rand
+            ):
+                return keys.ltk_peripheral.value
+
         return None
 
     async def get_link_key(self, address: hci.Address) -> bytes | None:
