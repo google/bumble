@@ -686,6 +686,8 @@ class Host(utils.EventEmitter):
                 self.pending_response, timeout=response_timeout
             )
             return response
+        except asyncio.TimeoutError:
+            raise
         except Exception:
             logger.exception(color("!!! Exception while sending command:", "red"))
             raise
@@ -866,7 +868,7 @@ class Host(utils.EventEmitter):
         self.send_hci_packet(
             hci.HCI_SynchronousDataPacket(
                 connection_handle=connection_handle,
-                packet_status=0,
+                packet_status=hci.HCI_SynchronousDataPacket.Status.CORRECTLY_RECEIVED_DATA,
                 data_total_length=len(sdu),
                 data=sdu,
             )
@@ -1178,11 +1180,28 @@ class Host(utils.EventEmitter):
     def on_hci_connection_complete_event(
         self, event: hci.HCI_Connection_Complete_Event
     ):
+        if event.link_type == hci.HCI_Connection_Complete_Event.LinkType.SCO:
+            # Pass this on to the synchronous connection handler
+            forwarded_event = hci.HCI_Synchronous_Connection_Complete_Event(
+                status=event.status,
+                connection_handle=event.connection_handle,
+                bd_addr=event.bd_addr,
+                link_type=event.link_type,
+                transmission_interval=0,
+                retransmission_window=0,
+                rx_packet_length=0,
+                tx_packet_length=0,
+                air_mode=0,
+            )
+            self.on_hci_synchronous_connection_complete_event(forwarded_event)
+            return
+
         if event.status == hci.HCI_SUCCESS:
             # Create/update the connection
             logger.debug(
-                f'### BR/EDR CONNECTION: [0x{event.connection_handle:04X}] '
-                f'{event.bd_addr}'
+                f'### BR/EDR ACL CONNECTION: [0x{event.connection_handle:04X}] '
+                f'{event.bd_addr} '
+                f'{event.link_type.name}'
             )
 
             connection = self.connections.get(event.connection_handle)
@@ -1582,6 +1601,9 @@ class Host(utils.EventEmitter):
                 event.bd_addr,
                 event.connection_handle,
                 event.link_type,
+                event.rx_packet_length,
+                event.tx_packet_length,
+                event.air_mode,
             )
         else:
             logger.debug(f'### SCO CONNECTION FAILED: {event.status}')

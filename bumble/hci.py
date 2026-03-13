@@ -1748,6 +1748,61 @@ class CodingFormat:
         )
 
 
+@dataclasses.dataclass(frozen=True)
+class VoiceSetting:
+    class AirCodingFormat(enum.IntEnum):
+        CVSD = 0
+        U_LAW = 1
+        A_LAW = 2
+        TRANSPARENT_DATA = 3
+
+    class InputSampleSize(enum.IntEnum):
+        SIZE_8_BITS = 0
+        SIZE_16_BITS = 1
+
+    class InputDataFormat(enum.IntEnum):
+        ONES_COMPLEMENT = 0
+        TWOS_COMPLEMENT = 1
+        SIGN_AND_MAGNITUDE = 2
+        UNSIGNED = 3
+
+    class InputCodingFormat(enum.IntEnum):
+        LINEAR = 0
+        U_LAW = 1
+        A_LAW = 2
+        RESERVED = 3
+
+    air_coding_format: AirCodingFormat = AirCodingFormat.CVSD
+    linear_pcm_bit_position: int = 0
+    input_sample_size: InputSampleSize = InputSampleSize.SIZE_8_BITS
+    input_data_format: InputDataFormat = InputDataFormat.ONES_COMPLEMENT
+    input_coding_format: InputCodingFormat = InputCodingFormat.LINEAR
+
+    @classmethod
+    def from_int(cls, value: int) -> VoiceSetting:
+        air_coding_format = cls.AirCodingFormat(value & 0b11)
+        linear_pcm_bit_position = (value >> 2) & 0b111
+        input_sample_size = cls.InputSampleSize((value >> 5) & 0b1)
+        input_data_format = cls.InputDataFormat((value >> 6) & 0b11)
+        input_coding_format = cls.InputCodingFormat((value >> 8) & 0b11)
+        return cls(
+            air_coding_format=air_coding_format,
+            linear_pcm_bit_position=linear_pcm_bit_position,
+            input_sample_size=input_sample_size,
+            input_data_format=input_data_format,
+            input_coding_format=input_coding_format,
+        )
+
+    def __int__(self) -> int:
+        return (
+            self.air_coding_format
+            | (self.linear_pcm_bit_position << 2)
+            | (self.input_sample_size << 5)
+            | (self.input_data_format << 6)
+            | (self.input_coding_format << 8)
+        )
+
+
 # -----------------------------------------------------------------------------
 class HCI_Constant:
     @staticmethod
@@ -2889,6 +2944,23 @@ class HCI_Read_Clock_Offset_Command(HCI_AsyncCommand):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
+class HCI_Accept_Synchronous_Connection_Request_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.1.27 Accept Synchronous Connection Request Command
+    '''
+
+    bd_addr: Address = field(metadata=metadata(Address.parse_address))
+    transmit_bandwidth: int = field(metadata=metadata(4))
+    receive_bandwidth: int = field(metadata=metadata(4))
+    max_latency: int = field(metadata=metadata(2))
+    voice_setting: int = field(metadata=metadata(2))
+    retransmission_effort: int = field(metadata=metadata(1))
+    packet_type: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
 class HCI_Reject_Synchronous_Connection_Request_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.1.28 Reject Synchronous Connection Request Command
@@ -3942,6 +4014,23 @@ class HCI_Read_Local_OOB_Extended_Data_Command(
     '''
     See Bluetooth spec @ 7.3.95 Read Local OOB Extended Data Command
     '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_Configure_Data_Path_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.3.101 Configure Data Path Command
+    '''
+
+    class DataPathDirection(SpecableEnum):
+        INPUT = 0x00
+        OUTPUT = 0x01
+
+    data_path_direction: DataPathDirection = field(metadata=metadata(1))
+    data_path_id: int = field(metadata=metadata(1))
+    vendor_specific_config: bytes = field(metadata=metadata('*'))
 
 
 # -----------------------------------------------------------------------------
@@ -7334,7 +7423,7 @@ class HCI_Connection_Complete_Event(HCI_Event):
     status: int = field(metadata=metadata(STATUS_SPEC))
     connection_handle: int = field(metadata=metadata(2))
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
-    link_type: int = field(metadata=LinkType.type_metadata(1))
+    link_type: LinkType = field(metadata=LinkType.type_metadata(1))
     encryption_enabled: int = field(metadata=metadata(1))
 
 
@@ -7730,12 +7819,6 @@ class HCI_Synchronous_Connection_Complete_Event(HCI_Event):
         SCO = 0x00
         ESCO = 0x02
 
-    class AirMode(SpecableEnum):
-        U_LAW_LOG = 0x00
-        A_LAW_LOG_AIR_MORE = 0x01
-        CVSD = 0x02
-        TRANSPARENT_DATA = 0x03
-
     status: int = field(metadata=metadata(STATUS_SPEC))
     connection_handle: int = field(metadata=metadata(2))
     bd_addr: Address = field(metadata=metadata(Address.parse_address))
@@ -7744,7 +7827,7 @@ class HCI_Synchronous_Connection_Complete_Event(HCI_Event):
     retransmission_window: int = field(metadata=metadata(1))
     rx_packet_length: int = field(metadata=metadata(2))
     tx_packet_length: int = field(metadata=metadata(2))
-    air_mode: int = field(metadata=AirMode.type_metadata(1))
+    air_mode: int = field(metadata=CodecID.type_metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -7976,7 +8059,9 @@ class HCI_AclDataPacket(HCI_Packet):
         bc_flag = (h >> 14) & 3
         data = packet[5:]
         if len(data) != data_total_length:
-            raise InvalidPacketError('invalid packet length')
+            raise InvalidPacketError(
+                f'invalid packet length {len(data)} != {data_total_length}'
+            )
         return cls(
             connection_handle=connection_handle,
             pb_flag=pb_flag,
@@ -8009,10 +8094,16 @@ class HCI_SynchronousDataPacket(HCI_Packet):
     See Bluetooth spec @ 5.4.3 HCI SCO Data Packets
     '''
 
+    class Status(enum.IntEnum):
+        CORRECTLY_RECEIVED_DATA = 0b00
+        POSSIBLY_INVALID_DATA = 0b01
+        NO_DATA = 0b10
+        DATA_PARTIALLY_LOST = 0b11
+
     hci_packet_type = HCI_SYNCHRONOUS_DATA_PACKET
 
     connection_handle: int
-    packet_status: int
+    packet_status: Status
     data_total_length: int
     data: bytes
 
@@ -8021,7 +8112,7 @@ class HCI_SynchronousDataPacket(HCI_Packet):
         # Read the header
         h, data_total_length = struct.unpack_from('<HB', packet, 1)
         connection_handle = h & 0xFFF
-        packet_status = (h >> 12) & 0b11
+        packet_status = cls.Status((h >> 12) & 0b11)
         data = packet[4:]
         if len(data) != data_total_length:
             raise InvalidPacketError(
@@ -8045,7 +8136,7 @@ class HCI_SynchronousDataPacket(HCI_Packet):
         return (
             f'{color("SCO", "blue")}: '
             f'handle=0x{self.connection_handle:04x}, '
-            f'ps={self.packet_status}, '
+            f'ps={self.packet_status.name}, '
             f'data_total_length={self.data_total_length}, '
             f'data={self.data.hex()}'
         )
@@ -8073,8 +8164,8 @@ class HCI_IsoDataPacket(HCI_Packet):
     def __post_init__(self) -> None:
         self.ts_flag = self.time_stamp is not None
 
-    @staticmethod
-    def from_bytes(packet: bytes) -> HCI_IsoDataPacket:
+    @classmethod
+    def from_bytes(cls, packet: bytes) -> HCI_IsoDataPacket:
         time_stamp: int | None = None
         packet_sequence_number: int | None = None
         iso_sdu_length: int | None = None
@@ -8103,7 +8194,7 @@ class HCI_IsoDataPacket(HCI_Packet):
             pos += 4
 
         iso_sdu_fragment = packet[pos:]
-        return HCI_IsoDataPacket(
+        return cls(
             connection_handle=connection_handle,
             pb_flag=pb_flag,
             ts_flag=ts_flag,

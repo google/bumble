@@ -170,7 +170,9 @@ def format_code(ctx, check=False, diff=False):
 @task
 def check_types(ctx):
     checklist = ["apps", "bumble", "examples", "tests", "tasks.py"]
+    print(">>> Running the type checker...")
     try:
+        print("+++ Checking with mypy...")
         ctx.run(f"mypy {' '.join(checklist)}")
     except UnexpectedExit as exc:
         print("Please check your code against the mypy messages.")

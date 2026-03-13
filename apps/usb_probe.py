@@ -111,9 +111,14 @@ def show_device_details(device):
                         if (endpoint.getAddress() & USB_ENDPOINT_IN == 0)
                         else 'IN'
                     )
+                    endpoint_details = (
+                        f', Max Packet Size = {endpoint.getMaxPacketSize()}'
+                        if endpoint_type == 'ISOCHRONOUS'
+                        else ''
+                    )
                     print(
                         f'        Endpoint 0x{endpoint.getAddress():02X}: '
-                        f'{endpoint_type} {endpoint_direction}'
+                        f'{endpoint_type} {endpoint_direction}{endpoint_details}'
                     )
 
 
