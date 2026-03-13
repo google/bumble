@@ -2116,13 +2116,10 @@ class AdvertisingData:
 # -----------------------------------------------------------------------------
 # Connection PHY
 # -----------------------------------------------------------------------------
+@dataclasses.dataclass
 class ConnectionPHY:
-    def __init__(self, tx_phy, rx_phy):
-        self.tx_phy = tx_phy
-        self.rx_phy = rx_phy
-
-    def __str__(self):
-        return f'ConnectionPHY(tx_phy={self.tx_phy}, rx_phy={self.rx_phy})'
+    tx_phy: int
+    rx_phy: int
 
 
 # -----------------------------------------------------------------------------
