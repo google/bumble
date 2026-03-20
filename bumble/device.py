@@ -1837,6 +1837,7 @@ class Connection(utils.CompositeEventEmitter):
         self.pairing_peer_io_capability = None
         self.pairing_peer_authentication_requirements = None
         self.peer_le_features = hci.LeFeatureMask(0)
+        self.peer_classic_features = hci.LmpFeatureMask(0)
         self.cs_configs = {}
         self.cs_procedures = {}
 
@@ -2053,6 +2054,15 @@ class Connection(utils.CompositeEventEmitter):
         """
         self.peer_le_features = await self.device.get_remote_le_features(self)
         return self.peer_le_features
+
+    async def get_remote_classic_features(self) -> hci.LmpFeatureMask:
+        """[Classic Only] Reads remote LMP supported features.
+
+        Returns:
+            LMP features supported by the remote device.
+        """
+        self.peer_classic_features = await self.device.get_remote_classic_features(self)
+        return self.peer_classic_features
 
     def on_att_mtu_update(self, mtu: int):
         logger.debug(
@@ -5280,6 +5290,77 @@ class Device(utils.CompositeEventEmitter):
                 )
             )
             return await read_feature_future
+
+    async def get_remote_classic_features(
+        self, connection: Connection
+    ) -> hci.LmpFeatureMask:
+        """[Classic Only] Reads remote LE supported features.
+
+        Args:
+            handle: connection handle to read LMP features.
+
+        Returns:
+            LMP features supported by the remote device.
+        """
+        with closing(utils.EventWatcher()) as watcher:
+            read_feature_future: asyncio.Future[tuple[int, int]] = (
+                asyncio.get_running_loop().create_future()
+            )
+            read_features = hci.LmpFeatureMask(0)
+            current_page_number = 0
+
+            @watcher.on(self.host, 'classic_remote_features')
+            def on_classic_remote_features(
+                handle: int,
+                status: int,
+                features: int,
+                page_number: int,
+                max_page_number: int,
+            ) -> None:
+                if handle != connection.handle:
+                    logger.warning(
+                        "Received classic_remote_features for wrong handle, expected=0x%04X, got=0x%04X",
+                        connection.handle,
+                        handle,
+                    )
+                    return
+                if page_number != current_page_number:
+                    logger.warning(
+                        "Received classic_remote_features for wrong page, expected=%d, got=%d",
+                        current_page_number,
+                        page_number,
+                    )
+                    return
+
+                if status == hci.HCI_ErrorCode.SUCCESS:
+                    read_feature_future.set_result((features, max_page_number))
+                else:
+                    read_feature_future.set_exception(hci.HCI_Error(status))
+
+            await self.send_async_command(
+                hci.HCI_Read_Remote_Supported_Features_Command(
+                    connection_handle=connection.handle
+                )
+            )
+
+            new_features, max_page_number = await read_feature_future
+            read_features |= new_features
+            if not (read_features & hci.LmpFeatureMask.EXTENDED_FEATURES):
+                return read_features
+
+            while current_page_number <= max_page_number:
+                read_feature_future = asyncio.get_running_loop().create_future()
+                await self.send_async_command(
+                    hci.HCI_Read_Remote_Extended_Features_Command(
+                        connection_handle=connection.handle,
+                        page_number=current_page_number,
+                    )
+                )
+                new_features, max_page_number = await read_feature_future
+                read_features |= new_features << (current_page_number * 64)
+                current_page_number += 1
+
+            return read_features
 
     @utils.experimental('Only for testing.')
     async def get_remote_cs_capabilities(

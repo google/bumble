@@ -1660,6 +1660,19 @@ class Host(utils.EventEmitter):
                 'connection_encryption_failure', event.connection_handle, event.status
             )
 
+    def on_hci_read_remote_supported_features_complete_event(
+        self, event: hci.HCI_Read_Remote_Supported_Features_Complete_Event
+    ) -> None:
+        # Notify the client
+        self.emit(
+            'classic_remote_features',
+            event.connection_handle,
+            event.status,
+            int.from_bytes(event.lmp_features, 'little'),
+            0,  # page number
+            0,  # max page number
+        )
+
     def on_hci_encryption_change_v2_event(
         self, event: hci.HCI_Encryption_Change_V2_Event
     ):
@@ -1815,6 +1828,18 @@ class Host(utils.EventEmitter):
                 b'',
                 rssi,
             )
+
+    def on_hci_read_remote_extended_features_complete_event(
+        self, event: hci.HCI_Read_Remote_Extended_Features_Complete_Event
+    ):
+        self.emit(
+            'classic_remote_features',
+            event.connection_handle,
+            event.status,
+            int.from_bytes(event.extended_lmp_features, 'little'),
+            event.page_number,
+            event.maximum_page_number,
+        )
 
     def on_hci_extended_inquiry_result_event(
         self, event: hci.HCI_Extended_Inquiry_Result_Event

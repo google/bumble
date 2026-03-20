@@ -322,3 +322,38 @@ class LmpNameRes(Packet):
     name_offset: int = field(metadata=hci.metadata(2))
     name_length: int = field(metadata=hci.metadata(3))
     name_fregment: bytes = field(metadata=hci.metadata('*'))
+
+
+@Packet.subclass
+@dataclass
+class LmpFeaturesReq(Packet):
+    opcode = Opcode.LMP_FEATURES_REQ
+
+    features: bytes = field(metadata=hci.metadata(8))
+
+
+@Packet.subclass
+@dataclass
+class LmpFeaturesRes(Packet):
+    opcode = Opcode.LMP_FEATURES_RES
+
+    features: bytes = field(metadata=hci.metadata(8))
+
+
+@Packet.subclass
+@dataclass
+class LmpFeaturesReqExt(Packet):
+    opcode = Opcode.LMP_FEATURES_REQ_EXT
+
+    features_page: int = field(metadata=hci.metadata(1))
+    features: bytes = field(metadata=hci.metadata(8))
+
+
+@Packet.subclass
+@dataclass
+class LmpFeaturesResExt(Packet):
+    opcode = Opcode.LMP_FEATURES_RES_EXT
+
+    features_page: int = field(metadata=hci.metadata(1))
+    max_features_page: int = field(metadata=hci.metadata(1))
+    features: bytes = field(metadata=hci.metadata(8))

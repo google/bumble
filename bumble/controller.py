@@ -238,9 +238,12 @@ class Controller:
     hci_revision: int = 0
     lmp_version: int = hci.HCI_VERSION_BLUETOOTH_CORE_5_0
     lmp_subversion: int = 0
-    lmp_features: bytes = bytes.fromhex(
-        '0000000060000000'
-    )  # BR/EDR Not Supported, LE Supported (Controller)
+    lmp_features: hci.LmpFeatureMask = (
+        hci.LmpFeatureMask.LE_SUPPORTED_CONTROLLER
+        | hci.LmpFeatureMask.BR_EDR_NOT_SUPPORTED
+        | hci.LmpFeatureMask.EXTENDED_FEATURES
+    )
+    lmp_features_max_page_number: int = 3
     manufacturer_company_identifier: int = 0xFFFF
     acl_data_packet_length: int = 27
     total_num_acl_data_packets: int = 64
@@ -250,10 +253,78 @@ class Controller:
     total_num_iso_data_packets: int = 64
     event_mask: int = 0
     event_mask_page_2: int = 0
-    supported_commands: bytes = bytes.fromhex(
-        '2000800000c000000000e4000000a822000000000000040000f7ffff7f000000'
-        '30f0f9ff01008004002000000000000000000000000000000000000000000000'
-    )
+    supported_commands: set[int] = {
+        hci.HCI_DISCONNECT_COMMAND,
+        hci.HCI_READ_REMOTE_VERSION_INFORMATION_COMMAND,
+        hci.HCI_READ_CLOCK_OFFSET_COMMAND,
+        hci.HCI_READ_LMP_HANDLE_COMMAND,
+        hci.HCI_SET_EVENT_MASK_COMMAND,
+        hci.HCI_RESET_COMMAND,
+        hci.HCI_READ_TRANSMIT_POWER_LEVEL_COMMAND,
+        hci.HCI_SET_CONTROLLER_TO_HOST_FLOW_CONTROL_COMMAND,
+        hci.HCI_HOST_BUFFER_SIZE_COMMAND,
+        hci.HCI_HOST_NUMBER_OF_COMPLETED_PACKETS_COMMAND,
+        hci.HCI_READ_LOCAL_VERSION_INFORMATION_COMMAND,
+        hci.HCI_READ_LOCAL_SUPPORTED_FEATURES_COMMAND,
+        hci.HCI_READ_BUFFER_SIZE_COMMAND,
+        hci.HCI_READ_BD_ADDR_COMMAND,
+        hci.HCI_READ_RSSI_COMMAND,
+        hci.HCI_SET_EVENT_MASK_PAGE_2_COMMAND,
+        hci.HCI_LE_SET_EVENT_MASK_COMMAND,
+        hci.HCI_LE_READ_BUFFER_SIZE_COMMAND,
+        hci.HCI_LE_READ_LOCAL_SUPPORTED_FEATURES_COMMAND,
+        hci.HCI_LE_SET_RANDOM_ADDRESS_COMMAND,
+        hci.HCI_LE_SET_ADVERTISING_PARAMETERS_COMMAND,
+        hci.HCI_LE_READ_ADVERTISING_PHYSICAL_CHANNEL_TX_POWER_COMMAND,
+        hci.HCI_LE_SET_ADVERTISING_DATA_COMMAND,
+        hci.HCI_LE_SET_SCAN_RESPONSE_DATA_COMMAND,
+        hci.HCI_LE_SET_ADVERTISING_ENABLE_COMMAND,
+        hci.HCI_LE_SET_SCAN_PARAMETERS_COMMAND,
+        hci.HCI_LE_SET_SCAN_ENABLE_COMMAND,
+        hci.HCI_LE_CREATE_CONNECTION_COMMAND,
+        hci.HCI_LE_CREATE_CONNECTION_CANCEL_COMMAND,
+        hci.HCI_LE_READ_FILTER_ACCEPT_LIST_SIZE_COMMAND,
+        hci.HCI_LE_CLEAR_FILTER_ACCEPT_LIST_COMMAND,
+        hci.HCI_LE_ADD_DEVICE_TO_FILTER_ACCEPT_LIST_COMMAND,
+        hci.HCI_LE_REMOVE_DEVICE_FROM_FILTER_ACCEPT_LIST_COMMAND,
+        hci.HCI_LE_CONNECTION_UPDATE_COMMAND,
+        hci.HCI_LE_SET_HOST_CHANNEL_CLASSIFICATION_COMMAND,
+        hci.HCI_LE_READ_CHANNEL_MAP_COMMAND,
+        hci.HCI_LE_READ_REMOTE_FEATURES_COMMAND,
+        hci.HCI_LE_ENCRYPT_COMMAND,
+        hci.HCI_LE_RAND_COMMAND,
+        hci.HCI_LE_ENABLE_ENCRYPTION_COMMAND,
+        hci.HCI_LE_LONG_TERM_KEY_REQUEST_REPLY_COMMAND,
+        hci.HCI_LE_LONG_TERM_KEY_REQUEST_NEGATIVE_REPLY_COMMAND,
+        hci.HCI_LE_READ_SUPPORTED_STATES_COMMAND,
+        hci.HCI_LE_RECEIVER_TEST_COMMAND,
+        hci.HCI_LE_TRANSMITTER_TEST_COMMAND,
+        hci.HCI_LE_TEST_END_COMMAND,
+        hci.HCI_READ_AUTHENTICATED_PAYLOAD_TIMEOUT_COMMAND,
+        hci.HCI_WRITE_AUTHENTICATED_PAYLOAD_TIMEOUT_COMMAND,
+        hci.HCI_LE_REMOTE_CONNECTION_PARAMETER_REQUEST_REPLY_COMMAND,
+        hci.HCI_LE_REMOTE_CONNECTION_PARAMETER_REQUEST_NEGATIVE_REPLY_COMMAND,
+        hci.HCI_LE_SET_DATA_LENGTH_COMMAND,
+        hci.HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
+        hci.HCI_LE_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH_COMMAND,
+        hci.HCI_LE_ADD_DEVICE_TO_RESOLVING_LIST_COMMAND,
+        hci.HCI_LE_REMOVE_DEVICE_FROM_RESOLVING_LIST_COMMAND,
+        hci.HCI_LE_CLEAR_RESOLVING_LIST_COMMAND,
+        hci.HCI_LE_READ_RESOLVING_LIST_SIZE_COMMAND,
+        hci.HCI_LE_READ_PEER_RESOLVABLE_ADDRESS_COMMAND,
+        hci.HCI_LE_READ_LOCAL_RESOLVABLE_ADDRESS_COMMAND,
+        hci.HCI_LE_SET_ADDRESS_RESOLUTION_ENABLE_COMMAND,
+        hci.HCI_LE_SET_RESOLVABLE_PRIVATE_ADDRESS_TIMEOUT_COMMAND,
+        hci.HCI_LE_READ_MAXIMUM_DATA_LENGTH_COMMAND,
+        hci.HCI_LE_READ_PHY_COMMAND,
+        hci.HCI_LE_SET_DEFAULT_PHY_COMMAND,
+        hci.HCI_LE_SET_PHY_COMMAND,
+        hci.HCI_LE_RECEIVER_TEST_V2_COMMAND,
+        hci.HCI_LE_TRANSMITTER_TEST_V2_COMMAND,
+        hci.HCI_LE_READ_TRANSMIT_POWER_COMMAND,
+        hci.HCI_LE_SET_PRIVACY_MODE_COMMAND,
+        hci.HCI_LE_READ_BUFFER_SIZE_V2_COMMAND,
+    }
     le_event_mask: int = 0
     le_features: hci.LeFeatureMask = (
         hci.LeFeatureMask.LE_ENCRYPTION
@@ -391,6 +462,12 @@ class Controller:
 
         if self.link:
             self.link.on_address_changed(self)
+
+    @property
+    def lmp_features_bytes(self) -> bytes:
+        return self.lmp_features.to_bytes(
+            (self.lmp_features_max_page_number + 1) * 8, 'little'
+        )
 
     # Packet Sink protocol (packets coming from the host via HCI)
     def on_packet(self, packet: bytes) -> None:
@@ -968,6 +1045,51 @@ class Controller:
                     packet.name_length,
                     packet.name_fregment,
                 )
+            case lmp.LmpFeaturesReq(features):
+                self.send_lmp_packet(
+                    sender_address,
+                    lmp.LmpFeaturesRes(features=self.lmp_features_bytes[:8]),
+                )
+            case lmp.LmpFeaturesRes(features):
+                if connection := self.classic_connections.get(sender_address):
+                    self.send_hci_packet(
+                        hci.HCI_Read_Remote_Supported_Features_Complete_Event(
+                            status=hci.HCI_ErrorCode.SUCCESS,
+                            connection_handle=connection.handle,
+                            lmp_features=features,
+                        )
+                    )
+            case lmp.LmpFeaturesReqExt(features_page, features):
+                # Calculate start/end of page
+                page_start = features_page * 8
+                page_end = page_start + 8
+                features_bytes = self.lmp_features_bytes
+                if page_start < len(features_bytes):
+                    page_features = features_bytes[page_start:page_end].ljust(
+                        8, b'\x00'
+                    )
+                else:
+                    page_features = b'\x00' * 8
+
+                self.send_lmp_packet(
+                    sender_address,
+                    lmp.LmpFeaturesResExt(
+                        features_page=features_page,
+                        max_features_page=len(features_bytes) // 8 - 1,
+                        features=page_features,
+                    ),
+                )
+            case lmp.LmpFeaturesResExt(features_page, max_features_page, features):
+                if connection := self.classic_connections.get(sender_address):
+                    self.send_hci_packet(
+                        hci.HCI_Read_Remote_Extended_Features_Complete_Event(
+                            status=hci.HCI_ErrorCode.SUCCESS,
+                            connection_handle=connection.handle,
+                            page_number=features_page,
+                            maximum_page_number=max_features_page,
+                            extended_lmp_features=features,
+                        )
+                    )
             case _:
                 logger.error("!!! Unhandled packet: %s", packet)
 
@@ -1349,6 +1471,53 @@ class Controller:
 
         return None
 
+    def on_hci_read_remote_supported_features_command(
+        self, command: hci.HCI_Read_Remote_Supported_Features_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.20 Read Remote Supported Features command
+        '''
+        handle = command.connection_handle
+        if not (connection := self.find_classic_connection_by_handle(handle)):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+            return None
+
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        self.send_lmp_packet(
+            connection.peer_address,
+            lmp.LmpFeaturesReq(self.lmp_features_bytes[:8]),
+        )
+
+        return None
+
+    def on_hci_read_remote_extended_features_command(
+        self, command: hci.HCI_Read_Remote_Extended_Features_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.21 Read Remote Extended Features command
+        '''
+        handle = command.connection_handle
+        if not (connection := self.find_classic_connection_by_handle(handle)):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+            return None
+
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        self.send_lmp_packet(
+            connection.peer_address,
+            lmp.LmpFeaturesReqExt(
+                features_page=command.page_number,
+                features=self.lmp_features_bytes[
+                    command.page_number * 8 : (command.page_number + 1) * 8
+                ],
+            ),
+        )
+
+        return None
+
     def on_hci_enhanced_setup_synchronous_connection_command(
         self, command: hci.HCI_Enhanced_Setup_Synchronous_Connection_Command
     ) -> None:
@@ -1645,11 +1814,15 @@ class Controller:
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_write_simple_pairing_mode_command(
-        self, _command: hci.HCI_Write_Simple_Pairing_Mode_Command
+        self, command: hci.HCI_Write_Simple_Pairing_Mode_Command
     ) -> hci.HCI_StatusReturnParameters:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.59 Write Simple Pairing Mode Command
         '''
+        if command.simple_pairing_mode:
+            self.lmp_features |= hci.LmpFeatureMask.SECURE_SIMPLE_PAIRING_HOST_SUPPORT
+        else:
+            self.lmp_features &= ~hci.LmpFeatureMask.SECURE_SIMPLE_PAIRING_HOST_SUPPORT
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_set_event_mask_page_2_command(
@@ -1670,16 +1843,23 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.3.78 Write LE Host Support Command
         '''
         return hci.HCI_Read_LE_Host_Support_ReturnParameters(
-            status=hci.HCI_ErrorCode.SUCCESS, le_supported_host=1, unused=0
+            status=hci.HCI_ErrorCode.SUCCESS,
+            le_supported_host=(
+                1 if self.lmp_features & hci.LmpFeatureMask.LE_SUPPORTED_HOST else 0
+            ),
+            unused=0,
         )
 
     def on_hci_write_le_host_support_command(
-        self, _command: hci.HCI_Write_LE_Host_Support_Command
+        self, command: hci.HCI_Write_LE_Host_Support_Command
     ) -> hci.HCI_StatusReturnParameters:
         '''
         See Bluetooth spec Vol 4, Part E - 7.3.79 Write LE Host Support Command
         '''
-        # TODO / Just ignore for now
+        if command.le_supported_host:
+            self.lmp_features |= hci.LmpFeatureMask.LE_SUPPORTED_HOST
+        else:
+            self.lmp_features &= ~hci.LmpFeatureMask.LE_SUPPORTED_HOST
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_write_authenticated_payload_timeout_command(
@@ -1716,7 +1896,11 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.4.2 Read Local Supported Commands Command
         '''
         return hci.HCI_Read_Local_Supported_Commands_ReturnParameters(
-            hci.HCI_ErrorCode.SUCCESS, supported_commands=self.supported_commands
+            hci.HCI_ErrorCode.SUCCESS,
+            supported_commands=sum(
+                hci.HCI_SUPPORTED_COMMANDS_MASKS.get(opcode, 0)
+                for opcode in self.supported_commands
+            ).to_bytes(64, 'little'),
         )
 
     def on_hci_read_local_supported_features_command(
@@ -1726,7 +1910,8 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.4.3 Read Local Supported Features Command
         '''
         return hci.HCI_Read_Local_Supported_Features_ReturnParameters(
-            hci.HCI_ErrorCode.SUCCESS, lmp_features=self.lmp_features[:8]
+            hci.HCI_ErrorCode.SUCCESS,
+            lmp_features=self.lmp_features_bytes[:8],
         )
 
     def on_hci_read_local_extended_features_command(
@@ -1735,18 +1920,19 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.4.4 Read Local Extended Features Command
         '''
-        if command.page_number * 8 > len(self.lmp_features):
+        feature_bytes = self.lmp_features_bytes
+        if command.page_number * 8 > len(feature_bytes):
             return hci.HCI_Read_Local_Extended_Features_ReturnParameters(
                 status=hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR,
                 page_number=command.page_number,
-                maximum_page_number=len(self.lmp_features) // 8 - 1,
+                maximum_page_number=len(feature_bytes) // 8 - 1,
                 extended_lmp_features=bytes(8),
             )
         return hci.HCI_Read_Local_Extended_Features_ReturnParameters(
             status=hci.HCI_ErrorCode.SUCCESS,
             page_number=command.page_number,
-            maximum_page_number=len(self.lmp_features) // 8 - 1,
-            extended_lmp_features=self.lmp_features[
+            maximum_page_number=len(feature_bytes) // 8 - 1,
+            extended_lmp_features=feature_bytes[
                 command.page_number * 8 : (command.page_number + 1) * 8
             ],
         )
