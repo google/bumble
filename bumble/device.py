@@ -2827,12 +2827,13 @@ class Device(utils.CompositeEventEmitter):
         await self.host.reset()
 
         # Try to get the public address from the controller
-        try:
-            response = await self.host.send_sync_command(hci.HCI_Read_BD_ADDR_Command())
-            logger.debug(color(f'BD_ADDR: {response.bd_addr}', 'yellow'))
-            self.public_address = response.bd_addr
-        except hci.HCI_Error:
-            logger.debug('Controller has no public address')
+        if self.public_address == hci.Address.ANY:
+            try:
+                response = await self.host.send_sync_command(hci.HCI_Read_BD_ADDR_Command())
+                logger.debug(color(f'BD_ADDR: {response.bd_addr}', 'yellow'))
+                self.public_address = response.bd_addr
+            except hci.HCI_Error:
+                logger.debug('Controller has no public address')
 
         # Instantiate the Key Store (we do this here rather than at __init__ time
         # because some Key Store implementations use the public address as a namespace)
