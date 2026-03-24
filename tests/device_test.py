@@ -827,6 +827,22 @@ async def test_remote_name_request():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_get_remote_classic_features():
+    devices = TwoDevices()
+    devices[0].classic_enabled = True
+    devices[1].classic_enabled = True
+    await devices[0].power_on()
+    await devices[1].power_on()
+    connection = await devices[0].connect_classic(devices[1].public_address)
+
+    assert (
+        await asyncio.wait_for(connection.get_remote_classic_features(), _TIMEOUT)
+        == devices.controllers[1].lmp_features
+    )
+
+
+# -----------------------------------------------------------------------------
 async def run_test_device():
     await test_device_connect_parallel()
     await test_flush()

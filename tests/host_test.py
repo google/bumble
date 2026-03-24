@@ -22,6 +22,7 @@ import unittest.mock
 
 import pytest
 
+from bumble import controller, hci
 from bumble.controller import Controller
 from bumble.hci import (
     HCI_AclDataPacket,
@@ -49,34 +50,27 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'supported_commands, lmp_features',
+    'supported_commands, max_lmp_features_page_number',
     [
-        (
-            # Default commands
-            '2000800000c000000000e4000000a822000000000000040000f7ffff7f000000'
-            '30f0f9ff01008004000000000000000000000000000000000000000000000000',
-            # Only LE LMP feature
-            '0000000060000000',
-        ),
+        (controller.Controller.supported_commands, 0),
         (
             # All commands
-            'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
-            'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+            set(hci.HCI_Command.command_names.keys()),
             # 3 pages of LMP features
-            '000102030405060708090A0B0C0D0E0F011112131415161718191A1B1C1D1E1F',
+            2,
         ),
     ],
 )
-async def test_reset(supported_commands: str, lmp_features: str):
+async def test_reset(supported_commands: set[int], max_lmp_features_page_number: int):
     controller = Controller('C')
-    controller.supported_commands = bytes.fromhex(supported_commands)
-    controller.lmp_features = bytes.fromhex(lmp_features)
+    controller.supported_commands = supported_commands
+    controller.lmp_features_max_page_number = max_lmp_features_page_number
     host = Host(controller, AsyncPipeSink(controller))
 
     await host.reset()
 
-    assert host.local_lmp_features == int.from_bytes(
-        bytes.fromhex(lmp_features), 'little'
+    assert host.local_lmp_features == (
+        controller.lmp_features & ~(1 << (64 * max_lmp_features_page_number + 1))
     )
 
 
