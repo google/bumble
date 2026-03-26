@@ -19,7 +19,7 @@ dependencies = [
     # Pyodide bundles a version of cryptography that is built for wasm, which may not match the
     # versions available on PyPI. Relax the version requirement since it's better than being
     # completely unable to import the package in case of version mismatch.
-    "cryptography >= 44.0.3; platform_system=='Emscripten'",
+    "cryptography >= 39.0.0; platform_system=='Emscripten'",
     # Android wheels for cryptography are not yet available on PyPI, so chaquopy uses
     # the builds from https://chaquo.com/pypi-13.1/cryptography/. But these are not regually
     # updated. Relax the version requirement since it's better than being completely unable
