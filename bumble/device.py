@@ -558,7 +558,9 @@ class AdvertisingParameters:
     )
     primary_advertising_interval_min: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
     primary_advertising_interval_max: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
-    primary_advertising_channel_map: hci.HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap = (
+    primary_advertising_channel_map: (
+        hci.HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap
+    ) = (
         AdvertisingChannelMap.CHANNEL_37
         | AdvertisingChannelMap.CHANNEL_38
         | AdvertisingChannelMap.CHANNEL_39
@@ -581,7 +583,9 @@ class AdvertisingParameters:
 class PeriodicAdvertisingParameters:
     periodic_advertising_interval_min: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
     periodic_advertising_interval_max: float = DEVICE_DEFAULT_ADVERTISING_INTERVAL
-    periodic_advertising_properties: hci.HCI_LE_Set_Periodic_Advertising_Parameters_Command.Properties = field(
+    periodic_advertising_properties: (
+        hci.HCI_LE_Set_Periodic_Advertising_Parameters_Command.Properties
+    ) = field(
         default_factory=lambda: hci.HCI_LE_Set_Periodic_Advertising_Parameters_Command.Properties(
             0
         )
@@ -893,7 +897,9 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
 
         options = hci.HCI_LE_Periodic_Advertising_Create_Sync_Command.Options(0)
         if self.filter_duplicates:
-            options |= hci.HCI_LE_Periodic_Advertising_Create_Sync_Command.Options.DUPLICATE_FILTERING_INITIALLY_ENABLED
+            options |= (
+                hci.HCI_LE_Periodic_Advertising_Create_Sync_Command.Options.DUPLICATE_FILTERING_INITIALLY_ENABLED
+            )
 
         await self.device.send_async_command(
             hci.HCI_LE_Periodic_Advertising_Create_Sync_Command(
@@ -1573,8 +1579,12 @@ class CigParameters:
     worst_case_sca: WorstCaseSca = WorstCaseSca.SCA_251_TO_500_PPM
     packing: Packing = Packing.SEQUENTIAL
     framing: Framing = Framing.UNFRAMED
-    max_transport_latency_c_to_p: int = DEVICE_DEFAULT_ISO_CIS_MAX_TRANSPORT_LATENCY  # Max C->P transport latency, in milliseconds
-    max_transport_latency_p_to_c: int = DEVICE_DEFAULT_ISO_CIS_MAX_TRANSPORT_LATENCY  # Max C->P transport latency, in milliseconds
+    max_transport_latency_c_to_p: int = (
+        DEVICE_DEFAULT_ISO_CIS_MAX_TRANSPORT_LATENCY  # Max C->P transport latency, in milliseconds
+    )
+    max_transport_latency_p_to_c: int = (
+        DEVICE_DEFAULT_ISO_CIS_MAX_TRANSPORT_LATENCY  # Max C->P transport latency, in milliseconds
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -2441,7 +2451,9 @@ class Device(utils.CompositeEventEmitter):
         self.le_connecting = False
         self.disconnecting = False
         self.connections = {}  # Connections, by connection handle
-        self.pending_connections = {}  # Pending connections, by BD address (BR/EDR only)
+        self.pending_connections = (
+            {}
+        )  # Pending connections, by BD address (BR/EDR only)
         self.sco_links = {}  # ScoLinks, by connection handle (BR/EDR only)
         self.cis_links = {}  # CisLinks, by connection handle (LE only)
         self._pending_cis = {}  # (CIS_ID, CIG_ID), by CIS_handle
