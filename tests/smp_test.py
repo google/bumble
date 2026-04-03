@@ -319,7 +319,6 @@ async def test_smp_debug_mode():
     config = DeviceConfiguration(smp_debug_mode=True)
     device = Device(config=config)
 
-    # assert device.smp_manager.ecc_key.private_key == smp.SMP_DEBUG_KEY_PRIVATE
     assert device.smp_manager.ecc_key.x == smp.SMP_DEBUG_KEY_PUBLIC_X
     assert device.smp_manager.ecc_key.y == smp.SMP_DEBUG_KEY_PUBLIC_Y
 
