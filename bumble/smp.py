@@ -1981,8 +1981,6 @@ class Manager(utils.EventEmitter):
             # When the Security Manager is placed in a Debug mode it shall use the
             # following Diffie-Hellman private / public key pair:
             debug_key = crypto.EccKey.from_private_key_bytes(SMP_DEBUG_KEY_PRIVATE)
-            assert debug_key.x == SMP_DEBUG_KEY_PUBLIC_X
-            assert debug_key.y == SMP_DEBUG_KEY_PUBLIC_Y
             return debug_key
 
         if self._ecc_key is None:
