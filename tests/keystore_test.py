@@ -21,6 +21,7 @@ import logging
 import os
 import pathlib
 import tempfile
+from unittest import mock
 
 import pytest
 
@@ -180,10 +181,54 @@ async def test_default_namespace(temporary_file):
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_no_filename(tmp_path):
+    import platformdirs
+
+    with mock.patch.object(platformdirs, 'user_data_path', return_value=tmp_path):
+        # Case 1: no namespace, no filename
+        keystore = JsonKeyStore(None, None)
+        expected_directory = tmp_path / 'Pairing'
+        expected_filename = expected_directory / 'keys.json'
+        assert keystore.directory_name == expected_directory
+        assert keystore.filename == expected_filename
+
+        # Save some data
+        keys = PairingKeys()
+        ltk = bytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+        keys.ltk = PairingKeys.Key(ltk)
+        await keystore.update('foo', keys)
+        assert expected_filename.exists()
+
+        # Load back
+        keystore2 = JsonKeyStore(None, None)
+        foo = await keystore2.get('foo')
+        assert foo is not None
+        assert foo.ltk.value == ltk
+
+        # Case 2: namespace, no filename
+        keystore3 = JsonKeyStore('my:namespace', None)
+        # safe_name = 'my-namespace' (lower is already 'my:namespace', then replace ':' with '-')
+        expected_filename3 = expected_directory / 'my-namespace.json'
+        assert keystore3.filename == expected_filename3
+
+        # Save some data
+        await keystore3.update('bar', keys)
+        assert expected_filename3.exists()
+
+        # Load back
+        keystore4 = JsonKeyStore('my:namespace', None)
+        bar = await keystore4.get('bar')
+        assert bar is not None
+        assert bar.ltk.value == ltk
+
+
+# -----------------------------------------------------------------------------
 async def run_tests():
     await test_basic()
     await test_parsing()
     await test_default_namespace()
+    await test_no_filename()
 
 
 # -----------------------------------------------------------------------------
