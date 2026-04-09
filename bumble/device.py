@@ -2159,6 +2159,7 @@ class DeviceConfiguration:
     )
     eatt_enabled: bool = False
     gatt_services: list[dict[str, Any]] = field(init=False)
+    smp_debug_mode: bool = False
 
     def __post_init__(self) -> None:
         self.gatt_services = []
@@ -2571,6 +2572,7 @@ class Device(utils.CompositeEventEmitter):
                 ),
             ),
         )
+        self.smp_manager.debug_mode = self.config.smp_debug_mode
 
         self.l2cap_channel_manager.register_fixed_channel(smp.SMP_CID, self.on_smp_pdu)
 

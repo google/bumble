@@ -178,6 +178,16 @@ class AuthReq(hci.SpecableFlag):
 SMP_CTKD_H7_LEBR_SALT = bytes.fromhex('000000000000000000000000746D7031')
 SMP_CTKD_H7_BRLE_SALT = bytes.fromhex('000000000000000000000000746D7032')
 
+# Diffie-Hellman private / public key pair in Debug Mode (Core - Vol. 3, Part H)
+SMP_DEBUG_KEY_PRIVATE = bytes.fromhex(
+        '3f49f6d4 a3c55f38 74c9b3e3 d2103f50 4aff607b eb40b799 5899b8a6 cd3c1abd'
+    )
+SMP_DEBUG_KEY_PUBLIC_X = bytes.fromhex(
+        '20b003d2 f297be2c 5e2c83a7 e9f9a5b9 eff49111 acf4fddb cc030148 0e359de6'
+    )
+SMP_DEBUG_KEY_PUBLIC_Y= bytes.fromhex(
+        'dc809c49 652aeb6d 63329abf 5a52155c 766345c2 8fed3024 741c8ed0 1589d28b'
+    )
 # fmt: on
 # pylint: enable=line-too-long
 # pylint: disable=invalid-name
@@ -1919,6 +1929,7 @@ class Manager(utils.EventEmitter):
         self._ecc_key = None
         self.pairing_config_factory = pairing_config_factory
         self.session_proxy = Session
+        self.debug_mode = False
 
     def send_command(self, connection: Connection, command: SMP_Command) -> None:
         logger.debug(
@@ -1965,6 +1976,13 @@ class Manager(utils.EventEmitter):
 
     @property
     def ecc_key(self) -> crypto.EccKey:
+        if self.debug_mode:
+            # Core - Vol 3, Part H:
+            # When the Security Manager is placed in a Debug mode it shall use the
+            # following Diffie-Hellman private / public key pair:
+            debug_key = crypto.EccKey.from_private_key_bytes(SMP_DEBUG_KEY_PRIVATE)
+            return debug_key
+
         if self._ecc_key is None:
             self._ecc_key = crypto.EccKey.generate()
         assert self._ecc_key

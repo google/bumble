@@ -24,7 +24,7 @@ import pytest
 from bumble import crypto, pairing, smp
 from bumble.core import AdvertisingData
 from bumble.crypto import EccKey, aes_cmac, ah, c1, f4, f5, f6, g2, h6, h7, s1
-from bumble.device import Device
+from bumble.device import Device, DeviceConfiguration
 from bumble.hci import Address
 from bumble.pairing import LeRole, OobData, OobSharedData
 
@@ -312,3 +312,17 @@ async def test_send_identity_address_command(
     actual_command = mock_method.call_args.args[0]
     assert actual_command.addr_type == expected_identity_address.address_type
     assert actual_command.bd_addr == expected_identity_address
+
+
+@pytest.mark.asyncio
+async def test_smp_debug_mode():
+    config = DeviceConfiguration(smp_debug_mode=True)
+    device = Device(config=config)
+
+    assert device.smp_manager.ecc_key.x == smp.SMP_DEBUG_KEY_PUBLIC_X
+    assert device.smp_manager.ecc_key.y == smp.SMP_DEBUG_KEY_PUBLIC_Y
+
+    device.smp_manager.debug_mode = False
+
+    assert not device.smp_manager.ecc_key.x == smp.SMP_DEBUG_KEY_PUBLIC_X
+    assert not device.smp_manager.ecc_key.y == smp.SMP_DEBUG_KEY_PUBLIC_Y
