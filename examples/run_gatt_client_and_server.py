@@ -83,6 +83,7 @@ async def main() -> None:
         GATT_DEVICE_INFORMATION_SERVICE, [manufacturer_name_characteristic]
     )
     server_device.add_service(device_info_service)
+    await server_device.start_advertising()
 
     # Connect the client to the server
     connection = await client_device.connect(server_device.random_address)
