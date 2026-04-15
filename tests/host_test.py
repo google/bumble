@@ -171,14 +171,15 @@ class Source:
 
 
 class Sink:
-    response: HCI_Event
+    response: HCI_Event | None
 
-    def __init__(self, source: Source, response: HCI_Event) -> None:
+    def __init__(self, source: Source, response: HCI_Event | None) -> None:
         self.source = source
         self.response = response
 
     def on_packet(self, packet: bytes) -> None:
-        self.source.sink.on_packet(bytes(self.response))
+        if self.response is not None:
+            self.source.sink.on_packet(bytes(self.response))
 
 
 @pytest.mark.asyncio
@@ -226,6 +227,23 @@ async def test_send_sync_command() -> None:
     )
     response3 = await host.send_sync_command_raw(command)  # type: ignore
     assert isinstance(response3.return_parameters, HCI_GenericReturnParameters)
+
+
+@pytest.mark.asyncio
+async def test_send_sync_command_timeout() -> None:
+    source = Source()
+    sink = Sink(source, None)
+
+    host = Host(source, sink)
+    host.ready = True
+
+    with pytest.raises(asyncio.TimeoutError):
+        await host.send_sync_command(HCI_Reset_Command(), response_timeout=0.01)
+
+    # The sending semaphore should have been released, so this should not block
+    # indefinitely
+    with pytest.raises(asyncio.TimeoutError):
+        await host.send_sync_command(hci.HCI_Reset_Command(), response_timeout=0.01)
 
 
 @pytest.mark.asyncio

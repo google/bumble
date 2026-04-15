@@ -692,10 +692,8 @@ class Host(utils.EventEmitter):
         finally:
             self.pending_command = None
             self.pending_response = None
-            if (
-                response is not None
-                and response.num_hci_command_packets
-                and self.command_semaphore.locked()
+            if response is None or (
+                response.num_hci_command_packets and self.command_semaphore.locked()
             ):
                 self.command_semaphore.release()
 
