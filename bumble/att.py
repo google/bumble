@@ -42,7 +42,7 @@ from typing_extensions import TypeIs
 
 from bumble import hci, l2cap, utils
 from bumble.colors import color
-from bumble.core import UUID, InvalidOperationError, ProtocolError
+from bumble.core import UUID, InvalidOperationError, InvalidPacketError, ProtocolError
 from bumble.hci import HCI_Object
 
 # -----------------------------------------------------------------------------
@@ -250,7 +250,7 @@ class ATT_PDU:
     @classmethod
     def from_bytes(cls, pdu: bytes) -> ATT_PDU:
         if not pdu:
-            raise ValueError("Empty ATT PDU")
+            raise InvalidPacketError("Empty ATT PDU")
         op_code = pdu[0]
 
         subclass = ATT_PDU.pdu_classes.get(op_code)

@@ -68,6 +68,8 @@ class HfpProtocolError(ProtocolError):
 
 # -----------------------------------------------------------------------------
 class HfpProtocol:
+    MAX_BUFFER_SIZE: ClassVar[int] = 65536
+
     dlc: rfcomm.DLC
     buffer: str
     lines: collections.deque
@@ -88,11 +90,17 @@ class HfpProtocol:
 
         logger.debug(f'<<< Data received: {data}')
 
+        # Drop incoming data if it would overflow the buffer; keep existing
+        # partial packet state intact so a future clean packet can still parse.
+        if len(self.buffer) + len(data) > self.MAX_BUFFER_SIZE:
+            logger.warning(
+                'HFP buffer overflow (>%d bytes), dropping incoming data',
+                self.MAX_BUFFER_SIZE,
+            )
+            return
+
         # Add to the buffer and look for lines
         self.buffer += data
-        if len(self.buffer) > 65536:
-            logger.warning("HFP buffer overflow, truncating")
-            self.buffer = self.buffer[-65536:]
         while (separator := self.buffer.find('\r')) >= 0:
             line = self.buffer[:separator].strip()
             self.buffer = self.buffer[separator + 1 :]

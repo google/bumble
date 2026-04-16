@@ -36,6 +36,7 @@ from bumble.colors import color
 from bumble.core import (
     AdvertisingData,
     InvalidArgumentError,
+    InvalidPacketError,
     PhysicalTransport,
     ProtocolError,
 )
@@ -216,7 +217,7 @@ class SMP_Command:
     @classmethod
     def from_bytes(cls, pdu: bytes) -> SMP_Command:
         if not pdu:
-            raise ValueError("Empty SMP PDU")
+            raise InvalidPacketError("Empty SMP PDU")
         code = CommandCode(pdu[0])
 
         subclass = SMP_Command.smp_classes.get(code)
