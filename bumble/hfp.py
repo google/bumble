@@ -84,12 +84,15 @@ class HfpProtocol:
     def feed(self, data: bytes | str) -> None:
         # Convert the data to a string if needed
         if isinstance(data, bytes):
-            data = data.decode('utf-8')
+            data = data.decode('utf-8', errors='replace')
 
         logger.debug(f'<<< Data received: {data}')
 
         # Add to the buffer and look for lines
         self.buffer += data
+        if len(self.buffer) > 65536:
+            logger.warning("HFP buffer overflow, truncating")
+            self.buffer = self.buffer[-65536:]
         while (separator := self.buffer.find('\r')) >= 0:
             line = self.buffer[:separator].strip()
             self.buffer = self.buffer[separator + 1 :]

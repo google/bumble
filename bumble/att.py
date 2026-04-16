@@ -249,6 +249,8 @@ class ATT_PDU:
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> ATT_PDU:
+        if not pdu:
+            raise ValueError("Empty ATT PDU")
         op_code = pdu[0]
 
         subclass = ATT_PDU.pdu_classes.get(op_code)
