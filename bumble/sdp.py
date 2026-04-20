@@ -594,7 +594,10 @@ class SDP_PDU:
 
     @classmethod
     def from_bytes(cls, pdu: bytes) -> SDP_PDU:
-        pdu_id, transaction_id, _parameters_length = struct.unpack_from('>BHH', pdu, 0)
+        pdu_id, transaction_id, parameters_length = struct.unpack_from('>BHH', pdu, 0)
+
+        if len(pdu) != 5 + parameters_length:
+            logger.warning("Expect %d bytes, got %d", 5 + parameters_length, len(pdu))
 
         subclass = cls.subclasses.get(pdu_id)
         if not (subclass := cls.subclasses.get(pdu_id)):
@@ -616,9 +619,11 @@ class SDP_PDU:
 
     def __bytes__(self):
         if self._payload is None:
-            self._payload = struct.pack(
-                '>BHH', self.pdu_id, self.transaction_id, 0
-            ) + hci.HCI_Object.dict_to_bytes(self.__dict__, self.fields)
+            parameters = hci.HCI_Object.dict_to_bytes(self.__dict__, self.fields)
+            self._payload = (
+                struct.pack('>BHH', self.pdu_id, self.transaction_id, len(parameters))
+                + parameters
+            )
         return self._payload
 
     @property
