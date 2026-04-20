@@ -18,9 +18,11 @@
 import asyncio
 import logging
 import os
+import re
 
 import pytest
 
+from bumble import sdp
 from bumble.core import BT_L2CAP_PROTOCOL_ID, UUID
 from bumble.sdp import (
     SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
@@ -204,6 +206,16 @@ def sdp_records(record_count=1):
         ]
         for i in range(record_count)
     }
+
+
+# -----------------------------------------------------------------------------
+def test_pdu_parameter_length(caplog) -> None:
+    caplog.set_level(logging.WARNING)
+    pdu = sdp.SDP_ErrorResponse(
+        transaction_id=0, error_code=sdp.ErrorCode.INVALID_SDP_VERSION
+    )
+    assert sdp.SDP_PDU.from_bytes(bytes(pdu)) == pdu
+    assert not re.search("Expect \d+ bytes, got \d+", caplog.text)
 
 
 # -----------------------------------------------------------------------------
