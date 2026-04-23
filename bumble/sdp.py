@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import struct
+import threading
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar, NewType, TypeVar
@@ -42,6 +43,13 @@ if TYPE_CHECKING:
 # Logging
 # -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
+
+
+# SDP data elements are nested (SEQUENCE, ALTERNATIVE). Cap parse recursion to
+# prevent a malicious peer from crashing the process via a deeply nested PDU.
+# 32 levels is well beyond anything a legitimate service record uses.
+_MAX_DATA_ELEMENT_NESTING = 32
+_parse_state = threading.local()
 
 
 # -----------------------------------------------------------------------------
@@ -284,12 +292,22 @@ class DataElement:
 
     @staticmethod
     def list_from_bytes(data):
-        elements = []
-        while data:
-            element = DataElement.from_bytes(data)
-            elements.append(element)
-            data = data[len(bytes(element)) :]
-        return elements
+        depth = getattr(_parse_state, "depth", 0)
+        if depth >= _MAX_DATA_ELEMENT_NESTING:
+            raise ValueError(
+                f"SDP data element nesting exceeds max depth "
+                f"({_MAX_DATA_ELEMENT_NESTING})"
+            )
+        _parse_state.depth = depth + 1
+        try:
+            elements = []
+            while data:
+                element = DataElement.from_bytes(data)
+                elements.append(element)
+                data = data[len(bytes(element)) :]
+            return elements
+        finally:
+            _parse_state.depth = depth
 
     @staticmethod
     def parse_from_bytes(data, offset):
