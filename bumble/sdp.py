@@ -294,7 +294,7 @@ class DataElement:
     def list_from_bytes(data):
         depth = getattr(_parse_state, "depth", 0)
         if depth >= _MAX_DATA_ELEMENT_NESTING:
-            raise ValueError(
+            raise InvalidPacketError(
                 f"SDP data element nesting exceeds max depth "
                 f"({_MAX_DATA_ELEMENT_NESTING})"
             )

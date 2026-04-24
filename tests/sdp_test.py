@@ -461,8 +461,6 @@ def test_nested_sequence_recursion_guard():
             break
         inner = bytes([0x36, (size >> 8) & 0xFF, size & 0xFF]) + inner
 
-    import pytest
-
     with pytest.raises(ValueError, match="nesting exceeds max depth"):
         DataElement.from_bytes(inner)
 
