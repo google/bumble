@@ -440,3 +440,43 @@ async def run():
 if __name__ == '__main__':
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(run())
+
+
+# -----------------------------------------------------------------------------
+def test_nested_sequence_recursion_guard():
+    """Regression test: deeply-nested SDP SEQUENCE/ALTERNATIVE must not crash
+    the parser with RecursionError. Instead a ValueError is raised once the
+    configured nesting limit is exceeded.
+
+    Root cause: DataElement.from_bytes -> list_from_bytes -> (constructor
+    dispatching back to list_from_bytes for SEQUENCE/ALTERNATIVE) recursed
+    without a depth limit. A malicious SDP peer could craft a PDU exceeding
+    Pythons default recursion limit (~1000 frames) and crash the host.
+    """
+    # Build nested SEQUENCE payload with tag 0x36 (SEQUENCE, 2-byte length).
+    inner = b"\x35\x00"  # empty SEQUENCE terminator
+    for _ in range(1500):
+        size = len(inner)
+        if size >= 65535:
+            break
+        inner = bytes([0x36, (size >> 8) & 0xFF, size & 0xFF]) + inner
+
+    with pytest.raises(ValueError, match="nesting exceeds max depth"):
+        DataElement.from_bytes(inner)
+
+
+def test_nested_sequence_within_limit_still_works():
+    """Nested-but-reasonable SDP SEQUENCEs must still parse correctly."""
+    leaf = DataElement.unsigned_integer(1, value_size=2)
+    payload = leaf
+    for _ in range(16):  # under the 32-depth limit
+        payload = DataElement.sequence([payload])
+    raw = bytes(payload)
+    parsed = DataElement.from_bytes(raw)
+    # Walk back down to confirm structural integrity preserved
+    cur = parsed
+    for _ in range(16):
+        assert cur.type == DataElement.SEQUENCE
+        cur = cur.value[0]
+    assert cur.type == DataElement.UNSIGNED_INTEGER
+    assert cur.value == 1
