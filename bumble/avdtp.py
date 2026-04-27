@@ -314,7 +314,7 @@ class MessageAssembler:
         # Drop empty PDUs sent by remote — accessing pdu[0] below would
         # raise IndexError, propagating up to the L2CAP read loop and
         # tearing down the channel. Same class as #912 (ATT empty PDU).
-        if len(pdu) < 1:
+        if not pdu:
             logger.warning('AVDTP message assembler: empty PDU dropped')
             return
 

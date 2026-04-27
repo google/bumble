@@ -142,7 +142,7 @@ def test_message_assembler_truncated_pdu(pdu: bytes):
     assembler = avdtp.MessageAssembler(callback)
     # Must not raise; nothing should be delivered to callback either.
     assembler.on_pdu(pdu)
-    assert completed == []
+    assert not completed
 
 
 # -----------------------------------------------------------------------------
