@@ -311,6 +311,13 @@ class MessageAssembler:
     def on_pdu(self, pdu: bytes) -> None:
         self.packet_count += 1
 
+        # Drop empty PDUs sent by remote — accessing pdu[0] below would
+        # raise IndexError, propagating up to the L2CAP read loop and
+        # tearing down the channel. Same class as #912 (ATT empty PDU).
+        if not pdu:
+            logger.warning('AVDTP message assembler: empty PDU dropped')
+            return
+
         transaction_label = pdu[0] >> 4
         packet_type = Protocol.PacketType((pdu[0] >> 2) & 3)
         message_type = Message.MessageType(pdu[0] & 3)
@@ -324,6 +331,23 @@ class MessageAssembler:
             Protocol.PacketType.SINGLE_PACKET,
             Protocol.PacketType.START_PACKET,
         ):
+            # Both single and start packets carry the signal identifier in
+            # pdu[1]; start packets additionally carry the packet count in
+            # pdu[2]. Guard each access so a malformed remote frame can't
+            # crash the message assembler.
+            if len(pdu) < 2:
+                logger.warning(
+                    'AVDTP %s packet too short (%d bytes); dropped',
+                    packet_type.name,
+                    len(pdu),
+                )
+                return
+            if packet_type == Protocol.PacketType.START_PACKET and len(pdu) < 3:
+                logger.warning(
+                    'AVDTP START packet missing signal-packet count; dropped'
+                )
+                return
+
             if self.message is not None:
                 # The previous message has not been terminated
                 logger.warning(
