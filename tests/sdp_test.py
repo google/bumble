@@ -215,7 +215,7 @@ def test_pdu_parameter_length(caplog) -> None:
         transaction_id=0, error_code=sdp.ErrorCode.INVALID_SDP_VERSION
     )
     assert sdp.SDP_PDU.from_bytes(bytes(pdu)) == pdu
-    assert not re.search("Expect \d+ bytes, got \d+", caplog.text)
+    assert not re.search(r"Expect \d+ bytes, got \d+", caplog.text)
 
 
 # -----------------------------------------------------------------------------
