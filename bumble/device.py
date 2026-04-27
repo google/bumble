@@ -5618,8 +5618,8 @@ class Device(utils.CompositeEventEmitter):
     async def notify_subscriber(
         self,
         connection: Connection,
-        attribute: Attribute,
-        value: Any | None = None,
+        attribute: Attribute[_T],
+        value: _T | None = None,
         force: bool = False,
     ) -> None:
         """
@@ -5638,7 +5638,7 @@ class Device(utils.CompositeEventEmitter):
         await self.gatt_server.notify_subscriber(connection, attribute, value, force)
 
     async def notify_subscribers(
-        self, attribute: Attribute, value: Any | None = None, force: bool = False
+        self, attribute: Attribute[_T], value: _T | None = None, force: bool = False
     ) -> None:
         """
         Send a notification to all the subscribers of an attribute.
@@ -5657,8 +5657,8 @@ class Device(utils.CompositeEventEmitter):
     async def indicate_subscriber(
         self,
         connection: Connection,
-        attribute: Attribute,
-        value: Any | None = None,
+        attribute: Attribute[_T],
+        value: _T | None = None,
         force: bool = False,
     ):
         """
@@ -5679,7 +5679,7 @@ class Device(utils.CompositeEventEmitter):
         await self.gatt_server.indicate_subscriber(connection, attribute, value, force)
 
     async def indicate_subscribers(
-        self, attribute: Attribute, value: Any | None = None, force: bool = False
+        self, attribute: Attribute[_T], value: _T | None = None, force: bool = False
     ):
         """
         Send an indication to all the subscribers of an attribute.
