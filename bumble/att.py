@@ -1083,7 +1083,7 @@ class Attribute(utils.EventEmitter, Generic[_T]):
         else:
             value_str = str(self.value)
         if value_str:
-            value_string = f', value={self.value.hex()}'
+            value_string = f', value={value_str}'
         else:
             value_string = ''
         return (
