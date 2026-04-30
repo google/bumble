@@ -33,7 +33,7 @@ To install package dependencies needed to run the bumble examples, execute the f
 
 ```
 python -m pip install --upgrade pip
-python -m pip install ".[test,development,documentation]"
+python -m pip install ".[all]" --group dev
 ```
 
 ### Examples
