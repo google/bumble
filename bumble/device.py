@@ -1423,6 +1423,9 @@ class ScoLink(utils.CompositeEventEmitter):
     acl_connection: Connection
     handle: int
     link_type: int
+    rx_packet_length: int
+    tx_packet_length: int
+    air_mode: hci.CodecID
     sink: Callable[[hci.HCI_SynchronousDataPacket], Any] | None = None
 
     EVENT_DISCONNECTION: ClassVar[str] = "disconnection"
@@ -6051,7 +6054,7 @@ class Device(utils.CompositeEventEmitter):
     def on_connection_request(
         self, bd_addr: hci.Address, class_of_device: int, link_type: int
     ):
-        logger.debug(f'*** Connection request: {bd_addr}')
+        logger.debug(f'*** Connection request: {bd_addr} link_type={link_type}')
 
         # Handle SCO request.
         if link_type in (
@@ -6061,6 +6064,7 @@ class Device(utils.CompositeEventEmitter):
             if connection := self.find_connection_by_bd_addr(
                 bd_addr, transport=PhysicalTransport.BR_EDR
             ):
+                connection.emit(self.EVENT_SCO_REQUEST, link_type)
                 self.emit(self.EVENT_SCO_REQUEST, connection, link_type)
             else:
                 logger.error(f'SCO request from a non-connected device {bd_addr}')
@@ -6420,8 +6424,7 @@ class Device(utils.CompositeEventEmitter):
             logger.warning('peer name is not valid UTF-8')
             if connection:
                 connection.emit(connection.EVENT_REMOTE_NAME_FAILURE, error)
-            else:
-                self.emit(self.EVENT_REMOTE_NAME_FAILURE, address, error)
+            self.emit(self.EVENT_REMOTE_NAME_FAILURE, address, error)
 
     # [Classic only]
     @host_event_handler
@@ -6438,7 +6441,13 @@ class Device(utils.CompositeEventEmitter):
     @with_connection_from_address
     @utils.experimental('Only for testing.')
     def on_sco_connection(
-        self, acl_connection: Connection, sco_handle: int, link_type: int
+        self,
+        acl_connection: Connection,
+        sco_handle: int,
+        link_type: int,
+        rx_packet_length: int,
+        tx_packet_length: int,
+        air_mode: int,
     ) -> None:
         logger.debug(
             f'*** SCO connected: {acl_connection.peer_address}, '
@@ -6450,7 +6459,11 @@ class Device(utils.CompositeEventEmitter):
             acl_connection=acl_connection,
             handle=sco_handle,
             link_type=link_type,
+            rx_packet_length=rx_packet_length,
+            tx_packet_length=tx_packet_length,
+            air_mode=hci.CodecID(air_mode),
         )
+        acl_connection.emit(self.EVENT_SCO_CONNECTION, sco_link)
         self.emit(self.EVENT_SCO_CONNECTION, sco_link)
 
     # [Classic only]
@@ -6461,7 +6474,8 @@ class Device(utils.CompositeEventEmitter):
         self, acl_connection: Connection, status: int
     ) -> None:
         logger.debug(f'*** SCO connection failure: {acl_connection.peer_address}***')
-        self.emit(self.EVENT_SCO_CONNECTION_FAILURE)
+        acl_connection.emit(self.EVENT_SCO_CONNECTION_FAILURE, status)
+        self.emit(self.EVENT_SCO_CONNECTION_FAILURE, status)
 
     # [Classic only]
     @host_event_handler
@@ -6924,15 +6938,18 @@ class Device(utils.CompositeEventEmitter):
     @with_connection_from_address
     def on_classic_pairing(self, connection: Connection) -> None:
         connection.emit(connection.EVENT_CLASSIC_PAIRING)
+        self.emit(connection.EVENT_CLASSIC_PAIRING, connection)
 
     # [Classic only]
     @host_event_handler
     @with_connection_from_address
     def on_classic_pairing_failure(self, connection: Connection, status: int) -> None:
         connection.emit(connection.EVENT_CLASSIC_PAIRING_FAILURE, status)
+        self.emit(connection.EVENT_CLASSIC_PAIRING_FAILURE, connection, status)
 
     def on_pairing_start(self, connection: Connection) -> None:
         connection.emit(connection.EVENT_PAIRING_START)
+        self.emit(connection.EVENT_PAIRING_START, connection)
 
     def on_pairing(
         self,
