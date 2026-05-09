@@ -2343,6 +2343,9 @@ class Device(utils.CompositeEventEmitter):
     _pending_cis: dict[int, tuple[int, int]]
     gatt_service: gatt_service.GenericAttributeProfileService | None = None
     keystore: KeyStore | None = None
+    inquiry_response: bytes | None = None
+    address_resolver: smp.AddressResolver | None = None
+    connect_own_address_type: hci.OwnAddressType | None = None
 
     EVENT_ADVERTISEMENT = "advertisement"
     EVENT_PERIODIC_ADVERTISING_SYNC_TRANSFER = "periodic_advertising_sync_transfer"
@@ -2461,16 +2464,11 @@ class Device(utils.CompositeEventEmitter):
         self.bis_links = {}
         self.big_syncs = {}
         self.classic_enabled = False
-        self.inquiry_response = None
-        self.address_resolver = None
         self.classic_pending_accepts = {
             hci.Address.ANY: []
         }  # Futures, by BD address OR [Futures] for hci.Address.ANY
 
         self._cis_lock = asyncio.Lock()
-
-        # Own address type cache
-        self.connect_own_address_type = None
 
         self.name = config.name
         self.public_address = hci.Address.ANY
