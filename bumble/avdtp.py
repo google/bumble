@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
+import abc
 import asyncio
 import enum
 import logging
@@ -1946,9 +1947,6 @@ class Stream:
             await self.rtp_channel.disconnect()
             self.rtp_channel = None
 
-        # Release the endpoint
-        self.local_endpoint.in_use = 0
-
         self.change_state(State.IDLE)
 
     async def on_set_configuration_command(
@@ -2039,7 +2037,6 @@ class Stream:
 
         if self.rtp_channel is None:
             # No channel to release, we're done
-            self.local_endpoint.in_use = 0
             self.change_state(State.IDLE)
         else:
             # TODO: set a timer as we wait for the RTP channel to be closed
@@ -2051,7 +2048,6 @@ class Stream:
         await self.local_endpoint.on_abort_command()
         if self.rtp_channel is None:
             # No need to wait
-            self.local_endpoint.in_use = 0
             self.change_state(State.IDLE)
         else:
             # Wait for the RTP channel to be closed
@@ -2074,7 +2070,6 @@ class Stream:
     def on_l2cap_channel_close(self) -> None:
         logger.debug(color('<<< stream channel closed', 'magenta'))
         self.local_endpoint.on_rtp_channel_close()
-        self.local_endpoint.in_use = 0
         self.rtp_channel = None
 
         if self.state in (State.CLOSING, State.ABORTING):
@@ -2099,7 +2094,6 @@ class Stream:
         self.state = State.IDLE
 
         local_endpoint.stream = self
-        local_endpoint.in_use = 1
 
     def __str__(self) -> str:
         return (
@@ -2109,13 +2103,15 @@ class Stream:
 
 
 # -----------------------------------------------------------------------------
-@dataclass
-class StreamEndPoint:
+class StreamEndPoint(abc.ABC):
     seid: int
     media_type: MediaType
     tsep: StreamEndPointType
-    in_use: int
     capabilities: Iterable[ServiceCapabilities]
+
+    @property
+    def in_use(self) -> int:
+        raise NotImplementedError()
 
 
 # -----------------------------------------------------------------------------
@@ -2156,20 +2152,29 @@ class DiscoveredStreamEndPoint(StreamEndPoint, StreamEndPointProxy):
         in_use: int,
         capabilities: Iterable[ServiceCapabilities],
     ) -> None:
-        StreamEndPoint.__init__(
-            self,
-            seid=seid,
-            media_type=media_type,
-            tsep=tsep,
-            in_use=in_use,
-            capabilities=capabilities,
-        )
+        # StreamEndPoint attributes
+        self.seid = seid
+        self.media_type = media_type
+        self.tsep = tsep
+        self._in_use = in_use
+        self.capabilities = capabilities
+
         StreamEndPointProxy.__init__(self, protocol=protocol, seid=seid)
+
+    @property
+    def in_use(self) -> int:
+        return self._in_use
 
 
 # -----------------------------------------------------------------------------
 class LocalStreamEndPoint(StreamEndPoint, utils.EventEmitter):
     stream: Stream | None
+
+    @property
+    def in_use(self) -> int:
+        if self.stream and self.stream.state != State.IDLE:
+            return 1
+        return 0
 
     EVENT_CONFIGURATION = "configuration"
     EVENT_OPEN = "open"
@@ -2193,15 +2198,13 @@ class LocalStreamEndPoint(StreamEndPoint, utils.EventEmitter):
         capabilities: Iterable[ServiceCapabilities],
         configuration: Iterable[ServiceCapabilities] | None = None,
     ):
-        StreamEndPoint.__init__(
-            self,
-            seid=seid,
-            media_type=media_type,
-            tsep=tsep,
-            in_use=0,
-            capabilities=capabilities,
-        )
         utils.EventEmitter.__init__(self)
+        # StreamEndPoint attributes
+        self.seid = seid
+        self.media_type = media_type
+        self.tsep = tsep
+        self.capabilities = capabilities
+
         self.protocol = protocol
         self.configuration = configuration if configuration is not None else []
         self.stream = None
