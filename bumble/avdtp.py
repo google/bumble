@@ -2156,8 +2156,15 @@ class DiscoveredStreamEndPoint(StreamEndPoint, StreamEndPointProxy):
         in_use: int,
         capabilities: Iterable[ServiceCapabilities],
     ) -> None:
-        StreamEndPoint.__init__(self, seid, media_type, tsep, in_use, capabilities)
-        StreamEndPointProxy.__init__(self, protocol, seid)
+        StreamEndPoint.__init__(
+            self,
+            seid=seid,
+            media_type=media_type,
+            tsep=tsep,
+            in_use=in_use,
+            capabilities=capabilities,
+        )
+        StreamEndPointProxy.__init__(self, protocol=protocol, seid=seid)
 
 
 # -----------------------------------------------------------------------------
@@ -2186,7 +2193,14 @@ class LocalStreamEndPoint(StreamEndPoint, utils.EventEmitter):
         capabilities: Iterable[ServiceCapabilities],
         configuration: Iterable[ServiceCapabilities] | None = None,
     ):
-        StreamEndPoint.__init__(self, seid, media_type, tsep, 0, capabilities)
+        StreamEndPoint.__init__(
+            self,
+            seid=seid,
+            media_type=media_type,
+            tsep=tsep,
+            in_use=0,
+            capabilities=capabilities,
+        )
         utils.EventEmitter.__init__(self)
         self.protocol = protocol
         self.configuration = configuration if configuration is not None else []
@@ -2273,12 +2287,12 @@ class LocalSource(LocalStreamEndPoint):
             codec_capabilities,
         ] + list(other_capabilities)
         super().__init__(
-            protocol,
-            seid,
-            codec_capabilities.media_type,
-            AVDTP_TSEP_SRC,
-            capabilities,
-            capabilities,
+            protocol=protocol,
+            seid=seid,
+            media_type=codec_capabilities.media_type,
+            tsep=AVDTP_TSEP_SRC,
+            capabilities=capabilities,
+            configuration=capabilities,
         )
         self.packet_pump = packet_pump
 
@@ -2317,11 +2331,11 @@ class LocalSink(LocalStreamEndPoint):
             codec_capabilities,
         ]
         super().__init__(
-            protocol,
-            seid,
-            codec_capabilities.media_type,
-            AVDTP_TSEP_SNK,
-            capabilities,
+            protocol=protocol,
+            seid=seid,
+            media_type=codec_capabilities.media_type,
+            tsep=AVDTP_TSEP_SNK,
+            capabilities=capabilities,
         )
 
     def on_rtp_channel_open(self) -> None:
