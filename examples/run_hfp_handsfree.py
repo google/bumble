@@ -49,23 +49,35 @@ def on_audio_packet(packet: hci.HCI_SynchronousDataPacket) -> None:
     else:
         print('!!! discarding packet with status ', packet.packet_status.name)
 
-    if input_wav and hf_protocol:
-        # Send PCM audio from the input
-        frame_count = len(packet.data) // 2
-        while frame_count:
-            # NOTE: we use a fixed number of frames here, this should likely be adjusted
-            # based on the transport parameters (like the USB max packet size)
-            chunk_size = min(frame_count, 16)
+
+async def send_audio_loop(link: ScoLink):
+    print("### Starting active send_audio_loop")
+    try:
+        while input_wav and hf_protocol:
+            # mSBC uses 60 bytes (30 frames of 16-bit) every 7.5ms
+            if link.air_mode == hci.CodecID.MSBC:
+                chunk_size = 30
+                interval = 0.0075
+            else:
+                # CVSD default
+                chunk_size = 120
+                interval = 0.015  # 15ms
+
             if not (pcm_data := input_wav.readframes(chunk_size)):
-                return
-            frame_count -= chunk_size
+                input_wav.setpos(0)  # Loop
+                continue
+
             hf_protocol.dlc.multiplexer.l2cap_channel.connection.device.host.send_sco_sdu(
-                connection_handle=packet.connection_handle,
+                connection_handle=link.handle,
                 sdu=pcm_data,
             )
+            await asyncio.sleep(interval)
+    except asyncio.CancelledError:
+        print("### send_audio_loop cancelled")
+    except Exception as e:
+        print(f"### Exception in send_audio_loop: {e}")
 
 
-# -----------------------------------------------------------------------------
 def on_sco_connection(link: ScoLink) -> None:
     print('### SCO connection established:', link)
     if link.air_mode == hci.CodecID.TRANSPARENT:
@@ -73,6 +85,9 @@ def on_sco_connection(link: ScoLink) -> None:
         return
 
     link.sink = on_audio_packet
+
+    if input_wav:
+        asyncio.create_task(send_audio_loop(link))
 
 
 # -----------------------------------------------------------------------------

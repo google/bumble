@@ -2039,7 +2039,6 @@ class Stream:
 
         if self.rtp_channel is None:
             # No channel to release, we're done
-            self.local_endpoint.in_use = 0
             self.change_state(State.IDLE)
         else:
             # TODO: set a timer as we wait for the RTP channel to be closed
@@ -2051,7 +2050,6 @@ class Stream:
         await self.local_endpoint.on_abort_command()
         if self.rtp_channel is None:
             # No need to wait
-            self.local_endpoint.in_use = 0
             self.change_state(State.IDLE)
         else:
             # Wait for the RTP channel to be closed

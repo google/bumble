@@ -42,13 +42,13 @@ async def open_udp_transport(spec: str) -> Transport:
 
     class UdpPacketSink:
         def __init__(self, transport):
-            self.transport = transport
+            self.write_transport = transport
 
         def on_packet(self, packet):
-            self.transport.sendto(packet)
+            self.write_transport.sendto(packet)
 
         def close(self):
-            self.transport.close()
+            self.write_transport.close()
 
     local, remote = spec.split(',')
     local_host, local_port = local.rsplit(':', maxsplit=1)

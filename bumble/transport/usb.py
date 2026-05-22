@@ -227,17 +227,46 @@ class UsbPacketSink:
         self.bulk_out = bulk_out
         self.isochronous_out = isochronous_out
         self.bulk_or_control_out_transfer = device.getTransfer()
-        self.isochronous_out_transfer = device.getTransfer(iso_packets=1)
-        self.out_transfer_ready = asyncio.Semaphore(1)
-        self.packets: asyncio.Queue[bytes] = (
-            asyncio.Queue()
-        )  # Queue of packets waiting to be sent
+        self.active_iso_transfer = None  # Track active in-flight ISO transfer
+        self.bulk_out_ready = asyncio.Semaphore(1)
+        self.iso_out_ready = asyncio.Semaphore(1)
+        self.bulk_packets: asyncio.Queue[bytes] = asyncio.Queue()
+        self.iso_packets: asyncio.Queue[bytes] = asyncio.Queue()
         self.loop = asyncio.get_running_loop()
-        self.queue_task = None
+        self.bulk_queue_task = None
+        self.iso_queue_task = None
         self.closed = False
+        self.iso_active = False
 
     def start(self):
-        self.queue_task = asyncio.create_task(self.process_queue())
+        self.bulk_queue_task = asyncio.create_task(self.process_bulk_queue())
+
+    def start_iso(self):
+        if self.isochronous_out is not None and self.iso_queue_task is None:
+            logger.debug("Starting ISO OUT transfers")
+            self.iso_active = True
+            self.iso_queue_task = asyncio.create_task(self.process_iso_queue())
+
+    async def stop_iso(self):
+        if self.iso_queue_task is not None:
+            logger.debug("Stopping ISO OUT transfers")
+            self.iso_active = False
+            self.iso_queue_task.cancel()
+            self.iso_queue_task = None
+
+            # Empty the queue
+            while not self.iso_packets.empty():
+                self.iso_packets.get_nowait()
+
+            # Cancel transfer if in flight
+            transfer = self.active_iso_transfer
+            self.active_iso_transfer = None
+            if transfer and transfer.isSubmitted():
+                try:
+                    transfer.cancel()
+                    await self.iso_out_ready.acquire()
+                except usb1.USBError as error:
+                    logger.debug(f'ISO OUT transfer likely already completed ({error})')
 
     def on_packet(self, packet):
         # Ignore packets if we're closed
@@ -248,13 +277,21 @@ class UsbPacketSink:
             logger.warning('packet too short')
             return
 
-        # Queue the packet
-        self.packets.put_nowait(packet)
+        # Queue the packet depending on type
+        packet_type = packet[0]
+        if packet_type == hci.HCI_SYNCHRONOUS_DATA_PACKET:
+            self.iso_packets.put_nowait(packet)
+        else:
+            self.bulk_packets.put_nowait(packet)
 
     def transfer_callback(self, transfer):
-        self.loop.call_soon_threadsafe(self.out_transfer_ready.release)
-        status = transfer.getStatus()
+        if transfer.getUserData() == "ISO":
+            self.active_iso_transfer = None
+            self.loop.call_soon_threadsafe(self.iso_out_ready.release)
+        else:
+            self.loop.call_soon_threadsafe(self.bulk_out_ready.release)
 
+        status = transfer.getStatus()
         logger.debug(f"OUT CALLBACK: {status}")
 
         if status != usb1.TRANSFER_COMPLETED:
@@ -265,15 +302,10 @@ class UsbPacketSink:
                 )
             )
 
-    async def process_queue(self):
+    async def process_bulk_queue(self):
         while not self.closed:
-            # Wait for a packet to transfer.
-            packet = await self.packets.get()
-
-            # Wait until we can start a transfer.
-            await self.out_transfer_ready.acquire()
-
-            # Transfer the packet.
+            packet = await self.bulk_packets.get()
+            await self.bulk_out_ready.acquire()
             packet_type = packet[0]
             packet_payload = packet[1:]
             submitted = False
@@ -297,30 +329,44 @@ class UsbPacketSink:
                     )
                     self.bulk_or_control_out_transfer.submit()
                     submitted = True
-                elif packet_type == hci.HCI_SYNCHRONOUS_DATA_PACKET:
-                    if self.isochronous_out is None:
-                        logger.warning(
-                            color('isochronous packets not supported', 'red')
-                        )
-                        self.out_transfer_ready.release()
-                        continue
-
-                    self.isochronous_out_transfer.setIsochronous(
-                        self.isochronous_out.getAddress(),
-                        packet_payload,
-                        callback=self.transfer_callback,
-                    )
-                    self.isochronous_out_transfer.submit()
-                    submitted = True
-                else:
-                    logger.warning(
-                        color(f'unsupported packet type {packet_type}', 'red')
-                    )
             except Exception as error:
-                logger.warning(f'!!! exception while submitting transfer: {error}')
+                logger.warning(f'!!! exception while submitting bulk transfer: {error}')
 
             if not submitted:
-                self.out_transfer_ready.release()
+                self.bulk_out_ready.release()
+
+    async def process_iso_queue(self):
+        while self.iso_active:
+            packet = await self.iso_packets.get()
+            await self.iso_out_ready.acquire()
+            packet_payload = packet[1:]
+            submitted = False
+            try:
+                max_packet_size = self.isochronous_out.getMaxPacketSize()
+                iso_packets = (
+                    len(packet_payload) + max_packet_size - 1
+                ) // max_packet_size
+
+                lengths = [max_packet_size] * (iso_packets - 1)
+                lengths.append(len(packet_payload) - sum(lengths))
+
+                transfer = self.device.getTransfer(iso_packets=iso_packets)
+                transfer.setIsochronous(
+                    self.isochronous_out.getAddress(),
+                    packet_payload,
+                    callback=self.transfer_callback,
+                    user_data="ISO",
+                    iso_transfer_length_list=lengths,
+                )
+                self.active_iso_transfer = transfer
+                transfer.submit()
+                submitted = True
+            except Exception as error:
+                logger.warning(f'!!! exception while submitting iso transfer: {error}')
+
+            if not submitted:
+                self.active_iso_transfer = None
+                self.iso_out_ready.release()
 
     def close(self):
         self.closed = True
@@ -328,29 +374,25 @@ class UsbPacketSink:
     async def terminate(self):
         self.close()
 
-        if self.queue_task:
-            self.queue_task.cancel()
+        if self.bulk_queue_task:
+            self.bulk_queue_task.cancel()
 
-        # Empty the packet queue so that we don't send any more data
-        while not self.packets.empty():
-            self.packets.get_nowait()
+        await self.stop_iso()
+
+        # Empty the packet queues
+        while not self.bulk_packets.empty():
+            self.bulk_packets.get_nowait()
 
         # If we have transfers in flight, cancel them
-        for transfer in (
-            self.bulk_or_control_out_transfer,
-            self.isochronous_out_transfer,
-        ):
-            if transfer.isSubmitted():
-                # Try to cancel the transfer, but that may fail because it may have
-                # already completed
-                try:
-                    transfer.cancel()
-
-                    logger.debug('waiting for OUT transfer cancellation to be done...')
-                    await self.out_transfer_ready.acquire()
-                    logger.debug('OUT transfer cancellation done')
-                except usb1.USBError as error:
-                    logger.debug(f'OUT transfer likely already completed ({error})')
+        transfer = self.bulk_or_control_out_transfer
+        if transfer.isSubmitted():
+            try:
+                transfer.cancel()
+                logger.debug('waiting for OUT transfer cancellation to be done...')
+                await self.bulk_out_ready.acquire()
+                logger.debug('OUT transfer cancellation done')
+            except usb1.USBError as error:
+                logger.debug(f'OUT transfer likely already completed ({error})')
 
 
 READ_SIZE = 4096
@@ -403,6 +445,7 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         }
         self.closed = False
         self.lock = threading.Lock()
+        self.empty_sco_count = 0
 
     def start(self):
         # Set up transfer objects for input
@@ -424,7 +467,12 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         )
         self.bulk_in_transfer.submit()
 
-        if self.isochronous_in is not None:
+        self.dequeue_task = self.loop.create_task(self.dequeue())
+
+    def start_iso(self):
+        if self.isochronous_in is not None and self.isochronous_in_transfer is None:
+            logger.debug("Starting ISO IN transfers")
+            self.done[hci.HCI_SYNCHRONOUS_DATA_PACKET].clear()
             self.isochronous_in_transfer = self.device.getTransfer(iso_packets=16)
             self.isochronous_in_transfer.setIsochronous(
                 self.isochronous_in.getAddress(),
@@ -434,7 +482,17 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
             )
             self.isochronous_in_transfer.submit()
 
-        self.dequeue_task = self.loop.create_task(self.dequeue())
+    async def stop_iso(self):
+        if self.isochronous_in_transfer is not None:
+            logger.debug("Stopping ISO IN transfers")
+            transfer = self.isochronous_in_transfer
+            self.isochronous_in_transfer = None
+            if transfer.isSubmitted():
+                try:
+                    transfer.cancel()
+                    await self.done[hci.HCI_SYNCHRONOUS_DATA_PACKET].wait()
+                except usb1.USBError as error:
+                    logger.debug(f'ISO IN transfer likely already completed ({error})')
 
     def queue_packet(self, packet_type: int, packet_data: bytes) -> None:
         self.loop.call_soon_threadsafe(
@@ -460,9 +518,11 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
                     logger.debug("packet source closed, discarding transfer")
                 else:
                     if packet_type == hci.HCI_SYNCHRONOUS_DATA_PACKET:
+                        empty_this_transfer = True
                         for iso_status, iso_buffer in transfer.iterISO():
                             if not iso_buffer:
                                 continue
+                            empty_this_transfer = False
                             if iso_status:
                                 logger.warning(f"ISO packet status error: {iso_status}")
                                 continue
@@ -472,6 +532,12 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
                                 iso_buffer.hex(),
                             )
                             self.isochronous_accumulator.feed(iso_buffer)
+                        if empty_this_transfer:
+                            self.empty_sco_count += 1
+                            if self.empty_sco_count % 100 == 0:
+                                logger.debug(
+                                    f"Received 100 empty SCO transfers (total {self.empty_sco_count})"
+                                )
                     else:
                         self.queue_packet(
                             packet_type,
@@ -516,11 +582,12 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         if self.dequeue_task:
             self.dequeue_task.cancel()
 
+        await self.stop_iso()
+
         # Cancel the transfers
         for transfer in (
             self.interrupt_in_transfer,
             self.bulk_in_transfer,
-            self.isochronous_in_transfer,
         ):
             if transfer is None:
                 continue
@@ -546,7 +613,18 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
 
 
 class UsbTransport(Transport):
-    def __init__(self, context, device, acl_interface, sco_interface, source, sink):
+    source: UsbPacketSource
+    sink: UsbPacketSink
+
+    def __init__(
+        self,
+        context: Any,
+        device: Any,
+        acl_interface: Any,
+        sco_interface: Any,
+        source: UsbPacketSource,
+        sink: UsbPacketSink,
+    ) -> None:
         super().__init__(source, sink)
         self.context = context
         self.device = device
@@ -571,16 +649,16 @@ class UsbTransport(Transport):
             device.setInterfaceAltSetting(
                 acl_interface.getNumber(), acl_interface.getAlternateSetting()
             )
-        if sco_interface is not None and sco_interface.getAlternateSetting() != 0:
-            logger.debug(
-                f'setting SCO interface {sco_interface.getNumber()} '
-                f'altsetting {sco_interface.getAlternateSetting()}'
-            )
-            device.setInterfaceAltSetting(
-                sco_interface.getNumber(), sco_interface.getAlternateSetting()
-            )
 
-        # The source and sink can now start
+        self.sco_alt_setting = 0
+        if sco_interface is not None:
+            self.sco_alt_setting = sco_interface.getAlternateSetting()
+            logger.debug(
+                f'setting SCO interface {sco_interface.getNumber()} altsetting 0'
+            )
+            device.setInterfaceAltSetting(sco_interface.getNumber(), 0)
+
+        # The source and sink can now start (only bulk/interrupt)
         source.start()
         sink.start()
 
@@ -606,6 +684,40 @@ class UsbTransport(Transport):
 
         logger.debug('ending USB event loop')
         self.loop.call_soon_threadsafe(self.event_loop_done.set_result, None)
+
+    async def set_sco_config(self, active: bool, air_mode: int) -> None:
+        if self.sco_interface is None:
+            return
+
+        if active:
+            alt_setting = self.sco_alt_setting
+            if alt_setting == 0:
+                logger.warning("No valid SCO alternate setting found on startup")
+                return
+
+            logger.debug(
+                f'Activating SCO: interface {self.sco_interface.getNumber()} '
+                f'altsetting {alt_setting}'
+            )
+            try:
+                self.device.setInterfaceAltSetting(
+                    self.sco_interface.getNumber(), alt_setting
+                )
+                self.source.start_iso()
+                self.sink.start_iso()
+            except usb1.USBError as error:
+                logger.error(f"Failed to set SCO altsetting: {error}")
+        else:
+            logger.debug(
+                f'Deactivating SCO: interface {self.sco_interface.getNumber()} '
+                f'altsetting 0'
+            )
+            try:
+                await self.source.stop_iso()
+                await self.sink.stop_iso()
+                self.device.setInterfaceAltSetting(self.sco_interface.getNumber(), 0)
+            except usb1.USBError as error:
+                logger.error(f"Failed to reset SCO altsetting: {error}")
 
     async def close(self):
         self.source.close()

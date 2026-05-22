@@ -263,6 +263,7 @@ class Host(utils.EventEmitter):
         super().__init__()
 
         self.hci_metadata = {}
+        self.transport = None
         self.ready = False  # True when we can accept incoming packets
         self.connections = {}  # Connections, by connection handle
         self.cis_links = {}  # CIS links, by connection handle
@@ -655,6 +656,7 @@ class Host(utils.EventEmitter):
     def set_packet_source(self, source: TransportSource) -> None:
         source.set_packet_sink(self)
         self.hci_metadata = getattr(source, 'metadata', self.hci_metadata)
+        self.transport = getattr(source, 'transport', None)
 
     def send_hci_packet(self, packet: hci.HCI_Packet) -> None:
         logger.debug(f'{color("### HOST -> CONTROLLER", "blue")}: {packet}')
@@ -1246,6 +1248,11 @@ class Host(utils.EventEmitter):
 
         if event.status == hci.HCI_SUCCESS:
             logger.debug(f'### DISCONNECTION: {connection}, reason={event.reason}')
+            is_sco = handle in self.sco_links
+            if is_sco and self.transport:
+                asyncio.create_task(
+                    self.transport.set_sco_config(active=False, air_mode=0)
+                )
 
             # Notify the listeners
             self.emit('disconnection', handle, event.reason)
@@ -1583,6 +1590,10 @@ class Host(utils.EventEmitter):
         self, event: hci.HCI_Synchronous_Connection_Complete_Event
     ):
         if event.status == hci.HCI_SUCCESS:
+            if self.transport:
+                asyncio.create_task(
+                    self.transport.set_sco_config(active=True, air_mode=event.air_mode)
+                )
             # Create/update the connection
             logger.debug(
                 f'### SCO CONNECTION: [0x{event.connection_handle:04X}] {event.bd_addr}'
