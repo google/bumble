@@ -168,6 +168,11 @@ async def open_usb_transport(spec: str) -> Transport:
                         self.acl_out, packet[1:], callback=self.transfer_callback
                     )
                     self.acl_out_transfer.submit()
+                elif packet_type == hci.HCI_ISO_DATA_PACKET:
+                    self.acl_out_transfer.setBulk(
+                        self.acl_out, packet[1:], callback=self.transfer_callback
+                    )
+                    self.acl_out_transfer.submit()
                 elif packet_type == hci.HCI_COMMAND_PACKET:
                     self.acl_out_transfer.setControl(
                         USB_RECIPIENT_DEVICE | USB_REQUEST_TYPE_CLASS,
