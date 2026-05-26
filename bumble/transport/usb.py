@@ -291,7 +291,32 @@ async def open_usb_transport(spec: str) -> Transport:
                     return
                 if self.sink:
                     try:
-                        self.sink.on_packet(packet)
+                        packet_type = packet[0]
+                        len_packet = len(packet)
+                        # A single USB interrupt transfer may contain multiple HCI events concatenated.
+                        # Go through the packet buffer and dispatch each complete event individually so
+                        # that no packet is silently discarded due to being concatenated with another packet.
+                        if (
+                            packet_type == hci.HCI_EVENT_PACKET
+                            and len_packet > 3 + packet[2]
+                        ):
+                            offset = 1  # skip the prepended packet_type byte
+                            hci_event_header_len = 2  # event_code (1) + param_len (1)
+                            while offset < len_packet:
+                                if (
+                                    offset + hci_event_header_len > len_packet
+                                ):  # incomplete header
+                                    break
+                                param_len = packet[offset + 1]
+                                end = offset + hci_event_header_len + param_len
+                                if end > len_packet:  # incomplete packet
+                                    break
+                                self.sink.on_packet(
+                                    bytes([packet_type]) + packet[offset:end]
+                                )
+                                offset = end
+                        else:
+                            self.sink.on_packet(packet)
                     except Exception:
                         logger.exception(
                             color('!!! Exception in sink.on_packet', 'red')
