@@ -247,6 +247,7 @@ class Host(utils.EventEmitter):
     bis_links: dict[int, IsoLink]
     sco_links: dict[int, ScoLink]
     bigs: dict[int, set[int]]
+    link_ts_flags: dict[int, int]
     acl_packet_queue: DataPacketQueue | None = None
     le_acl_packet_queue: DataPacketQueue | None = None
     iso_packet_queue: DataPacketQueue | None = None
@@ -269,6 +270,7 @@ class Host(utils.EventEmitter):
         self.bis_links = {}  # BIS links, by connection handle
         self.sco_links = {}  # SCO links, by connection handle
         self.bigs = {}  # BIG Handle to BIS Handles
+        self.link_ts_flags = {}  # TS_Flag for ISO links, by handle
         self.pending_command: hci.HCI_SyncCommand | hci.HCI_AsyncCommand | None = None
         self.pending_response: (
             asyncio.Future[
@@ -486,6 +488,7 @@ class Host(utils.EventEmitter):
                     hci.HCI_LE_PHY_UPDATE_COMPLETE_EVENT,
                     hci.HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT,
                     hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_EVENT,
+                    hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V2_EVENT,
                     hci.HCI_LE_PERIODIC_ADVERTISING_REPORT_EVENT,
                     hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT,
                     hci.HCI_LE_SCAN_TIMEOUT_EVENT,
@@ -1026,6 +1029,82 @@ class Host(utils.EventEmitter):
         # Look for the connection to which this data belongs
         if connection := self.connections.get(packet.connection_handle):
             connection.on_hci_acl_data_packet(packet)
+            return
+
+        # WORKAROUND: Some controllers (e.g. Intel BE200) send ISO data wrapped in ACL packets
+        # using the CIS handle.
+        is_cis = packet.connection_handle in self.cis_links
+        is_bis = packet.connection_handle in self.bis_links
+
+        if is_cis or is_bis:
+            logger.debug(
+                f"Received ISO data wrapped in ACL packet for handle 0x{packet.connection_handle:04X}"
+            )
+            payload = packet.data
+
+            ts_flag = self.link_ts_flags.get(packet.connection_handle)
+            if ts_flag is None:
+                # Learn TS flag from the first packet on this link
+                if is_bis:
+                    # BIS packets always have Timestamp according to spec
+                    ts_flag = 1
+                elif len(payload) < 8:
+                    # Too short to have 8-byte header (TS), must be No TS
+                    ts_flag = 0
+                else:
+                    psn_no_ts = int.from_bytes(payload[0:2], 'little')
+                    psn_has_ts = int.from_bytes(payload[4:6], 'little')
+                    if psn_has_ts == 0:
+                        ts_flag = 1
+                    elif psn_no_ts == 0:
+                        ts_flag = 0
+                    else:
+                        # Fallback heuristic
+                        ts_flag = 1 if psn_has_ts < psn_no_ts else 0
+                self.link_ts_flags[packet.connection_handle] = ts_flag
+                logger.info(
+                    f"Learned TS_Flag = {ts_flag} for handle 0x{packet.connection_handle:04X}"
+                )
+
+            if ts_flag:
+                header_size = 8
+                sdu_length_offset = 6
+            else:
+                header_size = 4
+                sdu_length_offset = 2
+
+            pb_flag = 0b10
+            if len(payload) >= header_size:
+                sdu_length = int.from_bytes(
+                    payload[sdu_length_offset : sdu_length_offset + 2], 'little'
+                )
+                if sdu_length == len(payload) - header_size:
+                    pb_flag = 0b10  # Complete SDU
+                else:
+                    pb_flag = 0b00  # First fragment
+            else:
+                pb_flag = 0b01  # Continuation
+                ts_flag = 0
+
+            # Reconstruct the raw ISO packet (excluding packet indicator 0x05)
+            pdu_info = packet.connection_handle | (pb_flag << 12) | (ts_flag << 14)
+            header = bytes(
+                [
+                    pdu_info & 0xFF,
+                    (pdu_info >> 8) & 0xFF,
+                    len(payload) & 0xFF,
+                    (len(payload) >> 8) & 0xFF,
+                ]
+            )
+            raw_iso_packet = header + payload
+
+            try:
+                iso_packet = hci.HCI_IsoDataPacket.from_bytes(
+                    bytes([hci.HCI_ISO_DATA_PACKET]) + raw_iso_packet
+                )
+                self.on_hci_iso_data_packet(iso_packet)
+            except Exception as e:
+                logger.warning(f"Failed to reconstruct ISO packet from ACL: {e}")
 
     def on_hci_sco_data_packet(self, packet: hci.HCI_SynchronousDataPacket) -> None:
         # Experimental
@@ -1232,6 +1311,7 @@ class Host(utils.EventEmitter):
             self.emit('disconnection', handle, event.reason)
 
             # Remove the handle reference
+            self.link_ts_flags.pop(handle, None)
             _ = (
                 self.connections.pop(handle, 0)
                 or self.cis_links.pop(handle, 0)
@@ -1340,6 +1420,20 @@ class Host(utils.EventEmitter):
 
     def on_hci_le_periodic_advertising_sync_established_event(
         self, event: hci.HCI_LE_Periodic_Advertising_Sync_Established_Event
+    ):
+        self.emit(
+            'periodic_advertising_sync_establishment',
+            event.status,
+            event.sync_handle,
+            event.advertising_sid,
+            event.advertiser_address,
+            event.advertiser_phy,
+            event.periodic_advertising_interval,
+            event.advertiser_clock_accuracy,
+        )
+
+    def on_hci_le_periodic_advertising_sync_established_v2_event(
+        self, event: hci.HCI_LE_Periodic_Advertising_Sync_Established_V2_Event
     ):
         self.emit(
             'periodic_advertising_sync_establishment',
