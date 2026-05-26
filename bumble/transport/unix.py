@@ -88,16 +88,16 @@ async def open_unix_server_transport(spec: str) -> Transport:
         def connection_made(self, transport):
             peer_name = transport.get_extra_info('peer_name')
             logger.debug('connection from %s', peer_name)
-            self.packet_sink.transport = transport
+            self.packet_sink.write_transport = transport
 
         # Called when the client is disconnected
         def connection_lost(self, error):
             logger.debug('connection lost: %s', error)
-            self.packet_sink.transport = None
+            self.packet_sink.write_transport = None
 
         def eof_received(self):
             logger.debug('connection end')
-            self.packet_sink.transport = None
+            self.packet_sink.write_transport = None
 
         # Called when data is received on the socket
         def data_received(self, data):
@@ -105,11 +105,11 @@ async def open_unix_server_transport(spec: str) -> Transport:
 
     class UnixServerPacketSink:
         def __init__(self):
-            self.transport = None
+            self.write_transport = None
 
         def on_packet(self, packet):
-            if self.transport:
-                self.transport.write(packet)
+            if self.write_transport:
+                self.write_transport.write(packet)
             else:
                 logger.debug('no client, dropping packet')
 

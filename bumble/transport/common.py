@@ -309,14 +309,16 @@ class StreamPacketSource(asyncio.Protocol, ParserSource):
 
 # -----------------------------------------------------------------------------
 class StreamPacketSink:
+    write_transport: asyncio.WriteTransport
+
     def __init__(self, transport: asyncio.WriteTransport) -> None:
-        self.transport = transport
+        self.write_transport = transport
 
     def on_packet(self, packet: bytes) -> None:
-        self.transport.write(packet)
+        self.write_transport.write(packet)
 
     def close(self) -> None:
-        self.transport.close()
+        self.write_transport.close()
 
 
 # -----------------------------------------------------------------------------
@@ -338,6 +340,14 @@ class Transport:
     def __init__(self, source: TransportSource, sink: TransportSink) -> None:
         self.source = source
         self.sink = sink
+        try:
+            setattr(source, 'transport', self)
+        except AttributeError:
+            pass
+        try:
+            setattr(sink, 'transport', self)
+        except AttributeError:
+            pass
 
     async def __aenter__(self):
         return self
@@ -353,6 +363,9 @@ class Transport:
             self.source.close()
         if hasattr(self.sink, 'close'):
             self.sink.close()
+
+    async def set_sco_config(self, active: bool, alternate: int) -> None:
+        pass
 
 
 # -----------------------------------------------------------------------------
@@ -503,3 +516,6 @@ class SnoopingTransport(Transport):
         await self.transport.close()
         if self.close_snooper:
             self.close_snooper()
+
+    async def set_sco_config(self, active: bool, alternate: int) -> None:
+        await self.transport.set_sco_config(active, alternate)

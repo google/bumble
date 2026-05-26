@@ -45,8 +45,10 @@ from bumble.hci import (
     HCI_Read_Local_Supported_Codecs_Command,
     HCI_Read_Local_Supported_Codecs_V2_Command,
     HCI_Read_Local_Version_Information_Command,
+    HCI_Read_Voice_Setting_Command,
     LeFeature,
     SpecificationVersion,
+    VoiceSetting,
     map_null_terminated_utf8_string,
 )
 from bumble.host import Host
@@ -213,6 +215,16 @@ async def get_codecs_info(host: Host) -> None:
             print('  No standard codecs')
         if not response2.vendor_specific_codec_ids:
             print('  No Vendor-specific codecs')
+
+    if host.supports_command(HCI_Read_Voice_Setting_Command.op_code):
+        response3 = await host.send_sync_command(HCI_Read_Voice_Setting_Command())
+        voice_setting = VoiceSetting.from_int(response3.voice_setting)
+        print(color('Voice Setting:', 'yellow'))
+        print(f'  Air Coding Format:       {voice_setting.air_coding_format.name}')
+        print(f'  Linear PCM Bit Position: {voice_setting.linear_pcm_bit_position}')
+        print(f'  Input Sample Size:       {voice_setting.input_sample_size.name}')
+        print(f'  Input Data Format:       {voice_setting.input_data_format.name}')
+        print(f'  Input Coding Format:     {voice_setting.input_coding_format.name}')
 
 
 # -----------------------------------------------------------------------------

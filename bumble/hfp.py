@@ -177,7 +177,7 @@ class AgFeature(enum.IntFlag):
     VOICE_RECOGNITION_TEXT = 0x2000
 
 
-class AudioCodec(enum.IntEnum):
+class AudioCodec(utils.OpenIntEnum):
     """
     Audio Codec IDs (normative).
 
@@ -189,7 +189,7 @@ class AudioCodec(enum.IntEnum):
     LC3_SWB = 0x03  # Support for LC3-SWB audio codec
 
 
-class HfIndicator(enum.IntEnum):
+class HfIndicator(utils.OpenIntEnum):
     """
     HF Indicators (normative).
 
@@ -218,7 +218,7 @@ class CallHoldOperation(enum.Enum):
     )
 
 
-class ResponseHoldStatus(enum.IntEnum):
+class ResponseHoldStatus(utils.OpenIntEnum):
     """
     Response Hold status (normative).
 
@@ -246,7 +246,7 @@ class AgIndicator(enum.Enum):
     BATTERY_CHARGE = 'battchg'
 
 
-class CallSetupAgIndicator(enum.IntEnum):
+class CallSetupAgIndicator(utils.OpenIntEnum):
     """
     Values for the Call Setup AG indicator (normative).
 
@@ -259,7 +259,7 @@ class CallSetupAgIndicator(enum.IntEnum):
     REMOTE_ALERTED = 3  # Remote party alerted in an outgoing call
 
 
-class CallHeldAgIndicator(enum.IntEnum):
+class CallHeldAgIndicator(utils.OpenIntEnum):
     """
     Values for the Call Held AG indicator (normative).
 
@@ -273,7 +273,7 @@ class CallHeldAgIndicator(enum.IntEnum):
     CALL_ON_HOLD_NO_ACTIVE_CALL = 2  # Call on hold, no active call
 
 
-class CallInfoDirection(enum.IntEnum):
+class CallInfoDirection(utils.OpenIntEnum):
     """
     Call Info direction (normative).
 
@@ -284,7 +284,7 @@ class CallInfoDirection(enum.IntEnum):
     MOBILE_TERMINATED_CALL = 1
 
 
-class CallInfoStatus(enum.IntEnum):
+class CallInfoStatus(utils.OpenIntEnum):
     """
     Call Info status (normative).
 
@@ -299,7 +299,7 @@ class CallInfoStatus(enum.IntEnum):
     WAITING = 5
 
 
-class CallInfoMode(enum.IntEnum):
+class CallInfoMode(utils.OpenIntEnum):
     """
     Call Info mode (normative).
 
@@ -312,7 +312,7 @@ class CallInfoMode(enum.IntEnum):
     UNKNOWN = 9
 
 
-class CallInfoMultiParty(enum.IntEnum):
+class CallInfoMultiParty(utils.OpenIntEnum):
     """
     Call Info Multi-Party state (normative).
 
@@ -399,7 +399,7 @@ class CallLineIdentification:
         )
 
 
-class VoiceRecognitionState(enum.IntEnum):
+class VoiceRecognitionState(utils.OpenIntEnum):
     """
     vrec values provided in AT+BVRA command.
 
@@ -412,7 +412,7 @@ class VoiceRecognitionState(enum.IntEnum):
     ENHANCED_READY = 2
 
 
-class CmeError(enum.IntEnum):
+class CmeError(utils.OpenIntEnum):
     """
     CME ERROR codes (partial listed).
 
@@ -1606,7 +1606,7 @@ class AgProtocol(utils.EventEmitter):
 # -----------------------------------------------------------------------------
 
 
-class ProfileVersion(enum.IntEnum):
+class ProfileVersion(utils.OpenIntEnum):
     """
     Profile version (normative).
 
@@ -2058,6 +2058,7 @@ _ESCO_PARAMETERS_MSBC_T1 = EscoParameters(
     max_latency=0x0008,
     packet_type=(
         HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
+        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV3
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV3
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5
@@ -2073,7 +2074,6 @@ _ESCO_PARAMETERS_MSBC_T2 = EscoParameters(
     max_latency=0x000D,
     packet_type=(
         HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.EV3
-        | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV3
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV3
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_2_EV5
         | HCI_Enhanced_Setup_Synchronous_Connection_Command.PacketType.NO_3_EV5

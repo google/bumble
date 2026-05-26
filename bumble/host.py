@@ -263,6 +263,7 @@ class Host(utils.EventEmitter):
         super().__init__()
 
         self.hci_metadata = {}
+        self.transport = None
         self.ready = False  # True when we can accept incoming packets
         self.connections = {}  # Connections, by connection handle
         self.cis_links = {}  # CIS links, by connection handle
@@ -655,6 +656,7 @@ class Host(utils.EventEmitter):
     def set_packet_source(self, source: TransportSource) -> None:
         source.set_packet_sink(self)
         self.hci_metadata = getattr(source, 'metadata', self.hci_metadata)
+        self.transport = getattr(source, 'transport', None)
 
     def send_hci_packet(self, packet: hci.HCI_Packet) -> None:
         logger.debug(f'{color("### HOST -> CONTROLLER", "blue")}: {packet}')
@@ -686,6 +688,8 @@ class Host(utils.EventEmitter):
                 self.pending_response, timeout=response_timeout
             )
             return response
+        except asyncio.TimeoutError:
+            raise
         except Exception:
             logger.exception(color("!!! Exception while sending command:", "red"))
             raise
@@ -864,7 +868,7 @@ class Host(utils.EventEmitter):
         self.send_hci_packet(
             hci.HCI_SynchronousDataPacket(
                 connection_handle=connection_handle,
-                packet_status=0,
+                packet_status=hci.HCI_SynchronousDataPacket.Status.CORRECTLY_RECEIVED_DATA,
                 data_total_length=len(sdu),
                 data=sdu,
             )
@@ -1176,11 +1180,28 @@ class Host(utils.EventEmitter):
     def on_hci_connection_complete_event(
         self, event: hci.HCI_Connection_Complete_Event
     ):
+        if event.link_type == hci.HCI_Connection_Complete_Event.LinkType.SCO:
+            # Pass this on to the synchronous connection handler
+            forwarded_event = hci.HCI_Synchronous_Connection_Complete_Event(
+                status=event.status,
+                connection_handle=event.connection_handle,
+                bd_addr=event.bd_addr,
+                link_type=event.link_type,
+                transmission_interval=0,
+                retransmission_window=0,
+                rx_packet_length=0,
+                tx_packet_length=0,
+                air_mode=0,
+            )
+            self.on_hci_synchronous_connection_complete_event(forwarded_event)
+            return
+
         if event.status == hci.HCI_SUCCESS:
             # Create/update the connection
             logger.debug(
-                f'### BR/EDR CONNECTION: [0x{event.connection_handle:04X}] '
-                f'{event.bd_addr}'
+                f'### BR/EDR ACL CONNECTION: [0x{event.connection_handle:04X}] '
+                f'{event.bd_addr} '
+                f'{event.link_type.name}'
             )
 
             connection = self.connections.get(event.connection_handle)
@@ -1227,6 +1248,11 @@ class Host(utils.EventEmitter):
 
         if event.status == hci.HCI_SUCCESS:
             logger.debug(f'### DISCONNECTION: {connection}, reason={event.reason}')
+            is_sco = handle in self.sco_links
+            if is_sco and self.transport:
+                asyncio.create_task(
+                    self.transport.set_sco_config(active=False, air_mode=0)
+                )
 
             # Notify the listeners
             self.emit('disconnection', handle, event.reason)
@@ -1564,6 +1590,10 @@ class Host(utils.EventEmitter):
         self, event: hci.HCI_Synchronous_Connection_Complete_Event
     ):
         if event.status == hci.HCI_SUCCESS:
+            if self.transport:
+                asyncio.create_task(
+                    self.transport.set_sco_config(active=True, air_mode=event.air_mode)
+                )
             # Create/update the connection
             logger.debug(
                 f'### SCO CONNECTION: [0x{event.connection_handle:04X}] {event.bd_addr}'
@@ -1580,6 +1610,9 @@ class Host(utils.EventEmitter):
                 event.bd_addr,
                 event.connection_handle,
                 event.link_type,
+                event.rx_packet_length,
+                event.tx_packet_length,
+                event.air_mode,
             )
         else:
             logger.debug(f'### SCO CONNECTION FAILED: {event.status}')

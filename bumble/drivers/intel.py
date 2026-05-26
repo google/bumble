@@ -48,6 +48,9 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 INTEL_USB_PRODUCTS = {
+    (0x8087, 0x0025),  # 9260
+    (0x8087, 0x0026),  # AX201
+    (0x8087, 0x0029),  # AX200
     (0x8087, 0x0032),  # AX210
     (0x8087, 0x0033),  # AX211
     (0x8087, 0x0036),  # BE200
@@ -293,6 +296,7 @@ class HardwarePlatform(utils.OpenIntEnum):
 class HardwareVariant(utils.OpenIntEnum):
     # This is a just a partial list.
     # Add other constants here as new hardware is encountered and tested.
+    CYCLONE_PEAK = 0x14
     TYPHOON_PEAK = 0x17
     GARFIELD_PEAK = 0x19
     GALE_PEAK = 0x1C
@@ -476,6 +480,7 @@ class Driver(common.Driver):
         if hardware_info.platform != HardwarePlatform.INTEL_37:
             raise DriverError("hardware platform not supported")
         if hardware_info.variant not in (
+            HardwareVariant.CYCLONE_PEAK,
             HardwareVariant.TYPHOON_PEAK,
             HardwareVariant.GARFIELD_PEAK,
             HardwareVariant.GALE_PEAK,
