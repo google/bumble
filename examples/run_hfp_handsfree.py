@@ -41,28 +41,27 @@ output_wav: wave.Wave_write | None = None
 def on_audio_packet(packet: hci.HCI_SynchronousDataPacket) -> None:
     if (
         packet.packet_status
-        == hci.HCI_SynchronousDataPacket.Status.CORRECTLY_RECEIVED_DATA
+        != hci.HCI_SynchronousDataPacket.Status.CORRECTLY_RECEIVED_DATA
     ):
-        if output_wav:
-            # Save the PCM audio to the output
-            output_wav.writeframes(packet.data)
-    else:
         print('!!! discarding packet with status ', packet.packet_status.name)
+        return
+
+    frame_count = len(packet.data) // 2
+    print(f">>> received {frame_count} PCM samples")
+
+    if output_wav:
+        # Save the PCM audio to the output
+        output_wav.writeframes(packet.data)
 
     if input_wav and hf_protocol:
-        # Send PCM audio from the input
-        frame_count = len(packet.data) // 2
-        while frame_count:
-            # NOTE: we use a fixed number of frames here, this should likely be adjusted
-            # based on the transport parameters (like the USB max packet size)
-            chunk_size = min(frame_count, 16)
-            if not (pcm_data := input_wav.readframes(chunk_size)):
-                return
-            frame_count -= chunk_size
-            hf_protocol.dlc.multiplexer.l2cap_channel.connection.device.host.send_sco_sdu(
-                connection_handle=packet.connection_handle,
-                sdu=pcm_data,
-            )
+        # Send PCM audio from the input, same amount as what was received
+        while not (pcm_data := input_wav.readframes(frame_count)):
+            input_wav.setpos(0)  # Loop
+        print(f">>> sending {frame_count} PCM samples")
+        hf_protocol.dlc.multiplexer.l2cap_channel.connection.device.host.send_sco_sdu(
+            connection_handle=packet.connection_handle,
+            sdu=pcm_data,
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -123,6 +122,16 @@ def on_sco_request(
         print('!!! no supported command for SCO connection request')
         return
 
+    global output_wav
+    if output_wav:
+        output_wav.setnchannels(1)
+        output_wav.setsampwidth(2)
+        match protocol.active_codec:
+            case hfp.AudioCodec.CVSD:
+                output_wav.setframerate(8000)
+            case hfp.AudioCodec.MSBC:
+                output_wav.setframerate(16000)
+
     connection.on('sco_connection', on_sco_connection)
 
 
@@ -159,15 +168,6 @@ def on_ag_indicator(indicator):
 # -----------------------------------------------------------------------------
 def on_codec_negotiation(codec: hfp.AudioCodec):
     print(f'### Negotiated codec: {codec.name}')
-    global output_wav
-    if output_wav:
-        output_wav.setnchannels(1)
-        output_wav.setsampwidth(2)
-        match codec:
-            case hfp.AudioCodec.CVSD:
-                output_wav.setframerate(8000)
-            case hfp.AudioCodec.MSBC:
-                output_wav.setframerate(16000)
 
 
 # -----------------------------------------------------------------------------

@@ -58,6 +58,8 @@ USB_BT_HCI_CLASS_TUPLE = (
     USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER,
 )
 
+MAX_SCO_PACKET_SIZE = 1024
+
 
 # -----------------------------------------------------------------------------
 def load_libusb():
@@ -227,7 +229,17 @@ class UsbPacketSink:
         self.bulk_out = bulk_out
         self.isochronous_out = isochronous_out
         self.bulk_or_control_out_transfer = device.getTransfer()
-        self.isochronous_out_transfer = device.getTransfer(iso_packets=1)
+        self.isochronous_out_transfer = (
+            device.getTransfer(
+                iso_packets=(
+                    MAX_SCO_PACKET_SIZE // isochronous_out.getMaxPacketSize()
+                    if isochronous_out.getMaxPacketSize()
+                    else 1
+                )
+            )
+            if isochronous_out is not None
+            else None
+        )
         self.out_transfer_ready = asyncio.Semaphore(1)
         self.packets: asyncio.Queue[bytes] = (
             asyncio.Queue()
@@ -298,17 +310,29 @@ class UsbPacketSink:
                     self.bulk_or_control_out_transfer.submit()
                     submitted = True
                 elif packet_type == hci.HCI_SYNCHRONOUS_DATA_PACKET:
-                    if self.isochronous_out is None:
+                    if self.isochronous_out_transfer is None:
                         logger.warning(
                             color('isochronous packets not supported', 'red')
                         )
                         self.out_transfer_ready.release()
                         continue
 
+                    # Setup a list of packet lengths, each up to the max packet size
+                    iso_max_packet_size = self.isochronous_out.getMaxPacketSize()
+                    iso_packet_count = (
+                        len(packet_payload) + iso_max_packet_size - 1
+                    ) // iso_max_packet_size
+                    iso_packet_lengths = [iso_max_packet_size] * (iso_packet_count - 1)
+                    iso_packet_lengths.append(
+                        len(packet_payload) - sum(iso_packet_lengths)
+                    )
+
+                    # Set up and submit the isochronous transfer
                     self.isochronous_out_transfer.setIsochronous(
                         self.isochronous_out.getAddress(),
                         packet_payload,
                         callback=self.transfer_callback,
+                        iso_transfer_length_list=iso_packet_lengths,
                     )
                     self.isochronous_out_transfer.submit()
                     submitted = True
@@ -340,6 +364,9 @@ class UsbPacketSink:
             self.bulk_or_control_out_transfer,
             self.isochronous_out_transfer,
         ):
+            if transfer is None:
+                continue
+
             if transfer.isSubmitted():
                 # Try to cancel the transfer, but that may fail because it may have
                 # already completed
@@ -351,6 +378,11 @@ class UsbPacketSink:
                     logger.debug('OUT transfer cancellation done')
                 except usb1.USBError as error:
                     logger.debug(f'OUT transfer likely already completed ({error})')
+
+            try:
+                transfer.close()
+            except usb1.USBError as error:
+                logger.warning(f'failed to close transfer ({error})')
 
 
 READ_SIZE = 4096
@@ -585,7 +617,7 @@ class UsbTransport(Transport):
         sink.start()
 
         # Create a thread to process events
-        self.event_thread = threading.Thread(target=self.run)
+        self.event_thread = threading.Thread(target=self.run, daemon=True)
         self.event_thread.start()
 
     def run(self):

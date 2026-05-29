@@ -1721,6 +1721,15 @@ class CodecID(SpecableEnum):
     VENDOR_SPECIFIC = 0xFF
 
 
+# From Bluetooth Assigned Numbers, 2.10 PCM_Data_Format
+class PcmDataFormat(SpecableEnum):
+    NA = 0x00
+    ONES_COMPLEMENT = 0x01
+    TWOS_COMPLEMENT = 0x02
+    SIGN_MAGNITUDE = 0x03
+    UNSIGNED = 0x04
+
+
 @dataclasses.dataclass(frozen=True)
 class CodingFormat:
     codec_id: CodecID
@@ -1729,7 +1738,7 @@ class CodingFormat:
 
     @classmethod
     def parse_from_bytes(cls, data: bytes, offset: int) -> tuple[int, CodingFormat]:
-        (codec_id, company_id, vendor_specific_codec_id) = struct.unpack_from(
+        codec_id, company_id, vendor_specific_codec_id = struct.unpack_from(
             '<BHH', data, offset
         )
         return offset + 5, cls(
@@ -2063,7 +2072,7 @@ class HCI_Object:
                 )
                 continue
 
-            (field_name, field_type) = object_field
+            field_name, field_type = object_field
             result += HCI_Object.serialize_field(hci_object[field_name], field_type)
 
         return bytes(result)
@@ -3106,8 +3115,8 @@ class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_AsyncCommand):
     output_coding_format: int = field(metadata=metadata(CodingFormat.parse_from_bytes))
     input_coded_data_size: int = field(metadata=metadata(2))
     output_coded_data_size: int = field(metadata=metadata(2))
-    input_pcm_data_format: int = field(metadata=metadata(1))
-    output_pcm_data_format: int = field(metadata=metadata(1))
+    input_pcm_data_format: int = field(metadata=PcmDataFormat.type_metadata(1))
+    output_pcm_data_format: int = field(metadata=PcmDataFormat.type_metadata(1))
     input_pcm_sample_payload_msb_position: int = field(metadata=metadata(1))
     output_pcm_sample_payload_msb_position: int = field(metadata=metadata(1))
     input_data_path: int = field(metadata=metadata(1))
@@ -3117,13 +3126,6 @@ class HCI_Enhanced_Setup_Synchronous_Connection_Command(HCI_AsyncCommand):
     max_latency: int = field(metadata=metadata(2))
     packet_type: int = field(metadata=metadata(2))
     retransmission_effort: int = field(metadata=metadata(1))
-
-    class PcmDataFormat(SpecableEnum):
-        NA = 0x00
-        ONES_COMPLEMENT = 0x01
-        TWOS_COMPLEMENT = 0x02
-        SIGN_MAGNITUDE = 0x03
-        UNSIGNED = 0x04
 
     class DataPath(SpecableEnum):
         HCI = 0x00
@@ -3171,8 +3173,8 @@ class HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(HCI_AsyncComman
     output_coding_format: int = field(metadata=metadata(CodingFormat.parse_from_bytes))
     input_coded_data_size: int = field(metadata=metadata(2))
     output_coded_data_size: int = field(metadata=metadata(2))
-    input_pcm_data_format: int = field(metadata=metadata(1))
-    output_pcm_data_format: int = field(metadata=metadata(1))
+    input_pcm_data_format: int = field(metadata=PcmDataFormat.type_metadata(1))
+    output_pcm_data_format: int = field(metadata=PcmDataFormat.type_metadata(1))
     input_pcm_sample_payload_msb_position: int = field(metadata=metadata(1))
     output_pcm_sample_payload_msb_position: int = field(metadata=metadata(1))
     input_data_path: int = field(metadata=metadata(1))
