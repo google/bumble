@@ -489,7 +489,7 @@ class Sender:
                         flags=(
                             Packet.PacketFlags.LAST
                             if tx_i == self.tx_packet_count - 1
-                            else 0
+                            else Packet.PacketFlags(0)
                         ),
                         sequence=tx_i,
                         timestamp=int((time.time() - self.start_time) * 1000000),

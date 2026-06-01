@@ -78,17 +78,23 @@ class Loopback:
             self.connection_event.set()
 
     def on_sco_connection(
-        self, address: Address, connection_handle: int, link_type: int
-    ):
+        self,
+        address: Address,
+        connection_handle: int,
+        link_type,
+        rx_packet_length: int,
+        tx_packet_length: int,
+        air_mode: int,
+    ) -> None:
         self.on_connection(connection_handle)
 
-    def on_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes):
+    def on_packet(self, connection_handle: int, packet: bytes):
         """Calculate packet receive speed"""
         now = time.time()
-        (counter,) = struct.unpack_from("H", pdu, 0)
+        (counter,) = struct.unpack_from("H", packet, 0)
         rtt = now - self.send_timestamps[counter]
         self.rtts.append(rtt)
-        print(f'<<< Received packet {counter}: {len(pdu)} bytes, RTT={rtt:.4f}')
+        print(f'<<< Received packet {counter}: {len(packet)} bytes, RTT={rtt:.4f}')
         assert connection_handle == self.connection_handle
         assert counter == self.expected_counter
         self.expected_counter += 1
@@ -97,8 +103,8 @@ class Loopback:
         else:
             elapsed_since_start = now - self.start_timestamp
             elapsed_since_last = now - self.last_timestamp
-            self.bytes_received += len(pdu)
-            instant_rx_speed = len(pdu) / elapsed_since_last
+            self.bytes_received += len(packet)
+            instant_rx_speed = len(packet) / elapsed_since_last
             average_rx_speed = self.bytes_received / elapsed_since_start
             if self.mode == 'throughput':
                 print(
@@ -115,8 +121,11 @@ class Loopback:
             print(color('@@@ Received last packet', 'green'))
             self.done.set()
 
+    def on_l2cap_pdu(self, connection_handle: int, cid: int, pdu: bytes):
+        self.on_packet(connection_handle, pdu)
+
     def on_sco_packet(self, connection_handle: int, packet) -> None:
-        print("---", connection_handle, packet)
+        self.on_packet(connection_handle, packet)
 
     async def send_acl_packet(self, host: Host, packet: bytes) -> None:
         assert self.connection_handle
