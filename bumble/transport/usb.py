@@ -456,15 +456,11 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         self.bulk_in = bulk_in
         self.bulk_in_transfer = None
         self.isochronous_in = isochronous_in
-        self.isochronous_in_transfer = None
+        self.isochronous_in_transfers = []
         self.loop = asyncio.get_running_loop()
         self.queue = asyncio.Queue()
         self.dequeue_task = None
-        self.done = {
-            hci.HCI_EVENT_PACKET: asyncio.Event(),
-            hci.HCI_ACL_DATA_PACKET: asyncio.Event(),
-            hci.HCI_SYNCHRONOUS_DATA_PACKET: asyncio.Event(),
-        }
+        self.done = {}
         self.splitters = {
             hci.HCI_EVENT_PACKET: EventPacketSplitter(
                 lambda packet: self.queue_packet(hci.HCI_EVENT_PACKET, packet)
@@ -490,6 +486,7 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
             callback=self.transfer_callback,
             user_data=hci.HCI_EVENT_PACKET,
         )
+        self.done[self.interrupt_in_transfer] = asyncio.Event()
         self.interrupt_in_transfer.submit()
 
         self.bulk_in_transfer = self.device.getTransfer()
@@ -499,19 +496,21 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
             callback=self.transfer_callback,
             user_data=hci.HCI_ACL_DATA_PACKET,
         )
+        self.done[self.bulk_in_transfer] = asyncio.Event()
         self.bulk_in_transfer.submit()
 
         if self.isochronous_in is not None:
-            self.isochronous_in_transfer = self.device.getTransfer(
-                iso_packets=MAX_SCO_IN_PACKETS
-            )
-            self.isochronous_in_transfer.setIsochronous(
-                self.isochronous_in.getAddress(),
-                MAX_SCO_IN_PACKETS * self.isochronous_in.getMaxPacketSize(),
-                callback=self.transfer_callback,
-                user_data=hci.HCI_SYNCHRONOUS_DATA_PACKET,
-            )
-            self.isochronous_in_transfer.submit()
+            for _ in range(NUMBER_OF_SCO_IN_TRANSFERS):
+                transfer = self.device.getTransfer(iso_packets=MAX_SCO_IN_PACKETS)
+                transfer.setIsochronous(
+                    self.isochronous_in.getAddress(),
+                    MAX_SCO_IN_PACKETS * self.isochronous_in.getMaxPacketSize(),
+                    callback=self.transfer_callback,
+                    user_data=hci.HCI_SYNCHRONOUS_DATA_PACKET,
+                )
+                self.isochronous_in_transfers.append(transfer)
+                self.done[transfer] = asyncio.Event()
+                transfer.submit()
 
         self.dequeue_task = self.loop.create_task(self.dequeue())
 
@@ -566,12 +565,12 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
                         self.loop.call_soon_threadsafe(self.on_transport_lost)
         elif status == usb1.TRANSFER_CANCELLED:
             logger.debug(f"IN[{packet_type}] transfer canceled")
-            self.loop.call_soon_threadsafe(self.done[packet_type].set)
+            self.loop.call_soon_threadsafe(self.done[transfer].set)
         else:
             logger.warning(
                 color(f'!!! IN[{packet_type}] transfer not completed', 'red')
             )
-            self.loop.call_soon_threadsafe(self.done[packet_type].set)
+            self.loop.call_soon_threadsafe(self.done[transfer].set)
             self.loop.call_soon_threadsafe(self.on_transport_lost)
 
     async def dequeue(self):
@@ -600,7 +599,7 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         for transfer in (
             self.interrupt_in_transfer,
             self.bulk_in_transfer,
-            self.isochronous_in_transfer,
+            *self.isochronous_in_transfers,
         ):
             if transfer is None:
                 continue
@@ -616,7 +615,7 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
                         f'waiting for IN[{packet_type}] transfer cancellation '
                         'to be done...'
                     )
-                    await self.done[packet_type].wait()
+                    await self.done[transfer].wait()
                     logger.debug(f'IN[{packet_type}] transfer cancellation done')
                 except usb1.USBError as error:
                     logger.debug(
