@@ -336,6 +336,25 @@ class UsbPacketSink:
                     )
                     self.isochronous_out_transfer.submit()
                     submitted = True
+                elif packet_type == hci.HCI_ISO_DATA_PACKET:
+                    if self.isochronous_out_transfer is None:
+                        # Workaround: Send ISO packets over Bulk Out when Isochronous endpoints are not enabled
+                        self.bulk_or_control_out_transfer.setBulk(
+                            self.bulk_out.getAddress(),
+                            packet_payload,
+                            callback=self.transfer_callback,
+                        )
+                        self.bulk_or_control_out_transfer.submit()
+                        submitted = True
+                    else:
+                        logger.warning(
+                            color(
+                                'ISO packets over Isochronous endpoints not supported yet',
+                                'red',
+                            )
+                        )
+                        self.out_transfer_ready.release()
+                        continue
                 else:
                     logger.warning(
                         color(f'unsupported packet type {packet_type}', 'red')
