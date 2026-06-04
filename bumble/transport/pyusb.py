@@ -104,6 +104,9 @@ async def open_pyusb_transport(spec: str) -> Transport:
                         0,
                         packet[1:],
                     )
+                elif packet_type == hci.HCI_ISO_DATA_PACKET:
+                    # Workaround: Send ISO packets over Bulk Out
+                    self.device.write(USB_ENDPOINT_ACL_OUT, packet[1:])
                 else:
                     logger.warning(
                         color(f'unsupported packet type {packet_type}', 'red')
