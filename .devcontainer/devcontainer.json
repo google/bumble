@@ -12,7 +12,7 @@
 
 	// Use 'postCreateCommand' to run commands after the container is created.
     "postCreateCommand": 
-        "python -m pip install '.[build,test,development,documentation]'",
+        "python -m pip install '.[all]' --group all",
 
     // Configure tool-specific properties.
     "customizations": {

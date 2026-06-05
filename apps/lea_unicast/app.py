@@ -30,7 +30,7 @@ from importlib import resources
 try:
     import lc3  # type: ignore  # pylint: disable=E0401
 except ImportError as e:
-    raise ImportError("Try `python -m pip install \".[lc3]\"`.") from e
+    raise ImportError("Try `python -m pip install \".[auracast]\"`.") from e
 
 import aiohttp.web
 import click
