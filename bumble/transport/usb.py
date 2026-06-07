@@ -413,7 +413,8 @@ class PacketSplitter:
             if (bytes_needed := self.header_size - len(self.packet)) > 0:
                 self.packet += data[:bytes_needed]
                 data = data[bytes_needed:]
-                continue
+                if len(self.packet) < self.header_size:
+                    continue
 
             packet_length = self.header_size + int.from_bytes(
                 self.packet[self.length_offset : self.length_offset + self.length_size],
