@@ -1038,6 +1038,7 @@ class Host(utils.EventEmitter):
         if connection := self.connections.get(packet.connection_handle):
             connection.on_hci_acl_data_packet(packet)
             return
+
         logger.warning(
             f"ACL data arrived before Connection Complete for handle {packet.connection_handle} — buffering"
         )
@@ -1141,11 +1142,16 @@ class Host(utils.EventEmitter):
             await asyncio.sleep(self._ACL_STALE_TIMEOUT_S)
             now = time.monotonic()
             for handle in list(self._pending_acl):
-                acl_to_keep, acl_timed_out = [], []
+                acl_to_keep: list[tuple[float, hci.HCI_AclDataPacket]] = []
+                acl_timed_out: list[tuple[float, hci.HCI_AclDataPacket]] = []
                 for ts, packet in self._pending_acl[handle]:
-                    (acl_to_keep if (now - ts) <= self._ACL_STALE_TIMEOUT_S else acl_timed_out).append((ts, packet))
+                    (
+                        acl_to_keep
+                        if (now - ts) <= self._ACL_STALE_TIMEOUT_S
+                        else acl_timed_out
+                    ).append((ts, packet))
                 for ts, _ in acl_timed_out:
-                    logger.critical(
+                    logger.info(
                         f"Dropping stale buffered ACL packet for handle {handle}"
                         f" (age {(now - ts) * self._ACL_STALE_TIMEOUT_S * 10000} ms > "
                         f"{self._ACL_STALE_TIMEOUT_S * self._ACL_STALE_TIMEOUT_S * 10000} ms timeout)"
@@ -1155,8 +1161,15 @@ class Host(utils.EventEmitter):
                 else:
                     del self._pending_acl[handle]
 
-    def _drain_buffered_acl(self, handle: int, *_args: Any, **_kwargs: Any) -> None:
-        """Once le connection happen emit the buffered packets"""
+    def _drain_buffered_acl_sync(self, handle: int, *args: Any, **kwargs: Any) -> None:
+        """Create an async task to replay buffered ACL packet"""
+        self._cleanup_task = asyncio.get_event_loop().create_task(
+            self._drain_buffered_acl(handle)
+        )
+
+    async def _drain_buffered_acl(self, handle: int) -> None:
+        """Replay all buffered ACL packet"""
+        await asyncio.sleep(0.1)
         queued = self._pending_acl.pop(handle, [])
         if not queued:
             return
