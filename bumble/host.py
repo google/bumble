@@ -257,7 +257,7 @@ class Host(utils.EventEmitter):
     long_term_key_provider: Callable[[int, bytes, int], Awaitable[bytes | None]] | None
     link_key_provider: Callable[[hci.Address], Awaitable[bytes | None]] | None
 
-    _ACL_STALE_TIMEOUT_S: float = 0.100  # 100 ms
+    _ACL_STALE_TIMEOUT_S: float = 0.500  # 500 ms
 
     def __init__(
         self,
@@ -1153,8 +1153,8 @@ class Host(utils.EventEmitter):
                 for ts, _ in acl_timed_out:
                     logger.info(
                         f"Dropping stale buffered ACL packet for handle {handle}"
-                        f" (age {(now - ts) * self._ACL_STALE_TIMEOUT_S * 10000} ms > "
-                        f"{self._ACL_STALE_TIMEOUT_S * self._ACL_STALE_TIMEOUT_S * 10000} ms timeout)"
+                        f" (age {(now - ts) * self._ACL_STALE_TIMEOUT_S * 1000} ms > "
+                        f"{self._ACL_STALE_TIMEOUT_S * self._ACL_STALE_TIMEOUT_S * 1000} ms timeout)"
                     )
                 if acl_to_keep:
                     self._pending_acl[handle] = acl_to_keep
