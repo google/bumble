@@ -297,7 +297,7 @@ class Host(utils.EventEmitter):
         self.pairing_io_capability_provider = None  # Classic only
         self.snooper: Snooper | None = None
         self._pending_acl: dict[int, list[tuple[float, hci.HCI_AclDataPacket]]] = {}
-        self._cleanup_task: asyncio.Task[None] | None = None
+        self._drain_acl_buffer_task: asyncio.Task[None] | None = None
         self.on("le_connection", self._drain_buffered_acl)
 
         # Connect to the source and sink if specified
@@ -1046,10 +1046,6 @@ class Host(utils.EventEmitter):
         self._pending_acl.setdefault(packet.connection_handle, []).append(
             (time.monotonic(), packet)
         )
-        if self._cleanup_task is None or self._cleanup_task.done():
-            self._cleanup_task = asyncio.get_event_loop().create_task(
-                self._clean_pending_acl_to_old()
-            )
 
         # WORKAROUND: Some controllers (e.g. Intel BE200) send ISO data wrapped in ACL packets
         # using the CIS handle.
@@ -1137,48 +1133,24 @@ class Host(utils.EventEmitter):
     def on_l2cap_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
 
-    async def _clean_pending_acl_to_old(self) -> None:
-        """Periodically discard buffered ACL packets that have exceeded the timeout."""
-        while self._pending_acl:
-            await asyncio.sleep(self._ACL_STALE_TIMEOUT_S)
-            now = time.monotonic()
-            for handle in list(self._pending_acl):
-                acl_to_keep: list[tuple[float, hci.HCI_AclDataPacket]] = []
-                acl_timed_out: list[tuple[float, hci.HCI_AclDataPacket]] = []
-                for ts, packet in self._pending_acl[handle]:
-                    (
-                        acl_to_keep
-                        if (now - ts) <= self._ACL_STALE_TIMEOUT_S
-                        else acl_timed_out
-                    ).append((ts, packet))
-                for ts, _ in acl_timed_out:
-                    logger.info(
-                        f"Dropping stale buffered ACL packet for handle {handle}"
-                        f" (age {(now - ts) * self._ACL_STALE_TIMEOUT_S * 1000} ms > "
-                        f"{self._ACL_STALE_TIMEOUT_S * self._ACL_STALE_TIMEOUT_S * 1000} ms timeout)"
-                    )
-                if acl_to_keep:
-                    self._pending_acl[handle] = acl_to_keep
-                else:
-                    del self._pending_acl[handle]
-
     def _drain_buffered_acl_sync(self, handle: int, *args: Any, **kwargs: Any) -> None:
         """Create an async task to replay buffered ACL packet"""
-        self._cleanup_task = asyncio.get_event_loop().create_task(
+        self._drain_acl_buffer_task = asyncio.get_event_loop().create_task(
             self._drain_buffered_acl(handle)
         )
 
     async def _drain_buffered_acl(self, handle: int) -> None:
         """Replay all buffered ACL packet"""
-        await asyncio.sleep(0.1)
         queued = self._pending_acl.pop(handle, [])
         if not queued:
             return
+        now = time.monotonic()
+        logger.info(f"Replaying buffered ACL packets for handle: {handle}")
         for ts, packet in queued:
-            logger.info(
-                f"Replaying buffered ACL packet for handle handle (age {(time.monotonic() - ts) * 1000} ms)"
-            )
-            self.on_hci_acl_data_packet(packet)
+            # Sleep to allow other tasks to run
+            await asyncio.sleep(0)
+            if (now - ts) <= self._ACL_STALE_TIMEOUT_S:
+                self.on_hci_acl_data_packet(packet)
 
     def on_command_processed(
         self, event: hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event
