@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
+import time
 import asyncio
 import collections
 import dataclasses
@@ -256,6 +257,8 @@ class Host(utils.EventEmitter):
     long_term_key_provider: Callable[[int, bytes, int], Awaitable[bytes | None]] | None
     link_key_provider: Callable[[hci.Address], Awaitable[bytes | None]] | None
 
+    _ACL_STALE_TIMEOUT_S: float = 0.500  # 500 ms
+
     def __init__(
         self,
         controller_source: TransportSource | None = None,
@@ -293,6 +296,9 @@ class Host(utils.EventEmitter):
         self.link_key_provider = None
         self.pairing_io_capability_provider = None  # Classic only
         self.snooper: Snooper | None = None
+        self._pending_acl: dict[int, list[tuple[float, hci.HCI_AclDataPacket]]] = {}
+        self._drain_acl_buffer_task: asyncio.Task[None] | None = None
+        self.on("le_connection", self._drain_buffered_acl)
 
         # Connect to the source and sink if specified
         if controller_source:
@@ -1033,6 +1039,13 @@ class Host(utils.EventEmitter):
             connection.on_hci_acl_data_packet(packet)
             return
 
+        logger.warning(
+            f"ACL data arrived before Connection Complete for handle {packet.connection_handle} — buffering"
+        )
+        self._pending_acl.setdefault(packet.connection_handle, []).append(
+            (time.monotonic(), packet)
+        )
+
         # WORKAROUND: Some controllers (e.g. Intel BE200) send ISO data wrapped in ACL packets
         # using the CIS handle.
         is_cis = packet.connection_handle in self.cis_links
@@ -1118,6 +1131,25 @@ class Host(utils.EventEmitter):
 
     def on_l2cap_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
+
+    def _drain_buffered_acl_sync(self, handle: int, *args: Any, **kwargs: Any) -> None:
+        """Create an async task to replay buffered ACL packet"""
+        self._drain_acl_buffer_task = asyncio.get_event_loop().create_task(
+            self._drain_buffered_acl(handle)
+        )
+
+    async def _drain_buffered_acl(self, handle: int) -> None:
+        """Replay all buffered ACL packet"""
+        queued = self._pending_acl.pop(handle, [])
+        if not queued:
+            return
+        now = time.monotonic()
+        logger.info(f"Replaying buffered ACL packets for handle: {handle}")
+        for ts, packet in queued:
+            # Sleep to allow other tasks to run
+            await asyncio.sleep(0)
+            if (now - ts) <= self._ACL_STALE_TIMEOUT_S:
+                self.on_hci_acl_data_packet(packet)
 
     def on_command_processed(
         self, event: hci.HCI_Command_Complete_Event | hci.HCI_Command_Status_Event
