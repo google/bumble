@@ -1725,16 +1725,15 @@ class LeCreditBasedChannel(utils.EventEmitter):
         return await disconnection_result
 
     def abort(self) -> None:
-        if self.state == self.State.CONNECTED or self.state == self.State.DISCONNECTING:
-            was_disconnecting = self.state == self.State.DISCONNECTING
+        if self.state in (self.State.CONNECTED, self.State.DISCONNECTING):
             self._change_state(self.State.DISCONNECTED)
             self.manager.on_channel_closed(self)
-            if was_disconnecting and self.disconnection_result:
-                self.disconnection_result.set_result(None)
-                self.disconnection_result = None
-        if self.state == self.State.CONNECTING:
-            if self.connection_result is not None:
-                self.connection_result.cancel()
+        if self.connection_result is not None:
+            self.connection_result.cancel()
+            self.connection_result = None
+        if self.disconnection_result is not None:
+            self.disconnection_result.set_result(None)
+            self.disconnection_result = None
 
     def on_pdu(self, pdu: bytes) -> None:
         if self.sink is None:
@@ -1868,10 +1867,9 @@ class LeCreditBasedChannel(utils.EventEmitter):
                 source_cid=request.source_cid,
             )
         )
-        was_disconnecting = self.state == self.State.DISCONNECTING
         self._change_state(self.State.DISCONNECTED)
         self.manager.on_channel_closed(self)
-        if was_disconnecting and self.disconnection_result:
+        if self.disconnection_result is not None:
             self.disconnection_result.set_result(None)
             self.disconnection_result = None
         self.flush_output()
@@ -2894,15 +2892,12 @@ class ChannelManager:
         channel.on_credits(credit.credits)
 
     def on_channel_closed(self, channel: ClassicChannel | LeCreditBasedChannel) -> None:
-        connection_channels = self.channels.get(channel.connection.handle)
-        if connection_channels:
-            if connection_channels.get(channel.source_cid) is channel:
-                del connection_channels[channel.source_cid]
-        if isinstance(channel, LeCreditBasedChannel):
-            le_connection_channels = self.le_coc_channels.get(channel.connection.handle)
-            if le_connection_channels:
-                if le_connection_channels.get(channel.destination_cid) is channel:
-                    del le_connection_channels[channel.destination_cid]
+        if classic_connection_channels := self.channels.get(channel.connection.handle):
+            classic_connection_channels.pop(channel.source_cid, None)
+        elif le_connection_channels := self.le_coc_channels.get(
+            channel.connection.handle
+        ):
+            le_connection_channels.pop(channel.destination_cid, None)
 
     async def create_le_credit_based_channel(
         self,

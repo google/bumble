@@ -460,6 +460,7 @@ def test_fcs(cid: int, payload: str, expected: str):
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_abort_while_disconnecting():
+    # Setup client and server channels
     devices = TwoDevices()
     await devices.setup_connection()
     psm = 1234
@@ -474,15 +475,16 @@ async def test_abort_while_disconnecting():
     )
     server_channel = await server_channels.get()
 
-    # Stub server channel's on_disconnection_request to ignore the request,
-    # simulating a lost packet or unresponsive peer.
+    # Stub the server's request handler to ignore the disconnection request.
+    # This keeps the client channel in the DISCONNECTING state, waiting for a response,
+    # so we can simulate calling abort() during an active disconnection.
     server_channel.on_disconnection_request = lambda request: None
 
     # Intercept state change to DISCONNECTING and call abort()
     original_change_state = client_channel._change_state
     abort_called = False
 
-    def my_change_state(new_state):
+    def intercept_change_state_and_abort(new_state):
         nonlocal abort_called
         original_change_state(new_state)
         if (
@@ -492,11 +494,42 @@ async def test_abort_while_disconnecting():
             abort_called = True
             client_channel.abort()
 
-    client_channel._change_state = my_change_state
+    client_channel._change_state = intercept_change_state_and_abort
 
-    # Start disconnection and wait with a timeout
+    # Start disconnection and wait with a timeout. It should resolve immediately due to the abort.
     await asyncio.wait_for(client_channel.disconnect(), timeout=1.0)
     assert client_channel.state == l2cap.LeCreditBasedChannel.State.DISCONNECTED
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_disconnection_collision():
+    # Setup client and server channels
+    devices = TwoDevices()
+    await devices.setup_connection()
+    psm = 1234
+
+    server_channels = asyncio.Queue[l2cap.LeCreditBasedChannel]()
+    devices.devices[1].create_l2cap_server(
+        spec=l2cap.LeCreditBasedChannelSpec(psm=psm),
+        handler=server_channels.put_nowait,
+    )
+    client_channel = await devices.connections[0].create_l2cap_channel(
+        spec=l2cap.LeCreditBasedChannelSpec(psm)
+    )
+    server_channel = await server_channels.get()
+
+    # Trigger disconnection from both sides concurrently to cause a collision.
+    # Both channels will transition to DISCONNECTING and send DISCONNECTION_REQUESTs.
+    # When each side receives the peer's request, it will handle it and resolve the
+    # disconnection_result future.
+    await asyncio.gather(
+        client_channel.disconnect(),
+        server_channel.disconnect(),
+    )
+
+    assert client_channel.state == l2cap.LeCreditBasedChannel.State.DISCONNECTED
+    assert server_channel.state == l2cap.LeCreditBasedChannel.State.DISCONNECTED
 
 
 # -----------------------------------------------------------------------------
