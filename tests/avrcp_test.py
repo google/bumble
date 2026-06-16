@@ -46,7 +46,7 @@ class TwoDevices(test_utils.TwoDevices):
 
 
 @pytest.mark.parametrize(
-    "command,",
+    "command",
     [
         avrcp.GetPlayStatusCommand(),
         avrcp.GetCapabilitiesCommand(
@@ -132,7 +132,7 @@ def test_command(command: avrcp.Command):
 
 
 @pytest.mark.parametrize(
-    "event,",
+    "event",
     [
         avrcp.UidsChangedEvent(uid_counter=7),
         avrcp.TrackChangedEvent(uid=12356),
@@ -159,7 +159,7 @@ def test_event(event: avrcp.Event):
 
 
 @pytest.mark.parametrize(
-    "response,",
+    "response",
     [
         avrcp.GetPlayStatusResponse(
             song_length=1010, song_position=13, play_status=avrcp.PlayStatus.PAUSED

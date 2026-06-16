@@ -197,7 +197,7 @@ async def test_basic_connection():
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.parametrize("info_type,", list(l2cap.L2CAP_Information_Request.InfoType))
+@pytest.mark.parametrize("info_type", list(l2cap.L2CAP_Information_Request.InfoType))
 async def test_l2cap_information_request(monkeypatch, info_type):
     # TODO: Replace handlers with API when implemented
     devices = await TwoDevices.create_with_connection()
@@ -321,7 +321,7 @@ async def test_mtu():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mtu,", (50, 255, 256, 1000))
+@pytest.mark.parametrize("mtu", (50, 255, 256, 1000))
 async def test_enhanced_retransmission_mode(mtu: int):
     devices = TwoDevices()
     await devices.setup_connection()

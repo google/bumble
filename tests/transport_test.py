@@ -102,7 +102,7 @@ def test_parser_extensions():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    "address,",
+    "address",
     ("127.0.0.1", "::1"),
 )
 async def test_tcp_connection(address):
@@ -205,7 +205,7 @@ async def test_unix_connection_abstract():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    "address,",
+    "address",
     ("127.0.0.1", "[::1]"),
 )
 async def test_android_netsim_connection(address):
@@ -228,7 +228,7 @@ async def test_android_netsim_connection(address):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    "spec,",
+    "spec",
     (
         "android-netsim:[::1]:{port},mode=host[a=b,c=d]",
         "android-netsim:localhost:{port},mode=host[a=b,c=d]",
