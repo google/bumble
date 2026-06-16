@@ -458,6 +458,48 @@ def test_fcs(cid: int, payload: str, expected: str):
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_abort_while_disconnecting():
+    devices = TwoDevices()
+    await devices.setup_connection()
+    psm = 1234
+
+    server_channels = asyncio.Queue[l2cap.LeCreditBasedChannel]()
+    devices.devices[1].create_l2cap_server(
+        spec=l2cap.LeCreditBasedChannelSpec(psm=psm),
+        handler=server_channels.put_nowait,
+    )
+    client_channel = await devices.connections[0].create_l2cap_channel(
+        spec=l2cap.LeCreditBasedChannelSpec(psm)
+    )
+    server_channel = await server_channels.get()
+
+    # Stub server channel's on_disconnection_request to ignore the request,
+    # simulating a lost packet or unresponsive peer.
+    server_channel.on_disconnection_request = lambda request: None
+
+    # Intercept state change to DISCONNECTING and call abort()
+    original_change_state = client_channel._change_state
+    abort_called = False
+
+    def my_change_state(new_state):
+        nonlocal abort_called
+        original_change_state(new_state)
+        if (
+            new_state == l2cap.LeCreditBasedChannel.State.DISCONNECTING
+            and not abort_called
+        ):
+            abort_called = True
+            client_channel.abort()
+
+    client_channel._change_state = my_change_state
+
+    # Start disconnection and wait with a timeout
+    await asyncio.wait_for(client_channel.disconnect(), timeout=1.0)
+    assert client_channel.state == l2cap.LeCreditBasedChannel.State.DISCONNECTED
+
+
+# -----------------------------------------------------------------------------
 async def run():
     test_helpers()
     await test_basic_connection()

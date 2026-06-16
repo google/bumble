@@ -1683,6 +1683,10 @@ class LeCreditBasedChannel(utils.EventEmitter):
         if identifier in self.manager.le_coc_requests:
             raise InvalidStateError('too many concurrent connection requests')
 
+        # Create a future to wait for the response
+        connection_result = asyncio.get_running_loop().create_future()
+        self.connection_result = connection_result
+
         self._change_state(self.State.CONNECTING)
         request = L2CAP_LE_Credit_Based_Connection_Request(
             identifier=identifier,
@@ -1695,16 +1699,18 @@ class LeCreditBasedChannel(utils.EventEmitter):
         self.manager.le_coc_requests[identifier] = request
         self.send_control_frame(request)
 
-        # Create a future to wait for the response
-        self.connection_result = asyncio.get_running_loop().create_future()
-
         # Wait for the connection to succeed or fail
-        return await self.connection_result
+        return await connection_result
 
     async def disconnect(self) -> None:
         # Check that we're connected
         if self.state != self.State.CONNECTED:
             raise InvalidStateError('not connected')
+
+        # Create a future to wait for the state machine to get to a success or error
+        # state
+        disconnection_result = asyncio.get_running_loop().create_future()
+        self.disconnection_result = disconnection_result
 
         self._change_state(self.State.DISCONNECTING)
         self.flush_output()
@@ -1716,14 +1722,16 @@ class LeCreditBasedChannel(utils.EventEmitter):
             )
         )
 
-        # Create a future to wait for the state machine to get to a success or error
-        # state
-        self.disconnection_result = asyncio.get_running_loop().create_future()
-        return await self.disconnection_result
+        return await disconnection_result
 
     def abort(self) -> None:
-        if self.state == self.State.CONNECTED:
+        if self.state == self.State.CONNECTED or self.state == self.State.DISCONNECTING:
+            was_disconnecting = self.state == self.State.DISCONNECTING
             self._change_state(self.State.DISCONNECTED)
+            self.manager.on_channel_closed(self)
+            if was_disconnecting and self.disconnection_result:
+                self.disconnection_result.set_result(None)
+                self.disconnection_result = None
         if self.state == self.State.CONNECTING:
             if self.connection_result is not None:
                 self.connection_result.cancel()
@@ -1860,7 +1868,12 @@ class LeCreditBasedChannel(utils.EventEmitter):
                 source_cid=request.source_cid,
             )
         )
+        was_disconnecting = self.state == self.State.DISCONNECTING
         self._change_state(self.State.DISCONNECTED)
+        self.manager.on_channel_closed(self)
+        if was_disconnecting and self.disconnection_result:
+            self.disconnection_result.set_result(None)
+            self.disconnection_result = None
         self.flush_output()
 
     def on_disconnection_response(self, response: L2CAP_Disconnection_Response) -> None:
@@ -1876,6 +1889,7 @@ class LeCreditBasedChannel(utils.EventEmitter):
             return
 
         self._change_state(self.State.DISCONNECTED)
+        self.manager.on_channel_closed(self)
         if self.disconnection_result:
             self.disconnection_result.set_result(None)
             self.disconnection_result = None
@@ -2461,7 +2475,7 @@ class ChannelManager:
         if (
             channel := self.find_channel(connection.handle, response.source_cid)
         ) is None:
-            logger.warning(
+            logger.debug(
                 color(
                     f'channel {response.source_cid} not found for '
                     f'0x{connection.handle:04X}:{cid}',
@@ -2879,11 +2893,16 @@ class ChannelManager:
 
         channel.on_credits(credit.credits)
 
-    def on_channel_closed(self, channel: ClassicChannel) -> None:
+    def on_channel_closed(self, channel: ClassicChannel | LeCreditBasedChannel) -> None:
         connection_channels = self.channels.get(channel.connection.handle)
         if connection_channels:
-            if channel.source_cid in connection_channels:
+            if connection_channels.get(channel.source_cid) is channel:
                 del connection_channels[channel.source_cid]
+        if isinstance(channel, LeCreditBasedChannel):
+            le_connection_channels = self.le_coc_channels.get(channel.connection.handle)
+            if le_connection_channels:
+                if le_connection_channels.get(channel.destination_cid) is channel:
+                    del le_connection_channels[channel.destination_cid]
 
     async def create_le_credit_based_channel(
         self,
