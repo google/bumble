@@ -72,7 +72,7 @@ def test_sef():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'sirk_type,', [(csip.SirkType.ENCRYPTED), (csip.SirkType.PLAINTEXT)]
+    'sirk_type', [(csip.SirkType.ENCRYPTED), (csip.SirkType.PLAINTEXT)]
 )
 async def test_csis(sirk_type):
     SIRK = bytes.fromhex('2f62c8ae41867d1bb619e788a2605faa')

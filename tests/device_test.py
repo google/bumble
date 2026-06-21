@@ -278,7 +278,7 @@ async def test_legacy_advertising():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    'auto_restart,',
+    'auto_restart',
     (True, False),
 )
 @pytest.mark.asyncio
@@ -357,7 +357,7 @@ async def test_advertising_and_scanning():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    'own_address_type,',
+    'own_address_type',
     (OwnAddressType.PUBLIC, OwnAddressType.RANDOM),
 )
 @pytest.mark.asyncio
@@ -395,7 +395,7 @@ async def test_extended_advertising_connection(own_address_type):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    'own_address_type,',
+    'own_address_type',
     (OwnAddressType.PUBLIC, OwnAddressType.RANDOM),
 )
 @pytest.mark.asyncio

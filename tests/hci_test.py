@@ -297,7 +297,7 @@ def test_custom_le_meta_event():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    "clazz,",
+    "clazz",
     [
         clazz[1]
         for clazz in inspect.getmembers(hci)
@@ -313,7 +313,7 @@ def test_hci_command_subclasses_op_code(clazz: type[hci.HCI_Command]):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    "clazz,",
+    "clazz",
     [
         clazz[1]
         for clazz in inspect.getmembers(hci)
@@ -330,7 +330,7 @@ def test_hci_event_subclasses_event_code(clazz: type[hci.HCI_Event]):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
-    "clazz,",
+    "clazz",
     [
         clazz[1]
         for clazz in inspect.getmembers(hci)

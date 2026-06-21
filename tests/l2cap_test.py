@@ -49,19 +49,19 @@ def test_helpers():
     psm = l2cap.L2CAP_Connection_Request.serialize_psm(0x242311)
     assert psm == bytes([0x11, 0x23, 0x24])
 
-    (offset, psm) = l2cap.L2CAP_Connection_Request.parse_psm(
+    offset, psm = l2cap.L2CAP_Connection_Request.parse_psm(
         bytes([0x00, 0x01, 0x00, 0x44]), 1
     )
     assert offset == 3
     assert psm == 0x01
 
-    (offset, psm) = l2cap.L2CAP_Connection_Request.parse_psm(
+    offset, psm = l2cap.L2CAP_Connection_Request.parse_psm(
         bytes([0x00, 0x23, 0x10, 0x44]), 1
     )
     assert offset == 3
     assert psm == 0x1023
 
-    (offset, psm) = l2cap.L2CAP_Connection_Request.parse_psm(
+    offset, psm = l2cap.L2CAP_Connection_Request.parse_psm(
         bytes([0x00, 0x11, 0x23, 0x24, 0x44]), 1
     )
     assert offset == 4
@@ -197,7 +197,7 @@ async def test_basic_connection():
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.parametrize("info_type,", list(l2cap.L2CAP_Information_Request.InfoType))
+@pytest.mark.parametrize("info_type", list(l2cap.L2CAP_Information_Request.InfoType))
 async def test_l2cap_information_request(monkeypatch, info_type):
     # TODO: Replace handlers with API when implemented
     devices = await TwoDevices.create_with_connection()
@@ -321,7 +321,7 @@ async def test_mtu():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mtu,", (50, 255, 256, 1000))
+@pytest.mark.parametrize("mtu", (50, 255, 256, 1000))
 async def test_enhanced_retransmission_mode(mtu: int):
     devices = TwoDevices()
     await devices.setup_connection()

@@ -333,7 +333,7 @@ async def test_query_calls_with_calls(
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "operation,",
+    "operation",
     (
         hfp.CallHoldOperation.RELEASE_ALL_HELD_CALLS,
         hfp.CallHoldOperation.RELEASE_ALL_ACTIVE_CALLS,
@@ -358,7 +358,7 @@ async def test_hold_call_without_call_index(
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "operation,",
+    "operation",
     (
         hfp.CallHoldOperation.RELEASE_SPECIFIC_CALL,
         hfp.CallHoldOperation.HOLD_ALL_CALLS_EXCEPT,
