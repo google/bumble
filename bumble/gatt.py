@@ -125,6 +125,8 @@ GATT_PUBLIC_BROADCAST_ANNOUNCEMENT_SERVICE  = UUID.from_16_bits(0x1856, 'Public 
 GATT_ELECTRONIC_SHELF_LABEL_SERVICE         = UUID.from_16_bits(0X1857, 'Electronic Shelf Label')
 GATT_GAMING_AUDIO_SERVICE                   = UUID.from_16_bits(0x1858, 'Gaming Audio')
 GATT_MESH_PROXY_SOLICITATION_SERVICE        = UUID.from_16_bits(0x1859, 'Mesh Audio Solicitation')
+GATT_INDUSTRIAL_MEASUREMENT_DEVICE_SERVICE  = UUID.from_16_bits(0x185A, 'Industrial Measurement Device Service')
+GATT_RANGING_SERVICE                        = UUID.from_16_bits(0x185B, 'Ranging Service')
 
 # Attribute Types
 GATT_PRIMARY_SERVICE_ATTRIBUTE_TYPE   = UUID.from_16_bits(0x2800, 'Primary Service')
@@ -286,6 +288,14 @@ GATT_ASHA_AUDIO_CONTROL_POINT_CHARACTERISTIC  = UUID('f0d4de7e-4a88-476c-9d9f-19
 GATT_ASHA_AUDIO_STATUS_CHARACTERISTIC         = UUID('38663f1a-e711-4cac-b641-326b56404837', 'AudioStatus')
 GATT_ASHA_VOLUME_CHARACTERISTIC               = UUID('00e4ca9e-ab14-41e4-8823-f9e70c7e91df', 'Volume')
 GATT_ASHA_LE_PSM_OUT_CHARACTERISTIC           = UUID('2d410339-82b6-42aa-b34e-e2e01df8cc1a', 'LE_PSM_OUT')
+
+# Ranging Service
+GATT_RAS_FEATURES_CHARACTERISTIC              = UUID.from_16_bits(0x2C14, "RAS Features")
+GATT_REAL_TIME_RANGING_DATA_CHARACTERISTIC    = UUID.from_16_bits(0x2C15, "Real-time Ranging Data")
+GATT_ON_DEMAND_RANGING_DATA_CHARACTERISTIC    = UUID.from_16_bits(0x2C16, "On-demand Ranging Data")
+GATT_RAS_CONTROL_POINT_CHARACTERISTIC         = UUID.from_16_bits(0x2C17, "RAS Control Point")
+GATT_RANGING_DATA_READY_CHARACTERISTIC        = UUID.from_16_bits(0x2C18, "Ranging Data Ready")
+GATT_RANGING_DATA_OVERWRITTEN_CHARACTERISTIC  = UUID.from_16_bits(0x2C19, "Ranging Data Overwritten")
 
 # Apple Notification Center Service
 GATT_ANCS_SERVICE                            = UUID('7905F431-B5CE-4E99-A40F-4B1E122D00D0', 'Apple Notification Center')
