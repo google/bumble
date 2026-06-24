@@ -132,6 +132,7 @@ write_to = "bumble/_version.py"
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.pylint.master]
 init-hook = 'import sys; sys.path.append(".")'
