@@ -133,8 +133,8 @@ def print_connection(connection: Connection) -> None:
     if connection.transport == PhysicalTransport.LE:
         params.append(
             'DL=('
-            f'TX:{connection.data_length[0]}/{connection.data_length[1]},'
-            f'RX:{connection.data_length[2]}/{connection.data_length[3]}'
+            f'TX:{connection.data_length.max_tx_octets}/{connection.data_length.max_tx_time},'
+            f'RX:{connection.data_length.max_rx_octets}/{connection.data_length.max_rx_time}'
             ')'
         )
 
