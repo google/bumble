@@ -68,7 +68,7 @@ async def test_self_disconnection():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'responder_role,',
+    'responder_role',
     (Role.CENTRAL, Role.PERIPHERAL),
 )
 async def test_self_classic_connection(responder_role):
