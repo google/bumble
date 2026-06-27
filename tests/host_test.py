@@ -74,6 +74,20 @@ async def test_reset(supported_commands: set[int], max_lmp_features_page_number:
     )
 
 
+@pytest.mark.asyncio
+async def test_reset_enables_number_of_completed_packets_event() -> None:
+    controller = Controller('C')
+    controller.total_num_le_acl_data_packets = 3
+    host = Host(controller, AsyncPipeSink(controller))
+
+    await host.reset()
+
+    completed_packets_event_bit = 1 << (hci.HCI_NUMBER_OF_COMPLETED_PACKETS_EVENT - 1)
+    assert controller.event_mask & completed_packets_event_bit
+    assert host.le_acl_packet_queue is not None
+    assert host.le_acl_packet_queue.max_in_flight == 3
+
+
 # -----------------------------------------------------------------------------
 def test_data_packet_queue():
     controller = unittest.mock.Mock()
