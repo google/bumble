@@ -21,6 +21,31 @@ from bumble import hci
 from bumble.transport import usb
 
 
+def test_safe_call_soon_ignores_closed_loop():
+    closed_loop = asyncio.new_event_loop()
+    closed_loop.close()
+    callback = mock.Mock()
+
+    usb._safe_call_soon(closed_loop, callback)
+
+    callback.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_safe_call_soon_schedules_callback_on_open_loop():
+    called = asyncio.Event()
+    args = []
+
+    def callback(value):
+        args.append(value)
+        called.set()
+
+    usb._safe_call_soon(asyncio.get_running_loop(), callback, 'scheduled')
+
+    await asyncio.wait_for(called.wait(), timeout=1.0)
+    assert args == ['scheduled']
+
+
 @pytest.mark.asyncio
 async def test_usb_packet_sink_iso_routing():
     # Mock usb1 device and endpoints

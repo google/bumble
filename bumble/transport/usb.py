@@ -38,6 +38,20 @@ logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
+def _safe_call_soon(loop: asyncio.AbstractEventLoop, callback, *args) -> None:
+    """Schedule `callback` on `loop` from the libusb event thread, tolerating the
+    case where the loop has already been closed during process/transport
+    teardown. Without this guard, a libusb transfer callback that fires after the
+    asyncio loop is closed raises 'Event loop is closed' on the C callback
+    thread, which can escalate to a libusb mutex assertion and crash the process
+    (SIGABRT). This makes an unclean shutdown a no-op instead of a core dump."""
+    try:
+        loop.call_soon_threadsafe(callback, *args)
+    except RuntimeError:
+        pass  # loop already closed; nothing left to schedule
+
+
+# -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
 # pylint: disable=invalid-name
@@ -266,7 +280,7 @@ class UsbPacketSink:
         self.packets.put_nowait(packet)
 
     def transfer_callback(self, transfer):
-        self.loop.call_soon_threadsafe(self.out_transfer_ready.release)
+        _safe_call_soon(self.loop, self.out_transfer_ready.release)
         status = transfer.getStatus()
 
         logger.debug(f"OUT CALLBACK: {status}")
@@ -535,8 +549,8 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         self.dequeue_task = self.loop.create_task(self.dequeue())
 
     def queue_packet(self, packet_type: int, packet_data: bytes) -> None:
-        self.loop.call_soon_threadsafe(
-            self.queue.put_nowait, bytes([packet_type]) + packet_data
+        _safe_call_soon(
+            self.loop, self.queue.put_nowait, bytes([packet_type]) + packet_data
         )
 
     def transfer_callback(self, transfer):
@@ -582,16 +596,16 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
                         transfer.submit()
                     except usb1.USBError as error:
                         logger.warning(f"Failed to re-submit transfer: {error}")
-                        self.loop.call_soon_threadsafe(self.on_transport_lost)
+                        _safe_call_soon(self.loop, self.on_transport_lost)
         elif status == usb1.TRANSFER_CANCELLED:
             logger.debug(f"IN[{packet_type}] transfer canceled")
-            self.loop.call_soon_threadsafe(self.done[transfer].set)
+            _safe_call_soon(self.loop, self.done[transfer].set)
         else:
             logger.warning(
                 color(f'!!! IN[{packet_type}] transfer not completed', 'red')
             )
-            self.loop.call_soon_threadsafe(self.done[transfer].set)
-            self.loop.call_soon_threadsafe(self.on_transport_lost)
+            _safe_call_soon(self.loop, self.done[transfer].set)
+            _safe_call_soon(self.loop, self.on_transport_lost)
 
     async def dequeue(self):
         while not self.closed:
@@ -704,7 +718,7 @@ class UsbTransport(Transport):
                 logger.warning(f'!!! Exception while handling events: {error}')
 
         logger.debug('ending USB event loop')
-        self.loop.call_soon_threadsafe(self.event_loop_done.set_result, None)
+        _safe_call_soon(self.loop, self.event_loop_done.set_result, None)
 
     async def close(self):
         self.source.close()
