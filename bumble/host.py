@@ -418,6 +418,7 @@ class Host(utils.EventEmitter):
                         hci.HCI_HARDWARE_ERROR_EVENT,
                         hci.HCI_FLUSH_OCCURRED_EVENT,
                         hci.HCI_ROLE_CHANGE_EVENT,
+                        hci.HCI_NUMBER_OF_COMPLETED_PACKETS_EVENT,
                         hci.HCI_MODE_CHANGE_EVENT,
                         hci.HCI_RETURN_LINK_KEYS_EVENT,
                         hci.HCI_PIN_CODE_REQUEST_EVENT,
