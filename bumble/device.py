@@ -1804,6 +1804,13 @@ class Connection(utils.CompositeEventEmitter):
         subrate_factor: int = 1
         continuation_number: int = 0
 
+    @dataclass(frozen=True)
+    class LeDataLength:
+        max_tx_octets: int
+        max_tx_time: int
+        max_rx_octets: int
+        max_rx_time: int
+
     def __init__(
         self,
         device: Device,
@@ -1832,7 +1839,7 @@ class Connection(utils.CompositeEventEmitter):
         self.authenticated = False
         self.sc = False
         self.att_mtu = att.ATT_DEFAULT_MTU
-        self.data_length: tuple[int, int, int, int] = DEVICE_DEFAULT_DATA_LENGTH
+        self.data_length = self.LeDataLength(*DEVICE_DEFAULT_DATA_LENGTH)
         self.gatt_client = gatt_client.Client(self)  # Per-connection client
         self.gatt_server = (
             device.gatt_server
@@ -6794,11 +6801,11 @@ class Device(utils.CompositeEventEmitter):
             f'*** Connection Data Length Change: [0x{connection.handle:04X}] '
             f'{connection.peer_address} as {connection.role_name}'
         )
-        connection.data_length = (
-            max_tx_octets,
-            max_tx_time,
-            max_rx_octets,
-            max_rx_time,
+        connection.data_length = Connection.LeDataLength(
+            max_tx_octets=max_tx_octets,
+            max_tx_time=max_tx_time,
+            max_rx_octets=max_rx_octets,
+            max_rx_time=max_rx_time,
         )
         connection.emit(connection.EVENT_CONNECTION_DATA_LENGTH_CHANGE)
 
