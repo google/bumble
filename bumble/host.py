@@ -31,6 +31,7 @@ from bumble.core import (
     InvalidStateError,
     PhysicalTransport,
 )
+from bumble.drivers.intel import HCI_INTEL_READ_VERSION_COMMAND
 from bumble.l2cap import L2CAP_PDU
 from bumble.snoop import Snooper
 from bumble.transport.common import TransportLostError
@@ -345,7 +346,8 @@ class Host(utils.EventEmitter):
         # Send a reset command unless a driver has already done so.
         if reset_needed:
             await self.send_sync_command(hci.HCI_Reset_Command())
-            self.ready = True
+        
+        self.ready = True
 
         response1 = await self.send_sync_command(
             hci.HCI_Read_Local_Supported_Commands_Command()
@@ -984,7 +986,10 @@ class Host(utils.EventEmitter):
 
         if self.ready or (
             isinstance(hci_packet, hci.HCI_Command_Complete_Event)
-            and hci_packet.command_opcode == hci.HCI_RESET_COMMAND
+            and (
+                hci_packet.command_opcode == hci.HCI_RESET_COMMAND
+                or hci_packet.command_opcode == HCI_INTEL_READ_VERSION_COMMAND
+            )
         ):
             self.on_hci_packet(hci_packet)
         else:
