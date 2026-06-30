@@ -346,7 +346,7 @@ class Host(utils.EventEmitter):
         # Send a reset command unless a driver has already done so.
         if reset_needed:
             await self.send_sync_command(hci.HCI_Reset_Command())
-        
+
         self.ready = True
 
         response1 = await self.send_sync_command(
