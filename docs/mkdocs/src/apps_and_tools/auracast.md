@@ -29,10 +29,10 @@ Try installing the optional `[auracast]` dependencies:
 
 ## LC3
 The `auracast` app depends on the `lc3` python module, which is available
-either as PyPI module (currently only available for Linux x86_64).
+as a PyPI module `lc3py` (currently available for Linux x86_64 and macOS arm64).
 When installing Bumble with the optional `auracast` dependency, the `lc3`
-module will be installed from the `lc3py` PyPI package if available.
-If not, you will need to install it separately. This can be done with:
+module will be installed automatically if your platform is supported.
+If not, you will need to install it separately. This can be done by building it from source:
 ```bash
 $ python3 -m pip install "git+https://github.com/google/liblc3.git"
 ```

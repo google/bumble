@@ -24,6 +24,20 @@ stack via a virtual HCI interface.
 Both ways are controlled via gRPC requests to the Android emulator controller and/or
 from the Android emulator.
 
+## Prerequisites
+
+Using the Android Emulator or Netsim transports requires the `android` optional dependencies (which include `grpcio` and `protobuf`).
+
+If you installed Bumble from PyPI:
+```bash
+python3 -m pip install "bumble[android]"
+```
+
+If you are running from source:
+```bash
+python3 -m pip install ".[android]"
+```
+
 ## Launching the Emulator
 
 If the version of the emulator you are running does not yet support enabling

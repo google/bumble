@@ -47,7 +47,7 @@ def build(ctx, install=False):
     if install:
         ctx.run('python -m pip install .[build]')
 
-    ctx.run("python -m build")
+    ctx.run("python -I -m build")
 
 
 # -----------------------------------------------------------------------------

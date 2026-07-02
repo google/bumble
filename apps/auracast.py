@@ -40,9 +40,7 @@ else:
 try:
     import lc3  # type: ignore  # pylint: disable=E0401
 except ImportError as e:
-    raise ImportError(
-        "Try `python -m pip install \"git+https://github.com/google/liblc3.git\"`."
-    ) from e
+    raise ImportError("Try `python -m pip install '.[auracast]'`.") from e
 
 import bumble.device
 import bumble.logging

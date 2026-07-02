@@ -37,18 +37,27 @@ from bumble.transport.common import (
 )
 
 # pylint: disable=no-name-in-module
-from bumble.transport.grpc_protobuf.netsim.common_pb2 import ChipKind
-from bumble.transport.grpc_protobuf.netsim.hci_packet_pb2 import HCIPacket
-from bumble.transport.grpc_protobuf.netsim.packet_streamer_pb2 import (
-    PacketRequest,
-    PacketResponse,
-)
-from bumble.transport.grpc_protobuf.netsim.packet_streamer_pb2_grpc import (
-    PacketStreamerServicer,
-    PacketStreamerStub,
-    add_PacketStreamerServicer_to_server,
-)
-from bumble.transport.grpc_protobuf.netsim.startup_pb2 import Chip, ChipInfo, DeviceInfo
+try:
+    from bumble.transport.grpc_protobuf.netsim.common_pb2 import ChipKind
+    from bumble.transport.grpc_protobuf.netsim.hci_packet_pb2 import HCIPacket
+    from bumble.transport.grpc_protobuf.netsim.packet_streamer_pb2 import (
+        PacketRequest,
+        PacketResponse,
+    )
+    from bumble.transport.grpc_protobuf.netsim.packet_streamer_pb2_grpc import (
+        PacketStreamerServicer,
+        PacketStreamerStub,
+        add_PacketStreamerServicer_to_server,
+    )
+    from bumble.transport.grpc_protobuf.netsim.startup_pb2 import (
+        Chip,
+        ChipInfo,
+        DeviceInfo,
+    )
+except ImportError as e:
+    raise ImportError(
+        'The bumble[android] extra is required to use the Android netsim transport'
+    ) from e
 
 # -----------------------------------------------------------------------------
 # Logging

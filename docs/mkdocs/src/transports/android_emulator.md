@@ -8,6 +8,9 @@ ANDROID EMULATOR TRANSPORT
     Use the `android-netsim` transport name instead.
 
 
+!!! note
+    This transport requires the `android` extra. See the [Android Platform](../platforms/android.md) page for installation instructions.
+
 The Android "netsim" transport either connects, as a host, to a **Netsim** virtual controller
 ("host" mode), or acts as a virtual controller itself ("controller" mode) accepting host
 connections.
