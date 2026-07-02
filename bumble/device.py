@@ -5442,7 +5442,7 @@ class Device(utils.CompositeEventEmitter):
         role: int = hci.CsRole.INITIATOR,
         rtt_type: int = hci.RttType.AA_ONLY,
         cs_sync_phy: int = hci.CsSyncPhy.LE_1M,
-        channel_map: bytes = b'\x54\x55\x55\x54\x55\x55\x55\x55\x55\x15',
+        channel_map: bytes = b'\x54\x55\x55\x54\x55\x55\x55\x55\x55\x05',
         channel_map_repetition: int = 0x01,
         channel_selection_type: int = hci.HCI_LE_CS_Create_Config_Command.ChannelSelectionType.ALGO_3B,
         ch3c_shape: int = hci.HCI_LE_CS_Create_Config_Command.Ch3cShape.HAT,
