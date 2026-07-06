@@ -913,7 +913,8 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
             )
         )
 
-        self.state = self.State.PENDING
+        if self.state == self.State.INIT:
+            self.state = self.State.PENDING
 
     async def terminate(self) -> None:
         if self.state in (self.State.INIT, self.State.CANCELLED, self.State.TERMINATED):
