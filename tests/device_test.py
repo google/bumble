@@ -17,6 +17,7 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import functools
+import inspect
 import logging
 import os
 from unittest import mock
@@ -691,6 +692,25 @@ async def test_power_on_default_static_address_should_not_be_any():
     await devices[0].power_on()
 
     assert devices[0].static_address != Address.ANY_RANDOM
+
+
+# -----------------------------------------------------------------------------
+def test_cs_channel_map_excludes_forbidden_channels():
+    forbidden = {0, 1, 23, 24, 25, 76, 77, 78, 79}
+    default_map = (
+        inspect.signature(Device.create_cs_config).parameters['channel_map'].default
+    )
+
+    enabled = {
+        byte_idx * 8 + bit
+        for byte_idx, byte in enumerate(default_map)
+        for bit in range(8)
+        if byte & (1 << bit)
+    }
+
+    assert enabled.isdisjoint(
+        forbidden
+    ), f"Default channel_map enables forbidden CS channels: {enabled & forbidden}"
 
 
 # -----------------------------------------------------------------------------
