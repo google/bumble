@@ -729,7 +729,10 @@ class UsbTransport(Transport):
         # We no longer need the event loop to run
         with self.lock:
             self.event_loop_should_exit = True
-        self.context.interruptEventHandler()
+        try:
+            self.context.interruptEventHandler()
+        except (AttributeError, usb1.USBError) as error:
+            logger.warning(f"Failed to interrupt event handler: {error}")
 
         self.device.releaseInterface(self.acl_interface.getNumber())
         if self.sco_interface:
