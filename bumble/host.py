@@ -31,7 +31,6 @@ from bumble.core import (
     InvalidStateError,
     PhysicalTransport,
 )
-from bumble.drivers.intel import HCI_INTEL_READ_VERSION_COMMAND
 from bumble.l2cap import L2CAP_PDU
 from bumble.snoop import Snooper
 from bumble.transport.common import TransportLostError
@@ -988,7 +987,7 @@ class Host(utils.EventEmitter):
             isinstance(hci_packet, hci.HCI_Command_Complete_Event)
             and (
                 hci_packet.command_opcode == hci.HCI_RESET_COMMAND
-                or hci_packet.command_opcode == HCI_INTEL_READ_VERSION_COMMAND
+                or hci_packet.command_opcode >> 10 == hci.HCI_VENDOR_OGF
             )
         ):
             self.on_hci_packet(hci_packet)
