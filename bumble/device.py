@@ -1189,6 +1189,15 @@ class ChannelSoundingCapabilities:
     t_pm_times_supported: int
     t_sw_time_supported: int
     tx_snr_capability: int
+    # Bluetooth 6.3 [v2] additions from LE CS Read Local Supported
+    # Capabilities V2 (opcode 0x20A5). Populated when the local controller
+    # supports the V2 command; zero otherwise. `cs_ipt_reflector_supported`
+    # is a derived boolean from `subfeatures_supported` bit 4 (the
+    # CS_IPT_REFLECTOR subfeature mask per Bluetooth Core Spec / Nordic
+    # hci_types.h:3934-3935).
+    t_ip2_ipt_times_supported: int = 0
+    t_sw_ipt_time_supported: int = 0
+    cs_ipt_reflector_supported: bool = False
 
 
 # -----------------------------------------------------------------------------
@@ -2961,9 +2970,30 @@ class Device(utils.CompositeEventEmitter):
                         bit_value=1,
                     )
                 )
-                result = await self.send_sync_command(
-                    hci.HCI_LE_CS_Read_Local_Supported_Capabilities_Command()
-                )
+                # Prefer the Bluetooth 6.3 V2 caps read (opcode 0x20A5) which
+                # appends T_IP2_IPT_TIMES and T_SW_IPT_TIME after tx_snr_capability.
+                # supports_command() would be the clean gate, but Nordic hci_uart
+                # firmware doesn't always set the LE Supported Commands bit for
+                # V2 even when the command works — so we blind-call V2 and
+                # transparently fall back to 6.0 on UNKNOWN_HCI_COMMAND. That
+                # keeps 6.0-only controllers working unchanged while extracting
+                # IPT timings whenever the controller actually implements V2.
+                use_v2 = True
+                try:
+                    result = await self.send_sync_command(
+                        hci.HCI_LE_CS_Read_Local_Supported_Capabilities_V2_Command()
+                    )
+                except hci.HCI_Error as e:
+                    if e.error_code != hci.HCI_UNKNOWN_HCI_COMMAND_ERROR:
+                        raise
+                    use_v2 = False
+                    result = await self.send_sync_command(
+                        hci.HCI_LE_CS_Read_Local_Supported_Capabilities_Command()
+                    )
+                # The V2 dataclass renamed rtt_random_sequence_n → rtt_random_payload_n
+                # (same semantic). Cover both.
+                rtt_random = (getattr(result, 'rtt_random_payload_n', None)
+                              if use_v2 else result.rtt_random_sequence_n)
                 self.cs_capabilities = ChannelSoundingCapabilities(
                     num_config_supported=result.num_config_supported,
                     max_consecutive_procedures_supported=result.max_consecutive_procedures_supported,
@@ -2974,7 +3004,7 @@ class Device(utils.CompositeEventEmitter):
                     rtt_capability=result.rtt_capability,
                     rtt_aa_only_n=result.rtt_aa_only_n,
                     rtt_sounding_n=result.rtt_sounding_n,
-                    rtt_random_sequence_n=result.rtt_random_sequence_n,
+                    rtt_random_sequence_n=rtt_random,
                     nadm_sounding_capability=result.nadm_sounding_capability,
                     nadm_random_capability=result.nadm_random_capability,
                     cs_sync_phys_supported=result.cs_sync_phys_supported,
@@ -2985,6 +3015,11 @@ class Device(utils.CompositeEventEmitter):
                     t_pm_times_supported=result.t_pm_times_supported,
                     t_sw_time_supported=result.t_sw_time_supported,
                     tx_snr_capability=result.tx_snr_capability,
+                    t_ip2_ipt_times_supported=getattr(result, 't_ip2_ipt_times_supported', 0),
+                    t_sw_ipt_time_supported=getattr(result, 't_sw_ipt_time_supported', 0),
+                    cs_ipt_reflector_supported=bool(
+                        result.subfeatures_supported & hci.CsSubfeature.CS_IPT_REFLECTOR
+                    ),
                 )
 
             if (
@@ -5448,6 +5483,7 @@ class Device(utils.CompositeEventEmitter):
         channel_selection_type: int = hci.HCI_LE_CS_Create_Config_Command.ChannelSelectionType.ALGO_3B,
         ch3c_shape: int = hci.HCI_LE_CS_Create_Config_Command.Ch3cShape.HAT,
         ch3c_jump: int = 0x03,
+        cs_enhancements_1: int = 0x00,
     ) -> ChannelSoundingConfig:
         complete_future: asyncio.Future[ChannelSoundingConfig] = (
             asyncio.get_running_loop().create_future()
@@ -5493,7 +5529,7 @@ class Device(utils.CompositeEventEmitter):
                     channel_selection_type=channel_selection_type,
                     ch3c_shape=ch3c_shape,
                     ch3c_jump=ch3c_jump,
-                    reserved=0x00,
+                    cs_enhancements_1=cs_enhancements_1,
                 )
             )
             return await complete_future
@@ -6826,6 +6862,19 @@ class Device(utils.CompositeEventEmitter):
     def on_cs_remote_supported_capabilities(
         self, event: hci.HCI_LE_CS_Read_Remote_Supported_Capabilities_Complete_Event
     ):
+        self._on_cs_remote_supported_capabilities_impl(event)
+
+    @host_event_handler
+    def on_cs_remote_supported_capabilities_v2(
+        self,
+        event: hci.HCI_LE_CS_Read_Remote_Supported_Capabilities_Complete_V2_Event,
+    ):
+        # 6.3 variant with T_IP2_IPT_Times and T_SW_IPT_Time appended.
+        # Fed through the same builder so downstream code doesn't care which
+        # HCI event landed.
+        self._on_cs_remote_supported_capabilities_impl(event)
+
+    def _on_cs_remote_supported_capabilities_impl(self, event) -> None:
         if not (connection := self.lookup_connection(event.connection_handle)):
             return
 
@@ -6835,6 +6884,12 @@ class Device(utils.CompositeEventEmitter):
             )
             return
 
+        # V1 event carries rtt_random_sequence_n; V2 renamed the field to
+        # rtt_random_payload_n (same semantic per spec 6.3).
+        rtt_random = getattr(
+            event, 'rtt_random_payload_n',
+            getattr(event, 'rtt_random_sequence_n', 0),
+        )
         capabilities = ChannelSoundingCapabilities(
             num_config_supported=event.num_config_supported,
             max_consecutive_procedures_supported=event.max_consecutive_procedures_supported,
@@ -6845,7 +6900,7 @@ class Device(utils.CompositeEventEmitter):
             rtt_capability=event.rtt_capability,
             rtt_aa_only_n=event.rtt_aa_only_n,
             rtt_sounding_n=event.rtt_sounding_n,
-            rtt_random_sequence_n=event.rtt_random_sequence_n,
+            rtt_random_sequence_n=rtt_random,
             nadm_sounding_capability=event.nadm_sounding_capability,
             nadm_random_capability=event.nadm_random_capability,
             cs_sync_phys_supported=event.cs_sync_phys_supported,
@@ -6856,6 +6911,11 @@ class Device(utils.CompositeEventEmitter):
             t_pm_times_supported=event.t_pm_times_supported,
             t_sw_time_supported=event.t_sw_time_supported,
             tx_snr_capability=event.tx_snr_capability,
+            t_ip2_ipt_times_supported=getattr(event, 't_ip2_ipt_times_supported', 0),
+            t_sw_ipt_time_supported=getattr(event, 't_sw_ipt_time_supported', 0),
+            cs_ipt_reflector_supported=bool(
+                event.subfeatures_supported & hci.CsSubfeature.CS_IPT_REFLECTOR
+            ),
         )
         connection.emit(connection.EVENT_CHANNEL_SOUNDING_CAPABILITIES, capabilities)
 
