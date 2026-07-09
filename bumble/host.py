@@ -2009,6 +2009,14 @@ class Host(utils.EventEmitter):
     ):
         self.emit('cs_remote_supported_capabilities', event)
 
+    def on_hci_le_cs_read_remote_supported_capabilities_complete_v2_event(
+        self,
+        event: hci.HCI_LE_CS_Read_Remote_Supported_Capabilities_Complete_V2_Event,
+    ):
+        # Bluetooth 6.3 variant (subevent 0x38) — dispatched separately so
+        # device.py handlers can pick the right payload shape.
+        self.emit('cs_remote_supported_capabilities_v2', event)
+
     def on_hci_le_cs_security_enable_complete_event(
         self, event: hci.HCI_LE_CS_Security_Enable_Complete_Event
     ):
