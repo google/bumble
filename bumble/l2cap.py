@@ -2043,12 +2043,19 @@ class ChannelManagerDelegate:
     """
 
     def accept_connection_parameters(
-        self, interval_min: int, interval_max: int, latency: int, timeout: int
+        self, interval_min: float, interval_max: float, latency: int, timeout: float
     ) -> bool:
         """
         Decide whether to accept the given connection parameters.
 
-        Return True to accept, False to reject.
+        Args:
+            interval_min: The minimum connection interval, in ms.
+            interval_max: The maximum connection interval, in ms.
+            latency: The connection latency, in number of connection events.
+            timeout: The connection timeout, in ms.
+
+        Returns:
+            True to accept, False to reject.
 
         By default, accept all connection parameters.
         Override this method to implement custom logic.
@@ -2576,10 +2583,10 @@ class ChannelManager:
 
         # Ask the delegate to accept or reject the connection parameters
         accept = self.delegate.accept_connection_parameters(
-            request.interval_min,
-            request.interval_max,
+            request.interval_min * 1.25,
+            request.interval_max * 1.25,
             request.latency,
-            request.timeout,
+            request.timeout * 10.0,
         )
 
         # Respond
