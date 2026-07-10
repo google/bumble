@@ -8174,6 +8174,10 @@ class HCI_IsoDataPacket(HCI_Packet):
         packet_status_flag: int | None = None
 
         pos = 1
+        if len(packet) < pos + 4:
+            raise InvalidPacketError(
+                f'ISO data packet too short: {len(packet)} bytes'
+            )
         pdu_info, data_total_length = struct.unpack_from('<HH', packet, pos)
         connection_handle = pdu_info & 0xFFF
         pb_flag = (pdu_info >> 12) & 0b11
@@ -8186,10 +8190,14 @@ class HCI_IsoDataPacket(HCI_Packet):
         if ts_flag:
             if not should_include_sdu_info:
                 logger.warning(f'Timestamp included when pb_flag={bin(pb_flag)}')
+            if len(packet) < pos + 4:
+                raise InvalidPacketError('ISO data packet truncated (timestamp)')
             time_stamp, *_ = struct.unpack_from('<I', packet, pos)
             pos += 4
 
         if should_include_sdu_info:
+            if len(packet) < pos + 4:
+                raise InvalidPacketError('ISO data packet truncated (SDU info)')
             packet_sequence_number, sdu_info = struct.unpack_from('<HH', packet, pos)
             iso_sdu_length = sdu_info & 0xFFF
             packet_status_flag = (sdu_info >> 15) & 1
