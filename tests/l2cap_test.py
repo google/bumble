@@ -18,7 +18,6 @@
 import asyncio
 import itertools
 import logging
-import os
 import random
 from collections.abc import Sequence
 from unittest import mock
@@ -33,9 +32,6 @@ from .test_utils import TwoDevices, async_barrier
 # Logging
 # -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
-
-
-# -----------------------------------------------------------------------------
 
 
 # -----------------------------------------------------------------------------
@@ -533,15 +529,21 @@ async def test_disconnection_collision():
 
 
 # -----------------------------------------------------------------------------
-async def run():
-    test_helpers()
-    await test_basic_connection()
-    await test_transfer()
-    await test_bidirectional_transfer()
-    await test_mtu()
+@pytest.mark.asyncio
+async def test_channel_manager_delegate():
+    class TestDelegate(l2cap.ChannelManagerDelegate):
+        def accept_connection_parameters(
+            self, interval_min: int, interval_max: int, latency: int, timeout: int
+        ) -> bool:
+            return False
 
-
-# -----------------------------------------------------------------------------
-if __name__ == '__main__':
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
-    asyncio.run(run())
+    devices = await TwoDevices.create_with_connection()
+    devices.devices[0].l2cap_channel_manager.delegate = TestDelegate()
+    with pytest.raises(core.ConnectionParameterUpdateError):
+        await devices.connections[1].update_parameters(
+            connection_interval_min=15,
+            connection_interval_max=30,
+            max_latency=3,
+            supervision_timeout=2000,
+            use_l2cap=True,
+        )
