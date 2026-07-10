@@ -533,7 +533,7 @@ async def test_disconnection_collision():
 async def test_channel_manager_delegate():
     class TestDelegate(l2cap.ChannelManagerDelegate):
         def accept_connection_parameters(
-            self, interval_min: int, interval_max: int, latency: int, timeout: int
+            self, interval_min: float, interval_max: float, latency: int, timeout: float
         ) -> bool:
             return False
 
@@ -541,9 +541,9 @@ async def test_channel_manager_delegate():
     devices.devices[0].l2cap_channel_manager.delegate = TestDelegate()
     with pytest.raises(core.ConnectionParameterUpdateError):
         await devices.connections[1].update_parameters(
-            connection_interval_min=15,
-            connection_interval_max=30,
+            connection_interval_min=15.0,
+            connection_interval_max=30.0,
             max_latency=3,
-            supervision_timeout=2000,
+            supervision_timeout=2000.0,
             use_l2cap=True,
         )
