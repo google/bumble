@@ -5229,7 +5229,11 @@ class Device(utils.CompositeEventEmitter):
                 )
                 await established
             except hci.HCI_Error:
-                del self.bigs[big_handle]
+                # The establishment-failure event handler may have already
+                # removed the entry; pop so this cleanup cannot raise KeyError
+                # and mask the HCI_Error (see on_big_termination for the same
+                # idempotent pattern).
+                self.bigs.pop(big_handle, None)
                 raise
 
         return big
@@ -5278,7 +5282,11 @@ class Device(utils.CompositeEventEmitter):
                 )
                 await established
             except hci.HCI_Error:
-                del self.big_syncs[big_handle]
+                # The establishment-failure event handler may have already
+                # removed the entry; pop so this cleanup cannot raise KeyError
+                # and mask the HCI_Error (see on_big_termination for the same
+                # idempotent pattern).
+                self.big_syncs.pop(big_handle, None)
                 raise
 
         return big_sync
