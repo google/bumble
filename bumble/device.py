@@ -1576,6 +1576,15 @@ class CigParameters:
         rtn_c_to_p: int = DEVICE_DEFAULT_ISO_CIS_RTN  # Number of C->P retransmissions
         rtn_p_to_c: int = DEVICE_DEFAULT_ISO_CIS_RTN  # Number of P->C retransmissions
 
+        def __post_init__(self) -> None:
+            # For unidirectional CIS (e.g., Central-to-Peripheral only), the unused direction's
+            # SDU size is 0. If SDU size is 0, we set RTN to 0 as well for maintaining
+            # compatibility with older firmware that has error 0x30 bug.
+            if self.max_sdu_c_to_p == 0:
+                self.rtn_c_to_p = 0
+            if self.max_sdu_p_to_c == 0:
+                self.rtn_p_to_c = 0
+
     cig_id: int
     cis_parameters: list[CisParameters]
     sdu_interval_c_to_p: int  # C->P SDU interval, in microseconds
