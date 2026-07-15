@@ -604,7 +604,7 @@ def test_cis_parameters_unidirectional():
     assert cis_c2p.rtn_c_to_p != 0
     assert cis_c2p.phy_c_to_p != hci.PhyBit(0)
     assert cis_c2p.rtn_p_to_c == 0
-    assert cis_c2p.phy_p_to_c == hci.PhyBit(0)
+    assert cis_c2p.phy_p_to_c != hci.PhyBit(0)
 
     # Test P2C unidirectional (C to P not used)
     cis_p2c = CigParameters.CisParameters(cis_id=2, max_sdu_c_to_p=0)
@@ -612,7 +612,7 @@ def test_cis_parameters_unidirectional():
     assert cis_p2c.rtn_p_to_c != 0
     assert cis_p2c.phy_p_to_c != hci.PhyBit(0)
     assert cis_p2c.rtn_c_to_p == 0
-    assert cis_p2c.phy_c_to_p == hci.PhyBit(0)
+    assert cis_p2c.phy_c_to_p != hci.PhyBit(0)
 
 
 # -----------------------------------------------------------------------------

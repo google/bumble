@@ -1578,15 +1578,12 @@ class CigParameters:
 
         def __post_init__(self) -> None:
             # For unidirectional CIS (e.g., Central-to-Peripheral only), the unused direction's
-            # SDU size is 0. If SDU size is 0, the corresponding retransmission count and PHY
-            # must also be set to 0. Otherwise, some controllers will reject the parameters
-            # with error 0x30 (Parameter Out Of Mandatory Range).
+            # SDU size is 0. If SDU size is 0, we set RTN to 0 as well for maintaining
+            # compatibility with older firmware that has error 0x30 bug.
             if self.max_sdu_c_to_p == 0:
                 self.rtn_c_to_p = 0
-                self.phy_c_to_p = hci.PhyBit(0)
             if self.max_sdu_p_to_c == 0:
                 self.rtn_p_to_c = 0
-                self.phy_p_to_c = hci.PhyBit(0)
 
     cig_id: int
     cis_parameters: list[CisParameters]
