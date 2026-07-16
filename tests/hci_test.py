@@ -702,6 +702,16 @@ def test_iso_data_packet():
 
 
 # -----------------------------------------------------------------------------
+def test_iso_data_packet_too_short():
+    # A truncated ISO data packet must raise InvalidPacketError, not the raw
+    # struct.error from unpack_from. Here pb_flag=0b00 asks for 4 bytes of SDU
+    # info at offset 5, but the packet ends at offset 5.
+    data = bytes.fromhex('0561000000')  # type + pdu_info(0x0061) + len(0) = 5 bytes
+    with pytest.raises(hci.InvalidPacketError):
+        hci.HCI_IsoDataPacket.from_bytes(data)
+
+
+# -----------------------------------------------------------------------------
 def run_test_events():
     test_HCI_Event()
     test_HCI_LE_Connection_Complete_Event()
