@@ -2978,25 +2978,29 @@ class Device(utils.CompositeEventEmitter):
                 # transparently fall back to 6.0 on UNKNOWN_HCI_COMMAND. That
                 # keeps 6.0-only controllers working unchanged while extracting
                 # IPT timings whenever the controller actually implements V2.
-                use_v2 = True
+                # `result` is one of two return-parameter shapes; annotate the
+                # union so the V2 read and the 6.0 fallback both type-check, and
+                # read the renamed rtt_random field in-branch where the concrete
+                # type is known.
+                result: (
+                    hci.HCI_LE_CS_Read_Local_Supported_Capabilities_V2_ReturnParameters
+                    | hci.HCI_LE_CS_Read_Local_Supported_Capabilities_ReturnParameters
+                )
                 try:
-                    result = await self.send_sync_command(
+                    v2 = await self.send_sync_command(
                         hci.HCI_LE_CS_Read_Local_Supported_Capabilities_V2_Command()
                     )
+                    result = v2
+                    # V2 renamed rtt_random_sequence_n → rtt_random_payload_n.
+                    rtt_random = v2.rtt_random_payload_n
                 except hci.HCI_Error as e:
                     if e.error_code != hci.HCI_UNKNOWN_HCI_COMMAND_ERROR:
                         raise
-                    use_v2 = False
-                    result = await self.send_sync_command(
+                    v1 = await self.send_sync_command(
                         hci.HCI_LE_CS_Read_Local_Supported_Capabilities_Command()
                     )
-                # The V2 dataclass renamed rtt_random_sequence_n → rtt_random_payload_n
-                # (same semantic). Cover both.
-                rtt_random = (
-                    getattr(result, 'rtt_random_payload_n', None)
-                    if use_v2
-                    else result.rtt_random_sequence_n
-                )
+                    result = v1
+                    rtt_random = v1.rtt_random_sequence_n
                 self.cs_capabilities = ChannelSoundingCapabilities(
                     num_config_supported=result.num_config_supported,
                     max_consecutive_procedures_supported=result.max_consecutive_procedures_supported,
