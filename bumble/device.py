@@ -2992,8 +2992,11 @@ class Device(utils.CompositeEventEmitter):
                     )
                 # The V2 dataclass renamed rtt_random_sequence_n → rtt_random_payload_n
                 # (same semantic). Cover both.
-                rtt_random = (getattr(result, 'rtt_random_payload_n', None)
-                              if use_v2 else result.rtt_random_sequence_n)
+                rtt_random = (
+                    getattr(result, 'rtt_random_payload_n', None)
+                    if use_v2
+                    else result.rtt_random_sequence_n
+                )
                 self.cs_capabilities = ChannelSoundingCapabilities(
                     num_config_supported=result.num_config_supported,
                     max_consecutive_procedures_supported=result.max_consecutive_procedures_supported,
@@ -3015,8 +3018,12 @@ class Device(utils.CompositeEventEmitter):
                     t_pm_times_supported=result.t_pm_times_supported,
                     t_sw_time_supported=result.t_sw_time_supported,
                     tx_snr_capability=result.tx_snr_capability,
-                    t_ip2_ipt_times_supported=getattr(result, 't_ip2_ipt_times_supported', 0),
-                    t_sw_ipt_time_supported=getattr(result, 't_sw_ipt_time_supported', 0),
+                    t_ip2_ipt_times_supported=getattr(
+                        result, 't_ip2_ipt_times_supported', 0
+                    ),
+                    t_sw_ipt_time_supported=getattr(
+                        result, 't_sw_ipt_time_supported', 0
+                    ),
                     cs_ipt_reflector_supported=bool(
                         result.subfeatures_supported & hci.CsSubfeature.CS_IPT_REFLECTOR
                     ),
@@ -6887,7 +6894,8 @@ class Device(utils.CompositeEventEmitter):
         # V1 event carries rtt_random_sequence_n; V2 renamed the field to
         # rtt_random_payload_n (same semantic per spec 6.3).
         rtt_random = getattr(
-            event, 'rtt_random_payload_n',
+            event,
+            'rtt_random_payload_n',
             getattr(event, 'rtt_random_sequence_n', 0),
         )
         capabilities = ChannelSoundingCapabilities(
