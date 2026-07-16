@@ -1136,8 +1136,7 @@ class Client:
         # Each Prepare Write Request carries opcode(1) + handle(2) + offset(2), so
         # the part value is limited to ATT_MTU - 5 bytes.
         max_part_size = self.mtu - 5
-        offset = 0
-        while offset < len(value):
+        for offset in range(0, len(value), max_part_size):
             part = value[offset : offset + max_part_size]
             response = await self.send_request(
                 att.ATT_Prepare_Write_Request(
@@ -1150,7 +1149,6 @@ class Client:
                 # Ask the server to drop whatever it has already queued
                 await self.send_request(att.ATT_Execute_Write_Request(flags=0x00))
                 raise att.ATT_Error(error_code=response.error_code, message=response)
-            offset += len(part)
 
         # Commit the queued values (flags=0x01 = write all pending prepared values)
         response = await self.send_request(att.ATT_Execute_Write_Request(flags=0x01))
