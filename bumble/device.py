@@ -2366,6 +2366,7 @@ class Device(utils.CompositeEventEmitter):
     inquiry_response: bytes | None = None
     address_resolver: smp.AddressResolver | None = None
     connect_own_address_type: hci.OwnAddressType | None = None
+    l2cap_channel_manager: l2cap.ChannelManager
 
     EVENT_ADVERTISEMENT = "advertisement"
     EVENT_PERIODIC_ADVERTISING_SYNC_TRANSFER = "periodic_advertising_sync_transfer"
@@ -4407,7 +4408,10 @@ class Device(utils.CompositeEventEmitter):
                     supervision_timeout,
                 )
             )
-            if l2cap_result != l2cap.L2CAP_CONNECTION_PARAMETERS_ACCEPTED_RESULT:
+            if (
+                l2cap_result
+                != l2cap.L2CAP_Connection_Parameter_Update_Response.Result.ACCEPTED
+            ):
                 raise ConnectionParameterUpdateError(l2cap_result)
 
             return

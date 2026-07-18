@@ -88,7 +88,7 @@ L2CAP_LE_PSM_DYNAMIC_RANGE_START = 0x0080
 L2CAP_LE_PSM_DYNAMIC_RANGE_END   = 0x00FF
 
 class CommandCode(hci.SpecableEnum):
-    L2CAP_COMMAND_REJECT                       = 0x01
+    L2CAP_COMMAND_REJECT_RESPONSE              = 0x01
     L2CAP_CONNECTION_REQUEST                   = 0x02
     L2CAP_CONNECTION_RESPONSE                  = 0x03
     L2CAP_CONFIGURE_REQUEST                    = 0x04
@@ -114,13 +114,6 @@ class CommandCode(hci.SpecableEnum):
     L2CAP_CREDIT_BASED_CONNECTION_RESPONSE     = 0x18
     L2CAP_CREDIT_BASED_RECONFIGURE_REQUEST     = 0x19
     L2CAP_CREDIT_BASED_RECONFIGURE_RESPONSE    = 0x1A
-
-L2CAP_CONNECTION_PARAMETERS_ACCEPTED_RESULT = 0x0000
-L2CAP_CONNECTION_PARAMETERS_REJECTED_RESULT = 0x0001
-
-L2CAP_COMMAND_NOT_UNDERSTOOD_REASON = 0x0000
-L2CAP_SIGNALING_MTU_EXCEEDED_REASON = 0x0001
-L2CAP_INVALID_CID_IN_REQUEST_REASON = 0x0002
 
 L2CAP_LE_CREDIT_BASED_CONNECTION_MAX_CREDITS             = 65535
 L2CAP_LE_CREDIT_BASED_CONNECTION_MIN_MTU                 = 23
@@ -463,9 +456,9 @@ class L2CAP_Control_Frame:
 # -----------------------------------------------------------------------------
 @L2CAP_Control_Frame.subclass
 @dataclasses.dataclass
-class L2CAP_Command_Reject(L2CAP_Control_Frame):
+class L2CAP_Command_Reject_Response(L2CAP_Control_Frame):
     '''
-    See Bluetooth spec @ Vol 3, Part A - 4.1 COMMAND REJECT
+    See Bluetooth spec @ Vol 3, Part A - 4.1 COMMAND REJECT RESPONSE
     '''
 
     class Reason(hci.SpecableEnum):
@@ -706,7 +699,11 @@ class L2CAP_Connection_Parameter_Update_Response(L2CAP_Control_Frame):
     See Bluetooth spec @ Vol 3, Part A - 4.21 CONNECTION PARAMETER UPDATE RESPONSE
     '''
 
-    result: int = dataclasses.field(metadata=hci.metadata(2))
+    class Result(hci.SpecableEnum):
+        ACCEPTED = 0x0000
+        REJECTED = 0x0001
+
+    result: Result = dataclasses.field(metadata=Result.type_metadata(2))
 
 
 # -----------------------------------------------------------------------------
@@ -2039,6 +2036,34 @@ class LeCreditBasedChannelServer(utils.EventEmitter):
 
 
 # -----------------------------------------------------------------------------
+class ChannelManagerDelegate:
+    """
+    Delegate for handling channel manager decisions,
+    such as accepting connection parameters.
+    """
+
+    def accept_connection_parameters(
+        self, interval_min: float, interval_max: float, latency: int, timeout: float
+    ) -> bool:
+        """
+        Decide whether to accept the given connection parameters.
+
+        Args:
+            interval_min: The minimum connection interval, in ms.
+            interval_max: The maximum connection interval, in ms.
+            latency: The connection latency, in number of connection events.
+            timeout: The connection timeout, in ms.
+
+        Returns:
+            True to accept, False to reject.
+
+        By default, accept all connection parameters.
+        Override this method to implement custom logic.
+        """
+        return True
+
+
+# -----------------------------------------------------------------------------
 class ChannelManager:
     identifiers: dict[int, int]
     channels: dict[int, dict[int, ClassicChannel | LeCreditBasedChannel]]
@@ -2058,12 +2083,16 @@ class ChannelManager:
         ],
     ]
     _host: Host | None
-    connection_parameters_update_response: asyncio.Future[int] | None
+    connection_parameters_update_response: (
+        asyncio.Future[L2CAP_Connection_Parameter_Update_Response.Result] | None
+    )
+    delegate: ChannelManagerDelegate
 
     def __init__(
         self,
         extended_features: Iterable[int] = (),
         connectionless_mtu: int = L2CAP_DEFAULT_CONNECTIONLESS_MTU,
+        delegate: ChannelManagerDelegate | None = None,
     ) -> None:
         self._host = None
         self.identifiers = {}  # Incrementing identifier values by connection
@@ -2084,6 +2113,7 @@ class ChannelManager:
         self.extended_features = set(extended_features)
         self.connectionless_mtu = connectionless_mtu
         self.connection_parameters_update_response = None
+        self.delegate = delegate or ChannelManagerDelegate()
 
     @property
     def host(self) -> Host:
@@ -2315,9 +2345,9 @@ class ChannelManager:
                 self.send_control_frame(
                     connection,
                     cid,
-                    L2CAP_Command_Reject(
+                    L2CAP_Command_Reject_Response(
                         identifier=control_frame.identifier,
-                        reason=L2CAP_COMMAND_NOT_UNDERSTOOD_REASON,
+                        reason=L2CAP_Command_Reject_Response.Reason.COMMAND_NOT_UNDERSTOOD,
                         data=b'',
                     ),
                 )
@@ -2327,15 +2357,15 @@ class ChannelManager:
             self.send_control_frame(
                 connection,
                 cid,
-                L2CAP_Command_Reject(
+                L2CAP_Command_Reject_Response(
                     identifier=control_frame.identifier,
-                    reason=L2CAP_COMMAND_NOT_UNDERSTOOD_REASON,
+                    reason=L2CAP_Command_Reject_Response.Reason.COMMAND_NOT_UNDERSTOOD,
                     data=b'',
                 ),
             )
 
-    def on_l2cap_command_reject(
-        self, _connection: Connection, _cid: int, packet: L2CAP_Command_Reject
+    def on_l2cap_command_reject_response(
+        self, _connection: Connection, _cid: int, packet: L2CAP_Command_Reject_Response
     ) -> None:
         logger.warning(f'{color("!!! Command rejected:", "red")} {packet.reason}')
 
@@ -2539,34 +2569,54 @@ class ChannelManager:
         cid: int,
         request: L2CAP_Connection_Parameter_Update_Request,
     ):
-        if connection.role == hci.Role.CENTRAL:
+        if connection.role == hci.Role.PERIPHERAL:
             self.send_control_frame(
                 connection,
                 cid,
-                L2CAP_Connection_Parameter_Update_Response(
+                L2CAP_Command_Reject_Response(
                     identifier=request.identifier,
-                    result=L2CAP_CONNECTION_PARAMETERS_ACCEPTED_RESULT,
+                    reason=L2CAP_Command_Reject_Response.Reason.COMMAND_NOT_UNDERSTOOD,
+                    data=b'',
                 ),
             )
-            self.host.send_command_sync(
-                hci.HCI_LE_Connection_Update_Command(
-                    connection_handle=connection.handle,
-                    connection_interval_min=request.interval_min,
-                    connection_interval_max=request.interval_max,
-                    max_latency=request.latency,
-                    supervision_timeout=request.timeout,
-                    min_ce_length=0,
-                    max_ce_length=0,
+            return
+
+        # Ask the delegate to accept or reject the connection parameters
+        accept = self.delegate.accept_connection_parameters(
+            request.interval_min * 1.25,
+            request.interval_max * 1.25,
+            request.latency,
+            request.timeout * 10.0,
+        )
+
+        # Respond
+        self.send_control_frame(
+            connection,
+            cid,
+            L2CAP_Connection_Parameter_Update_Response(
+                identifier=request.identifier,
+                result=(
+                    L2CAP_Connection_Parameter_Update_Response.Result.ACCEPTED
+                    if accept
+                    else L2CAP_Connection_Parameter_Update_Response.Result.REJECTED
+                ),
+            ),
+        )
+
+        if accept:
+            # Apply the requested parameters
+            utils.AsyncRunner.spawn(
+                self.host.send_async_command(
+                    hci.HCI_LE_Connection_Update_Command(
+                        connection_handle=connection.handle,
+                        connection_interval_min=request.interval_min,
+                        connection_interval_max=request.interval_max,
+                        max_latency=request.latency,
+                        supervision_timeout=request.timeout,
+                        min_ce_length=0,
+                        max_ce_length=0,
+                    )
                 )
-            )
-        else:
-            self.send_control_frame(
-                connection,
-                cid,
-                L2CAP_Connection_Parameter_Update_Response(
-                    identifier=request.identifier,
-                    result=L2CAP_CONNECTION_PARAMETERS_REJECTED_RESULT,
-                ),
             )
 
     async def update_connection_parameters(
@@ -2576,7 +2626,7 @@ class ChannelManager:
         interval_max: int,
         latency: int,
         timeout: int,
-    ) -> int:
+    ) -> L2CAP_Connection_Parameter_Update_Response.Result:
         # Check that there isn't already a request pending
         if self.connection_parameters_update_response:
             raise InvalidStateError('request already pending')
