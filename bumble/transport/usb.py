@@ -665,8 +665,6 @@ class UsbTransport(Transport):
         self.device = device
         self.acl_interface = acl_interface
         self.sco_interface = sco_interface
-        self.loop = asyncio.get_running_loop()
-        self.event_loop_done = self.loop.create_future()
         self.event_loop_should_exit = False
         self.lock = threading.Lock()
         self.closed = False
@@ -719,7 +717,6 @@ class UsbTransport(Transport):
                 logger.warning(f'!!! Exception while handling events: {error}')
 
         logger.debug('ending USB event loop')
-        _safe_call_soon(self.loop, self.event_loop_done.set_result, None)
 
     async def close(self):
         # close() may be reached both explicitly and through Transport.__aexit__.
@@ -747,8 +744,7 @@ class UsbTransport(Transport):
         # callback has returned. Wait and join before freeing transfers, the
         # device handle, or the context.
         logger.debug("waiting for USB event loop to be done...")
-        await self.event_loop_done
-        self.event_thread.join()
+        await asyncio.to_thread(self.event_thread.join)
         logger.debug("USB event loop done")
 
         self.device.releaseInterface(self.acl_interface.getNumber())
