@@ -414,10 +414,10 @@ class UsbPacketSink:
                 except usb1.USBError as error:
                     logger.debug(f'OUT transfer likely already completed ({error})')
 
-            try:
-                transfer.close()
-            except usb1.USBError as error:
-                logger.warning(f'failed to close transfer ({error})')
+        # Do not close the transfer objects here. The callbacks that wake this
+        # coroutine run on the libusb event thread and may not have returned yet.
+        # UsbTransport.close() stops and joins that thread before device.close()
+        # finalizes the transfers.
 
 
 READ_SIZE = 4096
@@ -665,10 +665,9 @@ class UsbTransport(Transport):
         self.device = device
         self.acl_interface = acl_interface
         self.sco_interface = sco_interface
-        self.loop = asyncio.get_running_loop()
-        self.event_loop_done = self.loop.create_future()
         self.event_loop_should_exit = False
         self.lock = threading.Lock()
+        self.closed = False
 
         # Get exclusive access
         device.claimInterface(acl_interface.getNumber())
@@ -718,9 +717,14 @@ class UsbTransport(Transport):
                 logger.warning(f'!!! Exception while handling events: {error}')
 
         logger.debug('ending USB event loop')
-        _safe_call_soon(self.loop, self.event_loop_done.set_result, None)
 
     async def close(self):
+        # close() may be reached both explicitly and through Transport.__aexit__.
+        # Guard the native resources from a second teardown.
+        if self.closed:
+            return
+        self.closed = True
+
         self.source.close()
         self.sink.close()
         await self.source.terminate()
@@ -734,16 +738,20 @@ class UsbTransport(Transport):
         except (AttributeError, usb1.USBError) as error:
             logger.warning(f"Failed to interrupt event handler: {error}")
 
+        # handleEvents() owns libusb state until the event thread has returned.
+        # In particular, transfer cancellation callbacks only schedule their
+        # asyncio completion signals; those signals do not prove that the native
+        # callback has returned. Wait and join before freeing transfers, the
+        # device handle, or the context.
+        logger.debug("waiting for USB event loop to be done...")
+        await asyncio.to_thread(self.event_thread.join)
+        logger.debug("USB event loop done")
+
         self.device.releaseInterface(self.acl_interface.getNumber())
         if self.sco_interface:
             self.device.releaseInterface(self.sco_interface.getNumber())
         self.device.close()
         self.context.close()
-
-        # Wait for the thread to terminate
-        logger.debug("waiting for USB event loop to be done...")
-        await self.event_loop_done
-        logger.debug("USB event loop done")
 
 
 async def open_usb_transport(spec: str) -> Transport:
