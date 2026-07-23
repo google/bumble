@@ -1096,8 +1096,8 @@ class Client:
         with_response: bool = False,
     ) -> None:
         '''
-        See Vol 3, Part G - 4.9.1 Write Without Response & 4.9.3 Write Characteristic
-        Value
+        See Vol 3, Part G - 4.9.1 Write Without Response, 4.9.3 Write Characteristic
+        Value & 4.9.4 Write Long Characteristic Values
 
         `attribute` can be an Attribute object, or a handle value
         '''
@@ -1105,6 +1105,12 @@ class Client:
         # Send a request or command to write
         attribute_handle = attribute if isinstance(attribute, int) else attribute.handle
         if with_response:
+            # Use the Write Long procedure when the value does not fit in a single
+            # Write Request
+            if len(value) > self.mtu - 3:
+                await self.write_long_value(attribute_handle, value)
+                return
+
             response = await self.send_request(
                 att.ATT_Write_Request(
                     attribute_handle=attribute_handle, attribute_value=value
@@ -1118,6 +1124,36 @@ class Client:
                     attribute_handle=attribute_handle, attribute_value=value
                 )
             )
+
+    async def write_long_value(self, attribute_handle: int, value: bytes) -> None:
+        '''
+        See Vol 3, Part G - 4.9.4 Write Long Characteristic Values
+
+        Writes a value that does not fit in a single Write Request by queuing it
+        with Prepare Write Requests and committing it with an Execute Write Request.
+        '''
+
+        # Each Prepare Write Request carries opcode(1) + handle(2) + offset(2), so
+        # the part value is limited to ATT_MTU - 5 bytes.
+        max_part_size = self.mtu - 5
+        for offset in range(0, len(value), max_part_size):
+            part = value[offset : offset + max_part_size]
+            response = await self.send_request(
+                att.ATT_Prepare_Write_Request(
+                    attribute_handle=attribute_handle,
+                    value_offset=offset,
+                    part_attribute_value=part,
+                )
+            )
+            if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+                # Ask the server to drop whatever it has already queued
+                await self.send_request(att.ATT_Execute_Write_Request(flags=0x00))
+                raise att.ATT_Error(error_code=response.error_code, message=response)
+
+        # Commit the queued values (flags=0x01 = write all pending prepared values)
+        response = await self.send_request(att.ATT_Execute_Write_Request(flags=0x01))
+        if response.op_code == att.Opcode.ATT_ERROR_RESPONSE:
+            raise att.ATT_Error(error_code=response.error_code, message=response)
 
     def on_disconnection(self, *args) -> None:
         del args  # unused.

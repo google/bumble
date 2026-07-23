@@ -104,6 +104,8 @@ class Server(utils.EventEmitter):
         )  # Map of subscriber states by connection handle and attribute handle
         self.indication_semaphores = defaultdict(lambda: asyncio.Semaphore(1))
         self.pending_confirmations = defaultdict(lambda: None)
+        # Queued prepared writes, per bearer
+        self.prepared_writes: dict[att.Bearer, list[tuple[int, int, bytes]]] = {}
 
     def __str__(self) -> str:
         return "\n".join(map(str, self.attributes))
@@ -559,6 +561,7 @@ class Server(utils.EventEmitter):
         self.subscribers.pop(bearer, None)
         self.indication_semaphores.pop(bearer, None)
         self.pending_confirmations.pop(bearer, None)
+        self.prepared_writes.pop(bearer, None)
 
     def on_gatt_pdu(self, bearer: att.Bearer, att_pdu: att.ATT_PDU) -> None:
         logger.debug(f'GATT Request to server: {_bearer_id(bearer)} {att_pdu}')
@@ -1152,6 +1155,88 @@ class Server(utils.EventEmitter):
             await attribute.write_value(bearer, request.attribute_value)
         except Exception:
             logger.exception('!!! ignoring exception')
+
+    def on_att_prepare_write_request(
+        self, bearer: att.Bearer, request: att.ATT_Prepare_Write_Request
+    ):
+        '''
+        See Bluetooth spec Vol 3, Part F - 3.4.6.1 Prepare Write Request
+        '''
+
+        # Check that the attribute exists
+        if self.get_attribute(request.attribute_handle) is None:
+            self.send_response(
+                bearer,
+                att.ATT_Error_Response(
+                    request_opcode_in_error=request.op_code,
+                    attribute_handle_in_error=request.attribute_handle,
+                    error_code=att.ATT_INVALID_HANDLE_ERROR,
+                ),
+            )
+            return
+
+        # Queue the partial value, to be committed on Execute Write Request
+        self.prepared_writes.setdefault(bearer, []).append(
+            (
+                request.attribute_handle,
+                request.value_offset,
+                request.part_attribute_value,
+            )
+        )
+
+        # Acknowledge by echoing back the received part
+        self.send_response(
+            bearer,
+            att.ATT_Prepare_Write_Response(
+                attribute_handle=request.attribute_handle,
+                value_offset=request.value_offset,
+                part_attribute_value=request.part_attribute_value,
+            ),
+        )
+
+    @utils.AsyncRunner.run_in_task()
+    async def on_att_execute_write_request(
+        self, bearer: att.Bearer, request: att.ATT_Execute_Write_Request
+    ):
+        '''
+        See Bluetooth spec Vol 3, Part F - 3.4.6.3 Execute Write Request
+        '''
+
+        queue = self.prepared_writes.pop(bearer, [])
+
+        # flags == 0x00 means cancel all prepared writes
+        if request.flags == 0:
+            self.send_response(bearer, att.ATT_Execute_Write_Response())
+            return
+
+        try:
+            # Reassemble the queued parts; reject a gap with INVALID_OFFSET
+            values: dict[int, bytearray] = {}
+            for handle, offset, part in queue:
+                buffer = values.setdefault(handle, bytearray())
+                if offset > len(buffer):
+                    raise att.ATT_Error(
+                        error_code=att.ATT_INVALID_OFFSET_ERROR, att_handle=handle
+                    )
+                buffer[offset : offset + len(part)] = part
+
+            # Commit the reassembled values through the normal write path
+            for handle, value in values.items():
+                attribute = self.get_attribute(handle)
+                assert attribute is not None
+                await attribute.write_value(bearer, bytes(value))
+        except att.ATT_Error as error:
+            self.send_response(
+                bearer,
+                att.ATT_Error_Response(
+                    request_opcode_in_error=request.op_code,
+                    attribute_handle_in_error=error.att_handle,
+                    error_code=error.error_code,
+                ),
+            )
+            return
+
+        self.send_response(bearer, att.ATT_Execute_Write_Response())
 
     def on_att_handle_value_confirmation(
         self,
