@@ -363,6 +363,48 @@ async def test_self_smp(io_caps, sc, mitm, key_dist):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_self_smp_waits_for_key_distribution():
+    two_devices = await TwoDevices.create_with_connection()
+    for device in two_devices.devices:
+        device.pairing_config_factory = lambda _: PairingConfig(
+            delegate=PairingDelegate(PairingDelegate.IoCapability.NO_OUTPUT_NO_INPUT)
+        )
+
+    connection = two_devices.connections[0]
+    packet_queue = connection.data_packet_queue
+    assert packet_queue is not None
+
+    # Withhold the controller's packet completions, so that everything the
+    # initiator sends stays in flight.
+    withheld: list[tuple[int, int]] = []
+    complete_packets = packet_queue.on_packets_completed
+    packet_queue.on_packets_completed = lambda count, handle: withheld.append(
+        (count, handle)
+    )
+
+    pairing = asyncio.create_task(connection.pair())
+    for _ in range(100):
+        if connection.is_encrypted:
+            break
+        await asyncio.sleep(0.01)
+    await async_barrier()
+
+    # Check that the withholding is in effect, then that pairing has not been
+    # reported as complete while the keys may still be sitting in the queue.
+    assert connection.is_encrypted
+    assert packet_queue.pending > 0
+    assert not pairing.done()
+
+    # Complete the packets: pairing may now finish.
+    packet_queue.on_packets_completed = complete_packets
+    for count, handle in withheld:
+        complete_packets(count, handle)
+    await asyncio.wait_for(pairing, timeout=5.0)
+    assert packet_queue.pending == 0
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_self_smp_reject():
     class RejectingDelegate(PairingDelegate):
         def __init__(self):
