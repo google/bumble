@@ -2097,6 +2097,21 @@ class Connection(utils.CompositeEventEmitter):
     def data_packet_queue(self) -> DataPacketQueue | None:
         return self.device.host.get_data_packet_queue(self.handle)
 
+    async def drain(self) -> None:
+        """Wait until the controller has completed every data packet queued for
+        this connection.
+
+        Returns immediately if this connection has no packet queue, or if
+        nothing has ever been queued for it.
+        """
+        if (data_packet_queue := self.data_packet_queue) is None:
+            return
+        try:
+            await data_packet_queue.drain(self.handle)
+        except ValueError:
+            # Nothing was ever sent on this connection.
+            pass
+
     def cancel_on_disconnection(self, awaitable: Awaitable[_T]) -> Awaitable[_T]:
         """
         Helper method to call `utils.cancel_on_event` for the 'disconnection' event
