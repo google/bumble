@@ -1737,6 +1737,136 @@ async def test_read_multiple_variable() -> None:
 
 
 # -----------------------------------------------------------------------------
+async def _connect_with_writeable_characteristic():
+    devices = await TwoDevices.create_with_connection()
+    [_, server] = devices
+
+    characteristic = Characteristic(
+        'FDB159DB-036C-49E3-B3DB-6325AC750806',
+        Characteristic.Properties.READ | Characteristic.Properties.WRITE,
+        Characteristic.READABLE | Characteristic.WRITEABLE,
+    )
+    server.add_service(
+        Service('3A657F47-D34F-46B3-B1EC-698E29B6B829', [characteristic])
+    )
+
+    peer = Peer(devices.connections[0])
+    await peer.discover_services()
+    await peer.discover_characteristics()
+    [proxy] = peer.get_characteristics_by_uuid(characteristic.uuid)
+    return peer, proxy, characteristic
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_write_long_value():
+    peer, proxy, characteristic = await _connect_with_writeable_characteristic()
+
+    # A value that does not fit in a single Write Request (ATT_MTU - 3)
+    long_value = bytes((i * 7) % 256 for i in range(149))
+    assert len(long_value) > peer.gatt_client.mtu - 3
+
+    # Record the request opcodes the client emits
+    sent_opcodes = []
+    inner_send_request = peer.gatt_client.send_request
+
+    async def recording_send_request(request):
+        sent_opcodes.append(request.op_code)
+        return await inner_send_request(request)
+
+    peer.gatt_client.send_request = recording_send_request
+
+    await proxy.write_value(long_value, with_response=True)
+    await async_barrier()
+
+    # The client used the Write Long procedure, not a single Write Request
+    assert att.Opcode.ATT_PREPARE_WRITE_REQUEST in sent_opcodes
+    assert att.Opcode.ATT_EXECUTE_WRITE_REQUEST in sent_opcodes
+    assert att.Opcode.ATT_WRITE_REQUEST not in sent_opcodes
+
+    # The server reassembled all the queued parts into the complete value
+    assert characteristic.value == long_value
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_write_long_value_manual():
+    peer, _, characteristic = await _connect_with_writeable_characteristic()
+    client = peer.gatt_client
+
+    long_value = bytes((i * 3) % 256 for i in range(60))
+
+    # Queue the value in three parts at increasing offsets
+    for offset in range(0, len(long_value), 20):
+        part = long_value[offset : offset + 20]
+        response = await client.send_request(
+            att.ATT_Prepare_Write_Request(
+                attribute_handle=characteristic.handle,
+                value_offset=offset,
+                part_attribute_value=part,
+            )
+        )
+        assert isinstance(response, att.ATT_Prepare_Write_Response)
+        assert response.value_offset == offset
+        assert response.part_attribute_value == part
+
+    # Commit the queued values (flags=0x01)
+    response = await client.send_request(att.ATT_Execute_Write_Request(flags=0x01))
+    assert isinstance(response, att.ATT_Execute_Write_Response)
+    await async_barrier()
+    assert characteristic.value == long_value
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_write_long_value_cancel():
+    peer, _, characteristic = await _connect_with_writeable_characteristic()
+    client = peer.gatt_client
+
+    # Queue a value, then cancel instead of committing (flags=0x00)
+    response = await client.send_request(
+        att.ATT_Prepare_Write_Request(
+            attribute_handle=characteristic.handle,
+            value_offset=0,
+            part_attribute_value=bytes([1, 2, 3, 4]),
+        )
+    )
+    assert isinstance(response, att.ATT_Prepare_Write_Response)
+
+    response = await client.send_request(att.ATT_Execute_Write_Request(flags=0x00))
+    assert isinstance(response, att.ATT_Execute_Write_Response)
+    await async_barrier()
+
+    # The cancelled value was not written (the attribute keeps its initial value)
+    assert characteristic.value is None
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_write_long_value_gap_rejected():
+    peer, _, characteristic = await _connect_with_writeable_characteristic()
+    client = peer.gatt_client
+
+    # Queue parts leaving a gap between them (offset 0 then offset 10)
+    for offset in (0, 10):
+        response = await client.send_request(
+            att.ATT_Prepare_Write_Request(
+                attribute_handle=characteristic.handle,
+                value_offset=offset,
+                part_attribute_value=bytes([1, 2, 3, 4]),
+            )
+        )
+        assert isinstance(response, att.ATT_Prepare_Write_Response)
+
+    # Committing a non-contiguous queue is rejected with INVALID_OFFSET
+    response = await client.send_request(att.ATT_Execute_Write_Request(flags=0x01))
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_INVALID_OFFSET_ERROR
+    await async_barrier()
+    assert characteristic.value is None
+
+
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(async_main())
