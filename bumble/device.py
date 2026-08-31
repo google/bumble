@@ -4397,7 +4397,7 @@ class Device(utils.CompositeEventEmitter):
         if use_l2cap:
             if connection.role != hci.Role.PERIPHERAL:
                 raise InvalidStateError(
-                    'only peripheral can update connection parameters with l2cap'
+                    'only a peripheral can update connection parameters with l2cap'
                 )
             l2cap_result = (
                 await self.l2cap_channel_manager.update_connection_parameters(

@@ -2042,25 +2042,35 @@ class ChannelManagerDelegate:
     such as accepting connection parameters.
     """
 
+    @dataclasses.dataclass
+    class ConnectionParameters:
+        connection_interval_min: float  # Minimum connection interval, in ms.
+        connection_interval_max: float  # Maximum connection interval, in ms.
+        max_latency: int  # Maximum latency, in number of connection events.
+        supervision_timeout: float  # Supervision timeout, in ms.
+        min_ce_length: float = 0  # Minimum connection event length, in ms.
+        max_ce_length: float = 0  # Maximum connection event length, in ms.
+
     def accept_connection_parameters(
-        self, interval_min: float, interval_max: float, latency: int, timeout: float
-    ) -> bool:
+        self,
+        connection: Connection,
+        connection_parameters: ConnectionParameters,
+    ) -> ConnectionParameters | None:
         """
-        Decide whether to accept the given connection parameters.
+        Decide whether to accept the given connection parameters, possibly with
+        modifications.
 
         Args:
-            interval_min: The minimum connection interval, in ms.
-            interval_max: The maximum connection interval, in ms.
-            latency: The connection latency, in number of connection events.
-            timeout: The connection timeout, in ms.
+            connection: the Connection on which the request was received.
+            connection_parameters: the requested parameters.
 
         Returns:
-            True to accept, False to reject.
+            A ConnectionParameters object with the accepted values, or None to reject.
 
         By default, accept all connection parameters.
         Override this method to implement custom logic.
         """
-        return True
+        return connection_parameters
 
 
 # -----------------------------------------------------------------------------
@@ -2083,6 +2093,7 @@ class ChannelManager:
         ],
     ]
     _host: Host | None
+    # TODO: this should really be a per-connection Future.
     connection_parameters_update_response: (
         asyncio.Future[L2CAP_Connection_Parameter_Update_Response.Result] | None
     )
@@ -2582,12 +2593,13 @@ class ChannelManager:
             return
 
         # Ask the delegate to accept or reject the connection parameters
-        accept = self.delegate.accept_connection_parameters(
-            request.interval_min * 1.25,
-            request.interval_max * 1.25,
-            request.latency,
-            request.timeout * 10.0,
+        requested = ChannelManagerDelegate.ConnectionParameters(
+            connection_interval_min=request.interval_min * 1.25,
+            connection_interval_max=request.interval_max * 1.25,
+            max_latency=request.latency,
+            supervision_timeout=request.timeout * 10.0,
         )
+        accepted = self.delegate.accept_connection_parameters(connection, requested)
 
         # Respond
         self.send_control_frame(
@@ -2596,25 +2608,29 @@ class ChannelManager:
             L2CAP_Connection_Parameter_Update_Response(
                 identifier=request.identifier,
                 result=(
-                    L2CAP_Connection_Parameter_Update_Response.Result.ACCEPTED
-                    if accept
-                    else L2CAP_Connection_Parameter_Update_Response.Result.REJECTED
+                    L2CAP_Connection_Parameter_Update_Response.Result.REJECTED
+                    if accepted is None
+                    else L2CAP_Connection_Parameter_Update_Response.Result.ACCEPTED
                 ),
             ),
         )
 
-        if accept:
+        if accepted is not None:
             # Apply the requested parameters
             utils.AsyncRunner.spawn(
                 self.host.send_async_command(
                     hci.HCI_LE_Connection_Update_Command(
                         connection_handle=connection.handle,
-                        connection_interval_min=request.interval_min,
-                        connection_interval_max=request.interval_max,
-                        max_latency=request.latency,
-                        supervision_timeout=request.timeout,
-                        min_ce_length=0,
-                        max_ce_length=0,
+                        connection_interval_min=int(
+                            accepted.connection_interval_min / 1.25
+                        ),
+                        connection_interval_max=int(
+                            accepted.connection_interval_max / 1.25
+                        ),
+                        max_latency=accepted.max_latency,
+                        supervision_timeout=int(accepted.max_latency / 10),
+                        min_ce_length=int(accepted.min_ce_length / 0.625),
+                        max_ce_length=int(accepted.max_ce_length / 0.625),
                     )
                 )
             )
