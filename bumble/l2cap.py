@@ -2616,7 +2616,7 @@ class ChannelManager:
         )
 
         if accepted is not None:
-            # Apply the requested parameters
+            # Apply the accepted parameters
             utils.AsyncRunner.spawn(
                 self.host.send_async_command(
                     hci.HCI_LE_Connection_Update_Command(
