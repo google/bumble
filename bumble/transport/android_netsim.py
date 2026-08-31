@@ -194,19 +194,25 @@ async def open_android_netsim_controller_transport(
                         self.done.set_result(None)
                     return
 
-                # If we're not initialized yet, wait for a init packet.
-                if self.name is None:
-                    if request.WhichOneof('request_type') == 'initial_info':
+                match request.WhichOneof('request_type'):
+                    case 'initial_info':
                         logger.debug(f'Received initial info: {request}')
+
+                        if self.name is not None:
+                            logger.warning('already initialized')
+                            error = PacketResponse(
+                                error='Initial info already received'
+                            )
+                            await self.context.write(error)
+                            continue
 
                         self.name = request.initial_info.name
 
                         # We only accept BLUETOOTH
                         if request.initial_info.chip.kind != ChipKind.BLUETOOTH:
-                            logger.debug('Request for unsupported chip type')
+                            logger.debug('request for unsupported chip type')
                             error = PacketResponse(error='Unsupported chip type')
                             await self.context.write(error)
-                            # return
                             continue
 
                         # Lease the sink so that no other device can send
@@ -215,24 +221,20 @@ async def open_android_netsim_controller_transport(
                             logger.warning('Another device is already connected')
                             error = PacketResponse(error='Device busy')
                             await self.context.write(error)
-                            # return
                             continue
 
-                        continue
+                    case 'hci_packet':
+                        if self.sink is None:
+                            logger.debug('ignoring HCI packet, no sink')
+                            continue
 
-                # Expect a data packet
-                request_type = request.WhichOneof('request_type')
-                if request_type != 'hci_packet':
-                    logger.warning(f'Unexpected request type: {request_type}')
-                    error = PacketResponse(error='Unexpected request type')
-                    await self.context.write(error)
-                    continue
+                        self.sink(
+                            bytes([request.hci_packet.packet_type])
+                            + request.hci_packet.packet
+                        )
 
-                # Process the packet
-                assert self.sink is not None
-                self.sink(
-                    bytes([request.hci_packet.packet_type]) + request.hci_packet.packet
-                )
+                    case _:
+                        logger.debug(f'ignoring request {request}')
 
         async def send_packet(self, data):
             return await self.context.write(
