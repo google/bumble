@@ -1,4 +1,4 @@
-# Copyright 2021-2022 Google LLC
+# Copyright 2021-2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ def test_parser():
 
     for parser in [parser1, parser2]:
         with open(
-            os.path.join(os.path.dirname(__file__), 'hci_data_001.bin'), 'rb'
+            os.path.join(os.path.dirname(__file__), '..', 'hci_data_001.bin'), 'rb'
         ) as input:
             while True:
                 n = random.randint(1, 9)
