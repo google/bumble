@@ -55,7 +55,7 @@ class Message:
         FEATURE_REPORT = 0x03
 
     # Handshake parameters
-    class Handshake(enum.IntEnum):
+    class Handshake(utils.OpenIntEnum):
         SUCCESSFUL = 0x00
         NOT_READY = 0x01
         ERR_INVALID_REPORT_ID = 0x02
@@ -364,6 +364,9 @@ class Device(HID):
     @override
     def on_ctrl_pdu(self, pdu: bytes) -> None:
         logger.debug(f'<<< HID CONTROL PDU: {pdu.hex()}')
+        if not pdu:
+            logger.warning('ignoring empty HID control PDU')
+            return
         param = pdu[0] & 0x0F
         message_type = pdu[0] >> 4
 
@@ -417,8 +420,15 @@ class Device(HID):
             return
         report_type = pdu[0] & 0x03
         buffer_flag = (pdu[0] & 0x08) >> 3
-        report_id = pdu[1]
         logger.debug(f"buffer_flag: {buffer_flag}")
+        # The report ID is followed by a 2-octet buffer size when the buffer
+        # flag is set. Bumble always carries a report ID, so a shorter PDU
+        # cannot be dispatched to the application callback.
+        if len(pdu) < (4 if buffer_flag else 2):
+            logger.warning(f'GET_REPORT PDU too short: {pdu.hex()}')
+            self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
+            return
+        report_id = pdu[1]
         if buffer_flag == 1:
             buffer_size = (pdu[3] << 8) | pdu[2]
         else:
@@ -454,6 +464,10 @@ class Device(HID):
             self.send_handshake_message(Message.Handshake.ERR_UNSUPPORTED_REQUEST)
             return
         report_type = pdu[0] & 0x03
+        if len(pdu) < 2:
+            logger.warning(f'SET_REPORT PDU too short: {pdu.hex()}')
+            self.send_handshake_message(Message.Handshake.ERR_INVALID_PARAMETER)
+            return
         report_id = pdu[1]
         report_data = pdu[2:]
         report_size = len(report_data) + 1
@@ -552,6 +566,9 @@ class Host(HID):
     @override
     def on_ctrl_pdu(self, pdu: bytes) -> None:
         logger.debug(f'<<< HID CONTROL PDU: {pdu.hex()}')
+        if not pdu:
+            logger.warning('ignoring empty HID control PDU')
+            return
         param = pdu[0] & 0x0F
         message_type = pdu[0] >> 4
         if message_type == Message.MessageType.HANDSHAKE:
