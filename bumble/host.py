@@ -1133,13 +1133,9 @@ class Host(utils.EventEmitter):
     def on_l2cap_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
 
-    def _drain_buffered_acl_sync(self, handle: int, *args: Any, **kwargs: Any) -> None:
-        """Create an async task to replay buffered ACL packet"""
-        self._drain_acl_buffer_task = asyncio.get_event_loop().create_task(
-            self._drain_buffered_acl(handle)
-        )
-
-    async def _drain_buffered_acl(self, handle: int) -> None:
+    async def _drain_buffered_acl(
+        self, handle: int, *_connection_parameters: Any
+    ) -> None:
         """Replay all buffered ACL packet"""
         queued = self._pending_acl.pop(handle, [])
         if not queued:
@@ -1147,8 +1143,6 @@ class Host(utils.EventEmitter):
         now = time.monotonic()
         logger.info(f"Replaying buffered ACL packets for handle: {handle}")
         for ts, packet in queued:
-            # Sleep to allow other tasks to run
-            await asyncio.sleep(0)
             if (now - ts) <= self._ACL_STALE_TIMEOUT_S:
                 self.on_hci_acl_data_packet(packet)
 
