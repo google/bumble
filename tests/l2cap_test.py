@@ -18,23 +18,19 @@
 import asyncio
 import itertools
 import logging
-import os
 import random
 from collections.abc import Sequence
 from unittest import mock
 
 import pytest
 
-from bumble import core, l2cap
+from bumble import core, device, l2cap
 from bumble.testing.test_utils import TwoDevices, async_barrier
 
 # -----------------------------------------------------------------------------
 # Logging
 # -----------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
-
-
-# -----------------------------------------------------------------------------
 
 
 # -----------------------------------------------------------------------------
@@ -532,15 +528,49 @@ async def test_disconnection_collision():
 
 
 # -----------------------------------------------------------------------------
-async def run():
-    test_helpers()
-    await test_basic_connection()
-    await test_transfer()
-    await test_bidirectional_transfer()
-    await test_mtu()
+@pytest.mark.asyncio
+async def test_channel_manager_delegate_accept():
+    class TestDelegate(l2cap.ChannelManagerDelegate):
+        def accept_connection_parameters(
+            self,
+            connection: device.Connection,
+            connection_parameters: l2cap.ChannelManagerDelegate.ConnectionParameters,
+        ) -> l2cap.ChannelManagerDelegate.ConnectionParameters | None:
+            return connection_parameters
+
+    devices = await TwoDevices.create_with_connection()
+    devices.devices[0].l2cap_channel_manager.delegate = TestDelegate()
+    await devices.connections[1].update_parameters(
+        connection_interval_min=15.0,
+        connection_interval_max=30.0,
+        max_latency=3,
+        supervision_timeout=2000.0,
+        use_l2cap=True,
+    )
+
+    # NOTE: we can't really test the outcome of the parameter change request here
+    # because the current implementation of the virtual controller doesn't yet support
+    # HCI_LE_CONNECTION_UPDATE_COMMAND, so we just test that the request was accepted
 
 
 # -----------------------------------------------------------------------------
-if __name__ == '__main__':
-    logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
-    asyncio.run(run())
+@pytest.mark.asyncio
+async def test_channel_manager_delegate_reject():
+    class TestDelegate(l2cap.ChannelManagerDelegate):
+        def accept_connection_parameters(
+            self,
+            connection: device.Connection,
+            connection_parameters: l2cap.ChannelManagerDelegate.ConnectionParameters,
+        ) -> l2cap.ChannelManagerDelegate.ConnectionParameters | None:
+            return None
+
+    devices = await TwoDevices.create_with_connection()
+    devices.devices[0].l2cap_channel_manager.delegate = TestDelegate()
+    with pytest.raises(core.ConnectionParameterUpdateError):
+        await devices.connections[1].update_parameters(
+            connection_interval_min=15.0,
+            connection_interval_max=30.0,
+            max_latency=3,
+            supervision_timeout=2000.0,
+            use_l2cap=True,
+        )
