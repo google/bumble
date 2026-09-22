@@ -149,7 +149,7 @@ class AdvertisingSet:
 
         self.send_extended_advertising_data()
 
-        interval = min(
+        interval = max(
             (
                 self.parameters.primary_advertising_interval_min * 0.625 / 1000.0
                 if self.parameters

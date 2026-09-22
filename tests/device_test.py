@@ -1299,7 +1299,9 @@ async def test_periodic_advertising_sync():
         advertising_parameters=AdvertisingParameters(
             advertising_event_properties=AdvertisingEventProperties(
                 is_connectable=False, is_scannable=False
-            )
+            ),
+            primary_advertising_interval_min=20,
+            primary_advertising_interval_max=40,
         ),
         periodic_advertising_parameters=PeriodicAdvertisingParameters(
             periodic_advertising_interval_min=100, periodic_advertising_interval_max=200
@@ -1345,7 +1347,9 @@ async def test_big_and_big_sync():
         advertising_parameters=AdvertisingParameters(
             advertising_event_properties=AdvertisingEventProperties(
                 is_connectable=False, is_scannable=False
-            )
+            ),
+            primary_advertising_interval_min=20,
+            primary_advertising_interval_max=40,
         ),
         periodic_advertising_parameters=PeriodicAdvertisingParameters(
             periodic_advertising_interval_min=100, periodic_advertising_interval_max=200
@@ -1475,6 +1479,8 @@ async def test_multiple_periodic_advertising_and_big_syncs():
                 is_connectable=False, is_scannable=False
             ),
             advertising_sid=0,
+            primary_advertising_interval_min=20,
+            primary_advertising_interval_max=40,
         ),
         periodic_advertising_parameters=PeriodicAdvertisingParameters(
             periodic_advertising_interval_min=100, periodic_advertising_interval_max=200
@@ -1490,6 +1496,8 @@ async def test_multiple_periodic_advertising_and_big_syncs():
                 is_connectable=False, is_scannable=False
             ),
             advertising_sid=1,
+            primary_advertising_interval_min=20,
+            primary_advertising_interval_max=40,
         ),
         periodic_advertising_parameters=PeriodicAdvertisingParameters(
             periodic_advertising_interval_min=100, periodic_advertising_interval_max=200
