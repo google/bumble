@@ -956,7 +956,7 @@ class PeriodicAdvertisingSync(utils.EventEmitter):
     ) -> None:
         self.status = status
 
-        if self.state == self.State.CANCELLED:
+        if self.state == self.State.CANCELLED and status == hci.HCI_SUCCESS:
             # Somehow, we receive an established event after trying to cancel, most
             # likely because the cancel command was sent too late, when the sync was
             # already established, but before the established event was sent.

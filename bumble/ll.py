@@ -70,7 +70,9 @@ class AdvExtInd(AdvertisingPdu):
 
     target_address: hci.Address | None = None
     adi: int | None = None
+    sid: int = 0
     tx_power: int | None = None
+    periodic_advertising_data: bytes | None = None
 
 
 # -----------------------------------------------------------------------------
@@ -219,3 +221,111 @@ class PeripheralFeatureReq(ControlPdu):
     opcode = ControlPdu.Opcode.LL_PERIPHERAL_FEATURE_REQ
 
     feature_set: bytes
+
+
+@dataclasses.dataclass
+class ConnectionUpdateInd(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_CONNECTION_UPDATE_IND
+
+    interval: int
+    latency: int
+    timeout: int
+
+
+@dataclasses.dataclass
+class ConnectionRateInd(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_CONNECTION_UPDATE_IND
+
+    interval: int
+    subrate_factor: int
+    peripheral_latency: int
+    continuation_number: int
+    timeout: int
+
+
+@dataclasses.dataclass
+class SubrateInd(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_SUBRATE_IND
+
+    subrate_factor: int
+    peripheral_latency: int
+    continuation_number: int
+    timeout: int
+
+
+@dataclasses.dataclass
+class CsConfigReq(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_CS_CONFIG_REQ
+
+    config_id: int
+    action: int
+    main_mode_type: int
+    sub_mode_type: int
+    min_main_mode_steps: int
+    max_main_mode_steps: int
+    main_mode_repetition: int
+    mode_0_steps: int
+    role: int
+    rtt_type: int
+    cs_sync_phy: int
+    channel_map: bytes
+    channel_map_repetition: int
+    channel_selection_type: int
+    ch3c_shape: int
+    ch3c_jump: int
+
+
+@dataclasses.dataclass
+class CsConfigRsp(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_CS_CONFIG_RSP
+
+    config_id: int
+    action: int
+    main_mode_type: int
+    sub_mode_type: int
+    min_main_mode_steps: int
+    max_main_mode_steps: int
+    main_mode_repetition: int
+    mode_0_steps: int
+    role: int
+    rtt_type: int
+    cs_sync_phy: int
+    channel_map: bytes
+    channel_map_repetition: int
+    channel_selection_type: int
+    ch3c_shape: int
+    ch3c_jump: int
+
+
+@dataclasses.dataclass
+class CsSecReq(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_CS_SEC_REQ
+
+
+@dataclasses.dataclass
+class CsSecRsp(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_CS_SEC_RSP
+
+
+@dataclasses.dataclass
+class CsReq(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_CS_REQ
+
+    config_id: int
+    state: int
+
+
+@dataclasses.dataclass
+class CsRsp(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_CS_RSP
+
+    config_id: int
+    state: int
+
+
+@dataclasses.dataclass
+class CsInd(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_CS_IND
+
+    config_id: int
+    state: int

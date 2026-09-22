@@ -128,6 +128,7 @@ class AdvertisingSet:
     parameters: hci.HCI_LE_Set_Extended_Advertising_Parameters_Command | None = None
     data: bytearray = dataclasses.field(default_factory=bytearray)
     scan_response_data: bytearray = dataclasses.field(default_factory=bytearray)
+    periodic_advertising_data: bytearray = dataclasses.field(default_factory=bytearray)
     enabled: bool = False
     timer_handle: asyncio.Handle | None = None
     random_address: hci.Address | None = None
@@ -148,10 +149,13 @@ class AdvertisingSet:
 
         self.send_extended_advertising_data()
 
-        interval = (
-            self.parameters.primary_advertising_interval_min * 0.625 / 1000.0
-            if self.parameters
-            else 1.0
+        interval = max(
+            (
+                self.parameters.primary_advertising_interval_min * 0.625 / 1000.0
+                if self.parameters
+                else 1.0
+            ),
+            0.01,
         )
         self.timer_handle = asyncio.get_running_loop().call_later(
             interval, self._on_extended_advertising_timer_fired
@@ -171,8 +175,19 @@ class AdvertisingSet:
         if self.controller.link:
             address = self.address
             assert address
-
-            self.controller.send_advertising_pdu(ll.AdvInd(address, bytes(self.data)))
+            sid = self.parameters.advertising_sid if self.parameters else 0
+            self.controller.send_advertising_pdu(
+                ll.AdvExtInd(
+                    advertiser_address=address,
+                    data=bytes(self.data),
+                    sid=sid,
+                    periodic_advertising_data=(
+                        bytes(self.periodic_advertising_data)
+                        if self.periodic_advertising_data
+                        else None
+                    ),
+                )
+            )
 
 
 # -----------------------------------------------------------------------------
@@ -366,6 +381,8 @@ class Controller:
         | hci.LeFeatureMask.LE_CODED_PHY
         | hci.LeFeatureMask.CHANNEL_SELECTION_ALGORITHM_2
         | hci.LeFeatureMask.MINIMUM_NUMBER_OF_USED_CHANNELS_PROCEDURE
+        | hci.LeFeatureMask.LE_EXTENDED_ADVERTISING
+        | hci.LeFeatureMask.LE_PERIODIC_ADVERTISING
     )
     le_states: bytes = bytes.fromhex('ffff3fffff030000')
     advertising_channel_tx_power: int = 0
@@ -419,6 +436,10 @@ class Controller:
         self.central_cis_links = {}
         self.peripheral_cis_links = {}
         self.advertising_sets = {}
+        self.pending_periodic_advertising_syncs: dict[tuple[hci.Address, int], int] = {}
+        self.established_periodic_advertising_syncs: dict[
+            int, tuple[hci.Address, int]
+        ] = {}
         self.default_phy = {
             'all_phys': 0,
             'tx_phys': 0,
@@ -662,6 +683,184 @@ class Controller:
                         le_features=feature_set,
                     )
                 )
+            case ll.ConnectionUpdateInd():
+                self.send_hci_packet(
+                    hci.HCI_LE_Connection_Update_Complete_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                        connection_interval=packet.interval,
+                        peripheral_latency=packet.latency,
+                        supervision_timeout=packet.timeout,
+                    )
+                )
+            case ll.ConnectionRateInd():
+                self.send_hci_packet(
+                    hci.HCI_LE_Connection_Rate_Change_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                        connection_interval=packet.interval,
+                        subrate_factor=packet.subrate_factor,
+                        peripheral_latency=packet.peripheral_latency,
+                        continuation_number=packet.continuation_number,
+                        supervision_timeout=packet.timeout,
+                    )
+                )
+            case ll.SubrateInd():
+                self.send_hci_packet(
+                    hci.HCI_LE_Subrate_Change_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                        subrate_factor=packet.subrate_factor,
+                        peripheral_latency=packet.peripheral_latency,
+                        continuation_number=packet.continuation_number,
+                        supervision_timeout=packet.timeout,
+                    )
+                )
+            case ll.CsConfigReq():
+                self.send_hci_packet(
+                    hci.HCI_LE_CS_Config_Complete_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                        config_id=packet.config_id,
+                        action=packet.action,
+                        main_mode_type=packet.main_mode_type,
+                        sub_mode_type=packet.sub_mode_type,
+                        min_main_mode_steps=packet.min_main_mode_steps,
+                        max_main_mode_steps=packet.max_main_mode_steps,
+                        main_mode_repetition=packet.main_mode_repetition,
+                        mode_0_steps=packet.mode_0_steps,
+                        role=packet.role,
+                        rtt_type=packet.rtt_type,
+                        cs_sync_phy=packet.cs_sync_phy,
+                        channel_map=packet.channel_map,
+                        channel_map_repetition=packet.channel_map_repetition,
+                        channel_selection_type=packet.channel_selection_type,
+                        ch3c_shape=packet.ch3c_shape,
+                        ch3c_jump=packet.ch3c_jump,
+                        reserved=0,
+                        t_ip1_time=10,
+                        t_ip2_time=10,
+                        t_fcs_time=10,
+                        t_pm_time=10,
+                    )
+                )
+                reply_role = (
+                    hci.CsRole.INITIATOR
+                    if packet.role == hci.CsRole.REFLECTOR
+                    else hci.CsRole.REFLECTOR
+                )
+                connection.send_ll_control_pdu(
+                    ll.CsConfigRsp(
+                        config_id=packet.config_id,
+                        action=packet.action,
+                        main_mode_type=packet.main_mode_type,
+                        sub_mode_type=packet.sub_mode_type,
+                        min_main_mode_steps=packet.min_main_mode_steps,
+                        max_main_mode_steps=packet.max_main_mode_steps,
+                        main_mode_repetition=packet.main_mode_repetition,
+                        mode_0_steps=packet.mode_0_steps,
+                        role=reply_role,
+                        rtt_type=packet.rtt_type,
+                        cs_sync_phy=packet.cs_sync_phy,
+                        channel_map=packet.channel_map,
+                        channel_map_repetition=packet.channel_map_repetition,
+                        channel_selection_type=packet.channel_selection_type,
+                        ch3c_shape=packet.ch3c_shape,
+                        ch3c_jump=packet.ch3c_jump,
+                    )
+                )
+            case ll.CsConfigRsp():
+                self.send_hci_packet(
+                    hci.HCI_LE_CS_Config_Complete_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                        config_id=packet.config_id,
+                        action=packet.action,
+                        main_mode_type=packet.main_mode_type,
+                        sub_mode_type=packet.sub_mode_type,
+                        min_main_mode_steps=packet.min_main_mode_steps,
+                        max_main_mode_steps=packet.max_main_mode_steps,
+                        main_mode_repetition=packet.main_mode_repetition,
+                        mode_0_steps=packet.mode_0_steps,
+                        role=packet.role,
+                        rtt_type=packet.rtt_type,
+                        cs_sync_phy=packet.cs_sync_phy,
+                        channel_map=packet.channel_map,
+                        channel_map_repetition=packet.channel_map_repetition,
+                        channel_selection_type=packet.channel_selection_type,
+                        ch3c_shape=packet.ch3c_shape,
+                        ch3c_jump=packet.ch3c_jump,
+                        reserved=0,
+                        t_ip1_time=10,
+                        t_ip2_time=10,
+                        t_fcs_time=10,
+                        t_pm_time=10,
+                    )
+                )
+            case ll.CsSecReq():
+                self.send_hci_packet(
+                    hci.HCI_LE_CS_Security_Enable_Complete_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                    )
+                )
+                connection.send_ll_control_pdu(ll.CsSecRsp())
+            case ll.CsSecRsp():
+                self.send_hci_packet(
+                    hci.HCI_LE_CS_Security_Enable_Complete_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                    )
+                )
+            case ll.CsReq():
+                connection.send_ll_control_pdu(
+                    ll.CsRsp(
+                        config_id=packet.config_id,
+                        state=packet.state,
+                    )
+                )
+            case ll.CsRsp():
+                connection.send_ll_control_pdu(
+                    ll.CsInd(
+                        config_id=packet.config_id,
+                        state=packet.state,
+                    )
+                )
+                self.send_hci_packet(
+                    hci.HCI_LE_CS_Procedure_Enable_Complete_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                        config_id=packet.config_id,
+                        state=packet.state,
+                        tone_antenna_config_selection=0,
+                        selected_tx_power=0,
+                        subevent_len=1250,
+                        subevents_per_event=1,
+                        subevent_interval=10,
+                        event_interval=10,
+                        procedure_interval=10,
+                        procedure_count=1,
+                        max_procedure_len=100,
+                    )
+                )
+            case ll.CsInd():
+                self.send_hci_packet(
+                    hci.HCI_LE_CS_Procedure_Enable_Complete_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        connection_handle=connection.handle,
+                        config_id=packet.config_id,
+                        state=packet.state,
+                        tone_antenna_config_selection=0,
+                        selected_tx_power=0,
+                        subevent_len=1250,
+                        subevents_per_event=1,
+                        subevent_interval=10,
+                        event_interval=10,
+                        procedure_interval=10,
+                        procedure_count=1,
+                        max_procedure_len=100,
+                    )
+                )
 
     def on_ll_advertising_pdu(self, packet: ll.AdvertisingPdu) -> None:
         logger.debug("[%s] <<< Advertising PDU: %s", self.name, packet)
@@ -849,6 +1048,42 @@ class Controller:
     def on_advertising_pdu(self, pdu: ll.AdvInd | ll.AdvExtInd) -> None:
         if isinstance(pdu, ll.AdvExtInd):
             direct_address = pdu.target_address
+            sync_key = (pdu.advertiser_address, pdu.sid)
+            if sync_handle := self.pending_periodic_advertising_syncs.pop(
+                sync_key, None
+            ):
+                self.established_periodic_advertising_syncs[sync_handle] = sync_key
+                self.send_hci_packet(
+                    hci.HCI_LE_Periodic_Advertising_Sync_Established_Event(
+                        status=hci.HCI_ErrorCode.SUCCESS,
+                        sync_handle=sync_handle,
+                        advertising_sid=pdu.sid,
+                        advertiser_address_type=pdu.advertiser_address.address_type,
+                        advertiser_address=pdu.advertiser_address,
+                        advertiser_phy=hci.Phy.LE_1M,
+                        periodic_advertising_interval=80,
+                        advertiser_clock_accuracy=0,
+                    )
+                )
+            for sync_handle, (
+                adv_addr,
+                sid,
+            ) in self.established_periodic_advertising_syncs.items():
+                if (
+                    adv_addr == pdu.advertiser_address
+                    and sid == pdu.sid
+                    and pdu.periodic_advertising_data is not None
+                ):
+                    self.send_hci_packet(
+                        hci.HCI_LE_Periodic_Advertising_Report_Event(
+                            sync_handle=sync_handle,
+                            tx_power=0,
+                            rssi=-50,
+                            cte_type=0xFF,
+                            data_status=0,
+                            data=pdu.periodic_advertising_data,
+                        )
+                    )
         else:
             direct_address = None
 
@@ -2615,6 +2850,15 @@ class Controller:
                 supervision_timeout=command.supervision_timeout,
             )
         )
+        if connection := self.find_le_connection_by_handle(command.connection_handle):
+            connection.send_ll_control_pdu(
+                ll.SubrateInd(
+                    subrate_factor=2,
+                    peripheral_latency=2,
+                    continuation_number=command.continuation_number,
+                    timeout=command.supervision_timeout,
+                )
+            )
         return None
 
     def on_hci_le_set_event_mask_command(
@@ -2780,6 +3024,26 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.11 LE Set Scan Enable Command
         '''
         self.le_scan_enable = bool(command.le_scan_enable)
+        self.filter_duplicates = bool(command.filter_duplicates)
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def on_hci_le_set_extended_scan_parameters_command(
+        self, command: hci.HCI_LE_Set_Extended_Scan_Parameters_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.64 LE Set Extended Scan Parameters Command
+        '''
+        self.le_scan_own_address_type = hci.AddressType(command.own_address_type)
+        self.le_scanning_filter_policy = command.scanning_filter_policy
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def on_hci_le_set_extended_scan_enable_command(
+        self, command: hci.HCI_LE_Set_Extended_Scan_Enable_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.65 LE Set Extended Scan Enable Command
+        '''
+        self.le_scan_enable = bool(command.enable)
         self.filter_duplicates = bool(command.filter_duplicates)
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
@@ -3253,21 +3517,28 @@ class Controller:
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_le_set_periodic_advertising_data_command(
-        self, _command: hci.HCI_LE_Set_Periodic_Advertising_Data_Command
+        self, command: hci.HCI_LE_Set_Periodic_Advertising_Data_Command
     ) -> hci.HCI_StatusReturnParameters:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.62 LE Set Periodic Advertising Data
         Command
         '''
+        if adv_set := self.advertising_sets.get(command.advertising_handle):
+            adv_set.periodic_advertising_data = bytearray(command.advertising_data)
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_le_set_periodic_advertising_enable_command(
-        self, _command: hci.HCI_LE_Set_Periodic_Advertising_Enable_Command
+        self, command: hci.HCI_LE_Set_Periodic_Advertising_Enable_Command
     ) -> hci.HCI_StatusReturnParameters:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.63 LE Set Periodic Advertising Enable
         Command
         '''
+        if adv_set := self.advertising_sets.get(command.advertising_handle):
+            if command.enable & 0x01:
+                adv_set.start()
+            else:
+                adv_set.stop()
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_le_read_transmit_power_command(
@@ -3437,3 +3708,310 @@ class Controller:
         See Bluetooth spec Vol 4, Part E - 7.8.115 LE Set Host Feature command
         '''
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def on_hci_le_connection_update_command(
+        self, command: hci.HCI_LE_Connection_Update_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.18 LE Connection Update Command
+        '''
+        if not (
+            connection := self.find_le_connection_by_handle(command.connection_handle)
+        ):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+            return
+
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+
+        event = hci.HCI_LE_Connection_Update_Complete_Event(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            connection_handle=command.connection_handle,
+            connection_interval=command.connection_interval_max,
+            peripheral_latency=command.max_latency,
+            supervision_timeout=command.supervision_timeout,
+        )
+        self.send_hci_packet(event)
+
+        connection.send_ll_control_pdu(
+            ll.ConnectionUpdateInd(
+                interval=command.connection_interval_max,
+                latency=command.max_latency,
+                timeout=command.supervision_timeout,
+            )
+        )
+
+    def on_hci_le_connection_rate_request_command(
+        self, command: hci.HCI_LE_Connection_Rate_Request_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 6, Part E - 7.8.125 LE Connection Rate Request Command
+        '''
+        if not (
+            connection := self.find_le_connection_by_handle(command.connection_handle)
+        ):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+            return
+
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+
+        self.send_hci_packet(
+            hci.HCI_LE_Connection_Rate_Change_Event(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                connection_handle=command.connection_handle,
+                connection_interval=command.connection_interval_max,
+                subrate_factor=command.subrate_max,
+                peripheral_latency=command.max_latency,
+                continuation_number=command.continuation_number,
+                supervision_timeout=command.supervision_timeout,
+            )
+        )
+        connection.send_ll_control_pdu(
+            ll.ConnectionRateInd(
+                interval=command.connection_interval_max,
+                subrate_factor=command.subrate_max,
+                peripheral_latency=command.max_latency,
+                continuation_number=command.continuation_number,
+                timeout=command.supervision_timeout,
+            )
+        )
+
+    def on_hci_le_periodic_advertising_create_sync_command(
+        self, command: hci.HCI_LE_Periodic_Advertising_Create_Sync_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.67 LE Periodic Advertising Create Sync Command
+        '''
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        sync_handle = 0x0010 + command.advertising_sid
+        sync_key = (command.advertiser_address, command.advertising_sid)
+        self.pending_periodic_advertising_syncs[sync_key] = sync_handle
+
+        def on_sync_timeout() -> None:
+            if handle := self.pending_periodic_advertising_syncs.pop(sync_key, None):
+                self.send_hci_packet(
+                    hci.HCI_LE_Periodic_Advertising_Sync_Established_Event(
+                        status=hci.HCI_ErrorCode.CONNECTION_FAILED_TO_BE_ESTABLISHED_ERROR,
+                        sync_handle=handle,
+                        advertising_sid=command.advertising_sid,
+                        advertiser_address_type=command.advertiser_address.address_type,
+                        advertiser_address=command.advertiser_address,
+                        advertiser_phy=hci.Phy.LE_1M,
+                        periodic_advertising_interval=0,
+                        advertiser_clock_accuracy=0,
+                    )
+                )
+
+        timeout_s = command.sync_timeout * 0.01
+        asyncio.get_running_loop().call_later(timeout_s, on_sync_timeout)
+
+    def on_hci_le_periodic_advertising_create_sync_cancel_command(
+        self, _command: hci.HCI_LE_Periodic_Advertising_Create_Sync_Cancel_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.68 LE Periodic Advertising Create Sync Cancel
+        Command
+        '''
+        if not self.pending_periodic_advertising_syncs:
+            return hci.HCI_StatusReturnParameters(
+                hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR
+            )
+        (adv_addr, sid), sync_handle = self.pending_periodic_advertising_syncs.popitem()
+        self.send_hci_packet(
+            hci.HCI_LE_Periodic_Advertising_Sync_Established_Event(
+                status=hci.HCI_ErrorCode.OPERATION_CANCELLED_BY_HOST_ERROR,
+                sync_handle=sync_handle,
+                advertising_sid=sid,
+                advertiser_address_type=adv_addr.address_type,
+                advertiser_address=adv_addr,
+                advertiser_phy=hci.Phy.LE_1M,
+                periodic_advertising_interval=0,
+                advertiser_clock_accuracy=0,
+            )
+        )
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def on_hci_le_periodic_advertising_terminate_sync_command(
+        self, command: hci.HCI_LE_Periodic_Advertising_Terminate_Sync_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.69 LE Periodic Advertising Terminate Sync Command
+        '''
+        self.established_periodic_advertising_syncs.pop(command.sync_handle, None)
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def on_hci_le_create_big_command(
+        self, command: hci.HCI_LE_Create_BIG_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.103 LE Create BIG Command
+        '''
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        handles = [0x0100 + i for i in range(command.num_bis)]
+        self.send_hci_packet(
+            hci.HCI_LE_Create_BIG_Complete_Event(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                big_handle=command.big_handle,
+                big_sync_delay=1000,
+                transport_latency_big=2000,
+                phy=command.phy,
+                nse=1,
+                bn=1,
+                pto=0,
+                irc=1,
+                max_pdu=command.max_sdu,
+                iso_interval=8,
+                connection_handle=handles,
+            )
+        )
+
+    def on_hci_le_terminate_big_command(
+        self, command: hci.HCI_LE_Terminate_BIG_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.105 LE Terminate BIG Command
+        '''
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        self.send_hci_packet(
+            hci.HCI_LE_Terminate_BIG_Complete_Event(
+                big_handle=command.big_handle,
+                reason=command.reason,
+            )
+        )
+
+    def on_hci_le_big_create_sync_command(
+        self, command: hci.HCI_LE_BIG_Create_Sync_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.106 LE BIG Create Sync Command
+        '''
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        handles = [0x0200 + i for i in range(len(command.bis))]
+        self.send_hci_packet(
+            hci.HCI_LE_BIG_Sync_Established_Event(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                big_handle=command.big_handle,
+                transport_latency_big=2000,
+                nse=1,
+                bn=1,
+                pto=0,
+                irc=1,
+                max_pdu=100,
+                iso_interval=8,
+                connection_handle=handles,
+            )
+        )
+
+    def on_hci_le_big_terminate_sync_command(
+        self, command: hci.HCI_LE_BIG_Terminate_Sync_Command
+    ) -> hci.HCI_LE_BIG_Terminate_Sync_ReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.107 LE BIG Terminate Sync Command
+        '''
+        return hci.HCI_LE_BIG_Terminate_Sync_ReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            big_handle=command.big_handle,
+        )
+
+    def on_hci_le_cs_create_config_command(
+        self, command: hci.HCI_LE_CS_Create_Config_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - LE CS Create Config Command
+        '''
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        if command.create_context == 1 and (
+            connection := self.find_le_connection_by_handle(command.connection_handle)
+        ):
+            peer_role = (
+                hci.CsRole.REFLECTOR
+                if command.role == hci.CsRole.INITIATOR
+                else hci.CsRole.INITIATOR
+            )
+            connection.send_ll_control_pdu(
+                ll.CsConfigReq(
+                    config_id=command.config_id,
+                    action=1,
+                    main_mode_type=command.main_mode_type,
+                    sub_mode_type=command.sub_mode_type,
+                    min_main_mode_steps=command.min_main_mode_steps,
+                    max_main_mode_steps=command.max_main_mode_steps,
+                    main_mode_repetition=command.main_mode_repetition,
+                    mode_0_steps=command.mode_0_steps,
+                    role=peer_role,
+                    rtt_type=command.rtt_type,
+                    cs_sync_phy=command.cs_sync_phy,
+                    channel_map=command.channel_map,
+                    channel_map_repetition=command.channel_map_repetition,
+                    channel_selection_type=command.channel_selection_type,
+                    ch3c_shape=command.ch3c_shape,
+                    ch3c_jump=command.ch3c_jump,
+                )
+            )
+        else:
+            self.send_hci_packet(
+                hci.HCI_LE_CS_Config_Complete_Event(
+                    status=hci.HCI_ErrorCode.SUCCESS,
+                    connection_handle=command.connection_handle,
+                    config_id=command.config_id,
+                    action=1,
+                    main_mode_type=command.main_mode_type,
+                    sub_mode_type=command.sub_mode_type,
+                    min_main_mode_steps=command.min_main_mode_steps,
+                    max_main_mode_steps=command.max_main_mode_steps,
+                    main_mode_repetition=command.main_mode_repetition,
+                    mode_0_steps=command.mode_0_steps,
+                    role=command.role,
+                    rtt_type=command.rtt_type,
+                    cs_sync_phy=command.cs_sync_phy,
+                    channel_map=command.channel_map,
+                    channel_map_repetition=command.channel_map_repetition,
+                    channel_selection_type=command.channel_selection_type,
+                    ch3c_shape=command.ch3c_shape,
+                    ch3c_jump=command.ch3c_jump,
+                    reserved=0,
+                    t_ip1_time=10,
+                    t_ip2_time=10,
+                    t_fcs_time=10,
+                    t_pm_time=10,
+                )
+            )
+
+    def on_hci_le_cs_security_enable_command(
+        self, command: hci.HCI_LE_CS_Security_Enable_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - LE CS Security Enable Command
+        '''
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        if connection := self.find_le_connection_by_handle(command.connection_handle):
+            connection.send_ll_control_pdu(ll.CsSecReq())
+
+    def on_hci_le_cs_set_procedure_parameters_command(
+        self, command: hci.HCI_LE_CS_Set_Procedure_Parameters_Command
+    ) -> hci.HCI_StatusAndConnectionHandleReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - LE CS Set Procedure Parameters Command
+        '''
+        return hci.HCI_StatusAndConnectionHandleReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            connection_handle=command.connection_handle,
+        )
+
+    def on_hci_le_cs_procedure_enable_command(
+        self, command: hci.HCI_LE_CS_Procedure_Enable_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - LE CS Procedure Enable Command
+        '''
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        if connection := self.find_le_connection_by_handle(command.connection_handle):
+            connection.send_ll_control_pdu(
+                ll.CsReq(
+                    config_id=command.config_id,
+                    state=command.enable,
+                )
+            )

@@ -59,10 +59,13 @@ class LocalLink:
         self.controllers.remove(controller)
 
     def find_le_controller(self, address: hci.Address) -> controller.Controller | None:
-        for controller in self.controllers:
-            for connection in controller.le_connections.values():
+        for c in self.controllers:
+            for connection in c.le_connections.values():
                 if connection.self_address == address:
-                    return controller
+                    return c
+        for c in self.controllers:
+            if c.random_address == address or c.public_address == address:
+                return c
         return None
 
     def find_classic_controller(

@@ -24,18 +24,26 @@ from unittest import mock
 
 import pytest
 
-from bumble import gatt, hci, utils
-from bumble.core import PhysicalTransport
+from bumble import gatt, hci, smp, utils
+from bumble.core import (
+    AdvertisingData,
+    InvalidStateError,
+    OutOfResourcesError,
+    PhysicalTransport,
+)
 from bumble.device import (
     Advertisement,
     AdvertisingEventProperties,
     AdvertisingParameters,
+    BigParameters,
     BigSyncParameters,
     CigParameters,
     CisLink,
     Connection,
     Device,
+    DeviceConfiguration,
     PeriodicAdvertisingParameters,
+    PeriodicAdvertisingSync,
 )
 from bumble.hci import (
     HCI_ACCEPT_CONNECTION_REQUEST_COMMAND,
@@ -1223,6 +1231,413 @@ async def test_classic_ssp_no_input_no_output_keyboard_fallback():
     )
     assert link_key0 is not None
     assert link_key0 == link_key1
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_connection_parameters_and_subrate():
+    two_devices = TwoDevices()
+    await two_devices.setup_connection()
+    connection = two_devices.connections[0]
+    remote_connection = two_devices.connections[1]
+
+    await connection.update_parameters(
+        connection_interval_min=15.0,
+        connection_interval_max=30.0,
+        max_latency=2,
+        supervision_timeout=1000.0,
+    )
+    await async_barrier()
+    assert connection.parameters.connection_interval == 30.0
+    assert connection.parameters.peripheral_latency == 2
+    assert remote_connection.parameters.connection_interval == 30.0
+    assert remote_connection.parameters.peripheral_latency == 2
+
+    await two_devices.devices[0].set_default_connection_subrate(
+        subrate_min=1,
+        subrate_max=4,
+        max_latency=1,
+        continuation_number=0,
+        supervision_timeout=1000.0,
+    )
+
+    await connection.update_subrate(
+        subrate_min=1,
+        subrate_max=4,
+        max_latency=1,
+        continuation_number=0,
+        supervision_timeout=1000.0,
+    )
+    await async_barrier()
+    assert connection.parameters.subrate_factor == 2
+    assert remote_connection.parameters.subrate_factor == 2
+
+    await connection.update_parameters_with_subrate(
+        connection_interval_min=15.0,
+        connection_interval_max=20.0,
+        subrate_min=1,
+        subrate_max=3,
+        max_latency=1,
+        continuation_number=0,
+        supervision_timeout=1000.0,
+        min_ce_length=0.0,
+        max_ce_length=0.0,
+    )
+    await async_barrier()
+    assert connection.parameters.subrate_factor == 3
+    assert remote_connection.parameters.subrate_factor == 3
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_periodic_advertising_sync():
+    two_devices = TwoDevices()
+    for dev in two_devices.devices:
+        await dev.power_on()
+
+    adv_set = await two_devices.devices[0].create_advertising_set(
+        advertising_parameters=AdvertisingParameters(
+            advertising_event_properties=AdvertisingEventProperties(
+                is_connectable=False, is_scannable=False
+            ),
+            primary_advertising_interval_min=20,
+            primary_advertising_interval_max=40,
+        ),
+        periodic_advertising_parameters=PeriodicAdvertisingParameters(
+            periodic_advertising_interval_min=100, periodic_advertising_interval_max=200
+        ),
+        periodic_advertising_data=b'\x05\x09Sync',
+        auto_start=True,
+    )
+    await adv_set.start_periodic()
+
+    established = asyncio.Event()
+    report_received = asyncio.Event()
+    received_reports = []
+
+    sync = await two_devices.devices[1].create_periodic_advertising_sync(
+        advertiser_address=two_devices.devices[0].random_address,
+        sid=0,
+    )
+    sync.on('establishment', established.set)
+    sync.on(
+        'periodic_advertisement',
+        lambda report: (received_reports.append(report), report_received.set()),
+    )
+
+    if sync.state != PeriodicAdvertisingSync.State.ESTABLISHED:
+        await asyncio.wait_for(established.wait(), _TIMEOUT)
+    assert sync.state == PeriodicAdvertisingSync.State.ESTABLISHED
+
+    await asyncio.wait_for(report_received.wait(), _TIMEOUT)
+    assert len(received_reports) > 0
+
+    await sync.terminate()
+    assert sync.state == PeriodicAdvertisingSync.State.TERMINATED
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_big_and_big_sync():
+    two_devices = TwoDevices()
+    for dev in two_devices.devices:
+        await dev.power_on()
+
+    adv_set = await two_devices.devices[0].create_advertising_set(
+        advertising_parameters=AdvertisingParameters(
+            advertising_event_properties=AdvertisingEventProperties(
+                is_connectable=False, is_scannable=False
+            ),
+            primary_advertising_interval_min=20,
+            primary_advertising_interval_max=40,
+        ),
+        periodic_advertising_parameters=PeriodicAdvertisingParameters(
+            periodic_advertising_interval_min=100, periodic_advertising_interval_max=200
+        ),
+        auto_start=True,
+    )
+    await adv_set.start_periodic()
+
+    big = await two_devices.devices[0].create_big(
+        advertising_set=adv_set,
+        parameters=BigParameters(
+            num_bis=2,
+            sdu_interval=10000,
+            max_sdu=100,
+            max_transport_latency=40,
+            rtn=2,
+        ),
+    )
+    assert len(big.bis_links) == 2
+
+    established = asyncio.Event()
+    pa_sync = await two_devices.devices[1].create_periodic_advertising_sync(
+        advertiser_address=two_devices.devices[0].random_address,
+        sid=0,
+    )
+    pa_sync.on('establishment', established.set)
+    if pa_sync.state != PeriodicAdvertisingSync.State.ESTABLISHED:
+        await asyncio.wait_for(established.wait(), _TIMEOUT)
+
+    big_sync = await two_devices.devices[1].create_big_sync(
+        pa_sync,
+        BigSyncParameters(big_sync_timeout=1000, bis=[1, 2]),
+    )
+    assert len(big_sync.bis_links) == 2
+
+    await big_sync.terminate()
+    await big.terminate()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_find_peer_by_name_and_identity_address():
+    two_devices = TwoDevices()
+    for dev in two_devices.devices:
+        await dev.power_on()
+
+    two_devices.devices[0].advertising_data = bytes(
+        AdvertisingData([(AdvertisingData.Type.COMPLETE_LOCAL_NAME, b'TargetPeer')])
+    )
+    await two_devices.devices[0].start_advertising()
+
+    addr = await two_devices.devices[1].find_peer_by_name('TargetPeer')
+    assert addr == two_devices.devices[0].random_address
+
+    two_devices.devices[1].address_resolver = smp.AddressResolver(
+        [(b'\x11' * 16, two_devices.devices[0].public_address)]
+    )
+    addr2 = await two_devices.devices[1].find_peer_by_identity_address(
+        two_devices.devices[0].random_address
+    )
+    assert addr2 == two_devices.devices[0].random_address
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_channel_sounding():
+    two_devices = TwoDevices()
+    await two_devices.setup_connection()
+    connection = two_devices.connections[0]
+    remote_connection = two_devices.connections[1]
+
+    config = await two_devices.devices[0].create_cs_config(
+        connection=connection, create_context=1
+    )
+    await async_barrier()
+    assert config.config_id == 0
+    assert config.role == hci.CsRole.INITIATOR
+    assert 0 in remote_connection.cs_configs
+    assert remote_connection.cs_configs[0].role == hci.CsRole.REFLECTOR
+
+    await two_devices.devices[0].enable_cs_security(connection=connection)
+    await async_barrier()
+
+    await two_devices.devices[0].set_cs_procedure_parameters(
+        connection=connection, config=config
+    )
+    procedure = await two_devices.devices[0].enable_cs_procedure(
+        connection=connection, config=config
+    )
+    await async_barrier()
+    assert procedure.config_id == 0
+    assert 0 in remote_connection.cs_procedures
+    assert remote_connection.cs_procedures[0].state == 1
+
+
+# -----------------------------------------------------------------------------
+def test_device_configuration_load_from_dict():
+    config = DeviceConfiguration()
+    config.load_from_dict(
+        {
+            'name': 'TestDevice',
+            'address': 'F0:F1:F2:F3:F4:F5',
+            'class_of_device': 0x240404,
+            'advertising_interval_min': 100,
+            'advertising_interval_max': 200,
+            'le_enabled': True,
+            'classic_enabled': True,
+            'le_subrate_enabled': True,
+            'irk': '00112233445566778899aabbccddeeff',
+            'keystore': 'JsonKeyStore',
+        }
+    )
+    assert config.name == 'TestDevice'
+    assert config.le_subrate_enabled is True
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_multiple_periodic_advertising_and_big_syncs():
+    two_devices = TwoDevices()
+    for dev in two_devices.devices:
+        await dev.power_on()
+
+    adv_set_0 = await two_devices.devices[0].create_advertising_set(
+        advertising_parameters=AdvertisingParameters(
+            advertising_event_properties=AdvertisingEventProperties(
+                is_connectable=False, is_scannable=False
+            ),
+            advertising_sid=0,
+            primary_advertising_interval_min=20,
+            primary_advertising_interval_max=40,
+        ),
+        periodic_advertising_parameters=PeriodicAdvertisingParameters(
+            periodic_advertising_interval_min=100, periodic_advertising_interval_max=200
+        ),
+        periodic_advertising_data=b'\x07\x09Train0',
+        auto_start=True,
+    )
+    await adv_set_0.start_periodic()
+
+    adv_set_1 = await two_devices.devices[0].create_advertising_set(
+        advertising_parameters=AdvertisingParameters(
+            advertising_event_properties=AdvertisingEventProperties(
+                is_connectable=False, is_scannable=False
+            ),
+            advertising_sid=1,
+            primary_advertising_interval_min=20,
+            primary_advertising_interval_max=40,
+        ),
+        periodic_advertising_parameters=PeriodicAdvertisingParameters(
+            periodic_advertising_interval_min=100, periodic_advertising_interval_max=200
+        ),
+        periodic_advertising_data=b'\x07\x09Train1',
+        auto_start=True,
+    )
+    await adv_set_1.start_periodic()
+
+    big_0 = await two_devices.devices[0].create_big(
+        advertising_set=adv_set_0,
+        parameters=BigParameters(
+            num_bis=2,
+            sdu_interval=10000,
+            max_sdu=100,
+            max_transport_latency=40,
+            rtn=2,
+        ),
+    )
+    big_1 = await two_devices.devices[0].create_big(
+        advertising_set=adv_set_1,
+        parameters=BigParameters(
+            num_bis=1,
+            sdu_interval=10000,
+            max_sdu=100,
+            max_transport_latency=40,
+            rtn=2,
+        ),
+    )
+    assert len(big_0.bis_links) == 2
+    assert len(big_1.bis_links) == 1
+
+    est_0 = asyncio.Event()
+    est_1 = asyncio.Event()
+    rep_0 = asyncio.Event()
+    rep_1 = asyncio.Event()
+    data_0 = []
+    data_1 = []
+
+    sync_0 = await two_devices.devices[1].create_periodic_advertising_sync(
+        advertiser_address=two_devices.devices[0].random_address,
+        sid=0,
+    )
+    sync_0.on('establishment', est_0.set)
+    sync_0.on(
+        'periodic_advertisement',
+        lambda r: (data_0.append(bytes(r.data)), rep_0.set()),
+    )
+    if sync_0.state != PeriodicAdvertisingSync.State.ESTABLISHED:
+        await asyncio.wait_for(est_0.wait(), _TIMEOUT)
+
+    sync_1 = await two_devices.devices[1].create_periodic_advertising_sync(
+        advertiser_address=two_devices.devices[0].random_address,
+        sid=1,
+    )
+    sync_1.on('establishment', est_1.set)
+    sync_1.on(
+        'periodic_advertisement',
+        lambda r: (data_1.append(bytes(r.data)), rep_1.set()),
+    )
+    if sync_1.state != PeriodicAdvertisingSync.State.ESTABLISHED:
+        await asyncio.wait_for(est_1.wait(), _TIMEOUT)
+
+    await asyncio.wait_for(rep_0.wait(), _TIMEOUT)
+    await asyncio.wait_for(rep_1.wait(), _TIMEOUT)
+    assert b'\x07\x09Train0' in data_0
+    assert b'\x07\x09Train1' in data_1
+
+    big_sync_0 = await two_devices.devices[1].create_big_sync(
+        sync_0, BigSyncParameters(big_sync_timeout=1000, bis=[1, 2])
+    )
+    big_sync_1 = await two_devices.devices[1].create_big_sync(
+        sync_1, BigSyncParameters(big_sync_timeout=1000, bis=[1])
+    )
+    assert len(big_sync_0.bis_links) == 2
+    assert len(big_sync_1.bis_links) == 1
+
+    await big_sync_0.terminate()
+    await big_sync_1.terminate()
+    await sync_0.terminate()
+    await sync_1.terminate()
+    await big_0.terminate()
+    await big_1.terminate()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_periodic_advertising_and_big_failure_exceptions():
+    two_devices = TwoDevices()
+    for dev in two_devices.devices:
+        await dev.power_on()
+
+    # 1. Duplicate Periodic Advertising Sync raises ValueError
+    sync = await two_devices.devices[1].create_periodic_advertising_sync(
+        advertiser_address=two_devices.devices[0].random_address,
+        sid=5,
+    )
+    with pytest.raises(ValueError, match="equivalent entry already created"):
+        await two_devices.devices[1].create_periodic_advertising_sync(
+            advertiser_address=two_devices.devices[0].random_address,
+            sid=5,
+        )
+
+    # 2. Create BIG Sync on unestablished PA Sync raises InvalidStateError
+    with pytest.raises(InvalidStateError, match="PA Sync is not established"):
+        await two_devices.devices[1].create_big_sync(
+            sync, BigSyncParameters(big_sync_timeout=1000, bis=[1])
+        )
+
+    # 3. Cancel pending Periodic Advertising Sync before establishment via terminate()
+    await sync.terminate()
+    assert sync.state == PeriodicAdvertisingSync.State.CANCELLED
+
+    # 4. Periodic Advertising Sync establishment timeout error (status != SUCCESS)
+    sync_err = await two_devices.devices[1].create_periodic_advertising_sync(
+        advertiser_address=two_devices.devices[0].random_address,
+        sid=6,
+        sync_timeout=0.02,
+    )
+    error_event = asyncio.Event()
+    sync_err.on('establishment_error', error_event.set)
+    await asyncio.wait_for(error_event.wait(), _TIMEOUT)
+    assert sync_err.state == PeriodicAdvertisingSync.State.ERROR
+    assert (
+        sync_err.status == hci.HCI_ErrorCode.CONNECTION_FAILED_TO_BE_ESTABLISHED_ERROR
+    )
+
+    # 5. Exhaust BIG handles raises OutOfResourcesError
+    original_bigs = dict(two_devices.devices[1].big_syncs)
+    try:
+        for handle in range(0x00, 0xEF + 1):
+            two_devices.devices[1].big_syncs[handle] = None  # type: ignore
+        with pytest.raises(
+            OutOfResourcesError, match="All valid BIG handles already in use"
+        ):
+            await two_devices.devices[1].create_big_sync(
+                sync, BigSyncParameters(big_sync_timeout=1000, bis=[1])
+            )
+    finally:
+        two_devices.devices[1].big_syncs = original_bigs
 
 
 # -----------------------------------------------------------------------------
