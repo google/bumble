@@ -131,7 +131,8 @@ class GenericAttributeProfileService(gatt.TemplateService):
             ]
         )
 
-        return crypto.aes_cmac(m=m, k=bytes(16))
+        # Hash is a uint128, so send least significant octet first.
+        return crypto.aes_cmac(m=m, k=bytes(16))[::-1]
 
 
 class GenericAttributeProfileServiceProxy(gatt_client.ProfileServiceProxy):
