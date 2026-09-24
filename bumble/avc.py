@@ -370,7 +370,7 @@ class PassThroughFrame:
     class OperationId(utils.OpenIntEnum):
         SELECT = 0x00
         UP = 0x01
-        DOWN = 0x01
+        DOWN = 0x02
         LEFT = 0x03
         RIGHT = 0x04
         RIGHT_UP = 0x05
