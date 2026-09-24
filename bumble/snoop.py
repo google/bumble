@@ -82,7 +82,7 @@ class BtSnooper(Snooper):
         flags = int(direction)
         packet_type = hci_packet[0]
         if packet_type in (HCI_EVENT_PACKET, HCI_COMMAND_PACKET):
-            flags |= 0x10
+            flags |= 0x02
 
         # Compute the current timestamp
         timestamp = (
