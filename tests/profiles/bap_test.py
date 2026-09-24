@@ -87,6 +87,26 @@ def test_codec_specific_capabilities() -> None:
 
 
 # -----------------------------------------------------------------------------
+def test_codec_specific_capabilities_preferred_frame_duration() -> None:
+    cap = CodecSpecificCapabilities(
+        supported_sampling_frequencies=SupportedSamplingFrequency.FREQ_16000,
+        supported_frame_durations=(
+            SupportedFrameDuration.DURATION_7500_US_SUPPORTED
+            | SupportedFrameDuration.DURATION_10000_US_SUPPORTED
+            | SupportedFrameDuration.DURATION_10000_US_PREFERRED
+        ),
+        supported_audio_channel_count=[1],
+        min_octets_per_codec_frame=40,
+        max_octets_per_codec_frame=40,
+        supported_max_codec_frames_per_sdu=1,
+    )
+    assert bytes([0x02, CodecSpecificCapabilities.Type.FRAME_DURATION, 0x23]) in bytes(
+        cap
+    )
+    assert CodecSpecificCapabilities.from_bytes(bytes(cap)) == cap
+
+
+# -----------------------------------------------------------------------------
 def test_pac_record() -> None:
     SAMPLE_FREQUENCY = SupportedSamplingFrequency.FREQ_16000
     FRAME_SURATION = SupportedFrameDuration.DURATION_10000_US_SUPPORTED
