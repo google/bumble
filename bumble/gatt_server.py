@@ -440,7 +440,7 @@ class Server(utils.EventEmitter):
         force: bool = False,
     ) -> None:
         if att.is_enhanced_bearer(bearer) or force:
-            return await self._notify_single_subscriber(bearer, attribute, value, force)
+            return await self._indicate_single_bearer(bearer, attribute, value, force)
         else:
             # If API is called to a Connection and not forced, try to indicate all subscribed bearers on it.
             bearers = [
