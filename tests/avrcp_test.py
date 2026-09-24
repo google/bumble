@@ -404,6 +404,12 @@ def test_avrcp_pdu_assembler():
     assert len(received_pdus) == 0
 
 
+def test_passthrough_operation_id_values():
+    assert avc.PassThroughFrame.OperationId.UP == 0x01
+    assert avc.PassThroughFrame.OperationId.DOWN == 0x02
+    assert avc.PassThroughFrame.OperationId(0x02).name == 'DOWN'
+
+
 def test_passthrough_commands():
     play_pressed = avc.PassThroughCommandFrame(
         avc.CommandFrame.CommandType.CONTROL,
