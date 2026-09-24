@@ -529,6 +529,14 @@ async def test_opus_packet_source():
 
 
 # -----------------------------------------------------------------------------
+def test_media_packet_csrc_list():
+    packet = MediaPacket(2, 0, 0, 0, 1, 2, 3, [0x11111111, 0x22222222], 96, b'xy')
+    parsed = MediaPacket.from_bytes(bytes(packet))
+    assert parsed.csrc_list == [0x11111111, 0x22222222]
+    assert parsed.payload == b'xy'
+
+
+# -----------------------------------------------------------------------------
 async def async_main():
     test_sbc_codec_specific_information()
     test_aac_codec_specific_information()

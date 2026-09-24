@@ -34,7 +34,7 @@ class MediaPacket:
         timestamp = struct.unpack_from('>I', data, 4)[0]
         ssrc = struct.unpack_from('>I', data, 8)[0]
         csrc_list = [
-            struct.unpack_from('>I', data, 12 + i)[0] for i in range(csrc_count)
+            struct.unpack_from('>I', data, 12 + i * 4)[0] for i in range(csrc_count)
         ]
         payload = data[12 + csrc_count * 4 :]
 
