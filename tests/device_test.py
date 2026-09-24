@@ -1710,6 +1710,21 @@ async def test_le_encryption_with_mismatched_keys():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_le_set_privacy_mode():
+    device = TwoDevices()[0]
+    await device.power_on()
+
+    await device.send_sync_command(
+        hci.HCI_LE_Set_Privacy_Mode_Command(
+            peer_identity_address_type=hci.Address.RANDOM_DEVICE_ADDRESS,
+            peer_identity_address=hci.Address('F0:BB:1E:00:00:01'),
+            privacy_mode=hci.HCI_LE_Set_Privacy_Mode_Command.PrivacyMode.DEVICE_PRIVACY_MODE,
+        )
+    )
+
+
+# -----------------------------------------------------------------------------
 async def run_test_device():
     await test_device_connect_parallel()
     await test_flush()

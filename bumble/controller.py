@@ -3384,6 +3384,14 @@ class Controller:
             ret = hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR
         return hci.HCI_StatusReturnParameters(ret)
 
+    def on_hci_le_set_privacy_mode_command(
+        self, _command: hci.HCI_LE_Set_Privacy_Mode_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.77 LE Set Privacy Mode Command
+        '''
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
     def on_hci_le_set_resolvable_private_address_timeout_command(
         self, command: hci.HCI_LE_Set_Resolvable_Private_Address_Timeout_Command
     ) -> hci.HCI_StatusReturnParameters:
