@@ -114,7 +114,7 @@ async def test_database_hash():
     )
     assert client.database_hash_characteristic
     assert await client.database_hash_characteristic.read_value() == bytes.fromhex(
-        'F1CA2D48ECF58BAC8A8830BBB9FBA990'
+        '90A9FBB9BB30888AAC8BF5EC482DCAF1'
     )
 
 
