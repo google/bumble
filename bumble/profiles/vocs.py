@@ -284,8 +284,8 @@ class VolumeOffsetControlServiceProxy(ProfileServiceProxy):
             service_proxy.get_required_characteristic_by_uuid(
                 GATT_AUDIO_LOCATION_CHARACTERISTIC
             ),
-            encode=lambda value: bytes([int(value)]),
-            decode=lambda data: AudioLocation(data[0]),
+            encode=lambda value: struct.pack('<I', int(value)),
+            decode=lambda data: AudioLocation(struct.unpack('<I', data)[0]),
         )
 
         self.volume_offset_control_point = (

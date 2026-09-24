@@ -165,6 +165,18 @@ async def test_set_audio_channel_location(vocs_client: VolumeOffsetControlServic
 
 
 @pytest.mark.asyncio
+async def test_set_audio_location_above_one_byte(
+    vocs_client: VolumeOffsetControlServiceProxy,
+):
+    new_audio_location = AudioLocation.SIDE_LEFT | AudioLocation.TOP_FRONT_RIGHT
+
+    await vocs_client.audio_location.write_value(new_audio_location)
+
+    location = await vocs_client.audio_location.read_value()
+    assert location == new_audio_location
+
+
+@pytest.mark.asyncio
 async def test_set_audio_output_description(
     vocs_client: VolumeOffsetControlServiceProxy,
 ):
