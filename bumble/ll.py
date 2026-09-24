@@ -170,6 +170,19 @@ class EncReq(ControlPdu):
 
 
 @dataclasses.dataclass
+class StartEncRsp(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_START_ENC_RSP
+
+
+@dataclasses.dataclass
+class RejectExtInd(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_REJECT_EXT_IND
+
+    reject_opcode: int
+    error_code: int
+
+
+@dataclasses.dataclass
 class CisReq(ControlPdu):
     opcode = ControlPdu.Opcode.LL_CIS_REQ
 

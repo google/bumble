@@ -61,6 +61,7 @@ from bumble.hci import (
     Role,
 )
 from bumble.host import DataPacketQueue, Host
+from bumble.keys import MemoryKeyStore, PairingKeys
 from bumble.pairing import PairingConfig, PairingDelegate
 from bumble.testing.test_utils import TwoDevices, async_barrier
 
@@ -1638,6 +1639,74 @@ async def test_periodic_advertising_and_big_failure_exceptions():
             )
     finally:
         two_devices.devices[1].big_syncs = original_bigs
+
+
+# -----------------------------------------------------------------------------
+async def _setup_le_encryption(peripheral_ltk: bytes | None):
+    two_devices = TwoDevices()
+    await two_devices.setup_connection()
+    central, peripheral = two_devices.connections[0], two_devices.connections[1]
+
+    ltk = bytes(range(16))
+    two_devices.devices[0].keystore = MemoryKeyStore()
+    await two_devices.devices[0].keystore.update(
+        str(central.peer_address), PairingKeys(ltk=PairingKeys.Key(value=ltk))
+    )
+
+    requests = []
+
+    async def long_term_key_provider(connection_handle, rand, ediv):
+        requests.append((connection_handle, rand, ediv))
+        return peripheral_ltk
+
+    two_devices.devices[1].host.long_term_key_provider = long_term_key_provider
+    return ltk, central, peripheral, requests
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_le_encryption():
+    ltk, central, peripheral, requests = await _setup_le_encryption(bytes(range(16)))
+
+    await central.encrypt()
+    await async_barrier()
+
+    assert requests == [(peripheral.handle, bytes(8), 0)]
+    assert central.is_encrypted
+    assert peripheral.is_encrypted
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_le_encryption_without_peripheral_key():
+    _, central, peripheral, requests = await _setup_le_encryption(None)
+
+    with pytest.raises(hci.HCI_Error) as error:
+        await central.encrypt()
+    await async_barrier()
+
+    assert error.value.error_code == hci.HCI_ErrorCode.PIN_OR_KEY_MISSING_ERROR
+    assert len(requests) == 1
+    assert not central.is_encrypted
+    assert not peripheral.is_encrypted
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_le_encryption_with_mismatched_keys():
+    _, central, peripheral, _ = await _setup_le_encryption(bytes(16))
+    reasons = []
+    central.on(central.EVENT_DISCONNECTION, reasons.append)
+    peripheral.on(peripheral.EVENT_DISCONNECTION, reasons.append)
+
+    with pytest.raises(asyncio.CancelledError):
+        await central.encrypt()
+    await async_barrier()
+
+    mic_failure = hci.HCI_ErrorCode.CONNECTION_TERMINATED_DUE_TO_MIC_FAILURE_ERROR
+    assert reasons == [mic_failure, mic_failure]
+    assert not central.is_encrypted
+    assert not peripheral.is_encrypted
 
 
 # -----------------------------------------------------------------------------
