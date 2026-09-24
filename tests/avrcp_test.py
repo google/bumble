@@ -421,6 +421,23 @@ def test_passthrough_commands():
     assert bytes(parsed) == play_pressed_bytes
 
 
+def test_passthrough_command_with_operation_data():
+    vendor_unique = avc.PassThroughCommandFrame(
+        avc.CommandFrame.CommandType.CONTROL,
+        avc.CommandFrame.SubunitType.PANEL,
+        0,
+        avc.PassThroughCommandFrame.StateFlag.PRESSED,
+        avc.PassThroughCommandFrame.OperationId.VENDOR_UNIQUE,
+        bytes.fromhex("0019580000"),
+    )
+
+    vendor_unique_bytes = bytes(vendor_unique)
+    parsed = avc.Frame.from_bytes(vendor_unique_bytes)
+    assert isinstance(parsed, avc.PassThroughCommandFrame)
+    assert parsed.operation_data == bytes.fromhex("0019580000")
+    assert bytes(parsed) == vendor_unique_bytes
+
+
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_find_sdp_records():

@@ -435,7 +435,7 @@ class PassThroughFrame:
         return (
             PassThroughFrame.StateFlag(operands[0] >> 7),
             PassThroughFrame.OperationId(operands[0] & 0x7F),
-            operands[1 : 1 + operands[1]],
+            operands[2 : 2 + operands[1]],
         )
 
     def make_operands(self):
