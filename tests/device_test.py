@@ -1387,6 +1387,71 @@ async def test_big_and_big_sync():
     assert len(big_sync.bis_links) == 2
 
     await big_sync.terminate()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_big_sync_and_terminate_255_times():
+    two_devices = TwoDevices()
+    for dev in two_devices.devices:
+        await dev.power_on()
+
+    adv_set = await two_devices.devices[0].create_advertising_set(
+        advertising_parameters=AdvertisingParameters(
+            advertising_event_properties=AdvertisingEventProperties(
+                is_connectable=False, is_scannable=False
+            ),
+            primary_advertising_interval_min=20,
+            primary_advertising_interval_max=40,
+        ),
+        periodic_advertising_parameters=PeriodicAdvertisingParameters(
+            periodic_advertising_interval_min=100, periodic_advertising_interval_max=200
+        ),
+        auto_start=True,
+    )
+    await adv_set.start_periodic()
+
+    big = await two_devices.devices[0].create_big(
+        advertising_set=adv_set,
+        parameters=BigParameters(
+            num_bis=2,
+            sdu_interval=10000,
+            max_sdu=100,
+            max_transport_latency=40,
+            rtn=2,
+        ),
+    )
+
+    pa_sync = await two_devices.devices[1].create_periodic_advertising_sync(
+        advertiser_address=two_devices.devices[0].random_address,
+        sid=0,
+    )
+    established = asyncio.Event()
+    pa_sync.on('establishment', established.set)
+    if pa_sync.state != PeriodicAdvertisingSync.State.ESTABLISHED:
+        await asyncio.wait_for(established.wait(), _TIMEOUT)
+
+    device_2 = two_devices.devices[1]
+    for i in range(255):
+        big_sync = await device_2.create_big_sync(
+            pa_sync,
+            BigSyncParameters(big_sync_timeout=1000, bis=[1, 2]),
+        )
+        assert len(big_sync.bis_links) == 2
+        await big_sync.terminate()
+
+        # Each sync must have used a fresh handle and left no stale entries. If
+        # the terminate cleanup is missing, the IN_BIG_SYNC handle would hit the
+        # 255 limit (wrap-around) on the last iteration and create_big_sync would
+        # fail or reuse a handle that is still registered.
+        assert big_sync.big_handle not in device_2.big_syncs
+        assert all(
+            bis_link.handle not in device_2.bis_links for bis_link in big_sync.bis_links
+        )
+
+    # No stale entries should have accumulated across all 255 syncs.
+    assert device_2.big_syncs == {}
+    assert device_2.bis_links == {}
     await big.terminate()
 
 
