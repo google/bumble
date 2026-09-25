@@ -82,7 +82,7 @@ async def test_init_service(aics_client: AICSServiceProxy):
     assert (
         await aics_client.gain_settings_properties.read_value()
         == GainSettingsProperties(
-            gain_settings_unit=1, gain_settings_minimum=0, gain_settings_maximum=255
+            gain_settings_unit=1, gain_settings_minimum=-128, gain_settings_maximum=127
         )
     )
     assert await aics_client.audio_input_status.read_value() == (
@@ -167,6 +167,29 @@ async def test_set_gain_setting_when_gain_mode_MANUAL(aics_client: AICSServicePr
                 AudioInputControlPointOpCode.SET_GAIN_SETTING,
                 change_counter,
                 gain_settings,
+            ]
+        )
+    )
+
+    assert await aics_client.audio_input_state.read_value() == AudioInputState(
+        gain_settings=gain_settings,
+        mute=Mute.NOT_MUTED,
+        gain_mode=GainMode.MANUAL,
+        change_counter=change_counter,
+    )
+
+
+@pytest.mark.asyncio
+async def test_set_negative_gain_setting(aics_client: AICSServiceProxy):
+    aics_service.audio_input_state.gain_mode = GainMode.MANUAL
+    change_counter = 0
+    gain_settings = -10
+    await aics_client.audio_input_control_point.write_value(
+        bytes(
+            [
+                AudioInputControlPointOpCode.SET_GAIN_SETTING,
+                change_counter,
+                gain_settings & 0xFF,
             ]
         )
     )
