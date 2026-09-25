@@ -236,6 +236,7 @@ class Connection:
     link_type: int
     classic_allow_role_switch: bool = False
     ssp_state: SspState = dataclasses.field(default_factory=SspState)
+    encryption_request: ll.EncReq | None = None
 
     def __post_init__(self) -> None:
         self.assembler = hci.HCI_AclDataPacketAssembler(self.on_acl_pdu)
@@ -668,7 +669,13 @@ class Controller:
             case ll.CisTerminateInd():
                 self.on_le_cis_disconnected(packet.cig_id, packet.cis_id)
             case ll.EncReq():
-                self.on_le_encrypted(connection)
+                self.on_le_encryption_request(connection, packet)
+            case ll.StartEncRsp():
+                self.on_le_encryption_change(connection, hci.HCI_ErrorCode.SUCCESS)
+            case ll.RejectExtInd(
+                reject_opcode=ll.ControlPdu.Opcode.LL_ENC_REQ, error_code=error_code
+            ):
+                self.on_le_encryption_change(connection, error_code)
             case ll.FeatureReq() | ll.PeripheralFeatureReq():
                 connection.send_ll_control_pdu(
                     ll.FeatureRsp(
@@ -1020,11 +1027,44 @@ class Controller:
         )
         self.pending_le_connection = None
 
-    def on_le_encrypted(self, connection: Connection) -> None:
-        # For now, just setup the encryption without asking the host
+    def on_le_encryption_request(
+        self, connection: Connection, packet: ll.EncReq
+    ) -> None:
+        # The peripheral's host provides the LTK, which must match the central's.
+        connection.encryption_request = packet
+        self.send_hci_packet(
+            hci.HCI_LE_Long_Term_Key_Request_Event(
+                connection_handle=connection.handle,
+                random_number=packet.rand,
+                encryption_diversifier=packet.ediv,
+            )
+        )
+
+    def on_le_long_term_key_reply(
+        self, connection: Connection, request: ll.EncReq, long_term_key: bytes | None
+    ) -> None:
+        if long_term_key is None:
+            connection.send_ll_control_pdu(
+                ll.RejectExtInd(
+                    reject_opcode=ll.ControlPdu.Opcode.LL_ENC_REQ,
+                    error_code=hci.HCI_ErrorCode.PIN_OR_KEY_MISSING_ERROR,
+                )
+            )
+        elif long_term_key != request.ltk:
+            # The peers cannot decrypt each other's packets.
+            reason = hci.HCI_ErrorCode.CONNECTION_TERMINATED_DUE_TO_MIC_FAILURE_ERROR
+            connection.send_ll_control_pdu(ll.TerminateInd(reason))
+            self.on_le_disconnected(connection, reason)
+        else:
+            connection.send_ll_control_pdu(ll.StartEncRsp())
+            self.on_le_encryption_change(connection, hci.HCI_ErrorCode.SUCCESS)
+
+    def on_le_encryption_change(self, connection: Connection, status: int) -> None:
         self.send_hci_packet(
             hci.HCI_Encryption_Change_Event(
-                status=0, connection_handle=connection.handle, encryption_enabled=1
+                status=status,
+                connection_handle=connection.handle,
+                encryption_enabled=int(status == hci.HCI_ErrorCode.SUCCESS),
             )
         )
 
@@ -3218,8 +3258,43 @@ class Controller:
 
         self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
 
-        # TODO: Handle authentication
-        self.on_le_encrypted(connection)
+    def on_hci_le_long_term_key_request_reply_command(
+        self, command: hci.HCI_LE_Long_Term_Key_Request_Reply_Command
+    ) -> hci.HCI_StatusAndConnectionHandleReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.25 LE Long Term Key Request Reply
+        Command
+        '''
+        return self._le_long_term_key_request_response(
+            command.connection_handle, command.long_term_key
+        )
+
+    def on_hci_le_long_term_key_request_negative_reply_command(
+        self, command: hci.HCI_LE_Long_Term_Key_Request_Negative_Reply_Command
+    ) -> hci.HCI_StatusAndConnectionHandleReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.26 LE Long Term Key Request Negative
+        Reply Command
+        '''
+        return self._le_long_term_key_request_response(command.connection_handle, None)
+
+    def _le_long_term_key_request_response(
+        self, connection_handle: int, long_term_key: bytes | None
+    ) -> hci.HCI_StatusAndConnectionHandleReturnParameters:
+        if not (connection := self.find_le_connection_by_handle(connection_handle)):
+            status = hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR
+        elif not (request := connection.encryption_request):
+            status = hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR
+        else:
+            connection.encryption_request = None
+            # Complete the command before reporting the outcome.
+            asyncio.get_running_loop().call_soon(
+                self.on_le_long_term_key_reply, connection, request, long_term_key
+            )
+            status = hci.HCI_ErrorCode.SUCCESS
+        return hci.HCI_StatusAndConnectionHandleReturnParameters(
+            status=status, connection_handle=connection_handle
+        )
 
     def on_hci_le_read_supported_states_command(
         self, _command: hci.HCI_LE_Read_Supported_States_Command
@@ -3308,6 +3383,14 @@ class Controller:
         else:
             ret = hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR
         return hci.HCI_StatusReturnParameters(ret)
+
+    def on_hci_le_set_privacy_mode_command(
+        self, _command: hci.HCI_LE_Set_Privacy_Mode_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.77 LE Set Privacy Mode Command
+        '''
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_le_set_resolvable_private_address_timeout_command(
         self, command: hci.HCI_LE_Set_Resolvable_Private_Address_Timeout_Command
