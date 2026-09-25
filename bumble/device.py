@@ -1160,6 +1160,7 @@ class BigSync(utils.EventEmitter):
             logger.error('BIG Sync %d is not active.', self.big_handle)
             return
 
+        self.device._remove_big_sync(self)
         await self.device.send_sync_command(
             hci.HCI_LE_BIG_Terminate_Sync_Command(big_handle=self.big_handle)
         )
@@ -5933,14 +5934,19 @@ class Device(utils.CompositeEventEmitter):
             self.bis_links[bis_link.handle] = bis_link
         big_sync.emit(BigSync.Event.ESTABLISHMENT)
 
+    def _remove_big_sync(self, big_sync: BigSync) -> None:
+        if self.big_syncs.pop(big_sync.big_handle, None) is None:
+            return
+        for bis_link in big_sync.bis_links:
+            self.bis_links.pop(bis_link.handle, None)
+
     @host_event_handler
     def on_big_sync_lost(self, big_handle: int, reason: int) -> None:
-        if not (big_sync := self.big_syncs.pop(big_handle, None)):
+        if not (big_sync := self.big_syncs.get(big_handle)):
             logger.warning('BIG %d not found', big_handle)
             return
 
-        for bis_link in big_sync.bis_links:
-            self.bis_links.pop(bis_link.handle, None)
+        self._remove_big_sync(big_sync)
         big_sync.state = BigSync.State.TERMINATED
         big_sync.emit(BigSync.Event.TERMINATION, reason)
 
