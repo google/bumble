@@ -1392,9 +1392,6 @@ async def test_big_and_big_sync():
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_big_sync_and_terminate_255_times():
-    # Regression: each BigSync.terminate() must remove the big handle and its
-    # bis link entries from the device. If those entries leak, the IN_BIG_SYNC
-    # / IN_BIS handles wrap around every 255 syncs and the 255th re-sync fails.
     two_devices = TwoDevices()
     for dev in two_devices.devices:
         await dev.power_on()
