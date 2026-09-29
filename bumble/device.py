@@ -1160,10 +1160,10 @@ class BigSync(utils.EventEmitter):
             logger.error('BIG Sync %d is not active.', self.big_handle)
             return
 
-        self.device._remove_big_sync(self)
         await self.device.send_sync_command(
             hci.HCI_LE_BIG_Terminate_Sync_Command(big_handle=self.big_handle)
         )
+        self.device._remove_big_sync(self)
         self.state = BigSync.State.TERMINATED
 
 
