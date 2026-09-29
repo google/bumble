@@ -43,8 +43,8 @@ class PacRecord:
     metadata: le_audio.Metadata = dataclasses.field(default_factory=le_audio.Metadata)
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> PacRecord:
-        offset, coding_format = hci.CodingFormat.parse_from_bytes(data, 0)
+    def parse_from_bytes(cls, data: bytes, offset: int) -> tuple[int, PacRecord]:
+        offset, coding_format = hci.CodingFormat.parse_from_bytes(data, offset)
         codec_specific_capabilities_size = data[offset]
 
         offset += 1
@@ -55,6 +55,7 @@ class PacRecord:
         metadata_size = data[offset]
         offset += 1
         metadata = le_audio.Metadata.from_bytes(data[offset : offset + metadata_size])
+        offset += metadata_size
 
         codec_specific_capabilities: CodecSpecificCapabilities | bytes
         if coding_format.codec_id == hci.CodecID.VENDOR_SPECIFIC:
@@ -64,11 +65,15 @@ class PacRecord:
                 codec_specific_capabilities_bytes
             )
 
-        return PacRecord(
+        return offset, PacRecord(
             coding_format=coding_format,
             codec_specific_capabilities=codec_specific_capabilities,
             metadata=metadata,
         )
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> PacRecord:
+        return cls.parse_from_bytes(data, 0)[1]
 
     @classmethod
     def list_from_bytes(cls, data: bytes) -> list[PacRecord]:
@@ -77,8 +82,7 @@ class PacRecord:
         records = []
         offset = 1
         for _ in range(record_count):
-            record = PacRecord.from_bytes(data[offset:])
-            offset += len(bytes(record))
+            offset, record = PacRecord.parse_from_bytes(data, offset)
             records.append(record)
 
         return records

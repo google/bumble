@@ -136,6 +136,27 @@ def test_vendor_specific_pac_record() -> None:
 
 
 # -----------------------------------------------------------------------------
+def test_pac_record_list() -> None:
+    # Two LC3 records without the optional Supported_Audio_Channel_Counts and
+    # Supported_Max_Codec_Frames_Per_SDU capabilities.
+    RAW_DATA = bytes.fromhex(
+        '02'
+        '06000000000d0301800002020205047800780000'
+        '06000000000d0301040002020205042800280000'
+    )
+    records = PacRecord.list_from_bytes(RAW_DATA)
+    assert len(records) == 2
+    assert records[1].codec_specific_capabilities == CodecSpecificCapabilities(
+        supported_sampling_frequencies=SupportedSamplingFrequency.FREQ_16000,
+        supported_frame_durations=SupportedFrameDuration.DURATION_10000_US_SUPPORTED,
+        supported_audio_channel_count=[1],
+        min_octets_per_codec_frame=40,
+        max_octets_per_codec_frame=40,
+        supported_max_codec_frames_per_sdu=1,
+    )
+
+
+# -----------------------------------------------------------------------------
 def test_ASE_Config_Codec() -> None:
     operation = ASE_Config_Codec(
         ase_id=[1, 2],
