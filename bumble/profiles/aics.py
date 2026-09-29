@@ -59,8 +59,8 @@ logger = logging.getLogger(__name__)
 # Constants
 # -----------------------------------------------------------------------------
 CHANGE_COUNTER_MAX_VALUE = 0xFF
-GAIN_SETTINGS_MIN_VALUE = 0
-GAIN_SETTINGS_MAX_VALUE = 255
+GAIN_SETTINGS_MIN_VALUE = -128
+GAIN_SETTINGS_MAX_VALUE = 127
 
 
 class ErrorCode(utils.OpenIntEnum):
@@ -131,13 +131,13 @@ class AudioInputState:
     attribute: Attribute | None = None
 
     def __bytes__(self) -> bytes:
-        return bytes(
-            [self.gain_settings, self.mute, self.gain_mode, self.change_counter]
+        return struct.pack(
+            "bBBB", self.gain_settings, self.mute, self.gain_mode, self.change_counter
         )
 
     @classmethod
     def from_bytes(cls, data: bytes):
-        gain_settings, mute, gain_mode, change_counter = struct.unpack("BBBB", data)
+        gain_settings, mute, gain_mode, change_counter = struct.unpack("bBBB", data)
         return cls(gain_settings, mute, gain_mode, change_counter)
 
     def update_gain_settings_unit(self, gain_settings_unit: int) -> None:
@@ -172,19 +172,18 @@ class GainSettingsProperties:
     @classmethod
     def from_bytes(cls, data: bytes):
         (gain_settings_unit, gain_settings_minimum, gain_settings_maximum) = (
-            struct.unpack('BBB', data)
+            struct.unpack('Bbb', data)
         )
         return GainSettingsProperties(
             gain_settings_unit, gain_settings_minimum, gain_settings_maximum
         )
 
     def __bytes__(self) -> bytes:
-        return bytes(
-            [
-                self.gain_settings_unit,
-                self.gain_settings_minimum,
-                self.gain_settings_maximum,
-            ]
+        return struct.pack(
+            'Bbb',
+            self.gain_settings_unit,
+            self.gain_settings_minimum,
+            self.gain_settings_maximum,
         )
 
 
@@ -201,7 +200,7 @@ class AudioInputControlPoint:
         opcode = AudioInputControlPointOpCode(value[0])
 
         if opcode == AudioInputControlPointOpCode.SET_GAIN_SETTING:
-            gain_settings_operand = value[2]
+            gain_settings_operand = struct.unpack_from('b', value, 2)[0]
             await self._set_gain_settings(connection, gain_settings_operand)
         elif opcode == AudioInputControlPointOpCode.UNMUTE:
             await self._unmute(connection)
