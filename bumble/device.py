@@ -2448,6 +2448,7 @@ class Device(utils.CompositeEventEmitter):
     inquiry_response: bytes | None = None
     address_resolver: smp.AddressResolver | None = None
     connect_own_address_type: hci.OwnAddressType | None = None
+    l2cap_channel_manager: l2cap.ChannelManager
 
     EVENT_ADVERTISEMENT = "advertisement"
     EVENT_PERIODIC_ADVERTISING_SYNC_TRANSFER = "periodic_advertising_sync_transfer"
@@ -4475,7 +4476,7 @@ class Device(utils.CompositeEventEmitter):
         if use_l2cap:
             if connection.role != hci.Role.PERIPHERAL:
                 raise InvalidStateError(
-                    'only peripheral can update connection parameters with l2cap'
+                    'only a peripheral can update connection parameters with l2cap'
                 )
             l2cap_result = (
                 await self.l2cap_channel_manager.update_connection_parameters(
@@ -4486,7 +4487,10 @@ class Device(utils.CompositeEventEmitter):
                     supervision_timeout,
                 )
             )
-            if l2cap_result != l2cap.L2CAP_CONNECTION_PARAMETERS_ACCEPTED_RESULT:
+            if (
+                l2cap_result
+                != l2cap.L2CAP_Connection_Parameter_Update_Response.Result.ACCEPTED
+            ):
                 raise ConnectionParameterUpdateError(l2cap_result)
 
             return
