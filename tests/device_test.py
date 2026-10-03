@@ -1387,6 +1387,30 @@ async def test_big_and_big_sync():
     assert len(big_sync.bis_links) == 2
 
     await big_sync.terminate()
+
+    # Terminating must clean up the BIG sync handle and its BIS links from the
+    # device, so that none are left behind as stale entries.
+    assert not two_devices.devices[1].big_syncs
+    assert not two_devices.devices[1].bis_links
+
+    # next_big_handle() always picks the lowest unused handle (starting from
+    # DEVICE_MIN_BIG_HANDLE), so a re-sync must be able to allocate the same
+    # lowest handle again after the previous sync was cleaned up.
+    big_sync_2 = await two_devices.devices[1].create_big_sync(
+        pa_sync,
+        BigSyncParameters(big_sync_timeout=1000, bis=[1, 2]),
+    )
+    assert len(big_sync_2.bis_links) == 2
+    assert big_sync_2.big_handle == big_sync.big_handle
+    assert big_sync_2.big_handle in two_devices.devices[1].big_syncs
+    assert all(
+        bis_link.handle in two_devices.devices[1].bis_links
+        for bis_link in big_sync_2.bis_links
+    )
+    await big_sync_2.terminate()
+    assert not two_devices.devices[1].big_syncs
+    assert not two_devices.devices[1].bis_links
+
     await big.terminate()
 
 
