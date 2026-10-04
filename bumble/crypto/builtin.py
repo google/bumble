@@ -572,6 +572,9 @@ class _EllipticCurve:
 
     def ecdh_shared_secret(self, private_key: int, other_public_key: _Point) -> bytes:
         """Computes the shared secret using ECDH."""
+        x, y = other_public_key.x, other_public_key.y
+        if (y * y - (x * x * x + self.a * x + self.b)) % self.p != 0:
+            raise core.InvalidPacketError("Public key is not a point on the curve")
         other_public_key_jacobian = _JacobianPoint.from_affine(other_public_key)
         shared_point_jacobian = other_public_key_jacobian * private_key
         shared_point_affine = shared_point_jacobian.to_affine()
