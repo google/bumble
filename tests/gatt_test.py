@@ -28,7 +28,7 @@ from unittest.mock import ANY, AsyncMock, Mock
 import pytest
 from typing_extensions import Self
 
-from bumble import att, gatt_client, l2cap
+from bumble import att, gatt_client, gatt_server, l2cap
 from bumble.att import (
     ATT_ATTRIBUTE_NOT_FOUND_ERROR,
     ATT_PDU,
@@ -44,6 +44,7 @@ from bumble.device import Device, Peer
 from bumble.gatt import (
     GATT_BATTERY_LEVEL_CHARACTERISTIC,
     GATT_CLIENT_CHARACTERISTIC_CONFIGURATION_DESCRIPTOR,
+    GATT_MAX_ATTRIBUTE_VALUE_SIZE,
     Characteristic,
     CharacteristicValue,
     Descriptor,
@@ -1838,6 +1839,73 @@ async def test_write_long_value_cancel():
 
     # The cancelled value was not written (the attribute keeps its initial value)
     assert characteristic.value is None
+
+
+# -----------------------------------------------------------------------------
+async def _prepare_write_long_value(client, handle, value):
+    part_size = client.mtu - 5
+    for offset in range(0, len(value), part_size):
+        response = await client.send_request(
+            att.ATT_Prepare_Write_Request(
+                attribute_handle=handle,
+                value_offset=offset,
+                part_attribute_value=value[offset : offset + part_size],
+            )
+        )
+        assert isinstance(response, att.ATT_Prepare_Write_Response)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_write_long_value_too_long_rejected():
+    peer, _, characteristic = await _connect_with_writeable_characteristic()
+    client = peer.gatt_client
+
+    # A value of exactly the maximum attribute value size is accepted
+    max_value = bytes(i % 256 for i in range(GATT_MAX_ATTRIBUTE_VALUE_SIZE))
+    await _prepare_write_long_value(client, characteristic.handle, max_value)
+    response = await client.send_request(att.ATT_Execute_Write_Request(flags=0x01))
+    assert isinstance(response, att.ATT_Execute_Write_Response)
+    await async_barrier()
+    assert characteristic.value == max_value
+
+    # One byte more is rejected with INVALID_ATTRIBUTE_LENGTH, and not written
+    await _prepare_write_long_value(client, characteristic.handle, max_value + b'\0')
+    response = await client.send_request(att.ATT_Execute_Write_Request(flags=0x01))
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_INVALID_ATTRIBUTE_LENGTH_ERROR
+    assert response.attribute_handle_in_error == characteristic.handle
+    await async_barrier()
+    assert characteristic.value == max_value
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_write_long_value_queue_full():
+    peer, _, characteristic = await _connect_with_writeable_characteristic()
+    client = peer.gatt_client
+
+    request = att.ATT_Prepare_Write_Request(
+        attribute_handle=characteristic.handle,
+        value_offset=0,
+        part_attribute_value=bytes([1, 2, 3, 4]),
+    )
+
+    # Fill the queue
+    for _ in range(gatt_server.GATT_SERVER_MAX_PREPARED_WRITES):
+        response = await client.send_request(request)
+        assert isinstance(response, att.ATT_Prepare_Write_Response)
+
+    # One more is rejected with PREPARE_QUEUE_FULL
+    response = await client.send_request(request)
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_PREPARE_QUEUE_FULL_ERROR
+
+    # Cancelling empties the queue, which then accepts new parts
+    response = await client.send_request(att.ATT_Execute_Write_Request(flags=0x00))
+    assert isinstance(response, att.ATT_Execute_Write_Response)
+    response = await client.send_request(request)
+    assert isinstance(response, att.ATT_Prepare_Write_Response)
 
 
 # -----------------------------------------------------------------------------

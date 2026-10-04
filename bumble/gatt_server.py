@@ -60,6 +60,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 # Constants
 # -----------------------------------------------------------------------------
+GATT_SERVER_MAX_PREPARED_WRITES = 64  # Max queued Prepare Write Requests per bearer
 GATT_SERVER_DEFAULT_MAX_MTU = 517
 
 
@@ -1176,7 +1177,18 @@ class Server(utils.EventEmitter):
             return
 
         # Queue the partial value, to be committed on Execute Write Request
-        self.prepared_writes.setdefault(bearer, []).append(
+        queue = self.prepared_writes.setdefault(bearer, [])
+        if len(queue) >= GATT_SERVER_MAX_PREPARED_WRITES:
+            self.send_response(
+                bearer,
+                att.ATT_Error_Response(
+                    request_opcode_in_error=request.op_code,
+                    attribute_handle_in_error=request.attribute_handle,
+                    error_code=att.ATT_PREPARE_QUEUE_FULL_ERROR,
+                ),
+            )
+            return
+        queue.append(
             (
                 request.attribute_handle,
                 request.value_offset,
@@ -1210,7 +1222,8 @@ class Server(utils.EventEmitter):
             return
 
         try:
-            # Reassemble the queued parts; reject a gap with INVALID_OFFSET
+            # Reassemble the queued parts; reject a gap with INVALID_OFFSET and
+            # an oversized value with INVALID_ATTRIBUTE_LENGTH
             values: dict[int, bytearray] = {}
             for handle, offset, part in queue:
                 buffer = values.setdefault(handle, bytearray())
@@ -1219,6 +1232,11 @@ class Server(utils.EventEmitter):
                         error_code=att.ATT_INVALID_OFFSET_ERROR, att_handle=handle
                     )
                 buffer[offset : offset + len(part)] = part
+                if len(buffer) > GATT_MAX_ATTRIBUTE_VALUE_SIZE:
+                    raise att.ATT_Error(
+                        error_code=att.ATT_INVALID_ATTRIBUTE_LENGTH_ERROR,
+                        att_handle=handle,
+                    )
 
             # Commit the reassembled values through the normal write path
             for handle, value in values.items():
