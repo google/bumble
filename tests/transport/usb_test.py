@@ -167,3 +167,41 @@ async def test_usb_packet_sink_command_addressing(interface_number, request_type
             await sink.queue_task
         except asyncio.CancelledError:
             pass
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'device_class',
+    [
+        # Class defined per interface
+        0x00,
+        # Miscellaneous: composite device with interface associations
+        0xEF,
+    ],
+)
+async def test_open_usb_transport_by_index_checks_interfaces(device_class):
+    # A Bluetooth interface without endpoints: enough to be selected by index,
+    # but not to open a transport
+    setting = mock.MagicMock()
+    setting.getClass.return_value = 0xE0
+    setting.getSubClass.return_value = 0x01
+    setting.getProtocol.return_value = 0x01
+    setting.__iter__.side_effect = lambda: iter([])
+    interface = mock.MagicMock()
+    interface.__iter__.side_effect = lambda: iter([setting])
+    configuration = mock.MagicMock()
+    configuration.__iter__.side_effect = lambda: iter([interface])
+    device = mock.MagicMock()
+    device.getDeviceClass.return_value = device_class
+    device.getDeviceSubClass.return_value = 0x02
+    device.getDeviceProtocol.return_value = 0x01
+    device.__iter__.side_effect = lambda: iter([configuration])
+    context = mock.Mock()
+    context.getDeviceIterator.return_value = [device]
+
+    with (
+        mock.patch.object(usb, 'load_libusb'),
+        mock.patch.object(usb.usb1, 'USBContext', return_value=context),
+        pytest.raises(usb.TransportInitError, match='no compatible interface'),
+    ):
+        await usb.open_usb_transport('0')

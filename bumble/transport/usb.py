@@ -59,6 +59,7 @@ USB_RECIPIENT_DEVICE = 0x00
 USB_RECIPIENT_INTERFACE = 0x01
 USB_REQUEST_TYPE_CLASS = 0x01 << 5
 USB_DEVICE_CLASS_DEVICE = 0x00
+USB_DEVICE_CLASS_MISCELLANEOUS = 0xEF
 USB_DEVICE_CLASS_WIRELESS_CONTROLLER = 0xE0
 USB_DEVICE_SUBCLASS_RF_CONTROLLER = 0x01
 USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER = 0x01
@@ -868,8 +869,12 @@ async def open_usb_transport(spec: str) -> Transport:
                 ) == USB_BT_HCI_CLASS_TUPLE:
                     return True
 
-                # If the device class is 'Device', look for a matching interface
-                if device.getDeviceClass() == USB_DEVICE_CLASS_DEVICE:
+                # If the device class is 'Device' or 'Miscellaneous' (composite
+                # devices), look for a matching interface
+                if device.getDeviceClass() in (
+                    USB_DEVICE_CLASS_DEVICE,
+                    USB_DEVICE_CLASS_MISCELLANEOUS,
+                ):
                     for configuration in device:
                         for interface in configuration:
                             for setting in interface:
