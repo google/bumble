@@ -118,3 +118,52 @@ async def test_usb_packet_sink_iso_routing_with_iso_endpoint():
             await sink.queue_task
         except asyncio.CancelledError:
             pass
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('interface_number', 'request_type'),
+    [
+        # Single function controller: addressed to the device
+        (0, 0x20),
+        # Controller behind other functions in a composite device: addressed to
+        # its interface
+        (2, 0x21),
+    ],
+)
+async def test_usb_packet_sink_command_addressing(interface_number, request_type):
+    mock_device = mock.Mock()
+    mock_bulk_out = mock.Mock()
+    mock_transfer = mock.Mock()
+    mock_device.getTransfer.return_value = mock_transfer
+
+    sink = usb.UsbPacketSink(
+        mock_device,
+        mock_bulk_out,
+        isochronous_out=None,
+        interface_number=interface_number,
+    )
+    sink.start()
+
+    # Send HCI_Reset
+    sink.on_packet(bytes([hci.HCI_COMMAND_PACKET, 0x03, 0x0C, 0x00]))
+
+    # Yield control to let the queue processor run
+    await asyncio.sleep(0.01)
+
+    mock_transfer.setControl.assert_called_once_with(
+        request_type,
+        0,
+        0,
+        interface_number,
+        bytes([0x03, 0x0C, 0x00]),
+        callback=sink.transfer_callback,
+    )
+    mock_transfer.submit.assert_called_once()
+
+    if sink.queue_task:
+        sink.queue_task.cancel()
+        try:
+            await sink.queue_task
+        except asyncio.CancelledError:
+            pass
