@@ -532,6 +532,68 @@ async def test_disconnection_collision():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_zero_length_sdu():
+    devices = await TwoDevices.create_with_connection()
+
+    server_channels = asyncio.Queue[l2cap.LeCreditBasedChannel]()
+    server = devices[1].create_l2cap_server(
+        spec=l2cap.LeCreditBasedChannelSpec(),
+        handler=server_channels.put_nowait,
+    )
+    assert (connection := devices.connections[0])
+    client = await connection.create_l2cap_channel(
+        spec=l2cap.LeCreditBasedChannelSpec(server.psm)
+    )
+    server_channel = await server_channels.get()
+    received = asyncio.Queue[bytes]()
+    server_channel.sink = received.put_nowait
+
+    # A zero-length SDU must not hold up the SDUs that follow it
+    client.send_pdu(bytes(2))
+    client.write(b'hello')
+    assert await asyncio.wait_for(received.get(), timeout=1.0) == b''
+    assert await asyncio.wait_for(received.get(), timeout=1.0) == b'hello'
+    await client.disconnect()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "sdu_length, payload_length",
+    (
+        (101, 0),  # SDU length larger than the MTU
+        (0, 48),  # More payload than the SDU length
+        (10, 11),
+    ),
+)
+async def test_invalid_sdu_length(sdu_length: int, payload_length: int):
+    devices = await TwoDevices.create_with_connection()
+
+    server_channels = asyncio.Queue[l2cap.LeCreditBasedChannel]()
+    server = devices[1].create_l2cap_server(
+        spec=l2cap.LeCreditBasedChannelSpec(mtu=100),
+        handler=server_channels.put_nowait,
+    )
+    assert (connection := devices.connections[0])
+    client = await connection.create_l2cap_channel(
+        spec=l2cap.LeCreditBasedChannelSpec(server.psm)
+    )
+    server_channel = await server_channels.get()
+    server_channel.sink = mock.Mock()
+    closed = asyncio.Event()
+    server_channel.once(server_channel.EVENT_CLOSE, closed.set)
+
+    # The receiver must disconnect the channel rather than buffer or deliver
+    client.send_pdu(sdu_length.to_bytes(2, 'little') + bytes(payload_length))
+    await asyncio.wait_for(closed.wait(), timeout=1.0)
+
+    server_channel.sink.assert_not_called()
+    assert server_channel.in_sdu is None
+    assert client.state == l2cap.LeCreditBasedChannel.State.DISCONNECTED
+
+
+# -----------------------------------------------------------------------------
 async def run():
     test_helpers()
     await test_basic_connection()
