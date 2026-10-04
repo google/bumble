@@ -23,6 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from bumble.att import ATT_INSUFFICIENT_AUTHENTICATION_ERROR, ATT_Error
 from bumble.core import PhysicalTransport, ProtocolError
 from bumble.device import Peer
 from bumble.gatt import Characteristic, Service
@@ -446,6 +447,139 @@ async def test_self_smp_wrong_pin():
         assert error.error_code == ErrorCode.CONFIRM_VALUE_FAILED
 
     assert not paired
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'sc, authenticated, reconnect',
+    [
+        (False, False, False),
+        (False, True, False),
+        (True, False, False),
+        (True, True, False),
+        (True, False, True),
+        (True, True, True),
+    ],
+)
+async def test_self_smp_authentication_requirement(sc, authenticated, reconnect):
+    # Create two devices, each with a controller, attached to the same link
+    two_devices = TwoDevices()
+
+    # Add a GATT characteristic that requires authentication to device 1
+    characteristic = Characteristic(
+        'FDB159DB-036C-49E3-B3DB-6325AC750806',
+        Characteristic.Properties.READ | Characteristic.Properties.WRITE,
+        Characteristic.READABLE
+        | Characteristic.WRITEABLE
+        | Characteristic.READ_REQUIRES_AUTHENTICATION
+        | Characteristic.WRITE_REQUIRES_AUTHENTICATION,
+        bytes([1, 2, 3]),
+    )
+    service = Service('3A657F47-D34F-46B3-B1EC-698E29B6B829', [characteristic])
+    two_devices.devices[1].add_service(service)
+
+    # Pair with a passkey, or with Just Works when there is no way to enter one
+    passkey = asyncio.get_running_loop().create_future()
+
+    class Delegate(PairingDelegate):
+        async def display_number(self, number, digits):
+            passkey.set_result(number)
+
+        async def get_number(self):
+            return await passkey
+
+    if authenticated:
+        io_capabilities = [
+            PairingDelegate.IoCapability.KEYBOARD_INPUT_ONLY,
+            PairingDelegate.IoCapability.DISPLAY_OUTPUT_ONLY,
+        ]
+    else:
+        io_capabilities = [PairingDelegate.IoCapability.NO_OUTPUT_NO_INPUT] * 2
+    # Bond with the random addresses, which are the ones used to connect
+    pairing_configs = [
+        PairingConfig(
+            sc=sc,
+            identity_address_type=PairingConfig.AddressType.RANDOM,
+            delegate=Delegate(io_capability),
+        )
+        for io_capability in io_capabilities
+    ]
+    two_devices.devices[0].pairing_config_factory = lambda connection: pairing_configs[
+        0
+    ]
+    two_devices.devices[1].pairing_config_factory = lambda connection: pairing_configs[
+        1
+    ]
+
+    # Connect and pair the two devices
+    await two_devices.setup_connection()
+    two_devices.connections[0].on(
+        'pairing', lambda keys: two_devices.on_paired(0, keys)
+    )
+    two_devices.connections[1].on(
+        'pairing', lambda keys: two_devices.on_paired(1, keys)
+    )
+    await two_devices.devices[0].pair(two_devices.connections[0])
+    await asyncio.gather(*two_devices.paired)
+
+    if reconnect:
+        # Reconnect and encrypt the link with the stored keys
+        await two_devices.connections[0].disconnect()
+        await async_barrier()
+        await two_devices.devices[1].start_advertising(advertising_interval_min=1.0)
+        await two_devices.devices[0].connect(two_devices.devices[1].random_address)
+        await async_barrier()
+        assert not two_devices.connections[1].authenticated
+        await two_devices.connections[0].encrypt()
+        await async_barrier()
+
+    for connection in two_devices.connections.values():
+        assert connection.is_encrypted
+        assert connection.authenticated == authenticated
+        assert connection.sc == sc
+
+    # Only an authenticated link gives access to the characteristic
+    peer = Peer(two_devices.connections[0])
+    await peer.discover_services()
+    await peer.discover_characteristics()
+    remote_characteristic = peer.get_characteristics_by_uuid(characteristic.uuid)[0]
+    if authenticated:
+        assert await remote_characteristic.read_value() == bytes([1, 2, 3])
+        await remote_characteristic.write_value(bytes([4]), with_response=True)
+        assert characteristic.value == bytes([4])
+    else:
+        with pytest.raises(ATT_Error) as error:
+            await remote_characteristic.read_value()
+        assert error.value.error_code == ATT_INSUFFICIENT_AUTHENTICATION_ERROR
+        with pytest.raises(ATT_Error) as error:
+            await remote_characteristic.write_value(bytes([4]), with_response=True)
+        assert error.value.error_code == ATT_INSUFFICIENT_AUTHENTICATION_ERROR
+        assert characteristic.value == bytes([1, 2, 3])
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_self_smp_stale_stored_key_security():
+    # Create two devices, each with a controller, attached to the same link
+    two_devices = TwoDevices()
+    await two_devices.setup_connection()
+    connection = two_devices.connections[0]
+    connection.on('pairing', lambda keys: two_devices.on_paired(0, keys))
+
+    # As left by a failed attempt to encrypt with a stored authenticated key
+    connection.ltk_security = (True, True)
+    authenticated = []
+    connection.on(
+        'connection_encryption_change',
+        lambda: authenticated.append(connection.authenticated),
+    )
+
+    # Pairing with Just Works must not make the link authenticated at any point
+    await two_devices.devices[0].pair(connection)
+    await two_devices.paired[0]
+    assert authenticated == [False]
+    assert not connection.authenticated
 
 
 # -----------------------------------------------------------------------------

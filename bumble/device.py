@@ -1784,6 +1784,7 @@ class Connection(utils.CompositeEventEmitter):
     encryption_key_size: int
     authenticated: bool
     sc: bool
+    ltk_security: tuple[bool, bool] | None
     gatt_client: gatt_client.Client
     pairing_peer_io_capability: int | None
     pairing_peer_authentication_requirements: int | None
@@ -1915,6 +1916,9 @@ class Connection(utils.CompositeEventEmitter):
         self.encryption_key_size = 0
         self.authenticated = False
         self.sc = False
+        # (authenticated, sc) of the stored LTK that was last given to the
+        # controller, applied once encryption with that key is enabled [LE only]
+        self.ltk_security = None
         self.att_mtu = att.ATT_DEFAULT_MTU
         self.data_length = self.LeDataLength(*DEVICE_DEFAULT_DATA_LENGTH)
         self.gatt_client = gatt_client.Client(self)  # Per-connection client
@@ -4943,12 +4947,15 @@ class Device(utils.CompositeEventEmitter):
             if keys is not None:
                 logger.debug('found keys in the key store')
                 if keys.ltk:
+                    connection.ltk_security = (keys.ltk.authenticated, True)
                     return keys.ltk.value
 
                 if connection.role == hci.Role.CENTRAL and keys.ltk_central:
+                    connection.ltk_security = (keys.ltk_central.authenticated, False)
                     return keys.ltk_central.value
 
                 if connection.role == hci.Role.PERIPHERAL and keys.ltk_peripheral:
+                    connection.ltk_security = (keys.ltk_peripheral.authenticated, False)
                     return keys.ltk_peripheral.value
         return None
 
@@ -5025,10 +5032,12 @@ class Device(utils.CompositeEventEmitter):
                     ltk = keys.ltk.value
                     rand = bytes(8)
                     ediv = 0
+                    connection.ltk_security = (keys.ltk.authenticated, True)
                 elif keys.ltk_central is not None:
                     ltk = keys.ltk_central.value
                     rand = keys.ltk_central.rand or b''
                     ediv = keys.ltk_central.ediv or 0
+                    connection.ltk_security = (keys.ltk_central.authenticated, False)
                 else:
                     raise InvalidOperationError('no LTK found for peer')
 
@@ -6726,12 +6735,14 @@ class Device(utils.CompositeEventEmitter):
             connection.authenticated = True
             connection.sc = True
         if (
-            not connection.authenticated
+            connection.ltk_security is not None
             and connection.transport == PhysicalTransport.LE
             and encryption == hci.HCI_Encryption_Change_Event.Enabled.E0_OR_AES_CCM
         ):
-            connection.authenticated = True
-            connection.sc = True
+            # The link is only as secure as the stored key it is encrypted with.
+            # When pairing, this is set in `on_pairing` instead.
+            connection.authenticated, connection.sc = connection.ltk_security
+            connection.ltk_security = None
         connection.emit(connection.EVENT_CONNECTION_ENCRYPTION_CHANGE)
 
     @host_event_handler
@@ -7036,6 +7047,8 @@ class Device(utils.CompositeEventEmitter):
         self.emit(connection.EVENT_CLASSIC_PAIRING_FAILURE, connection, status)
 
     def on_pairing_start(self, connection: Connection) -> None:
+        # The link will be encrypted with a new key, not with a stored one
+        connection.ltk_security = None
         connection.emit(connection.EVENT_PAIRING_START)
         self.emit(connection.EVENT_PAIRING_START, connection)
 
@@ -7050,7 +7063,13 @@ class Device(utils.CompositeEventEmitter):
             connection.peer_resolvable_address = connection.peer_address
             connection.peer_address = identity_address
         connection.sc = sc
-        connection.authenticated = True
+        # Only a pairing method with MITM protection (i.e. not Just Works)
+        # authenticates the link, which the keys that it generated keep track of.
+        connection.authenticated = any(
+            key.authenticated
+            for key in (keys.ltk, keys.ltk_central, keys.ltk_peripheral)
+            if key is not None
+        )
         connection.emit(connection.EVENT_PAIRING, keys)
 
     def on_pairing_failure(self, connection: Connection, reason: int) -> None:
