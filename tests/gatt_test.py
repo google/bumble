@@ -1866,6 +1866,139 @@ async def test_write_long_value_gap_rejected():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_write_not_permitted():
+    devices = await TwoDevices.create_with_connection()
+
+    characteristic = Characteristic(
+        '1234', Characteristic.Properties.READ, Characteristic.READABLE, b'1234'
+    )
+    devices[1].add_service(Service('ABCD', [characteristic]))
+    client = devices.connections[0].gatt_client
+
+    response = await client.send_request(
+        att.ATT_Write_Request(
+            attribute_handle=characteristic.handle, attribute_value=b'5678'
+        )
+    )
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_WRITE_NOT_PERMITTED_ERROR
+
+    await client.send_command(
+        att.ATT_Write_Command(
+            attribute_handle=characteristic.handle, attribute_value=b'5678'
+        )
+    )
+
+    response = await client.send_request(
+        att.ATT_Prepare_Write_Request(
+            attribute_handle=characteristic.handle,
+            value_offset=0,
+            part_attribute_value=b'5678',
+        )
+    )
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_WRITE_NOT_PERMITTED_ERROR
+
+    # Nothing was queued, so there is nothing to commit
+    response = await client.send_request(att.ATT_Execute_Write_Request(flags=0x01))
+    assert isinstance(response, att.ATT_Execute_Write_Response)
+    await async_barrier()
+
+    assert characteristic.value == b'1234'
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_read_not_permitted():
+    devices = await TwoDevices.create_with_connection()
+
+    characteristic = Characteristic(
+        '1234', Characteristic.Properties.WRITE, Characteristic.WRITEABLE, b'1234'
+    )
+    devices[1].add_service(Service('ABCD', [characteristic]))
+    client = devices.connections[0].gatt_client
+
+    for request in (
+        att.ATT_Read_Request(attribute_handle=characteristic.handle),
+        att.ATT_Read_Blob_Request(
+            attribute_handle=characteristic.handle, value_offset=0
+        ),
+        att.ATT_Read_By_Type_Request(
+            starting_handle=0x0001,
+            ending_handle=0xFFFF,
+            attribute_type=characteristic.uuid,
+        ),
+        att.ATT_Read_Multiple_Request(set_of_handles=[characteristic.handle]),
+        att.ATT_Read_Multiple_Variable_Request(set_of_handles=[characteristic.handle]),
+    ):
+        response = await client.send_request(request)
+        assert isinstance(response, att.ATT_Error_Response)
+        assert response.error_code == att.ATT_READ_NOT_PERMITTED_ERROR
+        assert response.attribute_handle_in_error == characteristic.handle
+
+    # An attribute that cannot be read is not matched by value
+    response = await client.send_request(
+        att.ATT_Find_By_Type_Value_Request(
+            starting_handle=0x0001,
+            ending_handle=0xFFFF,
+            attribute_type=characteristic.uuid,
+            attribute_value=b'1234',
+        )
+    )
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_ATTRIBUTE_NOT_FOUND_ERROR
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_requires_permissions_imply_access():
+    devices = await TwoDevices.create_with_connection()
+
+    # No READABLE or WRITEABLE bit, only the security requirements
+    characteristic = Characteristic(
+        '1234',
+        Characteristic.Properties.READ | Characteristic.Properties.WRITE,
+        Characteristic.READ_REQUIRES_ENCRYPTION
+        | Characteristic.WRITE_REQUIRES_ENCRYPTION,
+        b'1234',
+    )
+    devices[1].add_service(Service('ABCD', [characteristic]))
+    client = devices.connections[0].gatt_client
+
+    # Not encrypted: the security requirement is reported, not NOT_PERMITTED
+    response = await client.send_request(
+        att.ATT_Read_Request(attribute_handle=characteristic.handle)
+    )
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_INSUFFICIENT_ENCRYPTION_ERROR
+
+    response = await client.send_request(
+        att.ATT_Write_Request(
+            attribute_handle=characteristic.handle, attribute_value=b'5678'
+        )
+    )
+    assert isinstance(response, att.ATT_Error_Response)
+    assert response.error_code == att.ATT_INSUFFICIENT_ENCRYPTION_ERROR
+
+    # Encrypted: both are allowed
+    devices.connections[1].encryption = 1
+    response = await client.send_request(
+        att.ATT_Read_Request(attribute_handle=characteristic.handle)
+    )
+    assert isinstance(response, att.ATT_Read_Response)
+    assert response.attribute_value == b'1234'
+
+    response = await client.send_request(
+        att.ATT_Write_Request(
+            attribute_handle=characteristic.handle, attribute_value=b'5678'
+        )
+    )
+    assert isinstance(response, att.ATT_Write_Response)
+    assert characteristic.value == b'5678'
+
+
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(async_main())
