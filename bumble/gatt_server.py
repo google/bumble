@@ -113,6 +113,8 @@ class Server(utils.EventEmitter):
         self.max_mtu = (
             GATT_SERVER_DEFAULT_MAX_MTU  # The max MTU we're willing to negotiate
         )
+        # When False, READABLE and WRITEABLE are not required for peer reads and writes
+        self.strict_permissions = True
         self.subscribers = (
             {}
         )  # Map of subscriber states by connection handle and attribute handle
@@ -388,7 +390,7 @@ class Server(utils.EventEmitter):
         self, bearer: att.Bearer, attribute: att.Attribute
     ) -> bytes:
         # Read a value on behalf of a peer
-        if not attribute.permissions & _READ_PERMISSIONS:
+        if self.strict_permissions and not attribute.permissions & _READ_PERMISSIONS:
             raise att.ATT_Error(
                 error_code=att.ATT_READ_NOT_PERMITTED_ERROR, att_handle=attribute.handle
             )
@@ -1146,7 +1148,7 @@ class Server(utils.EventEmitter):
             return
 
         # Check that the attribute can be written
-        if not attribute.permissions & _WRITE_PERMISSIONS:
+        if self.strict_permissions and not attribute.permissions & _WRITE_PERMISSIONS:
             self.send_response(
                 bearer,
                 att.ATT_Error_Response(
@@ -1198,7 +1200,7 @@ class Server(utils.EventEmitter):
             return
 
         # Check that the attribute can be written
-        if not attribute.permissions & _WRITE_PERMISSIONS:
+        if self.strict_permissions and not attribute.permissions & _WRITE_PERMISSIONS:
             return
 
         # Check the request parameters
@@ -1232,7 +1234,7 @@ class Server(utils.EventEmitter):
             return
 
         # Check that the attribute can be written
-        if not attribute.permissions & _WRITE_PERMISSIONS:
+        if self.strict_permissions and not attribute.permissions & _WRITE_PERMISSIONS:
             self.send_response(
                 bearer,
                 att.ATT_Error_Response(

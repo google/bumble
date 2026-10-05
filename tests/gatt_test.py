@@ -1999,6 +1999,32 @@ async def test_requires_permissions_imply_access():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_permissions_not_strict():
+    devices = await TwoDevices.create_with_connection()
+    devices[1].gatt_server.strict_permissions = False
+
+    characteristic = Characteristic(
+        '1234', Characteristic.Properties.NOTIFY, Characteristic.Permissions(0), b'1234'
+    )
+    devices[1].add_service(Service('ABCD', [characteristic]))
+    client = devices.connections[0].gatt_client
+
+    response = await client.send_request(
+        att.ATT_Write_Request(
+            attribute_handle=characteristic.handle, attribute_value=b'5678'
+        )
+    )
+    assert isinstance(response, att.ATT_Write_Response)
+
+    response = await client.send_request(
+        att.ATT_Read_Request(attribute_handle=characteristic.handle)
+    )
+    assert isinstance(response, att.ATT_Read_Response)
+    assert response.attribute_value == b'5678'
+
+
+# -----------------------------------------------------------------------------
 if __name__ == '__main__':
     logging.basicConfig(level=os.environ.get('BUMBLE_LOGLEVEL', 'INFO').upper())
     asyncio.run(async_main())
