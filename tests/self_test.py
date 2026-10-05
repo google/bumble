@@ -389,10 +389,18 @@ async def test_self_smp_waits_for_key_distribution():
     await async_barrier()
 
     # Check that the withholding is in effect, then that pairing has not been
-    # reported as complete while the keys may still be sitting in the queue.
+    # reported as complete while the keys may still be sitting in the queue,
+    # even though the keys have already been saved to the keystore.
     assert connection.is_encrypted
     assert packet_queue.pending > 0
     assert not pairing.done()
+    assert two_devices.devices[0].keystore is not None
+    assert (
+        await two_devices.devices[0].keystore.get(
+            str(two_devices.devices[1].public_address)
+        )
+        is not None
+    )
 
     # Complete the packets: pairing may now finish.
     packet_queue.on_packets_completed = complete_packets
