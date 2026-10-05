@@ -63,6 +63,20 @@ logger = logging.getLogger(__name__)
 GATT_SERVER_MAX_PREPARED_WRITES = 64  # Max queued Prepare Write Requests per bearer
 GATT_SERVER_DEFAULT_MAX_MTU = 517
 
+# A security requirement implies the access that it protects
+_READ_PERMISSIONS = (
+    att.Attribute.READABLE
+    | att.Attribute.READ_REQUIRES_ENCRYPTION
+    | att.Attribute.READ_REQUIRES_AUTHENTICATION
+    | att.Attribute.READ_REQUIRES_AUTHORIZATION
+)
+_WRITE_PERMISSIONS = (
+    att.Attribute.WRITEABLE
+    | att.Attribute.WRITE_REQUIRES_ENCRYPTION
+    | att.Attribute.WRITE_REQUIRES_AUTHENTICATION
+    | att.Attribute.WRITE_REQUIRES_AUTHORIZATION
+)
+
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -100,6 +114,8 @@ class Server(utils.EventEmitter):
         self.max_mtu = (
             GATT_SERVER_DEFAULT_MAX_MTU  # The max MTU we're willing to negotiate
         )
+        # When False, READABLE and WRITEABLE are not required for peer reads and writes
+        self.strict_permissions = True
         self.subscribers = (
             {}
         )  # Map of subscriber states by connection handle and attribute handle
@@ -370,6 +386,16 @@ class Server(utils.EventEmitter):
     def send_response(self, bearer: att.Bearer, response: att.ATT_PDU) -> None:
         logger.debug(f'GATT Response from server: {_bearer_id(bearer)} {response}')
         self.send_gatt_pdu(bearer, bytes(response))
+
+    async def _read_attribute_value(
+        self, bearer: att.Bearer, attribute: att.Attribute
+    ) -> bytes:
+        # Read a value on behalf of a peer
+        if self.strict_permissions and not attribute.permissions & _READ_PERMISSIONS:
+            raise att.ATT_Error(
+                error_code=att.ATT_READ_NOT_PERMITTED_ERROR, att_handle=attribute.handle
+            )
+        return await attribute.read_value(bearer)
 
     async def notify_subscriber(
         self,
@@ -722,16 +748,21 @@ class Server(utils.EventEmitter):
         pdu_space_available = bearer.att_mtu - 2
         attributes = []
         response: att.ATT_PDU
-        async for attribute in (
+        for attribute in (
             attribute
             for attribute in self.attributes
             if attribute.handle >= request.starting_handle
             and attribute.handle <= request.ending_handle
             and attribute.type == request.attribute_type
-            and (await attribute.read_value(bearer)) == request.attribute_value
             and pdu_space_available >= 4
         ):
-            # TODO: check permissions
+            # Only attributes that can be read are returned
+            try:
+                attribute_value = await self._read_attribute_value(bearer, attribute)
+            except att.ATT_Error:
+                continue
+            if attribute_value != request.attribute_value:
+                continue
 
             # Add the attribute to the list
             attributes.append(attribute)
@@ -804,7 +835,7 @@ class Server(utils.EventEmitter):
             and pdu_space_available
         ):
             try:
-                attribute_value = await attribute.read_value(bearer)
+                attribute_value = await self._read_attribute_value(bearer, attribute)
             except att.ATT_Error as error:
                 # If the first attribute is unreadable, return an error
                 # Otherwise return attributes up to this point
@@ -857,7 +888,7 @@ class Server(utils.EventEmitter):
         response: att.ATT_PDU
         if attribute := self.get_attribute(request.attribute_handle):
             try:
-                value = await attribute.read_value(bearer)
+                value = await self._read_attribute_value(bearer, attribute)
             except att.ATT_Error as error:
                 response = att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
@@ -886,7 +917,7 @@ class Server(utils.EventEmitter):
         response: att.ATT_PDU
         if attribute := self.get_attribute(request.attribute_handle):
             try:
-                value = await attribute.read_value(bearer)
+                value = await self._read_attribute_value(bearer, attribute)
             except att.ATT_Error as error:
                 response = att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
@@ -1015,9 +1046,16 @@ class Server(utils.EventEmitter):
                 )
                 self.send_response(bearer, response)
                 return
-            # No need to catch permission errors here, since these attributes
-            # must all be world-readable
-            attribute_value = await attribute.read_value(bearer)
+            try:
+                attribute_value = await self._read_attribute_value(bearer, attribute)
+            except att.ATT_Error as error:
+                response = att.ATT_Error_Response(
+                    request_opcode_in_error=request.op_code,
+                    attribute_handle_in_error=handle,
+                    error_code=error.error_code,
+                )
+                self.send_response(bearer, response)
+                return
             # Check the attribute value size
             max_attribute_size = min(bearer.att_mtu - 1, 251)
             if len(attribute_value) > max_attribute_size:
@@ -1057,9 +1095,16 @@ class Server(utils.EventEmitter):
                 )
                 self.send_response(bearer, response)
                 return
-            # No need to catch permission errors here, since these attributes
-            # must all be world-readable
-            attribute_value = await attribute.read_value(bearer)
+            try:
+                attribute_value = await self._read_attribute_value(bearer, attribute)
+            except att.ATT_Error as error:
+                response = att.ATT_Error_Response(
+                    request_opcode_in_error=request.op_code,
+                    attribute_handle_in_error=handle,
+                    error_code=error.error_code,
+                )
+                self.send_response(bearer, response)
+                return
             length = len(attribute_value)
             # Check the attribute value size
             max_attribute_size = min(bearer.att_mtu - 3, 251)
@@ -1103,7 +1148,17 @@ class Server(utils.EventEmitter):
             )
             return
 
-        # TODO: check permissions
+        # Check that the attribute can be written
+        if self.strict_permissions and not attribute.permissions & _WRITE_PERMISSIONS:
+            self.send_response(
+                bearer,
+                att.ATT_Error_Response(
+                    request_opcode_in_error=request.op_code,
+                    attribute_handle_in_error=request.attribute_handle,
+                    error_code=att.ATT_WRITE_NOT_PERMITTED_ERROR,
+                ),
+            )
+            return
 
         # Check the request parameters
         if len(request.attribute_value) > GATT_MAX_ATTRIBUTE_VALUE_SIZE:
@@ -1145,7 +1200,9 @@ class Server(utils.EventEmitter):
         if attribute is None:
             return
 
-        # TODO: check permissions
+        # Check that the attribute can be written
+        if self.strict_permissions and not attribute.permissions & _WRITE_PERMISSIONS:
+            return
 
         # Check the request parameters
         if len(request.attribute_value) > GATT_MAX_ATTRIBUTE_VALUE_SIZE:
@@ -1165,13 +1222,26 @@ class Server(utils.EventEmitter):
         '''
 
         # Check that the attribute exists
-        if self.get_attribute(request.attribute_handle) is None:
+        attribute = self.get_attribute(request.attribute_handle)
+        if attribute is None:
             self.send_response(
                 bearer,
                 att.ATT_Error_Response(
                     request_opcode_in_error=request.op_code,
                     attribute_handle_in_error=request.attribute_handle,
                     error_code=att.ATT_INVALID_HANDLE_ERROR,
+                ),
+            )
+            return
+
+        # Check that the attribute can be written
+        if self.strict_permissions and not attribute.permissions & _WRITE_PERMISSIONS:
+            self.send_response(
+                bearer,
+                att.ATT_Error_Response(
+                    request_opcode_in_error=request.op_code,
+                    attribute_handle_in_error=request.attribute_handle,
+                    error_code=att.ATT_WRITE_NOT_PERMITTED_ERROR,
                 ),
             )
             return
