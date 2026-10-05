@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61", "wheel", "setuptools_scm>=8"]
-build-backend = "setuptools.build_meta"
+requires = ["flit_scm"]
+build-backend = "flit_scm:buildapi"
 
 [project]
 name = "bumble"
@@ -109,27 +109,8 @@ bumble-intel-fw-download = "bumble.tools.intel_fw_download:main"
 [project.urls]
 Homepage = "https://github.com/google/bumble"
 
-[tool.setuptools]
-packages = [
-    "bumble",
-    "bumble.transport",
-    "bumble.transport.grpc_protobuf",
-    "bumble.drivers",
-    "bumble.profiles",
-    "bumble.apps",
-    "bumble.tools",
-]
-
-[tool.setuptools.package-dir]
-"bumble" = "bumble"
-"bumble.apps" = "apps"
-"bumble.tools" = "tools"
-
 [tool.setuptools_scm]
 write_to = "bumble/_version.py"
-
-[tool.setuptools.package-data]
-"*" = ["*.pyi", "py.typed"]
 
 [tool.pytest.ini_options]
 pythonpath = "."
