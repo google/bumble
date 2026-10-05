@@ -5019,6 +5019,9 @@ class Device(utils.CompositeEventEmitter):
                 pending_encryption.set_exception(hci.HCI_Error(error_code))
 
             if connection.transport == PhysicalTransport.LE:
+                if connection.role != hci.Role.CENTRAL:
+                    raise InvalidStateError('only centrals can start encryption')
+
                 # Look for a key in the key store
                 if self.keystore is None:
                     raise InvalidOperationError('no key store')
@@ -5040,9 +5043,6 @@ class Device(utils.CompositeEventEmitter):
                     connection.ltk_security = (keys.ltk_central.authenticated, False)
                 else:
                     raise InvalidOperationError('no LTK found for peer')
-
-                if connection.role != hci.Role.CENTRAL:
-                    raise InvalidStateError('only centrals can start encryption')
 
                 await self.send_async_command(
                     hci.HCI_LE_Enable_Encryption_Command(
@@ -6753,6 +6753,8 @@ class Device(utils.CompositeEventEmitter):
             f'{connection.peer_address} as {connection.role_name}, '
             f'error={error}'
         )
+        # The stored key, if one was used, did not encrypt the link
+        connection.ltk_security = None
         connection.emit(connection.EVENT_CONNECTION_ENCRYPTION_FAILURE, error)
 
     @host_event_handler

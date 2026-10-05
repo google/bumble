@@ -24,10 +24,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from bumble.att import ATT_INSUFFICIENT_AUTHENTICATION_ERROR, ATT_Error
-from bumble.core import PhysicalTransport, ProtocolError
+from bumble.core import InvalidStateError, PhysicalTransport, ProtocolError
 from bumble.device import Peer
 from bumble.gatt import Characteristic, Service
 from bumble.hci import Role
+from bumble.keys import PairingKeys
 from bumble.pairing import PairingConfig, PairingDelegate
 from bumble.smp import (
     ErrorCode,
@@ -580,6 +581,31 @@ async def test_self_smp_stale_stored_key_security():
     await two_devices.paired[0]
     assert authenticated == [False]
     assert not connection.authenticated
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_self_smp_unused_stored_key_security():
+    # Create two devices, each with a controller, attached to the same link
+    two_devices = TwoDevices()
+    await two_devices.setup_connection()
+    device = two_devices.devices[1]
+    connection = two_devices.connections[1]
+
+    # A peripheral cannot start encryption, so its stored key is not used
+    assert device.keystore is not None
+    await device.keystore.update(
+        str(connection.peer_address),
+        PairingKeys(ltk=PairingKeys.Key(value=bytes(16), authenticated=True)),
+    )
+    with pytest.raises(InvalidStateError):
+        await connection.encrypt()
+    assert connection.ltk_security is None
+
+    # Nor is a stored key that fails to encrypt the link
+    connection.ltk_security = (True, True)
+    device.on_connection_encryption_failure(connection.handle, 0x06)
+    assert connection.ltk_security is None
 
 
 # -----------------------------------------------------------------------------
