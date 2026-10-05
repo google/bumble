@@ -1304,16 +1304,6 @@ class Session:
 
         self.completed = True
 
-        # The keys we have just distributed may still be waiting for the
-        # controller's flow control. Don't report success until they have all
-        # been acknowledged: an application that disconnects as soon as
-        # `pair()` returns would otherwise cut the last key distribution PDU,
-        # and a peer that never receives it discards the incomplete bond.
-        await self.connection.drain()
-
-        if self.pairing_result is not None and not self.pairing_result.done():
-            self.pairing_result.set_result(None)
-
         # Use the peer address from the pairing protocol or the connection
         if self.peer_bd_addr is not None:
             peer_address = self.peer_bd_addr
@@ -1365,6 +1355,16 @@ class Session:
                 value=self.link_key, authenticated=authenticated
             )
         await self.manager.on_pairing(self, peer_address, keys)
+
+        # The keys we have just distributed may still be waiting for the
+        # controller's flow control. Don't report success until they have all
+        # been acknowledged: an application that disconnects as soon as
+        # `pair()` returns would otherwise cut the last key distribution PDU,
+        # and a peer that never receives it discards the incomplete bond.
+        await self.connection.drain()
+
+        if self.pairing_result is not None and not self.pairing_result.done():
+            self.pairing_result.set_result(None)
 
     def on_pairing_failure(self, reason: ErrorCode) -> None:
         logger.warning('pairing failure (%s)', reason.name)
