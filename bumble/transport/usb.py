@@ -56,8 +56,10 @@ def _safe_call_soon(loop: asyncio.AbstractEventLoop, callback, *args) -> None:
 # -----------------------------------------------------------------------------
 # pylint: disable=invalid-name
 USB_RECIPIENT_DEVICE = 0x00
+USB_RECIPIENT_INTERFACE = 0x01
 USB_REQUEST_TYPE_CLASS = 0x01 << 5
 USB_DEVICE_CLASS_DEVICE = 0x00
+USB_DEVICE_CLASS_MISCELLANEOUS = 0xEF
 USB_DEVICE_CLASS_WIRELESS_CONTROLLER = 0xE0
 USB_DEVICE_SUBCLASS_RF_CONTROLLER = 0x01
 USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER = 0x01
@@ -240,10 +242,11 @@ def find_endpoints(device, forced_mode, sco_alternate=None):
 
 
 class UsbPacketSink:
-    def __init__(self, device, bulk_out, isochronous_out) -> None:
+    def __init__(self, device, bulk_out, isochronous_out, interface_number=0) -> None:
         self.device = device
         self.bulk_out = bulk_out
         self.isochronous_out = isochronous_out
+        self.interface_number = interface_number
         self.bulk_or_control_out_transfer = device.getTransfer()
         self.isochronous_out_transfer = (
             device.getTransfer(
@@ -315,11 +318,20 @@ class UsbPacketSink:
                     self.bulk_or_control_out_transfer.submit()
                     submitted = True
                 elif packet_type == hci.HCI_COMMAND_PACKET:
+                    # A controller that isn't the first interface of a composite
+                    # device must be addressed by its interface number, or the
+                    # command goes to whichever function owns interface 0
+                    # (Core Spec Vol 4, Part B, 2.2.2)
                     self.bulk_or_control_out_transfer.setControl(
-                        USB_RECIPIENT_DEVICE | USB_REQUEST_TYPE_CLASS,
+                        (
+                            USB_RECIPIENT_INTERFACE
+                            if self.interface_number
+                            else USB_RECIPIENT_DEVICE
+                        )
+                        | USB_REQUEST_TYPE_CLASS,
                         0,
                         0,
-                        0,
+                        self.interface_number,
                         packet_payload,
                         callback=self.transfer_callback,
                     )
@@ -857,8 +869,12 @@ async def open_usb_transport(spec: str) -> Transport:
                 ) == USB_BT_HCI_CLASS_TUPLE:
                     return True
 
-                # If the device class is 'Device', look for a matching interface
-                if device.getDeviceClass() == USB_DEVICE_CLASS_DEVICE:
+                # If the device class is 'Device' or 'Miscellaneous' (composite
+                # devices), look for a matching interface
+                if device.getDeviceClass() in (
+                    USB_DEVICE_CLASS_DEVICE,
+                    USB_DEVICE_CLASS_MISCELLANEOUS,
+                ):
                     for configuration in device:
                         for interface in configuration:
                             for setting in interface:
@@ -955,7 +971,9 @@ async def open_usb_transport(spec: str) -> Transport:
         source = UsbPacketSource(
             device, device_metadata, interrupt_in, bulk_in, isochronous_in
         )
-        sink = UsbPacketSink(device, bulk_out, isochronous_out)
+        sink = UsbPacketSink(
+            device, bulk_out, isochronous_out, acl_interface.getNumber()
+        )
         return UsbTransport(context, device, acl_interface, sco_interface, source, sink)
     except usb1.USBError as error:
         logger.warning(color(f'!!! failed to open USB device: {error}', 'red'))
