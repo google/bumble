@@ -84,6 +84,14 @@ def test_ecc(crypto_backend):
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.parametrize("x, y", [(0, 0), (1, 1)])
+def test_ecc_dh_point_not_on_curve(crypto_backend, x, y):
+    key = EccKey.generate()
+    with pytest.raises(ValueError):
+        key.dh(x.to_bytes(32, 'big'), y.to_bytes(32, 'big'))
+
+
+# -----------------------------------------------------------------------------
 def test_c1(crypto_backend):
     k = bytes(16)
     r = reversed_hex('5783D52156AD6F0E6388274EC6702EE0')
