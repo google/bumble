@@ -89,6 +89,28 @@ async def test_reset_enables_number_of_completed_packets_event() -> None:
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_le_connection_replays_buffered_acl() -> None:
+    host = Host()
+    connection_handle = 123
+    packet = HCI_AclDataPacket(
+        connection_handle=connection_handle,
+        pb_flag=0,
+        bc_flag=0,
+        data_total_length=0,
+        data=b'',
+    )
+    host.on_hci_acl_data_packet(packet)
+
+    connection = unittest.mock.Mock()
+    host.connections[connection_handle] = connection
+    host.emit('le_connection', connection_handle, None, None, None, None, 0, 0, 0)
+    await asyncio.sleep(0)
+
+    connection.on_hci_acl_data_packet.assert_called_once_with(packet)
+
+
+# -----------------------------------------------------------------------------
 def test_data_packet_queue():
     controller = unittest.mock.Mock()
     queue = DataPacketQueue(10, 2, controller.send)
