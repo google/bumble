@@ -297,7 +297,6 @@ class Host(utils.EventEmitter):
         self.pairing_io_capability_provider = None  # Classic only
         self.snooper: Snooper | None = None
         self._pending_acl: dict[int, list[tuple[float, hci.HCI_AclDataPacket]]] = {}
-        self._drain_acl_buffer_task: asyncio.Task[None] | None = None
         self.on("le_connection", self._drain_buffered_acl)
 
         # Connect to the source and sink if specified
@@ -1141,7 +1140,7 @@ class Host(utils.EventEmitter):
         if not queued:
             return
         now = time.monotonic()
-        logger.info(f"Replaying buffered ACL packets for handle: {handle}")
+        logger.debug(f"Replaying buffered ACL packets for handle: {handle}")
         for ts, packet in queued:
             if (now - ts) <= self._ACL_STALE_TIMEOUT_S:
                 self.on_hci_acl_data_packet(packet)
