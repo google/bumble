@@ -1061,12 +1061,14 @@ class Session:
     def start_encryption(self, key: bytes) -> None:
         # We can now encrypt the connection with the short term key, so that we can
         # distribute the long term and/or other keys over an encrypted connection
-        self.manager.device.host.send_command_sync(
-            HCI_LE_Enable_Encryption_Command(
-                connection_handle=self.connection.handle,
-                random_number=bytes(8),
-                encrypted_diversifier=0,
-                long_term_key=key,
+        utils.AsyncRunner.spawn(
+            self.manager.device.host.send_async_command(
+                HCI_LE_Enable_Encryption_Command(
+                    connection_handle=self.connection.handle,
+                    random_number=bytes(8),
+                    encrypted_diversifier=0,
+                    long_term_key=key,
+                )
             )
         )
 

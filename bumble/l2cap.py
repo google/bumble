@@ -2553,15 +2553,17 @@ class ChannelManager:
                     result=L2CAP_CONNECTION_PARAMETERS_ACCEPTED_RESULT,
                 ),
             )
-            self.host.send_command_sync(
-                hci.HCI_LE_Connection_Update_Command(
-                    connection_handle=connection.handle,
-                    connection_interval_min=request.interval_min,
-                    connection_interval_max=request.interval_max,
-                    max_latency=request.latency,
-                    supervision_timeout=request.timeout,
-                    min_ce_length=0,
-                    max_ce_length=0,
+            utils.AsyncRunner.spawn(
+                self.host.send_async_command(
+                    hci.HCI_LE_Connection_Update_Command(
+                        connection_handle=connection.handle,
+                        connection_interval_min=request.interval_min,
+                        connection_interval_max=request.interval_max,
+                        max_latency=request.latency,
+                        supervision_timeout=request.timeout,
+                        min_ce_length=0,
+                        max_ce_length=0,
+                    )
                 )
             )
         else:
