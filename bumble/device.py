@@ -6198,19 +6198,23 @@ class Device(utils.CompositeEventEmitter):
                 parameters=Connection.Parameters(0, 0, 0),
             )
 
-            self.host.send_command_sync(
-                hci.HCI_Accept_Connection_Request_Command(
-                    bd_addr=bd_addr,
-                    role=0x01,  # Remain the peripheral
+            utils.AsyncRunner.spawn(
+                self.host.send_async_command(
+                    hci.HCI_Accept_Connection_Request_Command(
+                        bd_addr=bd_addr,
+                        role=0x01,  # Remain the peripheral
+                    )
                 )
             )
 
         # reject incoming connection
         else:
-            self.host.send_command_sync(
-                hci.HCI_Reject_Connection_Request_Command(
-                    bd_addr=bd_addr,
-                    reason=hci.HCI_CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR,
+            utils.AsyncRunner.spawn(
+                self.host.send_async_command(
+                    hci.HCI_Reject_Connection_Request_Command(
+                        bd_addr=bd_addr,
+                        reason=hci.HCI_CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR,
+                    )
                 )
             )
 
