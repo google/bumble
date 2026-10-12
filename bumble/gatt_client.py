@@ -36,11 +36,10 @@ from typing import (
     Any,
     ClassVar,
     Generic,
+    Self,
     TypeVar,
     overload,
 )
-
-from typing_extensions import Self
 
 from bumble import att, core, l2cap, utils
 from bumble.colors import color
@@ -369,7 +368,7 @@ class Client:
                 response = await asyncio.wait_for(
                     self.pending_response, GATT_REQUEST_TIMEOUT
                 )
-            except asyncio.TimeoutError as error:
+            except TimeoutError as error:
                 logger.warning(color('!!! GATT Request timeout', 'red'))
                 raise core.TimeoutError(f'GATT timeout for {request.name}') from error
             finally:

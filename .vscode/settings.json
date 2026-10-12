@@ -106,5 +106,6 @@
     "python-envs.defaultEnvManager": "ms-python.python:venv",
     "nrf-connect.applications": [
         "${workspaceFolder}/extras/zephyr/hci_usb"
-    ]
+    ],
+    "idf.currentSetup": "/Users/gilles/.espressif/v6.1/esp-idf"
 }

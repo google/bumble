@@ -17,7 +17,6 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import logging
-import sys
 
 import pytest
 import pytest_asyncio
@@ -60,12 +59,8 @@ async def assert_queue_is_empty(queue: asyncio.Queue):
     assert queue.empty()
 
     # Check that nothing is being added during TIMEOUT secondes
-    if sys.version_info >= (3, 11):
-        with pytest.raises(TimeoutError):
-            await asyncio.wait_for(queue.get(), TIMEOUT)
-    else:
-        with pytest.raises(asyncio.TimeoutError):
-            await asyncio.wait_for(queue.get(), TIMEOUT)
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(queue.get(), TIMEOUT)
 
 
 # -----------------------------------------------------------------------------

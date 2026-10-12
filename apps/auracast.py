@@ -24,18 +24,13 @@ import dataclasses
 import functools
 import logging
 import secrets
-import sys
+import tomllib
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from typing import (
     Any,
 )
 
 import click
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 try:
     import lc3  # type: ignore  # pylint: disable=E0401

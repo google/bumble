@@ -506,7 +506,7 @@ class Server(utils.EventEmitter):
             try:
                 self.send_gatt_pdu(bearer, bytes(indication))
                 await asyncio.wait_for(pending_confirmation, GATT_REQUEST_TIMEOUT)
-            except asyncio.TimeoutError as error:
+            except TimeoutError as error:
                 logger.warning(color('!!! GATT Indicate timeout', 'red'))
                 raise TimeoutError(f'GATT timeout for {indication.name}') from error
             finally:

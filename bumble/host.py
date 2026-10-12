@@ -690,7 +690,7 @@ class Host(utils.EventEmitter):
                 self.pending_response, timeout=response_timeout
             )
             return response
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
         except Exception:
             logger.exception(color("!!! Exception while sending command:", "red"))

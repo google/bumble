@@ -22,9 +22,7 @@ import asyncio
 import dataclasses
 import enum
 import struct
-from typing import TYPE_CHECKING, ClassVar
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
 from bumble import core, device, gatt, gatt_client, utils
 

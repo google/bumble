@@ -17,8 +17,7 @@
 # -----------------------------------------------------------------------------
 import asyncio
 import functools
-
-from typing_extensions import Self
+from typing import Self
 
 from bumble.controller import Controller
 from bumble.device import Connection, Device

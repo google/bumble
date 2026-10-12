@@ -22,9 +22,7 @@ import dataclasses
 import enum
 import struct
 from collections.abc import Callable, Sequence
-from typing import Any
-
-from typing_extensions import Self
+from typing import Any, Self
 
 from bumble import att, core, device, gatt, gatt_adapters, gatt_client, utils
 

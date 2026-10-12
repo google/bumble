@@ -27,13 +27,13 @@ from collections.abc import Awaitable, Callable
 from typing import (
     Any,
     Protocol,
+    Self,
     TypeVar,
     overload,
 )
 
 import pyee
 import pyee.asyncio
-from typing_extensions import Self
 
 from bumble.colors import color
 
