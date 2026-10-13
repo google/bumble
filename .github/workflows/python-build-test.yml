@@ -23,13 +23,13 @@ jobs:
 
     steps:
     - name: Check out from Git
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
     - name: Get history and tags for SCM versioning to work
       run: |
         git fetch --prune --unshallow
         git fetch --depth=1 origin +refs/tags/*:refs/tags/*
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -54,9 +54,9 @@ jobs:
       fail-fast: false
     steps:
       - name: Check out from Git
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Python dependencies
@@ -64,7 +64,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[all]" --group dev
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
         with:
           components: clippy,rustfmt
           toolchain: ${{ matrix.rust-version }}
