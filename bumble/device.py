@@ -33,12 +33,11 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Self,
     TypeVar,
     cast,
     overload,
 )
-
-from typing_extensions import Self
 
 from bumble import (
     att,
@@ -2874,7 +2873,7 @@ class Device(utils.CompositeEventEmitter):
             return await self.host.send_command(
                 command, check_result, self.command_timeout
             )
-        except asyncio.TimeoutError as error:
+        except TimeoutError as error:
             logger.warning(f'!!! Command {command.name} timed out')
             raise CommandTimeoutError() from error
 
@@ -2893,7 +2892,7 @@ class Device(utils.CompositeEventEmitter):
         '''
         try:
             return await self.host.send_sync_command(command, self.command_timeout)
-        except asyncio.TimeoutError as error:
+        except TimeoutError as error:
             logger.warning(f'!!! Command {command.name} timed out')
             raise CommandTimeoutError() from error
 
@@ -2911,7 +2910,7 @@ class Device(utils.CompositeEventEmitter):
         '''
         try:
             return await self.host.send_sync_command_raw(command, self.command_timeout)
-        except asyncio.TimeoutError as error:
+        except TimeoutError as error:
             logger.warning(f'!!! Command {command.name} timed out')
             raise CommandTimeoutError() from error
 
@@ -2933,7 +2932,7 @@ class Device(utils.CompositeEventEmitter):
             return await self.host.send_async_command(
                 command, check_status, self.command_timeout
             )
-        except asyncio.TimeoutError as error:
+        except TimeoutError as error:
             logger.warning(f'!!! Command {command.name} timed out')
             raise CommandTimeoutError() from error
 
@@ -4030,7 +4029,7 @@ class Device(utils.CompositeEventEmitter):
                 return await asyncio.wait_for(
                     asyncio.shield(pending_connection), timeout
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 await self.send_sync_command(
                     hci.HCI_LE_Create_Connection_Cancel_Command()
                 )
@@ -4128,7 +4127,7 @@ class Device(utils.CompositeEventEmitter):
                 return await asyncio.wait_for(
                     asyncio.shield(pending_connection), timeout
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 await self.send_sync_command(
                     hci.HCI_Create_Connection_Cancel_Command(bd_addr=peer_address)
                 )

@@ -31,12 +31,11 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
+    Self,
     SupportsBytes,
     TypeVar,
     cast,
 )
-
-from typing_extensions import Self
 
 from bumble import crypto, utils
 from bumble.colors import color

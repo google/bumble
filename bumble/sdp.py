@@ -22,9 +22,7 @@ import logging
 import struct
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar, TypeAlias, TypeVar
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, ClassVar, Self, TypeAlias, TypeVar
 
 from bumble import core, hci, l2cap, utils
 from bumble.colors import color

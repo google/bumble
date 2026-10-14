@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Google", email = "bumble-dev@google.com" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "click >= 8.1.3; platform_system!='Emscripten'",
     "cryptography >= 44.0.3; platform_system!='Emscripten' and platform_system!='Android'",
@@ -43,7 +43,7 @@ android = [
     "protobuf >= 3.12.4; platform_system!='Emscripten'",
 ]
 auracast = [
-    "lc3py >= 1.1.3; python_version>='3.10' and ((platform_system=='Linux' and platform_machine=='x86_64') or (platform_system=='Darwin' and platform_machine=='arm64'))",
+    "lc3py >= 1.1.3; (platform_system=='Linux' and platform_machine=='x86_64') or (platform_system=='Darwin' and platform_machine=='arm64')",
     "sounddevice >= 0.5.1",
 ]
 all = [

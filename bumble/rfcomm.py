@@ -23,9 +23,7 @@ import dataclasses
 import enum
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Self
 
 from bumble import core, l2cap, sdp, utils
 from bumble.colors import color

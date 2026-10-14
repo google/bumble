@@ -22,9 +22,7 @@ import enum
 import logging
 import struct
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import ClassVar
-
-from typing_extensions import Self
+from typing import ClassVar, Self
 
 from bumble import utils
 from bumble.codecs import AacAudioRtpPacket

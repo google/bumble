@@ -28,9 +28,7 @@ import json
 import logging
 import os
 import pathlib
-from typing import TYPE_CHECKING, Any
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, Self
 
 from bumble import hci
 from bumble.colors import color

@@ -119,7 +119,7 @@ class SerialPacketSource(StreamPacketSource):
 
         try:
             await asyncio.wait_for(run(), max_time)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             transport.close()
             raise TransportInitError(
                 'the controller did not answer the commands sent to resynchronize'

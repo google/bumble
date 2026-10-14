@@ -26,9 +26,7 @@ import logging
 import re
 import traceback
 from collections.abc import Iterable
-from typing import Any, ClassVar, Literal, overload
-
-from typing_extensions import Self
+from typing import Any, ClassVar, Literal, Self, overload
 
 from bumble import at, device, rfcomm, sdp, utils
 from bumble.colors import color

@@ -27,11 +27,10 @@ from typing import (
     ClassVar,
     Final,
     Literal,
+    Self,
     cast,
     overload,
 )
-
-from typing_extensions import Self
 
 from bumble import utils
 from bumble.company_ids import COMPANY_IDENTIFIERS

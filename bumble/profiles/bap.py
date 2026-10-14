@@ -24,8 +24,7 @@ import functools
 import logging
 import struct
 from collections.abc import Sequence
-
-from typing_extensions import Self
+from typing import Self
 
 from bumble import core, data_types, gatt, hci, utils
 from bumble.profiles import le_audio

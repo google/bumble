@@ -66,7 +66,7 @@ class BtSnooper(Snooper):
     """
 
     IDENTIFICATION_PATTERN = b'btsnoop\0'
-    TIMESTAMP_ANCHOR = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+    TIMESTAMP_ANCHOR = datetime.datetime(2000, 1, 1, tzinfo=datetime.UTC)
     TIMESTAMP_DELTA = 0x00E03AB44A676000
     ONE_MS = datetime.timedelta(microseconds=1)
 
@@ -87,10 +87,7 @@ class BtSnooper(Snooper):
         # Compute the current timestamp
         timestamp = (
             int(
-                (
-                    datetime.datetime.now(tz=datetime.timezone.utc)
-                    - self.TIMESTAMP_ANCHOR
-                )
+                (datetime.datetime.now(tz=datetime.UTC) - self.TIMESTAMP_ANCHOR)
                 / self.ONE_MS
             )
             + self.TIMESTAMP_DELTA
@@ -138,7 +135,7 @@ class PcapSnooper(Snooper):
         )
 
     def snoop(self, hci_packet: bytes, direction: Snooper.Direction):
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         sec = int(now.timestamp())
         usec = now.microsecond
 
@@ -237,7 +234,7 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
             # Process the file name string pattern.
             file_path = io_name.format(
                 now=datetime.datetime.now(),
-                utcnow=datetime.datetime.now(tz=datetime.timezone.utc),
+                utcnow=datetime.datetime.now(tz=datetime.UTC),
                 pid=os.getpid(),
                 instance=_SNOOPER_INSTANCE_COUNT,
             )
@@ -261,7 +258,7 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
             # Process the file name string pattern.
             file_path = io_name.format(
                 now=datetime.datetime.now(),
-                utcnow=datetime.datetime.now(tz=datetime.timezone.utc),
+                utcnow=datetime.datetime.now(tz=datetime.UTC),
                 pid=os.getpid(),
                 instance=_SNOOPER_INSTANCE_COUNT,
             )

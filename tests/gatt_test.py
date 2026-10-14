@@ -22,11 +22,10 @@ import enum
 import logging
 import os
 import struct
-from typing import Any
+from typing import Any, Self
 from unittest.mock import ANY, AsyncMock, Mock
 
 import pytest
-from typing_extensions import Self
 
 from bumble import att, gatt_client, gatt_server, l2cap
 from bumble.att import (

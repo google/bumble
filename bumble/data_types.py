@@ -26,9 +26,7 @@ import dataclasses
 import math
 import struct
 from collections.abc import Sequence
-from typing import Any, ClassVar
-
-from typing_extensions import Self
+from typing import Any, ClassVar, Self
 
 from bumble import company_ids, core, hci
 
