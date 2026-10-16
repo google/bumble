@@ -302,3 +302,79 @@ async def test_send_async_command() -> None:
         HCI_LE_Terminate_BIG_Command(big_handle=0, reason=0), check_status=False
     )
     assert response == HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    'iso_packet',
+    [
+        # Complete SDU, no Time_Stamp.
+        hci.HCI_IsoDataPacket(
+            connection_handle=0x60,
+            data_total_length=4 + 240,
+            iso_sdu_fragment=bytes(range(240)),
+            pb_flag=0b10,
+            packet_sequence_number=7,
+            iso_sdu_length=240,
+            packet_status_flag=0,
+        ),
+        # Empty SDU reported as lost data, no Time_Stamp.
+        hci.HCI_IsoDataPacket(
+            connection_handle=0x60,
+            data_total_length=4,
+            iso_sdu_fragment=b'',
+            pb_flag=0b10,
+            packet_sequence_number=8,
+            iso_sdu_length=0,
+            packet_status_flag=1,
+        ),
+        # Complete SDU, with Time_Stamp.
+        hci.HCI_IsoDataPacket(
+            connection_handle=0x60,
+            data_total_length=8 + 120,
+            iso_sdu_fragment=bytes(120),
+            pb_flag=0b10,
+            time_stamp=0x12345678,
+            packet_sequence_number=9,
+            iso_sdu_length=120,
+            packet_status_flag=0,
+        ),
+        # First fragment of a fragmented SDU.
+        hci.HCI_IsoDataPacket(
+            connection_handle=0x60,
+            data_total_length=4 + 120,
+            iso_sdu_fragment=bytes([1] * 120),
+            pb_flag=0b00,
+            packet_sequence_number=10,
+            iso_sdu_length=240,
+            packet_status_flag=0,
+        ),
+        # Last fragment of a fragmented SDU (no SDU header).
+        hci.HCI_IsoDataPacket(
+            connection_handle=0x60,
+            data_total_length=120,
+            iso_sdu_fragment=bytes([2] * 120),
+            pb_flag=0b11,
+        ),
+    ],
+)
+def test_iso_data_wrapped_in_acl_packet(iso_packet: hci.HCI_IsoDataPacket) -> None:
+    host = Host()
+    host.cis_links[0x60] = unittest.mock.MagicMock()
+    received: list[hci.HCI_IsoDataPacket] = []
+    host.on('iso_packet', lambda _handle, packet: received.append(packet))
+
+    # Controllers sending ISO data over the USB Bulk endpoint deliver it as ACL data.
+    raw_iso_packet = bytes(iso_packet)
+    host.on_hci_acl_data_packet(
+        HCI_AclDataPacket.from_bytes(
+            bytes([hci.HCI_ACL_DATA_PACKET]) + raw_iso_packet[1:]
+        )
+    )
+
+    assert len(received) == 1
+    assert bytes(received[0]) == raw_iso_packet
+    assert received[0].pb_flag == iso_packet.pb_flag
+    assert received[0].time_stamp == iso_packet.time_stamp
+    assert received[0].iso_sdu_length == iso_packet.iso_sdu_length
+    assert received[0].iso_sdu_fragment == iso_packet.iso_sdu_fragment
