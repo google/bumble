@@ -210,7 +210,7 @@ async def test_open_usb_transport_by_index_checks_interfaces(device_class):
 
 
 # -----------------------------------------------------------------------------
-def _make_sco_sink(iso_max_packet_size: int):
+def _make_sco_sink(iso_max_packet_size: int, sco_alternate_setting: int = 0):
     mock_device = mock.Mock()
     mock_bulk_out = mock.Mock()
     mock_iso_out = mock.Mock()
@@ -225,7 +225,12 @@ def _make_sco_sink(iso_max_packet_size: int):
             lambda _address, buffer, **_kwargs: sent_packets.append(buffer)
         )
     mock_device.getTransfer.side_effect = [mock.Mock()] + iso_transfers
-    sink = usb.UsbPacketSink(mock_device, mock_bulk_out, isochronous_out=mock_iso_out)
+    sink = usb.UsbPacketSink(
+        mock_device,
+        mock_bulk_out,
+        isochronous_out=mock_iso_out,
+        sco_alternate_setting=sco_alternate_setting,
+    )
     return sink, iso_transfers, sent_packets
 
 
@@ -359,3 +364,138 @@ def test_find_endpoints_returns_selected_sco_endpoints(
     assert selected_setting is expected_setting
     assert isochronous_in is expected_in
     assert isochronous_out is expected_out
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_usb_packet_sink_sco_alternate_setting_6():
+    sink, iso_transfers, sent_packets = _make_sco_sink(63, sco_alternate_setting=6)
+    # One codec frame (60 bytes) per HCI SCO packet, in a single USB frame.
+    assert sink.sco_packet_data_size == 60
+    sink.start()
+
+    frames = [bytes([i]) * 60 for i in range(2)]
+    for frame in frames:
+        sink.on_packet(bytes([hci.HCI_SYNCHRONOUS_DATA_PACKET, 0x0A, 0x01, 60]) + frame)
+    await asyncio.sleep(0.01)
+
+    assert sent_packets == [bytes([0x0A, 0x01, 60]) + frame for frame in frames]
+    for transfer in iso_transfers:
+        for call in transfer.setIsochronous.call_args_list:
+            assert call.kwargs['iso_transfer_length_list'] == [63]
+
+    await sink.terminate()
+
+
+def _make_dynamic_sco_transport(alternate_settings):
+    transport = usb.UsbTransport.__new__(usb.UsbTransport)
+    transport.device = mock.Mock()
+    transport.sco_interface = mock.Mock()
+    transport.sco_interface.getNumber.return_value = 1
+    transport.usb_source = mock.Mock()
+    transport.usb_sink = mock.Mock()
+    sco_settings = {
+        alternate_setting: (mock.Mock(name=f'in{alternate_setting}'), mock.Mock())
+        for alternate_setting in alternate_settings
+    }
+    transport.enable_dynamic_sco_alternate_setting(sco_settings)
+    return transport, sco_settings
+
+
+def _sync_connection_complete(handle: int, air_mode: int) -> bytes:
+    parameters = (
+        bytes([hci.HCI_SUCCESS])
+        + handle.to_bytes(2, 'little')
+        + bytes(6)  # BD_ADDR
+        + bytes([0x02, 0x0C, 0x06])  # Link_Type, Transmission_Interval, Window
+        + (60).to_bytes(2, 'little')  # RX_Packet_Length
+        + (60).to_bytes(2, 'little')  # TX_Packet_Length
+        + bytes([air_mode])
+    )
+    return (
+        bytes(
+            [
+                hci.HCI_EVENT_PACKET,
+                hci.HCI_SYNCHRONOUS_CONNECTION_COMPLETE_EVENT,
+                len(parameters),
+            ]
+        )
+        + parameters
+    )
+
+
+def _disconnection_complete(handle: int) -> bytes:
+    return (
+        bytes([hci.HCI_EVENT_PACKET, hci.HCI_DISCONNECTION_COMPLETE_EVENT, 4, 0])
+        + handle.to_bytes(2, 'little')
+        + bytes([0x13])
+    )
+
+
+def _current_alternate_setting(transport) -> int:
+    return transport.device.setInterfaceAltSetting.call_args.args[1]
+
+
+@pytest.mark.parametrize(
+    ('alternate_settings', 'expected_alternate_setting'),
+    [
+        ((1, 2, 3, 4, 5, 6), 6),
+        # Without alternate setting 6, fall back to alternate setting 1
+        ((1, 2, 3, 4, 5), 1),
+    ],
+)
+def test_dynamic_sco_alternate_setting_transparent(
+    alternate_settings, expected_alternate_setting
+):
+    transport, sco_settings = _make_dynamic_sco_transport(alternate_settings)
+    # No SCO link: alternate setting 0
+    assert _current_alternate_setting(transport) == 0
+    transport.usb_source.start_sco.assert_not_called()
+
+    transport.on_event_for_sco(
+        _sync_connection_complete(0x010A, hci.CodecID.TRANSPARENT)
+    )
+    assert _current_alternate_setting(transport) == expected_alternate_setting
+    isochronous_in, isochronous_out = sco_settings[expected_alternate_setting]
+    transport.usb_source.start_sco.assert_called_once_with(isochronous_in)
+    transport.usb_sink.configure_sco.assert_called_once_with(
+        isochronous_out, expected_alternate_setting
+    )
+
+    transport.on_event_for_sco(_disconnection_complete(0x010A))
+    assert _current_alternate_setting(transport) == 0
+
+
+def test_dynamic_sco_alternate_setting_cvsd():
+    transport, _ = _make_dynamic_sco_transport((1, 2, 3, 4, 5, 6))
+
+    # 16-bit samples (default): 2, 4 and 5 for 1, 2 and 3 links
+    transport.on_event_for_sco(_sync_connection_complete(0x0101, 0x02))
+    assert _current_alternate_setting(transport) == 2
+    transport.on_event_for_sco(_sync_connection_complete(0x0102, 0x02))
+    assert _current_alternate_setting(transport) == 4
+    transport.on_event_for_sco(_disconnection_complete(0x0102))
+    assert _current_alternate_setting(transport) == 2
+    transport.on_event_for_sco(_disconnection_complete(0x0101))
+    assert _current_alternate_setting(transport) == 0
+
+    # 8-bit samples (Voice_Setting input sample size bit cleared): number of links
+    transport.on_command_for_sco(
+        bytes([hci.HCI_COMMAND_PACKET])
+        + hci.HCI_WRITE_VOICE_SETTING_COMMAND.to_bytes(2, 'little')
+        + bytes([2, 0x40, 0x00])
+    )
+    transport.on_event_for_sco(_sync_connection_complete(0x0101, 0x02))
+    assert _current_alternate_setting(transport) == 1
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_drops_empty_sco_packets():
+    source = usb.UsbPacketSource(mock.Mock(), {}, None, None, None)
+    source.queue_packet(hci.HCI_SYNCHRONOUS_DATA_PACKET, bytes([0x0A, 0x01, 0]))
+    source.queue_packet(hci.HCI_SYNCHRONOUS_DATA_PACKET, bytes([0x0A, 0x01, 1, 0xAB]))
+    await asyncio.sleep(0.01)
+    assert source.queue.qsize() == 1
+    assert source.queue.get_nowait() == bytes(
+        [hci.HCI_SYNCHRONOUS_DATA_PACKET, 0x0A, 0x01, 1, 0xAB]
+    )
