@@ -31,7 +31,7 @@ from bumble.testing import test_utils
         (1, 1000), (True, False, None), (2, None), ((3.0, 4.0, 5.0), None)
     ),
 )
-async def test_read_measurement(
+async def test_notify_measurement(
     heart_rate: int,
     sensor_contact_detected: bool | None,
     energy_expanded: int | None,
@@ -47,7 +47,15 @@ async def test_read_measurement(
     async with device_module.Peer(devices.connections[1]) as peer:
         client = peer.create_service_proxy(heart_rate_service.HeartRateServiceProxy)
         assert client
-        assert await client.heart_rate_measurement.read_value() == measurement
+        # The measurement can only be notified, not read
+        notifications = asyncio.Queue[
+            heart_rate_service.HeartRateService.HeartRateMeasurement
+        ]()
+        await client.heart_rate_measurement.subscribe(notifications.put_nowait)
+        await devices[0].notify_subscribers(
+            service.heart_rate_measurement_characteristic
+        )
+        assert await notifications.get() == measurement
 
 
 # -----------------------------------------------------------------------------
