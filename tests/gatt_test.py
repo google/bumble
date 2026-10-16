@@ -1869,6 +1869,7 @@ async def test_write_long_value_gap_rejected():
 @pytest.mark.asyncio
 async def test_write_not_permitted():
     devices = await TwoDevices.create_with_connection()
+    devices[1].config.gatt_strict_permissions = True
 
     characteristic = Characteristic(
         '1234', Characteristic.Properties.READ, Characteristic.READABLE, b'1234'
@@ -1912,6 +1913,7 @@ async def test_write_not_permitted():
 @pytest.mark.asyncio
 async def test_read_not_permitted():
     devices = await TwoDevices.create_with_connection()
+    devices[1].config.gatt_strict_permissions = True
 
     characteristic = Characteristic(
         '1234', Characteristic.Properties.WRITE, Characteristic.WRITEABLE, b'1234'
@@ -1954,6 +1956,7 @@ async def test_read_not_permitted():
 @pytest.mark.asyncio
 async def test_requires_permissions_imply_access():
     devices = await TwoDevices.create_with_connection()
+    devices[1].config.gatt_strict_permissions = True
 
     # No READABLE or WRITEABLE bit, only the security requirements
     characteristic = Characteristic(
@@ -2002,7 +2005,6 @@ async def test_requires_permissions_imply_access():
 @pytest.mark.asyncio
 async def test_permissions_not_strict():
     devices = await TwoDevices.create_with_connection()
-    devices[1].gatt_server.strict_permissions = False
 
     characteristic = Characteristic(
         '1234', Characteristic.Properties.NOTIFY, Characteristic.Permissions(0), b'1234'
