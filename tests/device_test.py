@@ -705,6 +705,20 @@ async def test_power_on_default_static_address_should_not_be_any():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_power_on_disables_privacy_offload_without_ll_privacy():
+    devices = TwoDevices()
+    devices.controllers[0].le_features &= ~hci.LeFeatureMask.LL_PRIVACY
+    devices[0].address_resolution_offload = True
+    devices[0].address_generation_offload = True
+
+    await devices[0].power_on()
+
+    assert not devices[0].address_resolution_offload
+    assert not devices[0].address_generation_offload
+
+
+# -----------------------------------------------------------------------------
 def test_cs_channel_map_excludes_forbidden_channels():
     forbidden = {0, 1, 23, 24, 25, 76, 77, 78, 79}
     default_map = (

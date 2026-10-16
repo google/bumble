@@ -2939,6 +2939,13 @@ class Device(utils.CompositeEventEmitter):
     async def power_on(self) -> None:
         # Reset the controller
         await self.host.reset()
+        if not self.supports_le_features(hci.LeFeatureMask.LL_PRIVACY):
+            if self.address_resolution_offload or self.address_generation_offload:
+                logger.info(
+                    'Controller does not support LL Privacy; disabling privacy offloads'
+                )
+                self.address_resolution_offload = False
+                self.address_generation_offload = False
 
         # Try to get the public address from the controller
         try:
