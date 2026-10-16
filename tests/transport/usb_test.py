@@ -96,8 +96,10 @@ async def test_usb_packet_sink_iso_routing_with_iso_endpoint():
     mock_transfer_bulk = mock.Mock()
     mock_transfer_iso = mock.Mock()
 
-    # getTransfer is called twice: once for bulk_or_control and once for isochronous
-    mock_device.getTransfer.side_effect = [mock_transfer_bulk, mock_transfer_iso]
+    # getTransfer is called once for bulk_or_control, then for each isochronous transfer
+    mock_device.getTransfer.side_effect = [mock_transfer_bulk] + [
+        mock_transfer_iso
+    ] * usb.NUMBER_OF_SCO_OUT_TRANSFERS
 
     sink = usb.UsbPacketSink(mock_device, mock_bulk_out, isochronous_out=mock_iso_out)
     sink.start()
@@ -205,3 +207,155 @@ async def test_open_usb_transport_by_index_checks_interfaces(device_class):
         pytest.raises(usb.TransportInitError, match='no compatible interface'),
     ):
         await usb.open_usb_transport('0')
+
+
+# -----------------------------------------------------------------------------
+def _make_sco_sink(iso_max_packet_size: int):
+    mock_device = mock.Mock()
+    mock_bulk_out = mock.Mock()
+    mock_iso_out = mock.Mock()
+    mock_iso_out.getAddress.return_value = 0x03
+    mock_iso_out.getMaxPacketSize.return_value = iso_max_packet_size
+    sent_packets: list[bytes] = []
+    iso_transfers = [mock.Mock() for _ in range(usb.NUMBER_OF_SCO_OUT_TRANSFERS)]
+    for transfer in iso_transfers:
+        transfer.isSubmitted.return_value = False
+        # Record the packets in the order they are sent.
+        transfer.setIsochronous.side_effect = (
+            lambda _address, buffer, **_kwargs: sent_packets.append(buffer)
+        )
+    mock_device.getTransfer.side_effect = [mock.Mock()] + iso_transfers
+    sink = usb.UsbPacketSink(mock_device, mock_bulk_out, isochronous_out=mock_iso_out)
+    return sink, iso_transfers, sent_packets
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('iso_max_packet_size', 'sco_packet_data_size'),
+    [
+        # Alternate setting 1
+        (9, 24),
+        # Alternate setting 2
+        (17, 48),
+    ],
+)
+async def test_usb_packet_sink_sco_repacketization(
+    iso_max_packet_size, sco_packet_data_size
+):
+    sink, iso_transfers, sent_packets = _make_sco_sink(iso_max_packet_size)
+    assert sink.sco_packet_data_size == sco_packet_data_size
+    sink.start()
+
+    # 2 SCO packets of 60 bytes on handle 0x0101, sent faster than they complete.
+    data = bytes(range(120))
+    for i in (0, 60):
+        sink.on_packet(
+            bytes([hci.HCI_SYNCHRONOUS_DATA_PACKET, 0x01, 0x01, 60]) + data[i : i + 60]
+        )
+    await asyncio.sleep(0.01)
+
+    expected_packets = [
+        bytes([0x01, 0x01, sco_packet_data_size]) + data[i : i + sco_packet_data_size]
+        for i in range(
+            0,
+            len(data) // sco_packet_data_size * sco_packet_data_size,
+            sco_packet_data_size,
+        )
+    ]
+    in_flight = min(len(expected_packets), usb.NUMBER_OF_SCO_OUT_TRANSFERS)
+    # Several transfers are in flight at the same time.
+    assert sent_packets == expected_packets[:in_flight]
+    for transfer in iso_transfers:
+        for call in transfer.setIsochronous.call_args_list:
+            assert (
+                call.kwargs['iso_transfer_length_list']
+                == [iso_max_packet_size] * usb.USB_FRAMES_PER_SCO_PACKET
+            )
+
+    # Completing transfers lets the remaining packets go.
+    for transfer in iso_transfers:
+        transfer.getStatus.return_value = usb.usb1.TRANSFER_COMPLETED
+        if transfer.setIsochronous.called:
+            sink.sco_transfer_callback(transfer)
+    await asyncio.sleep(0.01)
+    assert sent_packets == expected_packets
+
+    # The remainder is kept until more data comes in.
+    assert len(sink.sco_buffers[0x0101]) == len(data) % sco_packet_data_size
+
+    await sink.terminate()
+
+
+def _make_sco_setting(alternate: int, max_packet_size: int):
+    setting = mock.MagicMock()
+    setting.getClass.return_value = 0xE0
+    setting.getSubClass.return_value = 0x01
+    setting.getProtocol.return_value = 0x01
+    setting.getAlternateSetting.return_value = alternate
+    endpoints = []
+    for address in (0x83, 0x03):
+        endpoint = mock.Mock()
+        endpoint.getAttributes.return_value = usb.USB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS
+        endpoint.getAddress.return_value = address
+        endpoint.getMaxPacketSize.return_value = max_packet_size
+        endpoints.append(endpoint)
+    setting.__iter__.side_effect = lambda: iter(endpoints)
+    return setting, endpoints
+
+
+def _make_acl_setting():
+    setting = mock.MagicMock()
+    setting.getClass.return_value = 0xE0
+    setting.getSubClass.return_value = 0x01
+    setting.getProtocol.return_value = 0x01
+    endpoints = []
+    for attributes, address in (
+        (usb.USB_ENDPOINT_TRANSFER_TYPE_INTERRUPT, 0x81),
+        (usb.USB_ENDPOINT_TRANSFER_TYPE_BULK, 0x82),
+        (usb.USB_ENDPOINT_TRANSFER_TYPE_BULK, 0x02),
+    ):
+        endpoint = mock.Mock()
+        endpoint.getAttributes.return_value = attributes
+        endpoint.getAddress.return_value = address
+        endpoints.append(endpoint)
+    setting.__iter__.side_effect = lambda: iter(endpoints)
+    return setting
+
+
+@pytest.mark.parametrize(
+    ('sco_alternate', 'expected_alternate'),
+    [
+        (1, 1),
+        (2, 2),
+        # Largest max packet size, which isn't the last setting here.
+        (0, 2),
+    ],
+)
+def test_find_endpoints_returns_selected_sco_endpoints(
+    sco_alternate, expected_alternate
+):
+    acl_interface = mock.MagicMock()
+    acl_setting = _make_acl_setting()
+    acl_interface.__iter__.side_effect = lambda: iter([acl_setting])
+    sco_settings = {
+        1: _make_sco_setting(1, 9),
+        2: _make_sco_setting(2, 17),
+        3: _make_sco_setting(3, 13),
+    }
+    sco_interface = mock.MagicMock()
+    sco_interface.__iter__.side_effect = lambda: iter(
+        [setting for setting, _ in sco_settings.values()]
+    )
+    configuration = mock.MagicMock()
+    configuration.__iter__.side_effect = lambda: iter([acl_interface, sco_interface])
+    device = mock.MagicMock()
+    device.__iter__.side_effect = lambda: iter([configuration])
+
+    endpoints = usb.find_endpoints(device, False, sco_alternate)
+
+    assert endpoints is not None
+    _, _, selected_setting, _, _, isochronous_in, _, isochronous_out = endpoints
+    expected_setting, (expected_in, expected_out) = sco_settings[expected_alternate]
+    assert selected_setting is expected_setting
+    assert isochronous_in is expected_in
+    assert isochronous_out is expected_out
