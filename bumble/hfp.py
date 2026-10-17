@@ -28,7 +28,7 @@ import traceback
 from collections.abc import Iterable
 from typing import Any, ClassVar, Literal, Self, overload
 
-from bumble import at, device, rfcomm, sdp, utils
+from bumble import at, device, hci, rfcomm, sdp, utils
 from bumble.colors import color
 from bumble.core import (
     BT_GENERIC_AUDIO_SERVICE,
@@ -43,7 +43,9 @@ from bumble.hci import (
     CodingFormat,
     HCI_Enhanced_Setup_Synchronous_Connection_Command,
     PcmDataFormat,
+    VoiceSetting,
 )
+from bumble.host import Host
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -1977,6 +1979,71 @@ class EscoParameters:
         # which is expensive and breaks CodingFormat object, so let it simply copy here.
         return self.__dict__
 
+    def legacy_voice_setting(self) -> VoiceSetting:
+        '''
+        Voice_Setting parameter of the non-enhanced Setup/Accept Synchronous
+        Connection commands, which carry a voice setting instead of a coding format:
+        only the air coding format, and the sample size, format and bit position of the
+        PCM data on HCI can be kept. Codecs that the host codes itself (mSBC, LC3) are
+        sent over the air as transparent data.
+        '''
+        return VoiceSetting(
+            air_coding_format=LEGACY_AIR_CODING_FORMATS.get(
+                self.transmit_coding_format.codec_id,
+                VoiceSetting.AirCodingFormat.TRANSPARENT_DATA,
+            ),
+            linear_pcm_bit_position=self.input_pcm_sample_payload_msb_position,
+            input_sample_size=(
+                VoiceSetting.InputSampleSize.SIZE_8_BITS
+                if self.input_coded_data_size == 8
+                else VoiceSetting.InputSampleSize.SIZE_16_BITS
+            ),
+            input_data_format=LEGACY_PCM_DATA_FORMATS.get(
+                self.input_pcm_data_format, VoiceSetting.InputDataFormat.TWOS_COMPLEMENT
+            ),
+            input_coding_format=LEGACY_INPUT_CODING_FORMATS.get(
+                self.transmit_coding_format.codec_id,
+                VoiceSetting.InputCodingFormat.LINEAR,
+            ),
+        )
+
+    def as_legacy_dict(self) -> dict[str, Any]:
+        '''
+        Parameters of the non-enhanced Setup/Accept Synchronous Connection commands.
+
+        The packet type is passed through as-is, rather than masked to the packet types
+        that the non-enhanced encoding defines, because the controllers tested pick the
+        eSCO packet type (and thus the size of the air payload) from the whole value.
+        '''
+        return {
+            'transmit_bandwidth': self.transmit_bandwidth,
+            'receive_bandwidth': self.receive_bandwidth,
+            'max_latency': self.max_latency,
+            'voice_setting': int(self.legacy_voice_setting()),
+            'retransmission_effort': int(self.retransmission_effort),
+            'packet_type': int(self.packet_type),
+        }
+
+
+# Air coding formats of the Voice_Setting parameter of the non-enhanced commands: any
+# codec that is not listed here is coded by the host and sent as transparent data.
+LEGACY_AIR_CODING_FORMATS = {
+    CodecID.CVSD: VoiceSetting.AirCodingFormat.CVSD,
+    CodecID.U_LOG: VoiceSetting.AirCodingFormat.U_LAW,
+    CodecID.A_LOG: VoiceSetting.AirCodingFormat.A_LAW,
+    CodecID.TRANSPARENT: VoiceSetting.AirCodingFormat.TRANSPARENT_DATA,
+}
+LEGACY_INPUT_CODING_FORMATS = {
+    CodecID.U_LOG: VoiceSetting.InputCodingFormat.U_LAW,
+    CodecID.A_LOG: VoiceSetting.InputCodingFormat.A_LAW,
+}
+LEGACY_PCM_DATA_FORMATS = {
+    PcmDataFormat.ONES_COMPLEMENT: VoiceSetting.InputDataFormat.ONES_COMPLEMENT,
+    PcmDataFormat.TWOS_COMPLEMENT: VoiceSetting.InputDataFormat.TWOS_COMPLEMENT,
+    PcmDataFormat.SIGN_MAGNITUDE: VoiceSetting.InputDataFormat.SIGN_AND_MAGNITUDE,
+    PcmDataFormat.UNSIGNED: VoiceSetting.InputDataFormat.UNSIGNED,
+}
+
 
 _ESCO_PARAMETERS_CVSD_D0 = EscoParameters(
     transmit_coding_format=CodingFormat(CodecID.CVSD),
@@ -2088,3 +2155,40 @@ ESCO_PARAMETERS = {
     DefaultCodecParameters.ESCO_MSBC_T1: _ESCO_PARAMETERS_MSBC_T1,
     DefaultCodecParameters.ESCO_MSBC_T2: _ESCO_PARAMETERS_MSBC_T2,
 }
+
+
+def setup_synchronous_connection_command(
+    host: Host, connection_handle: int, parameters: EscoParameters
+) -> hci.HCI_AsyncCommand:
+    '''
+    Build a Setup Synchronous Connection command for the given codec parameters, using
+    the enhanced command when the controller supports it, and the non-enhanced one
+    otherwise (e.g. the Realtek RTL8761 only implements the non-enhanced commands).
+    '''
+    if host.supports_command(hci.HCI_ENHANCED_SETUP_SYNCHRONOUS_CONNECTION_COMMAND):
+        return hci.HCI_Enhanced_Setup_Synchronous_Connection_Command(
+            connection_handle=connection_handle, **parameters.asdict()
+        )
+    return hci.HCI_Setup_Synchronous_Connection_Command(
+        connection_handle=connection_handle, **parameters.as_legacy_dict()
+    )
+
+
+def accept_synchronous_connection_request_command(
+    host: Host, bd_addr: hci.Address, parameters: EscoParameters
+) -> hci.HCI_AsyncCommand:
+    '''
+    Build an Accept Synchronous Connection Request command for the given codec
+    parameters, using the enhanced command when the controller supports it, and the
+    non-enhanced one otherwise, so that both commands of a SCO/eSCO link setup are
+    built the same way (see setup_synchronous_connection_command).
+    '''
+    if host.supports_command(
+        hci.HCI_ENHANCED_ACCEPT_SYNCHRONOUS_CONNECTION_REQUEST_COMMAND
+    ):
+        return hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(
+            bd_addr=bd_addr, **parameters.asdict()
+        )
+    return hci.HCI_Accept_Synchronous_Connection_Request_Command(
+        bd_addr=bd_addr, **parameters.as_legacy_dict()
+    )
