@@ -19,6 +19,7 @@ nav:
     - Use Case 6: use_cases/use_case_6.md
   - Components:
     - Controller: components/controller.md
+    - Radio-backed LE Controller: components/radio_controller.md
     - Host: components/host.md
     - GATT: components/gatt.md
     - Security Manager: components/security_manager.md

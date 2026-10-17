@@ -26,12 +26,17 @@ import secrets
 import struct
 from typing import TYPE_CHECKING, Any, cast
 
-from bumble import crypto, hci, link, ll, lmp
+from bumble import crypto, hci
+from bumble import link
 from bumble import link as bumble_link
+from bumble import ll, lmp
 from bumble.colors import color
 from bumble.core import PhysicalTransport
 
 if TYPE_CHECKING:
+    from bumble.radio_controller.controller_backend import ControllerBackend
+    from bumble.radio_controller.controller_le import LeControllerProcedures
+    from bumble.radio_controller.radio_discovery import Advertising
     from bumble.transport.common import TransportSink
 
 # -----------------------------------------------------------------------------
@@ -58,23 +63,84 @@ class CisLink:
 
 
 # -----------------------------------------------------------------------------
-@dataclasses.dataclass
 class LegacyAdvertiser:
-    controller: Controller
-    advertising_interval_min: int = 0
-    advertising_interval_max: int = 0
-    advertising_type: int = 0
-    own_address_type: int = 0
-    peer_address_type: int = 0
-    peer_address: hci.Address = hci.Address.ANY
-    advertising_channel_map: int = 0
-    advertising_filter_policy: int = 0
+    def __init__(
+        self,
+        controller: Controller,
+        advertising_interval_min: int = 0,
+        advertising_interval_max: int = 0,
+        advertising_type: int = 0,
+        own_address_type: int = 0,
+        peer_address_type: int = 0,
+        peer_address: hci.Address = hci.Address.ANY,
+        advertising_channel_map: int = 0,
+        advertising_filter_policy: int = 0,
+        advertising_data: bytes = b'',
+        scan_response_data: bytes = b'',
+        enabled: bool = False,
+        timer_handle: asyncio.Handle | None = None,
+    ):
+        self.controller = controller
+        self.advertising_interval_min = advertising_interval_min
+        self.advertising_interval_max = advertising_interval_max
+        self.advertising_type = advertising_type
+        self.own_address_type = own_address_type
+        self.peer_address_type = peer_address_type
+        self.peer_address = peer_address
+        self.advertising_channel_map = advertising_channel_map
+        self.advertising_filter_policy = advertising_filter_policy
+        self._advertising_data = advertising_data
+        self._scan_response_data = scan_response_data
+        self._enabled = enabled
+        self.timer_handle = timer_handle
 
-    advertising_data: bytes = b''
-    scan_response_data: bytes = b''
+    @property
+    def _radio_state(self) -> Advertising | None:
+        procedures = self.controller.le_procedures
+        return procedures.link.advertisers.get(-1) if procedures else None
 
-    enabled: bool = False
-    timer_handle: asyncio.Handle | None = None
+    @property
+    def advertising_data(self) -> bytes:
+        state = self._radio_state
+        return bytes(state.data) if state is not None else self._advertising_data
+
+    @advertising_data.setter
+    def advertising_data(self, value: bytes) -> None:
+        state = self._radio_state
+        if state is None:
+            self._advertising_data = value
+        else:
+            state.data = bytearray(value)
+
+    @property
+    def scan_response_data(self) -> bytes:
+        state = self._radio_state
+        return (
+            bytes(state.scan_response)
+            if state is not None
+            else self._scan_response_data
+        )
+
+    @scan_response_data.setter
+    def scan_response_data(self, value: bytes) -> None:
+        state = self._radio_state
+        if state is None:
+            self._scan_response_data = value
+        else:
+            state.scan_response = bytearray(value)
+
+    @property
+    def enabled(self) -> bool:
+        state = self._radio_state
+        return state.enabled if state is not None else self._enabled
+
+    @enabled.setter
+    def enabled(self, value: bool) -> None:
+        state = self._radio_state
+        if state is None:
+            self._enabled = value
+        else:
+            state.enabled = value
 
     @property
     def address(self) -> hci.Address:
@@ -121,17 +187,112 @@ class LegacyAdvertiser:
 
 
 # -----------------------------------------------------------------------------
-@dataclasses.dataclass
 class AdvertisingSet:
-    controller: Controller
-    handle: int
-    parameters: hci.HCI_LE_Set_Extended_Advertising_Parameters_Command | None = None
-    data: bytearray = dataclasses.field(default_factory=bytearray)
-    scan_response_data: bytearray = dataclasses.field(default_factory=bytearray)
-    periodic_advertising_data: bytearray = dataclasses.field(default_factory=bytearray)
-    enabled: bool = False
-    timer_handle: asyncio.Handle | None = None
-    random_address: hci.Address | None = None
+    """Public advertising record, backed by its radio context when one exists."""
+
+    def __init__(
+        self,
+        controller: Controller,
+        handle: int,
+        parameters: (
+            hci.HCI_LE_Set_Extended_Advertising_Parameters_Command | None
+        ) = None,
+        data: bytearray | None = None,
+        scan_response_data: bytearray | None = None,
+        periodic_advertising_data: bytearray | None = None,
+        enabled: bool = False,
+        timer_handle: asyncio.Handle | None = None,
+        random_address: hci.Address | None = None,
+    ):
+        self.controller = controller
+        self.handle = handle
+        self.parameters = parameters
+        self._data = data if data is not None else bytearray()
+        self._scan_response_data = (
+            scan_response_data if scan_response_data is not None else bytearray()
+        )
+        self._periodic_advertising_data = (
+            periodic_advertising_data
+            if periodic_advertising_data is not None
+            else bytearray()
+        )
+        self._enabled = enabled
+        self.timer_handle = timer_handle
+        self._random_address = random_address
+
+    @property
+    def _radio_state(self) -> Advertising | None:
+        procedures = self.controller.le_procedures
+        return procedures.link.advertisers.get(self.handle) if procedures else None
+
+    @property
+    def data(self) -> bytearray:
+        state = self._radio_state
+        return state.data if state is not None else self._data
+
+    @data.setter
+    def data(self, value: bytearray) -> None:
+        state = self._radio_state
+        if state is None:
+            self._data = value
+        else:
+            state.data = value
+
+    @property
+    def scan_response_data(self) -> bytearray:
+        state = self._radio_state
+        return state.scan_response if state is not None else self._scan_response_data
+
+    @scan_response_data.setter
+    def scan_response_data(self, value: bytearray) -> None:
+        state = self._radio_state
+        if state is None:
+            self._scan_response_data = value
+        else:
+            state.scan_response = value
+
+    @property
+    def periodic_advertising_data(self) -> bytearray:
+        state = self._radio_state
+        return (
+            state.periodic_data
+            if state is not None
+            else self._periodic_advertising_data
+        )
+
+    @periodic_advertising_data.setter
+    def periodic_advertising_data(self, value: bytearray) -> None:
+        state = self._radio_state
+        if state is None:
+            self._periodic_advertising_data = value
+        else:
+            state.periodic_data = value
+
+    @property
+    def enabled(self) -> bool:
+        state = self._radio_state
+        return state.enabled if state is not None else self._enabled
+
+    @enabled.setter
+    def enabled(self, value: bool) -> None:
+        state = self._radio_state
+        if state is None:
+            self._enabled = value
+        else:
+            state.enabled = value
+
+    @property
+    def random_address(self) -> hci.Address | None:
+        state = self._radio_state
+        return state.random_address if state is not None else self._random_address
+
+    @random_address.setter
+    def random_address(self, value: hci.Address | None) -> None:
+        state = self._radio_state
+        if state is None:
+            self._random_address = value
+        else:
+            state.random_address = value
 
     @property
     def address(self) -> hci.Address | None:
@@ -231,7 +392,7 @@ class Connection:
     role: hci.Role
     self_address: hci.Address
     peer_address: hci.Address
-    link: link.LocalLink
+    link: link.LocalLink | None
     transport: PhysicalTransport
     link_type: int
     classic_allow_role_switch: bool = False
@@ -242,6 +403,11 @@ class Connection:
         self.assembler = hci.HCI_AclDataPacketAssembler(self.on_acl_pdu)
 
     def on_hci_acl_data_packet(self, packet: hci.HCI_AclDataPacket) -> None:
+        if self.link is None:
+            procedures = self.controller.le_procedures
+            assert procedures is not None
+            procedures.on_hci_acl_data_packet(packet)
+            return
         self.assembler.feed_packet(packet)
         self.controller.send_hci_packet(
             hci.HCI_Number_Of_Completed_Packets_Event(
@@ -427,9 +593,15 @@ class Controller:
         host_sink: TransportSink | None = None,
         link: link.LocalLink | None = None,
         public_address: bytes | str | hci.Address | None = None,
+        *,
+        backend: ControllerBackend | None = None,
     ) -> None:
+        if link is not None and backend is not None:
+            raise ValueError('pass either link or backend, not both')
         self.name = name
-        self.link = link or bumble_link.LocalLink()
+        self.backend = backend
+        self.link = (link or bumble_link.LocalLink()) if backend is None else None
+        self.le_procedures: LeControllerProcedures | None = None
         self.le_connections = {}
         self.classic_connections = {}
         self.sco_links = {}
@@ -469,6 +641,11 @@ class Controller:
         self.terminated: asyncio.Future[Any] = (
             asyncio.get_running_loop().create_future()
         )
+        if backend is not None:
+            backend.bind(self)
+
+    def trace(self, message: str) -> None:
+        logger.debug('[%s] %s', self.name, message)
 
     @property
     def host(self) -> TransportSink | None:
@@ -520,6 +697,24 @@ class Controller:
 
     # Packet Sink protocol (packets coming from the host via HCI)
     def on_packet(self, packet: bytes) -> None:
+        if (
+            self.backend is not None
+            and len(packet) >= 4
+            and packet[0] == hci.HCI_COMMAND_PACKET
+        ):
+            opcode, size = struct.unpack_from('<HB', packet, 1)
+            if opcode not in self.supported_commands and len(packet) == size + 4:
+                # An unsupported opcode has no parameter schema at this Controller.
+                command_class = hci.HCI_Command.command_classes.get(
+                    opcode, hci.HCI_Command
+                )
+                generic = (
+                    hci.HCI_AsyncCommand
+                    if issubclass(command_class, hci.HCI_AsyncCommand)
+                    else hci.HCI_Command
+                )
+                self.on_hci_packet(generic(packet[4:], op_code=opcode))
+                return
         self.on_hci_packet(hci.HCI_Packet.from_bytes(packet))
 
     def on_hci_packet(self, packet: hci.HCI_Packet) -> None:
@@ -541,9 +736,35 @@ class Controller:
 
     def on_hci_command_packet(self, command: hci.HCI_Command) -> None:
         handler_name = f'on_{command.name.lower()}'
-        handler = getattr(self, handler_name, self.on_hci_command)
-        result: hci.HCI_ReturnParameters | None = handler(command)
-        if isinstance(command, hci.HCI_SyncCommand):
+        if self.backend is not None and command.op_code not in self.supported_commands:
+            if isinstance(command, hci.HCI_AsyncCommand):
+                self._send_hci_command_status(
+                    hci.HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR, command.op_code
+                )
+                return
+            handler = self.on_hci_command
+        else:
+            handler = getattr(
+                self.le_procedures,
+                handler_name,
+                getattr(self, handler_name, self.on_hci_command),
+            )
+        if (
+            self.le_procedures is not None
+            and handler != self.on_hci_command
+            and not self.le_procedures.command_allowed(command.op_code)
+        ):
+            if isinstance(command, hci.HCI_AsyncCommand):
+                self._send_hci_command_status(
+                    hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR, command.op_code
+                )
+                return
+            result = hci.HCI_StatusReturnParameters(
+                hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR
+            )
+        else:
+            result = handler(command)
+        if isinstance(command, hci.HCI_SyncCommand) or handler == self.on_hci_command:
             if result is None:
                 logger.error("Sync command handlers should return parameters, got None")
                 return

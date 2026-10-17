@@ -113,6 +113,7 @@ Homepage = "https://github.com/google/bumble"
 [tool.setuptools]
 packages = [
     "bumble",
+    "bumble.radio_controller",
     "bumble.transport",
     "bumble.transport.grpc_protobuf",
     "bumble.drivers",

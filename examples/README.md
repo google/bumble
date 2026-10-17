@@ -5,6 +5,22 @@ NOTE:
 To run python scripts from this directory when the Bumble package isn't installed in your environment,
 put .. in your PYTHONPATH: `export PYTHONPATH=..`
 
+# `run_radio_controller.py` and `run_radio_device.py`
+
+`run_radio_device.py` starts a BabbleSim PHY and runs a complete scenario with normal Bumble Hosts and independent radio Controller threads. Select advertising/scanning, connection with a GATT read, periodic synchronization, or mixed-role ACL coexistence with scanning and periodic traffic. Every scenario checks its results, saves Device/HCI/PHY logs and exits without pytest.
+
+```sh
+export BSIM_OUT_PATH=/path/to/babble-workspace/bsim
+python -m examples.run_radio_device advertising --advertisers 8
+python -m examples.run_radio_device connection
+python -m examples.run_radio_device periodic --phy 2m
+python -m examples.run_radio_device coexistence --links-per-role 4
+```
+
+For periodic and coexistence scenarios, `--phy 1m`, `--phy 2m` or `--phy coded` selects secondary advertising and periodic traffic. Sample ACLs use LE 1M. Concurrent sample invocations use fresh simulation IDs by default; explicitly supplied simulation IDs and log directories must be distinct.
+
+`run_radio_controller.py` exposes a Controller-only Unix-socket H4 endpoint for an external Host. See [Radio-backed LE Controller](../docs/mkdocs/src/components/radio_controller.md) for environment setup, complete commands, logs and implementation limits.
+
 # `run_controller.py`
 Run two virtual controllers, one connected to a soft device written in python with a simple GATT server, and the other connected to an external host.
 

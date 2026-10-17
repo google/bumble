@@ -45,6 +45,9 @@ An app that connected to a device (BLE) and encrypts the connection.
 ## `run_controller.py`
 Creates two linked controllers, attaches one to a transport, and the other to a local host with a GATT server application. This can be used, for example, to attach a virtual controller to a native stack, like BlueZ on Linux, and use the native tools, like `bluetoothctl`, to scan and connect to the GATT server included in the example.
 
+## `run_radio_controller.py` and `run_radio_device.py`
+`run_radio_device.py` starts a BabbleSim PHY and runs an advertising, connection/GATT, periodic synchronization or multi-role coexistence scenario. Normal Bumble Hosts share an event loop, and each Controller runs in its own radio thread. The scenarios save logs and exit after checking their results, without pytest. `run_radio_controller.py` exposes a Controller-only Unix-socket H4 endpoint for an external Host. See [Radio-backed LE Controller](../components/radio_controller.md) for setup, commands and implementation limits.
+
 ## `run_csis_servers.py`
 Runs CSIS servers on two devices to form a Coordinated Set. **Note**: If using the example config file (e.g. `device1.json`), the `address` needs to be removed, so that the devices are given different random addresses.   
 

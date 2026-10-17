@@ -17,6 +17,9 @@ venv/
 .venv/
 # snoop logs
 out/
+# Coverage data
+/.coverage
+/.coverage.*
 # macOS
 .DS_Store
 ._*
