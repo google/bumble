@@ -247,6 +247,87 @@ HCI_VERSION_BLUETOOTH_CORE_6_0     = SpecificationVersion.BLUETOOTH_CORE_6_0
 HCI_VERSION_BLUETOOTH_CORE_6_1     = SpecificationVersion.BLUETOOTH_CORE_6_1
 HCI_VERSION_BLUETOOTH_CORE_6_2     = SpecificationVersion.BLUETOOTH_CORE_6_2
 
+# LE parameter units: Core Vol 4, Part E, 7.8.5, 7.8.10, 7.8.53 and 7.8.64-67.
+# These convert encoded command parameters, not event-loop scheduling steps.
+HCI_LE_ADV_INTERVAL_UNIT_US = 625
+HCI_LE_SCAN_INTERVAL_UNIT_US = 625
+# Extended advertising/scanning Duration.
+HCI_LE_DURATION_UNIT_US = 10_000
+# Extended scanning Period.
+HCI_LE_SCAN_PERIOD_UNIT_US = 1_280_000
+# Periodic sync Sync_Timeout.
+HCI_LE_PERIODIC_SYNC_TIMEOUT_UNIT_US = 10_000
+# Core 7.8.54-55 and 7.8.62: complete data across a sequence of HCI fragments.
+HCI_LE_ADV_DATA_SIZE_MAX = 1650
+# Core 7.8.54-55: 255 HCI parameter octets minus four fixed command fields.
+HCI_LE_EXT_ADV_DATA_FRAGMENT_SIZE_MAX = 251
+
+# HCI LE parameter bounds: Core Vol 4, Part E, 7.8.
+# Advertising intervals use HCI_LE_ADV_INTERVAL_UNIT_US.
+HCI_LE_ADV_INTERVAL_MIN = 0x0020
+HCI_LE_ADV_INTERVAL_MAX = 0x4000
+HCI_LE_EXT_ADV_INTERVAL_MAX = 0xFFFFFF
+HCI_LE_ADV_HANDLE_MAX = 0xEF
+# Scan window/interval bounds, in HCI_LE_SCAN_INTERVAL_UNIT_US units.
+HCI_LE_SCAN_INTERVAL_MIN = 0x0004
+HCI_LE_SCAN_INTERVAL_MAX = 0x4000
+HCI_LE_EXT_SCAN_INTERVAL_MAX = 0xFFFF
+# Periodic sync timeout bounds and maximum skipped events.
+HCI_LE_PERIODIC_SYNC_TIMEOUT_MIN = 0x000A
+HCI_LE_PERIODIC_SYNC_TIMEOUT_MAX = 0x4000
+HCI_LE_PERIODIC_SYNC_SKIP_MAX = 0x01F3
+# All_PHYs bits mean no preference, not the individual PHY selection mask.
+HCI_LE_ALL_PHYS_TX_MASK = 1 << 0
+HCI_LE_ALL_PHYS_RX_MASK = 1 << 1
+HCI_LE_PHY_OPTIONS_NO_PREFERENCE = 0
+HCI_LE_PHY_OPTIONS_S2_PREFERRED = 1
+HCI_LE_PHY_OPTIONS_S8_PREFERRED = 2
+# Periodic sync option bit 1 disables initial reports.
+HCI_LE_PERIODIC_SYNC_REPORTS_DISABLED_MASK = 1 << 1
+# HCI reset defaults: Core Vol 4, Part E, 7.3.1 and 7.8.1.
+HCI_EVENT_MASK_DEFAULT = 0x00001FFFFFFFFFFF
+# Core Vol 4, Part E, 7.3.69: page-2 bit 0 corresponds to event code 0x40.
+HCI_EVENT_MASK_PAGE_2_CODE_BASE = 0x40
+HCI_LE_EVENT_MASK_DEFAULT = 0x1F
+# One HCI event has at most 255 parameter octets.
+HCI_EVENT_PARAMETER_SIZE_MAX = 255
+# Extended report fixed overhead: subevent, report count and one report header.
+HCI_LE_EXT_ADV_REPORT_OVERHEAD_SIZE = 26
+HCI_LE_EXT_ADV_REPORT_DATA_SIZE_MAX = (
+    HCI_EVENT_PARAMETER_SIZE_MAX - HCI_LE_EXT_ADV_REPORT_OVERHEAD_SIZE
+)
+# Periodic report fixed overhead includes the subevent octet.
+HCI_LE_PERIODIC_REPORT_OVERHEAD_SIZE = 8
+HCI_LE_PERIODIC_REPORT_DATA_SIZE_MAX = (
+    HCI_EVENT_PARAMETER_SIZE_MAX - HCI_LE_PERIODIC_REPORT_OVERHEAD_SIZE
+)
+# Extended advertising event_type bits 5..6 encode Data_Status.
+HCI_LE_EXT_ADV_REPORT_DATA_STATUS_SHIFT = 5
+HCI_LE_EXT_ADV_REPORT_DATA_STATUS_VALUE_MASK = 0x03
+HCI_LE_EXT_ADV_REPORT_DATA_STATUS_MASK = (
+    HCI_LE_EXT_ADV_REPORT_DATA_STATUS_VALUE_MASK
+    << HCI_LE_EXT_ADV_REPORT_DATA_STATUS_SHIFT
+)
+# Low four property bits identify the corresponding legacy advertising PDU.
+HCI_LE_EXT_ADV_REPORT_LEGACY_PROPERTIES_MASK = 0x0F
+# Periodic report CTE_Type when no CTE is present.
+HCI_LE_PERIODIC_REPORT_CTE_NONE = 0xFF
+# Advertising Set Terminated's completed-event counter is one octet.
+HCI_LE_ADV_COMPLETED_EVENTS_MAX = 0xFF
+
+# Advertising filter policy: scanning and connection requests use separate bits.
+HCI_LE_ADV_FILTER_SCAN_MASK = 1 << 0
+HCI_LE_ADV_FILTER_CONNECT_MASK = 1 << 1
+HCI_LE_ADV_FILTER_POLICY_MASK = (
+    HCI_LE_ADV_FILTER_SCAN_MASK | HCI_LE_ADV_FILTER_CONNECT_MASK
+)
+# Extended scanning Filter_Duplicates encodings.
+HCI_LE_SCAN_DUPLICATES_DISABLED = 0
+HCI_LE_SCAN_DUPLICATES_ENABLED = 1
+HCI_LE_SCAN_DUPLICATES_RESET_EACH_PERIOD = 2
+# LE Supported States return parameter width.
+HCI_LE_SUPPORTED_STATES_SIZE = 8
+
 # HCI Packet types
 HCI_COMMAND_PACKET          = 0x01
 HCI_ACL_DATA_PACKET         = 0x02
@@ -2189,7 +2270,7 @@ class HCI_Object:
             )
 
         # Measure the widest field name
-        max_field_name_length = max(len(s[0]) for s in field_strings)
+        max_field_name_length = max((len(s[0]) for s in field_strings), default=0)
         sep = ':'
         return '\n'.join(
             f'{indentation}'
@@ -4035,10 +4116,27 @@ class HCI_Write_Secure_Connections_Host_Support_Command(
 
 
 # -----------------------------------------------------------------------------
-@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Authenticated_Payload_Timeout_ReturnParameters(
+    HCI_StatusAndConnectionHandleReturnParameters
+):
+    authenticated_payload_timeout: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Authenticated_Payload_Timeout_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Authenticated_Payload_Timeout_Command(
+    HCI_SyncCommand[HCI_Read_Authenticated_Payload_Timeout_ReturnParameters]
+):
+    """Core Vol 4, Part E, 7.3.93."""
+
+    connection_handle: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
 class HCI_Write_Authenticated_Payload_Timeout_Command(
-    HCI_SyncCommand[HCI_StatusReturnParameters]
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
 ):
     '''
     See Bluetooth spec @ 7.3.94 Write Authenticated Payload Timeout Command
@@ -4659,6 +4757,48 @@ class HCI_LE_Read_Remote_Features_Command(HCI_AsyncCommand):
 
 
 # -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Host_Channel_Classification_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    """See Bluetooth spec @ 7.8.19 LE Set Host Channel Classification."""
+
+    channel_map: bytes = field(metadata=metadata(5))
+
+
+@dataclasses.dataclass
+class HCI_LE_Read_Channel_Map_ReturnParameters(
+    HCI_StatusAndConnectionHandleReturnParameters
+):
+    channel_map: bytes = field(metadata=metadata(5))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Channel_Map_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Channel_Map_Command(
+    HCI_SyncCommand[HCI_LE_Read_Channel_Map_ReturnParameters]
+):
+    """See Bluetooth spec @ 7.8.20 LE Read Channel Map."""
+
+    connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Encrypt_ReturnParameters(HCI_StatusReturnParameters):
+    encrypted_data: bytes = field(metadata=metadata(16))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Encrypt_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Encrypt_Command(HCI_SyncCommand[HCI_LE_Encrypt_ReturnParameters]):
+    """See Bluetooth spec @ 7.8.22 LE Encrypt."""
+
+    key: bytes = field(metadata=metadata(16))
+    plaintext_data: bytes = field(metadata=metadata(16))
+
+
 @dataclasses.dataclass
 class HCI_LE_Rand_ReturnParameters(HCI_StatusReturnParameters):
     random_number: bytes = field(metadata=metadata(8))
@@ -5015,6 +5155,10 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(
         USE_LEGACY_ADVERTISING_PDUS = 1 << 4
         ANONYMOUS_ADVERTISING = 1 << 5
         INCLUDE_TX_POWER = 1 << 6
+        # Core, Vol 4, Part E, 7.8.53: decision-based advertising properties.
+        USE_DECISION_PDUS = 1 << 7
+        INCLUDE_ADVA_IN_DECISION_PDUS = 1 << 8
+        INCLUDE_ADI_IN_DECISION_PDUS = 1 << 9
 
         def __str__(self) -> str:
             return '|'.join(
@@ -5048,7 +5192,7 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(
         metadata=metadata(Address.parse_address_preceded_by_type)
     )
     advertising_filter_policy: int = field(metadata=metadata(1))
-    advertising_tx_power: int = field(metadata=metadata(1))
+    advertising_tx_power: int = field(metadata=metadata(-1))
     primary_advertising_phy: int = field(metadata=Phy.type_metadata(1))
     secondary_advertising_max_skip: int = field(metadata=metadata(1))
     secondary_advertising_phy: int = field(metadata=Phy.type_metadata(1))
@@ -5582,6 +5726,63 @@ class HCI_LE_Periodic_Advertising_Terminate_Sync_Command(
     '''
 
     sync_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Add_Device_To_Periodic_Advertiser_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''See Bluetooth spec @ 7.8.70 LE Add Device To Periodic Advertiser List.'''
+
+    advertiser_address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
+    advertiser_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
+    advertising_sid: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Remove_Device_From_Periodic_Advertiser_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''See Bluetooth spec @ 7.8.71 LE Remove Device From Periodic Advertiser List.'''
+
+    advertiser_address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
+    advertiser_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
+    advertising_sid: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Clear_Periodic_Advertiser_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''See Bluetooth spec @ 7.8.72 LE Clear Periodic Advertiser List.'''
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_Periodic_Advertiser_List_Size_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    periodic_advertiser_list_size: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Read_Periodic_Advertiser_List_Size_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Read_Periodic_Advertiser_List_Size_Command(
+    HCI_SyncCommand[HCI_LE_Read_Periodic_Advertiser_List_Size_ReturnParameters]
+):
+    '''See Bluetooth spec @ 7.8.73 LE Read Periodic Advertiser List Size.'''
 
 
 # -----------------------------------------------------------------------------
@@ -6959,7 +7160,7 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
         primary_phy: int = field(metadata=metadata(Phy.type_spec(1)))
         secondary_phy: int = field(metadata=metadata(Phy.type_spec(1)))
         advertising_sid: int = field(metadata=metadata(1))
-        tx_power: int = field(metadata=metadata(1))
+        tx_power: int = field(metadata=metadata(-1))
         rssi: int = field(metadata=metadata(-1))
         periodic_advertising_interval: int = field(metadata=metadata(2))
         direct_address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
@@ -7071,6 +7272,24 @@ class HCI_LE_Periodic_Advertising_Sync_Lost_Event(HCI_LE_Meta_Event):
 
 
 # -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Scan_Timeout_Event(HCI_LE_Meta_Event):
+    """See Bluetooth spec @ 7.7.65.17 LE Scan Timeout Event."""
+
+
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Scan_Request_Received_Event(HCI_LE_Meta_Event):
+    """See Bluetooth spec @ 7.7.65.19 LE Scan Request Received Event."""
+
+    advertising_handle: int = field(metadata=metadata(1))
+    scanner_address_type: int = field(metadata=AddressType.type_metadata(1))
+    scanner_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
+
+
 @HCI_LE_Meta_Event.event
 @dataclasses.dataclass
 class HCI_LE_Advertising_Set_Terminated_Event(HCI_LE_Meta_Event):
@@ -7646,6 +7865,14 @@ class HCI_Encryption_Change_Event(HCI_Event):
     status: int = field(metadata=metadata(STATUS_SPEC))
     connection_handle: int = field(metadata=metadata(2))
     encryption_enabled: int = field(metadata=Enabled.type_metadata(1))
+
+
+@HCI_Event.event
+@dataclasses.dataclass
+class HCI_Authenticated_Payload_Timeout_Expired_Event(HCI_Event):
+    """Core Vol 4, Part E, 7.7.75."""
+
+    connection_handle: int = field(metadata=metadata(2))
 
 
 # -----------------------------------------------------------------------------
