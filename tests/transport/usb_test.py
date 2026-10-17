@@ -499,3 +499,49 @@ async def test_usb_packet_source_drops_empty_sco_packets():
     assert source.queue.get_nowait() == bytes(
         [hci.HCI_SYNCHRONOUS_DATA_PACKET, 0x0A, 0x01, 1, 0xAB]
     )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_usb_packet_sink_sco_unsupported_max_packet_size():
+    # 3 * 1 - 3 = 0 bytes of data per packet: SCO data can't be sent.
+    sink, iso_transfers, sent_packets = _make_sco_sink(1)
+    assert sink.sco_packet_data_size == 0
+    assert not sink.isochronous_out_transfers
+    sink.start()
+
+    # Must not loop forever.
+    sink.on_packet(bytes([hci.HCI_SYNCHRONOUS_DATA_PACKET, 0x01, 0x01, 2, 0, 0]))
+    await asyncio.sleep(0.01)
+    assert not sent_packets
+    for transfer in iso_transfers:
+        transfer.setIsochronous.assert_not_called()
+
+    await sink.terminate()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_sink_sco_cancelled_transfers_not_reused():
+    sink, iso_transfers, _ = _make_sco_sink(17)
+    sink.start()
+    previous_transfer = iso_transfers[0]
+
+    # The alternate setting changes: transfers of the previous setting are
+    # cancelled, and their callbacks come after the new transfers are created.
+    sink.stop_sco()
+    new_transfers = [mock.Mock() for _ in range(usb.NUMBER_OF_SCO_OUT_TRANSFERS)]
+    sink.device.getTransfer.side_effect = new_transfers
+    sink.configure_sco(sink.isochronous_out, 2)
+
+    previous_transfer.getStatus.return_value = usb.usb1.TRANSFER_CANCELLED
+    sink.sco_transfer_callback(previous_transfer)
+    previous_transfer.getStatus.return_value = usb.usb1.TRANSFER_COMPLETED
+    sink.sco_transfer_callback(previous_transfer)
+    await asyncio.sleep(0.01)
+
+    free_transfers = []
+    while not sink.free_isochronous_out_transfers.empty():
+        free_transfers.append(sink.free_isochronous_out_transfers.get_nowait())
+    assert free_transfers == new_transfers
+
+    await sink.terminate()

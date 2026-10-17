@@ -85,6 +85,7 @@ USB_FRAMES_PER_SCO_PACKET = 3
 # rate of the SCO link instead of leaving gaps between transfers.
 NUMBER_OF_SCO_OUT_TRANSFERS = 4
 HCI_SCO_HEADER_SIZE = 3
+HCI_SCO_MAX_DATA_SIZE = 255  # The Data_Total_Length field is 1 byte
 # With alternate setting 6 (transparent 16 kHz, e.g. mSBC / LC3 SWB), each HCI SCO
 # packet (3 + 60 bytes, i.e. one 7.5 ms codec frame) fits in a single USB frame (Core
 # Spec Vol 4, Part B, Table 2.1). Packets are sent back to back: controllers such as
@@ -339,19 +340,25 @@ class UsbPacketSink:
         self.sco_packet_data_size = 0
         self.isochronous_out_transfers = []
         self.free_isochronous_out_transfers = asyncio.Queue()
-        if isochronous_out is not None and isochronous_out.getMaxPacketSize() > 0:
-            self.sco_packet_data_size = (
-                self.sco_frames_per_packet * isochronous_out.getMaxPacketSize()
-                - HCI_SCO_HEADER_SIZE
+        if isochronous_out is None:
+            return
+        sco_packet_data_size = (
+            self.sco_frames_per_packet * isochronous_out.getMaxPacketSize()
+            - HCI_SCO_HEADER_SIZE
+        )
+        if not 0 < sco_packet_data_size <= HCI_SCO_MAX_DATA_SIZE:
+            logger.warning(
+                f'unsupported SCO max packet size {isochronous_out.getMaxPacketSize()} '
+                f'for alternate setting {sco_alternate_setting}'
             )
-            for _ in range(NUMBER_OF_SCO_OUT_TRANSFERS):
-                transfer = self.device.getTransfer(
-                    iso_packets=self.sco_frames_per_packet
-                )
-                self.isochronous_out_transfers.append(transfer)
-                self.free_isochronous_out_transfers.put_nowait(transfer)
-            if self.queue_task is not None and self.sco_queue_task is None:
-                self.sco_queue_task = asyncio.create_task(self.process_sco_queue())
+            return
+        self.sco_packet_data_size = sco_packet_data_size
+        for _ in range(NUMBER_OF_SCO_OUT_TRANSFERS):
+            transfer = self.device.getTransfer(iso_packets=self.sco_frames_per_packet)
+            self.isochronous_out_transfers.append(transfer)
+            self.free_isochronous_out_transfers.put_nowait(transfer)
+        if self.queue_task is not None and self.sco_queue_task is None:
+            self.sco_queue_task = asyncio.create_task(self.process_sco_queue())
         logger.debug(
             f'SCO OUT: alternate setting {sco_alternate_setting}, '
             f'{self.sco_packet_data_size} bytes per packet'
@@ -423,14 +430,22 @@ class UsbPacketSink:
             del buffer[: self.sco_packet_data_size]
 
     def sco_transfer_callback(self, transfer):
-        _safe_call_soon(
-            self.loop, self.free_isochronous_out_transfers.put_nowait, transfer
-        )
         status = transfer.getStatus()
+        if status == usb1.TRANSFER_CANCELLED or self.closed:
+            # Expected when the transport is closed or the alternate setting
+            # changes. The transfer is not reused.
+            logger.debug(f'SCO OUT transfer ended: status={status}')
+            return
         if status != usb1.TRANSFER_COMPLETED:
             logger.warning(
                 color(f'!!! SCO OUT transfer not completed: status={status}', 'red')
             )
+        _safe_call_soon(self.loop, self.release_isochronous_out_transfer, transfer)
+
+    def release_isochronous_out_transfer(self, transfer) -> None:
+        # Transfers from a previous alternate setting are not reused.
+        if transfer in self.isochronous_out_transfers:
+            self.free_isochronous_out_transfers.put_nowait(transfer)
 
     async def process_sco_queue(self):
         iso_max_packet_size = (self.sco_packet_data_size + HCI_SCO_HEADER_SIZE) // (
