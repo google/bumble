@@ -584,6 +584,74 @@ def test_HCI_LE_Set_Extended_Advertising_Enable_Command():
 
 
 # -----------------------------------------------------------------------------
+def test_HCI_Setup_Synchronous_Connection_Command():
+    # A legacy Setup Synchronous Connection command with a 16-bit CVSD voice setting
+    # and eSCO packet types (Core Spec Vol 4, Part E - 7.1.26).
+    command = hci.HCI_Setup_Synchronous_Connection_Command(
+        connection_handle=0x0060,
+        transmit_bandwidth=8000,
+        receive_bandwidth=8000,
+        max_latency=10,
+        voice_setting=0x0060,
+        retransmission_effort=1,
+        packet_type=0x0388,
+    )
+    basic_check(command)
+
+    parsed = hci.HCI_Packet.from_bytes(bytes(command))
+    assert parsed.connection_handle == 0x0060
+    assert parsed.voice_setting == 0x0060
+    assert (
+        parsed.packet_type
+        & hci.HCI_Setup_Synchronous_Connection_Command.ESCO_PACKET_TYPES
+    )
+    assert not (
+        parsed.packet_type
+        & hci.HCI_Setup_Synchronous_Connection_Command.SCO_PACKET_TYPES
+    )
+
+    # A SCO link, with an 8-bit voice setting
+    sco_command = hci.HCI_Setup_Synchronous_Connection_Command(
+        connection_handle=0x0060,
+        transmit_bandwidth=8000,
+        receive_bandwidth=8000,
+        max_latency=10,
+        voice_setting=0x0000,
+        retransmission_effort=1,
+        packet_type=hci.HCI_Setup_Synchronous_Connection_Command.PacketType.HV3,
+    )
+    basic_check(sco_command)
+    assert (
+        sco_command.packet_type
+        & hci.HCI_Setup_Synchronous_Connection_Command.SCO_PACKET_TYPES
+    )
+    assert not (
+        sco_command.packet_type
+        & hci.HCI_Setup_Synchronous_Connection_Command.ESCO_PACKET_TYPES
+    )
+
+
+# -----------------------------------------------------------------------------
+def test_voice_setting_codec_id():
+    # The Air_Coding_Format of a voice setting uses a different numbering than the air
+    # mode (codec ID) reported by the Synchronous Connection Complete event.
+    assert hci.VoiceSetting.from_int(0x0060).codec_id() == hci.CodecID.CVSD
+    assert hci.VoiceSetting.from_int(0x0063).codec_id() == hci.CodecID.TRANSPARENT
+    assert (
+        hci.VoiceSetting(
+            air_coding_format=hci.VoiceSetting.AirCodingFormat.U_LAW
+        ).codec_id()
+        == hci.CodecID.U_LOG
+    )
+    assert (
+        hci.VoiceSetting(
+            air_coding_format=hci.VoiceSetting.AirCodingFormat.A_LAW
+        ).codec_id()
+        == hci.CodecID.A_LOG
+    )
+
+
+# -----------------------------------------------------------------------------
 def test_HCI_LE_Setup_ISO_Data_Path_Command():
     command = hci.HCI_Packet.from_bytes(
         bytes.fromhex('016e200d60000001030000000000000000')
