@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      https://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,9 +19,9 @@ import asyncio
 import sys
 
 import bumble.logging
+from bumble import hfp
 from bumble.core import PhysicalTransport
-from bumble.device import Device, ScoLink
-from bumble.hci import HCI_Enhanced_Setup_Synchronous_Connection_Command
+from bumble.device import Connection, Device, ScoLink
 from bumble.hfp import ESCO_PARAMETERS, DefaultCodecParameters
 from bumble.transport import open_transport
 
@@ -64,15 +64,30 @@ async def main() -> None:
         ),
     )
 
-    def on_sco(sco_link: ScoLink):
+    esco_parameters = ESCO_PARAMETERS[DefaultCodecParameters.ESCO_CVSD_S3]
+
+    # The peer controller asks its host to accept the SCO or eSCO link before the
+    # connection can complete.
+    def on_sco_request(connection: Connection, _link_type: int) -> None:
+        connection.abort_on(
+            'disconnection',
+            connection.device.send_async_command(
+                hfp.accept_synchronous_connection_request_command(
+                    connection.device.host, connection.peer_address, esco_parameters
+                )
+            ),
+        )
+
+    devices[1].on(Device.EVENT_SCO_REQUEST, on_sco_request)
+
+    def on_sco(sco_link: ScoLink) -> None:
         connections[0].abort_on('disconnection', sco_link.disconnect())
 
-    devices[0].once('sco_connection', on_sco)
+    devices[0].once(Device.EVENT_SCO_CONNECTION, on_sco)
 
     await devices[0].send_command(
-        HCI_Enhanced_Setup_Synchronous_Connection_Command(
-            connection_handle=connections[0].handle,
-            **ESCO_PARAMETERS[DefaultCodecParameters.ESCO_CVSD_S3].asdict(),
+        hfp.setup_synchronous_connection_command(
+            devices[0].host, connections[0].handle, esco_parameters
         )
     )
 
