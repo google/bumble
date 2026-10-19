@@ -497,6 +497,11 @@ class AclPacketSplitter(PacketSplitter):
 # does not report a valid bInterval.
 DEFAULT_INTR_INTERVAL = 0.004
 
+# USB Vendor IDs that require ACL-vs-Event poll synchronization by default due
+# to Bulk IN completing ahead of periodic Interrupt IN polling.
+USB_VENDOR_ID_INTEL = 0x8087
+POLL_SYNC_VENDOR_IDS = {USB_VENDOR_ID_INTEL}
+
 
 def _get_intr_interval(device, interrupt_in) -> float:
     raw_interval = getattr(interrupt_in, 'getInterval', lambda: None)()
@@ -542,6 +547,7 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         bulk_in,
         isochronous_in,
         intr_interval: float | None = None,
+        poll_sync: bool | None = None,
     ):
         super().__init__()
         self.device = device
@@ -559,7 +565,14 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         if intr_interval is not None:
             self.intr_interval = float(intr_interval)
         else:
-            self.intr_interval = _get_intr_interval(device, interrupt_in)
+            if poll_sync is None:
+                poll_sync = (
+                    isinstance(metadata, dict)
+                    and metadata.get('vendor_id') in POLL_SYNC_VENDOR_IDS
+                )
+            self.intr_interval = (
+                _get_intr_interval(device, interrupt_in) if poll_sync else 0.0
+            )
         self.dequeue_task = None
         self.done: dict[Any, asyncio.Event] = {}
         self.splitters = {
@@ -896,7 +909,11 @@ class UsbTransport(Transport):
         self.context.close()
 
 
-async def open_usb_transport(spec: str) -> Transport:
+async def open_usb_transport(
+    spec: str,
+    intr_interval: float | None = None,
+    poll_sync: bool | None = None,
+) -> Transport:
     '''
     Open a USB transport.
     The moniker string has this syntax:
@@ -912,7 +929,8 @@ async def open_usb_transport(spec: str) -> Transport:
 
     Opotionally, the moniker may include a +sco=<alternate> suffix to enable SCO/eSCO
     and specify the alternate setting to use for SCO/eSCO transfers, with 0 meaning an
-    automatic selection.
+    automatic selection, and/or a +poll_sync (or +poll_sync=0 / +poll_sync=1) suffix to
+    explicitly enable or disable Interrupt IN / Bulk IN packet poll synchronization.
 
     In addition, if the moniker ends with the symbol "!", the device will be used in
     "forced" mode:
@@ -931,6 +949,7 @@ async def open_usb_transport(spec: str) -> Transport:
     mode.
     0+sco=0 --> the first BT USB dongle, with SCO enabled using auto-selection.
     0+sco=5 --> the first BT USB dongle, with SCO enabled using alternate setting 5.
+    0+poll_sync --> the first BT USB dongle, with ACL poll-sync explicitly enabled.
     '''
 
     # Find the device according to the spec moniker
@@ -947,11 +966,23 @@ async def open_usb_transport(spec: str) -> Transport:
         else:
             forced_mode = False
 
-        if '+sco=' in spec:
-            spec, sco_alternate_str = spec.split('+sco=')
-            sco_alternate = int(sco_alternate_str)
-        else:
-            sco_alternate = None
+        spec_parts = spec.split('+')
+        spec = spec_parts[0]
+        sco_alternate = None
+        for option in spec_parts[1:]:
+            if option.startswith('sco='):
+                sco_alternate = int(option.split('=', 1)[1])
+            elif option == 'poll_sync':
+                if poll_sync is None:
+                    poll_sync = True
+            elif option.startswith('poll_sync='):
+                if poll_sync is None:
+                    poll_sync = option.split('=', 1)[1].lower() not in (
+                        '0',
+                        'false',
+                        'no',
+                        'off',
+                    )
 
         if ':' in spec:
             vendor_id, product_id = spec.split(':')
@@ -1099,7 +1130,13 @@ async def open_usb_transport(spec: str) -> Transport:
                 logger.warning('failed to set configuration')
 
         source = UsbPacketSource(
-            device, device_metadata, interrupt_in, bulk_in, isochronous_in
+            device,
+            device_metadata,
+            interrupt_in,
+            bulk_in,
+            isochronous_in,
+            intr_interval=intr_interval,
+            poll_sync=poll_sync,
         )
         sink = UsbPacketSink(
             device, bulk_out, isochronous_out, acl_interface.getNumber()
