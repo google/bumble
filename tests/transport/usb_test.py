@@ -215,7 +215,7 @@ async def test_usb_packet_source_acl_ordering():
         mock.Mock(),
         mock.Mock(),
         None,
-        intr_interval=0.01,
+        intr_interval=0.05,
     )
     acl = b'\x00\x28\x02\x00\xaa\xbb'
     enc_event = b'\x08\x04\x00\x00\x08\x01'
@@ -226,19 +226,110 @@ async def test_usb_packet_source_acl_ordering():
     # 1. Event arrives while ACL is deferred -> Event is queued before ACL.
     source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
     source.splitters[hci.HCI_EVENT_PACKET].feed(enc_event)
-    assert await source.queue.get() == bytes([hci.HCI_EVENT_PACKET]) + enc_event
-    assert await source.queue.get() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
+    await asyncio.sleep(0)
+    assert source.queue.get_nowait() == bytes([hci.HCI_EVENT_PACKET]) + enc_event
+    assert source.queue.get_nowait() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
 
-    # 2. Disconnection Complete arrives while ACL is deferred -> ACL is flushed first.
+    # 2. Disconnection Complete arrives while ACL is deferred -> ACL is flushed
+    # immediately before the timer expires, ahead of Disconnection Complete.
     source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
     source.splitters[hci.HCI_EVENT_PACKET].feed(disconn_event)
-    assert await source.queue.get() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
-    assert await source.queue.get() == bytes([hci.HCI_EVENT_PACKET]) + disconn_event
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+    assert source.queue.get_nowait() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
+    assert source.queue.get_nowait() == bytes([hci.HCI_EVENT_PACKET]) + disconn_event
 
-    # 3. Standalone ACL packet is flushed after intr_interval expires.
+    # 3. Standalone ACL packet remains deferred after _enqueue_packet runs, and is
+    # flushed only after intr_interval expires.
     source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
     assert source.queue.empty()
+    assert len(source.acl_queue) == 1
     assert await asyncio.wait_for(source.queue.get(), timeout=1.0) == (
         bytes([hci.HCI_ACL_DATA_PACKET]) + acl
     )
+    source.close()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_staggered_acl_deadlines():
+    loop = asyncio.get_running_loop()
+    now = 100.0
+    with mock.patch.object(loop, 'time', side_effect=lambda: now):
+        source = usb.UsbPacketSource(
+            mock.Mock(),
+            {},
+            mock.Mock(),
+            mock.Mock(),
+            None,
+            intr_interval=0.04,
+        )
+        acl_1 = b'\x00\x28\x02\x00\x01\x01'
+        acl_2 = b'\x00\x28\x02\x00\x02\x02'
+
+        source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl_1)
+        await asyncio.sleep(0)
+        now = 100.02
+        source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl_2)
+        await asyncio.sleep(0)
+        assert len(source.acl_queue) == 2
+
+        # When acl_1's deadline (100.04) expires, acl_2 (100.06) remains deferred.
+        now = 100.04
+        assert await asyncio.wait_for(source.queue.get(), timeout=1.0) == (
+            bytes([hci.HCI_ACL_DATA_PACKET]) + acl_1
+        )
+        assert source.queue.empty()
+        assert len(source.acl_queue) == 1
+
+        now = 100.06
+        assert await asyncio.wait_for(source.queue.get(), timeout=1.0) == (
+            bytes([hci.HCI_ACL_DATA_PACKET]) + acl_2
+        )
+        source.close()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_close_cancels_pending_timer():
+    source = usb.UsbPacketSource(
+        mock.Mock(),
+        {},
+        mock.Mock(),
+        mock.Mock(),
+        None,
+        intr_interval=0.03,
+    )
+    acl = b'\x00\x28\x02\x00\xaa\xbb'
+
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is not None
+    assert len(source.acl_queue) == 1
+
+    source.close()
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+
+    await asyncio.sleep(0.04)
+    assert source.queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_zero_intr_interval_bypass():
+    source = usb.UsbPacketSource(
+        mock.Mock(),
+        {},
+        mock.Mock(),
+        mock.Mock(),
+        None,
+        intr_interval=0,
+    )
+    acl = b'\x00\x28\x02\x00\xaa\xbb'
+
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+    assert source.queue.get_nowait() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
     source.close()
