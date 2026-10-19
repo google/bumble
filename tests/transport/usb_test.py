@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import asyncio
+from collections.abc import Iterable
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -210,7 +212,9 @@ async def test_open_usb_transport_by_index_checks_interfaces(device_class):
 
 
 # -----------------------------------------------------------------------------
-def _make_sco_sink(iso_max_packet_size: int, sco_alternate_setting: int = 0):
+def _make_sco_sink(
+    iso_max_packet_size: int, sco_alternate_setting: int = 0
+) -> tuple[usb.UsbPacketSink, list[mock.Mock], list[bytes]]:
     mock_device = mock.Mock()
     mock_bulk_out = mock.Mock()
     mock_iso_out = mock.Mock()
@@ -245,8 +249,8 @@ def _make_sco_sink(iso_max_packet_size: int, sco_alternate_setting: int = 0):
     ],
 )
 async def test_usb_packet_sink_sco_repacketization(
-    iso_max_packet_size, sco_packet_data_size
-):
+    iso_max_packet_size: int, sco_packet_data_size: int
+) -> None:
     sink, iso_transfers, sent_packets = _make_sco_sink(iso_max_packet_size)
     assert sink.sco_packet_data_size == sco_packet_data_size
     sink.start()
@@ -291,7 +295,9 @@ async def test_usb_packet_sink_sco_repacketization(
     await sink.terminate()
 
 
-def _make_sco_setting(alternate: int, max_packet_size: int):
+def _make_sco_setting(
+    alternate: int, max_packet_size: int
+) -> tuple[mock.MagicMock, list[mock.Mock]]:
     setting = mock.MagicMock()
     setting.getClass.return_value = 0xE0
     setting.getSubClass.return_value = 0x01
@@ -308,7 +314,7 @@ def _make_sco_setting(alternate: int, max_packet_size: int):
     return setting, endpoints
 
 
-def _make_acl_setting():
+def _make_acl_setting() -> mock.MagicMock:
     setting = mock.MagicMock()
     setting.getClass.return_value = 0xE0
     setting.getSubClass.return_value = 0x01
@@ -337,8 +343,8 @@ def _make_acl_setting():
     ],
 )
 def test_find_endpoints_returns_selected_sco_endpoints(
-    sco_alternate, expected_alternate
-):
+    sco_alternate: int, expected_alternate: int
+) -> None:
     acl_interface = mock.MagicMock()
     acl_setting = _make_acl_setting()
     acl_interface.__iter__.side_effect = lambda: iter([acl_setting])
@@ -368,7 +374,7 @@ def test_find_endpoints_returns_selected_sco_endpoints(
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_usb_packet_sink_sco_alternate_setting_6():
+async def test_usb_packet_sink_sco_alternate_setting_6() -> None:
     sink, iso_transfers, sent_packets = _make_sco_sink(63, sco_alternate_setting=6)
     # One codec frame (60 bytes) per HCI SCO packet, in a single USB frame.
     assert sink.sco_packet_data_size == 60
@@ -387,7 +393,10 @@ async def test_usb_packet_sink_sco_alternate_setting_6():
     await sink.terminate()
 
 
-def _make_dynamic_sco_transport(alternate_settings):
+def _make_dynamic_sco_transport(
+    alternate_settings: Iterable[int],
+) -> tuple[Any, dict[int, usb.ScoEndpoints]]:
+    # The transport is returned as Any, as its source and sink are mocks.
     transport = usb.UsbTransport.__new__(usb.UsbTransport)
     transport.device = mock.Mock()
     transport.sco_interface = mock.Mock()
@@ -395,7 +404,10 @@ def _make_dynamic_sco_transport(alternate_settings):
     transport.usb_source = mock.Mock()
     transport.usb_sink = mock.Mock()
     sco_settings = {
-        alternate_setting: (mock.Mock(name=f'in{alternate_setting}'), mock.Mock())
+        alternate_setting: usb.ScoEndpoints(
+            mock.Mock(name=f'in{alternate_setting}'),
+            mock.Mock(name=f'out{alternate_setting}'),
+        )
         for alternate_setting in alternate_settings
     }
     transport.enable_dynamic_sco_alternate_setting(sco_settings)
@@ -432,7 +444,7 @@ def _disconnection_complete(handle: int) -> bytes:
     )
 
 
-def _current_alternate_setting(transport) -> int:
+def _current_alternate_setting(transport: Any) -> int:
     return transport.device.setInterfaceAltSetting.call_args.args[1]
 
 
@@ -445,8 +457,8 @@ def _current_alternate_setting(transport) -> int:
     ],
 )
 def test_dynamic_sco_alternate_setting_transparent(
-    alternate_settings, expected_alternate_setting
-):
+    alternate_settings: tuple[int, ...], expected_alternate_setting: int
+) -> None:
     transport, sco_settings = _make_dynamic_sco_transport(alternate_settings)
     # No SCO link: alternate setting 0
     assert _current_alternate_setting(transport) == 0
@@ -456,17 +468,17 @@ def test_dynamic_sco_alternate_setting_transparent(
         _sync_connection_complete(0x010A, hci.CodecID.TRANSPARENT)
     )
     assert _current_alternate_setting(transport) == expected_alternate_setting
-    isochronous_in, isochronous_out = sco_settings[expected_alternate_setting]
-    transport.usb_source.start_sco.assert_called_once_with(isochronous_in)
+    endpoints = sco_settings[expected_alternate_setting]
+    transport.usb_source.start_sco.assert_called_once_with(endpoints.isochronous_in)
     transport.usb_sink.configure_sco.assert_called_once_with(
-        isochronous_out, expected_alternate_setting
+        endpoints.isochronous_out, expected_alternate_setting
     )
 
     transport.on_event_for_sco(_disconnection_complete(0x010A))
     assert _current_alternate_setting(transport) == 0
 
 
-def test_dynamic_sco_alternate_setting_cvsd():
+def test_dynamic_sco_alternate_setting_cvsd() -> None:
     transport, _ = _make_dynamic_sco_transport((1, 2, 3, 4, 5, 6))
 
     # 16-bit samples (default): 2, 4 and 5 for 1, 2 and 3 links
@@ -490,7 +502,7 @@ def test_dynamic_sco_alternate_setting_cvsd():
 
 
 @pytest.mark.asyncio
-async def test_usb_packet_source_drops_empty_sco_packets():
+async def test_usb_packet_source_drops_empty_sco_packets() -> None:
     source = usb.UsbPacketSource(mock.Mock(), {}, None, None, None)
     source.queue_packet(hci.HCI_SYNCHRONOUS_DATA_PACKET, bytes([0x0A, 0x01, 0]))
     source.queue_packet(hci.HCI_SYNCHRONOUS_DATA_PACKET, bytes([0x0A, 0x01, 1, 0xAB]))
@@ -503,7 +515,7 @@ async def test_usb_packet_source_drops_empty_sco_packets():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_usb_packet_sink_sco_unsupported_max_packet_size():
+async def test_usb_packet_sink_sco_unsupported_max_packet_size() -> None:
     # 3 * 1 - 3 = 0 bytes of data per packet: SCO data can't be sent.
     sink, iso_transfers, sent_packets = _make_sco_sink(1)
     assert sink.sco_packet_data_size == 0
@@ -521,7 +533,7 @@ async def test_usb_packet_sink_sco_unsupported_max_packet_size():
 
 
 @pytest.mark.asyncio
-async def test_usb_packet_sink_sco_cancelled_transfers_not_reused():
+async def test_usb_packet_sink_sco_cancelled_transfers_not_reused() -> None:
     sink, iso_transfers, _ = _make_sco_sink(17)
     sink.start()
     previous_transfer = iso_transfers[0]
