@@ -302,6 +302,25 @@ async def test_usb_packet_source_close_cancels_pending_timer():
     )
     acl = b'\x00\x28\x02\x00\xaa\xbb'
 
+    # 1. _clear_acl_queue() directly cancels pending timer and clears acl_queue.
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is not None
+    assert len(source.acl_queue) == 1
+    source._clear_acl_queue()
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+
+    # 2. on_transport_lost() cancels pending timer and clears acl_queue.
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is not None
+    assert len(source.acl_queue) == 1
+    source.on_transport_lost()
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+
+    # 3. close() cancels pending timer and clears acl_queue.
     source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
     await asyncio.sleep(0)
     assert source.acl_flush_handle is not None

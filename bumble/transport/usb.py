@@ -587,6 +587,12 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
 
         self.dequeue_task = self.loop.create_task(self.dequeue())
 
+    def _clear_acl_queue(self) -> None:
+        if self.acl_flush_handle is not None:
+            self.acl_flush_handle.cancel()
+            self.acl_flush_handle = None
+        self.acl_queue.clear()
+
     def _flush_acl_queue(self) -> None:
         if self.acl_flush_handle is not None:
             self.acl_flush_handle.cancel()
@@ -722,19 +728,13 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
                     logger.exception(color('!!! Exception in sink.on_packet', 'red'))
 
     def on_transport_lost(self):
-        if self.acl_flush_handle is not None:
-            self.acl_flush_handle.cancel()
-            self.acl_flush_handle = None
-        self.acl_queue.clear()
+        self._clear_acl_queue()
         super().on_transport_lost()
 
     def close(self):
         with self.lock:
             self.closed = True
-        if self.acl_flush_handle is not None:
-            self.acl_flush_handle.cancel()
-            self.acl_flush_handle = None
-        self.acl_queue.clear()
+        self._clear_acl_queue()
 
     async def terminate(self):
         self.close()
