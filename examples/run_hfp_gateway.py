@@ -147,8 +147,8 @@ async def ws_server(ws_client: websockets.asyncio.server.ServerConnection):
                     raise ValueError(f'Unsupported codec {codec}')
 
                 await device.send_command(
-                    hci.HCI_Enhanced_Setup_Synchronous_Connection_Command(
-                        connection_handle=connection.handle, **esco_param.asdict()
+                    hfp.setup_synchronous_connection_command(
+                        device.host, connection.handle, esco_param
                     )
                 )
             elif message_type == 'disconnect_sco':

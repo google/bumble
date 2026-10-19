@@ -191,11 +191,35 @@ class AdvertisingSet:
 
 
 # -----------------------------------------------------------------------------
+def _coding_format_codec_id(coding_format: int) -> int:
+    '''
+    Codec ID of a Coding_Format field of a command.
+
+    The field is declared as an int but parsed into a CodingFormat instance (see
+    HCI_Enhanced_Setup_Synchronous_Connection_Command), hence the cast.
+    '''
+    return cast(hci.CodingFormat, coding_format).codec_id
+
+
+# -----------------------------------------------------------------------------
+def sco_air_mode(codec_id: int) -> int:
+    '''
+    Air mode (Core Spec Vol 4, Part E - 7.7.35) of a link for this codec: codecs that
+    the controller codes itself keep their codec ID, anything else (mSBC, LC3,
+    transparent data) is transparent to the controller.
+    '''
+    if codec_id in (hci.CodecID.U_LOG, hci.CodecID.A_LOG, hci.CodecID.CVSD):
+        return codec_id
+    return hci.CodecID.TRANSPARENT
+
+
+# -----------------------------------------------------------------------------
 @dataclasses.dataclass
 class ScoLink:
     handle: int
     link_type: int
     peer_address: hci.Address
+    air_mode: int = 0
 
 
 @dataclasses.dataclass
@@ -1338,11 +1362,15 @@ class Controller:
                 )
             case lmp.LmpScoLinkReq():
                 self.on_classic_connection_request(
-                    sender_address, hci.HCI_Connection_Complete_Event.LinkType.SCO
+                    sender_address,
+                    hci.HCI_Connection_Complete_Event.LinkType.SCO,
+                    packet.air_mode,
                 )
             case lmp.LmpEscoLinkReq():
                 self.on_classic_connection_request(
-                    sender_address, hci.HCI_Connection_Complete_Event.LinkType.ESCO
+                    sender_address,
+                    hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+                    packet.air_mode,
                 )
             case lmp.LmpDetach():
                 self.on_classic_disconnected(
@@ -1703,7 +1731,7 @@ class Controller:
         )
 
     def on_classic_connection_request(
-        self, peer_address: hci.Address, link_type: int
+        self, peer_address: hci.Address, link_type: int, air_mode: int = 0
     ) -> None:
         if link_type == hci.HCI_Connection_Complete_Event.LinkType.ACL:
             self.classic_connections[peer_address] = Connection(
@@ -1718,10 +1746,13 @@ class Controller:
                 classic_allow_role_switch=self.classic_allow_role_switch,
             )
         else:
+            # Remember the requested air mode for the Synchronous Connection Complete
+            # event, in case the host accepts the request without a voice setting.
             self.sco_links[peer_address] = ScoLink(
                 handle=0,
                 link_type=link_type,
                 peer_address=peer_address,
+                air_mode=air_mode,
             )
         self.send_hci_packet(
             hci.HCI_Connection_Request_Event(
@@ -1839,6 +1870,10 @@ class Controller:
     def on_classic_sco_connection_complete(
         self, peer_address: hci.Address, status: int, link_type: int
     ) -> None:
+        # The requester's parameters, which include the air mode, are kept on the
+        # pending link while the request is in flight.
+        pending_link = self.sco_links.pop(peer_address, None)
+        air_mode = pending_link.air_mode if pending_link else 0
         if status == hci.HCI_ErrorCode.SUCCESS:
             # Allocate (or reuse) a connection handle
             connection_handle = self.allocate_connection_handle()
@@ -1846,6 +1881,7 @@ class Controller:
                 handle=connection_handle,
                 link_type=link_type,
                 peer_address=peer_address,
+                air_mode=air_mode,
             )
             self.sco_links[peer_address] = sco_link
             logger.debug(f'New SCO connection handle: 0x{connection_handle:04X}')
@@ -1863,7 +1899,7 @@ class Controller:
                 retransmission_window=0,
                 rx_packet_length=0,
                 tx_packet_length=0,
-                air_mode=0,
+                air_mode=air_mode,
             )
         )
 
@@ -2127,6 +2163,158 @@ class Controller:
 
         return None
 
+    def on_hci_setup_synchronous_connection_command(
+        self, command: hci.HCI_Setup_Synchronous_Connection_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.26 Setup Synchronous Connection command
+        '''
+
+        if self.link is None:
+            return None
+
+        if not (
+            connection := self.find_connection_by_handle(command.connection_handle)
+        ):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+            return None
+
+        self._send_hci_command_status(hci.HCI_ErrorCode.SUCCESS, command.op_code)
+        # The link is an eSCO link if the host allows any eSCO packet type, and a SCO
+        # link otherwise (the eSCO fields of the LMP packet are left unset, like the
+        # enhanced command does).
+        link_type = (
+            hci.HCI_Connection_Complete_Event.LinkType.ESCO
+            if command.packet_type
+            & hci.HCI_Setup_Synchronous_Connection_Command.ESCO_PACKET_TYPES
+            else hci.HCI_Connection_Complete_Event.LinkType.SCO
+        )
+        # Keep the parameters of the request until the peer answers, including the air
+        # mode, which the Synchronous Connection Complete event reports.
+        pending_link = ScoLink(
+            handle=0,
+            link_type=link_type,
+            peer_address=connection.peer_address,
+            air_mode=sco_air_mode(
+                hci.VoiceSetting.from_int(command.voice_setting).codec_id()
+            ),
+        )
+        self.sco_links[connection.peer_address] = pending_link
+        if link_type == hci.HCI_Connection_Complete_Event.LinkType.ESCO:
+            lmp_packet: lmp.Packet = lmp.LmpEscoLinkReq(
+                esco_handle=0,
+                esco_lt_addr=0,
+                timing_control_flags=0,
+                d_esco=0,
+                t_esco=0,
+                w_esco=0,
+                esco_packet_type_c_to_p=0,
+                esco_packet_type_p_to_c=0,
+                packet_length_c_to_p=0,
+                packet_length_p_to_c=0,
+                air_mode=pending_link.air_mode,
+                negotiation_state=0,
+            )
+        else:
+            lmp_packet = lmp.LmpScoLinkReq(
+                sco_handle=0,
+                timing_control_flags=0,
+                d_sco=0,
+                t_sco=0,
+                sco_packet=0,
+                air_mode=pending_link.air_mode,
+            )
+        future = self.send_lmp_packet(connection.peer_address, lmp_packet)
+
+        def on_response(future: asyncio.Future[int]) -> None:
+            self.on_classic_sco_connection_complete(
+                connection.peer_address, future.result(), link_type
+            )
+
+        future.add_done_callback(on_response)
+        return None
+
+    def on_hci_accept_synchronous_connection_request_command(
+        self, command: hci.HCI_Accept_Synchronous_Connection_Request_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.27 Accept Synchronous Connection Request command
+        '''
+
+        if self.link is None:
+            return None
+
+        if not (connection := self.classic_connections.get(command.bd_addr)):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+            return None
+
+        self._send_hci_command_status(hci.HCI_ErrorCode.SUCCESS, command.op_code)
+        # The accepted link is the one the peer requested, if it is still pending.
+        link = self.sco_links.get(command.bd_addr)
+        link_type = (
+            link.link_type if link else hci.HCI_Connection_Complete_Event.LinkType.ESCO
+        )
+        if link:
+            # The host's voice setting decides how this side codes the audio.
+            link.air_mode = sco_air_mode(
+                hci.VoiceSetting.from_int(command.voice_setting).codec_id()
+            )
+        self.send_lmp_packet(
+            connection.peer_address,
+            (
+                lmp.LmpAcceptedExt(lmp.Opcode.LMP_ESCO_LINK_REQ)
+                if link_type == hci.HCI_Connection_Complete_Event.LinkType.ESCO
+                else lmp.LmpAccepted(
+                    response_opcode=lmp.Opcode.LMP_SCO_LINK_REQ,
+                )
+            ),
+        )
+        self.on_classic_sco_connection_complete(
+            connection.peer_address, hci.HCI_ErrorCode.SUCCESS, link_type
+        )
+        return None
+
+    def on_hci_reject_synchronous_connection_request_command(
+        self, command: hci.HCI_Reject_Synchronous_Connection_Request_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.1.28 Reject Synchronous Connection Request command
+        '''
+
+        if self.link is None:
+            return None
+
+        if not (connection := self.classic_connections.get(command.bd_addr)):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+            return None
+
+        self._send_hci_command_status(hci.HCI_ErrorCode.SUCCESS, command.op_code)
+        link = self.sco_links.pop(command.bd_addr, None)
+        # The eSCO link request is an extended LMP opcode, so its rejection is the
+        # extended form, with the opcode code (see on_lmp_packet).
+        self.send_lmp_packet(
+            connection.peer_address,
+            (
+                lmp.LmpNotAcceptedExt(
+                    response_opcode=lmp.Opcode.LMP_ESCO_LINK_REQ & 0xFF,
+                    error_code=command.reason,
+                )
+                if link is not None
+                and link.link_type == hci.HCI_Connection_Complete_Event.LinkType.ESCO
+                else lmp.LmpNotAccepted(
+                    response_opcode=lmp.Opcode.LMP_SCO_LINK_REQ,
+                    error_code=command.reason,
+                )
+            ),
+        )
+        return None
+
     def on_hci_enhanced_setup_synchronous_connection_command(
         self, command: hci.HCI_Enhanced_Setup_Synchronous_Connection_Command
     ) -> None:
@@ -2146,6 +2334,17 @@ class Controller:
             return None
 
         self._send_hci_command_status(hci.HCI_ErrorCode.SUCCESS, command.op_code)
+        # Keep the parameters of the request until the peer answers, including the air
+        # mode, which the Synchronous Connection Complete event reports.
+        pending_link = ScoLink(
+            handle=0,
+            link_type=hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+            peer_address=connection.peer_address,
+            air_mode=sco_air_mode(
+                _coding_format_codec_id(command.transmit_coding_format)
+            ),
+        )
+        self.sco_links[connection.peer_address] = pending_link
         future = self.send_lmp_packet(
             connection.peer_address,
             lmp.LmpEscoLinkReq(
@@ -2159,7 +2358,7 @@ class Controller:
                 esco_packet_type_p_to_c=0,
                 packet_length_c_to_p=0,
                 packet_length_p_to_c=0,
-                air_mode=0,
+                air_mode=pending_link.air_mode,
                 negotiation_state=0,
             ),
         )
@@ -2191,6 +2390,13 @@ class Controller:
             return None
 
         self._send_hci_command_status(hci.HCI_ErrorCode.SUCCESS, command.op_code)
+        # The accepted link is the one the peer requested, if it is still pending.
+        link = self.sco_links.get(command.bd_addr)
+        if link:
+            # The host's coding format decides how this side codes the audio.
+            link.air_mode = sco_air_mode(
+                _coding_format_codec_id(command.transmit_coding_format)
+            )
         self.send_lmp_packet(
             connection.peer_address,
             lmp.LmpAcceptedExt(lmp.Opcode.LMP_ESCO_LINK_REQ),
@@ -2198,7 +2404,11 @@ class Controller:
         self.on_classic_sco_connection_complete(
             connection.peer_address,
             hci.HCI_ErrorCode.SUCCESS,
-            hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+            (
+                link.link_type
+                if link
+                else hci.HCI_Connection_Complete_Event.LinkType.ESCO
+            ),
         )
         return None
 

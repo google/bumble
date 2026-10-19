@@ -16,13 +16,16 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import dataclasses
 import logging
 import os
+from unittest import mock
 
 import pytest
 import pytest_asyncio
 
 from bumble import core, hci, hfp, rfcomm
+from bumble.host import Host
 from bumble.testing.test_utils import TwoDevices
 
 # -----------------------------------------------------------------------------
@@ -504,7 +507,126 @@ async def test_ag_sdp_record():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_sco_setup():
+@pytest.mark.parametrize(
+    (
+        'codec_parameters',
+        'enhanced_commands',
+        'expected_link_type',
+        'expected_air_mode',
+    ),
+    [
+        # eSCO link with the enhanced commands
+        (
+            hfp.DefaultCodecParameters.ESCO_CVSD_S1,
+            True,
+            hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+            hci.CodecID.CVSD,
+        ),
+        # Transparent (mSBC) eSCO link with the enhanced commands
+        (
+            hfp.DefaultCodecParameters.ESCO_MSBC_T2,
+            True,
+            hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+            hci.CodecID.TRANSPARENT,
+        ),
+        # eSCO link with the non-enhanced commands
+        (
+            hfp.DefaultCodecParameters.ESCO_CVSD_S1,
+            False,
+            hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+            hci.CodecID.CVSD,
+        ),
+        # SCO link with the non-enhanced commands
+        (
+            hfp.DefaultCodecParameters.SCO_CVSD_D1,
+            False,
+            hci.HCI_Connection_Complete_Event.LinkType.SCO,
+            hci.CodecID.CVSD,
+        ),
+    ],
+)
+async def test_sco_setup(
+    codec_parameters: hfp.DefaultCodecParameters,
+    enhanced_commands: bool,
+    expected_link_type: int,
+    expected_air_mode: int,
+):
+    devices = TwoDevices()
+
+    # Enable Classic connections
+    devices[0].classic_enabled = True
+    devices[1].classic_enabled = True
+
+    # Start
+    await devices[0].power_on()
+    await devices[1].power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect(
+            devices[1].public_address, transport=core.PhysicalTransport.BR_EDR
+        ),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    parameters = hfp.ESCO_PARAMETERS[codec_parameters]
+
+    def on_sco_request(_connection, _link_type: int):
+        connections[1].abort_on(
+            'disconnection',
+            devices[1].send_command(
+                hfp.accept_synchronous_connection_request_command(
+                    devices[1].host, connections[1].peer_address, parameters
+                )
+            ),
+        )
+
+    devices[1].on('sco_request', on_sco_request)
+
+    sco_connection_futures = [
+        asyncio.get_running_loop().create_future(),
+        asyncio.get_running_loop().create_future(),
+    ]
+
+    for index, future in enumerate(sco_connection_futures):
+        devices[index].on('sco_connection', future.set_result)
+
+    # Pretend the controllers only implement either the enhanced or the non-enhanced
+    # commands, so that both ways of setting up a link are covered.
+    with mock.patch.object(
+        Host,
+        'supports_command',
+        lambda _self, op_code: enhanced_commands
+        and op_code
+        in (
+            hci.HCI_ENHANCED_SETUP_SYNCHRONOUS_CONNECTION_COMMAND,
+            hci.HCI_ENHANCED_ACCEPT_SYNCHRONOUS_CONNECTION_REQUEST_COMMAND,
+        ),
+    ):
+        await devices[0].send_command(
+            hfp.setup_synchronous_connection_command(
+                devices[0].host, connections[0].handle, parameters
+            )
+        )
+        sco_connections = await asyncio.gather(*sco_connection_futures)
+
+    for sco_connection in sco_connections:
+        assert sco_connection.link_type == expected_link_type
+        assert sco_connection.air_mode == expected_air_mode
+
+    sco_disconnection_futures = [
+        asyncio.get_running_loop().create_future(),
+        asyncio.get_running_loop().create_future(),
+    ]
+    for future, sco_connection in zip(sco_disconnection_futures, sco_connections):
+        sco_connection.on('disconnection', future.set_result)
+
+    await sco_connections[0].disconnect()
+    await asyncio.gather(*sco_disconnection_futures)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_sco_setup_rejected():
     devices = TwoDevices()
 
     # Enable Classic connections
@@ -526,42 +648,88 @@ async def test_sco_setup():
         connections[1].abort_on(
             'disconnection',
             devices[1].send_command(
-                hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(
+                hci.HCI_Reject_Synchronous_Connection_Request_Command(
                     bd_addr=connections[1].peer_address,
-                    **hfp.ESCO_PARAMETERS[
-                        hfp.DefaultCodecParameters.ESCO_CVSD_S1
-                    ].asdict(),
+                    reason=hci.HCI_ErrorCode.CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR,
                 )
             ),
         )
 
     devices[1].on('sco_request', on_sco_request)
 
-    sco_connection_futures = [
-        asyncio.get_running_loop().create_future(),
-        asyncio.get_running_loop().create_future(),
-    ]
+    failure_future = asyncio.get_running_loop().create_future()
+    devices[0].on('sco_connection_failure', failure_future.set_result)
 
-    for device, future in zip(devices, sco_connection_futures):
-        device.on('sco_connection', future.set_result)
-
-    await devices[0].send_command(
-        hci.HCI_Enhanced_Setup_Synchronous_Connection_Command(
-            connection_handle=connections[0].handle,
-            **hfp.ESCO_PARAMETERS[hfp.DefaultCodecParameters.ESCO_CVSD_S1].asdict(),
+    # The non-enhanced Reject Synchronous Connection Request command
+    with mock.patch.object(Host, 'supports_command', return_value=False):
+        await devices[0].send_command(
+            hfp.setup_synchronous_connection_command(
+                devices[0].host,
+                connections[0].handle,
+                hfp.ESCO_PARAMETERS[hfp.DefaultCodecParameters.ESCO_CVSD_S1],
+            )
         )
+        assert (
+            await asyncio.wait_for(failure_future, timeout=5)
+            == hci.HCI_ErrorCode.CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR
+        )
+
+
+# -----------------------------------------------------------------------------
+def test_esco_parameters_as_legacy_dict():
+    # CVSD: the air coding format is CVSD, the PCM data is 16-bit two's complement
+    # (which is also the default voice setting of most controllers).
+    parameters = hfp.ESCO_PARAMETERS[hfp.DefaultCodecParameters.ESCO_CVSD_S1]
+    legacy = parameters.as_legacy_dict()
+    assert legacy['voice_setting'] == 0x0060
+    assert legacy['transmit_bandwidth'] == parameters.transmit_bandwidth
+    assert legacy['receive_bandwidth'] == parameters.receive_bandwidth
+    assert legacy['max_latency'] == parameters.max_latency
+    assert legacy['retransmission_effort'] == parameters.retransmission_effort
+    assert legacy['packet_type'] == parameters.packet_type
+
+    # mSBC is coded by the host: it goes over the air as transparent data
+    parameters = hfp.ESCO_PARAMETERS[hfp.DefaultCodecParameters.ESCO_MSBC_T2]
+    assert parameters.as_legacy_dict()['voice_setting'] == 0x0063
+
+    # 8-bit PCM samples, sign and magnitude
+    parameters = dataclasses.replace(
+        hfp.ESCO_PARAMETERS[hfp.DefaultCodecParameters.ESCO_CVSD_S1],
+        input_coded_data_size=8,
+        input_pcm_data_format=hci.PcmDataFormat.SIGN_MAGNITUDE,
     )
-    sco_connections = await asyncio.gather(*sco_connection_futures)
+    assert parameters.as_legacy_dict()['voice_setting'] == 0x0080
 
-    sco_disconnection_futures = [
-        asyncio.get_running_loop().create_future(),
-        asyncio.get_running_loop().create_future(),
-    ]
-    for future, sco_connection in zip(sco_disconnection_futures, sco_connections):
-        sco_connection.on('disconnection', future.set_result)
 
-    await sco_connections[0].disconnect()
-    await asyncio.gather(*sco_disconnection_futures)
+# -----------------------------------------------------------------------------
+def test_synchronous_connection_commands():
+    parameters = hfp.ESCO_PARAMETERS[hfp.DefaultCodecParameters.ESCO_CVSD_S1]
+    address = hci.Address('F0:F1:F2:F3:F4:F5')
+    host = mock.Mock()
+
+    host.supports_command.return_value = True
+    assert isinstance(
+        hfp.setup_synchronous_connection_command(host, 0x0040, parameters),
+        hci.HCI_Enhanced_Setup_Synchronous_Connection_Command,
+    )
+    assert isinstance(
+        hfp.accept_synchronous_connection_request_command(host, address, parameters),
+        hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command,
+    )
+
+    host.supports_command.return_value = False
+    legacy_setup = hfp.setup_synchronous_connection_command(host, 0x0040, parameters)
+    assert isinstance(legacy_setup, hci.HCI_Setup_Synchronous_Connection_Command)
+    assert legacy_setup.connection_handle == 0x0040
+    assert legacy_setup.voice_setting == 0x0060
+    legacy_accept = hfp.accept_synchronous_connection_request_command(
+        host, address, parameters
+    )
+    assert isinstance(
+        legacy_accept, hci.HCI_Accept_Synchronous_Connection_Request_Command
+    )
+    assert legacy_accept.bd_addr == address
+    assert legacy_accept.voice_setting == 0x0060
 
 
 # -----------------------------------------------------------------------------
