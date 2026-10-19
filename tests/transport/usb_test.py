@@ -709,3 +709,60 @@ async def test_usb_packet_source_zero_intr_interval_bypass():
     assert len(source.acl_queue) == 0
     assert source.queue.get_nowait() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
     source.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('speed', 'b_interval', 'expected'),
+    [
+        # Intervals below DEFAULT_INTR_INTERVAL (4 ms) clamp to 4 ms floor
+        (usb.usb1.SPEED_FULL, 1, usb.DEFAULT_INTR_INTERVAL),
+        (usb.usb1.SPEED_HIGH, 4, usb.DEFAULT_INTR_INTERVAL),
+        (usb.usb1.SPEED_HIGH, 1, usb.DEFAULT_INTR_INTERVAL),
+        (usb.usb1.SPEED_SUPER, 4, usb.DEFAULT_INTR_INTERVAL),
+        # Intervals above 4 ms are preserved
+        (usb.usb1.SPEED_FULL, 6, 0.006),
+        (usb.usb1.SPEED_LOW, 10, 0.010),
+        (usb.usb1.SPEED_HIGH, 7, 0.008),
+        (usb.usb1.SPEED_SUPER, 7, 0.008),
+        # Invalid/zero bInterval falls back to DEFAULT_INTR_INTERVAL
+        (usb.usb1.SPEED_FULL, 0, usb.DEFAULT_INTR_INTERVAL),
+    ],
+)
+async def test_usb_packet_source_endpoint_interval_derivation(
+    speed, b_interval, expected
+):
+    mock_device = mock.Mock()
+    mock_device.getDevice.return_value.getDeviceSpeed.return_value = speed
+
+    mock_interrupt_in = mock.Mock()
+    mock_interrupt_in.getInterval.return_value = b_interval
+
+    source = usb.UsbPacketSource(
+        mock_device,
+        {},
+        mock_interrupt_in,
+        mock.Mock(),
+        None,
+    )
+    assert source.intr_interval == pytest.approx(expected)
+    source.close()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_speed_super_plus_x2_missing(monkeypatch):
+    monkeypatch.delattr(usb.usb1, 'SPEED_SUPER_PLUS_X2', raising=False)
+    mock_device = mock.Mock()
+    mock_device.getDevice.return_value.getDeviceSpeed.return_value = usb.usb1.SPEED_HIGH
+    mock_interrupt_in = mock.Mock()
+    mock_interrupt_in.getInterval.return_value = 7  # 8 ms at High-Speed
+
+    source = usb.UsbPacketSource(
+        mock_device,
+        {},
+        mock_interrupt_in,
+        mock.Mock(),
+        None,
+    )
+    assert source.intr_interval == pytest.approx(0.008)
+    source.close()

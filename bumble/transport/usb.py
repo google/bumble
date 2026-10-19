@@ -675,6 +675,29 @@ class AclPacketSplitter(PacketSplitter):
 DEFAULT_INTR_INTERVAL = 0.004
 
 
+def _get_intr_interval(
+    device: usb1.USBDeviceHandle, interrupt_in: usb1.USBEndpoint
+) -> float:
+    """Compute the HCI interrupt endpoint polling sync window in seconds."""
+    raw_interval = interrupt_in.getInterval()
+    if raw_interval <= 0:
+        return DEFAULT_INTR_INTERVAL
+
+    speed = device.getDevice().getDeviceSpeed()
+    # pylint: disable=no-member
+    if speed is not None and speed in (
+        usb1.SPEED_HIGH,
+        usb1.SPEED_SUPER,
+        usb1.SPEED_SUPER_PLUS,
+        getattr(usb1, 'SPEED_SUPER_PLUS_X2', None),
+    ):
+        exponent = min(raw_interval, 16)
+        interval = (1 << (exponent - 1)) * 0.000125
+    else:
+        interval = float(raw_interval) / 1000.0
+    return max(interval, DEFAULT_INTR_INTERVAL)
+
+
 class UsbPacketSource(asyncio.Protocol, BaseSource):
     def __init__(
         self,
@@ -689,9 +712,9 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         self.device = device
         self.metadata = metadata
         self.interrupt_in = interrupt_in
-        self.interrupt_in_transfer = None
+        self.interrupt_in_transfer: usb1.USBTransfer | None = None
         self.bulk_in = bulk_in
-        self.bulk_in_transfer = None
+        self.bulk_in_transfer: usb1.USBTransfer | None = None
         self.isochronous_in = isochronous_in
         self.isochronous_in_transfers: list[usb1.USBTransfer] = []
         self.loop = asyncio.get_running_loop()
@@ -701,13 +724,7 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         if intr_interval is not None:
             self.intr_interval = float(intr_interval)
         else:
-            raw_interval = getattr(interrupt_in, 'getInterval', lambda: None)()
-            if isinstance(raw_interval, (int, float)) and raw_interval > 0:
-                self.intr_interval = max(
-                    float(raw_interval) / 1000.0, DEFAULT_INTR_INTERVAL
-                )
-            else:
-                self.intr_interval = DEFAULT_INTR_INTERVAL
+            self.intr_interval = _get_intr_interval(device, interrupt_in)
         self.dequeue_task: asyncio.Task[None] | None = None
         self.done: dict[usb1.USBTransfer, asyncio.Event] = {}
         self.splitters = {
