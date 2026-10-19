@@ -352,3 +352,41 @@ async def test_usb_packet_source_zero_intr_interval_bypass():
     assert len(source.acl_queue) == 0
     assert source.queue.get_nowait() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
     source.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('speed', 'via_handle', 'b_interval', 'expected'),
+    [
+        (usb.usb1.SPEED_FULL, False, 1, 0.001),
+        (usb.usb1.SPEED_LOW, False, 10, 0.010),
+        (usb.usb1.SPEED_HIGH, False, 4, 0.001),
+        (usb.usb1.SPEED_HIGH, True, 1, 0.000125),
+        (usb.usb1.SPEED_SUPER, True, 4, 0.001),
+        (usb.usb1.SPEED_FULL, False, 0, usb.DEFAULT_INTR_INTERVAL),
+        (usb.usb1.SPEED_FULL, False, None, usb.DEFAULT_INTR_INTERVAL),
+    ],
+)
+async def test_usb_packet_source_endpoint_interval_derivation(
+    speed, via_handle, b_interval, expected
+):
+    mock_device = mock.Mock(spec=['getDevice'] if via_handle else ['getDeviceSpeed'])
+    if via_handle:
+        usb_device = mock.Mock(spec=['getDeviceSpeed'])
+        usb_device.getDeviceSpeed.return_value = speed
+        mock_device.getDevice.return_value = usb_device
+    else:
+        mock_device.getDeviceSpeed.return_value = speed
+
+    mock_interrupt_in = mock.Mock(spec=['getInterval'])
+    mock_interrupt_in.getInterval.return_value = b_interval
+
+    source = usb.UsbPacketSource(
+        mock_device,
+        {},
+        mock_interrupt_in,
+        mock.Mock(),
+        None,
+    )
+    assert source.intr_interval == pytest.approx(expected)
+    source.close()

@@ -498,6 +498,40 @@ class AclPacketSplitter(PacketSplitter):
 DEFAULT_INTR_INTERVAL = 0.004
 
 
+def _get_intr_interval(device, interrupt_in) -> float:
+    raw_interval = getattr(interrupt_in, 'getInterval', lambda: None)()
+    if not isinstance(raw_interval, (int, float)) or raw_interval <= 0:
+        return DEFAULT_INTR_INTERVAL
+
+    speed = None
+    get_speed = getattr(device, 'getDeviceSpeed', None)
+    if callable(get_speed):
+        candidate = get_speed()
+        if isinstance(candidate, int):
+            speed = candidate
+    if speed is None:
+        get_device = getattr(device, 'getDevice', None)
+        if callable(get_device):
+            usb_device = get_device()
+            get_usb_speed = getattr(usb_device, 'getDeviceSpeed', None)
+            if callable(get_usb_speed):
+                candidate = get_usb_speed()
+                if isinstance(candidate, int):
+                    speed = candidate
+
+    # pylint: disable=no-member
+    if speed in (
+        usb1.SPEED_HIGH,
+        usb1.SPEED_SUPER,
+        usb1.SPEED_SUPER_PLUS,
+        usb1.SPEED_SUPER_PLUS_X2,
+    ):
+        exponent = min(max(int(raw_interval), 1), 16)
+        return (1 << (exponent - 1)) * 0.000125
+
+    return float(raw_interval) / 1000.0
+
+
 class UsbPacketSource(asyncio.Protocol, BaseSource):
 
     def __init__(
@@ -525,13 +559,7 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         if intr_interval is not None:
             self.intr_interval = float(intr_interval)
         else:
-            raw_interval = getattr(interrupt_in, 'getInterval', lambda: None)()
-            if isinstance(raw_interval, (int, float)) and raw_interval > 0:
-                self.intr_interval = max(
-                    float(raw_interval) / 1000.0, DEFAULT_INTR_INTERVAL
-                )
-            else:
-                self.intr_interval = DEFAULT_INTR_INTERVAL
+            self.intr_interval = _get_intr_interval(device, interrupt_in)
         self.dequeue_task = None
         self.done: dict[Any, asyncio.Event] = {}
         self.splitters = {
