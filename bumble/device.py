@@ -2997,6 +2997,15 @@ class Device(utils.CompositeEventEmitter):
                     )
                 )
 
+            if not self.supports_le_features(hci.LeFeatureMask.LL_PRIVACY):
+                if self.address_resolution_offload or self.address_generation_offload:
+                    logger.warning(
+                        'Controller does not support LL Privacy; '
+                        'disabling privacy offloads'
+                    )
+                    self.address_resolution_offload = False
+                    self.address_generation_offload = False
+
             # Load the address resolving list
             if self.keystore:
                 await self.refresh_resolving_list()
