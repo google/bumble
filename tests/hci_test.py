@@ -712,6 +712,23 @@ def test_iso_data_packet_too_short():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.parametrize('packet_status', list(hci.HCI_IsoDataPacket.PacketStatus))
+def test_iso_data_packet_status_flag(
+    packet_status: hci.HCI_IsoDataPacket.PacketStatus,
+) -> None:
+    # Packet_Status_Flag occupies bits 14-15 of the ISO_SDU_Length field.
+    data = (
+        bytes.fromhex('05612007000100')
+        + ((packet_status << 14) | 0x003).to_bytes(2, 'little')
+        + bytes(3)
+    )
+    packet = hci.HCI_IsoDataPacket.from_bytes(data)
+    assert packet.packet_status_flag == packet_status
+    assert packet.iso_sdu_length == 3
+    assert bytes(packet) == data
+
+
+# -----------------------------------------------------------------------------
 def run_test_events():
     test_HCI_Event()
     test_HCI_LE_Connection_Complete_Event()

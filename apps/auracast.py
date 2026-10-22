@@ -44,6 +44,7 @@ import bumble.utils
 from bumble import company_ids, core, data_types, gatt, hci
 from bumble.audio import io as audio_io
 from bumble.colors import color
+from bumble.host import IsoSdu
 from bumble.profiles import bap, bass, le_audio, pbp
 
 # -----------------------------------------------------------------------------
@@ -859,9 +860,9 @@ async def run_receive(
             )
         )
 
-        def sink(queue: collections.deque[bytes], packet: hci.HCI_IsoDataPacket):
-            # TODO: re-assemble fragments and detect errors
-            queue.append(packet.iso_sdu_fragment)
+        def sink(queue: collections.deque[bytes], sdu: IsoSdu):
+            # TODO: detect errors using sdu.packet_status
+            queue.append(sdu.data)
 
             while all(lc3_queues):
                 # This assumes SDUs contain one LC3 frame each, which may not

@@ -42,7 +42,8 @@ from bumble import data_types, utils
 from bumble.colors import color
 from bumble.core import AdvertisingData
 from bumble.device import AdvertisingParameters, CisLink, Device, DeviceConfiguration
-from bumble.hci import Address, CodecID, CodingFormat, HCI_IsoDataPacket
+from bumble.hci import Address, CodecID, CodingFormat
+from bumble.host import IsoSdu
 from bumble.profiles import ascs, bap, pacs
 from bumble.transport import open_transport
 
@@ -373,18 +374,18 @@ class Speaker:
                 )
             ) + bytes(bap.UnicastServerAdvertisingData())
 
-            def on_pdu(pdu: HCI_IsoDataPacket, ase: ascs.AseStateMachine):
+            def on_sdu(sdu: IsoSdu, ase: ascs.AseStateMachine):
                 codec_config = ase.codec_specific_configuration
                 if (
                     not isinstance(codec_config, bap.CodecSpecificConfiguration)
                     or codec_config.frame_duration is None
                     or codec_config.audio_channel_allocation is None
                     or decoder is None
-                    or not pdu.iso_sdu_fragment
+                    or not sdu.data
                 ):
                     return
                 pcm = decoder.decode(
-                    pdu.iso_sdu_fragment, bit_depth=DEFAULT_PCM_BYTES_PER_SAMPLE * 8
+                    sdu.data, bit_depth=DEFAULT_PCM_BYTES_PER_SAMPLE * 8
                 )
                 utils.cancel_on_event(
                     self.device, 'disconnection', self.ui_server.send_audio(pcm)
@@ -419,7 +420,7 @@ class Speaker:
                     else:
                         if not ase.cis_link:
                             return
-                        ase.cis_link.sink = functools.partial(on_pdu, ase=ase)
+                        ase.cis_link.sink = functools.partial(on_sdu, ase=ase)
                 elif ase.state == ascs.AseStateMachine.State.CODEC_CONFIGURED:
                     if (
                         not isinstance(codec_config, bap.CodecSpecificConfiguration)

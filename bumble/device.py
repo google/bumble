@@ -69,7 +69,7 @@ from bumble.core import (
     UnreachableError,
 )
 from bumble.gatt import Attribute, Characteristic, Descriptor, Service
-from bumble.host import DataPacketQueue, Host
+from bumble.host import DataPacketQueue, Host, IsoSdu
 from bumble.keys import KeyStore, PairingKeys
 from bumble.profiles import gatt_service
 from bumble.profiles.gap import GenericAccessService
@@ -1512,7 +1512,8 @@ class ScoLink(utils.CompositeEventEmitter):
 class _IsoLink:
     handle: int
     device: Device
-    sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
+    # Called with each complete ISO SDU received from the controller.
+    sink: Callable[[IsoSdu], Any] | None = None
     data_paths: set[_IsoLink.Direction]
     _data_path_lock: asyncio.Lock
 
@@ -1694,7 +1695,7 @@ class CisLink(utils.EventEmitter, _IsoLink):
     max_pdu_p_to_c: int = 0
     iso_interval: float = 0.0  # ISO interval, in milliseconds
     state: State = State.PENDING
-    sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
+    sink: Callable[[IsoSdu], Any] | None = None
 
     EVENT_DISCONNECTION: ClassVar[str] = "disconnection"
     EVENT_DISCONNECTION_FAILURE: ClassVar[str] = "disconnection_failure"
@@ -1716,7 +1717,7 @@ class CisLink(utils.EventEmitter, _IsoLink):
 class BisLink(_IsoLink):
     handle: int
     big: Big | BigSync
-    sink: Callable[[hci.HCI_IsoDataPacket], Any] | None = None
+    sink: Callable[[IsoSdu], Any] | None = None
     device: Device = field(init=False)
 
     def __post_init__(self) -> None:
@@ -6716,12 +6717,11 @@ class Device(utils.CompositeEventEmitter):
 
     # [LE only]
     @host_event_handler
-    @utils.experimental('Only for testing')
-    def on_iso_packet(self, handle: int, packet: hci.HCI_IsoDataPacket) -> None:
-        if (cis_link := self.cis_links.get(handle)) and cis_link.sink:
-            cis_link.sink(packet)
-        elif (bis_link := self.bis_links.get(handle)) and bis_link.sink:
-            bis_link.sink(packet)
+    def on_iso_sdu(self, handle: int, sdu: IsoSdu) -> None:
+        if (iso_link := self.cis_links.get(handle) or self.bis_links.get(handle)) and (
+            sink := iso_link.sink
+        ):
+            sink(sdu)
 
     @host_event_handler
     @with_connection_from_handle
