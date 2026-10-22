@@ -19,10 +19,11 @@ from __future__ import annotations
 
 import asyncio
 import ctypes
+import dataclasses
 import logging
 import platform
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 import usb1
@@ -74,9 +75,29 @@ USB_BT_HCI_CLASS_TUPLE = (
     USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER,
 )
 
-MAX_SCO_PACKET_SIZE = 1024
 MAX_SCO_IN_PACKETS = 128
 NUMBER_OF_SCO_IN_TRANSFERS = 2
+# Each HCI SCO packet sent over the isochronous endpoint spans 3 USB (micro)frames,
+# with the 3-byte HCI header at the start of the first one (Core Spec Vol 4, Part B,
+# 2.1.1). For example, with alternate setting 2 (17-byte max packet size), each HCI SCO
+# packet carries 3 * 17 - 3 = 48 bytes of data.
+USB_FRAMES_PER_SCO_PACKET = 3
+# Number of isochronous OUT transfers kept in flight, so that SCO data is sent at the
+# rate of the SCO link instead of leaving gaps between transfers.
+NUMBER_OF_SCO_OUT_TRANSFERS = 4
+HCI_SCO_HEADER_SIZE = 3
+HCI_SCO_MAX_DATA_SIZE = 255  # The Data_Total_Length field is 1 byte
+# Input_Sample_Size bit of the Voice_Setting parameter (Core Spec Vol 4, Part E, 6.12)
+VOICE_SETTING_16_BIT_SAMPLES = 0x0020
+# With alternate setting 6 (transparent 16 kHz, e.g. mSBC / LC3 SWB), each HCI SCO
+# packet (3 + 60 bytes, i.e. one 7.5 ms codec frame) fits in a single USB frame (Core
+# Spec Vol 4, Part B, Table 2.1). Packets are sent back to back: controllers such as
+# Intel BE200 do not accept empty frames in between.
+SCO_ALT6_ALTERNATE_SETTING = 6
+# Alternate settings for 1, 2 and 3 SCO links with 16-bit samples on HCI. With 8-bit
+# samples, the alternate setting is the number of SCO links (Core Spec Vol 4, Part B,
+# Table 2.1).
+SCO_16_BIT_ALTERNATE_SETTINGS = (2, 4, 5)
 
 
 # -----------------------------------------------------------------------------
@@ -104,7 +125,87 @@ def load_libusb():
             usb1.loadLibrary(libusb_dll)
 
 
-def find_endpoints(device, forced_mode, sco_alternate=None):
+@dataclasses.dataclass(frozen=True)
+class ScoEndpoints:
+    '''Isochronous endpoints of a SCO alternate setting.'''
+
+    isochronous_in: usb1.USBEndpoint
+    isochronous_out: usb1.USBEndpoint
+
+    @property
+    def max_packet_sizes(self) -> tuple[int, int]:
+        return (
+            self.isochronous_in.getMaxPacketSize(),
+            self.isochronous_out.getMaxPacketSize(),
+        )
+
+
+def _is_bluetooth_hci(setting: usb1.USBInterfaceSetting) -> bool:
+    return (
+        setting.getClass(),
+        setting.getSubClass(),
+        setting.getProtocol(),
+    ) == USB_BT_HCI_CLASS_TUPLE
+
+
+def _find_isochronous_endpoints(
+    setting: usb1.USBInterfaceSetting,
+) -> ScoEndpoints | None:
+    '''Returns the IN and OUT isochronous endpoints with the largest max packet size.'''
+    endpoints = [
+        endpoint
+        for endpoint in setting
+        if endpoint.getAttributes() & 0x03 == USB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS
+        and endpoint.getMaxPacketSize() > 0
+    ]
+
+    def largest_endpoint(direction_in: bool) -> usb1.USBEndpoint | None:
+        candidates = [
+            endpoint
+            for endpoint in endpoints
+            if bool(endpoint.getAddress() & USB_ENDPOINT_IN) == direction_in
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda endpoint: endpoint.getMaxPacketSize())
+
+    isochronous_in = largest_endpoint(direction_in=True)
+    isochronous_out = largest_endpoint(direction_in=False)
+    if isochronous_in is None or isochronous_out is None:
+        return None
+    return ScoEndpoints(isochronous_in, isochronous_out)
+
+
+def _cancel_transfers(transfers: Iterable[usb1.USBTransfer]) -> None:
+    '''Cancels the submitted transfers, ignoring those that already completed.'''
+    for transfer in transfers:
+        if transfer.isSubmitted():
+            try:
+                transfer.cancel()
+            except usb1.USBError as error:
+                logger.debug(f'transfer likely already completed ({error})')
+
+
+def _drain(queue: asyncio.Queue[Any]) -> None:
+    while not queue.empty():
+        queue.get_nowait()
+
+
+def find_endpoints(
+    device: usb1.USBDevice, forced_mode: bool, sco_alternate: int | None = None
+) -> (
+    tuple[
+        int,
+        usb1.USBInterfaceSetting,
+        usb1.USBInterfaceSetting | None,
+        usb1.USBEndpoint,
+        usb1.USBEndpoint,
+        usb1.USBEndpoint | None,
+        usb1.USBEndpoint,
+        usb1.USBEndpoint | None,
+    ]
+    | None
+):
     '''Look for the interfaces with the right class and endpoints'''
     # pylint: disable-next=too-many-nested-blocks
     for configuration_index, configuration in enumerate(device):
@@ -153,75 +254,23 @@ def find_endpoints(device, forced_mode, sco_alternate=None):
                     acl_interface = setting
 
         # Select the interface and endpoints for SCO
-        sco_interface = None
-        max_packet_size = (0, 0)
-        isochronous_in = None
-        isochronous_out = None
-
-        for interface in configuration:
-            if sco_interface is not None:
-                continue
-
-            if sco_alternate is None:
-                continue
-
-            for setting in interface:
-                if (
-                    not forced_mode
-                    and (
-                        setting.getClass(),
-                        setting.getSubClass(),
-                        setting.getProtocol(),
+        sco_interface: usb1.USBInterfaceSetting | None = None
+        sco_endpoints: ScoEndpoints | None = None
+        if sco_alternate is not None:
+            for interface in configuration:
+                candidates = [
+                    (setting, endpoints)
+                    for setting in interface
+                    if (forced_mode or _is_bluetooth_hci(setting))
+                    and sco_alternate in (0, setting.getAlternateSetting())
+                    and (endpoints := _find_isochronous_endpoints(setting))
+                ]
+                if candidates:
+                    # With sco_alternate=0, pick the largest max packet sizes
+                    sco_interface, sco_endpoints = max(
+                        candidates, key=lambda candidate: candidate[1].max_packet_sizes
                     )
-                    != USB_BT_HCI_CLASS_TUPLE
-                ):
-                    continue
-
-                if (
-                    sco_alternate != 0
-                    and setting.getAlternateSetting() != sco_alternate
-                ):
-                    continue
-
-                isochronous_in = None
-                isochronous_out = None
-
-                for endpoint in setting:
-                    if (
-                        endpoint.getAttributes() & 0x03
-                        == USB_ENDPOINT_TRANSFER_TYPE_ISOCHRONOUS
-                    ):
-                        if endpoint.getMaxPacketSize() > 0:
-                            if endpoint.getAddress() & USB_ENDPOINT_IN:
-                                if (
-                                    isochronous_in is None
-                                    or endpoint.getMaxPacketSize()
-                                    > (isochronous_in.getMaxPacketSize())
-                                ):
-                                    isochronous_in = endpoint
-                            else:
-                                if (
-                                    isochronous_out is None
-                                    or endpoint.getMaxPacketSize()
-                                    > (isochronous_out.getMaxPacketSize())
-                                ):
-                                    isochronous_out = endpoint
-
-                if isochronous_in is not None and isochronous_out is not None:
-                    if (
-                        sco_interface is None
-                        or sco_alternate == 0
-                        and (
-                            isochronous_in.getMaxPacketSize(),
-                            isochronous_out.getMaxPacketSize(),
-                        )
-                        > max_packet_size
-                    ):
-                        sco_interface = setting
-                        max_packet_size = (
-                            isochronous_in.getMaxPacketSize(),
-                            isochronous_out.getMaxPacketSize(),
-                        )
+                    break
 
         # Return if we found at least a compatible ACL interface
         if acl_interface is not None:
@@ -231,9 +280,9 @@ def find_endpoints(device, forced_mode, sco_alternate=None):
                 sco_interface,
                 interrupt_in,
                 bulk_in,
-                isochronous_in,
+                sco_endpoints.isochronous_in if sco_endpoints else None,
                 bulk_out,
-                isochronous_out,
+                sco_endpoints.isochronous_out if sco_endpoints else None,
             )
 
         logger.debug(f'skipping configuration {configuration_index + 1}')
@@ -241,34 +290,116 @@ def find_endpoints(device, forced_mode, sco_alternate=None):
     return None
 
 
+def find_sco_settings(
+    configuration: usb1.USBConfiguration, interface_number: int
+) -> dict[int, ScoEndpoints]:
+    '''Returns the isochronous endpoints of each SCO alternate setting.'''
+    settings = {
+        setting.getAlternateSetting(): endpoints
+        for interface in configuration
+        for setting in interface
+        if setting.getNumber() == interface_number
+        and (endpoints := _find_isochronous_endpoints(setting))
+    }
+    logger.debug(
+        'SCO alternate settings (IN, OUT max packet sizes): '
+        + ', '.join(
+            f'{alternate_setting}: {endpoints.max_packet_sizes}'
+            for alternate_setting, endpoints in sorted(settings.items())
+        )
+    )
+    return settings
+
+
 class UsbPacketSink:
-    def __init__(self, device, bulk_out, isochronous_out, interface_number=0) -> None:
+    def __init__(
+        self,
+        device: usb1.USBDeviceHandle,
+        bulk_out: usb1.USBEndpoint,
+        isochronous_out: usb1.USBEndpoint | None,
+        interface_number: int = 0,
+        sco_alternate_setting: int = 0,
+    ) -> None:
         self.device = device
         self.bulk_out = bulk_out
         self.isochronous_out = isochronous_out
         self.interface_number = interface_number
         self.bulk_or_control_out_transfer = device.getTransfer()
-        self.isochronous_out_transfer = (
-            device.getTransfer(
-                iso_packets=(
-                    MAX_SCO_PACKET_SIZE // isochronous_out.getMaxPacketSize()
-                    if isochronous_out.getMaxPacketSize()
-                    else 1
-                )
-            )
-            if isochronous_out is not None
-            else None
-        )
         self.out_transfer_ready = asyncio.Semaphore(1)
         self.packets: asyncio.Queue[bytes] = (
             asyncio.Queue()
         )  # Queue of packets waiting to be sent
         self.loop = asyncio.get_running_loop()
-        self.queue_task = None
+        self.queue_task: asyncio.Task[None] | None = None
         self.closed = False
+
+        # SCO data is sent on its own path, so that it is not delayed by ACL data or
+        # commands, with several isochronous transfers in flight.
+        self.sco_packet_data_size = 0
+        self.sco_buffers: dict[int, bytearray] = {}  # Pending SCO data, by handle
+        self.sco_packets: asyncio.Queue[bytes] = asyncio.Queue()
+        self.sco_queue_task: asyncio.Task[None] | None = None
+        self.isochronous_out_transfers: list[usb1.USBTransfer] = []
+        self.free_isochronous_out_transfers: asyncio.Queue[usb1.USBTransfer] = (
+            asyncio.Queue()
+        )
+        self.sco_frames_per_packet = USB_FRAMES_PER_SCO_PACKET
+        self.command_hook: Callable[[bytes], None] | None = None
+        self.configure_sco(isochronous_out, sco_alternate_setting)
+
+    def configure_sco(
+        self, isochronous_out: usb1.USBEndpoint | None, sco_alternate_setting: int
+    ) -> None:
+        '''Sets up the SCO OUT transfers for an isochronous endpoint.'''
+        self.isochronous_out = isochronous_out
+        self.sco_frames_per_packet = (
+            1
+            if sco_alternate_setting == SCO_ALT6_ALTERNATE_SETTING
+            else USB_FRAMES_PER_SCO_PACKET
+        )
+        self.sco_packet_data_size = 0
+        self.isochronous_out_transfers = []
+        self.free_isochronous_out_transfers = asyncio.Queue()
+        if isochronous_out is None:
+            return
+        sco_packet_data_size = (
+            self.sco_frames_per_packet * isochronous_out.getMaxPacketSize()
+            - HCI_SCO_HEADER_SIZE
+        )
+        if not 0 < sco_packet_data_size <= HCI_SCO_MAX_DATA_SIZE:
+            logger.warning(
+                f'unsupported SCO max packet size {isochronous_out.getMaxPacketSize()} '
+                f'for alternate setting {sco_alternate_setting}'
+            )
+            return
+        self.sco_packet_data_size = sco_packet_data_size
+        self.isochronous_out_transfers = [
+            self.device.getTransfer(iso_packets=self.sco_frames_per_packet)
+            for _ in range(NUMBER_OF_SCO_OUT_TRANSFERS)
+        ]
+        for transfer in self.isochronous_out_transfers:
+            self.free_isochronous_out_transfers.put_nowait(transfer)
+        if self.queue_task is not None and self.sco_queue_task is None:
+            self.sco_queue_task = asyncio.create_task(self.process_sco_queue())
+        logger.debug(
+            f'SCO OUT: alternate setting {sco_alternate_setting}, '
+            f'{self.sco_packet_data_size} bytes per packet'
+        )
+
+    def stop_sco(self) -> None:
+        '''Stops sending SCO data, dropping pending data.'''
+        if self.sco_queue_task:
+            self.sco_queue_task.cancel()
+            self.sco_queue_task = None
+        _cancel_transfers(self.isochronous_out_transfers)
+        self.isochronous_out_transfers = []
+        self.sco_buffers.clear()
+        _drain(self.sco_packets)
 
     def start(self):
         self.queue_task = asyncio.create_task(self.process_queue())
+        if self.isochronous_out_transfers:
+            self.sco_queue_task = asyncio.create_task(self.process_sco_queue())
 
     def on_packet(self, packet):
         # Ignore packets if we're closed
@@ -279,8 +410,79 @@ class UsbPacketSink:
             logger.warning('packet too short')
             return
 
+        if packet[0] == hci.HCI_SYNCHRONOUS_DATA_PACKET:
+            self.on_sco_packet(packet[1:])
+            return
+
+        if self.command_hook and packet[0] == hci.HCI_COMMAND_PACKET:
+            try:
+                self.command_hook(packet)
+            except Exception:
+                logger.exception(color('!!! Exception in command hook', 'red'))
+
         # Queue the packet
         self.packets.put_nowait(packet)
+
+    def on_sco_packet(self, packet: bytes) -> None:
+        if not self.isochronous_out_transfers:
+            logger.warning(color('isochronous packets not supported', 'red'))
+            return
+
+        if len(packet) < HCI_SCO_HEADER_SIZE:
+            logger.warning('SCO packet too short')
+            return
+
+        # Re-packetize the data into HCI SCO packets that exactly fill the
+        # isochronous packets of the alternate setting, keeping the remainder until
+        # more data is available.
+        handle = int.from_bytes(packet[:2], 'little') & 0x0FFF
+        buffer = self.sco_buffers.setdefault(handle, bytearray())
+        buffer.extend(packet[HCI_SCO_HEADER_SIZE:])
+        size = self.sco_packet_data_size
+        complete_size = len(buffer) - len(buffer) % size
+        header = packet[:2] + bytes([size])
+        for offset in range(0, complete_size, size):
+            self.sco_packets.put_nowait(header + bytes(buffer[offset : offset + size]))
+        del buffer[:complete_size]
+
+    def sco_transfer_callback(self, transfer: usb1.USBTransfer) -> None:
+        status = transfer.getStatus()
+        if status == usb1.TRANSFER_CANCELLED or self.closed:
+            # Expected when the transport is closed or the alternate setting
+            # changes. The transfer is not reused.
+            logger.debug(f'SCO OUT transfer ended: status={status}')
+            return
+        if status != usb1.TRANSFER_COMPLETED:
+            logger.warning(
+                color(f'!!! SCO OUT transfer not completed: status={status}', 'red')
+            )
+        _safe_call_soon(self.loop, self.release_isochronous_out_transfer, transfer)
+
+    def release_isochronous_out_transfer(self, transfer: usb1.USBTransfer) -> None:
+        # Transfers from a previous alternate setting are not reused.
+        if transfer in self.isochronous_out_transfers:
+            self.free_isochronous_out_transfers.put_nowait(transfer)
+
+    async def process_sco_queue(self) -> None:
+        assert self.isochronous_out is not None
+        iso_transfer_length_list = [
+            (self.sco_packet_data_size + HCI_SCO_HEADER_SIZE)
+            // self.sco_frames_per_packet
+        ] * self.sco_frames_per_packet
+        while not self.closed:
+            packet = await self.sco_packets.get()
+            transfer = await self.free_isochronous_out_transfers.get()
+            try:
+                transfer.setIsochronous(
+                    self.isochronous_out.getAddress(),
+                    packet,
+                    callback=self.sco_transfer_callback,
+                    iso_transfer_length_list=iso_transfer_length_list,
+                )
+                transfer.submit()
+            except Exception as error:
+                logger.warning(f'!!! exception while submitting SCO transfer: {error}')
+                self.free_isochronous_out_transfers.put_nowait(transfer)
 
     def transfer_callback(self, transfer):
         _safe_call_soon(self.loop, self.out_transfer_ready.release)
@@ -337,35 +539,8 @@ class UsbPacketSink:
                     )
                     self.bulk_or_control_out_transfer.submit()
                     submitted = True
-                elif packet_type == hci.HCI_SYNCHRONOUS_DATA_PACKET:
-                    if self.isochronous_out_transfer is None:
-                        logger.warning(
-                            color('isochronous packets not supported', 'red')
-                        )
-                        self.out_transfer_ready.release()
-                        continue
-
-                    # Setup a list of packet lengths, each up to the max packet size
-                    iso_max_packet_size = self.isochronous_out.getMaxPacketSize()
-                    iso_packet_count = (
-                        len(packet_payload) + iso_max_packet_size - 1
-                    ) // iso_max_packet_size
-                    iso_packet_lengths = [iso_max_packet_size] * (iso_packet_count - 1)
-                    iso_packet_lengths.append(
-                        len(packet_payload) - sum(iso_packet_lengths)
-                    )
-
-                    # Set up and submit the isochronous transfer
-                    self.isochronous_out_transfer.setIsochronous(
-                        self.isochronous_out.getAddress(),
-                        packet_payload,
-                        callback=self.transfer_callback,
-                        iso_transfer_length_list=iso_packet_lengths,
-                    )
-                    self.isochronous_out_transfer.submit()
-                    submitted = True
                 elif packet_type == hci.HCI_ISO_DATA_PACKET:
-                    if self.isochronous_out_transfer is None:
+                    if not self.isochronous_out_transfers:
                         # Workaround: Send ISO packets over Bulk Out when Isochronous endpoints are not enabled
                         self.bulk_or_control_out_transfer.setBulk(
                             self.bulk_out.getAddress(),
@@ -401,19 +576,19 @@ class UsbPacketSink:
 
         if self.queue_task:
             self.queue_task.cancel()
+        if self.sco_queue_task:
+            self.sco_queue_task.cancel()
 
-        # Empty the packet queue so that we don't send any more data
-        while not self.packets.empty():
-            self.packets.get_nowait()
+        # Empty the packet queues so that we don't send any more data
+        _drain(self.packets)
+        _drain(self.sco_packets)
+
+        # SCO transfers in flight complete on their own within a few frames, and are
+        # finalized after the libusb event thread is joined (see below).
+        _cancel_transfers(self.isochronous_out_transfers)
 
         # If we have transfers in flight, cancel them
-        for transfer in (
-            self.bulk_or_control_out_transfer,
-            self.isochronous_out_transfer,
-        ):
-            if transfer is None:
-                continue
-
+        for transfer in (self.bulk_or_control_out_transfer,):
             if transfer.isSubmitted():
                 # Try to cancel the transfer, but that may fail because it may have
                 # already completed
@@ -493,7 +668,14 @@ class AclPacketSplitter(PacketSplitter):
 
 
 class UsbPacketSource(asyncio.Protocol, BaseSource):
-    def __init__(self, device, metadata, interrupt_in, bulk_in, isochronous_in):
+    def __init__(
+        self,
+        device: usb1.USBDeviceHandle,
+        metadata: dict[str, Any],
+        interrupt_in: usb1.USBEndpoint,
+        bulk_in: usb1.USBEndpoint,
+        isochronous_in: usb1.USBEndpoint | None,
+    ) -> None:
         super().__init__()
         self.device = device
         self.metadata = metadata
@@ -502,11 +684,11 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         self.bulk_in = bulk_in
         self.bulk_in_transfer = None
         self.isochronous_in = isochronous_in
-        self.isochronous_in_transfers = []
+        self.isochronous_in_transfers: list[usb1.USBTransfer] = []
         self.loop = asyncio.get_running_loop()
-        self.queue = asyncio.Queue()
-        self.dequeue_task = None
-        self.done = {}
+        self.queue: asyncio.Queue[bytes] = asyncio.Queue()
+        self.dequeue_task: asyncio.Task[None] | None = None
+        self.done: dict[usb1.USBTransfer, asyncio.Event] = {}
         self.splitters = {
             hci.HCI_EVENT_PACKET: EventPacketSplitter(
                 lambda packet: self.queue_packet(hci.HCI_EVENT_PACKET, packet)
@@ -522,6 +704,35 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         }
         self.closed = False
         self.lock = threading.Lock()
+        self.event_hook: Callable[[bytes], None] | None = None
+
+    def start_sco(self, isochronous_in: usb1.USBEndpoint) -> None:
+        '''Starts receiving SCO data from an isochronous endpoint.'''
+        self.isochronous_in = isochronous_in
+        self.isochronous_in_transfers = [
+            self.make_sco_in_transfer(isochronous_in)
+            for _ in range(NUMBER_OF_SCO_IN_TRANSFERS)
+        ]
+        for transfer in self.isochronous_in_transfers:
+            self.done[transfer] = asyncio.Event()
+            transfer.submit()
+
+    def make_sco_in_transfer(
+        self, isochronous_in: usb1.USBEndpoint
+    ) -> usb1.USBTransfer:
+        transfer = self.device.getTransfer(iso_packets=MAX_SCO_IN_PACKETS)
+        transfer.setIsochronous(
+            isochronous_in.getAddress(),
+            MAX_SCO_IN_PACKETS * isochronous_in.getMaxPacketSize(),
+            callback=self.transfer_callback,
+            user_data=hci.HCI_SYNCHRONOUS_DATA_PACKET,
+        )
+        return transfer
+
+    def stop_sco(self) -> None:
+        '''Stops receiving SCO data.'''
+        _cancel_transfers(self.isochronous_in_transfers)
+        self.isochronous_in_transfers = []
 
     def start(self):
         # Set up transfer objects for input
@@ -546,21 +757,18 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         self.bulk_in_transfer.submit()
 
         if self.isochronous_in is not None:
-            for _ in range(NUMBER_OF_SCO_IN_TRANSFERS):
-                transfer = self.device.getTransfer(iso_packets=MAX_SCO_IN_PACKETS)
-                transfer.setIsochronous(
-                    self.isochronous_in.getAddress(),
-                    MAX_SCO_IN_PACKETS * self.isochronous_in.getMaxPacketSize(),
-                    callback=self.transfer_callback,
-                    user_data=hci.HCI_SYNCHRONOUS_DATA_PACKET,
-                )
-                self.isochronous_in_transfers.append(transfer)
-                self.done[transfer] = asyncio.Event()
-                transfer.submit()
+            self.start_sco(self.isochronous_in)
 
         self.dequeue_task = self.loop.create_task(self.dequeue())
 
     def queue_packet(self, packet_type: int, packet_data: bytes) -> None:
+        if (
+            packet_type == hci.HCI_SYNCHRONOUS_DATA_PACKET
+            and len(packet_data) >= HCI_SCO_HEADER_SIZE
+            and packet_data[2] == 0
+        ):
+            # Empty SCO packets may be received around alternate setting changes.
+            return
         _safe_call_soon(
             self.loop, self.queue.put_nowait, bytes([packet_type]) + packet_data
         )
@@ -625,6 +833,11 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
                 packet = await self.queue.get()
             except asyncio.CancelledError:
                 return
+            if self.event_hook and packet[0] == hci.HCI_EVENT_PACKET:
+                try:
+                    self.event_hook(packet)
+                except Exception:
+                    logger.exception(color('!!! Exception in event hook', 'red'))
             if self.sink:
                 try:
                     self.sink.on_packet(packet)
@@ -671,8 +884,23 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
 
 
 class UsbTransport(Transport):
-    def __init__(self, context, device, acl_interface, sco_interface, source, sink):
+    def __init__(
+        self,
+        context: usb1.USBContext,
+        device: usb1.USBDeviceHandle,
+        acl_interface: usb1.USBInterfaceSetting,
+        sco_interface: usb1.USBInterfaceSetting | None,
+        source: UsbPacketSource,
+        sink: UsbPacketSink,
+    ) -> None:
         super().__init__(source, sink)
+        self.usb_source = source
+        self.usb_sink = sink
+        # Dynamic SCO alternate setting (see enable_dynamic_sco_alternate_setting)
+        self.sco_settings: dict[int, ScoEndpoints] = {}
+        self.sco_links: dict[int, int] = {}  # Air mode, by handle
+        self.sco_16_bit_samples = True
+        self.sco_alternate_setting = -1
         self.context = context
         self.device = device
         self.acl_interface = acl_interface
@@ -711,6 +939,113 @@ class UsbTransport(Transport):
         # Create a thread to process events
         self.event_thread = threading.Thread(target=self.run, daemon=True)
         self.event_thread.start()
+
+    def enable_dynamic_sco_alternate_setting(
+        self, sco_settings: dict[int, ScoEndpoints]
+    ) -> None:
+        """Select the SCO alternate setting when SCO links are established.
+
+        Like Linux btusb, keep alternate setting 0 while there is no SCO link, and
+        switch according to the air mode, the sample size on HCI and the number of
+        links when links are established or closed. Some controllers (e.g. Intel
+        BE200) do not send or receive data with alternate setting 6 unless it is
+        selected after the SCO link is established.
+        """
+        assert self.sco_interface is not None
+        self.sco_settings = sco_settings
+        self.sco_links = {}
+        self.sco_16_bit_samples = True
+        self.sco_alternate_setting = -1
+        self.set_sco_alternate_setting(0)
+        self.usb_source.event_hook = self.on_event_for_sco
+        self.usb_sink.command_hook = self.on_command_for_sco
+
+    def select_sco_alternate_setting(self) -> int:
+        '''Returns the alternate setting for the current SCO links.
+
+        See Core Spec Vol 4, Part B, Table 2.1.
+        '''
+        if not self.sco_links:
+            return 0
+        candidates: tuple[int, ...]
+        if hci.CodecID.TRANSPARENT in self.sco_links.values():
+            candidates = (SCO_ALT6_ALTERNATE_SETTING, 1)
+        else:
+            link_count = min(len(self.sco_links), len(SCO_16_BIT_ALTERNATE_SETTINGS))
+            candidates = (
+                (
+                    SCO_16_BIT_ALTERNATE_SETTINGS[link_count - 1]
+                    if self.sco_16_bit_samples
+                    else link_count
+                ),
+            )
+        return next(
+            (setting for setting in candidates if setting in self.sco_settings),
+            max(self.sco_settings),
+        )
+
+    def set_sco_alternate_setting(self, alternate_setting: int) -> None:
+        if alternate_setting == self.sco_alternate_setting:
+            return
+        assert self.sco_interface is not None
+        logger.debug(f'switching SCO alternate setting to {alternate_setting}')
+        self.usb_source.stop_sco()
+        self.usb_sink.stop_sco()
+        self.device.setInterfaceAltSetting(
+            self.sco_interface.getNumber(), alternate_setting
+        )
+        self.sco_alternate_setting = alternate_setting
+        if alternate_setting:
+            endpoints = self.sco_settings[alternate_setting]
+            self.usb_source.start_sco(endpoints.isochronous_in)
+            self.usb_sink.configure_sco(endpoints.isochronous_out, alternate_setting)
+
+    def on_command_for_sco(self, packet: bytes) -> None:
+        '''Tracks the sample size of SCO data on HCI from the host commands.'''
+        if int.from_bytes(packet[1:3], 'little') not in (
+            hci.HCI_WRITE_VOICE_SETTING_COMMAND,
+            hci.HCI_ENHANCED_SETUP_SYNCHRONOUS_CONNECTION_COMMAND,
+            hci.HCI_ENHANCED_ACCEPT_SYNCHRONOUS_CONNECTION_REQUEST_COMMAND,
+        ):
+            return
+        match hci.HCI_Command.from_bytes(packet):
+            case hci.HCI_Write_Voice_Setting_Command(voice_setting=voice_setting):
+                self.sco_16_bit_samples = bool(
+                    voice_setting & VOICE_SETTING_16_BIT_SAMPLES
+                )
+            case hci.HCI_Enhanced_Setup_Synchronous_Connection_Command(
+                input_coded_data_size=coded_data_size
+            ) | hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(
+                input_coded_data_size=coded_data_size
+            ):
+                self.sco_16_bit_samples = coded_data_size != 8
+
+    def on_event_for_sco(self, packet: bytes) -> None:
+        '''Tracks the SCO links, and selects the alternate setting accordingly.'''
+        if packet[1] not in (
+            hci.HCI_SYNCHRONOUS_CONNECTION_COMPLETE_EVENT,
+            hci.HCI_DISCONNECTION_COMPLETE_EVENT,
+        ):
+            return
+        match hci.HCI_Event.from_bytes(packet):
+            case hci.HCI_Synchronous_Connection_Complete_Event(
+                status=hci.HCI_SUCCESS,
+                connection_handle=connection_handle,
+                air_mode=air_mode,
+            ):
+                logger.debug(
+                    f'SCO link 0x{connection_handle:04X} established, '
+                    f'air mode {air_mode}'
+                )
+                self.sco_links[connection_handle] = air_mode
+            case hci.HCI_Disconnection_Complete_Event(
+                status=hci.HCI_SUCCESS, connection_handle=connection_handle
+            ):
+                if self.sco_links.pop(connection_handle, None) is None:
+                    return
+            case _:
+                return
+        self.set_sco_alternate_setting(self.select_sco_alternate_setting())
 
     def run(self):
         logger.debug('starting USB event loop')
@@ -939,6 +1274,20 @@ async def open_usb_transport(spec: str) -> Transport:
             f'isochronous_out=0x{isochronous_out.getAddress() if isochronous_out else 0:02X}'
         )
 
+        # With sco=0, the SCO alternate setting is selected when SCO links are
+        # established (see UsbTransport.enable_dynamic_sco_alternate_setting).
+        dynamic_sco_settings = (
+            find_sco_settings(
+                next(
+                    device_configuration
+                    for index, device_configuration in enumerate(found, start=1)
+                    if index == configuration
+                ),
+                sco_interface.getNumber(),
+            )
+            if sco_alternate == 0 and sco_interface is not None
+            else None
+        )
         device_metadata = {
             'vendor_id': found.getVendorID(),
             'product_id': found.getProductID(),
@@ -968,13 +1317,29 @@ async def open_usb_transport(spec: str) -> Transport:
             except usb1.USBError:
                 logger.warning('failed to set configuration')
 
+        if dynamic_sco_settings is not None:
+            # The SCO endpoints are selected once a SCO link is established.
+            isochronous_in = isochronous_out = None
         source = UsbPacketSource(
             device, device_metadata, interrupt_in, bulk_in, isochronous_in
         )
         sink = UsbPacketSink(
-            device, bulk_out, isochronous_out, acl_interface.getNumber()
+            device,
+            bulk_out,
+            isochronous_out,
+            acl_interface.getNumber(),
+            (
+                sco_interface.getAlternateSetting()
+                if sco_interface is not None and dynamic_sco_settings is None
+                else 0
+            ),
         )
-        return UsbTransport(context, device, acl_interface, sco_interface, source, sink)
+        transport = UsbTransport(
+            context, device, acl_interface, sco_interface, source, sink
+        )
+        if dynamic_sco_settings is not None:
+            transport.enable_dynamic_sco_alternate_setting(dynamic_sco_settings)
+        return transport
     except usb1.USBError as error:
         logger.warning(color(f'!!! failed to open USB device: {error}', 'red'))
         context.close()
