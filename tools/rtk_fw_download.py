@@ -25,7 +25,7 @@ import click
 import bumble.logging
 from bumble.colors import color
 from bumble.drivers import rtk
-from tools import rtk_util
+from bumble.tools import rtk_util
 
 # -----------------------------------------------------------------------------
 # Logging
