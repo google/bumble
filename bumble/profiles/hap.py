@@ -385,7 +385,6 @@ class HearingAccessService(gatt.TemplateService):
 
         if self.read_presets_request_in_progress:
             raise att.ATT_Error(att.ErrorCode.PROCEDURE_ALREADY_IN_PROGRESS)
-        self.read_presets_request_in_progress = True
 
         start_index = value[1]
         if start_index == 0x00:
@@ -404,6 +403,7 @@ class HearingAccessService(gatt.TemplateService):
         if len(presets) == 0:
             raise att.ATT_Error(att.ErrorCode.OUT_OF_RANGE)
 
+        self.read_presets_request_in_progress = True
         utils.AsyncRunner.spawn(self._read_preset_response(connection, presets))
 
     async def _read_preset_response(
