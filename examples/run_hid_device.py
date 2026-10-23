@@ -1,4 +1,4 @@
-# Copyright 2021-2022 Google LLC
+# Copyright 2021-2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,388 +15,22 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+# pylint: disable=duplicate-code
+from __future__ import annotations
+
 import asyncio
 import json
 import struct
 import sys
 
 import websockets.asyncio.server
+from typing_extensions import override
 
 import bumble.logging
-from bumble.core import (
-    BT_HIDP_PROTOCOL_ID,
-    BT_HUMAN_INTERFACE_DEVICE_SERVICE,
-    BT_L2CAP_PROTOCOL_ID,
-    PhysicalTransport,
-)
-from bumble.device import Device
-from bumble.hid import HID_CONTROL_PSM, HID_INTERRUPT_PSM, Message
-from bumble.hid import Device as HID_Device
-from bumble.sdp import (
-    SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-    SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID,
-    SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-    SDP_PUBLIC_BROWSE_ROOT,
-    SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-    SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-    DataElement,
-    ServiceAttribute,
-)
+from bumble import hid
+from bumble.core import PhysicalTransport
+from bumble.device import Connection, Device
 from bumble.transport import open_transport
-
-# -----------------------------------------------------------------------------
-# SDP attributes for Bluetooth HID devices
-SDP_HID_SERVICE_NAME_ATTRIBUTE_ID = 0x0100
-SDP_HID_SERVICE_DESCRIPTION_ATTRIBUTE_ID = 0x0101
-SDP_HID_PROVIDER_NAME_ATTRIBUTE_ID = 0x0102
-SDP_HID_DEVICE_RELEASE_NUMBER_ATTRIBUTE_ID = 0x0200  # [DEPRECATED]
-SDP_HID_PARSER_VERSION_ATTRIBUTE_ID = 0x0201
-SDP_HID_DEVICE_SUBCLASS_ATTRIBUTE_ID = 0x0202
-SDP_HID_COUNTRY_CODE_ATTRIBUTE_ID = 0x0203
-SDP_HID_VIRTUAL_CABLE_ATTRIBUTE_ID = 0x0204
-SDP_HID_RECONNECT_INITIATE_ATTRIBUTE_ID = 0x0205
-SDP_HID_DESCRIPTOR_LIST_ATTRIBUTE_ID = 0x0206
-SDP_HID_LANGID_BASE_LIST_ATTRIBUTE_ID = 0x0207
-SDP_HID_SDP_DISABLE_ATTRIBUTE_ID = 0x0208  # [DEPRECATED]
-SDP_HID_BATTERY_POWER_ATTRIBUTE_ID = 0x0209
-SDP_HID_REMOTE_WAKE_ATTRIBUTE_ID = 0x020A
-SDP_HID_PROFILE_VERSION_ATTRIBUTE_ID = 0x020B  # DEPRECATED]
-SDP_HID_SUPERVISION_TIMEOUT_ATTRIBUTE_ID = 0x020C
-SDP_HID_NORMALLY_CONNECTABLE_ATTRIBUTE_ID = 0x020D
-SDP_HID_BOOT_DEVICE_ATTRIBUTE_ID = 0x020E
-SDP_HID_SSR_HOST_MAX_LATENCY_ATTRIBUTE_ID = 0x020F
-SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID = 0x0210
-
-# Refer to HID profile specification v1.1.1, "5.3 Service Discovery Protocol (SDP)" for details
-# HID SDP attribute values
-LANGUAGE = 0x656E  # 0x656E uint16 “en” (English)
-ENCODING = 0x6A  # 0x006A uint16 UTF-8 encoding
-PRIMARY_LANGUAGE_BASE_ID = 0x100  # 0x0100 uint16 PrimaryLanguageBaseID
-VERSION_NUMBER = 0x0101  # 0x0101 uint16 version number (v1.1)
-SERVICE_NAME = b'Bumble HID'
-SERVICE_DESCRIPTION = b'Bumble'
-PROVIDER_NAME = b'Bumble'
-HID_PARSER_VERSION = 0x0111  # uint16 0x0111 (v1.1.1)
-HID_DEVICE_SUBCLASS = 0xC0  # Combo keyboard/pointing device
-HID_COUNTRY_CODE = 0x21  # 0x21 Uint8, USA
-HID_VIRTUAL_CABLE = True  # Virtual cable enabled
-HID_RECONNECT_INITIATE = True  #  Reconnect initiate enabled
-REPORT_DESCRIPTOR_TYPE = 0x22  # 0x22 Type = Report Descriptor
-HID_LANGID_BASE_LANGUAGE = 0x0409  # 0x0409 Language = English (United States)
-HID_LANGID_BASE_BLUETOOTH_STRING_OFFSET = 0x100  # 0x0100 Default
-HID_BATTERY_POWER = True  #  Battery power enabled
-HID_REMOTE_WAKE = True  #  Remote wake enabled
-HID_SUPERVISION_TIMEOUT = 0xC80  # uint16 0xC80 (2s)
-HID_NORMALLY_CONNECTABLE = True  #  Normally connectable enabled
-HID_BOOT_DEVICE = True  #  Boot device support enabled
-HID_SSR_HOST_MAX_LATENCY = 0x640  # uint16 0x640 (1s)
-HID_SSR_HOST_MIN_TIMEOUT = 0xC80  # uint16 0xC80 (2s)
-HID_REPORT_MAP = bytes(  # Text String, 50 Octet Report Descriptor
-    # pylint: disable=line-too-long
-    [
-        0x05,
-        0x01,  # Usage Page (Generic Desktop Ctrls)
-        0x09,
-        0x06,  # Usage (Keyboard)
-        0xA1,
-        0x01,  # Collection (Application)
-        0x85,
-        0x01,  # . Report ID (1)
-        0x05,
-        0x07,  # . Usage Page (Kbrd/Keypad)
-        0x19,
-        0xE0,  # . Usage Minimum (0xE0)
-        0x29,
-        0xE7,  # . Usage Maximum (0xE7)
-        0x15,
-        0x00,  # . Logical Minimum (0)
-        0x25,
-        0x01,  # . Logical Maximum (1)
-        0x75,
-        0x01,  # . Report Size (1)
-        0x95,
-        0x08,  # . Report Count (8)
-        0x81,
-        0x02,  # . Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-        0x95,
-        0x01,  # . Report Count (1)
-        0x75,
-        0x08,  # . Report Size (8)
-        0x81,
-        0x03,  # . Input (Const,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-        0x95,
-        0x05,  # . Report Count (5)
-        0x75,
-        0x01,  # . Report Size (1)
-        0x05,
-        0x08,  # . Usage Page (LEDs)
-        0x19,
-        0x01,  # . Usage Minimum (Num Lock)
-        0x29,
-        0x05,  # . Usage Maximum (Kana)
-        0x91,
-        0x02,  # . Output (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-        0x95,
-        0x01,  # . Report Count (1)
-        0x75,
-        0x03,  # . Report Size (3)
-        0x91,
-        0x03,  # . Output (Const,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-        0x95,
-        0x06,  # . Report Count (6)
-        0x75,
-        0x08,  # . Report Size (8)
-        0x15,
-        0x00,  # . Logical Minimum (0)
-        0x25,
-        0x65,  # . Logical Maximum (101)
-        0x05,
-        0x07,  # . Usage Page (Kbrd/Keypad)
-        0x19,
-        0x00,  # . Usage Minimum (0x00)
-        0x29,
-        0x65,  # . Usage Maximum (0x65)
-        0x81,
-        0x00,  # . Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-        0xC0,  # End Collection
-        0x05,
-        0x01,  # Usage Page (Generic Desktop Ctrls)
-        0x09,
-        0x02,  # Usage (Mouse)
-        0xA1,
-        0x01,  # Collection (Application)
-        0x85,
-        0x02,  # . Report ID (2)
-        0x09,
-        0x01,  # . Usage (Pointer)
-        0xA1,
-        0x00,  # . Collection (Physical)
-        0x05,
-        0x09,  # .   Usage Page (Button)
-        0x19,
-        0x01,  # .   Usage Minimum (0x01)
-        0x29,
-        0x03,  # .   Usage Maximum (0x03)
-        0x15,
-        0x00,  # .   Logical Minimum (0)
-        0x25,
-        0x01,  # .   Logical Maximum (1)
-        0x95,
-        0x03,  # .   Report Count (3)
-        0x75,
-        0x01,  # .   Report Size (1)
-        0x81,
-        0x02,  # .   Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-        0x95,
-        0x01,  # .   Report Count (1)
-        0x75,
-        0x05,  # .   Report Size (5)
-        0x81,
-        0x03,  # .   Input (Const,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-        0x05,
-        0x01,  # .   Usage Page (Generic Desktop Ctrls)
-        0x09,
-        0x30,  # .   Usage (X)
-        0x09,
-        0x31,  # .   Usage (Y)
-        0x15,
-        0x81,  # .   Logical Minimum (-127)
-        0x25,
-        0x7F,  # .   Logical Maximum (127)
-        0x75,
-        0x08,  # .   Report Size (8)
-        0x95,
-        0x02,  # .   Report Count (2)
-        0x81,
-        0x06,  # .   Input (Data,Var,Rel,No Wrap,Linear,Preferred State,No Null Position)
-        0xC0,  # . End Collection
-        0xC0,  # End Collection
-    ]
-)
-
-
-# Default protocol mode set to report protocol
-protocol_mode = Message.ProtocolMode.REPORT_PROTOCOL
-
-
-# -----------------------------------------------------------------------------
-def sdp_records():
-    service_record_handle = 0x00010002
-    return {
-        service_record_handle: [
-            ServiceAttribute(
-                SDP_SERVICE_RECORD_HANDLE_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_32(service_record_handle),
-            ),
-            ServiceAttribute(
-                SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
-                DataElement.sequence([DataElement.uuid(SDP_PUBLIC_BROWSE_ROOT)]),
-            ),
-            ServiceAttribute(
-                SDP_SERVICE_CLASS_ID_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [DataElement.uuid(BT_HUMAN_INTERFACE_DEVICE_SERVICE)]
-                ),
-            ),
-            ServiceAttribute(
-                SDP_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.sequence(
-                            [
-                                DataElement.uuid(BT_L2CAP_PROTOCOL_ID),
-                                DataElement.unsigned_integer_16(HID_CONTROL_PSM),
-                            ]
-                        ),
-                        DataElement.sequence(
-                            [
-                                DataElement.uuid(BT_HIDP_PROTOCOL_ID),
-                            ]
-                        ),
-                    ]
-                ),
-            ),
-            ServiceAttribute(
-                SDP_LANGUAGE_BASE_ATTRIBUTE_ID_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.unsigned_integer_16(LANGUAGE),
-                        DataElement.unsigned_integer_16(ENCODING),
-                        DataElement.unsigned_integer_16(PRIMARY_LANGUAGE_BASE_ID),
-                    ]
-                ),
-            ),
-            ServiceAttribute(
-                SDP_BLUETOOTH_PROFILE_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.sequence(
-                            [
-                                DataElement.uuid(BT_HUMAN_INTERFACE_DEVICE_SERVICE),
-                                DataElement.unsigned_integer_16(VERSION_NUMBER),
-                            ]
-                        ),
-                    ]
-                ),
-            ),
-            ServiceAttribute(
-                SDP_ADDITIONAL_PROTOCOL_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.sequence(
-                            [
-                                DataElement.sequence(
-                                    [
-                                        DataElement.uuid(BT_L2CAP_PROTOCOL_ID),
-                                        DataElement.unsigned_integer_16(
-                                            HID_INTERRUPT_PSM
-                                        ),
-                                    ]
-                                ),
-                                DataElement.sequence(
-                                    [
-                                        DataElement.uuid(BT_HIDP_PROTOCOL_ID),
-                                    ]
-                                ),
-                            ]
-                        ),
-                    ]
-                ),
-            ),
-            ServiceAttribute(
-                SDP_HID_SERVICE_NAME_ATTRIBUTE_ID,
-                DataElement(DataElement.TEXT_STRING, SERVICE_NAME),
-            ),
-            ServiceAttribute(
-                SDP_HID_SERVICE_DESCRIPTION_ATTRIBUTE_ID,
-                DataElement(DataElement.TEXT_STRING, SERVICE_DESCRIPTION),
-            ),
-            ServiceAttribute(
-                SDP_HID_PROVIDER_NAME_ATTRIBUTE_ID,
-                DataElement(DataElement.TEXT_STRING, PROVIDER_NAME),
-            ),
-            ServiceAttribute(
-                SDP_HID_PARSER_VERSION_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_32(HID_PARSER_VERSION),
-            ),
-            ServiceAttribute(
-                SDP_HID_DEVICE_SUBCLASS_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_32(HID_DEVICE_SUBCLASS),
-            ),
-            ServiceAttribute(
-                SDP_HID_COUNTRY_CODE_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_32(HID_COUNTRY_CODE),
-            ),
-            ServiceAttribute(
-                SDP_HID_VIRTUAL_CABLE_ATTRIBUTE_ID,
-                DataElement.boolean(HID_VIRTUAL_CABLE),
-            ),
-            ServiceAttribute(
-                SDP_HID_RECONNECT_INITIATE_ATTRIBUTE_ID,
-                DataElement.boolean(HID_RECONNECT_INITIATE),
-            ),
-            ServiceAttribute(
-                SDP_HID_DESCRIPTOR_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.sequence(
-                            [
-                                DataElement.unsigned_integer_16(REPORT_DESCRIPTOR_TYPE),
-                                DataElement(DataElement.TEXT_STRING, HID_REPORT_MAP),
-                            ]
-                        ),
-                    ]
-                ),
-            ),
-            ServiceAttribute(
-                SDP_HID_LANGID_BASE_LIST_ATTRIBUTE_ID,
-                DataElement.sequence(
-                    [
-                        DataElement.sequence(
-                            [
-                                DataElement.unsigned_integer_16(
-                                    HID_LANGID_BASE_LANGUAGE
-                                ),
-                                DataElement.unsigned_integer_16(
-                                    HID_LANGID_BASE_BLUETOOTH_STRING_OFFSET
-                                ),
-                            ]
-                        ),
-                    ]
-                ),
-            ),
-            ServiceAttribute(
-                SDP_HID_BATTERY_POWER_ATTRIBUTE_ID,
-                DataElement.boolean(HID_BATTERY_POWER),
-            ),
-            ServiceAttribute(
-                SDP_HID_REMOTE_WAKE_ATTRIBUTE_ID,
-                DataElement.boolean(HID_REMOTE_WAKE),
-            ),
-            ServiceAttribute(
-                SDP_HID_SUPERVISION_TIMEOUT_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_16(HID_SUPERVISION_TIMEOUT),
-            ),
-            ServiceAttribute(
-                SDP_HID_NORMALLY_CONNECTABLE_ATTRIBUTE_ID,
-                DataElement.boolean(HID_NORMALLY_CONNECTABLE),
-            ),
-            ServiceAttribute(
-                SDP_HID_BOOT_DEVICE_ATTRIBUTE_ID,
-                DataElement.boolean(HID_BOOT_DEVICE),
-            ),
-            ServiceAttribute(
-                SDP_HID_SSR_HOST_MAX_LATENCY_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_16(HID_SSR_HOST_MAX_LATENCY),
-            ),
-            ServiceAttribute(
-                SDP_HID_SSR_HOST_MIN_TIMEOUT_ATTRIBUTE_ID,
-                DataElement.unsigned_integer_16(HID_SSR_HOST_MIN_TIMEOUT),
-            ),
-        ]
-    }
 
 
 # -----------------------------------------------------------------------------
@@ -410,71 +44,127 @@ async def get_stream_reader(pipe) -> asyncio.StreamReader:
 
 class DeviceData:
     def __init__(self) -> None:
-        self.keyboardData = bytearray(
+        self.keyboard_data = bytearray(
             [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
         )
-        self.mouseData = bytearray([0x02, 0x00, 0x00, 0x00])
+        self.mouse_data = bytearray([0x02, 0x00, 0x00, 0x00])
 
 
 # Device's live data - Mouse and Keyboard will be stored in this
-deviceData = DeviceData()
+device_data = DeviceData()
+
+
+class HidDeviceDelegate(hid.Device.Delegate):
+    @override
+    def get_report(self, report_type: hid.ReportType, report_id: int | None) -> bytes:
+        print(f"GET_REPORT report_id: {report_id}, report_type: {report_type.name}")
+        match (report_type, report_id):
+            case (hid.ReportType.INPUT_REPORT, 1):
+                return bytes(device_data.keyboard_data[1:])
+            case (hid.ReportType.INPUT_REPORT, 2):
+                return bytes(device_data.mouse_data[1:])
+            case (hid.ReportType.INPUT_REPORT, _) | (
+                hid.ReportType.OTHER_REPORT,
+                3,
+            ):
+                raise hid.HidProtocolError(
+                    hid.HandshakeMessage.ResultCode.ERR_INVALID_REPORT_ID
+                )
+            case (hid.ReportType.OUTPUT_REPORT, _):
+                # Return single byte sample data for testing
+                return bytes([0x11])
+            case (hid.ReportType.FEATURE_REPORT, _):
+                raise hid.HidProtocolError(
+                    hid.HandshakeMessage.ResultCode.ERR_INVALID_PARAMETER
+                )
+            case _:
+                raise hid.HidProtocolError(
+                    hid.HandshakeMessage.ResultCode.ERR_UNSUPPORTED_REQUEST
+                )
+
+    @override
+    def set_report(self, report_type: hid.ReportType, data: bytes) -> None:
+        report_id = data[0] if data else 0
+        print(
+            f"SET_REPORT report_id: {report_id}, report_type: {report_type.name}, "
+            f"report_size: {len(data)}, data: {data.hex()}"
+        )
+        match (report_type, report_id):
+            case (hid.ReportType.FEATURE_REPORT, _):
+                raise hid.HidProtocolError(
+                    hid.HandshakeMessage.ResultCode.ERR_INVALID_PARAMETER
+                )
+            case (hid.ReportType.INPUT_REPORT, 1) if len(data) != len(
+                device_data.keyboard_data
+            ):
+                raise hid.HidProtocolError(
+                    hid.HandshakeMessage.ResultCode.ERR_INVALID_PARAMETER
+                )
+            case (hid.ReportType.INPUT_REPORT, 2) if len(data) != len(
+                device_data.mouse_data
+            ):
+                raise hid.HidProtocolError(
+                    hid.HandshakeMessage.ResultCode.ERR_INVALID_PARAMETER
+                )
+            case (hid.ReportType.INPUT_REPORT, 3):
+                raise hid.HidProtocolError(
+                    hid.HandshakeMessage.ResultCode.ERR_INVALID_REPORT_ID
+                )
 
 
 # -----------------------------------------------------------------------------
-async def keyboard_device(hid_device: HID_Device):
+async def keyboard_device(hid_device: hid.Device) -> None:
     # Start a Websocket server to receive events from a web page
-    async def serve(websocket: websockets.asyncio.server.ServerConnection):
-        global deviceData
+    async def serve(websocket: websockets.asyncio.server.ServerConnection) -> None:
         while True:
             try:
                 message = await websocket.recv()
-                print('Received: ', str(message))
+                print("Received: ", str(message))
                 parsed = json.loads(message)
-                message_type = parsed['type']
-                if message_type == 'keydown':
-                    # Only deal with keys a to z for now
-                    key = parsed['key']
-                    if len(key) == 1:
-                        code = ord(key)
-                        if ord('a') <= code <= ord('z'):
-                            hid_code = 0x04 + code - ord('a')
-                            deviceData.keyboardData = bytearray(
-                                [
-                                    0x01,
-                                    0x00,
-                                    0x00,
-                                    hid_code,
-                                    0x00,
-                                    0x00,
-                                    0x00,
-                                    0x00,
-                                    0x00,
-                                ]
-                            )
-                            hid_device.send_data(deviceData.keyboardData)
-                elif message_type == 'keyup':
-                    deviceData.keyboardData = bytearray(
-                        [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-                    )
-                    hid_device.send_data(deviceData.keyboardData)
-                elif message_type == "mousemove":
-                    # logical min and max values
-                    log_min = -127
-                    log_max = 127
-                    x = parsed['x']
-                    y = parsed['y']
-                    # limiting x and y values within logical max and min range
-                    x = max(log_min, min(log_max, x))
-                    y = max(log_min, min(log_max, y))
-                    deviceData.mouseData = bytearray([0x02, 0x00]) + struct.pack(
-                        ">bb", x, y
-                    )
-                    hid_device.send_data(deviceData.mouseData)
+                match parsed["type"]:
+                    case "keydown":
+                        # Only deal with keys a to z for now
+                        key = parsed["key"]
+                        if len(key) == 1:
+                            code = ord(key)
+                            if ord("a") <= code <= ord("z"):
+                                hid_code = 0x04 + code - ord("a")
+                                device_data.keyboard_data = bytearray(
+                                    [
+                                        0x01,
+                                        0x00,
+                                        0x00,
+                                        hid_code,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                        0x00,
+                                    ]
+                                )
+                                hid_device.send_interrupt_data(
+                                    bytes(device_data.keyboard_data)
+                                )
+                    case "keyup":
+                        device_data.keyboard_data = bytearray(
+                            [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+                        )
+                        hid_device.send_interrupt_data(bytes(device_data.keyboard_data))
+                    case "mousemove":
+                        # logical min and max values
+                        log_min = -127
+                        log_max = 127
+                        x = max(log_min, min(log_max, parsed["x"]))
+                        y = max(log_min, min(log_max, parsed["y"]))
+                        device_data.mouse_data = bytearray([0x02, 0x00]) + struct.pack(
+                            ">bb", x, y
+                        )
+                        hid_device.send_interrupt_data(bytes(device_data.mouse_data))
             except websockets.exceptions.ConnectionClosedOK:
                 pass
 
     # pylint: disable-next=no-member
-    await websockets.asyncio.server.serve(serve, 'localhost', 8989)
+    await websockets.asyncio.server.serve(serve, "localhost", 8989)
     await asyncio.get_event_loop().create_future()
 
 
@@ -482,118 +172,20 @@ async def keyboard_device(hid_device: HID_Device):
 async def main() -> None:
     if len(sys.argv) < 3:
         print(
-            'Usage: python run_hid_device.py <device-config> <transport-spec> <command>'
-            '  where <command> is one of:\n'
-            '  test-mode (run with menu enabled for testing)\n'
-            '  web (run a keyboard with keypress input from a web page, '
-            'see keyboard.html'
+            "Usage: python run_hid_device.py <device-config> <transport-spec> "
+            "<command>\n"
+            "  where <command> is one of:\n"
+            "  test-mode (run with menu enabled for testing)\n"
+            "  web (run a keyboard with keypress input from a web page, "
+            "see keyboard.html"
         )
-        print('example: python run_hid_device.py hid_keyboard.json usb:0 web')
-        print('example: python run_hid_device.py hid_keyboard.json usb:0 test-mode')
-
+        print("example: python run_hid_device.py hid_keyboard.json usb:0 web")
+        print("example: python run_hid_device.py hid_keyboard.json usb:0 test-mode")
         return
 
-    async def handle_virtual_cable_unplug():
-        hid_host_bd_addr = str(hid_device.remote_device_bd_address)
-        await hid_device.disconnect_interrupt_channel()
-        await hid_device.disconnect_control_channel()
-        await device.keystore.delete(hid_host_bd_addr)  # type: ignore
-        connection = hid_device.connection
-        if connection is not None:
-            await connection.disconnect()
-
-    def on_hid_data_cb(pdu: bytes):
-        print(f'Received Data, PDU: {pdu.hex()}')
-
-    def on_get_report_cb(
-        report_id: int, report_type: int, buffer_size: int
-    ) -> HID_Device.GetSetStatus:
-        retValue = hid_device.GetSetStatus()
-        print(
-            "GET_REPORT report_id: "
-            + str(report_id)
-            + "report_type: "
-            + str(report_type)
-            + "buffer_size:"
-            + str(buffer_size)
-        )
-        if report_type == Message.ReportType.INPUT_REPORT:
-            if report_id == 1:
-                retValue.data = deviceData.keyboardData[1:]
-                retValue.status = hid_device.GetSetReturn.SUCCESS
-            elif report_id == 2:
-                retValue.data = deviceData.mouseData[1:]
-                retValue.status = hid_device.GetSetReturn.SUCCESS
-            else:
-                retValue.status = hid_device.GetSetReturn.REPORT_ID_NOT_FOUND
-
-            if buffer_size:
-                data_len = buffer_size - 1
-                retValue.data = retValue.data[:data_len]
-        elif report_type == Message.ReportType.OUTPUT_REPORT:
-            # This sample app has nothing to do with the report received, to enable PTS
-            # testing, we will return single byte random data.
-            retValue.data = bytearray([0x11])
-            retValue.status = hid_device.GetSetReturn.SUCCESS
-        elif report_type == Message.ReportType.FEATURE_REPORT:
-            retValue.status = hid_device.GetSetReturn.ERR_INVALID_PARAMETER
-        elif report_type == Message.ReportType.OTHER_REPORT:
-            if report_id == 3:
-                retValue.status = hid_device.GetSetReturn.REPORT_ID_NOT_FOUND
-        else:
-            retValue.status = hid_device.GetSetReturn.FAILURE
-
-        return retValue
-
-    def on_set_report_cb(
-        report_id: int, report_type: int, report_size: int, data: bytes
-    ) -> HID_Device.GetSetStatus:
-        print(
-            "SET_REPORT report_id: "
-            + str(report_id)
-            + "report_type: "
-            + str(report_type)
-            + "report_size "
-            + str(report_size)
-            + "data:"
-            + str(data)
-        )
-        if report_type == Message.ReportType.FEATURE_REPORT:
-            status = HID_Device.GetSetReturn.ERR_INVALID_PARAMETER
-        elif report_type == Message.ReportType.INPUT_REPORT:
-            if report_id == 1 and report_size != len(deviceData.keyboardData):
-                status = HID_Device.GetSetReturn.ERR_INVALID_PARAMETER
-            elif report_id == 2 and report_size != len(deviceData.mouseData):
-                status = HID_Device.GetSetReturn.ERR_INVALID_PARAMETER
-            elif report_id == 3:
-                status = HID_Device.GetSetReturn.REPORT_ID_NOT_FOUND
-            else:
-                status = HID_Device.GetSetReturn.SUCCESS
-        else:
-            status = HID_Device.GetSetReturn.SUCCESS
-
-        return HID_Device.GetSetStatus(status=status)
-
-    def on_get_protocol_cb() -> HID_Device.GetSetStatus:
-        return HID_Device.GetSetStatus(
-            data=bytes([protocol_mode]),
-            status=hid_device.GetSetReturn.SUCCESS,
-        )
-
-    def on_set_protocol_cb(protocol: int) -> HID_Device.GetSetStatus:
-        # We do not support SET_PROTOCOL.
-        print(f"SET_PROTOCOL report_id: {protocol}")
-        return HID_Device.GetSetStatus(
-            status=hid_device.GetSetReturn.ERR_UNSUPPORTED_REQUEST
-        )
-
-    def on_virtual_cable_unplug_cb():
-        print('Received Virtual Cable Unplug')
-        asyncio.create_task(handle_virtual_cable_unplug())
-
-    print('<<< connecting to HCI...')
+    print("<<< connecting to HCI...")
     async with await open_transport(sys.argv[2]) as hci_transport:
-        print('<<< connected')
+        print("<<< connected")
 
         # Create a device
         device = Device.from_config_file_with_hci(
@@ -601,22 +193,56 @@ async def main() -> None:
         )
         device.classic_enabled = True
 
+        active_connection: Connection | None = None
+
+        def on_connection(connection: Connection) -> None:
+            nonlocal active_connection
+            active_connection = connection
+
+            def on_disconnection(_reason: int) -> None:
+                nonlocal active_connection
+                active_connection = None
+
+            connection.on(
+                connection.EVENT_DISCONNECTION,
+                on_disconnection,
+            )
+
+        device.on(device.EVENT_CONNECTION, on_connection)
+
         # Create and register HID device
-        hid_device = HID_Device(device)
+        delegate = HidDeviceDelegate()
+        hid_device = hid.Device(device, delegate=delegate)
 
-        # Register for  call backs
-        hid_device.on('interrupt_data', on_hid_data_cb)
+        async def handle_virtual_cable_unplug() -> None:
+            await hid_device.disconnect()
+            if hid_device.remote_device_bd_address and device.keystore:
+                try:
+                    await device.keystore.delete(
+                        str(hid_device.remote_device_bd_address)
+                    )
+                except KeyError:
+                    pass
+            if active_connection is not None:
+                await active_connection.disconnect()
 
-        hid_device.register_get_report_cb(on_get_report_cb)
-        hid_device.register_set_report_cb(on_set_report_cb)
-        hid_device.register_get_protocol_cb(on_get_protocol_cb)
-        hid_device.register_set_protocol_cb(on_set_protocol_cb)
+        def on_hid_data_cb(report_type: hid.ReportType, data: bytes) -> None:
+            print(f"Received Data, report_type: {report_type.name}, PDU: {data.hex()}")
 
-        # Register for virtual cable unplug call back
-        hid_device.on('virtual_cable_unplug', on_virtual_cable_unplug_cb)
+        def on_virtual_cable_unplug_cb() -> None:
+            print("Received Virtual Cable Unplug")
+            asyncio.create_task(handle_virtual_cable_unplug())
+
+        hid_device.on(hid_device.EVENT_INTERRUPT_DATA, on_hid_data_cb)
+        hid_device.on(hid_device.EVENT_VIRTUAL_CABLE_UNPLUG, on_virtual_cable_unplug_cb)
 
         # Setup the SDP to advertise HID Device service
-        device.sdp_service_records = sdp_records()
+        device.sdp_service_records = {
+            0x00010002: hid.DeviceSdpRecord(
+                service_record_handle=0x00010002,
+                report_map=hid.DEFAULT_REPORT_MAP,
+            ).to_service_attributes()
+        }
 
         # Start the controller
         await device.power_on()
@@ -625,109 +251,135 @@ async def main() -> None:
         await device.set_discoverable(True)
         await device.set_connectable(True)
 
-        async def menu():
+        async def menu() -> None:
+            nonlocal active_connection
             reader = await get_stream_reader(sys.stdin)
             while True:
-                print(
-                    "\n************************ HID Device Menu *****************************\n"
-                )
-                print(" 1. Connect Control Channel")
-                print(" 2. Connect Interrupt Channel")
-                print(" 3. Disconnect Control Channel")
-                print(" 4. Disconnect Interrupt Channel")
-                print(" 5. Send Report on Interrupt Channel")
-                print(" 6. Virtual Cable Unplug")
-                print(" 7. Disconnect device")
-                print(" 8. Delete Bonding")
-                print(" 9. Re-connect to device")
-                print("10. Exit ")
+                print("\n" + "*" * 20 + " HID Device Menu " + "*" * 20 + "\n")
+                print(" 1. Connect HID Channels")
+                print(" 2. Disconnect HID Channels")
+                print(" 3. Send Report on Interrupt Channel")
+                print(" 4. Virtual Cable Unplug")
+                print(" 5. Disconnect device")
+                print(" 6. Delete Bonding")
+                print(" 7. Re-connect to device")
+                print(" 8. Exit ")
                 print("\nEnter your choice : \n")
 
-                choice = await reader.readline()
-                choice = choice.decode('utf-8').strip()
+                choice_line = await reader.readline()
+                choice = choice_line.decode("utf-8").strip()
 
-                if choice == '1':
-                    await hid_device.connect_control_channel()
+                match choice:
+                    case "1":
+                        if active_connection is not None:
+                            await hid_device.connect(active_connection)
+                        else:
+                            print("No active connection")
 
-                elif choice == '2':
-                    await hid_device.connect_interrupt_channel()
+                    case "2":
+                        await hid_device.disconnect()
 
-                elif choice == '3':
-                    await hid_device.disconnect_control_channel()
+                    case "3":
+                        print(" 1. Report ID 0x01")
+                        print(" 2. Report ID 0x02")
+                        print(" 3. Invalid Report ID")
 
-                elif choice == '4':
-                    await hid_device.disconnect_interrupt_channel()
+                        choice1_line = await reader.readline()
+                        choice1 = choice1_line.decode("utf-8").strip()
 
-                elif choice == '5':
-                    print(" 1. Report ID 0x01")
-                    print(" 2. Report ID 0x02")
-                    print(" 3. Invalid Report ID")
+                        match choice1:
+                            case "1":
+                                hid_device.send_interrupt_data(
+                                    bytes(
+                                        [
+                                            0x01,
+                                            0x00,
+                                            0x00,
+                                            0x04,
+                                            0x00,
+                                            0x00,
+                                            0x00,
+                                            0x00,
+                                            0x00,
+                                        ]
+                                    )
+                                )
+                                hid_device.send_interrupt_data(
+                                    bytes(
+                                        [
+                                            0x01,
+                                            0x00,
+                                            0x00,
+                                            0x00,
+                                            0x00,
+                                            0x00,
+                                            0x00,
+                                            0x00,
+                                            0x00,
+                                        ]
+                                    )
+                                )
+                            case "2":
+                                hid_device.send_interrupt_data(
+                                    bytes([0x02, 0x00, 0x00, 0xF6])
+                                )
+                                hid_device.send_interrupt_data(
+                                    bytes([0x02, 0x00, 0x00, 0x00])
+                                )
+                            case "3":
+                                hid_device.send_interrupt_data(
+                                    bytes([0x00, 0x00, 0x00, 0x00])
+                                )
+                                hid_device.send_interrupt_data(
+                                    bytes([0x00, 0x00, 0x00, 0x00])
+                                )
+                            case _:
+                                print("Incorrect option selected")
 
-                    choice1 = await reader.readline()
-                    choice1 = choice1.decode('utf-8').strip()
+                    case "4":
+                        hid_device.virtual_cable_unplug()
+                        if hid_device.remote_device_bd_address and device.keystore:
+                            try:
+                                await device.keystore.delete(
+                                    str(hid_device.remote_device_bd_address)
+                                )
+                            except KeyError:
+                                print("Device not found or Device already unpaired.")
 
-                    if choice1 == '1':
-                        data = bytearray(
-                            [0x01, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00]
-                        )
-                        hid_device.send_data(data)
-                        data = bytearray(
-                            [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-                        )
-                        hid_device.send_data(data)
+                    case "5":
+                        if active_connection is not None:
+                            await active_connection.disconnect()
+                            active_connection = None
+                        else:
+                            print("Already disconnected from device")
 
-                    elif choice1 == '2':
-                        data = bytearray([0x02, 0x00, 0x00, 0xF6])
-                        hid_device.send_data(data)
-                        data = bytearray([0x02, 0x00, 0x00, 0x00])
-                        hid_device.send_data(data)
+                    case "6":
+                        if hid_device.remote_device_bd_address and device.keystore:
+                            try:
+                                await device.keystore.delete(
+                                    str(hid_device.remote_device_bd_address)
+                                )
+                            except KeyError:
+                                print("Device NOT found or Device already unpaired.")
 
-                    elif choice1 == '3':
-                        data = bytearray([0x00, 0x00, 0x00, 0x00])
-                        hid_device.send_data(data)
-                        data = bytearray([0x00, 0x00, 0x00, 0x00])
-                        hid_device.send_data(data)
+                    case "7":
+                        if hid_device.remote_device_bd_address:
+                            active_connection = await device.connect(
+                                hid_device.remote_device_bd_address,
+                                transport=PhysicalTransport.BR_EDR,
+                            )
+                            await active_connection.authenticate()
+                            await active_connection.encrypt()
+                        else:
+                            print("Remote device address unknown.")
 
-                    else:
-                        print('Incorrect option selected')
+                    case "8":
+                        sys.exit("Exit successful")
 
-                elif choice == '6':
-                    hid_device.virtual_cable_unplug()
-                    try:
-                        hid_host_bd_addr = str(hid_device.remote_device_bd_address)
-                        await device.keystore.delete(hid_host_bd_addr)
-                    except KeyError:
-                        print('Device not found or Device already unpaired.')
+                    case _:
+                        print("Invalid option selected.")
 
-                elif choice == '7':
-                    connection = hid_device.connection
-                    if connection is not None:
-                        await connection.disconnect()
-                    else:
-                        print("Already disconnected from device")
-
-                elif choice == '8':
-                    try:
-                        hid_host_bd_addr = str(hid_device.remote_device_bd_address)
-                        await device.keystore.delete(hid_host_bd_addr)
-                    except KeyError:
-                        print('Device NOT found or Device already unpaired.')
-
-                elif choice == '9':
-                    hid_host_bd_addr = str(hid_device.remote_device_bd_address)
-                    connection = await device.connect(
-                        hid_host_bd_addr, transport=PhysicalTransport.BR_EDR
-                    )
-                    await connection.authenticate()
-                    await connection.encrypt()
-
-                elif choice == '10':
-                    sys.exit("Exit successful")
-
-                else:
-                    print("Invalid option selected.")
-
-        if (len(sys.argv) > 3) and (sys.argv[3] == 'test-mode'):
+        if (len(sys.argv) > 3) and (sys.argv[3] == "test-mode"):
             # Test mode for PTS/Unit testing
             await menu()
         else:
@@ -739,5 +391,6 @@ async def main() -> None:
 
 
 # -----------------------------------------------------------------------------
-bumble.logging.setup_basic_logging('DEBUG')
-asyncio.run(main())
+if __name__ == "__main__":
+    bumble.logging.setup_basic_logging("DEBUG")
+    asyncio.run(main())
