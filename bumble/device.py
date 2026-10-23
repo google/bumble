@@ -2260,6 +2260,7 @@ class DeviceConfiguration:
         l2cap.L2CAP_Information_Request.ExtendedFeatures.ENHANCED_RETRANSMISSION_MODE,
     )
     eatt_enabled: bool = False
+    gatt_strict_permissions: bool = False
     gatt_services: list[dict[str, Any]] = field(init=False)
     smp_debug_mode: bool = False
 
