@@ -8299,6 +8299,17 @@ class HCI_IsoDataPacket(HCI_Packet):
 
     hci_packet_type = HCI_ISO_DATA_PACKET
 
+    class PbFlag(enum.IntEnum):
+        FIRST_FRAGMENT = 0b00
+        CONTINUATION_FRAGMENT = 0b01
+        COMPLETE_SDU = 0b10
+        LAST_FRAGMENT = 0b11
+
+    class PacketStatus(utils.OpenIntEnum):
+        VALID_DATA = 0b00
+        POSSIBLY_INVALID_DATA = 0b01
+        LOST_DATA = 0b10
+
     connection_handle: int
     data_total_length: int
     iso_sdu_fragment: bytes
@@ -8344,7 +8355,7 @@ class HCI_IsoDataPacket(HCI_Packet):
                 raise InvalidPacketError('ISO data packet truncated (SDU info)')
             packet_sequence_number, sdu_info = struct.unpack_from('<HH', packet, pos)
             iso_sdu_length = sdu_info & 0xFFF
-            packet_status_flag = (sdu_info >> 15) & 1
+            packet_status_flag = (sdu_info >> 14) & 0b11
             pos += 4
 
         iso_sdu_fragment = packet[pos:]
@@ -8378,7 +8389,7 @@ class HCI_IsoDataPacket(HCI_Packet):
             fmt += 'HH'
             args += [
                 self.packet_sequence_number,
-                self.iso_sdu_length | self.packet_status_flag << 15,
+                self.iso_sdu_length | self.packet_status_flag << 14,
             ]
         return struct.pack(fmt, *args) + self.iso_sdu_fragment
 
