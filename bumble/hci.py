@@ -2188,8 +2188,8 @@ class HCI_Object:
                 ),
             )
 
-        # Measure the widest field name
-        max_field_name_length = max(len(s[0]) for s in field_strings)
+        # Measure the widest field name. Repeated fields may contain no items.
+        max_field_name_length = max((len(s[0]) for s in field_strings), default=0)
         sep = ':'
         return '\n'.join(
             f'{indentation}'
@@ -4035,6 +4035,26 @@ class HCI_Write_Secure_Connections_Host_Support_Command(
 
 
 # -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_Read_Authenticated_Payload_Timeout_ReturnParameters(
+    HCI_StatusAndConnectionHandleReturnParameters
+):
+    authenticated_payload_timeout: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_Read_Authenticated_Payload_Timeout_ReturnParameters)
+@dataclasses.dataclass
+class HCI_Read_Authenticated_Payload_Timeout_Command(
+    HCI_SyncCommand[HCI_Read_Authenticated_Payload_Timeout_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.3.93 Read Authenticated Payload Timeout Command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
 @HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
 class HCI_Write_Authenticated_Payload_Timeout_Command(
@@ -4648,6 +4668,39 @@ class HCI_LE_Connection_Update_Command(HCI_AsyncCommand):
 
 
 # -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Host_Channel_Classification_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.19 LE Set Host Channel Classification Command
+    '''
+
+    channel_map: bytes = field(metadata=metadata(5))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_Channel_Map_ReturnParameters(
+    HCI_StatusAndConnectionHandleReturnParameters
+):
+    channel_map: bytes = field(metadata=metadata(5))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Channel_Map_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Channel_Map_Command(
+    HCI_SyncCommand[HCI_LE_Read_Channel_Map_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.20 LE Read Channel Map Command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
 class HCI_LE_Read_Remote_Features_Command(HCI_AsyncCommand):
@@ -4656,6 +4709,23 @@ class HCI_LE_Read_Remote_Features_Command(HCI_AsyncCommand):
     '''
 
     connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Encrypt_ReturnParameters(HCI_StatusReturnParameters):
+    encrypted_data: bytes = field(metadata=metadata(16))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Encrypt_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Encrypt_Command(HCI_SyncCommand[HCI_LE_Encrypt_ReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.22 LE Encrypt Command
+    '''
+
+    key: bytes = field(metadata=metadata(16))
+    plaintext_data: bytes = field(metadata=metadata(16))
 
 
 # -----------------------------------------------------------------------------
@@ -5582,6 +5652,71 @@ class HCI_LE_Periodic_Advertising_Terminate_Sync_Command(
     '''
 
     sync_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Add_Device_To_Periodic_Advertiser_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.70 LE Add Device To Periodic Advertiser List Command
+    '''
+
+    advertiser_address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
+    advertiser_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
+    advertising_sid: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Remove_Device_From_Periodic_Advertiser_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.71 LE Remove Device From Periodic Advertiser List Command
+    '''
+
+    advertiser_address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
+    advertiser_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
+    advertising_sid: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Clear_Periodic_Advertiser_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.72 LE Clear Periodic Advertiser List Command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_Periodic_Advertiser_List_Size_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    periodic_advertiser_list_size: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Read_Periodic_Advertiser_List_Size_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Read_Periodic_Advertiser_List_Size_Command(
+    HCI_SyncCommand[HCI_LE_Read_Periodic_Advertiser_List_Size_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.73 LE Read Periodic Advertiser List Size Command
+    '''
 
 
 # -----------------------------------------------------------------------------
@@ -7073,6 +7208,15 @@ class HCI_LE_Periodic_Advertising_Sync_Lost_Event(HCI_LE_Meta_Event):
 # -----------------------------------------------------------------------------
 @HCI_LE_Meta_Event.event
 @dataclasses.dataclass
+class HCI_LE_Scan_Timeout_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.17 LE Scan Timeout Event
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
 class HCI_LE_Advertising_Set_Terminated_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.18 LE Advertising Set Terminated Event
@@ -7082,6 +7226,21 @@ class HCI_LE_Advertising_Set_Terminated_Event(HCI_LE_Meta_Event):
     advertising_handle: int = field(metadata=metadata(1))
     connection_handle: int = field(metadata=metadata(2))
     num_completed_extended_advertising_events: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Scan_Request_Received_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.19 LE Scan Request Received Event
+    '''
+
+    advertising_handle: int = field(metadata=metadata(1))
+    scanner_address_type: int = field(metadata=AddressType.type_metadata(1))
+    scanner_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -7646,6 +7805,17 @@ class HCI_Encryption_Change_Event(HCI_Event):
     status: int = field(metadata=metadata(STATUS_SPEC))
     connection_handle: int = field(metadata=metadata(2))
     encryption_enabled: int = field(metadata=Enabled.type_metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Event.event
+@dataclasses.dataclass
+class HCI_Authenticated_Payload_Timeout_Expired_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 7.7.75 Authenticated Payload Timeout Expired Event
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
 
 
 # -----------------------------------------------------------------------------

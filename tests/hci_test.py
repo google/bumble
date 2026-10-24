@@ -608,6 +608,161 @@ def test_HCI_LE_Setup_ISO_Data_Path_Command():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ('packet', 'wire'),
+    [
+        pytest.param(
+            hci.HCI_Read_Authenticated_Payload_Timeout_Command(
+                connection_handle=0x0123
+            ),
+            '017b0c022301',
+            id='read-authenticated-payload-timeout',
+        ),
+        pytest.param(
+            hci.HCI_LE_Set_Host_Channel_Classification_Command(
+                channel_map=bytes.fromhex('0102030405')
+            ),
+            '011420050102030405',
+            id='set-host-channel-classification',
+        ),
+        pytest.param(
+            hci.HCI_LE_Read_Channel_Map_Command(connection_handle=0x0123),
+            '011520022301',
+            id='read-channel-map',
+        ),
+        pytest.param(
+            hci.HCI_LE_Encrypt_Command(
+                key=bytes(range(16)), plaintext_data=bytes(range(16, 32))
+            ),
+            '01172020'
+            '000102030405060708090a0b0c0d0e0f'
+            '101112131415161718191a1b1c1d1e1f',
+            id='encrypt',
+        ),
+        pytest.param(
+            hci.HCI_LE_Add_Device_To_Periodic_Advertiser_List_Command(
+                advertiser_address_type=hci.Address.RANDOM_DEVICE_ADDRESS,
+                advertiser_address=hci.Address('11:22:33:44:55:66'),
+                advertising_sid=0x07,
+            ),
+            '014720080166554433221107',
+            id='add-periodic-advertiser',
+        ),
+        pytest.param(
+            hci.HCI_LE_Remove_Device_From_Periodic_Advertiser_List_Command(
+                advertiser_address_type=hci.Address.RANDOM_DEVICE_ADDRESS,
+                advertiser_address=hci.Address('11:22:33:44:55:66'),
+                advertising_sid=0x07,
+            ),
+            '014820080166554433221107',
+            id='remove-periodic-advertiser',
+        ),
+        pytest.param(
+            hci.HCI_LE_Clear_Periodic_Advertiser_List_Command(),
+            '01492000',
+            id='clear-periodic-advertisers',
+        ),
+        pytest.param(
+            hci.HCI_LE_Read_Periodic_Advertiser_List_Size_Command(),
+            '014a2000',
+            id='read-periodic-advertiser-list-size',
+        ),
+    ],
+)
+def test_hci_command_wire_vectors(packet, wire: str) -> None:
+    encoded = bytes.fromhex(wire)
+    assert bytes(packet) == encoded
+
+    parsed = hci.HCI_Packet.from_bytes(encoded)
+    assert type(parsed) is type(packet)
+    for field_name, _ in packet.fields:
+        assert getattr(parsed, field_name) == getattr(packet, field_name)
+    assert bytes(parsed) == encoded
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ('event', 'wire'),
+    [
+        pytest.param(
+            hci.HCI_LE_Scan_Timeout_Event(),
+            '043e0111',
+            id='scan-timeout',
+        ),
+        pytest.param(
+            hci.HCI_LE_Scan_Request_Received_Event(
+                advertising_handle=0x03,
+                scanner_address_type=hci.Address.RANDOM_DEVICE_ADDRESS,
+                scanner_address=hci.Address('11:22:33:44:55:66'),
+            ),
+            '043e09130301665544332211',
+            id='scan-request-received',
+        ),
+        pytest.param(
+            hci.HCI_Authenticated_Payload_Timeout_Expired_Event(
+                connection_handle=0x0123
+            ),
+            '0457022301',
+            id='authenticated-payload-timeout-expired',
+        ),
+    ],
+)
+def test_hci_event_wire_vectors(event, wire: str) -> None:
+    encoded = bytes.fromhex(wire)
+    assert bytes(event) == encoded
+
+    parsed = hci.HCI_Packet.from_bytes(encoded)
+    assert type(parsed) is type(event)
+    for field_name, _ in event.fields:
+        assert getattr(parsed, field_name) == getattr(event, field_name)
+    assert bytes(parsed) == encoded
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    ('command_class', 'parameters', 'expected_fields'),
+    [
+        pytest.param(
+            hci.HCI_Read_Authenticated_Payload_Timeout_Command,
+            '0023013412',
+            {'connection_handle': 0x0123, 'authenticated_payload_timeout': 0x1234},
+            id='read-authenticated-payload-timeout',
+        ),
+        pytest.param(
+            hci.HCI_LE_Read_Channel_Map_Command,
+            '0023010102030405',
+            {'connection_handle': 0x0123, 'channel_map': bytes.fromhex('0102030405')},
+            id='read-channel-map',
+        ),
+        pytest.param(
+            hci.HCI_LE_Encrypt_Command,
+            '00000102030405060708090a0b0c0d0e0f',
+            {'encrypted_data': bytes(range(16))},
+            id='encrypt',
+        ),
+        pytest.param(
+            hci.HCI_LE_Read_Periodic_Advertiser_List_Size_Command,
+            '0008',
+            {'periodic_advertiser_list_size': 8},
+            id='read-periodic-advertiser-list-size',
+        ),
+    ],
+)
+def test_hci_command_return_parameters(
+    command_class, parameters: str, expected_fields: dict
+) -> None:
+    result = command_class.parse_return_parameters(bytes.fromhex(parameters))
+
+    assert result.status == hci.HCI_SUCCESS
+    for name, value in expected_fields.items():
+        assert getattr(result, name) == value
+
+
+def test_format_fields_accepts_an_empty_repeated_field() -> None:
+    assert hci.HCI_Object.format_fields({'items': []}, [[('items', 1)]]) == ''
+
+
+# -----------------------------------------------------------------------------
 def test_HCI_Read_Local_Supported_Codecs_Command_Complete():
     returned_parameters = (
         hci.HCI_Read_Local_Supported_Codecs_Command.parse_return_parameters(
