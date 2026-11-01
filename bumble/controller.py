@@ -920,18 +920,14 @@ class Controller:
         logger.debug(f'New PERIPHERAL connection handle: 0x{connection_handle:04X}')
 
         # Then say that the connection has completed
-        self.send_hci_packet(
-            hci.HCI_LE_Connection_Complete_Event(
-                status=hci.HCI_ErrorCode.SUCCESS,
-                connection_handle=connection.handle,
-                role=connection.role,
-                peer_address_type=peer_address.address_type,
-                peer_address=peer_address,
-                connection_interval=10,  # FIXME
-                peripheral_latency=0,  # FIXME
-                supervision_timeout=10,  # FIXME
-                central_clock_accuracy=7,  # FIXME
-            )
+        self.send_le_connection_complete_event(
+            connection_handle=connection.handle,
+            role=connection.role,
+            peer_address=peer_address,
+            connection_interval=10,  # FIXME
+            peripheral_latency=0,  # FIXME
+            supervision_timeout=10,  # FIXME
+            central_clock_accuracy=7,  # FIXME
         )
 
         if isinstance(advertiser, AdvertisingSet):
@@ -1011,21 +1007,63 @@ class Controller:
             )
         )
         # Say that the connection has completed
-        self.send_hci_packet(
-            # pylint: disable=line-too-long
-            hci.HCI_LE_Connection_Complete_Event(
-                status=hci.HCI_ErrorCode.SUCCESS,
-                connection_handle=connection.handle if connection else 0,
-                role=hci.Role.CENTRAL,
-                peer_address_type=peer_address.address_type,
-                peer_address=peer_address,
-                connection_interval=interval,
-                peripheral_latency=latency,
-                supervision_timeout=timeout,
-                central_clock_accuracy=0,
-            )
+        self.send_le_connection_complete_event(
+            connection_handle=connection.handle if connection else 0,
+            role=hci.Role.CENTRAL,
+            peer_address=peer_address,
+            connection_interval=interval,
+            peripheral_latency=latency,
+            supervision_timeout=timeout,
+            central_clock_accuracy=0,
         )
         self.pending_le_connection = None
+
+    def send_le_connection_complete_event(
+        self,
+        connection_handle: int,
+        role: hci.Role,
+        peer_address: hci.Address,
+        connection_interval: int,
+        peripheral_latency: int,
+        supervision_timeout: int,
+        central_clock_accuracy: int,
+    ) -> None:
+        '''
+        Send an LE Enhanced Connection Complete event if the host has unmasked it,
+        otherwise an LE Connection Complete event (Vol 4, Part E - 7.7.65.10).
+        '''
+        if self.le_event_mask & (
+            1 << (hci.HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT - 1)
+        ):
+            self.send_hci_packet(
+                hci.HCI_LE_Enhanced_Connection_Complete_Event(
+                    status=hci.HCI_ErrorCode.SUCCESS,
+                    connection_handle=connection_handle,
+                    role=role,
+                    peer_address_type=peer_address.address_type,
+                    peer_address=peer_address,
+                    local_resolvable_private_address=hci.Address.ANY_RANDOM,
+                    peer_resolvable_private_address=hci.Address.ANY_RANDOM,
+                    connection_interval=connection_interval,
+                    peripheral_latency=peripheral_latency,
+                    supervision_timeout=supervision_timeout,
+                    central_clock_accuracy=central_clock_accuracy,
+                )
+            )
+        else:
+            self.send_hci_packet(
+                hci.HCI_LE_Connection_Complete_Event(
+                    status=hci.HCI_ErrorCode.SUCCESS,
+                    connection_handle=connection_handle,
+                    role=role,
+                    peer_address_type=peer_address.address_type,
+                    peer_address=peer_address,
+                    connection_interval=connection_interval,
+                    peripheral_latency=peripheral_latency,
+                    supervision_timeout=supervision_timeout,
+                    central_clock_accuracy=central_clock_accuracy,
+                )
+            )
 
     def on_le_encryption_request(
         self, connection: Connection, packet: ll.EncReq
