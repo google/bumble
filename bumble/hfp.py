@@ -1407,12 +1407,14 @@ class AgProtocol(utils.EventEmitter):
         if operation not in self.supported_ag_call_hold_operations:
             logger.error(f'Unsupported operation: {operation_code.decode()}')
             self.send_cme_error(CmeError.OPERATION_NOT_SUPPORTED)
+            return
 
         if call_index is not None and not any(
             call.index == call_index for call in self.calls
         ):
             logger.error(f'No matching call {call_index}')
             self.send_cme_error(CmeError.INVALID_INDEX)
+            return
 
         # Real three-way calls have more complicated situations, but this is not a popular issue - let users to handle the remaining :)
 

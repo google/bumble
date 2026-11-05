@@ -388,6 +388,48 @@ async def test_hold_call_with_call_index(
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "operation_supported, call_known",
+    ((True, False), (False, True)),
+    ids=("unknown_call_index", "unsupported_operation"),
+)
+async def test_hold_call_rejected(
+    hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol],
+    operation_supported: bool,
+    call_known: bool,
+):
+    hf, ag = hfp_connections
+    call_hold_events = []
+    ag.on("call_hold", lambda op, index: call_hold_events.append((op, index)))
+    if not operation_supported:
+        ag.supported_ag_call_hold_operations.remove(
+            hfp.CallHoldOperation.RELEASE_SPECIFIC_CALL
+        )
+    if call_known:
+        ag.calls.append(
+            hfp.CallInfo(
+                index=1,
+                direction=hfp.CallInfoDirection.MOBILE_ORIGINATED_CALL,
+                status=hfp.CallInfoStatus.ACTIVE,
+                mode=hfp.CallInfoMode.VOICE,
+                multi_party=hfp.CallInfoMultiParty.NOT_IN_CONFERENCE,
+                number='123456789',
+            )
+        )
+
+    with pytest.raises(hfp.HfpProtocolError):
+        await hf.execute_command("AT+CHLD=11")
+
+    # The next command must get its own response, not a leftover OK.
+    response = await hf.execute_command(
+        "AT+CIND?", response_type=hfp.AtResponseType.SINGLE
+    )
+    assert response.code == "+CIND"
+    assert not call_hold_events
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_ring(hfp_connections: tuple[hfp.HfProtocol, hfp.AgProtocol]):
     hf, ag = hfp_connections
     ring_future = asyncio.get_running_loop().create_future()
