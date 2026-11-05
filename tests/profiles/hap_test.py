@@ -146,6 +146,27 @@ async def test_read_partial_presets(hap_client: hap.HearingAccessServiceProxy):
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
+async def test_read_presets_after_out_of_range_request(
+    hap_client: hap.HearingAccessServiceProxy,
+):
+    with pytest.raises(att.ATT_Error) as e:
+        await hap_client.hearing_aid_preset_control_point.write_value(
+            bytes([hap.HearingAidPresetControlPointOpcode.READ_PRESETS_REQUEST, 0, 1]),
+            with_response=True,
+        )
+    assert e.value.error_code == att.ErrorCode.OUT_OF_RANGE
+
+    await hap_client.hearing_aid_preset_control_point.write_value(
+        bytes([hap.HearingAidPresetControlPointOpcode.READ_PRESETS_REQUEST, 1, 1]),
+        with_response=True,
+    )
+    assert (await hap_client.preset_control_point_indications.get())[2:] == bytes(
+        foo_preset
+    )
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
 async def test_set_active_preset_valid(hap_client: hap.HearingAccessServiceProxy):
     await hap_client.hearing_aid_preset_control_point.write_value(
         bytes(
