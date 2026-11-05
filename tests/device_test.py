@@ -342,6 +342,74 @@ async def test_le_multiple_connects():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    'le_event_codes, expected_event_class',
+    [
+        (
+            [hci.HCI_LE_CONNECTION_COMPLETE_EVENT],
+            hci.HCI_LE_Connection_Complete_Event,
+        ),
+        (
+            [
+                hci.HCI_LE_CONNECTION_COMPLETE_EVENT,
+                hci.HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT,
+            ],
+            hci.HCI_LE_Enhanced_Connection_Complete_Event,
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_le_connection_complete_event_follows_le_event_mask(
+    le_event_codes, expected_event_class
+):
+    devices = TwoDevices()
+    for dev in devices:
+        await dev.power_on()
+        await dev.send_sync_command(
+            hci.HCI_LE_Set_Event_Mask_Command(
+                le_event_mask=hci.HCI_LE_Set_Event_Mask_Command.mask(le_event_codes)
+            )
+        )
+
+    with (
+        mock.patch.object(
+            devices.controllers[0],
+            'send_hci_packet',
+            wraps=devices.controllers[0].send_hci_packet,
+        ) as central_send,
+        mock.patch.object(
+            devices.controllers[1],
+            'send_hci_packet',
+            wraps=devices.controllers[1].send_hci_packet,
+        ) as peripheral_send,
+    ):
+        peripheral_connection = asyncio.get_running_loop().create_future()
+        devices[1].once(devices[1].EVENT_CONNECTION, peripheral_connection.set_result)
+        await devices[1].start_advertising(advertising_interval_min=1.0)
+        await asyncio.wait_for(devices[0].connect(devices[1].random_address), _TIMEOUT)
+        await asyncio.wait_for(peripheral_connection, _TIMEOUT)
+
+    for send, role, peer_address in (
+        (central_send, hci.Role.CENTRAL, devices[1].random_address),
+        (peripheral_send, hci.Role.PERIPHERAL, devices[0].random_address),
+    ):
+        events = [
+            call.args[0]
+            for call in send.call_args_list
+            if isinstance(
+                call.args[0],
+                (
+                    hci.HCI_LE_Connection_Complete_Event,
+                    hci.HCI_LE_Enhanced_Connection_Complete_Event,
+                ),
+            )
+        ]
+        assert [type(event) for event in events] == [expected_event_class]
+        assert events[0].role == role
+        assert events[0].peer_address == peer_address
+
+
+# -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_advertising_and_scanning():
     devices = TwoDevices()
