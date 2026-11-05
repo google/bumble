@@ -1832,6 +1832,21 @@ class VoiceSetting:
             | (self.input_coding_format << 8)
         )
 
+    def codec_id(self) -> CodecID:
+        '''Codec ID (air mode) that this voice setting asks the controller to use.'''
+        return VOICE_SETTING_AIR_CODING_FORMAT_CODEC_IDS[self.air_coding_format]
+
+
+# The Air_Coding_Format values of a Voice_Setting are not the same as the air mode of
+# the Synchronous Connection Complete event (0x00 u-law, 0x01 A-law, 0x02 CVSD,
+# 0x03 transparent), which is what CodecID models here.
+VOICE_SETTING_AIR_CODING_FORMAT_CODEC_IDS = {
+    VoiceSetting.AirCodingFormat.CVSD: CodecID.CVSD,
+    VoiceSetting.AirCodingFormat.U_LAW: CodecID.U_LOG,
+    VoiceSetting.AirCodingFormat.A_LAW: CodecID.A_LOG,
+    VoiceSetting.AirCodingFormat.TRANSPARENT_DATA: CodecID.TRANSPARENT,
+}
+
 
 # -----------------------------------------------------------------------------
 class HCI_Constant:
@@ -2969,6 +2984,49 @@ class HCI_Read_Clock_Offset_Command(HCI_AsyncCommand):
     '''
 
     connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_Setup_Synchronous_Connection_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.1.26 Setup Synchronous Connection Command
+
+    This is the non-enhanced version of the command, which some controllers implement
+    instead of HCI_Enhanced_Setup_Synchronous_Connection_Command (e.g. the Realtek
+    RTL8761): it can only describe the air coding format and the PCM format of the
+    Voice_Setting parameter, not the codec itself. The link is an eSCO link if any of
+    ESCO_PACKET_TYPES is allowed, otherwise a SCO link.
+    '''
+
+    class PacketType(SpecableFlag):
+        '''
+        Packet types the link may use: a set bit means the type may be used.
+
+        The HVx and EVx bits line up with the corresponding bits of the enhanced
+        command's PacketType; the enhanced command's "no 2-EV3" style bits have no
+        meaning here.
+        '''
+
+        HV1 = 0x0001
+        HV2 = 0x0002
+        HV3 = 0x0004
+        EV3 = 0x0008
+        EV4 = 0x0010
+        EV5 = 0x0020
+
+    # Packet types that make the link a SCO link and an eSCO link, respectively
+    SCO_PACKET_TYPES = PacketType.HV1 | PacketType.HV2 | PacketType.HV3
+    ESCO_PACKET_TYPES = PacketType.EV3 | PacketType.EV4 | PacketType.EV5
+
+    connection_handle: int = field(metadata=metadata(2))
+    transmit_bandwidth: int = field(metadata=metadata(4))
+    receive_bandwidth: int = field(metadata=metadata(4))
+    max_latency: int = field(metadata=metadata(2))
+    voice_setting: int = field(metadata=metadata(2))
+    retransmission_effort: int = field(metadata=metadata(1))
+    packet_type: int = field(metadata=metadata(2))
 
 
 # -----------------------------------------------------------------------------

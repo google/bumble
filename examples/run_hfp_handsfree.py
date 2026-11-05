@@ -87,40 +87,13 @@ def on_sco_request(
     else:
         raise RuntimeError("unknown active codec")
 
-    if connection.device.host.supports_command(
-        hci.HCI_ENHANCED_ACCEPT_SYNCHRONOUS_CONNECTION_REQUEST_COMMAND
-    ):
-        connection.cancel_on_disconnection(
-            connection.device.send_async_command(
-                hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(
-                    bd_addr=connection.peer_address, **esco_parameters.asdict()
-                )
+    connection.cancel_on_disconnection(
+        connection.device.send_async_command(
+            hfp.accept_synchronous_connection_request_command(
+                connection.device.host, connection.peer_address, esco_parameters
             )
         )
-    elif connection.device.host.supports_command(
-        hci.HCI_ACCEPT_SYNCHRONOUS_CONNECTION_REQUEST_COMMAND
-    ):
-        connection.cancel_on_disconnection(
-            connection.device.send_async_command(
-                hci.HCI_Accept_Synchronous_Connection_Request_Command(
-                    bd_addr=connection.peer_address,
-                    transmit_bandwidth=esco_parameters.transmit_bandwidth,
-                    receive_bandwidth=esco_parameters.receive_bandwidth,
-                    max_latency=esco_parameters.max_latency,
-                    voice_setting=int(
-                        hci.VoiceSetting(
-                            input_sample_size=hci.VoiceSetting.InputSampleSize.SIZE_16_BITS,
-                            input_data_format=hci.VoiceSetting.InputDataFormat.TWOS_COMPLEMENT,
-                        )
-                    ),
-                    retransmission_effort=esco_parameters.retransmission_effort,
-                    packet_type=esco_parameters.packet_type,
-                )
-            )
-        )
-    else:
-        print('!!! no supported command for SCO connection request')
-        return
+    )
 
     global output_wav
     if output_wav:
