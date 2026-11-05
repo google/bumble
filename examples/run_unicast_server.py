@@ -27,7 +27,8 @@ import bumble.logging
 from bumble import data_types
 from bumble.core import AdvertisingData
 from bumble.device import Device
-from bumble.hci import CodecID, CodingFormat, HCI_IsoDataPacket
+from bumble.hci import CodecID, CodingFormat
+from bumble.host import IsoSdu
 from bumble.profiles.ascs import AseStateMachine, AudioStreamControlService
 from bumble.profiles.bap import (
     AudioLocation,
@@ -128,13 +129,10 @@ async def main() -> None:
             + bytes(UnicastServerAdvertisingData())
         )
 
-        def on_pdu(ase: AseStateMachine, pdu: HCI_IsoDataPacket):
+        def on_sdu(ase: AseStateMachine, sdu: IsoSdu):
             # LC3 format: |frame_length(2)| + |frame(length)|.
-            sdu = b''
-            if pdu.iso_sdu_length:
-                sdu = struct.pack('<H', pdu.iso_sdu_length)
-            sdu += pdu.iso_sdu_fragment
-            file_outputs[ase].write(sdu)
+            if sdu.data:
+                file_outputs[ase].write(struct.pack('<H', len(sdu.data)) + sdu.data)
 
         def on_ase_state_change(ase: AseStateMachine) -> None:
             if ase.state != AseStateMachine.State.STREAMING:
@@ -170,7 +168,7 @@ async def main() -> None:
                 )
                 file_outputs[ase] = file_output
                 assert ase.cis_link
-                ase.cis_link.sink = functools.partial(on_pdu, ase)
+                ase.cis_link.sink = functools.partial(on_sdu, ase)
 
         for ase in ascs.ase_state_machines.values():
             ase.on(

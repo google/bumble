@@ -231,11 +231,125 @@ class ScoLink:
 
 
 # -----------------------------------------------------------------------------
+@dataclasses.dataclass(frozen=True)
+class IsoSdu:
+    '''
+    A complete ISO SDU received from the controller.
+
+    See Bluetooth spec @ Vol 4, Part E, 5.4.5 HCI ISO Data packets.
+    '''
+
+    data: bytes
+    packet_sequence_number: int
+    packet_status: hci.HCI_IsoDataPacket.PacketStatus = (
+        hci.HCI_IsoDataPacket.PacketStatus.VALID_DATA
+    )
+    time_stamp: int | None = None
+
+
+# -----------------------------------------------------------------------------
+class IsoSduAssembler:
+    '''
+    Reassembles fragmented HCI ISO Data packets of a single connection handle into
+    complete ISO SDUs.
+
+    Malformed or out-of-sequence fragments are logged and dropped; partially
+    received SDUs are discarded when a new SDU starts.
+    '''
+
+    first_packet: hci.HCI_IsoDataPacket | None
+    fragments: list[bytes]
+    current_length: int
+
+    def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        self.first_packet = None
+        self.fragments = []
+        self.current_length = 0
+
+    def feed_packet(self, packet: hci.HCI_IsoDataPacket) -> IsoSdu | None:
+        '''
+        Feed an HCI ISO Data packet.
+
+        Returns:
+            The reassembled SDU if this packet completes one, otherwise None.
+        '''
+        PbFlag = hci.HCI_IsoDataPacket.PbFlag
+        pb_flag = packet.pb_flag
+
+        if pb_flag in (PbFlag.FIRST_FRAGMENT, PbFlag.COMPLETE_SDU):
+            if self.first_packet is not None:
+                logger.warning(
+                    f'!!! ISO SDU start on handle 0x{packet.connection_handle:04X} '
+                    'while previous SDU is incomplete, dropping previous SDU'
+                )
+                self.reset()
+
+            if packet.iso_sdu_length is None or packet.packet_sequence_number is None:
+                logger.warning('!!! ISO SDU start without SDU header, dropping')
+                return None
+
+            self.first_packet = packet
+            self.fragments = [packet.iso_sdu_fragment]
+            self.current_length = len(packet.iso_sdu_fragment)
+        else:
+            if self.first_packet is None:
+                logger.warning(
+                    f'!!! ISO continuation on handle 0x{packet.connection_handle:04X} '
+                    'without start, dropping'
+                )
+                return None
+            self.fragments.append(packet.iso_sdu_fragment)
+            self.current_length += len(packet.iso_sdu_fragment)
+
+        first_packet = self.first_packet
+        assert first_packet.iso_sdu_length is not None
+        assert first_packet.packet_sequence_number is not None
+        expected_length = first_packet.iso_sdu_length
+
+        if self.current_length > expected_length:
+            logger.warning(
+                f'!!! ISO SDU data ({self.current_length} bytes) exceeds '
+                f'ISO_SDU_Length ({expected_length}), dropping'
+            )
+            self.reset()
+            return None
+
+        if pb_flag not in (PbFlag.COMPLETE_SDU, PbFlag.LAST_FRAGMENT):
+            # Wait for more fragments.
+            return None
+
+        if self.current_length != expected_length:
+            logger.warning(
+                f'!!! ISO SDU incomplete: got {self.current_length} bytes, '
+                f'expected {expected_length}, dropping'
+            )
+            self.reset()
+            return None
+
+        sdu = IsoSdu(
+            data=b''.join(self.fragments),
+            packet_sequence_number=first_packet.packet_sequence_number,
+            packet_status=hci.HCI_IsoDataPacket.PacketStatus(
+                first_packet.packet_status_flag or 0
+            ),
+            time_stamp=first_packet.time_stamp,
+        )
+        self.reset()
+        return sdu
+
+
+# -----------------------------------------------------------------------------
 @dataclasses.dataclass
 class IsoLink:
     handle: int
     packet_queue: DataPacketQueue = dataclasses.field(repr=False)
     packet_sequence_number: int = 0
+    sdu_assembler: IsoSduAssembler = dataclasses.field(
+        default_factory=IsoSduAssembler, repr=False
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -1065,8 +1179,13 @@ class Host(utils.EventEmitter):
         self.emit('sco_packet', packet.connection_handle, packet)
 
     def on_hci_iso_data_packet(self, packet: hci.HCI_IsoDataPacket) -> None:
-        # Experimental
-        self.emit('iso_packet', packet.connection_handle, packet)
+        handle = packet.connection_handle
+        if not (iso_link := self.cis_links.get(handle) or self.bis_links.get(handle)):
+            logger.warning(f'!!! ISO data for unknown handle 0x{handle:04X}')
+            return
+
+        if (sdu := iso_link.sdu_assembler.feed_packet(packet)) is not None:
+            self.emit('iso_sdu', handle, sdu)
 
     def on_l2cap_pdu(self, connection: Connection, cid: int, pdu: bytes) -> None:
         self.emit('l2cap_pdu', connection.handle, cid, pdu)
