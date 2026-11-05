@@ -2188,8 +2188,8 @@ class HCI_Object:
                 ),
             )
 
-        # Measure the widest field name
-        max_field_name_length = max(len(s[0]) for s in field_strings)
+        # Measure the widest field name. Repeated fields may contain no items.
+        max_field_name_length = max((len(s[0]) for s in field_strings), default=0)
         sep = ':'
         return '\n'.join(
             f'{indentation}'

@@ -175,6 +175,18 @@ def test_HCI_Number_Of_Completed_Packets_Event():
 
 
 # -----------------------------------------------------------------------------
+def test_HCI_Number_Of_Completed_Packets_Event_with_no_handles():
+    wire = bytes.fromhex('04130100')
+    event = hci.HCI_Packet.from_bytes(wire)
+
+    assert isinstance(event, hci.HCI_Number_Of_Completed_Packets_Event)
+    assert event.connection_handles == []
+    assert event.num_completed_packets == []
+    assert bytes(event) == wire
+    basic_check(event)
+
+
+# -----------------------------------------------------------------------------
 def test_HCI_Vendor_Event():
     data = bytes.fromhex('01020304')
     event = hci.HCI_Vendor_Event(data=data)
