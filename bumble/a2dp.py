@@ -923,7 +923,7 @@ class OpusParser:
                             logger.debug("first packet (header)")
                             if packet[:8] != b"OpusHead":
                                 raise ValueError("first packet is not OpusHead")
-                            packet_count = (
+                            channel_mode = (
                                 OpusPacket.ChannelMode.MONO
                                 if packet[9] == 1
                                 else OpusPacket.ChannelMode.STEREO

@@ -490,6 +490,33 @@ async def test_opus_parser():
 
 
 # -----------------------------------------------------------------------------
+async def test_opus_parser_mono():
+    page_header = (
+        b'OggS'  # Capture pattern
+        + b'\x00'  # Version
+        + b'\x02'  # Header type
+        + struct.pack("<QIIIB", 0, 2, 2, 0, 3)
+    )
+    segment_table = b'\x0a\x08\x0a'
+    opus_head_packet_data = b'OpusHead' + b'\x01' + b'\x01'  # 1 channel
+    opus_tags_packet_data = b'OpusTags'
+    audio_data_packet = b'0123456789'
+
+    data = Data(
+        page_header
+        + segment_table
+        + opus_head_packet_data
+        + opus_tags_packet_data
+        + audio_data_packet
+    )
+
+    packets = [packet async for packet in a2dp.OpusParser(data.read).packets]
+    assert len(packets) == 1
+    assert packets[0].channel_mode == a2dp.OpusPacket.ChannelMode.MONO
+    assert packets[0].payload == audio_data_packet
+
+
+# -----------------------------------------------------------------------------
 async def test_opus_packet_source():
     packed_header_data_revised = struct.pack(
         "<QIIIB",
