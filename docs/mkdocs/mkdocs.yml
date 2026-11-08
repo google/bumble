@@ -89,6 +89,7 @@ theme:
     - navigation.indexes
 
 plugins:
+  - search
   - mkdocstrings:
       handlers:
         python:
