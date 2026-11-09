@@ -146,10 +146,9 @@ class VolumeControlService(gatt.TemplateService):
     def _on_write_volume_control_point(
         self, connection: device.Connection, value: bytes
     ) -> None:
-        try:
-            opcode = VolumeControlPointOpcode(value[0])
-        except ValueError as error:
-            raise att.ATT_Error(ErrorCode.OPCODE_NOT_SUPPORTED) from error
+        if value[0] not in set(VolumeControlPointOpcode):
+            raise att.ATT_Error(ErrorCode.OPCODE_NOT_SUPPORTED)
+        opcode = VolumeControlPointOpcode(value[0])
 
         change_counter = value[1]
 
