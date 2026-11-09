@@ -1807,6 +1807,7 @@ class Connection(utils.CompositeEventEmitter):
     EVENT_CONNECTION_PHY_UPDATE = "connection_phy_update"
     EVENT_CONNECTION_PHY_UPDATE_FAILURE = "connection_phy_update_failure"
     EVENT_CONNECTION_DATA_LENGTH_CHANGE = "connection_data_length_change"
+    EVENT_CONNECTION_HDT_DATA_LENGTH_CHANGE = "connection_hdt_data_length_change"
     EVENT_CHANNEL_SOUNDING_CAPABILITIES_FAILURE = (
         "channel_sounding_capabilities_failure"
     )
@@ -1917,6 +1918,10 @@ class Connection(utils.CompositeEventEmitter):
         self.sc = False
         self.att_mtu = att.ATT_DEFAULT_MTU
         self.data_length = self.LeDataLength(*DEVICE_DEFAULT_DATA_LENGTH)
+        # Data length on the LE HDT PHY, if reported by the controller.
+        self.hdt_data_length: Connection.LeDataLength | None = None
+        # MIC length of the encrypted connection, if reported by the controller.
+        self.encryption_mic_length: hci.HdtMicLength | None = None
         self.gatt_client = gatt_client.Client(self)  # Per-connection client
         self.gatt_server = (
             device.gatt_server
@@ -3212,6 +3217,7 @@ class Device(utils.CompositeEventEmitter):
         feature_map: dict[hci.Phy, hci.LeFeatureMask] = {
             hci.Phy.LE_2M: hci.LeFeatureMask.LE_2M_PHY,
             hci.Phy.LE_CODED: hci.LeFeatureMask.LE_CODED_PHY,
+            hci.Phy.LE_HDT: hci.LeFeatureMask.HIGH_DATA_THROUGHPUT,
         }
         if phy not in feature_map:
             raise InvalidArgumentError('invalid PHY')
@@ -4427,8 +4433,32 @@ class Device(utils.CompositeEventEmitter):
             self.disconnecting = False
 
     async def set_data_length(
-        self, connection: Connection, tx_octets: int, tx_time: int
+        self,
+        connection: Connection,
+        tx_octets: int,
+        tx_time: int,
+        *,
+        phys: hci.DataLengthPhys = hci.DataLengthPhys.GFSK,
     ) -> None:
+        if phys == hci.DataLengthPhys.LE_HDT:
+            if tx_octets < 0x001B or tx_octets > 0x1FEF:
+                raise InvalidArgumentError(
+                    'tx_octets must be between 0x001B and 0x1FEF'
+                )
+
+            if tx_time < 0x0109 or tx_time > 0x4290:
+                raise InvalidArgumentError('tx_time must be between 0x0109 and 0x4290')
+
+            await self.send_sync_command(
+                hci.HCI_LE_Set_Data_Length_V2_Command(
+                    connection_handle=connection.handle,
+                    tx_octets=tx_octets,
+                    tx_time=tx_time,
+                    phys=phys,
+                )
+            )
+            return
+
         if tx_octets < 0x001B or tx_octets > 0x00FB:
             raise InvalidArgumentError('tx_octets must be between 0x001B and 0x00FB')
 
@@ -4440,6 +4470,21 @@ class Device(utils.CompositeEventEmitter):
                 connection_handle=connection.handle,
                 tx_octets=tx_octets,
                 tx_time=tx_time,
+            )
+        )
+
+    async def set_default_hdt_parameters(
+        self,
+        mic_length: hci.HdtMicLength = hci.HdtMicLength.MIC_128_BITS,
+        packet_format: hci.HdtPacketFormat = hci.HdtPacketFormat.ANY,
+        acl_rates: hci.HdtRate = hci.HdtRate.ALL,
+    ) -> None:
+        """[LE HDT only] Set the default LE HDT PHY parameters of new connections."""
+        await self.send_sync_command(
+            hci.HCI_LE_Set_HDT_Default_Parameters_Command(
+                preferred_mic_length=mic_length,
+                preferred_packet_format=packet_format,
+                preferred_acl_rates=acl_rates,
             )
         )
 
@@ -5016,6 +5061,13 @@ class Device(utils.CompositeEventEmitter):
             def _() -> None:
                 pending_encryption.set_result(None)
 
+            # When the connection is already encrypted, the controller refreshes
+            # the encryption key instead.
+            @watcher.on(connection, connection.EVENT_CONNECTION_ENCRYPTION_KEY_REFRESH)
+            def _() -> None:
+                if not pending_encryption.done():
+                    pending_encryption.set_result(None)
+
             @watcher.on(connection, connection.EVENT_CONNECTION_ENCRYPTION_FAILURE)
             def _(error_code: int):
                 pending_encryption.set_exception(hci.HCI_Error(error_code))
@@ -5400,11 +5452,22 @@ class Device(utils.CompositeEventEmitter):
 
             watcher.on(self.host, 'le_remote_features', on_le_remote_features)
             watcher.on(self.host, 'le_remote_features_failure', on_failure)
-            await self.send_async_command(
-                hci.HCI_LE_Read_Remote_Features_Command(
-                    connection_handle=connection.handle
+            if self.host.supports_command(
+                hci.HCI_LE_READ_ALL_REMOTE_FEATURES_COMMAND
+            ) and self.supports_le_features(hci.LeFeatureMask.LL_EXTENDED_FEATURE_SET):
+                # Read all the pages of the remote features.
+                await self.send_async_command(
+                    hci.HCI_LE_Read_All_Remote_Features_Command(
+                        connection_handle=connection.handle,
+                        pages_requested=hci.LE_FEATURES_MAX_PAGE,
+                    )
                 )
-            )
+            else:
+                await self.send_async_command(
+                    hci.HCI_LE_Read_Remote_Features_Command(
+                        connection_handle=connection.handle
+                    )
+                )
             return await read_feature_future
 
     async def get_remote_classic_features(
@@ -6924,6 +6987,35 @@ class Device(utils.CompositeEventEmitter):
             max_rx_time=max_rx_time,
         )
         connection.emit(connection.EVENT_CONNECTION_DATA_LENGTH_CHANGE)
+
+    @host_event_handler
+    @with_connection_from_handle
+    def on_connection_hdt_data_length_change(
+        self,
+        connection: Connection,
+        max_tx_octets: int,
+        max_tx_time: int,
+        max_rx_octets: int,
+        max_rx_time: int,
+    ):
+        logger.debug(
+            f'*** Connection HDT Data Length Change: [0x{connection.handle:04X}] '
+            f'{connection.peer_address} as {connection.role_name}'
+        )
+        connection.hdt_data_length = Connection.LeDataLength(
+            max_tx_octets=max_tx_octets,
+            max_tx_time=max_tx_time,
+            max_rx_octets=max_rx_octets,
+            max_rx_time=max_rx_time,
+        )
+        connection.emit(connection.EVENT_CONNECTION_HDT_DATA_LENGTH_CHANGE)
+
+    @host_event_handler
+    @with_connection_from_handle
+    def on_connection_encryption_mic_length(
+        self, connection: Connection, mic_length: int
+    ):
+        connection.encryption_mic_length = hci.HdtMicLength(mic_length)
 
     @host_event_handler
     def on_cs_remote_supported_capabilities(

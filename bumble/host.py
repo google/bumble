@@ -455,13 +455,81 @@ class Host(utils.EventEmitter):
             )
         )
         if self.supports_command(hci.HCI_SET_EVENT_MASK_PAGE_2_COMMAND):
+            page_2_events = [hci.HCI_ENCRYPTION_CHANGE_V2_EVENT]
+            if self.supports_command(
+                hci.HCI_LE_ENABLE_ENCRYPTION_V2_COMMAND
+            ) or self.supports_command(hci.HCI_REFRESH_ENCRYPTION_KEY_V2_COMMAND):
+                # Bluetooth 7.0 encryption events, with MIC length and Encryption
+                # Key Schedule information.
+                page_2_events += [
+                    hci.HCI_ENCRYPTION_CHANGE_V3_EVENT,
+                    hci.HCI_ENCRYPTION_KEY_REFRESH_COMPLETE_V2_EVENT,
+                ]
             await self.send_sync_command(
                 hci.HCI_Set_Event_Mask_Page_2_Command(
                     event_mask_page_2=hci.HCI_Set_Event_Mask_Page_2_Command.mask(
-                        [hci.HCI_ENCRYPTION_CHANGE_V2_EVENT]
+                        page_2_events
                     )
                 )
             )
+
+        le_events = [
+            hci.HCI_LE_CONNECTION_COMPLETE_EVENT,
+            hci.HCI_LE_ADVERTISING_REPORT_EVENT,
+            hci.HCI_LE_CONNECTION_UPDATE_COMPLETE_EVENT,
+            hci.HCI_LE_READ_REMOTE_FEATURES_COMPLETE_EVENT,
+            hci.HCI_LE_LONG_TERM_KEY_REQUEST_EVENT,
+            hci.HCI_LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT,
+            hci.HCI_LE_DATA_LENGTH_CHANGE_EVENT,
+            hci.HCI_LE_READ_LOCAL_P_256_PUBLIC_KEY_COMPLETE_EVENT,
+            hci.HCI_LE_GENERATE_DHKEY_COMPLETE_EVENT,
+            hci.HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT,
+            hci.HCI_LE_ENHANCED_CONNECTION_COMPLETE_V2_EVENT,
+            hci.HCI_LE_DIRECTED_ADVERTISING_REPORT_EVENT,
+            hci.HCI_LE_PHY_UPDATE_COMPLETE_EVENT,
+            hci.HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT,
+            hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_EVENT,
+            hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V2_EVENT,
+            hci.HCI_LE_PERIODIC_ADVERTISING_REPORT_EVENT,
+            hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT,
+            hci.HCI_LE_SCAN_TIMEOUT_EVENT,
+            hci.HCI_LE_ADVERTISING_SET_TERMINATED_EVENT,
+            hci.HCI_LE_SCAN_REQUEST_RECEIVED_EVENT,
+            hci.HCI_LE_CONNECTIONLESS_IQ_REPORT_EVENT,
+            hci.HCI_LE_CONNECTION_IQ_REPORT_EVENT,
+            hci.HCI_LE_CTE_REQUEST_FAILED_EVENT,
+            hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_EVENT,
+            hci.HCI_LE_CIS_ESTABLISHED_EVENT,
+            hci.HCI_LE_CIS_REQUEST_EVENT,
+            hci.HCI_LE_CREATE_BIG_COMPLETE_EVENT,
+            hci.HCI_LE_TERMINATE_BIG_COMPLETE_EVENT,
+            hci.HCI_LE_BIG_SYNC_ESTABLISHED_EVENT,
+            hci.HCI_LE_BIG_SYNC_LOST_EVENT,
+            hci.HCI_LE_REQUEST_PEER_SCA_COMPLETE_EVENT,
+            hci.HCI_LE_PATH_LOSS_THRESHOLD_EVENT,
+            hci.HCI_LE_TRANSMIT_POWER_REPORTING_EVENT,
+            hci.HCI_LE_BIGINFO_ADVERTISING_REPORT_EVENT,
+            hci.HCI_LE_SUBRATE_CHANGE_EVENT,
+            hci.HCI_LE_READ_ALL_REMOTE_FEATURES_COMPLETE_EVENT,
+            hci.HCI_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE_EVENT,
+            hci.HCI_LE_CS_PROCEDURE_ENABLE_COMPLETE_EVENT,
+            hci.HCI_LE_CS_SECURITY_ENABLE_COMPLETE_EVENT,
+            hci.HCI_LE_CS_CONFIG_COMPLETE_EVENT,
+            hci.HCI_LE_CS_SUBEVENT_RESULT_EVENT,
+            hci.HCI_LE_CS_SUBEVENT_RESULT_CONTINUE_EVENT,
+            hci.HCI_LE_MONITORED_ADVERTISERS_REPORT_EVENT,
+            hci.HCI_LE_FRAME_SPACE_UPDATE_COMPLETE_EVENT,
+            hci.HCI_LE_UTP_RECEIVE_EVENT,
+            hci.HCI_LE_CONNECTION_RATE_CHANGE_EVENT,
+        ]
+        if self.supports_le_features(hci.LeFeatureMask.HIGH_DATA_THROUGHPUT):
+            # Bluetooth 7.0 events carrying LE HDT PHY information.
+            le_events += [
+                hci.HCI_LE_DATA_LENGTH_CHANGE_V2_EVENT,
+                hci.HCI_LE_CIS_ESTABLISHED_V2_EVENT,
+                hci.HCI_LE_CIS_ESTABLISHED_V3_EVENT,
+                hci.HCI_LE_CREATE_BIG_COMPLETE_V2_EVENT,
+            ]
 
         if (
             self.local_version is not None
@@ -469,63 +537,25 @@ class Host(utils.EventEmitter):
         ):
             # Some older controllers don't like event masks with bits they don't
             # understand
-            le_event_mask = bytes.fromhex('1F00000000000000')
-        else:
-            le_event_mask = hci.HCI_LE_Set_Event_Mask_Command.mask(
-                [
-                    hci.HCI_LE_CONNECTION_COMPLETE_EVENT,
-                    hci.HCI_LE_ADVERTISING_REPORT_EVENT,
-                    hci.HCI_LE_CONNECTION_UPDATE_COMPLETE_EVENT,
-                    hci.HCI_LE_READ_REMOTE_FEATURES_COMPLETE_EVENT,
-                    hci.HCI_LE_LONG_TERM_KEY_REQUEST_EVENT,
-                    hci.HCI_LE_REMOTE_CONNECTION_PARAMETER_REQUEST_EVENT,
-                    hci.HCI_LE_DATA_LENGTH_CHANGE_EVENT,
-                    hci.HCI_LE_READ_LOCAL_P_256_PUBLIC_KEY_COMPLETE_EVENT,
-                    hci.HCI_LE_GENERATE_DHKEY_COMPLETE_EVENT,
-                    hci.HCI_LE_ENHANCED_CONNECTION_COMPLETE_EVENT,
-                    hci.HCI_LE_ENHANCED_CONNECTION_COMPLETE_V2_EVENT,
-                    hci.HCI_LE_DIRECTED_ADVERTISING_REPORT_EVENT,
-                    hci.HCI_LE_PHY_UPDATE_COMPLETE_EVENT,
-                    hci.HCI_LE_EXTENDED_ADVERTISING_REPORT_EVENT,
-                    hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_EVENT,
-                    hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_ESTABLISHED_V2_EVENT,
-                    hci.HCI_LE_PERIODIC_ADVERTISING_REPORT_EVENT,
-                    hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_LOST_EVENT,
-                    hci.HCI_LE_SCAN_TIMEOUT_EVENT,
-                    hci.HCI_LE_ADVERTISING_SET_TERMINATED_EVENT,
-                    hci.HCI_LE_SCAN_REQUEST_RECEIVED_EVENT,
-                    hci.HCI_LE_CONNECTIONLESS_IQ_REPORT_EVENT,
-                    hci.HCI_LE_CONNECTION_IQ_REPORT_EVENT,
-                    hci.HCI_LE_CTE_REQUEST_FAILED_EVENT,
-                    hci.HCI_LE_PERIODIC_ADVERTISING_SYNC_TRANSFER_RECEIVED_EVENT,
-                    hci.HCI_LE_CIS_ESTABLISHED_EVENT,
-                    hci.HCI_LE_CIS_REQUEST_EVENT,
-                    hci.HCI_LE_CREATE_BIG_COMPLETE_EVENT,
-                    hci.HCI_LE_TERMINATE_BIG_COMPLETE_EVENT,
-                    hci.HCI_LE_BIG_SYNC_ESTABLISHED_EVENT,
-                    hci.HCI_LE_BIG_SYNC_LOST_EVENT,
-                    hci.HCI_LE_REQUEST_PEER_SCA_COMPLETE_EVENT,
-                    hci.HCI_LE_PATH_LOSS_THRESHOLD_EVENT,
-                    hci.HCI_LE_TRANSMIT_POWER_REPORTING_EVENT,
-                    hci.HCI_LE_BIGINFO_ADVERTISING_REPORT_EVENT,
-                    hci.HCI_LE_SUBRATE_CHANGE_EVENT,
-                    hci.HCI_LE_READ_ALL_REMOTE_FEATURES_COMPLETE_EVENT,
-                    hci.HCI_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE_EVENT,
-                    hci.HCI_LE_CS_PROCEDURE_ENABLE_COMPLETE_EVENT,
-                    hci.HCI_LE_CS_SECURITY_ENABLE_COMPLETE_EVENT,
-                    hci.HCI_LE_CS_CONFIG_COMPLETE_EVENT,
-                    hci.HCI_LE_CS_SUBEVENT_RESULT_EVENT,
-                    hci.HCI_LE_CS_SUBEVENT_RESULT_CONTINUE_EVENT,
-                    hci.HCI_LE_MONITORED_ADVERTISERS_REPORT_EVENT,
-                    hci.HCI_LE_FRAME_SPACE_UPDATE_COMPLETE_EVENT,
-                    hci.HCI_LE_UTP_RECEIVE_EVENT,
-                    hci.HCI_LE_CONNECTION_RATE_CHANGE_EVENT,
-                ]
+            await self.send_sync_command(
+                hci.HCI_LE_Set_Event_Mask_Command(
+                    le_event_mask=bytes.fromhex('1F00000000000000')
+                )
             )
-
-        await self.send_sync_command(
-            hci.HCI_LE_Set_Event_Mask_Command(le_event_mask=le_event_mask)
-        )
+        elif self.supports_command(hci.HCI_LE_SET_EVENT_MASK_V2_COMMAND):
+            if self.supports_le_features(hci.LeFeatureMask.HIGH_DATA_THROUGHPUT):
+                le_events.append(hci.HCI_LE_TEST_REPORT_HDT_LINK_QUALITY_EVENT)
+            await self.send_sync_command(
+                hci.HCI_LE_Set_Event_Mask_V2_Command(
+                    le_event_mask=hci.HCI_LE_Set_Event_Mask_V2_Command.mask(le_events)
+                )
+            )
+        else:
+            await self.send_sync_command(
+                hci.HCI_LE_Set_Event_Mask_Command(
+                    le_event_mask=hci.HCI_LE_Set_Event_Mask_Command.mask(le_events)
+                )
+            )
 
         if self.supports_command(hci.HCI_READ_BUFFER_SIZE_COMMAND):
             response6 = await self.send_sync_command(hci.HCI_Read_Buffer_Size_Command())
@@ -1441,7 +1471,11 @@ class Host(utils.EventEmitter):
         )
 
     def on_hci_le_create_big_complete_event(
-        self, event: hci.HCI_LE_Create_BIG_Complete_Event
+        self,
+        event: (
+            hci.HCI_LE_Create_BIG_Complete_Event
+            | hci.HCI_LE_Create_BIG_Complete_V2_Event
+        ),
     ):
         self.bigs[event.big_handle] = set(event.connection_handle)
         if self.iso_packet_queue is None:
@@ -1467,6 +1501,11 @@ class Host(utils.EventEmitter):
             event.max_pdu,
             event.iso_interval,
         )
+
+    def on_hci_le_create_big_complete_v2_event(
+        self, event: hci.HCI_LE_Create_BIG_Complete_V2_Event
+    ):
+        self.on_hci_le_create_big_complete_event(event)
 
     def on_hci_le_big_sync_established_event(
         self, event: hci.HCI_LE_BIG_Sync_Established_Event
@@ -1534,7 +1573,14 @@ class Host(utils.EventEmitter):
             event.advertiser_clock_accuracy,
         )
 
-    def on_hci_le_cis_established_event(self, event: hci.HCI_LE_CIS_Established_Event):
+    def on_hci_le_cis_established_event(
+        self,
+        event: (
+            hci.HCI_LE_CIS_Established_Event
+            | hci.HCI_LE_CIS_Established_V2_Event
+            | hci.HCI_LE_CIS_Established_V3_Event
+        ),
+    ):
         # The remaining parameters are unused for now.
         if event.status == hci.HCI_SUCCESS:
             if self.iso_packet_queue is None:
@@ -1564,6 +1610,16 @@ class Host(utils.EventEmitter):
             self.emit(
                 'cis_establishment_failure', event.connection_handle, event.status
             )
+
+    def on_hci_le_cis_established_v2_event(
+        self, event: hci.HCI_LE_CIS_Established_V2_Event
+    ):
+        self.on_hci_le_cis_established_event(event)
+
+    def on_hci_le_cis_established_v3_event(
+        self, event: hci.HCI_LE_CIS_Established_V3_Event
+    ):
+        self.on_hci_le_cis_established_event(event)
 
     def on_hci_le_remote_connection_parameter_request_event(
         self, event: hci.HCI_LE_Remote_Connection_Parameter_Request_Event
@@ -1698,6 +1754,32 @@ class Host(utils.EventEmitter):
             event.max_rx_time,
         )
 
+    def on_hci_le_data_length_change_v2_event(
+        self, event: hci.HCI_LE_Data_Length_Change_V2_Event
+    ):
+        if event.connection_handle not in self.connections:
+            logger.warning('!!! DATA LENGTH CHANGE: unknown handle')
+            return
+
+        if event.phys == hci.DataLengthPhys.GFSK:
+            self.emit(
+                'connection_data_length_change',
+                event.connection_handle,
+                event.max_tx_octets,
+                event.max_tx_time,
+                event.max_rx_octets,
+                event.max_rx_time,
+            )
+        else:
+            self.emit(
+                'connection_hdt_data_length_change',
+                event.connection_handle,
+                event.max_tx_octets,
+                event.max_tx_time,
+                event.max_rx_octets,
+                event.max_rx_time,
+            )
+
     def on_hci_authentication_complete_event(
         self, event: hci.HCI_Authentication_Complete_Event
     ):
@@ -1754,12 +1836,51 @@ class Host(utils.EventEmitter):
                 'connection_encryption_failure', event.connection_handle, event.status
             )
 
+    def on_hci_encryption_change_v3_event(
+        self, event: hci.HCI_Encryption_Change_V3_Event
+    ):
+        # Notify the client
+        if event.status == hci.HCI_SUCCESS:
+            self.emit(
+                'connection_encryption_change',
+                event.connection_handle,
+                event.encryption_enabled,
+                event.encryption_key_size,
+            )
+            self.emit(
+                'connection_encryption_mic_length',
+                event.connection_handle,
+                event.mic_length,
+            )
+        else:
+            self.emit(
+                'connection_encryption_failure', event.connection_handle, event.status
+            )
+
     def on_hci_encryption_key_refresh_complete_event(
         self, event: hci.HCI_Encryption_Key_Refresh_Complete_Event
     ):
         # Notify the client
         if event.status == hci.HCI_SUCCESS:
             self.emit('connection_encryption_key_refresh', event.connection_handle)
+        else:
+            self.emit(
+                'connection_encryption_key_refresh_failure',
+                event.connection_handle,
+                event.status,
+            )
+
+    def on_hci_encryption_key_refresh_complete_v2_event(
+        self, event: hci.HCI_Encryption_Key_Refresh_Complete_V2_Event
+    ):
+        # Notify the client
+        if event.status == hci.HCI_SUCCESS:
+            self.emit('connection_encryption_key_refresh', event.connection_handle)
+            self.emit(
+                'connection_encryption_mic_length',
+                event.connection_handle,
+                event.mic_length,
+            )
         else:
             self.emit(
                 'connection_encryption_key_refresh_failure',
@@ -1953,6 +2074,26 @@ class Host(utils.EventEmitter):
             event.connection_handle,
             hci.LeFeatureMask(int.from_bytes(event.le_features, 'little')),
         )
+
+    def on_hci_le_read_all_remote_features_complete_event(
+        self, event: hci.HCI_LE_Read_All_Remote_Features_Complete_Event
+    ):
+        if event.status != hci.HCI_SUCCESS:
+            self.emit(
+                'le_remote_features_failure', event.connection_handle, event.status
+            )
+            return
+
+        self.emit(
+            'le_remote_features',
+            event.connection_handle,
+            hci.LeFeatureMask(int.from_bytes(event.le_features, 'little')),
+        )
+
+    def on_hci_le_test_report_hdt_link_quality_event(
+        self, event: hci.HCI_LE_Test_Report_HDT_Link_Quality_Event
+    ):
+        self.emit('le_test_report_hdt_link_quality', event)
 
     def on_hci_le_cs_read_remote_supported_capabilities_complete_event(
         self, event: hci.HCI_LE_CS_Read_Remote_Supported_Capabilities_Complete_Event
