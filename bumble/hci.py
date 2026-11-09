@@ -227,6 +227,8 @@ class SpecificationVersion(SpecableEnum):
     BLUETOOTH_CORE_6_0     = 14
     BLUETOOTH_CORE_6_1     = 15
     BLUETOOTH_CORE_6_2     = 16
+    BLUETOOTH_CORE_6_3     = 17
+    BLUETOOTH_CORE_7_0     = 18
 
 # For backwards compatibility only
 HCI_VERSION_BLUETOOTH_CORE_1_0B    = SpecificationVersion.BLUETOOTH_CORE_1_0B
@@ -246,6 +248,8 @@ HCI_VERSION_BLUETOOTH_CORE_5_4     = SpecificationVersion.BLUETOOTH_CORE_5_4
 HCI_VERSION_BLUETOOTH_CORE_6_0     = SpecificationVersion.BLUETOOTH_CORE_6_0
 HCI_VERSION_BLUETOOTH_CORE_6_1     = SpecificationVersion.BLUETOOTH_CORE_6_1
 HCI_VERSION_BLUETOOTH_CORE_6_2     = SpecificationVersion.BLUETOOTH_CORE_6_2
+HCI_VERSION_BLUETOOTH_CORE_6_3     = SpecificationVersion.BLUETOOTH_CORE_6_3
+HCI_VERSION_BLUETOOTH_CORE_7_0     = SpecificationVersion.BLUETOOTH_CORE_7_0
 
 # HCI Packet types
 HCI_COMMAND_PACKET          = 0x01
@@ -319,6 +323,9 @@ HCI_INQUIRY_RESPONSE_NOTIFICATION_EVENT                          = 0X56
 HCI_AUTHENTICATED_PAYLOAD_TIMEOUT_EXPIRED_EVENT                  = 0X57
 HCI_SAM_STATUS_CHANGE_EVENT                                      = 0X58
 HCI_ENCRYPTION_CHANGE_V2_EVENT                                   = 0x59
+HCI_ENCRYPTION_CHANGE_V3_EVENT                                   = 0x5A
+HCI_ENCRYPTION_KEY_REFRESH_COMPLETE_V2_EVENT                     = 0x5B
+HCI_ENCRYPTION_KEY_DEBUG_REPORT_EVENT                            = 0x5C
 
 HCI_VENDOR_EVENT = 0xFF
 
@@ -380,6 +387,12 @@ HCI_LE_FRAME_SPACE_UPDATE_COMPLETE_EVENT                    = 0x35
 HCI_LE_UTP_RECEIVE_EVENT                                    = 0x36
 HCI_LE_CONNECTION_RATE_CHANGE_EVENT                         = 0x37
 HCI_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE_V2_EVENT = 0x38
+HCI_LE_DATA_LENGTH_CHANGE_V2_EVENT                          = 0x39
+HCI_LE_CIS_ESTABLISHED_V3_EVENT                             = 0x3A
+HCI_LE_CREATE_BIG_COMPLETE_V2_EVENT                         = 0x3B
+HCI_LE_TEST_REPORT_HDT_LINK_QUALITY_EVENT                   = 0x3C
+HCI_LE_CIS_UPDATE_EVENT                                     = 0x3D
+HCI_LE_UPDATE_CIG_PERIPHERAL_REQUEST_EVENT                  = 0x3E
 
 
 # HCI Command
@@ -478,6 +491,7 @@ HCI_READ_SYNCHRONOUS_FLOW_CONTROL_ENABLE_COMMAND                         = hci_c
 HCI_WRITE_SYNCHRONOUS_FLOW_CONTROL_ENABLE_COMMAND                        = hci_command_op_code(0x03, 0x002F)
 HCI_SET_CONTROLLER_TO_HOST_FLOW_CONTROL_COMMAND                          = hci_command_op_code(0x03, 0x0031)
 HCI_HOST_BUFFER_SIZE_COMMAND                                             = hci_command_op_code(0x03, 0x0033)
+HCI_HOST_BUFFER_SIZE_V2_COMMAND                                          = hci_command_op_code(0x03, 0x0034)
 HCI_HOST_NUMBER_OF_COMPLETED_PACKETS_COMMAND                             = hci_command_op_code(0x03, 0x0035)
 HCI_READ_LINK_SUPERVISION_TIMEOUT_COMMAND                                = hci_command_op_code(0x03, 0x0036)
 HCI_WRITE_LINK_SUPERVISION_TIMEOUT_COMMAND                               = hci_command_op_code(0x03, 0x0037)
@@ -496,6 +510,7 @@ HCI_WRITE_AFH_CHANNEL_ASSESSMENT_MODE_COMMAND                            = hci_c
 HCI_READ_EXTENDED_INQUIRY_RESPONSE_COMMAND                               = hci_command_op_code(0x03, 0x0051)
 HCI_WRITE_EXTENDED_INQUIRY_RESPONSE_COMMAND                              = hci_command_op_code(0x03, 0x0052)
 HCI_REFRESH_ENCRYPTION_KEY_COMMAND                                       = hci_command_op_code(0x03, 0x0053)
+HCI_REFRESH_ENCRYPTION_KEY_V2_COMMAND                                    = hci_command_op_code(0x03, 0x0054)
 HCI_READ_SIMPLE_PAIRING_MODE_COMMAND                                     = hci_command_op_code(0x03, 0x0055)
 HCI_WRITE_SIMPLE_PAIRING_MODE_COMMAND                                    = hci_command_op_code(0x03, 0x0056)
 HCI_READ_LOCAL_OOB_DATA_COMMAND                                          = hci_command_op_code(0x03, 0x0057)
@@ -546,6 +561,7 @@ HCI_READ_LOCAL_SIMPLE_PAIRING_OPTIONS_COMMAND                            = hci_c
 HCI_READ_LOCAL_SUPPORTED_CODECS_V2_COMMAND                               = hci_command_op_code(0x04, 0x000D)
 HCI_READ_LOCAL_SUPPORTED_CODEC_CAPABILITIES_COMMAND                      = hci_command_op_code(0x04, 0x000E)
 HCI_READ_LOCAL_SUPPORTED_CONTROLLER_DELAY_COMMAND                        = hci_command_op_code(0x04, 0x000F)
+HCI_READ_LOCAL_SUPPORTED_COMMANDS_V2_COMMAND                             = hci_command_op_code(0x04, 0x0010)
 HCI_READ_FAILED_CONTACT_COUNTER_COMMAND                                  = hci_command_op_code(0x05, 0x0001)
 HCI_RESET_FAILED_CONTACT_COUNTER_COMMAND                                 = hci_command_op_code(0x05, 0x0002)
 HCI_READ_LINK_QUALITY_COMMAND                                            = hci_command_op_code(0x05, 0x0003)
@@ -559,6 +575,8 @@ HCI_READ_LOOPBACK_MODE_COMMAND                                           = hci_c
 HCI_WRITE_LOOPBACK_MODE_COMMAND                                          = hci_command_op_code(0x06, 0x0002)
 HCI_ENABLE_DEVICE_UNDER_TEST_MODE_COMMAND                                = hci_command_op_code(0x06, 0x0003)
 HCI_WRITE_SIMPLE_PAIRING_DEBUG_MODE_COMMAND                              = hci_command_op_code(0x06, 0x0004)
+HCI_READ_ENCRYPTION_KEY_DEBUG_REPORTING_MODE_COMMAND                     = hci_command_op_code(0x06, 0x0005)
+HCI_WRITE_ENCRYPTION_KEY_DEBUG_REPORTING_MODE_COMMAND                    = hci_command_op_code(0x06, 0x0006)
 HCI_WRITE_SECURE_CONNECTIONS_TEST_MODE_COMMAND                           = hci_command_op_code(0x06, 0x000A)
 HCI_LE_SET_EVENT_MASK_COMMAND                                            = hci_command_op_code(0x08, 0x0001)
 HCI_LE_READ_BUFFER_SIZE_COMMAND                                          = hci_command_op_code(0x08, 0x0002)
@@ -725,6 +743,36 @@ HCI_LE_UTP_SEND_COMMAND                                                  = hci_c
 HCI_LE_CONNECTION_RATE_REQUEST_COMMAND                                   = hci_command_op_code(0x08, 0x00A1)
 HCI_LE_SET_DEFAULT_RATE_PARAMETERS_COMMAND                               = hci_command_op_code(0x08, 0x00A2)
 HCI_LE_READ_MINIMUM_SUPPORTED_CONNECTION_INTERVAL_COMMAND                = hci_command_op_code(0x08, 0x00A3)
+# Bluetooth 6.3 / 7.0
+HCI_LE_SET_EVENT_MASK_V2_COMMAND                                         = hci_command_op_code(0x08, 0x00A4)
+HCI_LE_CS_SET_SECURITY_REQUIREMENTS_COMMAND                              = hci_command_op_code(0x08, 0x00A7)
+HCI_LE_CS_SET_DEFAULT_SECURITY_REQUIREMENTS_COMMAND                      = hci_command_op_code(0x08, 0x00A8)
+HCI_LE_TEST_END_V2_COMMAND                                               = hci_command_op_code(0x08, 0x00A9)
+HCI_LE_SET_DATA_LENGTH_V2_COMMAND                                        = hci_command_op_code(0x08, 0x00AA)
+HCI_LE_SETUP_ISO_DATA_PATH_V2_COMMAND                                    = hci_command_op_code(0x08, 0x00AB)
+HCI_LE_TRANSMITTER_TEST_V5_COMMAND                                       = hci_command_op_code(0x08, 0x00AC)
+HCI_LE_RECEIVER_TEST_V4_COMMAND                                          = hci_command_op_code(0x08, 0x00AD)
+HCI_LE_ENABLE_ENCRYPTION_V2_COMMAND                                      = hci_command_op_code(0x08, 0x00AF)
+HCI_LE_READ_MAXIMUM_DATA_LENGTH_V2_COMMAND                               = hci_command_op_code(0x08, 0x00B0)
+HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_V2_COMMAND                     = hci_command_op_code(0x08, 0x00B1)
+HCI_LE_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH_V2_COMMAND                    = hci_command_op_code(0x08, 0x00B2)
+HCI_LE_SET_CIG_PARAMETERS_V2_COMMAND                                     = hci_command_op_code(0x08, 0x00B3)
+HCI_LE_SET_CIG_PARAMETERS_TEST_V2_COMMAND                                = hci_command_op_code(0x08, 0x00B4)
+HCI_LE_CREATE_CIS_V2_COMMAND                                             = hci_command_op_code(0x08, 0x00B5)
+HCI_LE_CREATE_BIG_V2_COMMAND                                             = hci_command_op_code(0x08, 0x00B6)
+HCI_LE_CREATE_BIG_TEST_V2_COMMAND                                        = hci_command_op_code(0x08, 0x00B7)
+HCI_LE_READ_ENCRYPTION_KEY_SCHEDULE_DEBUG_MODE_COMMAND                   = hci_command_op_code(0x08, 0x00B8)
+HCI_LE_WRITE_ENCRYPTION_KEY_SCHEDULE_DEBUG_MODE_COMMAND                  = hci_command_op_code(0x08, 0x00B9)
+HCI_LE_SET_HDT_DEFAULT_PARAMETERS_COMMAND                                = hci_command_op_code(0x08, 0x00BC)
+HCI_LE_SET_HDT_PARAMETERS_TEST_COMMAND                                   = hci_command_op_code(0x08, 0x00BD)
+HCI_LE_READ_CIS_UPDATE_CAPABILITIES_COMMAND                              = hci_command_op_code(0x08, 0x00BF)
+HCI_LE_SET_DEFAULT_CIS_UPDATE_PARAMETERS_COMMAND                         = hci_command_op_code(0x08, 0x00C0)
+HCI_LE_ADD_CIG_CONFIGURATION_COMMAND                                     = hci_command_op_code(0x08, 0x00C1)
+HCI_LE_ADD_CIG_CONFIGURATION_TEST_COMMAND                                = hci_command_op_code(0x08, 0x00C2)
+HCI_LE_UPDATE_CIG_COMMAND                                                = hci_command_op_code(0x08, 0x00C3)
+HCI_LE_UPDATE_CIG_TEST_COMMAND                                           = hci_command_op_code(0x08, 0x00C4)
+HCI_LE_UPDATE_CIG_PERIPHERAL_REQUEST_REPLY_COMMAND                       = hci_command_op_code(0x08, 0x00C5)
+HCI_LE_REMOVE_CIG_CONFIGURATION_COMMAND                                  = hci_command_op_code(0x08, 0x00C6)
 
 
 # HCI Error Codes
@@ -883,6 +931,7 @@ class Phy(SpecableEnum):
     LE_1M    = 1
     LE_2M    = 2
     LE_CODED = 3
+    LE_HDT   = 5
 
 
 # ACL
@@ -894,12 +943,14 @@ HCI_ACK_PB_COMPLETE_L2CAP      = 3
 HCI_LE_PHY_NAMES: dict[int,str] = {
     Phy.LE_1M:    'LE 1M',
     Phy.LE_2M:    'LE 2M',
-    Phy.LE_CODED: 'LE Coded'
+    Phy.LE_CODED: 'LE Coded',
+    Phy.LE_HDT:   'LE HDT',
 }
 
 HCI_LE_1M_PHY_BIT    = 0
 HCI_LE_2M_PHY_BIT    = 1
 HCI_LE_CODED_PHY_BIT = 2
+HCI_LE_HDT_PHY_BIT   = 4
 
 HCI_LE_PHY_BIT_NAMES = ['LE_1M_PHY', 'LE_2M_PHY', 'LE_CODED_PHY']
 
@@ -907,6 +958,7 @@ HCI_LE_PHY_TYPE_TO_BIT: dict[Phy, int] = {
     Phy.LE_1M:    HCI_LE_1M_PHY_BIT,
     Phy.LE_2M:    HCI_LE_2M_PHY_BIT,
     Phy.LE_CODED: HCI_LE_CODED_PHY_BIT,
+    Phy.LE_HDT:   HCI_LE_HDT_PHY_BIT,
 }
 
 
@@ -914,6 +966,120 @@ class PhyBit(SpecableFlag):
     LE_1M    = 1 << HCI_LE_1M_PHY_BIT
     LE_2M    = 1 << HCI_LE_2M_PHY_BIT
     LE_CODED = 1 << HCI_LE_CODED_PHY_BIT
+    LE_HDT   = 1 << HCI_LE_HDT_PHY_BIT
+
+
+# PHY_Options of HCI_LE_Set_PHY.
+# See Bluetooth spec @ 7.8.49 LE Set PHY command
+class PhyOptions(SpecableFlag):
+    # Bits 0-1: preferred coding on the LE Coded PHY (0: none, 1: S=2, 2: S=8)
+    PREFER_S_2_CODED_PHY  = 1 << 0
+    PREFER_S_8_CODED_PHY  = 1 << 1
+    # Bits 2-6: preferred rates on the LE HDT PHY
+    PREFER_HDT2_RATE      = 1 << 2
+    PREFER_HDT3_RATE      = 1 << 3
+    PREFER_HDT4_RATE      = 1 << 4
+    PREFER_HDT6_RATE      = 1 << 5
+    PREFER_HDT7_5_RATE    = 1 << 6
+    # Bit 7: preferred 64-bit MIC on the LE HDT PHY if the connection is encrypted
+    PREFER_HDT_64_BIT_MIC = 1 << 7
+    # Bits 8-9: preferred packet format on the LE HDT PHY
+    # (0: none, 1: packet format 0, 2: packet format 1)
+    PREFER_HDT_PACKET_FORMAT_0 = 1 << 8
+    PREFER_HDT_PACKET_FORMAT_1 = 1 << 9
+    # Bit 10: force a key refresh when encrypted with Encryption Key Schedule
+    FORCE_KEY_REFRESH     = 1 << 10
+
+    @classmethod
+    def from_hdt_preferences(
+        cls,
+        rates: HdtRate | int = 0,
+        mic_length: HdtMicLength | int = 0x02,
+        packet_format: HdtPacketFormat | int = 0x00,
+    ) -> PhyOptions:
+        '''
+        Build PHY_Options bits 2 to 9 from HDT preferences, in the same way the
+        initial PHY_Options of a connection is derived from the
+        HCI_LE_Set_HDT_Default_Parameters command parameters.
+        '''
+        return cls(
+            ((int(rates) & 0x1F) << 2)
+            | ((1 if mic_length == HdtMicLength.MIC_64_BITS else 0) << 7)
+            | ((int(packet_format) & 0x03) << 8)
+        )
+
+    @property
+    def hdt_rates(self) -> HdtRate:
+        return HdtRate((self.value >> 2) & 0x1F)
+
+    @property
+    def hdt_mic_length(self) -> HdtMicLength:
+        return (
+            HdtMicLength.MIC_64_BITS
+            if self.value & self.PREFER_HDT_64_BIT_MIC
+            else HdtMicLength.MIC_128_BITS
+        )
+
+    @property
+    def hdt_packet_format(self) -> HdtPacketFormat:
+        return HdtPacketFormat((self.value >> 8) & 0x03)
+
+
+# Rates of the LE HDT PHY (Preferred_ACL_Rates, TX_Rate, HDT_Rates, Rates, ...).
+# See Bluetooth spec @ 7.8.159 LE Set HDT Default Parameters command
+class HdtRate(SpecableFlag):
+    HDT2   = 1 << 0
+    HDT3   = 1 << 1
+    HDT4   = 1 << 2
+    HDT6   = 1 << 3
+    HDT7_5 = 1 << 4
+
+    ALL = HDT2 | HDT3 | HDT4 | HDT6 | HDT7_5
+
+
+# Rates of the LE Coded PHY (Coded_Rates).
+# See Bluetooth spec @ 7.8.97 LE Set CIG Parameters command
+class CodedRate(SpecableFlag):
+    S8 = 1 << 0
+    S2 = 1 << 1
+
+
+# MIC length (HDT_MIC_Length, MIC_Length, Preferred_MIC_Length).
+# See Bluetooth spec @ 7.7.8 Encryption Change event
+class HdtMicLength(SpecableEnum):
+    MIC_32_BITS  = 0x00
+    MIC_64_BITS  = 0x01
+    MIC_128_BITS = 0x02
+
+
+# HDT packet format (Preferred_Packet_Format, Packet_Format, HDT_Packet_Format).
+# See Bluetooth spec @ 7.8.159 LE Set HDT Default Parameters command
+class HdtPacketFormat(SpecableEnum):
+    ANY      = 0x00
+    FORMAT_0 = 0x01
+    FORMAT_1 = 0x02
+
+
+# PHYS parameter of the LE Data Length commands and events.
+# See Bluetooth spec @ 7.8.33 LE Set Data Length command
+class DataLengthPhys(SpecableEnum):
+    GFSK   = 0x00
+    LE_HDT = 0x01
+
+
+# Key_Schedule_Enabled parameter.
+# See Bluetooth spec @ 7.7.8 Encryption Change event
+class KeyScheduleEnabled(SpecableEnum):
+    NOT_USED      = 0x00
+    USED          = 0x01
+    OPPORTUNISTIC = 0x02
+
+
+# Encryption_Type parameter of HCI_LE_Enable_Encryption [v2].
+# See Bluetooth spec @ 7.8.24 LE Enable Encryption command
+class EncryptionType(SpecableEnum):
+    LONG_TERM_KEY                          = 0x00
+    OPPORTUNISTIC_ENCRYPTION_KEY_SCHEDULE  = 0x01
 
 
 class CsRole(SpecableEnum):
@@ -1410,7 +1576,42 @@ HCI_SUPPORTED_COMMANDS_MASKS = {
     HCI_LE_UTP_SEND_COMMAND                                                   : 1 << (48*8+4),
     HCI_LE_CONNECTION_RATE_REQUEST_COMMAND                                    : 1 << (48*8+5),
     HCI_LE_SET_DEFAULT_RATE_PARAMETERS_COMMAND                                : 1 << (48*8+6),
-    HCI_LE_READ_MINIMUM_SUPPORTED_CONNECTION_INTERVAL_COMMAND                 : 1 << (48*8+7)
+    HCI_LE_READ_MINIMUM_SUPPORTED_CONNECTION_INTERVAL_COMMAND                 : 1 << (48*8+7),
+    HCI_READ_LOCAL_SUPPORTED_COMMANDS_V2_COMMAND                              : 1 << (49*8+0),
+    HCI_LE_SET_EVENT_MASK_V2_COMMAND                                          : 1 << (49*8+1),
+    HCI_LE_CS_WRITE_CACHED_REMOTE_SUPPORTED_CAPABILITIES_V2_COMMAND           : 1 << (49*8+3),
+    HCI_LE_CS_SET_SECURITY_REQUIREMENTS_COMMAND                               : 1 << (49*8+4),
+    HCI_LE_CS_SET_DEFAULT_SECURITY_REQUIREMENTS_COMMAND                       : 1 << (49*8+5),
+    HCI_LE_TEST_END_V2_COMMAND                                                : 1 << (49*8+6),
+    HCI_HOST_BUFFER_SIZE_V2_COMMAND                                           : 1 << (49*8+7),
+    HCI_LE_SETUP_ISO_DATA_PATH_V2_COMMAND                                     : 1 << (50*8+0),
+    HCI_LE_TRANSMITTER_TEST_V5_COMMAND                                        : 1 << (50*8+1),
+    HCI_LE_RECEIVER_TEST_V4_COMMAND                                           : 1 << (50*8+2),
+    HCI_REFRESH_ENCRYPTION_KEY_V2_COMMAND                                     : 1 << (50*8+3),
+    HCI_LE_ENABLE_ENCRYPTION_V2_COMMAND                                       : 1 << (50*8+4),
+    HCI_LE_READ_MAXIMUM_DATA_LENGTH_V2_COMMAND                                : 1 << (50*8+5),
+    HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_V2_COMMAND                      : 1 << (50*8+6),
+    HCI_LE_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH_V2_COMMAND                     : 1 << (50*8+7),
+    HCI_LE_SET_CIG_PARAMETERS_V2_COMMAND                                      : 1 << (51*8+0),
+    HCI_LE_SET_CIG_PARAMETERS_TEST_V2_COMMAND                                 : 1 << (51*8+1),
+    HCI_LE_CREATE_CIS_V2_COMMAND                                              : 1 << (51*8+2),
+    HCI_LE_CREATE_BIG_V2_COMMAND                                              : 1 << (51*8+3),
+    HCI_LE_CREATE_BIG_TEST_V2_COMMAND                                         : 1 << (51*8+4),
+    HCI_LE_READ_ENCRYPTION_KEY_SCHEDULE_DEBUG_MODE_COMMAND                    : 1 << (51*8+5),
+    HCI_LE_WRITE_ENCRYPTION_KEY_SCHEDULE_DEBUG_MODE_COMMAND                   : 1 << (51*8+6),
+    HCI_READ_ENCRYPTION_KEY_DEBUG_REPORTING_MODE_COMMAND                      : 1 << (51*8+7),
+    HCI_WRITE_ENCRYPTION_KEY_DEBUG_REPORTING_MODE_COMMAND                     : 1 << (52*8+0),
+    HCI_LE_SET_HDT_DEFAULT_PARAMETERS_COMMAND                                 : 1 << (52*8+1),
+    HCI_LE_SET_HDT_PARAMETERS_TEST_COMMAND                                    : 1 << (52*8+2),
+    HCI_LE_SET_DATA_LENGTH_V2_COMMAND                                         : 1 << (52*8+3),
+    HCI_LE_READ_CIS_UPDATE_CAPABILITIES_COMMAND                               : 1 << (52*8+4),
+    HCI_LE_SET_DEFAULT_CIS_UPDATE_PARAMETERS_COMMAND                          : 1 << (52*8+5),
+    HCI_LE_ADD_CIG_CONFIGURATION_COMMAND                                      : 1 << (52*8+6),
+    HCI_LE_ADD_CIG_CONFIGURATION_TEST_COMMAND                                 : 1 << (52*8+7),
+    HCI_LE_UPDATE_CIG_COMMAND                                                 : 1 << (53*8+0),
+    HCI_LE_UPDATE_CIG_TEST_COMMAND                                            : 1 << (53*8+1),
+    HCI_LE_UPDATE_CIG_PERIPHERAL_REQUEST_REPLY_COMMAND                        : 1 << (53*8+2),
+    HCI_LE_REMOVE_CIG_CONFIGURATION_COMMAND                                   : 1 << (53*8+3)
 }
 
 # LE Supported Features
@@ -1475,6 +1676,23 @@ class LeFeature(SpecableEnum):
     SHORTER_CONNECTION_INTERVALS                   = 72
     SHORTER_CONNECTION_INTERVALS_HOST_SUPPORT      = 73
     LE_FLUSHABLE_ACL_DATA                          = 74
+    CHANNEL_SOUNDING_ENHANCEMENT_1                 = 75
+    ENCRYPTION_KEY_SCHEDULE                        = 76
+    HIGH_DATA_THROUGHPUT                           = 77
+    RECEIVE_HDT6_RATE                              = 78
+    TRANSMIT_HDT6_RATE                             = 79
+    RECEIVE_HDT7_5_RATE                            = 80
+    TRANSMIT_HDT7_5_RATE                           = 81
+    HDT_PACKET_FORMAT_1                            = 82
+    LINK_QUALITY_FEEDBACK                          = 83
+    ISOCHRONOUS_BROADCASTER_ON_LE_HDT_PHY          = 84
+    SYNCHRONIZED_RECEIVER_ON_LE_HDT_PHY            = 85
+    CONNECTED_ISOCHRONOUS_STREAM_PARAMETER_UPDATE  = 86
+    CONNECTED_ISOCHRONOUS_STREAM_PARAMETER_UPDATE_HOST_SUPPORT = 87
+    CONNECTED_ISOCHRONOUS_STREAM_TRANSPORT_LATENCY_CHANGE = 88
+    CONNECTED_ISOCHRONOUS_STREAM_TRANSPORT_LATENCY_CHANGE_HOST_SUPPORT = 89
+    OPPORTUNISTIC_ENCRYPTION_HOST_SUPPORT          = 90
+    DATA_CHANGE_DRIVEN_RPA_UPDATES                 = 91
 
 
 class LeFeatureMask(utils.CompatibleIntFlag):
@@ -1537,6 +1755,27 @@ class LeFeatureMask(utils.CompatibleIntFlag):
     SHORTER_CONNECTION_INTERVALS                   = 1 << LeFeature.SHORTER_CONNECTION_INTERVALS
     SHORTER_CONNECTION_INTERVALS_HOST_SUPPORT      = 1 << LeFeature.SHORTER_CONNECTION_INTERVALS_HOST_SUPPORT
     LE_FLUSHABLE_ACL_DATA                          = 1 << LeFeature.LE_FLUSHABLE_ACL_DATA
+    CHANNEL_SOUNDING_ENHANCEMENT_1                 = 1 << LeFeature.CHANNEL_SOUNDING_ENHANCEMENT_1
+    ENCRYPTION_KEY_SCHEDULE                        = 1 << LeFeature.ENCRYPTION_KEY_SCHEDULE
+    HIGH_DATA_THROUGHPUT                           = 1 << LeFeature.HIGH_DATA_THROUGHPUT
+    RECEIVE_HDT6_RATE                              = 1 << LeFeature.RECEIVE_HDT6_RATE
+    TRANSMIT_HDT6_RATE                             = 1 << LeFeature.TRANSMIT_HDT6_RATE
+    RECEIVE_HDT7_5_RATE                            = 1 << LeFeature.RECEIVE_HDT7_5_RATE
+    TRANSMIT_HDT7_5_RATE                           = 1 << LeFeature.TRANSMIT_HDT7_5_RATE
+    HDT_PACKET_FORMAT_1                            = 1 << LeFeature.HDT_PACKET_FORMAT_1
+    LINK_QUALITY_FEEDBACK                          = 1 << LeFeature.LINK_QUALITY_FEEDBACK
+    ISOCHRONOUS_BROADCASTER_ON_LE_HDT_PHY          = 1 << LeFeature.ISOCHRONOUS_BROADCASTER_ON_LE_HDT_PHY
+    SYNCHRONIZED_RECEIVER_ON_LE_HDT_PHY            = 1 << LeFeature.SYNCHRONIZED_RECEIVER_ON_LE_HDT_PHY
+    CONNECTED_ISOCHRONOUS_STREAM_PARAMETER_UPDATE  = 1 << LeFeature.CONNECTED_ISOCHRONOUS_STREAM_PARAMETER_UPDATE
+    CONNECTED_ISOCHRONOUS_STREAM_PARAMETER_UPDATE_HOST_SUPPORT = 1 << LeFeature.CONNECTED_ISOCHRONOUS_STREAM_PARAMETER_UPDATE_HOST_SUPPORT
+    CONNECTED_ISOCHRONOUS_STREAM_TRANSPORT_LATENCY_CHANGE = 1 << LeFeature.CONNECTED_ISOCHRONOUS_STREAM_TRANSPORT_LATENCY_CHANGE
+    CONNECTED_ISOCHRONOUS_STREAM_TRANSPORT_LATENCY_CHANGE_HOST_SUPPORT = 1 << LeFeature.CONNECTED_ISOCHRONOUS_STREAM_TRANSPORT_LATENCY_CHANGE_HOST_SUPPORT
+    OPPORTUNISTIC_ENCRYPTION_HOST_SUPPORT          = 1 << LeFeature.OPPORTUNISTIC_ENCRYPTION_HOST_SUPPORT
+    DATA_CHANGE_DRIVEN_RPA_UPDATES                 = 1 << LeFeature.DATA_CHANGE_DRIVEN_RPA_UPDATES
+
+# LE features are reported in pages: page 0 has 8 octets, pages 1 to 10 have 24 octets
+# each. See Bluetooth spec @ 7.8.128 LE Read All Local Supported Features command.
+LE_FEATURES_MAX_PAGE = 10
 
 class LmpFeature(SpecableEnum):
     # Page 0 (Legacy LMP features)
@@ -3886,6 +4125,29 @@ class HCI_Write_Extended_Inquiry_Response_Command(
     )
 
 
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_Refresh_Encryption_Key_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.3.57 Refresh Encryption Key Command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_Refresh_Encryption_Key_V2_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.3.57 Refresh Encryption Key Command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    hdt_mic_length: int = field(metadata=HdtMicLength.type_metadata(1))
+
+
 @dataclasses.dataclass
 class HCI_Read_Simple_Pairing_Mode_ReturnParameters(HCI_StatusReturnParameters):
     simple_pairing_mode: int = field(metadata=metadata(1))
@@ -4353,6 +4615,45 @@ class HCI_LE_Set_Event_Mask_Command(HCI_SyncCommand[HCI_StatusReturnParameters])
 
 
 # -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Event_Mask_V2_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.1 LE Set Event Mask Command
+    '''
+
+    LE_EVENT_MASK_SIZE: ClassVar[int] = 255
+
+    # Up to the HCI_LE_Create_BIG_Complete [v2] event (subevent code 0x3B), the bit
+    # number for each subevent code is equal to one less than the subevent code.
+    # Bits 59 to 63 are reserved for specification development purposes, so
+    # later subevents deviate from that rule.
+    SUBEVENT_CODE_TO_BIT: ClassVar[dict[int, int]] = {
+        HCI_LE_TEST_REPORT_HDT_LINK_QUALITY_EVENT: 64,
+        HCI_LE_CIS_UPDATE_EVENT: 65,
+        HCI_LE_UPDATE_CIG_PERIPHERAL_REQUEST_EVENT: 66,
+    }
+
+    le_event_mask: bytes = field(metadata=metadata(LE_EVENT_MASK_SIZE))
+
+    @classmethod
+    def event_bit(cls, subevent_code: int) -> int:
+        '''
+        Return the LE event mask bit number for a subevent code.
+        '''
+        return cls.SUBEVENT_CODE_TO_BIT.get(subevent_code, subevent_code - 1)
+
+    @classmethod
+    def mask(cls, event_codes: Iterable[int]) -> bytes:
+        '''
+        Compute the event mask value for a list of events.
+        '''
+        return sum(
+            (1 << cls.event_bit(event_code)) for event_code in set(event_codes)
+        ).to_bytes(cls.LE_EVENT_MASK_SIZE, 'little')
+
+
+# -----------------------------------------------------------------------------
 @dataclasses.dataclass
 class HCI_LE_Read_Buffer_Size_ReturnParameters(HCI_StatusReturnParameters):
     le_acl_data_packet_length: int = field(metadata=metadata(2))
@@ -4712,6 +5013,18 @@ class HCI_LE_Read_Remote_Features_Command(HCI_AsyncCommand):
 
 
 # -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Read_All_Remote_Features_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.129 LE Read All Remote Features Command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    pages_requested: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
 @dataclasses.dataclass
 class HCI_LE_Encrypt_ReturnParameters(HCI_StatusReturnParameters):
     '''
@@ -4764,6 +5077,22 @@ class HCI_LE_Enable_Encryption_Command(HCI_AsyncCommand):
     random_number: bytes = field(metadata=metadata(8))
     encrypted_diversifier: int = field(metadata=metadata(2))
     long_term_key: bytes = field(metadata=metadata(16))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Enable_Encryption_V2_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.24 LE Enable Encryption Command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    random_number: bytes = field(metadata=metadata(8))
+    encrypted_diversifier: int = field(metadata=metadata(2))
+    long_term_key: bytes = field(metadata=metadata(16))
+    hdt_mic_length: int = field(metadata=HdtMicLength.type_metadata(1))
+    encryption_type: int = field(metadata=EncryptionType.type_metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -4894,6 +5223,52 @@ class HCI_LE_Write_Suggested_Default_Data_Length_Command(
 
 
 # -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Data_Length_V2_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.33 LE Set Data Length Command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    tx_octets: int = field(metadata=metadata(2))
+    tx_time: int = field(metadata=metadata(2))
+    phys: int = field(metadata=DataLengthPhys.type_metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Read_Suggested_Default_Data_Length_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Read_Suggested_Default_Data_Length_V2_Command(
+    HCI_SyncCommand[HCI_LE_Read_Suggested_Default_Data_Length_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.34 LE Read Suggested Default Data Length Command
+    '''
+
+    phys: int = field(metadata=DataLengthPhys.type_metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Write_Suggested_Default_Data_Length_V2_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.35 LE Write Suggested Default Data Length Command
+    '''
+
+    suggested_max_tx_octets: int = field(metadata=metadata(2))
+    suggested_max_tx_time: int = field(metadata=metadata(2))
+    phys: int = field(metadata=DataLengthPhys.type_metadata(1))
+
+
+# -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
 class HCI_LE_Read_Local_P_256_Public_Key_Command(HCI_AsyncCommand):
@@ -4990,6 +5365,29 @@ class HCI_LE_Read_Maximum_Data_Length_Command(
     '''
     See Bluetooth spec @ 7.8.46 LE Read Maximum Data Length Command
     '''
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_Maximum_Data_Length_V2_ReturnParameters(
+    HCI_LE_Read_Maximum_Data_Length_ReturnParameters
+):
+    supported_max_tx_payload_window_size: int = field(metadata=metadata(1))
+    supported_max_rx_payload_window_size: int = field(metadata=metadata(1))
+    supported_max_rx_octets_per_packet: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Maximum_Data_Length_V2_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Maximum_Data_Length_V2_Command(
+    HCI_SyncCommand[HCI_LE_Read_Maximum_Data_Length_V2_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.46 LE Read Maximum Data Length Command
+    '''
+
+    # 0x00 means "maximum across all PHYs", other values are a Phy.
+    phy: int = field(metadata=metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -5904,6 +6302,39 @@ class HCI_LE_Set_CIG_Parameters_Command(
 
 
 # -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_LE_Set_CIG_Parameters_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_CIG_Parameters_V2_Command(
+    HCI_SyncCommand[HCI_LE_Set_CIG_Parameters_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.97 LE Set CIG Parameters Command
+    '''
+
+    cig_id: int = field(metadata=metadata(1))
+    sdu_interval_c_to_p: int = field(metadata=metadata(3))
+    sdu_interval_p_to_c: int = field(metadata=metadata(3))
+    worst_case_sca: int = field(metadata=metadata(1))
+    packing: int = field(metadata=metadata(1))
+    framing: int = field(metadata=metadata(1))
+    max_transport_latency_c_to_p: int = field(metadata=metadata(2))
+    max_transport_latency_p_to_c: int = field(metadata=metadata(2))
+    cis_id: Sequence[int] = field(metadata=metadata(1, list_begin=True))
+    max_sdu_c_to_p: Sequence[int] = field(metadata=metadata(2))
+    max_sdu_p_to_c: Sequence[int] = field(metadata=metadata(2))
+    phy_c_to_p: Sequence[int] = field(metadata=metadata(1))
+    phy_p_to_c: Sequence[int] = field(metadata=metadata(1))
+    rtn_c_to_p: Sequence[int] = field(metadata=metadata(1))
+    rtn_p_to_c: Sequence[int] = field(metadata=metadata(1))
+    coded_rates_c_to_p: Sequence[int] = field(metadata=metadata(1))
+    coded_rates_p_to_c: Sequence[int] = field(metadata=metadata(1))
+    hdt_rates_c_to_p: Sequence[int] = field(metadata=metadata(2))
+    hdt_rates_p_to_c: Sequence[int] = field(metadata=metadata(2))
+    hdt_mic_length: Sequence[int] = field(metadata=metadata(1))
+    hdt_packet_format: Sequence[int] = field(metadata=metadata(1, list_end=True))
+
+
+# -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
 class HCI_LE_Create_CIS_Command(HCI_AsyncCommand):
@@ -5911,6 +6342,19 @@ class HCI_LE_Create_CIS_Command(HCI_AsyncCommand):
     See Bluetooth spec @ 7.8.99 LE Create CIS command
     '''
 
+    cis_connection_handle: Sequence[int] = field(metadata=metadata(2, list_begin=True))
+    acl_connection_handle: Sequence[int] = field(metadata=metadata(2, list_end=True))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Create_CIS_V2_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.99 LE Create CIS command
+    '''
+
+    config_id: int = field(metadata=metadata(1))
     cis_connection_handle: Sequence[int] = field(metadata=metadata(2, list_begin=True))
     acl_connection_handle: Sequence[int] = field(metadata=metadata(2, list_end=True))
 
@@ -5976,6 +6420,32 @@ class HCI_LE_Create_BIG_Command(HCI_AsyncCommand):
     framing: int = field(metadata=metadata(1))
     encryption: int = field(metadata=metadata(1))
     broadcast_code: bytes = field(metadata=metadata(16))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Create_BIG_V2_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.103 LE Create BIG command
+    '''
+
+    big_handle: int = field(metadata=metadata(1))
+    advertising_handle: int = field(metadata=metadata(1))
+    num_bis: int = field(metadata=metadata(1))
+    sdu_interval: int = field(metadata=metadata(3))
+    max_sdu: int = field(metadata=metadata(2))
+    max_transport_latency: int = field(metadata=metadata(2))
+    rtn: int = field(metadata=metadata(1))
+    phy: int = field(metadata=metadata(1))
+    packing: int = field(metadata=metadata(1))
+    framing: int = field(metadata=metadata(1))
+    encryption: int = field(metadata=metadata(1))
+    broadcast_code: bytes = field(metadata=metadata(16))
+    coded_rates: int = field(metadata=metadata(1))
+    hdt_rates: int = field(metadata=metadata(2))
+    hdt_mic_length: int = field(metadata=HdtMicLength.type_metadata(1))
+    hdt_packet_format: int = field(metadata=HdtPacketFormat.type_metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -6120,6 +6590,38 @@ class HCI_LE_Read_All_Local_Supported_Features_Command(
     '''
     See Bluetooth spec @ 7.8.128 LE Read All Local Supported Features Command
     '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_HDT_Default_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.159 LE Set HDT Default Parameters Command
+    '''
+
+    preferred_mic_length: int = field(metadata=HdtMicLength.type_metadata(1))
+    preferred_packet_format: int = field(metadata=HdtPacketFormat.type_metadata(1))
+    preferred_acl_rates: int = field(metadata=HdtRate.type_metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_HDT_Parameters_Test_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.160 LE Set HDT Parameters Test Command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    mic_length: int = field(metadata=HdtMicLength.type_metadata(1))
+    packet_format: int = field(metadata=HdtPacketFormat.type_metadata(1))
+    blocks_per_payload: int = field(metadata=metadata(1))
+    tx_rate: int = field(metadata=HdtRate.type_metadata(2))
 
 
 # -----------------------------------------------------------------------------
@@ -6982,6 +7484,22 @@ class HCI_LE_Data_Length_Change_Event(HCI_LE_Meta_Event):
 # -----------------------------------------------------------------------------
 @HCI_LE_Meta_Event.event
 @dataclasses.dataclass
+class HCI_LE_Data_Length_Change_V2_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.7 LE Data Length Change Event
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    max_tx_octets: int = field(metadata=metadata(2))
+    max_tx_time: int = field(metadata=metadata(2))
+    max_rx_octets: int = field(metadata=metadata(2))
+    max_rx_time: int = field(metadata=metadata(2))
+    phys: int = field(metadata=DataLengthPhys.type_metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
 class HCI_LE_Enhanced_Connection_Complete_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.10 LE Enhanced Connection Complete Event
@@ -7340,6 +7858,76 @@ class HCI_LE_CIS_Established_Event(HCI_LE_Meta_Event):
 # -----------------------------------------------------------------------------
 @HCI_LE_Meta_Event.event
 @dataclasses.dataclass
+class HCI_LE_CIS_Established_V2_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.25 LE CIS Established Event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    cig_sync_delay: int = field(metadata=metadata(3))
+    cis_sync_delay: int = field(metadata=metadata(3))
+    transport_latency_c_to_p: int = field(metadata=metadata(3))
+    transport_latency_p_to_c: int = field(metadata=metadata(3))
+    phy_c_to_p: int = field(metadata=metadata(1))
+    phy_p_to_c: int = field(metadata=metadata(1))
+    nse: int = field(metadata=metadata(1))
+    bn_c_to_p: int = field(metadata=metadata(1))
+    bn_p_to_c: int = field(metadata=metadata(1))
+    ft_c_to_p: int = field(metadata=metadata(1))
+    ft_p_to_c: int = field(metadata=metadata(1))
+    max_pdu_c_to_p: int = field(metadata=metadata(2))
+    max_pdu_p_to_c: int = field(metadata=metadata(2))
+    iso_interval: int = field(metadata=metadata(2))
+    sub_interval: int = field(metadata=metadata(3))
+    max_sdu_c_to_p: int = field(metadata=metadata(2))
+    max_sdu_p_to_c: int = field(metadata=metadata(2))
+    sdu_interval_c_to_p: int = field(metadata=metadata(3))
+    sdu_interval_p_to_c: int = field(metadata=metadata(3))
+    framing: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_CIS_Established_V3_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.25 LE CIS Established Event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    cig_sync_delay: int = field(metadata=metadata(3))
+    cis_sync_delay: int = field(metadata=metadata(3))
+    transport_latency_c_to_p: int = field(metadata=metadata(3))
+    transport_latency_p_to_c: int = field(metadata=metadata(3))
+    phy_c_to_p: int = field(metadata=metadata(1))
+    phy_p_to_c: int = field(metadata=metadata(1))
+    nse: int = field(metadata=metadata(1))
+    bn_c_to_p: int = field(metadata=metadata(1))
+    bn_p_to_c: int = field(metadata=metadata(1))
+    ft_c_to_p: int = field(metadata=metadata(1))
+    ft_p_to_c: int = field(metadata=metadata(1))
+    max_pdu_c_to_p: int = field(metadata=metadata(2))
+    max_pdu_p_to_c: int = field(metadata=metadata(2))
+    iso_interval: int = field(metadata=metadata(2))
+    sub_interval: int = field(metadata=metadata(3))
+    max_sdu_c_to_p: int = field(metadata=metadata(2))
+    max_sdu_p_to_c: int = field(metadata=metadata(2))
+    sdu_interval_c_to_p: int = field(metadata=metadata(3))
+    sdu_interval_p_to_c: int = field(metadata=metadata(3))
+    framing: int = field(metadata=metadata(1))
+    rates_c_to_p: int = field(metadata=metadata(2))
+    rates_p_to_c: int = field(metadata=metadata(2))
+    config_id: int = field(metadata=metadata(1))
+    tl_group_id: int = field(metadata=metadata(1))
+    encryption_enabled: int = field(metadata=metadata(1))
+    mic_length: int = field(metadata=HdtMicLength.type_metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
 class HCI_LE_CIS_Request_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.26 LE CIS Request Event
@@ -7370,6 +7958,33 @@ class HCI_LE_Create_BIG_Complete_Event(HCI_LE_Meta_Event):
     irc: int = field(metadata=metadata(1))
     max_pdu: int = field(metadata=metadata(2))
     iso_interval: int = field(metadata=metadata(2))
+    connection_handle: Sequence[int] = field(
+        metadata=metadata(2, list_begin=True, list_end=True)
+    )
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Create_BIG_Complete_V2_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.27 LE Create BIG Complete Event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    big_handle: int = field(metadata=metadata(1))
+    big_sync_delay: int = field(metadata=metadata(3))
+    transport_latency_big: int = field(metadata=metadata(3))
+    phy: int = field(metadata=metadata(1))
+    nse: int = field(metadata=metadata(1))
+    bn: int = field(metadata=metadata(1))
+    pto: int = field(metadata=metadata(1))
+    irc: int = field(metadata=metadata(1))
+    max_pdu: int = field(metadata=metadata(2))
+    iso_interval: int = field(metadata=metadata(2))
+    rates: int = field(metadata=metadata(2))
+    encryption_enabled: int = field(metadata=metadata(1))
+    mic_length: int = field(metadata=HdtMicLength.type_metadata(1))
     connection_handle: Sequence[int] = field(
         metadata=metadata(2, list_begin=True, list_end=True)
     )
@@ -7458,6 +8073,42 @@ class HCI_LE_Subrate_Change_Event(HCI_LE_Meta_Event):
     peripheral_latency: int = field(metadata=metadata(2))
     continuation_number: int = field(metadata=metadata(2))
     supervision_timeout: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Read_All_Remote_Features_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.38 LE Read All Remote Features Complete event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    max_remote_page: int = field(metadata=metadata(1))
+    max_valid_page: int = field(metadata=metadata(1))
+    le_features: bytes = field(metadata=metadata(248))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Test_Report_HDT_Link_Quality_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.51 LE Test Report HDT Link Quality event
+    '''
+
+    class ReportStatus(SpecableEnum):
+        FINAL_REPORT = 0x00
+        MORE_REPORTS_TO_FOLLOW = 0x01
+
+    RSSI_NOT_AVAILABLE: ClassVar[int] = 0x7F
+    SNR_NOT_AVAILABLE: ClassVar[int] = 0x1F
+
+    channel_index: int = field(metadata=metadata(1))
+    report_status: int = field(metadata=ReportStatus.type_metadata(1))
+    rssi: Sequence[int] = field(metadata=metadata(-1, list_begin=True))
+    snr: Sequence[int] = field(metadata=metadata(1, list_end=True))
 
 
 # -----------------------------------------------------------------------------
@@ -7845,6 +8496,25 @@ class HCI_Encryption_Change_V2_Event(HCI_Event):
 # -----------------------------------------------------------------------------
 @HCI_Event.event
 @dataclasses.dataclass
+class HCI_Encryption_Change_V3_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 7.7.8 Encryption Change Event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    encryption_enabled: int = field(
+        metadata=HCI_Encryption_Change_Event.Enabled.type_metadata(1)
+    )
+    encryption_key_size: int = field(metadata=metadata(1))
+    mic_length: int = field(metadata=HdtMicLength.type_metadata(1))
+    key_schedule_enabled: int = field(metadata=KeyScheduleEnabled.type_metadata(1))
+    key_schedule_debug_flag: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Event.event
+@dataclasses.dataclass
 class HCI_Read_Remote_Supported_Features_Complete_Event(HCI_Event):
     '''
     See Bluetooth spec @ 7.7.11 Read Remote Supported Features Complete Event
@@ -8216,6 +8886,21 @@ class HCI_Encryption_Key_Refresh_Complete_Event(HCI_Event):
 
     status: int = field(metadata=metadata(STATUS_SPEC))
     connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Event.event
+@dataclasses.dataclass
+class HCI_Encryption_Key_Refresh_Complete_V2_Event(HCI_Event):
+    '''
+    See Bluetooth spec @ 7.7.39 Encryption Key Refresh Complete Event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    mic_length: int = field(metadata=HdtMicLength.type_metadata(1))
+    key_schedule_enabled: int = field(metadata=KeyScheduleEnabled.type_metadata(1))
+    key_schedule_debug_flag: int = field(metadata=metadata(1))
 
 
 # -----------------------------------------------------------------------------
