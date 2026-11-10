@@ -24,7 +24,6 @@
 # -----------------------------------------------------------------------------
 from __future__ import annotations
 
-import copy
 import dataclasses
 import functools
 import secrets
@@ -32,9 +31,7 @@ import struct
 
 from bumble import core
 
-
-def _compact_word(word: bytes) -> int:
-    return int.from_bytes(word, "big")
+_U32_STRUCT = struct.Struct('>4I')
 
 
 def _shift_bytes(bs: bytes, xor_lsb: int = 0) -> bytes:
@@ -42,7 +39,10 @@ def _shift_bytes(bs: bytes, xor_lsb: int = 0) -> bytes:
 
 
 def _xor(a: bytes, b: bytes) -> bytes:
-    return bytes(x ^ y for x, y in zip(a, b))
+    if len(a) != len(b):
+        n = min(len(a), len(b))
+        a, b = a[:n], b[:n]
+    return (int.from_bytes(a, "big") ^ int.from_bytes(b, "big")).to_bytes(len(a), "big")
 
 
 # Based *largely* on the Rijndael implementation
@@ -83,81 +83,108 @@ class _AES:
     _U4 = [ 0x00000000, 0x090d0b0e, 0x121a161c, 0x1b171d12, 0x24342c38, 0x2d392736, 0x362e3a24, 0x3f23312a, 0x48685870, 0x4165537e, 0x5a724e6c, 0x537f4562, 0x6c5c7448, 0x65517f46, 0x7e466254, 0x774b695a, 0x90d0b0e0, 0x99ddbbee, 0x82caa6fc, 0x8bc7adf2, 0xb4e49cd8, 0xbde997d6, 0xa6fe8ac4, 0xaff381ca, 0xd8b8e890, 0xd1b5e39e, 0xcaa2fe8c, 0xc3aff582, 0xfc8cc4a8, 0xf581cfa6, 0xee96d2b4, 0xe79bd9ba, 0x3bbb7bdb, 0x32b670d5, 0x29a16dc7, 0x20ac66c9, 0x1f8f57e3, 0x16825ced, 0x0d9541ff, 0x04984af1, 0x73d323ab, 0x7ade28a5, 0x61c935b7, 0x68c43eb9, 0x57e70f93, 0x5eea049d, 0x45fd198f, 0x4cf01281, 0xab6bcb3b, 0xa266c035, 0xb971dd27, 0xb07cd629, 0x8f5fe703, 0x8652ec0d, 0x9d45f11f, 0x9448fa11, 0xe303934b, 0xea0e9845, 0xf1198557, 0xf8148e59, 0xc737bf73, 0xce3ab47d, 0xd52da96f, 0xdc20a261, 0x766df6ad, 0x7f60fda3, 0x6477e0b1, 0x6d7aebbf, 0x5259da95, 0x5b54d19b, 0x4043cc89, 0x494ec787, 0x3e05aedd, 0x3708a5d3, 0x2c1fb8c1, 0x2512b3cf, 0x1a3182e5, 0x133c89eb, 0x082b94f9, 0x01269ff7, 0xe6bd464d, 0xefb04d43, 0xf4a75051, 0xfdaa5b5f, 0xc2896a75, 0xcb84617b, 0xd0937c69, 0xd99e7767, 0xaed51e3d, 0xa7d81533, 0xbccf0821, 0xb5c2032f, 0x8ae13205, 0x83ec390b, 0x98fb2419, 0x91f62f17, 0x4dd68d76, 0x44db8678, 0x5fcc9b6a, 0x56c19064, 0x69e2a14e, 0x60efaa40, 0x7bf8b752, 0x72f5bc5c, 0x05bed506, 0x0cb3de08, 0x17a4c31a, 0x1ea9c814, 0x218af93e, 0x2887f230, 0x3390ef22, 0x3a9de42c, 0xdd063d96, 0xd40b3698, 0xcf1c2b8a, 0xc6112084, 0xf93211ae, 0xf03f1aa0, 0xeb2807b2, 0xe2250cbc, 0x956e65e6, 0x9c636ee8, 0x877473fa, 0x8e7978f4, 0xb15a49de, 0xb85742d0, 0xa3405fc2, 0xaa4d54cc, 0xecdaf741, 0xe5d7fc4f, 0xfec0e15d, 0xf7cdea53, 0xc8eedb79, 0xc1e3d077, 0xdaf4cd65, 0xd3f9c66b, 0xa4b2af31, 0xadbfa43f, 0xb6a8b92d, 0xbfa5b223, 0x80868309, 0x898b8807, 0x929c9515, 0x9b919e1b, 0x7c0a47a1, 0x75074caf, 0x6e1051bd, 0x671d5ab3, 0x583e6b99, 0x51336097, 0x4a247d85, 0x4329768b, 0x34621fd1, 0x3d6f14df, 0x267809cd, 0x2f7502c3, 0x105633e9, 0x195b38e7, 0x024c25f5, 0x0b412efb, 0xd7618c9a, 0xde6c8794, 0xc57b9a86, 0xcc769188, 0xf355a0a2, 0xfa58abac, 0xe14fb6be, 0xe842bdb0, 0x9f09d4ea, 0x9604dfe4, 0x8d13c2f6, 0x841ec9f8, 0xbb3df8d2, 0xb230f3dc, 0xa927eece, 0xa02ae5c0, 0x47b13c7a, 0x4ebc3774, 0x55ab2a66, 0x5ca62168, 0x63851042, 0x6a881b4c, 0x719f065e, 0x78920d50, 0x0fd9640a, 0x06d46f04, 0x1dc37216, 0x14ce7918, 0x2bed4832, 0x22e0433c, 0x39f75e2e, 0x30fa5520, 0x9ab701ec, 0x93ba0ae2, 0x88ad17f0, 0x81a01cfe, 0xbe832dd4, 0xb78e26da, 0xac993bc8, 0xa59430c6, 0xd2df599c, 0xdbd25292, 0xc0c54f80, 0xc9c8448e, 0xf6eb75a4, 0xffe67eaa, 0xe4f163b8, 0xedfc68b6, 0x0a67b10c, 0x036aba02, 0x187da710, 0x1170ac1e, 0x2e539d34, 0x275e963a, 0x3c498b28, 0x35448026, 0x420fe97c, 0x4b02e272, 0x5015ff60, 0x5918f46e, 0x663bc544, 0x6f36ce4a, 0x7421d358, 0x7d2cd856, 0xa10c7a37, 0xa8017139, 0xb3166c2b, 0xba1b6725, 0x8538560f, 0x8c355d01, 0x97224013, 0x9e2f4b1d, 0xe9642247, 0xe0692949, 0xfb7e345b, 0xf2733f55, 0xcd500e7f, 0xc45d0571, 0xdf4a1863, 0xd647136d, 0x31dccad7, 0x38d1c1d9, 0x23c6dccb, 0x2acbd7c5, 0x15e8e6ef, 0x1ce5ede1, 0x07f2f0f3, 0x0efffbfd, 0x79b492a7, 0x70b999a9, 0x6bae84bb, 0x62a38fb5, 0x5d80be9f, 0x548db591, 0x4f9aa883, 0x4697a38d ]
     # fmt: on
 
-    def __init__(self, key: bytes) -> None:
-        if len(key) not in (16, 24, 32):
-            raise core.InvalidArgumentError(f'Invalid key size {len(key)}')
-
-        rounds = self._NUMBER_OF_ROUNDS[len(key)]
-
-        # Encryption round keys
-        self._ke = [[0] * 4 for i in range(rounds + 1)]
-
-        # Decryption round keys
-        self._kd = [[0] * 4 for i in range(rounds + 1)]
-
+    # NOTE: lru_cache retains recent keys and expanded round keys in process memory.
+    # This is acceptable as this module is intended for testing and emulation only.
+    @classmethod
+    @functools.lru_cache(maxsize=16)
+    def _expand_encryption_key(
+        cls, key: bytes
+    ) -> tuple[tuple[int, int, int, int], ...]:
+        rounds = cls._NUMBER_OF_ROUNDS[len(key)]
         round_key_count = (rounds + 1) * 4
         kc = len(key) // 4
 
-        # Convert the key into ints
-        tk = [struct.unpack('>i', key[i : i + 4])[0] for i in range(0, len(key), 4)]
+        tk = list(struct.unpack(f'>{kc}I', key))
+        ke = [0] * round_key_count
+        ke[:kc] = tk
 
-        # Copy values into round key arrays
-        for i in range(0, kc):
-            self._ke[i // 4][i % 4] = tk[i]
-            self._kd[rounds - (i // 4)][i % 4] = tk[i]
-
-        # Key expansion (FIPS-197 section 5.2)
         r_con_pointer = 0
         t = kc
+        s_box = cls._S
+        rcon = cls._RCON
         while t < round_key_count:
             tt = tk[kc - 1]
             tk[0] ^= (
-                (self._S[(tt >> 16) & 0xFF] << 24)
-                ^ (self._S[(tt >> 8) & 0xFF] << 16)
-                ^ (self._S[tt & 0xFF] << 8)
-                ^ self._S[(tt >> 24) & 0xFF]
-                ^ (self._RCON[r_con_pointer] << 24)
+                (s_box[(tt >> 16) & 0xFF] << 24)
+                ^ (s_box[(tt >> 8) & 0xFF] << 16)
+                ^ (s_box[tt & 0xFF] << 8)
+                ^ s_box[(tt >> 24) & 0xFF]
+                ^ (rcon[r_con_pointer] << 24)
             )
             r_con_pointer += 1
 
             if kc != 8:
                 for i in range(1, kc):
                     tk[i] ^= tk[i - 1]
-
-            # Key expansion for 256-bit keys is "slightly different" (FIPS-197)
             else:
                 for i in range(1, kc // 2):
                     tk[i] ^= tk[i - 1]
                 tt = tk[kc // 2 - 1]
-
                 tk[kc // 2] ^= (
-                    self._S[tt & 0xFF]
-                    ^ (self._S[(tt >> 8) & 0xFF] << 8)
-                    ^ (self._S[(tt >> 16) & 0xFF] << 16)
-                    ^ (self._S[(tt >> 24) & 0xFF] << 24)
+                    s_box[tt & 0xFF]
+                    ^ (s_box[(tt >> 8) & 0xFF] << 8)
+                    ^ (s_box[(tt >> 16) & 0xFF] << 16)
+                    ^ (s_box[(tt >> 24) & 0xFF] << 24)
                 )
-
                 for i in range(kc // 2 + 1, kc):
                     tk[i] ^= tk[i - 1]
 
-            # Copy values into round key arrays
             j = 0
             while j < kc and t < round_key_count:
-                self._ke[t // 4][t % 4] = tk[j]
-                self._kd[rounds - (t // 4)][t % 4] = tk[j]
+                ke[t] = tk[j]
                 j += 1
                 t += 1
 
-        # Inverse-Cipher-ify the decryption round key (FIPS-197 section 5.3)
-        for r in range(1, rounds):
-            for j in range(0, 4):
-                tt = self._kd[r][j]
-                self._kd[r][j] = (
-                    self._U1[(tt >> 24) & 0xFF]
-                    ^ self._U2[(tt >> 16) & 0xFF]
-                    ^ self._U3[(tt >> 8) & 0xFF]
-                    ^ self._U4[tt & 0xFF]
+        return tuple(
+            (ke[i], ke[i + 1], ke[i + 2], ke[i + 3])
+            for i in range(0, round_key_count, 4)
+        )
+
+    @classmethod
+    @functools.lru_cache(maxsize=16)
+    def _expand_decryption_key(
+        cls, key: bytes
+    ) -> tuple[tuple[int, int, int, int], ...]:
+        ke = cls._expand_encryption_key(key)
+        rounds = len(ke) - 1
+        u1, u2, u3, u4 = cls._U1, cls._U2, cls._U3, cls._U4
+        kd: list[tuple[int, int, int, int]] = [ke[rounds]]
+        for r in range(rounds - 1, 0, -1):
+            k0, k1, k2, k3 = ke[r]
+            kd.append(
+                (
+                    u1[k0 >> 24]
+                    ^ u2[(k0 >> 16) & 0xFF]
+                    ^ u3[(k0 >> 8) & 0xFF]
+                    ^ u4[k0 & 0xFF],
+                    u1[k1 >> 24]
+                    ^ u2[(k1 >> 16) & 0xFF]
+                    ^ u3[(k1 >> 8) & 0xFF]
+                    ^ u4[k1 & 0xFF],
+                    u1[k2 >> 24]
+                    ^ u2[(k2 >> 16) & 0xFF]
+                    ^ u3[(k2 >> 8) & 0xFF]
+                    ^ u4[k2 & 0xFF],
+                    u1[k3 >> 24]
+                    ^ u2[(k3 >> 16) & 0xFF]
+                    ^ u3[(k3 >> 8) & 0xFF]
+                    ^ u4[k3 & 0xFF],
                 )
+            )
+        kd.append(ke[0])
+        return tuple(kd)
+
+    def __init__(self, key: bytes) -> None:
+        key = bytes(key)
+        if len(key) not in (16, 24, 32):
+            raise core.InvalidArgumentError(f'Invalid key size {len(key)}')
+
+        self._key = key
+        self._ke = self._expand_encryption_key(key)
+
+    @functools.cached_property
+    def _kd(self) -> tuple[tuple[int, int, int, int], ...]:
+        return self._expand_decryption_key(self._key)
 
     def encrypt(self, plaintext: bytes) -> bytes:
         """Encrypt a block of plain text using the AES block cipher."""
@@ -165,38 +192,73 @@ class _AES:
         if len(plaintext) != 16:
             raise core.InvalidArgumentError(f'wrong block length {len(plaintext)}')
 
-        rounds = len(self._ke) - 1
-        (s1, s2, s3) = [1, 2, 3]
-        a = [0, 0, 0, 0]
-
-        # Convert plaintext to (ints ^ key)
-        t = [
-            (_compact_word(plaintext[4 * i : 4 * i + 4]) ^ self._ke[0][i])
-            for i in range(0, 4)
-        ]
+        ke = self._ke
+        k0, k1, k2, k3 = ke[0]
+        t0, t1, t2, t3 = _U32_STRUCT.unpack(plaintext)
+        t0 ^= k0
+        t1 ^= k1
+        t2 ^= k2
+        t3 ^= k3
 
         # Apply round transforms
-        for r in range(1, rounds):
-            for i in range(0, 4):
-                a[i] = (
-                    self._T1[(t[i] >> 24) & 0xFF]
-                    ^ self._T2[(t[(i + s1) % 4] >> 16) & 0xFF]
-                    ^ self._T3[(t[(i + s2) % 4] >> 8) & 0xFF]
-                    ^ self._T4[t[(i + s3) % 4] & 0xFF]
-                    ^ self._ke[r][i]
-                )
-            t = copy.copy(a)
+        T1, T2, T3, T4 = self._T1, self._T2, self._T3, self._T4
+        for k0, k1, k2, k3 in ke[1:-1]:
+            t0, t1, t2, t3 = (
+                T1[t0 >> 24]
+                ^ T2[(t1 >> 16) & 0xFF]
+                ^ T3[(t2 >> 8) & 0xFF]
+                ^ T4[t3 & 0xFF]
+                ^ k0,
+                T1[t1 >> 24]
+                ^ T2[(t2 >> 16) & 0xFF]
+                ^ T3[(t3 >> 8) & 0xFF]
+                ^ T4[t0 & 0xFF]
+                ^ k1,
+                T1[t2 >> 24]
+                ^ T2[(t3 >> 16) & 0xFF]
+                ^ T3[(t0 >> 8) & 0xFF]
+                ^ T4[t1 & 0xFF]
+                ^ k2,
+                T1[t3 >> 24]
+                ^ T2[(t0 >> 16) & 0xFF]
+                ^ T3[(t1 >> 8) & 0xFF]
+                ^ T4[t2 & 0xFF]
+                ^ k3,
+            )
 
         # The last round is special
-        result = []
-        for i in range(0, 4):
-            tt = self._ke[rounds][i]
-            result.append((self._S[(t[i] >> 24) & 0xFF] ^ (tt >> 24)) & 0xFF)
-            result.append((self._S[(t[(i + s1) % 4] >> 16) & 0xFF] ^ (tt >> 16)) & 0xFF)
-            result.append((self._S[(t[(i + s2) % 4] >> 8) & 0xFF] ^ (tt >> 8)) & 0xFF)
-            result.append((self._S[t[(i + s3) % 4] & 0xFF] ^ tt) & 0xFF)
-
-        return bytes(result)
+        S = self._S
+        k0, k1, k2, k3 = ke[-1]
+        return _U32_STRUCT.pack(
+            (
+                (S[t0 >> 24] << 24)
+                | (S[(t1 >> 16) & 0xFF] << 16)
+                | (S[(t2 >> 8) & 0xFF] << 8)
+                | S[t3 & 0xFF]
+            )
+            ^ k0,
+            (
+                (S[t1 >> 24] << 24)
+                | (S[(t2 >> 16) & 0xFF] << 16)
+                | (S[(t3 >> 8) & 0xFF] << 8)
+                | S[t0 & 0xFF]
+            )
+            ^ k1,
+            (
+                (S[t2 >> 24] << 24)
+                | (S[(t3 >> 16) & 0xFF] << 16)
+                | (S[(t0 >> 8) & 0xFF] << 8)
+                | S[t1 & 0xFF]
+            )
+            ^ k2,
+            (
+                (S[t3 >> 24] << 24)
+                | (S[(t0 >> 16) & 0xFF] << 16)
+                | (S[(t1 >> 8) & 0xFF] << 8)
+                | S[t2 & 0xFF]
+            )
+            ^ k3,
+        )
 
     def decrypt(self, cipher_text: bytes) -> bytes:
         """Decrypt a block of cipher text using the AES block cipher."""
@@ -204,42 +266,73 @@ class _AES:
         if len(cipher_text) != 16:
             raise core.InvalidArgumentError(f'wrong block length {len(cipher_text)}')
 
-        rounds = len(self._kd) - 1
-        (s1, s2, s3) = [3, 2, 1]
-        a = [0, 0, 0, 0]
-
-        # Convert ciphertext to (ints ^ key)
-        t = [
-            (_compact_word(cipher_text[4 * i : 4 * i + 4]) ^ self._kd[0][i])
-            for i in range(0, 4)
-        ]
+        kd = self._kd
+        k0, k1, k2, k3 = kd[0]
+        t0, t1, t2, t3 = _U32_STRUCT.unpack(cipher_text)
+        t0 ^= k0
+        t1 ^= k1
+        t2 ^= k2
+        t3 ^= k3
 
         # Apply round transforms
-        for r in range(1, rounds):
-            for i in range(0, 4):
-                a[i] = (
-                    self._T5[(t[i] >> 24) & 0xFF]
-                    ^ self._T6[(t[(i + s1) % 4] >> 16) & 0xFF]
-                    ^ self._T7[(t[(i + s2) % 4] >> 8) & 0xFF]
-                    ^ self._T8[t[(i + s3) % 4] & 0xFF]
-                    ^ self._kd[r][i]
-                )
-            t = copy.copy(a)
+        T5, T6, T7, T8 = self._T5, self._T6, self._T7, self._T8
+        for k0, k1, k2, k3 in kd[1:-1]:
+            t0, t1, t2, t3 = (
+                T5[t0 >> 24]
+                ^ T6[(t3 >> 16) & 0xFF]
+                ^ T7[(t2 >> 8) & 0xFF]
+                ^ T8[t1 & 0xFF]
+                ^ k0,
+                T5[t1 >> 24]
+                ^ T6[(t0 >> 16) & 0xFF]
+                ^ T7[(t3 >> 8) & 0xFF]
+                ^ T8[t2 & 0xFF]
+                ^ k1,
+                T5[t2 >> 24]
+                ^ T6[(t1 >> 16) & 0xFF]
+                ^ T7[(t0 >> 8) & 0xFF]
+                ^ T8[t3 & 0xFF]
+                ^ k2,
+                T5[t3 >> 24]
+                ^ T6[(t2 >> 16) & 0xFF]
+                ^ T7[(t1 >> 8) & 0xFF]
+                ^ T8[t0 & 0xFF]
+                ^ k3,
+            )
 
         # The last round is special
-        result = []
-        for i in range(0, 4):
-            tt = self._kd[rounds][i]
-            result.append((self._S_INV[(t[i] >> 24) & 0xFF] ^ (tt >> 24)) & 0xFF)
-            result.append(
-                (self._S_INV[(t[(i + s1) % 4] >> 16) & 0xFF] ^ (tt >> 16)) & 0xFF
+        S_INV = self._S_INV
+        k0, k1, k2, k3 = kd[-1]
+        return _U32_STRUCT.pack(
+            (
+                (S_INV[t0 >> 24] << 24)
+                | (S_INV[(t3 >> 16) & 0xFF] << 16)
+                | (S_INV[(t2 >> 8) & 0xFF] << 8)
+                | S_INV[t1 & 0xFF]
             )
-            result.append(
-                (self._S_INV[(t[(i + s2) % 4] >> 8) & 0xFF] ^ (tt >> 8)) & 0xFF
+            ^ k0,
+            (
+                (S_INV[t1 >> 24] << 24)
+                | (S_INV[(t0 >> 16) & 0xFF] << 16)
+                | (S_INV[(t3 >> 8) & 0xFF] << 8)
+                | S_INV[t2 & 0xFF]
             )
-            result.append((self._S_INV[t[(i + s3) % 4] & 0xFF] ^ tt) & 0xFF)
-
-        return bytes(result)
+            ^ k1,
+            (
+                (S_INV[t2 >> 24] << 24)
+                | (S_INV[(t1 >> 16) & 0xFF] << 16)
+                | (S_INV[(t0 >> 8) & 0xFF] << 8)
+                | S_INV[t3 & 0xFF]
+            )
+            ^ k2,
+            (
+                (S_INV[t3 >> 24] << 24)
+                | (S_INV[(t2 >> 16) & 0xFF] << 16)
+                | (S_INV[(t1 >> 8) & 0xFF] << 8)
+                | S_INV[t0 & 0xFF]
+            )
+            ^ k3,
+        )
 
 
 class _ECB:
@@ -247,9 +340,12 @@ class _ECB:
         self._aes = _AES(key)
 
     def encrypt(self, plaintext: bytes) -> bytes:
+        if len(plaintext) == 16:
+            return self._aes.encrypt(plaintext)
+        encrypt_block = self._aes.encrypt
         return b"".join(
             [
-                self._aes.encrypt(
+                encrypt_block(
                     plaintext[offset : offset + 16].ljust(16, b"\x00")  # Pad 0.
                 )
                 for offset in range(0, len(plaintext), 16)
@@ -257,9 +353,12 @@ class _ECB:
         )
 
     def decrypt(self, cipher_text: bytes) -> bytes:
+        if len(cipher_text) == 16:
+            return self._aes.decrypt(cipher_text)
+        decrypt_block = self._aes.decrypt
         return b"".join(
             [
-                self._aes.encrypt(cipher_text[offset : offset + 16])
+                decrypt_block(cipher_text[offset : offset + 16])
                 for offset in range(0, len(cipher_text), 16)
             ]
         )
@@ -276,25 +375,37 @@ class _CBC:
         self._aes = _AES(key)
 
     def encrypt(self, plaintext: bytes) -> bytes:
-        cipher_text = b""
+        encrypt_block = self._aes.encrypt
+        last_block = self._last_cipher_block
+        blocks = []
         for offset in range(0, len(plaintext), 16):
-            pre_cipher_block = _xor(
-                plaintext[offset : offset + 16], self._last_cipher_block
+            last_block = encrypt_block(
+                _xor(plaintext[offset : offset + 16], last_block)
             )
-            self._last_cipher_block = self._aes.encrypt(pre_cipher_block)
-            cipher_text += self._last_cipher_block
-        return cipher_text
+            blocks.append(last_block)
+        self._last_cipher_block = last_block
+        return b"".join(blocks)
 
     def decrypt(self, cipher_text: bytes) -> bytes:
-        plaintext = b""
+        decrypt_block = self._aes.decrypt
+        last_block = self._last_cipher_block
+        blocks = []
         for offset in range(0, len(cipher_text), 16):
-            plaintext += _xor(
-                self._aes.decrypt(cipher_text[offset : offset + 16]),
-                self._last_cipher_block,
-            )
-            self._last_cipher_block = cipher_text[offset : offset + 16]
+            block = cipher_text[offset : offset + 16]
+            blocks.append(_xor(decrypt_block(block), last_block))
+            last_block = block
+        self._last_cipher_block = last_block
+        return b"".join(blocks)
 
-        return plaintext
+
+# NOTE: lru_cache retains recent keys and CMAC subkeys in process memory.
+# This is acceptable as this module is intended for testing and emulation only.
+@functools.lru_cache(maxsize=16)
+def _cmac_subkeys(key: bytes, bs: int, const_Rb: int) -> tuple[bytes, bytes]:
+    L = _AES(key).encrypt(bytes(bs))
+    k1 = _shift_bytes(L, const_Rb) if (L[0] & 0x80) else _shift_bytes(L)
+    k2 = _shift_bytes(k1, const_Rb) if (k1[0] & 0x80) else _shift_bytes(k1)
+    return k1, k2
 
 
 class _CMAC:
@@ -305,6 +416,7 @@ class _CMAC:
         mac_len: int = 16,
         update_after_digest: bool = False,
     ) -> None:
+        key = bytes(key)
         self.digest_size = mac_len
         self._key = key
         self._block_size = bs = 16
@@ -325,19 +437,8 @@ class _CMAC:
 
         # Compute sub-keys
         zero_block = bytes(bs)
-        self._ecb = _ECB(key)
-        L = self._ecb.encrypt(zero_block)
-        if L[0] & 0x80:
-            self._k1 = _shift_bytes(L, const_Rb)
-        else:
-            self._k1 = _shift_bytes(L)
-        if self._k1[0] & 0x80:
-            self._k2 = _shift_bytes(self._k1, const_Rb)
-        else:
-            self._k2 = _shift_bytes(self._k1)
-
-        # Initialize CBC cipher with zero IV
-        self._cbc = _CBC(key, zero_block)
+        self._aes = _AES(key)
+        self._k1, self._k2 = _cmac_subkeys(key, bs, const_Rb)
 
         # Cache for outstanding data to authenticate
         self._cache = bytearray(bs)
@@ -345,9 +446,6 @@ class _CMAC:
 
         # Last piece of cipher text produced
         self._last_ct = zero_block
-
-        # Last block that was encrypted with AES
-        self._last_pt: bytes | None = None
 
         # Counter for total message size
         self._data_size = 0
@@ -367,6 +465,9 @@ class _CMAC:
                 "update() cannot be called after digest() or verify()"
             )
 
+        if not msg:
+            return self
+
         self._data_size += len(msg)
         bs = self._block_size
 
@@ -374,39 +475,26 @@ class _CMAC:
             filler = min(bs - self._cache_n, len(msg))
             self._cache[self._cache_n : self._cache_n + filler] = msg[:filler]
             self._cache_n += filler
+            msg = msg[filler:]
 
-            if self._cache_n < bs:
+            if not msg:
                 return self
 
-            msg = msg[filler:]
-            self._update(self._cache)
+            self._last_ct = self._aes.encrypt(_xor(self._last_ct, self._cache))
             self._cache_n = 0
 
-        remain = len(msg) % bs
-        if remain > 0:
-            self._update(msg[:-remain])
-            self._cache[:remain] = msg[-remain:]
-        else:
-            self._update(msg)
+        remain = len(msg) % bs or bs
+        n_full = len(msg) - remain
+        if n_full > 0:
+            encrypt_block = self._aes.encrypt
+            last_ct = self._last_ct
+            for offset in range(0, n_full, bs):
+                last_ct = encrypt_block(_xor(last_ct, msg[offset : offset + bs]))
+            self._last_ct = last_ct
+
+        self._cache[:remain] = msg[n_full:]
         self._cache_n = remain
         return self
-
-    def _update(self, data_block: bytes) -> None:
-        """Update a block aligned to the block boundary"""
-
-        bs = self._block_size
-        assert len(data_block) % bs == 0
-
-        if len(data_block) == 0:
-            return
-
-        ct = self._cbc.encrypt(data_block)
-        if len(data_block) == bs:
-            second_last = self._last_ct
-        else:
-            second_last = ct[-bs * 2 : -bs]
-        self._last_ct = ct[-bs:]
-        self._last_pt = _xor(second_last, data_block[-bs:])
 
     def digest(self) -> bytes:
         bs = self._block_size
@@ -417,22 +505,100 @@ class _CMAC:
         if self._data_size > self._max_size:
             raise core.InvalidArgumentError("MAC is unsafe for this message")
 
-        if self._cache_n == 0 and self._data_size > 0 and self._last_pt:
+        if self._cache_n == bs:
             # Last block was full
-            pt = _xor(self._last_pt, self._k1)
+            pt = _xor(_xor(self._last_ct, self._cache), self._k1)
         else:
             # Last block is partial (or message length is zero)
             partial = self._cache[:]
             partial[self._cache_n :] = b'\x80' + b'\x00' * (bs - self._cache_n - 1)
             pt = _xor(_xor(self._last_ct, partial), self._k2)
 
-        self._mac_tag = self._ecb.encrypt(pt)[: self.digest_size]
+        self._mac_tag = self._aes.encrypt(pt)[: self.digest_size]
 
         return self._mac_tag
 
 
+def _jacobian_double(x: int, y: int, z: int, p: int, a: int) -> tuple[int, int, int]:
+    if not z or not y:
+        return (1, 1, 0)
+    yy = (y * y) % p
+    s = (4 * x * yy) % p
+    zz = (z * z) % p
+    if a == p - 3:
+        m = (3 * (x - zz) * (x + zz)) % p
+    else:
+        m = (3 * x * x + a * zz * zz) % p
+    x2 = (m * m - 2 * s) % p
+    y2 = (m * (s - x2) - 8 * yy * yy) % p
+    z2 = (2 * y * z) % p
+    return (x2, y2, z2)
+
+
+def _jacobian_add(
+    x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, p: int, a: int
+) -> tuple[int, int, int]:
+    if not z1:
+        return (x2, y2, z2)
+    if not z2:
+        return (x1, y1, z1)
+    z1z1 = (z1 * z1) % p
+    u2 = (x2 * z1z1) % p
+    s2 = (y2 * z1 * z1z1) % p
+    if z2 == 1:
+        u1 = x1
+        s1 = y1
+        if u1 == u2:
+            return _jacobian_double(x1, y1, z1, p, a) if s1 == s2 else (1, 1, 0)
+        h = (u2 - u1) % p
+        r = (s2 - s1) % p
+        z3 = (h * z1) % p
+    else:
+        z2z2 = (z2 * z2) % p
+        u1 = (x1 * z2z2) % p
+        s1 = (y1 * z2 * z2z2) % p
+        if u1 == u2:
+            return _jacobian_double(x1, y1, z1, p, a) if s1 == s2 else (1, 1, 0)
+        h = (u2 - u1) % p
+        r = (s2 - s1) % p
+        z3 = (h * z1 * z2) % p
+    hh = (h * h) % p
+    hhh = (h * hh) % p
+    u1hh = (u1 * hh) % p
+    x3 = (r * r - hhh - 2 * u1hh) % p
+    y3 = (r * (u1hh - x3) - s1 * hhh) % p
+    return (x3, y3, z3)
+
+
+def _jacobian_mul(
+    px: int, py: int, pz: int, k: int, p: int, a: int
+) -> tuple[int, int, int]:
+    if k <= 0 or not pz:
+        return (1, 1, 0)
+    tbl = [(1, 1, 0), (px, py, pz)]
+    p2 = _jacobian_double(px, py, pz, p, a)
+    tbl.append(p2)
+    curr = p2
+    for _ in range(3, 16):
+        curr = _jacobian_add(curr[0], curr[1], curr[2], px, py, pz, p, a)
+        tbl.append(curr)
+
+    rx, ry, rz = 1, 1, 0
+    for shift in range((k.bit_length() - 1) & ~3, -1, -4):
+        if rz:
+            rx, ry, rz = _jacobian_double(rx, ry, rz, p, a)
+            rx, ry, rz = _jacobian_double(rx, ry, rz, p, a)
+            rx, ry, rz = _jacobian_double(rx, ry, rz, p, a)
+            rx, ry, rz = _jacobian_double(rx, ry, rz, p, a)
+        w = (k >> shift) & 0xF
+        if w:
+            tx, ty, tz = tbl[w]
+            rx, ry, rz = _jacobian_add(rx, ry, rz, tx, ty, tz, p, a)
+    return (rx, ry, rz)
+
+
 # Define the original Point class for clarity and conversion purposes
-@dataclasses.dataclass
+@dataclasses.dataclass(slots=True)
 class _Point:
     """Represents a point on the elliptic curve in affine coordinates."""
 
@@ -442,7 +608,7 @@ class _Point:
     infinite: bool = False
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class _JacobianPoint:
     """Represents a point on the elliptic curve in Jacobian coordinates."""
 
@@ -470,74 +636,17 @@ class _JacobianPoint:
 
         p = self.curve.p
         inv_z = pow(self.z, -1, p)
-        affine_x = (self.x * inv_z**2) % p
-        affine_y = (self.y * inv_z**3) % p
+        inv_z2 = (inv_z * inv_z) % p
+        affine_x = (self.x * inv_z2) % p
+        affine_y = (self.y * inv_z2 * inv_z) % p
 
         return _Point(curve=self.curve, x=affine_x, y=affine_y, infinite=False)
 
-    def double(self) -> _JacobianPoint:
-        if self.z == 0 or self.y == 0:
-            return _JacobianPoint.point_at_infinity(self.curve)
-
-        s = 4 * self.x * self.y**2
-        m = 3 * self.x**2 + self.curve.a * self.z**4
-        x2 = m**2 - 2 * s
-        y2 = m * (s - x2) - 8 * self.y**4
-        z2 = 2 * self.y * self.z
-        p = self.curve.p
-
-        return _JacobianPoint(curve=self.curve, x=x2 % p, y=y2 % p, z=z2 % p)
-
-    def __add__(self, other: _JacobianPoint) -> _JacobianPoint:
-        if self.z == 0 and other.z == 0:
-            return _JacobianPoint.point_at_infinity(self.curve)
-        elif self.z == 0:
-            return other
-        elif other.z == 0:
-            return self
-
-        x1 = self.x
-        y1 = self.y
-        z1 = self.z
-        x2 = other.x
-        y2 = other.y
-        z2 = other.z
-        p = self.curve.p
-        u1 = (x1 * z2**2) % p
-        u2 = (x2 * z1**2) % p
-        s1 = (y1 * z2**3) % p
-        s2 = (y2 * z1**3) % p
-
-        if u1 == u2:
-            if s1 != s2:
-                return _JacobianPoint.point_at_infinity(self.curve)
-            else:
-                return self.double()
-        else:
-            h = u2 - u1
-            r = s2 - s1
-
-            h3 = h**3 % p
-            u1h2 = (u1 * h**2) % p
-            x3 = r**2 - h3 - 2 * u1h2
-            y3 = r * (u1h2 - x3) - s1 * h3
-            z3 = h * z1 * z2
-
-            return _JacobianPoint(self.curve, x3 % p, y3 % p, z3 % p)
-
     def __mul__(self, k: int) -> _JacobianPoint:
-        addend = self
-        result = _JacobianPoint.point_at_infinity(self.curve)
-
-        while k > 0:
-            if k % 2 != 0:
-                result = result + addend
-            addend = addend.double()
-            k = k >> 1
-        return result
-
-    def __rmul__(self, k: int) -> _JacobianPoint:
-        return self * k
+        rx, ry, rz = _jacobian_mul(
+            self.x, self.y, self.z, k, self.curve.p, self.curve.a
+        )
+        return _JacobianPoint(curve=self.curve, x=rx, y=ry, z=rz)
 
 
 @dataclasses.dataclass
@@ -549,14 +658,36 @@ class _EllipticCurve:
     g_x: int
     g_y: int
 
-    _generator_jacobian: _JacobianPoint = dataclasses.field(init=False)
+    _comb_table: tuple[tuple[int, int, int], ...] | None = dataclasses.field(
+        default=None, init=False, repr=False, compare=False
+    )
 
-    def __post_init__(self):
-        self._generator_jacobian = _JacobianPoint(
-            curve=self, x=self.g_x, y=self.g_y, z=1
-        )
+    def _get_comb_table(self) -> tuple[tuple[int, int, int], ...]:
+        if self._comb_table is None:
+            p, a = self.p, self.a
+            teeth = [(self.g_x, self.g_y, 1)]
+            x, y, z = self.g_x, self.g_y, 1
+            for _ in range(3):
+                for _ in range(64):
+                    x, y, z = _jacobian_double(x, y, z, p, a)
+                teeth.append((x, y, z))
+            tbl = [(1, 1, 0)] * 16
+            for mask in range(1, 16):
+                lsb = mask & -mask
+                bit = lsb.bit_length() - 1
+                px, py, pz = tbl[mask ^ lsb]
+                tx, ty, tz = teeth[bit]
+                tbl[mask] = _jacobian_add(px, py, pz, tx, ty, tz, p, a)
+            for mask in range(1, 16):
+                px, py, pz = tbl[mask]
+                if pz:
+                    inv_z = pow(pz, -1, p)
+                    inv_z2 = (inv_z * inv_z) % p
+                    tbl[mask] = ((px * inv_z2) % p, (py * inv_z2 * inv_z) % p, 1)
+            self._comb_table = tuple(tbl)
+        return self._comb_table
 
-    @dataclasses.dataclass
+    @dataclasses.dataclass(slots=True)
     class PrivateKey:
         key: int
         curve: _EllipticCurve
@@ -567,13 +698,37 @@ class _EllipticCurve:
 
     def generate_public_key(self, private_key: int) -> _Point:
         """Generates a public key from a private key using Jacobian coordinates for scalar multiplication."""
-        public_key_jacobian = self._generator_jacobian * private_key
-        return public_key_jacobian.to_affine()
+        k = private_key % self.n
+        if k == 0:
+            return _Point(infinite=True, curve=self)
+        tbl = self._get_comb_table()
+        p, a = self.p, self.a
+        k0 = k & ((1 << 64) - 1)
+        k1 = (k >> 64) & ((1 << 64) - 1)
+        k2 = (k >> 128) & ((1 << 64) - 1)
+        k3 = (k >> 192) & ((1 << 64) - 1)
+        rx, ry, rz = 1, 1, 0
+        for i in range(63, -1, -1):
+            if rz:
+                rx, ry, rz = _jacobian_double(rx, ry, rz, p, a)
+            idx = (
+                ((k0 >> i) & 1)
+                | (((k1 >> i) & 1) << 1)
+                | (((k2 >> i) & 1) << 2)
+                | (((k3 >> i) & 1) << 3)
+            )
+            if idx:
+                tx, ty, tz = tbl[idx]
+                rx, ry, rz = _jacobian_add(rx, ry, rz, tx, ty, tz, p, a)
+        return _JacobianPoint(curve=self, x=rx, y=ry, z=rz).to_affine()
 
     def ecdh_shared_secret(self, private_key: int, other_public_key: _Point) -> bytes:
         """Computes the shared secret using ECDH."""
         x, y = other_public_key.x, other_public_key.y
-        if (y * y - (x * x * x + self.a * x + self.b)) % self.p != 0:
+        if (
+            not (0 <= x < self.p and 0 <= y < self.p)
+            or (y * y - (x * x * x + self.a * x + self.b)) % self.p != 0
+        ):
             raise core.InvalidPacketError("Public key is not a point on the curve")
         other_public_key_jacobian = _JacobianPoint.from_affine(other_public_key)
         shared_point_jacobian = other_public_key_jacobian * private_key
@@ -586,14 +741,17 @@ class _EllipticCurve:
 
     @classmethod
     def SECP256R1(cls) -> _EllipticCurve:
-        p = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
-        a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC
-        b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B
-        n = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551  # Curve order
-        g_x = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296
-        g_y = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5
+        return _SECP256R1
 
-        return _EllipticCurve(p=p, a=a, b=b, n=n, g_x=g_x, g_y=g_y)
+
+_SECP256R1 = _EllipticCurve(
+    p=0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF,
+    a=0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC,
+    b=0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B,
+    n=0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551,  # Curve order
+    g_x=0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296,
+    g_y=0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5,
+)
 
 
 class EccKey:
@@ -601,16 +759,16 @@ class EccKey:
         self.private_key = private_key
 
     @functools.cached_property
+    def _public_key(self) -> _Point:
+        return self.private_key.curve.generate_public_key(self.private_key.key)
+
+    @functools.cached_property
     def x(self) -> bytes:
-        return self.private_key.curve.generate_public_key(
-            self.private_key.key
-        ).x.to_bytes(32, byteorder='big')
+        return self._public_key.x.to_bytes(32, byteorder='big')
 
     @functools.cached_property
     def y(self) -> bytes:
-        return self.private_key.curve.generate_public_key(
-            self.private_key.key
-        ).y.to_bytes(32, byteorder='big')
+        return self._public_key.y.to_bytes(32, byteorder='big')
 
     def dh(self, public_key_x: bytes, public_key_y: bytes) -> bytes:
         x = int.from_bytes(public_key_x, byteorder='big', signed=False)
@@ -622,12 +780,12 @@ class EccKey:
 
     @classmethod
     def generate(cls) -> EccKey:
-        return EccKey(_EllipticCurve.SECP256R1().generate_private_key())
+        return EccKey(_SECP256R1.generate_private_key())
 
     @classmethod
     def from_private_key_bytes(cls, d_bytes: bytes) -> EccKey:
         d = int.from_bytes(d_bytes, byteorder='big', signed=False)
-        return EccKey(_EllipticCurve.PrivateKey(d, _EllipticCurve.SECP256R1()))
+        return EccKey(_EllipticCurve.PrivateKey(d, _SECP256R1))
 
 
 def e(key: bytes, data: bytes) -> bytes:
