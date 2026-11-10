@@ -20,7 +20,7 @@ import logging
 import pytest
 import pytest_asyncio
 
-from bumble import device
+from bumble import att, device
 from bumble.profiles import vcs
 from bumble.testing.test_utils import TwoDevices
 
@@ -122,3 +122,15 @@ async def test_unmute(vcp_client: vcs.VolumeControlServiceProxy):
         bytes([vcs.VolumeControlPointOpcode.UNMUTE, 0])
     )
     assert (await vcp_client.volume_state.read_value()) == vcs.VolumeState(32, 0, 1)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_unsupported_opcode(vcp_client: vcs.VolumeControlServiceProxy):
+    with pytest.raises(att.ATT_Error) as e:
+        await vcp_client.volume_control_point.write_value(
+            bytes([0x07, 0]), with_response=True
+        )
+
+    assert e.value.error_code == vcs.ErrorCode.OPCODE_NOT_SUPPORTED
+    assert (await vcp_client.volume_state.read_value()) == vcs.VolumeState(32, 1, 0)
