@@ -53,10 +53,10 @@ from bumble.hci import (
     HCI_LE_CODED_PHY,
     HCI_Constant,
     HCI_Error,
-    HCI_IsoDataPacket,
     HCI_StatusError,
     Role,
 )
+from bumble.host import IsoSdu
 from bumble.pairing import PairingConfig
 from bumble.sdp import (
     SDP_BROWSE_GROUP_LIST_ATTRIBUTE_ID,
@@ -1312,11 +1312,11 @@ class IsoClient(StreamedPacketIO):
             if sender
             else cis_link.Direction.CONTROLLER_TO_HOST
         )
-        cis_link.sink = self.on_iso_packet
+        cis_link.sink = self.on_iso_sdu
         self.ready.set()
 
-    def on_iso_packet(self, iso_packet: HCI_IsoDataPacket) -> None:
-        self.on_packet(iso_packet.iso_sdu_fragment)
+    def on_iso_sdu(self, sdu: IsoSdu) -> None:
+        self.on_packet(sdu.data)
 
     def on_disconnection(self, _):
         pass
@@ -1360,11 +1360,11 @@ class IsoServer(StreamedPacketIO):
             if sender
             else cis_link.Direction.CONTROLLER_TO_HOST
         )
-        cis_link.sink = self.on_iso_packet
+        cis_link.sink = self.on_iso_sdu
         self.ready.set()
 
-    def on_iso_packet(self, iso_packet: HCI_IsoDataPacket) -> None:
-        self.on_packet(iso_packet.iso_sdu_fragment)
+    def on_iso_sdu(self, sdu: IsoSdu) -> None:
+        self.on_packet(sdu.data)
 
     def on_disconnection(self, _):
         pass
