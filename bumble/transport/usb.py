@@ -21,8 +21,10 @@ import asyncio
 import ctypes
 import dataclasses
 import logging
+import math
 import platform
 import threading
+from collections import deque
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -667,6 +669,41 @@ class AclPacketSplitter(PacketSplitter):
         super().__init__(length_offset=2, length_size=2, emit=emit)
 
 
+# Minimum default USB interrupt polling sync window (4 ms, matching Linux btusb
+# jiffies at HZ=250) and fallback when the endpoint descriptor does not report a
+# valid bInterval. Callers can override this window via intr_interval or
+# +poll_sync=<ms>.
+DEFAULT_INTR_INTERVAL = 0.004
+
+# USB Vendor IDs that require ACL-vs-Event poll synchronization by default due
+# to Bulk IN completing ahead of periodic Interrupt IN polling.
+USB_VENDOR_ID_INTEL = 0x8087
+POLL_SYNC_VENDOR_IDS = {USB_VENDOR_ID_INTEL}
+
+
+def _get_intr_interval(
+    device: usb1.USBDeviceHandle, interrupt_in: usb1.USBEndpoint
+) -> float:
+    """Compute the HCI interrupt endpoint polling sync window in seconds."""
+    raw_interval = interrupt_in.getInterval()
+    if raw_interval <= 0:
+        return DEFAULT_INTR_INTERVAL
+
+    speed = device.getDevice().getDeviceSpeed()
+    # pylint: disable=no-member
+    if speed is not None and speed in (
+        usb1.SPEED_HIGH,
+        usb1.SPEED_SUPER,
+        usb1.SPEED_SUPER_PLUS,
+        getattr(usb1, 'SPEED_SUPER_PLUS_X2', None),
+    ):
+        exponent = min(raw_interval, 16)
+        interval = (1 << (exponent - 1)) * 0.000125
+    else:
+        interval = float(raw_interval) / 1000.0
+    return max(interval, DEFAULT_INTR_INTERVAL)
+
+
 class UsbPacketSource(asyncio.Protocol, BaseSource):
     def __init__(
         self,
@@ -675,18 +712,35 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         interrupt_in: usb1.USBEndpoint,
         bulk_in: usb1.USBEndpoint,
         isochronous_in: usb1.USBEndpoint | None,
+        intr_interval: float | None = None,
+        poll_sync: bool | None = None,
     ) -> None:
         super().__init__()
         self.device = device
         self.metadata = metadata
         self.interrupt_in = interrupt_in
-        self.interrupt_in_transfer = None
+        self.interrupt_in_transfer: usb1.USBTransfer | None = None
         self.bulk_in = bulk_in
-        self.bulk_in_transfer = None
+        self.bulk_in_transfer: usb1.USBTransfer | None = None
         self.isochronous_in = isochronous_in
         self.isochronous_in_transfers: list[usb1.USBTransfer] = []
         self.loop = asyncio.get_running_loop()
         self.queue: asyncio.Queue[bytes] = asyncio.Queue()
+        self.acl_queue: deque[tuple[float, bytes]] = deque()
+        self.acl_flush_handle: asyncio.TimerHandle | None = None
+        if poll_sync is False:
+            self.intr_interval = 0.0
+        elif intr_interval is not None:
+            self.intr_interval = float(intr_interval)
+        else:
+            if poll_sync is None:
+                poll_sync = (
+                    isinstance(metadata, dict)
+                    and metadata.get('vendor_id') in POLL_SYNC_VENDOR_IDS
+                )
+            self.intr_interval = (
+                _get_intr_interval(device, interrupt_in) if poll_sync else 0.0
+            )
         self.dequeue_task: asyncio.Task[None] | None = None
         self.done: dict[usb1.USBTransfer, asyncio.Event] = {}
         self.splitters = {
@@ -761,6 +815,81 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
 
         self.dequeue_task = self.loop.create_task(self.dequeue())
 
+    def _clear_acl_queue(self) -> None:
+        if self.acl_flush_handle is not None:
+            self.acl_flush_handle.cancel()
+            self.acl_flush_handle = None
+        self.acl_queue.clear()
+
+    def _flush_acl_queue(self) -> None:
+        if self.acl_flush_handle is not None:
+            self.acl_flush_handle.cancel()
+            self.acl_flush_handle = None
+        while self.acl_queue:
+            _, packet = self.acl_queue.popleft()
+            self.queue.put_nowait(packet)
+
+    def _on_acl_timer(self) -> None:
+        self.acl_flush_handle = None
+        now = self.loop.time()
+        # Pop the head packet unconditionally because asyncio.call_at may fire
+        # slightly before the nominal deadline due to OS timer resolution.
+        if self.acl_queue:
+            _, packet = self.acl_queue.popleft()
+            self.queue.put_nowait(packet)
+        while self.acl_queue and self.acl_queue[0][0] <= now:
+            _, packet = self.acl_queue.popleft()
+            self.queue.put_nowait(packet)
+        if self.acl_queue:
+            self.acl_flush_handle = self.loop.call_at(
+                self.acl_queue[0][0], self._on_acl_timer
+            )
+
+    def _enqueue_packet(self, packet_type: int, packet_data: bytes) -> None:
+        if self.closed:
+            return
+
+        packet = bytes([packet_type]) + packet_data
+        if packet_type == hci.HCI_ACL_DATA_PACKET and self.intr_interval > 0:
+            # Inspired by Linux btusb poll_sync: defer ACL packets over the
+            # Interrupt IN polling window so an HCI event generated by the
+            # controller at the same time (which waits for the periodic
+            # Interrupt IN poll) is delivered first. Unlike btusb's single
+            # rx_work delayed work item (which drains the entire queue when the
+            # first packet's timer expires), each ACL packet gets its own
+            # intr_interval deadline so an earlier timer expiry does not
+            # prematurely flush a newer ACL packet.
+            # Note: Inbound ISO data packets (LE Audio) share the USB Bulk IN
+            # endpoint and pass through AclPacketSplitter, so they are also
+            # deferred by up to intr_interval when poll-sync is enabled.
+            deadline = self.loop.time() + self.intr_interval
+            self.acl_queue.append((deadline, packet))
+            if self.acl_flush_handle is None:
+                self.acl_flush_handle = self.loop.call_at(deadline, self._on_acl_timer)
+            return
+
+        if (
+            packet_type == hci.HCI_EVENT_PACKET
+            and self.acl_queue
+            and len(packet_data) > 0
+            and packet_data[0] == hci.HCI_DISCONNECTION_COMPLETE_EVENT
+        ):
+            # Unlike btusb, flush any deferred ACL packets BEFORE delivering
+            # HCI_Disconnection_Complete_Event. A connection cannot receive
+            # valid ACL data after Disconnection Complete, so flushing first
+            # ensures the Host processes the final ACL frames before tearing
+            # down connection state.
+            self._flush_acl_queue()
+            self.queue.put_nowait(packet)
+            return
+
+        # Enqueue the HCI Event (or SCO/unbuffered packet) BEFORE flushing
+        # deferred ACL packets so state-transition events (such as
+        # HCI_Encryption_Change) are processed ahead of subsequent ACL data.
+        self.queue.put_nowait(packet)
+        if packet_type == hci.HCI_EVENT_PACKET and self.acl_queue:
+            self._flush_acl_queue()
+
     def queue_packet(self, packet_type: int, packet_data: bytes) -> None:
         if (
             packet_type == hci.HCI_SYNCHRONOUS_DATA_PACKET
@@ -769,9 +898,7 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
         ):
             # Empty SCO packets may be received around alternate setting changes.
             return
-        _safe_call_soon(
-            self.loop, self.queue.put_nowait, bytes([packet_type]) + packet_data
-        )
+        _safe_call_soon(self.loop, self._enqueue_packet, packet_type, packet_data)
 
     def transfer_callback(self, transfer):
         packet_type = transfer.getUserData()
@@ -844,9 +971,14 @@ class UsbPacketSource(asyncio.Protocol, BaseSource):
                 except Exception:
                     logger.exception(color('!!! Exception in sink.on_packet', 'red'))
 
+    def on_transport_lost(self):
+        self._clear_acl_queue()
+        super().on_transport_lost()
+
     def close(self):
         with self.lock:
             self.closed = True
+        self._clear_acl_queue()
 
     async def terminate(self):
         self.close()
@@ -1101,7 +1233,11 @@ class UsbTransport(Transport):
         self.context.close()
 
 
-async def open_usb_transport(spec: str) -> Transport:
+async def open_usb_transport(
+    spec: str,
+    intr_interval: float | None = None,
+    poll_sync: bool | None = None,
+) -> Transport:
     '''
     Open a USB transport.
     The moniker string has this syntax:
@@ -1117,7 +1253,27 @@ async def open_usb_transport(spec: str) -> Transport:
 
     Opotionally, the moniker may include a +sco=<alternate> suffix to enable SCO/eSCO
     and specify the alternate setting to use for SCO/eSCO transfers, with 0 meaning an
-    automatic selection.
+    automatic selection, and/or +poll_sync, +poll_sync=<ms>, or +nopoll_sync to
+    control Interrupt IN / Bulk IN packet poll synchronization.
+
+    Poll synchronization precedence:
+    - Explicit keyword arguments (`poll_sync`, `intr_interval`) override moniker options.
+    - `poll_sync=False` (or `+nopoll_sync`) disables poll-sync (`intr_interval = 0.0`),
+      even when `intr_interval` is also provided.
+    - Otherwise, an explicit `intr_interval` (in seconds) or `+poll_sync=<ms>` (in
+      milliseconds) sets the exact deferral window without applying the default 4 ms
+      floor (`DEFAULT_INTR_INTERVAL`).
+    - When `intr_interval` is omitted and poll-sync is enabled (automatically for
+      controllers in `POLL_SYNC_VENDOR_IDS` such as Intel `0x8087`, or via
+      `poll_sync=True` / `+poll_sync`), the window is derived from the endpoint's
+      `bInterval` and device speed with a 4 ms floor (`DEFAULT_INTR_INTERVAL`).
+
+    Note on ISO / LE Audio latency:
+    Inbound HCI ISO data packets share the USB Bulk IN endpoint and pass through
+    `AclPacketSplitter`, so enabling poll-sync delays inbound LE Audio ISO packets by
+    up to `intr_interval` (>= 4 ms by default). Callers sensitive to LE Audio ISO
+    latency can reduce the window with `+poll_sync=<ms>` or disable it with
+    `+nopoll_sync` (or `poll_sync=False`).
 
     In addition, if the moniker ends with the symbol "!", the device will be used in
     "forced" mode:
@@ -1136,6 +1292,9 @@ async def open_usb_transport(spec: str) -> Transport:
     mode.
     0+sco=0 --> the first BT USB dongle, with SCO enabled using auto-selection.
     0+sco=5 --> the first BT USB dongle, with SCO enabled using alternate setting 5.
+    0+poll_sync --> the first BT USB dongle, with ACL poll-sync explicitly enabled.
+    0+poll_sync=2 --> the first BT USB dongle, with ACL poll-sync set to 2 ms.
+    0+nopoll_sync --> the first BT USB dongle, with ACL poll-sync explicitly disabled.
     '''
 
     # Find the device according to the spec moniker
@@ -1152,11 +1311,40 @@ async def open_usb_transport(spec: str) -> Transport:
         else:
             forced_mode = False
 
-        if '+sco=' in spec:
-            spec, sco_alternate_str = spec.split('+sco=')
-            sco_alternate = int(sco_alternate_str)
-        else:
-            sco_alternate = None
+        spec_parts = spec.split('+')
+        spec = spec_parts[0]
+        sco_alternate = None
+        moniker_poll_sync: bool | None = None
+        moniker_intr_interval: float | None = None
+        for option in spec_parts[1:]:
+            if option.startswith('sco='):
+                sco_alternate = int(option.split('=', 1)[1])
+            elif option == 'poll_sync':
+                moniker_poll_sync = True
+            elif option.startswith('poll_sync='):
+                try:
+                    ms = float(option.split('=', 1)[1])
+                except ValueError as error:
+                    context.close()
+                    raise ValueError(
+                        f'Invalid poll_sync interval in ms: {option}'
+                    ) from error
+                if ms <= 0 or not math.isfinite(ms):
+                    context.close()
+                    raise ValueError(f'Invalid poll_sync interval in ms: {option}')
+                moniker_poll_sync = True
+                moniker_intr_interval = ms / 1000.0
+            elif option == 'nopoll_sync':
+                moniker_poll_sync = False
+                moniker_intr_interval = None
+            else:
+                context.close()
+                raise ValueError(f'Unknown USB transport option: {option}')
+
+        if poll_sync is None:
+            poll_sync = moniker_poll_sync
+        if intr_interval is None:
+            intr_interval = moniker_intr_interval
 
         if ':' in spec:
             vendor_id, product_id = spec.split(':')
@@ -1321,7 +1509,13 @@ async def open_usb_transport(spec: str) -> Transport:
             # The SCO endpoints are selected once a SCO link is established.
             isochronous_in = isochronous_out = None
         source = UsbPacketSource(
-            device, device_metadata, interrupt_in, bulk_in, isochronous_in
+            device,
+            device_metadata,
+            interrupt_in,
+            bulk_in,
+            isochronous_in,
+            intr_interval=intr_interval,
+            poll_sync=poll_sync,
         )
         sink = UsbPacketSink(
             device,

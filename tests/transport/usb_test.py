@@ -557,3 +557,374 @@ async def test_usb_packet_sink_sco_cancelled_transfers_not_reused() -> None:
     assert free_transfers == new_transfers
 
     await sink.terminate()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_acl_ordering():
+    source = usb.UsbPacketSource(
+        mock.Mock(),
+        {},
+        mock.Mock(),
+        mock.Mock(),
+        None,
+        intr_interval=0.05,
+    )
+    acl = b'\x00\x28\x02\x00\xaa\xbb'
+    enc_event = b'\x08\x04\x00\x00\x08\x01'
+    disconn_event = bytes(
+        [hci.HCI_DISCONNECTION_COMPLETE_EVENT, 0x04, 0x00, 0x00, 0x08, 0x13]
+    )
+
+    # 1. Event arrives while ACL is deferred -> Event is queued before ACL.
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    source.splitters[hci.HCI_EVENT_PACKET].feed(enc_event)
+    await asyncio.sleep(0)
+    assert source.queue.get_nowait() == bytes([hci.HCI_EVENT_PACKET]) + enc_event
+    assert source.queue.get_nowait() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
+
+    # 2. Disconnection Complete arrives while ACL is deferred -> ACL is flushed
+    # immediately before the timer expires, ahead of Disconnection Complete.
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    source.splitters[hci.HCI_EVENT_PACKET].feed(disconn_event)
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+    assert source.queue.get_nowait() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
+    assert source.queue.get_nowait() == bytes([hci.HCI_EVENT_PACKET]) + disconn_event
+
+    # 3. Standalone ACL packet remains deferred after _enqueue_packet runs, and is
+    # flushed only after intr_interval expires.
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
+    assert source.queue.empty()
+    assert len(source.acl_queue) == 1
+    assert await asyncio.wait_for(source.queue.get(), timeout=1.0) == (
+        bytes([hci.HCI_ACL_DATA_PACKET]) + acl
+    )
+    source.close()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_staggered_acl_deadlines():
+    loop = asyncio.get_running_loop()
+    real_time = loop.time
+    offset = 0.0
+    with mock.patch.object(loop, 'time', side_effect=lambda: real_time() + offset):
+        source = usb.UsbPacketSource(
+            mock.Mock(),
+            {},
+            mock.Mock(),
+            mock.Mock(),
+            None,
+            intr_interval=0.5,
+        )
+        acl_1 = b'\x00\x28\x02\x00\x01\x01'
+        acl_2 = b'\x00\x28\x02\x00\x02\x02'
+
+        source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl_1)
+        await asyncio.sleep(0)
+        offset = 0.2
+        source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl_2)
+        await asyncio.sleep(0)
+        assert len(source.acl_queue) == 2
+
+        # Because loop.time is not frozen, wait_for times out properly before deadline.
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(source.queue.get(), timeout=0.01)
+
+        # When acl_1's deadline (+0.5s) expires, acl_2 (+0.7s) remains deferred.
+        offset = 0.5
+        assert await asyncio.wait_for(source.queue.get(), timeout=0.1) == (
+            bytes([hci.HCI_ACL_DATA_PACKET]) + acl_1
+        )
+        assert source.queue.empty()
+        assert len(source.acl_queue) == 1
+
+        offset = 0.7
+        assert await asyncio.wait_for(source.queue.get(), timeout=0.1) == (
+            bytes([hci.HCI_ACL_DATA_PACKET]) + acl_2
+        )
+        source.close()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_close_cancels_pending_timer():
+    source = usb.UsbPacketSource(
+        mock.Mock(),
+        {},
+        mock.Mock(),
+        mock.Mock(),
+        None,
+        intr_interval=0.03,
+    )
+    acl = b'\x00\x28\x02\x00\xaa\xbb'
+
+    # 1. _clear_acl_queue() directly cancels pending timer and clears acl_queue.
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is not None
+    assert len(source.acl_queue) == 1
+    source._clear_acl_queue()
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+
+    # 2. on_transport_lost() cancels pending timer and clears acl_queue.
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is not None
+    assert len(source.acl_queue) == 1
+    source.on_transport_lost()
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+
+    # 3. close() cancels pending timer and clears acl_queue.
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is not None
+    assert len(source.acl_queue) == 1
+
+    source.close()
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+
+    await asyncio.sleep(0.04)
+    assert source.queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_zero_intr_interval_bypass():
+    source = usb.UsbPacketSource(
+        mock.Mock(),
+        {},
+        mock.Mock(),
+        mock.Mock(),
+        None,
+        intr_interval=0,
+    )
+    acl = b'\x00\x28\x02\x00\xaa\xbb'
+
+    source.splitters[hci.HCI_ACL_DATA_PACKET].feed(acl)
+    await asyncio.sleep(0)
+    assert source.acl_flush_handle is None
+    assert len(source.acl_queue) == 0
+    assert source.queue.get_nowait() == bytes([hci.HCI_ACL_DATA_PACKET]) + acl
+    source.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('speed', 'b_interval', 'expected'),
+    [
+        # Intervals below DEFAULT_INTR_INTERVAL (4 ms) clamp to 4 ms floor
+        (usb.usb1.SPEED_FULL, 1, usb.DEFAULT_INTR_INTERVAL),
+        (usb.usb1.SPEED_HIGH, 4, usb.DEFAULT_INTR_INTERVAL),
+        (usb.usb1.SPEED_HIGH, 1, usb.DEFAULT_INTR_INTERVAL),
+        (usb.usb1.SPEED_SUPER, 4, usb.DEFAULT_INTR_INTERVAL),
+        # Intervals above 4 ms are preserved
+        (usb.usb1.SPEED_FULL, 6, 0.006),
+        (usb.usb1.SPEED_LOW, 10, 0.010),
+        (usb.usb1.SPEED_HIGH, 7, 0.008),
+        (usb.usb1.SPEED_SUPER, 7, 0.008),
+        # Invalid/zero bInterval falls back to DEFAULT_INTR_INTERVAL
+        (usb.usb1.SPEED_FULL, 0, usb.DEFAULT_INTR_INTERVAL),
+    ],
+)
+async def test_usb_packet_source_endpoint_interval_derivation(
+    speed, b_interval, expected
+):
+    mock_device = mock.Mock()
+    mock_device.getDevice.return_value.getDeviceSpeed.return_value = speed
+
+    mock_interrupt_in = mock.Mock()
+    mock_interrupt_in.getInterval.return_value = b_interval
+
+    source = usb.UsbPacketSource(
+        mock_device,
+        {'vendor_id': usb.USB_VENDOR_ID_INTEL},
+        mock_interrupt_in,
+        mock.Mock(),
+        None,
+    )
+    assert source.intr_interval == pytest.approx(expected)
+    source.close()
+
+
+@pytest.mark.asyncio
+async def test_usb_packet_source_speed_super_plus_x2_missing(monkeypatch):
+    monkeypatch.delattr(usb.usb1, 'SPEED_SUPER_PLUS_X2', raising=False)
+    mock_device = mock.Mock()
+    mock_device.getDevice.return_value.getDeviceSpeed.return_value = usb.usb1.SPEED_HIGH
+    mock_interrupt_in = mock.Mock()
+    mock_interrupt_in.getInterval.return_value = 7  # 8 ms at High-Speed
+
+    source = usb.UsbPacketSource(
+        mock_device,
+        {'vendor_id': usb.USB_VENDOR_ID_INTEL},
+        mock_interrupt_in,
+        mock.Mock(),
+        None,
+    )
+    assert source.intr_interval == pytest.approx(0.008)
+    source.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('metadata', 'intr_interval', 'poll_sync', 'expected'),
+    [
+        # Non-Intel controller defaults to 0.0 (no ACL latency penalty)
+        ({'vendor_id': 0x0A12, 'product_id': 0x0001}, None, None, 0.0),
+        ({}, None, None, 0.0),
+        # Intel controller enables poll-sync automatically by default (4 ms floor)
+        (
+            {'vendor_id': 0x8087, 'product_id': 0x0036},
+            None,
+            None,
+            usb.DEFAULT_INTR_INTERVAL,
+        ),
+        # Explicit poll_sync=True enables deferral on non-Intel controller (4 ms floor)
+        (
+            {'vendor_id': 0x0A12, 'product_id': 0x0001},
+            None,
+            True,
+            usb.DEFAULT_INTR_INTERVAL,
+        ),
+        # Explicit poll_sync=False disables deferral on Intel controller
+        ({'vendor_id': 0x8087, 'product_id': 0x0036}, None, False, 0.0),
+        # Explicit poll_sync=False takes precedence over intr_interval
+        ({'vendor_id': 0x8087, 'product_id': 0x0036}, 0.005, False, 0.0),
+        # Explicit intr_interval overrides endpoint interval (including < 4 ms)
+        ({'vendor_id': 0x0A12, 'product_id': 0x0001}, 0.005, None, 0.005),
+        ({'vendor_id': 0x8087, 'product_id': 0x0036}, 0.001, None, 0.001),
+    ],
+)
+async def test_usb_packet_source_poll_sync_vendor_and_opt_in(
+    metadata, intr_interval, poll_sync, expected
+):
+    mock_device = mock.Mock()
+    mock_device.getDevice.return_value.getDeviceSpeed.return_value = usb.usb1.SPEED_HIGH
+    mock_interrupt_in = mock.Mock()
+    mock_interrupt_in.getInterval.return_value = (
+        4  # 1 ms raw at High-Speed -> 4 ms floor
+    )
+
+    source = usb.UsbPacketSource(
+        mock_device,
+        metadata,
+        mock_interrupt_in,
+        mock.Mock(),
+        None,
+        intr_interval=intr_interval,
+        poll_sync=poll_sync,
+    )
+    assert source.intr_interval == pytest.approx(expected)
+    source.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('spec', 'kwargs', 'expected_poll_sync', 'expected_intr_interval'),
+    [
+        ('0', {}, None, None),
+        ('0+poll_sync', {}, True, None),
+        ('0+poll_sync=2', {}, True, 0.002),
+        ('0+poll_sync=1.5', {}, True, 0.0015),
+        ('0+nopoll_sync', {}, False, None),
+        ('0+sco=0+poll_sync', {}, True, None),
+        ('0+sco=0+poll_sync=2', {}, True, 0.002),
+        ('0', {'poll_sync': False}, False, None),
+        ('0+poll_sync=2', {'poll_sync': False}, False, 0.002),
+        ('0+poll_sync=2', {'intr_interval': 0.003}, True, 0.003),
+        ('0', {'poll_sync': True, 'intr_interval': 0.002}, True, 0.002),
+    ],
+)
+async def test_open_usb_transport_poll_sync_plumbing(
+    spec, kwargs, expected_poll_sync, expected_intr_interval
+):
+    device = mock.Mock()
+    device.getDeviceClass.return_value = usb.USB_DEVICE_CLASS_WIRELESS_CONTROLLER
+    device.getDeviceSubClass.return_value = usb.USB_DEVICE_SUBCLASS_RF_CONTROLLER
+    device.getDeviceProtocol.return_value = (
+        usb.USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER
+    )
+    device.getVendorID.return_value = 0x0A12
+    device.getProductID.return_value = 0x0001
+    handle = mock.Mock()
+    handle.getConfiguration.return_value = 1
+    device.open.return_value = handle
+
+    context = mock.Mock()
+    context.getDeviceIterator.return_value = [device]
+
+    acl_interface = mock.Mock()
+    acl_interface.getNumber.return_value = 0
+    acl_interface.getAlternateSetting.return_value = 0
+    interrupt_in = mock.Mock()
+    interrupt_in.getAddress.return_value = 0x81
+    bulk_in = mock.Mock()
+    bulk_in.getAddress.return_value = 0x82
+    bulk_out = mock.Mock()
+    bulk_out.getAddress.return_value = 0x02
+
+    mock_source = mock.Mock()
+    mock_sink = mock.Mock()
+    mock_transport = mock.Mock()
+
+    with (
+        mock.patch.object(usb, 'load_libusb'),
+        mock.patch.object(usb.usb1, 'USBContext', return_value=context),
+        mock.patch.object(usb.usb1, 'hasCapability', return_value=False),
+        mock.patch.object(
+            usb,
+            'find_endpoints',
+            return_value=(
+                1,
+                acl_interface,
+                None,
+                interrupt_in,
+                bulk_in,
+                None,
+                bulk_out,
+                None,
+            ),
+        ),
+        mock.patch.object(
+            usb, 'UsbPacketSource', return_value=mock_source
+        ) as source_cls,
+        mock.patch.object(usb, 'UsbPacketSink', return_value=mock_sink),
+        mock.patch.object(usb, 'UsbTransport', return_value=mock_transport),
+    ):
+        result = await usb.open_usb_transport(spec, **kwargs)
+
+    assert result is mock_transport
+    source_cls.assert_called_once_with(
+        handle,
+        {'vendor_id': 0x0A12, 'product_id': 0x0001},
+        interrupt_in,
+        bulk_in,
+        None,
+        intr_interval=expected_intr_interval,
+        poll_sync=expected_poll_sync,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'spec',
+    [
+        '0+unknown',
+        '0+foo=1',
+        '0+poll_sync=0',
+        '0+poll_sync=-2',
+        '0+poll_sync=abc',
+    ],
+)
+async def test_open_usb_transport_invalid_options(spec):
+    context = mock.Mock()
+    with (
+        mock.patch.object(usb, 'load_libusb'),
+        mock.patch.object(usb.usb1, 'USBContext', return_value=context),
+        pytest.raises(ValueError),
+    ):
+        await usb.open_usb_transport(spec)
+    context.close.assert_called_once()
