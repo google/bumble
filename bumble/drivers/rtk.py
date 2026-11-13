@@ -555,11 +555,9 @@ class Driver(common.Driver):
                 hci.HCI_Reset_Command(),
                 response_timeout=cls.POST_RESET_DELAY,
             )
-            host.ready = True  # Needed to let the host know the controller is ready.
         except asyncio.exceptions.TimeoutError:
             logger.warning("timeout waiting for hci reset, retrying")
             await host.send_sync_command(hci.HCI_Reset_Command())
-            host.ready = True
 
         response = await host.send_sync_command_raw(
             hci.HCI_Read_Local_Version_Information_Command()
