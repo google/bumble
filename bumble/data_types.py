@@ -675,10 +675,23 @@ class LeBluetoothDeviceAddress(hci.Address, core.DataType):
 
     @classmethod
     def from_bytes(cls, data: bytes) -> LeBluetoothDeviceAddress:
-        return cls(hci.Address(data[1:], hci.AddressType(data[0])))
+        # The 6 least significant octets are the address, and the least significant
+        # bit of the most significant octet is the address type (0: public, 1: random)
+        if len(data) != 7:
+            raise ValueError("data must be 7 bytes")
+        return cls(
+            hci.Address(
+                data[:6],
+                (
+                    hci.Address.RANDOM_DEVICE_ADDRESS
+                    if data[6] & 1
+                    else hci.Address.PUBLIC_DEVICE_ADDRESS
+                ),
+            )
+        )
 
     def __bytes__(self) -> bytes:
-        return bytes([self.address_type]) + self.address_bytes
+        return self.address_bytes + bytes([0 if self.is_public else 1])
 
     def __str__(self) -> str:
         return core.DataType.__str__(self)
