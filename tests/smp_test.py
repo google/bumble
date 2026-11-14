@@ -67,6 +67,24 @@ def test_oob_data(crypto_backend):
 
 
 # -----------------------------------------------------------------------------
+def test_oob_data_le_bluetooth_device_address():
+    # LE Bluetooth Device Address: 6 octets of address, followed by one octet
+    # with the address type in its LSB (0: public, 1: random).
+    oob_data = OobData.from_ad(
+        AdvertisingData.from_bytes(bytes.fromhex('081b06050403020101021c00'))
+    )
+    assert oob_data.address == Address(
+        "01:02:03:04:05:06", Address.RANDOM_DEVICE_ADDRESS
+    )
+    assert oob_data.role == LeRole.PERIPHERAL_ONLY
+
+    oob_data = OobData(
+        address=Address("01:02:03:04:05:06", Address.PUBLIC_DEVICE_ADDRESS)
+    )
+    assert bytes(oob_data.to_ad()) == bytes.fromhex('081b06050403020100')
+
+
+# -----------------------------------------------------------------------------
 @pytest.mark.parametrize(
     'ct2, expected',
     [

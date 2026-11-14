@@ -18,6 +18,9 @@
 
 from typing import assert_type
 
+import pytest
+
+from bumble import data_types
 from bumble.core import (
     UUID,
     AdvertisingData,
@@ -25,6 +28,7 @@ from bumble.core import (
     ClassOfDevice,
     get_dict_key_by_value,
 )
+from bumble.hci import Address
 
 
 # -----------------------------------------------------------------------------
@@ -137,6 +141,30 @@ def test_class_of_device() -> None:
         0x123,
     )
     assert str(c2) == "ClassOfDevice(AUDIO,AUDIO_VIDEO/0x123)"
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    'address_type, expected',
+    [
+        (Address.PUBLIC_DEVICE_ADDRESS, '06050403020100'),
+        (Address.RANDOM_DEVICE_ADDRESS, '06050403020101'),
+        (Address.PUBLIC_IDENTITY_ADDRESS, '06050403020100'),
+        (Address.RANDOM_IDENTITY_ADDRESS, '06050403020101'),
+    ],
+)
+def test_le_bluetooth_device_address(address_type, expected) -> None:
+    # See Supplement to the Bluetooth Core Specification, Part A
+    # 1.16 LE BLUETOOTH DEVICE ADDRESS: 6 octets of address, followed by one octet
+    # with the address type in its LSB (0: public, 1: random).
+    address = Address("01:02:03:04:05:06", address_type)
+    assert bytes(data_types.LeBluetoothDeviceAddress(address)) == bytes.fromhex(
+        expected
+    )
+
+    parsed = data_types.LeBluetoothDeviceAddress.from_bytes(bytes.fromhex(expected))
+    assert parsed.address_bytes == address.address_bytes
+    assert parsed.is_public == address.is_public
 
 
 # -----------------------------------------------------------------------------

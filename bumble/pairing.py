@@ -21,7 +21,7 @@ import enum
 import secrets
 from dataclasses import dataclass
 
-from bumble import hci, smp
+from bumble import data_types, hci, smp
 from bumble.core import AdvertisingData, LeRole
 from bumble.smp import (
     OobContext,
@@ -47,7 +47,9 @@ class OobData:
         shared_data_r: bytes | None = None
         for ad_type, ad_data in ad.ad_structures:
             if ad_type == AdvertisingData.LE_BLUETOOTH_DEVICE_ADDRESS:
-                instance.address = hci.Address(ad_data)
+                instance.address = data_types.LeBluetoothDeviceAddress.from_bytes(
+                    ad_data
+                ).clone()
             elif ad_type == AdvertisingData.LE_ROLE:
                 instance.role = LeRole(ad_data[0])
             elif ad_type == AdvertisingData.LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE:
@@ -65,7 +67,10 @@ class OobData:
         ad_structures: list[tuple[int, bytes]] = []
         if self.address is not None:
             ad_structures.append(
-                (AdvertisingData.Type.LE_BLUETOOTH_DEVICE_ADDRESS, bytes(self.address))
+                (
+                    AdvertisingData.Type.LE_BLUETOOTH_DEVICE_ADDRESS,
+                    bytes(data_types.LeBluetoothDeviceAddress(self.address)),
+                )
             )
         if self.role is not None:
             ad_structures.append((AdvertisingData.Type.LE_ROLE, bytes([self.role])))
