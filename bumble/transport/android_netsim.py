@@ -340,10 +340,11 @@ async def open_android_netsim_host_transport_with_channel(
 ):
     # Wrapper for I/O operations
     class HciDevice:
-        def __init__(self, name, variant, manufacturer, hci_device):
+        def __init__(self, name, variant, manufacturer, address, hci_device):
             self.name = name
             self.variant = variant
             self.manufacturer = manufacturer
+            self.address = address
             self.hci_device = hci_device
 
         async def start(self):  # Send the startup info
@@ -356,7 +357,11 @@ async def open_android_netsim_host_transport_with_channel(
                 arch=platform.machine(),
                 variant=self.variant,
             )
-            chip = Chip(kind=ChipKind.BLUETOOTH, manufacturer=self.manufacturer)
+            chip = Chip(
+                kind=ChipKind.BLUETOOTH,
+                manufacturer=self.manufacturer,
+                address=self.address,
+            )
             chip_info = ChipInfo(name=self.name, chip=chip, device_info=device_info)
             logger.debug(f'Sending chip info to netsim: {chip_info}')
             await self.hci_device.write(PacketRequest(initial_info=chip_info))
@@ -389,6 +394,7 @@ async def open_android_netsim_host_transport_with_channel(
         DEFAULT_VARIANT if options is None else options.get('variant', DEFAULT_VARIANT)
     )
     manufacturer = DEFAULT_MANUFACTURER
+    address = '' if options is None else options.get('address', '')
 
     # Connect as a host
     service = PacketStreamerStub(channel)
@@ -396,6 +402,7 @@ async def open_android_netsim_host_transport_with_channel(
         name=name,
         variant=variant,
         manufacturer=manufacturer,
+        address=address,
         hci_device=service.StreamPackets(),
     )
     await hci_device.start()
@@ -447,6 +454,11 @@ async def open_android_netsim_transport(spec: str | None) -> Transport:
         variant=<variant>
           The device info variant field, which may be used to convey a device or
           application type (ex: "virtual-speaker", or "keyboard")
+        address=<bd_addr>
+          The public Bluetooth address that netsim gives the virtual controller
+          (ex: "F0:F1:F2:F3:F4:F5"). Without this option, netsim picks the
+          address. Set it to stand in for a real device whose address a client
+          app has saved.
 
     In `controller` mode:
       The <host>:<port> part is required. <host> may be the address of a local network
@@ -458,13 +470,38 @@ async def open_android_netsim_transport(spec: str | None) -> Transport:
     name=bumble1 --> connect to netsim, using `bumble1` as the "chip" name.
     localhost:8555,name=bumble1 --> connect to netsim on localhost:8555, using
     `bumble1` as the "chip" name.
+    address=F0:F1:F2:F3:F4:F5 --> connect to netsim, and ask for a virtual
+    controller with the public address F0:F1:F2:F3:F4:F5.
     _:8877,mode=controller --> accept connections as a controller on any interface
     on port 8877.
     '''
 
-    # Parse the parameters
+    host, port, options = parse_android_netsim_spec(spec)
+
+    mode = options.get('mode', 'host')
+    if mode == 'host':
+        return await open_android_netsim_host_transport_with_address(
+            host, port, options
+        )
+    if mode == 'controller':
+        if host is None:
+            raise TransportSpecError('<host>:<port> missing')
+        return await open_android_netsim_controller_transport(host, port, options)
+
+    raise TransportSpecError('invalid mode option')
+
+
+# -----------------------------------------------------------------------------
+def parse_android_netsim_spec(
+    spec: str | None,
+) -> tuple[str | None, int, dict[str, str]]:
+    '''Split an android-netsim spec into (host, port, options).
+
+    The first ','-separated item is <host>:<port> only when it has no '='. An
+    option value can contain ':', as in address=F0:F1:F2:F3:F4:F5.
+    '''
     params = spec.split(',') if spec else []
-    if params and ':' in params[0]:
+    if params and ':' in params[0] and '=' not in params[0]:
         # Explicit <host>:<port>
         host, port_str = params[0].rsplit(':', maxsplit=1)
         port = int(port_str)
@@ -481,14 +518,4 @@ async def open_android_netsim_transport(spec: str | None) -> Transport:
         option_name, option_value = param.split('=')
         options[option_name] = option_value
 
-    mode = options.get('mode', 'host')
-    if mode == 'host':
-        return await open_android_netsim_host_transport_with_address(
-            host, port, options
-        )
-    if mode == 'controller':
-        if host is None:
-            raise TransportSpecError('<host>:<port> missing')
-        return await open_android_netsim_controller_transport(host, port, options)
-
-    raise TransportSpecError('invalid mode option')
+    return host, port, options

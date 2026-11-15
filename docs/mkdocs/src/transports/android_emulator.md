@@ -42,3 +42,9 @@ Both the `mode=<host|controller>` and `<hostname>:<port>` parameters are optiona
     connect as a host to Netsim on the discovered gRPC port, using `bumble1234` as the 
     controller instance name.
 
+!!! example Example
+    `android-netsim:address=F0:F1:F2:F3:F4:F5`
+    connect as a host to Netsim on the discovered gRPC port, and ask Netsim to give the
+    virtual controller the public address `F0:F1:F2:F3:F4:F5`. Use this to stand in for
+    a real device whose address a client app has saved.
+
