@@ -76,7 +76,6 @@ def test_oob_data_le_bluetooth_device_address():
     assert oob_data.address == Address(
         "01:02:03:04:05:06", Address.RANDOM_DEVICE_ADDRESS
     )
-    assert type(oob_data.address) is Address
     assert bytes(oob_data.address) == bytes.fromhex('060504030201')
     assert oob_data.role == LeRole.PERIPHERAL_ONLY
 

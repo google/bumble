@@ -47,11 +47,12 @@ class OobData:
         shared_data_r: bytes | None = None
         for ad_type, ad_data in ad.ad_structures:
             if ad_type == AdvertisingData.LE_BLUETOOTH_DEVICE_ADDRESS:
-                # clone() returns a plain hci.Address; the data type would keep the
-                # 7-octet AD layout for bytes() and its own str().
-                instance.address = data_types.LeBluetoothDeviceAddress.from_bytes(
-                    ad_data
-                ).clone()
+                # Store a plain hci.Address: the data type keeps the 7-octet AD
+                # layout for bytes() and its own str().
+                address = data_types.LeBluetoothDeviceAddress.from_bytes(ad_data)
+                instance.address = hci.Address(
+                    address.address_bytes, address.address_type
+                )
             elif ad_type == AdvertisingData.LE_ROLE:
                 instance.role = LeRole(ad_data[0])
             elif ad_type == AdvertisingData.LE_SECURE_CONNECTIONS_CONFIRMATION_VALUE:
