@@ -24,6 +24,7 @@ import logging
 import random
 import secrets
 import struct
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, cast
 
 from bumble import crypto, hci, link, ll, lmp
@@ -237,9 +238,46 @@ class Connection:
     classic_allow_role_switch: bool = False
     ssp_state: SspState = dataclasses.field(default_factory=SspState)
     encryption_request: ll.EncReq | None = None
+    # LE encryption state
+    encrypted: bool = False
+    encryption_parameters: ll.EncReq | None = None
+    hdt_mic_length: int = hci.HdtMicLength.MIC_128_BITS
+    # LE PHY state and preferences (see HCI_LE_Set_PHY)
+    tx_phy: hci.Phy = hci.Phy.LE_1M
+    rx_phy: hci.Phy = hci.Phy.LE_1M
+    all_phys: int = 0
+    tx_phys: int = 0
+    rx_phys: int = 0
+    phy_options: int = 0
+    # LE Data Length, by hci.DataLengthPhys
+    # Local preferred (Max_TX_Octets, Max_TX_Time)
+    data_length_preferences: dict[int, tuple[int, int]] = dataclasses.field(
+        default_factory=dict
+    )
+    # Effective (Max_TX_Octets, Max_TX_Time, Max_RX_Octets, Max_RX_Time)
+    effective_data_lengths: dict[int, tuple[int, int, int, int]] = dataclasses.field(
+        default_factory=dict
+    )
+    # Pending HCI_LE_Read_All_Remote_Features Pages_Requested
+    pending_le_feature_pages_requested: int | None = None
+    # HCI_LE_Set_HDT_Parameters_Test parameters
+    hdt_test_parameters: hci.HCI_LE_Set_HDT_Parameters_Test_Command | None = None
 
     def __post_init__(self) -> None:
         self.assembler = hci.HCI_AclDataPacketAssembler(self.on_acl_pdu)
+        if self.transport == PhysicalTransport.LE:
+            # Initial PHY preferences come from the default PHY and HDT parameters.
+            self.all_phys = self.controller.default_phy['all_phys']
+            self.tx_phys = self.controller.default_phy['tx_phys']
+            self.rx_phys = self.controller.default_phy['rx_phys']
+            self.phy_options = int(
+                hci.PhyOptions.from_hdt_preferences(
+                    rates=self.controller.hdt_preferred_acl_rates,
+                    mic_length=self.controller.hdt_preferred_mic_length,
+                    packet_format=self.controller.hdt_preferred_packet_format,
+                )
+            )
+            self.hdt_mic_length = self.controller.hdt_preferred_mic_length
 
     def on_hci_acl_data_packet(self, packet: hci.HCI_AclDataPacket) -> None:
         self.assembler.feed_packet(packet)
@@ -367,6 +405,21 @@ class Controller:
         hci.HCI_LE_READ_TRANSMIT_POWER_COMMAND,
         hci.HCI_LE_SET_PRIVACY_MODE_COMMAND,
         hci.HCI_LE_READ_BUFFER_SIZE_V2_COMMAND,
+        hci.HCI_LE_READ_ALL_LOCAL_SUPPORTED_FEATURES_COMMAND,
+        hci.HCI_LE_READ_ALL_REMOTE_FEATURES_COMMAND,
+        hci.HCI_LE_SET_EVENT_MASK_V2_COMMAND,
+        hci.HCI_REFRESH_ENCRYPTION_KEY_COMMAND,
+        hci.HCI_REFRESH_ENCRYPTION_KEY_V2_COMMAND,
+        hci.HCI_LE_ENABLE_ENCRYPTION_V2_COMMAND,
+        hci.HCI_LE_SET_DATA_LENGTH_V2_COMMAND,
+        hci.HCI_LE_READ_SUGGESTED_DEFAULT_DATA_LENGTH_V2_COMMAND,
+        hci.HCI_LE_WRITE_SUGGESTED_DEFAULT_DATA_LENGTH_V2_COMMAND,
+        hci.HCI_LE_READ_MAXIMUM_DATA_LENGTH_V2_COMMAND,
+        hci.HCI_LE_SET_CIG_PARAMETERS_V2_COMMAND,
+        hci.HCI_LE_CREATE_CIS_V2_COMMAND,
+        hci.HCI_LE_CREATE_BIG_V2_COMMAND,
+        hci.HCI_LE_SET_HDT_DEFAULT_PARAMETERS_COMMAND,
+        hci.HCI_LE_SET_HDT_PARAMETERS_TEST_COMMAND,
     }
     le_event_mask: int = 0
     le_features: hci.LeFeatureMask = (
@@ -384,6 +437,13 @@ class Controller:
         | hci.LeFeatureMask.MINIMUM_NUMBER_OF_USED_CHANNELS_PROCEDURE
         | hci.LeFeatureMask.LE_EXTENDED_ADVERTISING
         | hci.LeFeatureMask.LE_PERIODIC_ADVERTISING
+        | hci.LeFeatureMask.LL_EXTENDED_FEATURE_SET
+        | hci.LeFeatureMask.HIGH_DATA_THROUGHPUT
+        | hci.LeFeatureMask.RECEIVE_HDT6_RATE
+        | hci.LeFeatureMask.TRANSMIT_HDT6_RATE
+        | hci.LeFeatureMask.RECEIVE_HDT7_5_RATE
+        | hci.LeFeatureMask.TRANSMIT_HDT7_5_RATE
+        | hci.LeFeatureMask.HDT_PACKET_FORMAT_1
     )
     le_states: bytes = bytes.fromhex('ffff3fffff030000')
     advertising_channel_tx_power: int = 0
@@ -396,6 +456,19 @@ class Controller:
     supported_max_rx_time: int = 10000
     suggested_max_tx_octets: int = 27
     suggested_max_tx_time: int = 0x0148
+    # LE HDT PHY data length limits
+    hdt_supported_max_tx_octets: int = 0x1FEF
+    hdt_supported_max_tx_time: int = 0x4290
+    hdt_supported_max_rx_octets: int = 0x1FEF
+    hdt_supported_max_rx_time: int = 0x4290
+    hdt_suggested_max_tx_octets: int = 0x1FEF
+    hdt_suggested_max_tx_time: int = 0x4290
+    supported_max_tx_payload_window_size: int = 1
+    supported_max_rx_payload_window_size: int = 1
+    # HCI_LE_Set_HDT_Default_Parameters
+    hdt_preferred_mic_length: int = hci.HdtMicLength.MIC_128_BITS
+    hdt_preferred_packet_format: int = hci.HdtPacketFormat.ANY
+    hdt_preferred_acl_rates: int = hci.HdtRate.ALL
     default_phy: dict[str, int]
     le_scan_type: int = 0
     le_scan_interval: int = 0x10
@@ -441,10 +514,16 @@ class Controller:
         self.established_periodic_advertising_syncs: dict[
             int, tuple[hci.Address, int]
         ] = {}
+        # The default before HCI_LE_Set_Default_PHY is first issued is for All_PHYs to
+        # equal 0x00 and for TX_PHYs and RX_PHYs to both equal 0x03 if the device
+        # supports the LE 2M PHY and 0x01 otherwise.
+        default_phys = int(
+            self.supported_le_phys & (hci.PhyBit.LE_1M | hci.PhyBit.LE_2M)
+        )
         self.default_phy = {
             'all_phys': 0,
-            'tx_phys': 0,
-            'rx_phys': 0,
+            'tx_phys': default_phys,
+            'rx_phys': default_phys,
         }
         self.le_legacy_advertiser = LegacyAdvertiser(self)
 
@@ -517,6 +596,57 @@ class Controller:
         return self.lmp_features.to_bytes(
             (self.lmp_features_max_page_number + 1) * 8, 'little'
         )
+
+    # LE Features page 0 has 8 octets, pages 1 to 10 have 24 octets each.
+    LE_FEATURES_PAGE_0_SIZE = 8
+    LE_FEATURES_PAGE_SIZE = 24
+    LE_FEATURES_MAX_PAGE = hci.LE_FEATURES_MAX_PAGE
+
+    @classmethod
+    def le_features_size(cls, max_page: int) -> int:
+        '''Size, in octets, of the LE features pages 0 to max_page.'''
+        return cls.LE_FEATURES_PAGE_0_SIZE + max_page * cls.LE_FEATURES_PAGE_SIZE
+
+    @property
+    def le_features_max_page(self) -> int:
+        bit_length = self.le_features.value.bit_length()
+        if bit_length <= self.LE_FEATURES_PAGE_0_SIZE * 8:
+            return 0
+        return 1 + (bit_length - 1 - self.LE_FEATURES_PAGE_0_SIZE * 8) // (
+            self.LE_FEATURES_PAGE_SIZE * 8
+        )
+
+    def le_features_bytes(self, max_page: int = 0) -> bytes:
+        '''LE features pages 0 to max_page, as little-endian bytes.'''
+        size = self.le_features_size(max_page)
+        return (self.le_features.value & ((1 << (size * 8)) - 1)).to_bytes(
+            size, 'little'
+        )
+
+    @property
+    def supported_le_phys(self) -> hci.PhyBit:
+        phys = hci.PhyBit.LE_1M
+        if self.le_features & hci.LeFeatureMask.LE_2M_PHY:
+            phys |= hci.PhyBit.LE_2M
+        if self.le_features & hci.LeFeatureMask.LE_CODED_PHY:
+            phys |= hci.PhyBit.LE_CODED
+        if self.le_features & hci.LeFeatureMask.HIGH_DATA_THROUGHPUT:
+            phys |= hci.PhyBit.LE_HDT
+        return phys
+
+    @property
+    def supports_hdt(self) -> bool:
+        return bool(self.le_features & hci.LeFeatureMask.HIGH_DATA_THROUGHPUT)
+
+    def is_le_event_unmasked(self, subevent_code: int) -> bool:
+        return bool(
+            self.le_event_mask
+            & (1 << hci.HCI_LE_Set_Event_Mask_V2_Command.event_bit(subevent_code))
+        )
+
+    def is_event_page_2_unmasked(self, event_code: int) -> bool:
+        # The bit number for each event code on page 2 is 64 less than the event code.
+        return bool(self.event_mask_page_2 & (1 << (event_code - 64)))
 
     # Packet Sink protocol (packets coming from the host via HCI)
     def on_packet(self, packet: bytes) -> None:
@@ -678,9 +808,7 @@ class Controller:
                 self.on_le_encryption_change(connection, error_code)
             case ll.FeatureReq() | ll.PeripheralFeatureReq():
                 connection.send_ll_control_pdu(
-                    ll.FeatureRsp(
-                        feature_set=self.le_features.value.to_bytes(8, 'little')
-                    )
+                    ll.FeatureRsp(feature_set=self.le_features_bytes())
                 )
             case ll.FeatureRsp(feature_set):
                 self.send_hci_packet(
@@ -690,6 +818,24 @@ class Controller:
                         le_features=feature_set,
                     )
                 )
+            case ll.FeatureExtReq():
+                max_page = self.le_features_max_page
+                connection.send_ll_control_pdu(
+                    ll.FeatureExtRsp(
+                        max_page=max_page,
+                        feature_set=self.le_features_bytes(max_page),
+                    )
+                )
+            case ll.FeatureExtRsp():
+                self.on_le_all_remote_features(connection, packet)
+            case ll.LengthReq():
+                self.on_le_length_request(connection, packet)
+            case ll.LengthRsp():
+                self.on_le_length_response(connection, packet)
+            case ll.PhyReq():
+                self.on_le_phy_request(connection, packet)
+            case ll.PhyUpdateInd():
+                self.on_le_phy_update_indication(connection, packet)
             case ll.ConnectionUpdateInd():
                 self.send_hci_packet(
                     hci.HCI_LE_Connection_Update_Complete_Event(
@@ -1098,12 +1244,306 @@ class Controller:
             self.on_le_encryption_change(connection, hci.HCI_ErrorCode.SUCCESS)
 
     def on_le_encryption_change(self, connection: Connection, status: int) -> None:
-        self.send_hci_packet(
-            hci.HCI_Encryption_Change_Event(
-                status=status,
-                connection_handle=connection.handle,
-                encryption_enabled=int(status == hci.HCI_ErrorCode.SUCCESS),
+        if status == hci.HCI_ErrorCode.SUCCESS and connection.encrypted:
+            # The connection was already encrypted: this is a key refresh.
+            self.send_encryption_key_refresh_complete_event(connection, status)
+            return
+
+        if status == hci.HCI_ErrorCode.SUCCESS:
+            connection.encrypted = True
+        self.send_encryption_change_event(connection, status)
+
+    def le_mic_length(self, connection: Connection) -> hci.HdtMicLength:
+        '''
+        Length of the MIC used on an (encrypted) LE connection.
+        '''
+        if hci.Phy.LE_HDT in (connection.tx_phy, connection.rx_phy):
+            return hci.HdtMicLength(connection.hdt_mic_length)
+        return hci.HdtMicLength.MIC_32_BITS
+
+    def send_encryption_change_event(self, connection: Connection, status: int) -> None:
+        '''
+        Send the highest version of the HCI_Encryption_Change event unmasked by the
+        host (Vol 4, Part E - 7.7.8).
+        '''
+        encryption_enabled = int(status == hci.HCI_ErrorCode.SUCCESS)
+        if self.is_event_page_2_unmasked(hci.HCI_ENCRYPTION_CHANGE_V3_EVENT):
+            self.send_hci_packet(
+                hci.HCI_Encryption_Change_V3_Event(
+                    status=status,
+                    connection_handle=connection.handle,
+                    encryption_enabled=encryption_enabled,
+                    encryption_key_size=16,
+                    mic_length=self.le_mic_length(connection),
+                    key_schedule_enabled=hci.KeyScheduleEnabled.NOT_USED,
+                    key_schedule_debug_flag=0,
+                )
             )
+        elif self.is_event_page_2_unmasked(hci.HCI_ENCRYPTION_CHANGE_V2_EVENT):
+            self.send_hci_packet(
+                hci.HCI_Encryption_Change_V2_Event(
+                    status=status,
+                    connection_handle=connection.handle,
+                    encryption_enabled=encryption_enabled,
+                    encryption_key_size=16,
+                )
+            )
+        else:
+            self.send_hci_packet(
+                hci.HCI_Encryption_Change_Event(
+                    status=status,
+                    connection_handle=connection.handle,
+                    encryption_enabled=encryption_enabled,
+                )
+            )
+
+    def send_encryption_key_refresh_complete_event(
+        self, connection: Connection, status: int
+    ) -> None:
+        '''
+        Send the highest version of the HCI_Encryption_Key_Refresh_Complete event
+        unmasked by the host (Vol 4, Part E - 7.7.39).
+        '''
+        if self.is_event_page_2_unmasked(
+            hci.HCI_ENCRYPTION_KEY_REFRESH_COMPLETE_V2_EVENT
+        ):
+            self.send_hci_packet(
+                hci.HCI_Encryption_Key_Refresh_Complete_V2_Event(
+                    status=status,
+                    connection_handle=connection.handle,
+                    mic_length=self.le_mic_length(connection),
+                    key_schedule_enabled=hci.KeyScheduleEnabled.NOT_USED,
+                    key_schedule_debug_flag=0,
+                )
+            )
+        else:
+            self.send_hci_packet(
+                hci.HCI_Encryption_Key_Refresh_Complete_Event(
+                    status=status, connection_handle=connection.handle
+                )
+            )
+
+    def on_le_all_remote_features(
+        self, connection: Connection, packet: ll.FeatureExtRsp
+    ) -> None:
+        if (pages_requested := connection.pending_le_feature_pages_requested) is None:
+            logger.warning('unexpected LL_FEATURE_EXT_RSP')
+            return
+        connection.pending_le_feature_pages_requested = None
+
+        max_valid_page = min(pages_requested, packet.max_page)
+        valid_size = self.le_features_size(max_valid_page)
+        self.send_hci_packet(
+            hci.HCI_LE_Read_All_Remote_Features_Complete_Event(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                connection_handle=connection.handle,
+                max_remote_page=packet.max_page,
+                max_valid_page=max_valid_page,
+                le_features=packet.feature_set[:valid_size].ljust(
+                    self.le_features_size(self.LE_FEATURES_MAX_PAGE), b'\x00'
+                ),
+            )
+        )
+
+    ############################################################
+    # LE Data Length
+    ############################################################
+    def le_supported_data_length(self, phys: int) -> tuple[int, int, int, int]:
+        '''
+        Supported (Max_TX_Octets, Max_TX_Time, Max_RX_Octets, Max_RX_Time).
+        '''
+        if phys == hci.DataLengthPhys.LE_HDT:
+            return (
+                self.hdt_supported_max_tx_octets,
+                self.hdt_supported_max_tx_time,
+                self.hdt_supported_max_rx_octets,
+                self.hdt_supported_max_rx_time,
+            )
+        return (
+            self.supported_max_tx_octets,
+            self.supported_max_tx_time,
+            self.supported_max_rx_octets,
+            self.supported_max_rx_time,
+        )
+
+    def le_suggested_data_length(self, phys: int) -> tuple[int, int]:
+        if phys == hci.DataLengthPhys.LE_HDT:
+            return (self.hdt_suggested_max_tx_octets, self.hdt_suggested_max_tx_time)
+        return (self.suggested_max_tx_octets, self.suggested_max_tx_time)
+
+    def le_local_data_length(
+        self, connection: Connection, phys: int
+    ) -> tuple[int, int, int, int]:
+        '''
+        Local (Max_TX_Octets, Max_TX_Time, Max_RX_Octets, Max_RX_Time) of a
+        connection.
+        '''
+        max_tx_octets, max_tx_time, max_rx_octets, max_rx_time = (
+            self.le_supported_data_length(phys)
+        )
+        tx_octets, tx_time = connection.data_length_preferences.get(
+            phys, self.le_suggested_data_length(phys)
+        )
+        return (
+            min(tx_octets, max_tx_octets),
+            min(tx_time, max_tx_time),
+            max_rx_octets,
+            max_rx_time,
+        )
+
+    def send_le_length_pdu(
+        self, connection: Connection, phys: int, response: bool
+    ) -> None:
+        tx_octets, tx_time, rx_octets, rx_time = self.le_local_data_length(
+            connection, phys
+        )
+        pdu_class = ll.LengthRsp if response else ll.LengthReq
+        connection.send_ll_control_pdu(
+            pdu_class(
+                max_rx_octets=rx_octets,
+                max_rx_time=rx_time,
+                max_tx_octets=tx_octets,
+                max_tx_time=tx_time,
+                phys=phys,
+            )
+        )
+
+    def update_le_effective_data_length(
+        self, connection: Connection, packet: ll.LengthReq | ll.LengthRsp
+    ) -> None:
+        tx_octets, tx_time, rx_octets, rx_time = self.le_local_data_length(
+            connection, packet.phys
+        )
+        effective = (
+            min(tx_octets, packet.max_rx_octets),
+            min(tx_time, packet.max_rx_time),
+            min(rx_octets, packet.max_tx_octets),
+            min(rx_time, packet.max_tx_time),
+        )
+        if connection.effective_data_lengths.get(packet.phys) == effective:
+            # This event shall not be generated if the values have not changed.
+            return
+        connection.effective_data_lengths[packet.phys] = effective
+        self.send_le_data_length_change_event(connection, packet.phys, *effective)
+
+    def send_le_data_length_change_event(  # pylint: disable=too-many-positional-arguments
+        self,
+        connection: Connection,
+        phys: int,
+        max_tx_octets: int,
+        max_tx_time: int,
+        max_rx_octets: int,
+        max_rx_time: int,
+    ) -> None:
+        '''
+        Send the highest version of the HCI_LE_Data_Length_Change event unmasked by
+        the host (Vol 4, Part E - 7.7.65.7).
+        '''
+        if self.is_le_event_unmasked(hci.HCI_LE_DATA_LENGTH_CHANGE_V2_EVENT):
+            self.send_hci_packet(
+                hci.HCI_LE_Data_Length_Change_V2_Event(
+                    connection_handle=connection.handle,
+                    max_tx_octets=max_tx_octets,
+                    max_tx_time=max_tx_time,
+                    max_rx_octets=max_rx_octets,
+                    max_rx_time=max_rx_time,
+                    phys=phys,
+                )
+            )
+        elif phys == hci.DataLengthPhys.GFSK:
+            # Without PHYS, the parameters apply to GFSK PHYs.
+            self.send_hci_packet(
+                hci.HCI_LE_Data_Length_Change_Event(
+                    connection_handle=connection.handle,
+                    max_tx_octets=max_tx_octets,
+                    max_tx_time=max_tx_time,
+                    max_rx_octets=max_rx_octets,
+                    max_rx_time=max_rx_time,
+                )
+            )
+
+    def on_le_length_request(
+        self, connection: Connection, packet: ll.LengthReq
+    ) -> None:
+        self.send_le_length_pdu(connection, packet.phys, response=True)
+        self.update_le_effective_data_length(connection, packet)
+
+    def on_le_length_response(
+        self, connection: Connection, packet: ll.LengthRsp
+    ) -> None:
+        self.update_le_effective_data_length(connection, packet)
+
+    ############################################################
+    # LE PHY
+    ############################################################
+    # Order in which PHYs are selected when several are possible.
+    LE_PHY_SELECTION_ORDER = (
+        hci.Phy.LE_HDT,
+        hci.Phy.LE_2M,
+        hci.Phy.LE_1M,
+        hci.Phy.LE_CODED,
+    )
+
+    def le_preferred_phys(self, connection: Connection) -> tuple[int, int]:
+        '''
+        PHYs, as (TX_PHYs, RX_PHYs) bit fields, that the local Controller may use on
+        a connection.
+        '''
+        supported = int(self.supported_le_phys)
+        tx_phys = supported if connection.all_phys & 1 else connection.tx_phys
+        rx_phys = supported if connection.all_phys & 2 else connection.rx_phys
+        return (tx_phys & supported, rx_phys & supported)
+
+    def select_le_phy(self, phys: int, current: hci.Phy) -> hci.Phy:
+        for phy in self.LE_PHY_SELECTION_ORDER:
+            if phys & (1 << hci.HCI_LE_PHY_TYPE_TO_BIT[phy]):
+                return phy
+        return current
+
+    def set_le_connection_phy(
+        self,
+        connection: Connection,
+        phy_c_to_p: int,
+        phy_p_to_c: int,
+        always_notify: bool,
+    ) -> None:
+        if connection.role == hci.Role.CENTRAL:
+            tx_phy, rx_phy = hci.Phy(phy_c_to_p), hci.Phy(phy_p_to_c)
+        else:
+            tx_phy, rx_phy = hci.Phy(phy_p_to_c), hci.Phy(phy_c_to_p)
+        changed = (tx_phy, rx_phy) != (connection.tx_phy, connection.rx_phy)
+        connection.tx_phy, connection.rx_phy = tx_phy, rx_phy
+        if changed or always_notify:
+            self.send_hci_packet(
+                hci.HCI_LE_PHY_Update_Complete_Event(
+                    status=hci.HCI_ErrorCode.SUCCESS,
+                    connection_handle=connection.handle,
+                    tx_phy=tx_phy,
+                    rx_phy=rx_phy,
+                )
+            )
+
+    def on_le_phy_request(self, connection: Connection, packet: ll.PhyReq) -> None:
+        local_tx_phys, local_rx_phys = self.le_preferred_phys(connection)
+        # The peer transmits on what we receive, and receives on what we transmit.
+        rx_phy = self.select_le_phy(packet.tx_phys & local_rx_phys, connection.rx_phy)
+        tx_phy = self.select_le_phy(packet.rx_phys & local_tx_phys, connection.tx_phy)
+        if connection.role == hci.Role.CENTRAL:
+            phy_c_to_p, phy_p_to_c = tx_phy, rx_phy
+        else:
+            phy_c_to_p, phy_p_to_c = rx_phy, tx_phy
+        connection.send_ll_control_pdu(
+            ll.PhyUpdateInd(phy_c_to_p=phy_c_to_p, phy_p_to_c=phy_p_to_c)
+        )
+        self.set_le_connection_phy(
+            connection, phy_c_to_p, phy_p_to_c, always_notify=False
+        )
+
+    def on_le_phy_update_indication(
+        self, connection: Connection, packet: ll.PhyUpdateInd
+    ) -> None:
+        self.set_le_connection_phy(
+            connection, packet.phy_c_to_p, packet.phy_p_to_c, always_notify=True
         )
 
     def on_link_acl_data(
@@ -1266,27 +1706,56 @@ class Controller:
             if cis_link.cis_id == cis_id and cis_link.cig_id == cig_id
         )
 
-        self.send_hci_packet(
-            hci.HCI_LE_CIS_Established_Event(
-                status=hci.HCI_ErrorCode.SUCCESS,
-                connection_handle=cis_link.handle,
-                # CIS parameters are ignored.
-                cig_sync_delay=0,
-                cis_sync_delay=0,
-                transport_latency_c_to_p=0,
-                transport_latency_p_to_c=0,
-                phy_c_to_p=1,
-                phy_p_to_c=1,
-                nse=0,
-                bn_c_to_p=0,
-                bn_p_to_c=0,
-                ft_c_to_p=0,
-                ft_p_to_c=0,
-                max_pdu_c_to_p=0,
-                max_pdu_p_to_c=0,
-                iso_interval=0,
-            )
+        # CIS parameters are ignored.
+        parameters: dict[str, Any] = dict(  # pylint: disable=use-dict-literal
+            status=hci.HCI_ErrorCode.SUCCESS,
+            connection_handle=cis_link.handle,
+            cig_sync_delay=0,
+            cis_sync_delay=0,
+            transport_latency_c_to_p=0,
+            transport_latency_p_to_c=0,
+            phy_c_to_p=hci.Phy.LE_1M,
+            phy_p_to_c=hci.Phy.LE_1M,
+            nse=0,
+            bn_c_to_p=0,
+            bn_p_to_c=0,
+            ft_c_to_p=0,
+            ft_p_to_c=0,
+            max_pdu_c_to_p=0,
+            max_pdu_p_to_c=0,
+            iso_interval=0,
         )
+        v2_parameters: dict[str, Any] = dict(  # pylint: disable=use-dict-literal
+            sub_interval=0,
+            max_sdu_c_to_p=0,
+            max_sdu_p_to_c=0,
+            sdu_interval_c_to_p=0,
+            sdu_interval_p_to_c=0,
+            framing=0,
+        )
+        # Send the highest version of the event unmasked by the host.
+        if self.is_le_event_unmasked(hci.HCI_LE_CIS_ESTABLISHED_V3_EVENT):
+            encrypted = bool(
+                cis_link.acl_connection and cis_link.acl_connection.encrypted
+            )
+            self.send_hci_packet(
+                hci.HCI_LE_CIS_Established_V3_Event(
+                    **parameters,
+                    **v2_parameters,
+                    rates_c_to_p=0,
+                    rates_p_to_c=0,
+                    config_id=0,
+                    tl_group_id=0,
+                    encryption_enabled=int(encrypted),
+                    mic_length=hci.HdtMicLength.MIC_32_BITS,
+                )
+            )
+        elif self.is_le_event_unmasked(hci.HCI_LE_CIS_ESTABLISHED_V2_EVENT):
+            self.send_hci_packet(
+                hci.HCI_LE_CIS_Established_V2_Event(**parameters, **v2_parameters)
+            )
+        else:
+            self.send_hci_packet(hci.HCI_LE_CIS_Established_Event(**parameters))
 
     def on_le_cis_disconnected(self, cig_id: int, cis_id: int) -> None:
         '''
@@ -2985,7 +3454,7 @@ class Controller:
         '''
         return hci.HCI_LE_Read_Local_Supported_Features_ReturnParameters(
             status=hci.HCI_ErrorCode.SUCCESS,
-            le_features=self.le_features.value.to_bytes(8, 'little'),
+            le_features=self.le_features_bytes(),
         )
 
     def on_hci_le_read_all_local_supported_features_command(
@@ -2997,9 +3466,20 @@ class Controller:
         '''
         return hci.HCI_LE_Read_All_Local_Supported_Features_ReturnParameters(
             status=hci.HCI_ErrorCode.SUCCESS,
-            max_page=0,
-            le_features=self.le_features.value.to_bytes(248, 'little'),
+            max_page=self.le_features_max_page,
+            le_features=self.le_features_bytes(self.LE_FEATURES_MAX_PAGE),
         )
+
+    def on_hci_le_set_event_mask_v2_command(
+        self, command: hci.HCI_LE_Set_Event_Mask_V2_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.1 LE Set Event Mask Command
+        '''
+        self.le_event_mask = int.from_bytes(
+            command.le_event_mask, byteorder='little', signed=False
+        )
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_le_set_random_address_command(
         self, command: hci.HCI_LE_Set_Random_Address_Command
@@ -3244,14 +3724,48 @@ class Controller:
 
         if connection.role == hci.Role.CENTRAL:
             connection.send_ll_control_pdu(
-                ll.FeatureReq(feature_set=self.le_features.value.to_bytes(8, 'little'))
+                ll.FeatureReq(feature_set=self.le_features_bytes())
             )
         else:
             connection.send_ll_control_pdu(
-                ll.PeripheralFeatureReq(
-                    feature_set=self.le_features.value.to_bytes(8, 'little')
-                )
+                ll.PeripheralFeatureReq(feature_set=self.le_features_bytes())
             )
+        return None
+
+    def on_hci_le_read_all_remote_features_command(
+        self, command: hci.HCI_LE_Read_All_Remote_Features_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.129 LE Read All Remote Features Command
+        '''
+        if not (
+            connection := self.find_le_connection_by_handle(command.connection_handle)
+        ):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+            return None
+
+        if command.pages_requested > self.LE_FEATURES_MAX_PAGE:
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR, command.op_code
+            )
+            return None
+
+        if connection.pending_le_feature_pages_requested is not None:
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR, command.op_code
+            )
+            return None
+
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        connection.pending_le_feature_pages_requested = command.pages_requested
+        max_page = self.le_features_max_page
+        connection.send_ll_control_pdu(
+            ll.FeatureExtReq(
+                max_page=max_page, feature_set=self.le_features_bytes(max_page)
+            )
+        )
         return None
 
     def on_hci_le_rand_command(
@@ -3271,6 +3785,47 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.24 LE Enable Encryption Command
         '''
+        self._le_enable_encryption(command, hci.HdtMicLength.MIC_128_BITS)
+
+    def on_hci_le_enable_encryption_v2_command(
+        self, command: hci.HCI_LE_Enable_Encryption_V2_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.24 LE Enable Encryption Command
+        '''
+        if command.hdt_mic_length not in (
+            hci.HdtMicLength.MIC_64_BITS,
+            hci.HdtMicLength.MIC_128_BITS,
+        ) or command.encryption_type not in (
+            hci.EncryptionType.LONG_TERM_KEY,
+            hci.EncryptionType.OPPORTUNISTIC_ENCRYPTION_KEY_SCHEDULE,
+        ):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR, command.op_code
+            )
+            return
+
+        if (
+            command.encryption_type
+            == hci.EncryptionType.OPPORTUNISTIC_ENCRYPTION_KEY_SCHEDULE
+        ):
+            # Encryption Key Schedule is not supported.
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNSUPPORTED_FEATURE_OR_PARAMETER_VALUE_ERROR,
+                command.op_code,
+            )
+            return
+
+        self._le_enable_encryption(command, command.hdt_mic_length)
+
+    def _le_enable_encryption(
+        self,
+        command: (
+            hci.HCI_LE_Enable_Encryption_Command
+            | hci.HCI_LE_Enable_Encryption_V2_Command
+        ),
+        hdt_mic_length: int,
+    ) -> None:
         if not self.link:
             return
 
@@ -3282,19 +3837,81 @@ class Controller:
             or connection.transport != PhysicalTransport.LE
         ):
             logger.warning('connection not found')
-            return self._send_hci_command_status(
+            self._send_hci_command_status(
                 hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR, command.op_code
             )
+            return
 
-        connection.send_ll_control_pdu(
-            ll.EncReq(
-                rand=command.random_number,
-                ediv=command.encrypted_diversifier,
-                ltk=command.long_term_key,
-            ),
+        connection.hdt_mic_length = hdt_mic_length
+        connection.encryption_parameters = ll.EncReq(
+            rand=command.random_number,
+            ediv=command.encrypted_diversifier,
+            ltk=command.long_term_key,
         )
+        connection.send_ll_control_pdu(connection.encryption_parameters)
 
         self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+
+    def on_hci_refresh_encryption_key_command(
+        self, command: hci.HCI_Refresh_Encryption_Key_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.3.57 Refresh Encryption Key Command
+        '''
+        self._refresh_encryption_key(command, None)
+
+    def on_hci_refresh_encryption_key_v2_command(
+        self, command: hci.HCI_Refresh_Encryption_Key_V2_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.3.57 Refresh Encryption Key Command
+        '''
+        if command.hdt_mic_length not in (
+            hci.HdtMicLength.MIC_64_BITS,
+            hci.HdtMicLength.MIC_128_BITS,
+        ):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR, command.op_code
+            )
+            return
+        self._refresh_encryption_key(command, command.hdt_mic_length)
+
+    def _refresh_encryption_key(
+        self,
+        command: (
+            hci.HCI_Refresh_Encryption_Key_Command
+            | hci.HCI_Refresh_Encryption_Key_V2_Command
+        ),
+        hdt_mic_length: int | None,
+    ) -> None:
+        if not (
+            connection := self.find_le_connection_by_handle(command.connection_handle)
+        ):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+            return
+
+        if not connection.encrypted:
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.INSUFFICIENT_SECURITY_ERROR, command.op_code
+            )
+            return
+
+        if (
+            connection.role != hci.Role.CENTRAL
+            or connection.encryption_parameters is None
+        ):
+            # Only the Central can initiate the Encryption Refresh procedure.
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR, command.op_code
+            )
+            return
+
+        if hdt_mic_length is not None:
+            connection.hdt_mic_length = hdt_mic_length
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        connection.send_ll_control_pdu(connection.encryption_parameters)
 
     def on_hci_le_long_term_key_request_reply_command(
         self, command: hci.HCI_LE_Long_Term_Key_Request_Reply_Command
@@ -3368,6 +3985,125 @@ class Controller:
             '<HH', command.parameters[:4]
         )
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def _check_data_length_phys(self, phys: int) -> hci.HCI_ErrorCode:
+        if phys == hci.DataLengthPhys.GFSK:
+            return hci.HCI_ErrorCode.SUCCESS
+        if phys == hci.DataLengthPhys.LE_HDT:
+            return (
+                hci.HCI_ErrorCode.SUCCESS
+                if self.supports_hdt
+                else hci.HCI_ErrorCode.UNSUPPORTED_FEATURE_OR_PARAMETER_VALUE_ERROR
+            )
+        return hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR
+
+    def _check_data_length(
+        self, phys: int, tx_octets: int, tx_time: int
+    ) -> hci.HCI_ErrorCode:
+        if (status := self._check_data_length_phys(phys)) != hci.HCI_ErrorCode.SUCCESS:
+            return status
+        if phys == hci.DataLengthPhys.LE_HDT:
+            valid = 0x001B <= tx_octets <= 0x1FEF and 0x0109 <= tx_time <= 0x4290
+        else:
+            valid = 0x001B <= tx_octets <= 0x00FB and 0x0148 <= tx_time <= 0x4290
+        return (
+            hci.HCI_ErrorCode.SUCCESS
+            if valid
+            else hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR
+        )
+
+    def on_hci_le_read_suggested_default_data_length_v2_command(
+        self, command: hci.HCI_LE_Read_Suggested_Default_Data_Length_V2_Command
+    ) -> (
+        hci.HCI_LE_Read_Suggested_Default_Data_Length_ReturnParameters
+        | hci.HCI_StatusReturnParameters
+    ):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.34 LE Read Suggested Default Data Length
+        Command
+        '''
+        if (
+            status := self._check_data_length_phys(command.phys)
+        ) != hci.HCI_ErrorCode.SUCCESS:
+            return hci.HCI_StatusReturnParameters(status)
+
+        suggested_max_tx_octets, suggested_max_tx_time = self.le_suggested_data_length(
+            command.phys
+        )
+        return hci.HCI_LE_Read_Suggested_Default_Data_Length_ReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            suggested_max_tx_octets=suggested_max_tx_octets,
+            suggested_max_tx_time=suggested_max_tx_time,
+        )
+
+    def on_hci_le_write_suggested_default_data_length_v2_command(
+        self, command: hci.HCI_LE_Write_Suggested_Default_Data_Length_V2_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.35 LE Write Suggested Default Data Length
+        Command
+        '''
+        if (
+            status := self._check_data_length(
+                command.phys,
+                command.suggested_max_tx_octets,
+                command.suggested_max_tx_time,
+            )
+        ) != hci.HCI_ErrorCode.SUCCESS:
+            return hci.HCI_StatusReturnParameters(status)
+
+        if command.phys == hci.DataLengthPhys.LE_HDT:
+            self.hdt_suggested_max_tx_octets = command.suggested_max_tx_octets
+            self.hdt_suggested_max_tx_time = command.suggested_max_tx_time
+        else:
+            self.suggested_max_tx_octets = command.suggested_max_tx_octets
+            self.suggested_max_tx_time = command.suggested_max_tx_time
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def on_hci_le_set_data_length_command(
+        self, command: hci.HCI_LE_Set_Data_Length_Command
+    ) -> hci.HCI_StatusAndConnectionHandleReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.33 LE Set Data Length Command
+        '''
+        return self._le_set_data_length(
+            command.connection_handle,
+            command.tx_octets,
+            command.tx_time,
+            hci.DataLengthPhys.GFSK,
+        )
+
+    def on_hci_le_set_data_length_v2_command(
+        self, command: hci.HCI_LE_Set_Data_Length_V2_Command
+    ) -> hci.HCI_StatusAndConnectionHandleReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.33 LE Set Data Length Command
+        '''
+        return self._le_set_data_length(
+            command.connection_handle,
+            command.tx_octets,
+            command.tx_time,
+            command.phys,
+        )
+
+    def _le_set_data_length(
+        self, connection_handle: int, tx_octets: int, tx_time: int, phys: int
+    ) -> hci.HCI_StatusAndConnectionHandleReturnParameters:
+        if not (connection := self.find_le_connection_by_handle(connection_handle)):
+            status = hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR
+        else:
+            status = self._check_data_length(phys, tx_octets, tx_time)
+
+        if connection and status == hci.HCI_ErrorCode.SUCCESS:
+            connection.data_length_preferences[phys] = (tx_octets, tx_time)
+            # Start the Data Length Update procedure after completing the command.
+            asyncio.get_running_loop().call_soon(
+                self.send_le_length_pdu, connection, phys, False
+            )
+
+        return hci.HCI_StatusAndConnectionHandleReturnParameters(
+            status=status, connection_handle=connection_handle
+        )
 
     def on_hci_le_read_local_p_256_public_key_command(
         self, _command: hci.HCI_LE_Read_Local_P_256_Public_Key_Command
@@ -3454,18 +4190,90 @@ class Controller:
             supported_max_rx_time=self.supported_max_rx_time,
         )
 
+    def on_hci_le_read_maximum_data_length_v2_command(
+        self, command: hci.HCI_LE_Read_Maximum_Data_Length_V2_Command
+    ) -> (
+        hci.HCI_LE_Read_Maximum_Data_Length_V2_ReturnParameters
+        | hci.HCI_StatusReturnParameters
+    ):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.46 LE Read Maximum Data Length Command
+        '''
+        if command.phy == 0:
+            # No PHY selected: maximum across all PHYs.
+            phys = (
+                hci.DataLengthPhys.LE_HDT
+                if self.supports_hdt
+                else hci.DataLengthPhys.GFSK
+            )
+        elif command.phy in (
+            hci.Phy.LE_1M,
+            hci.Phy.LE_2M,
+            hci.Phy.LE_CODED,
+            hci.Phy.LE_HDT,
+        ):
+            if not (
+                self.supported_le_phys
+                & (1 << hci.HCI_LE_PHY_TYPE_TO_BIT[hci.Phy(command.phy)])
+            ):
+                return hci.HCI_StatusReturnParameters(
+                    hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR
+                )
+            phys = (
+                hci.DataLengthPhys.LE_HDT
+                if command.phy == hci.Phy.LE_HDT
+                else hci.DataLengthPhys.GFSK
+            )
+        else:
+            return hci.HCI_StatusReturnParameters(
+                hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR
+            )
+
+        max_tx_octets, max_tx_time, max_rx_octets, max_rx_time = (
+            self.le_supported_data_length(phys)
+        )
+        return hci.HCI_LE_Read_Maximum_Data_Length_V2_ReturnParameters(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            supported_max_tx_octets=max_tx_octets,
+            supported_max_tx_time=max_tx_time,
+            supported_max_rx_octets=max_rx_octets,
+            supported_max_rx_time=max_rx_time,
+            supported_max_tx_payload_window_size=self.supported_max_tx_payload_window_size,
+            supported_max_rx_payload_window_size=self.supported_max_rx_payload_window_size,
+            supported_max_rx_octets_per_packet=min(
+                self.supported_max_rx_payload_window_size * max_rx_octets, 0x1FEF
+            ),
+        )
+
     def on_hci_le_read_phy_command(
         self, command: hci.HCI_LE_Read_PHY_Command
-    ) -> hci.HCI_LE_Read_PHY_ReturnParameters:
+    ) -> hci.HCI_LE_Read_PHY_ReturnParameters | hci.HCI_StatusReturnParameters:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.47 LE Read PHY Command
         '''
+        if not (
+            connection := self.find_le_connection_by_handle(command.connection_handle)
+        ):
+            return hci.HCI_StatusReturnParameters(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR
+            )
+
         return hci.HCI_LE_Read_PHY_ReturnParameters(
             status=hci.HCI_ErrorCode.SUCCESS,
             connection_handle=command.connection_handle,
-            tx_phy=hci.HCI_LE_1M_PHY,
-            rx_phy=hci.HCI_LE_1M_PHY,
+            tx_phy=connection.tx_phy,
+            rx_phy=connection.rx_phy,
         )
+
+    def _check_le_phys(
+        self, all_phys: int, tx_phys: int, rx_phys: int
+    ) -> hci.HCI_ErrorCode:
+        supported = int(self.supported_le_phys)
+        if (not all_phys & 1 and tx_phys & ~supported) or (
+            not all_phys & 2 and rx_phys & ~supported
+        ):
+            return hci.HCI_ErrorCode.UNSUPPORTED_FEATURE_OR_PARAMETER_VALUE_ERROR
+        return hci.HCI_ErrorCode.SUCCESS
 
     def on_hci_le_set_default_phy_command(
         self, command: hci.HCI_LE_Set_Default_PHY_Command
@@ -3473,10 +4281,142 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.48 LE Set Default PHY Command
         '''
+        if (
+            status := self._check_le_phys(
+                command.all_phys, command.tx_phys, command.rx_phys
+            )
+        ) != hci.HCI_ErrorCode.SUCCESS:
+            return hci.HCI_StatusReturnParameters(status)
+
         self.default_phy['all_phys'] = command.all_phys
         self.default_phy['tx_phys'] = command.tx_phys
         self.default_phy['rx_phys'] = command.rx_phys
         return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def on_hci_le_set_phy_command(self, command: hci.HCI_LE_Set_PHY_Command) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.49 LE Set PHY Command
+        '''
+        if not (
+            connection := self.find_le_connection_by_handle(command.connection_handle)
+        ):
+            return self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR, command.op_code
+            )
+
+        if (
+            status := self._check_le_phys(
+                command.all_phys, command.tx_phys, command.rx_phys
+            )
+        ) != hci.HCI_ErrorCode.SUCCESS:
+            return self._send_hci_command_status(status, command.op_code)
+
+        connection.all_phys = command.all_phys
+        connection.tx_phys = command.tx_phys
+        connection.rx_phys = command.rx_phys
+        connection.phy_options = command.phy_options
+        if connection.phy_options & hci.PhyOptions.PREFER_HDT_64_BIT_MIC:
+            connection.hdt_mic_length = hci.HdtMicLength.MIC_64_BITS
+        else:
+            connection.hdt_mic_length = hci.HdtMicLength.MIC_128_BITS
+
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        tx_phys, rx_phys = self.le_preferred_phys(connection)
+        connection.send_ll_control_pdu(
+            ll.PhyReq(
+                tx_phys=tx_phys, rx_phys=rx_phys, phy_options=connection.phy_options
+            )
+        )
+        return None
+
+    def on_hci_le_set_hdt_default_parameters_command(
+        self, command: hci.HCI_LE_Set_HDT_Default_Parameters_Command
+    ) -> hci.HCI_StatusReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.159 LE Set HDT Default Parameters
+        Command
+        '''
+        if not self.supports_hdt:
+            return hci.HCI_StatusReturnParameters(
+                hci.HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR
+            )
+
+        if (
+            command.preferred_mic_length
+            not in (hci.HdtMicLength.MIC_64_BITS, hci.HdtMicLength.MIC_128_BITS)
+            or command.preferred_packet_format not in list(hci.HdtPacketFormat)
+            or command.preferred_acl_rates & ~hci.HdtRate.ALL
+        ):
+            return hci.HCI_StatusReturnParameters(
+                hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR
+            )
+
+        if command.preferred_packet_format == hci.HdtPacketFormat.FORMAT_1 and not (
+            self.le_features & hci.LeFeatureMask.HDT_PACKET_FORMAT_1
+        ):
+            return hci.HCI_StatusReturnParameters(
+                hci.HCI_ErrorCode.UNSUPPORTED_FEATURE_OR_PARAMETER_VALUE_ERROR
+            )
+
+        # This command does not affect any existing connection.
+        self.hdt_preferred_mic_length = command.preferred_mic_length
+        self.hdt_preferred_packet_format = command.preferred_packet_format
+        self.hdt_preferred_acl_rates = command.preferred_acl_rates
+        return hci.HCI_StatusReturnParameters(hci.HCI_ErrorCode.SUCCESS)
+
+    def on_hci_le_set_hdt_parameters_test_command(
+        self, command: hci.HCI_LE_Set_HDT_Parameters_Test_Command
+    ) -> hci.HCI_StatusAndConnectionHandleReturnParameters:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.160 LE Set HDT Parameters Test Command
+        '''
+
+        def result(
+            status: hci.HCI_ErrorCode,
+        ) -> hci.HCI_StatusAndConnectionHandleReturnParameters:
+            return hci.HCI_StatusAndConnectionHandleReturnParameters(
+                status=status, connection_handle=command.connection_handle
+            )
+
+        if not self.supports_hdt:
+            return result(hci.HCI_ErrorCode.UNKNOWN_HCI_COMMAND_ERROR)
+
+        connection = self.find_le_connection_by_handle(command.connection_handle)
+        cis_link = self.find_iso_link_by_handle(command.connection_handle)
+        if connection is None and cis_link is None:
+            return result(hci.HCI_ErrorCode.UNKNOWN_CONNECTION_IDENTIFIER_ERROR)
+
+        if (
+            command.packet_format not in list(hci.HdtPacketFormat)
+            or not 1 <= command.blocks_per_payload <= 16
+        ):
+            return result(hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR)
+
+        # MIC_Length and TX_Rate shall be ignored when Connection_Handle specifies a
+        # CIS. Only one bit shall be set in TX_Rate.
+        if connection is not None and (
+            command.mic_length
+            not in (hci.HdtMicLength.MIC_64_BITS, hci.HdtMicLength.MIC_128_BITS)
+            or command.tx_rate & ~hci.HdtRate.ALL
+            or int(command.tx_rate).bit_count() != 1
+        ):
+            return result(hci.HCI_ErrorCode.INVALID_COMMAND_PARAMETERS_ERROR)
+
+        if connection is not None and hci.Phy.LE_HDT in (
+            connection.tx_phy,
+            connection.rx_phy,
+        ):
+            return result(hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR)
+
+        if command.packet_format == hci.HdtPacketFormat.FORMAT_1 and not (
+            self.le_features & hci.LeFeatureMask.HDT_PACKET_FORMAT_1
+        ):
+            return result(hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR)
+
+        if connection is not None:
+            connection.hdt_test_parameters = command
+            connection.hdt_mic_length = command.mic_length
+        return result(hci.HCI_ErrorCode.SUCCESS)
 
     def on_hci_le_set_advertising_set_random_address_command(
         self, command: hci.HCI_LE_Set_Advertising_Set_Random_Address_Command
@@ -3678,25 +4618,47 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.97 LE Set CIG Parameter Command
         '''
+        return self._le_set_cig_parameters(command.cig_id, command.cis_id)
 
+    def on_hci_le_set_cig_parameters_v2_command(
+        self, command: hci.HCI_LE_Set_CIG_Parameters_V2_Command
+    ) -> (
+        hci.HCI_LE_Set_CIG_Parameters_ReturnParameters | hci.HCI_StatusReturnParameters
+    ):
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.97 LE Set CIG Parameter Command
+        '''
+        supported_phys = int(self.supported_le_phys)
+        if any(
+            phy & ~supported_phys
+            for phy in itertools.chain(command.phy_c_to_p, command.phy_p_to_c)
+        ):
+            return hci.HCI_StatusReturnParameters(
+                hci.HCI_ErrorCode.UNSUPPORTED_FEATURE_OR_PARAMETER_VALUE_ERROR
+            )
+        return self._le_set_cig_parameters(command.cig_id, command.cis_id)
+
+    def _le_set_cig_parameters(
+        self, cig_id: int, cis_ids: Iterable[int]
+    ) -> hci.HCI_LE_Set_CIG_Parameters_ReturnParameters:
         # Remove old CIG implicitly.
         cis_links = list(self.central_cis_links.items())
         for handle, cis_link in cis_links:
-            if cis_link.cig_id == command.cig_id:
+            if cis_link.cig_id == cig_id:
                 self.central_cis_links.pop(handle)
 
         handles = []
-        for cis_id in command.cis_id:
+        for cis_id in cis_ids:
             handle = self.allocate_connection_handle()
             handles.append(handle)
             self.central_cis_links[handle] = CisLink(
                 cis_id=cis_id,
-                cig_id=command.cig_id,
+                cig_id=cig_id,
                 handle=handle,
             )
         return hci.HCI_LE_Set_CIG_Parameters_ReturnParameters(
             status=hci.HCI_ErrorCode.SUCCESS,
-            cig_id=command.cig_id,
+            cig_id=cig_id,
             connection_handle=handles,
         )
 
@@ -3706,6 +4668,19 @@ class Controller:
         '''
         See Bluetooth spec Vol 4, Part E - 7.8.99 LE Create CIS Command
         '''
+        self._le_create_cis(command)
+
+    def on_hci_le_create_cis_v2_command(
+        self, command: hci.HCI_LE_Create_CIS_V2_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.99 LE Create CIS Command
+        '''
+        self._le_create_cis(command)
+
+    def _le_create_cis(
+        self, command: hci.HCI_LE_Create_CIS_Command | hci.HCI_LE_Create_CIS_V2_Command
+    ) -> None:
         if not self.link:
             return None
 
@@ -3972,22 +4947,88 @@ class Controller:
         '''
         self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
         handles = [0x0100 + i for i in range(command.num_bis)]
-        self.send_hci_packet(
-            hci.HCI_LE_Create_BIG_Complete_Event(
-                status=hci.HCI_ErrorCode.SUCCESS,
-                big_handle=command.big_handle,
-                big_sync_delay=1000,
-                transport_latency_big=2000,
-                phy=command.phy,
-                nse=1,
-                bn=1,
-                pto=0,
-                irc=1,
-                max_pdu=command.max_sdu,
-                iso_interval=8,
-                connection_handle=handles,
-            )
+        parameters: dict[str, Any] = dict(  # pylint: disable=use-dict-literal
+            status=hci.HCI_ErrorCode.SUCCESS,
+            big_handle=command.big_handle,
+            big_sync_delay=1000,
+            transport_latency_big=2000,
+            phy=command.phy,
+            nse=1,
+            bn=1,
+            pto=0,
+            irc=1,
+            max_pdu=command.max_sdu,
+            iso_interval=8,
+            connection_handle=handles,
         )
+        if self.is_le_event_unmasked(hci.HCI_LE_CREATE_BIG_COMPLETE_V2_EVENT):
+            self.send_hci_packet(
+                hci.HCI_LE_Create_BIG_Complete_V2_Event(
+                    **parameters,
+                    rates=0,
+                    encryption_enabled=command.encryption,
+                    mic_length=hci.HdtMicLength.MIC_32_BITS,
+                )
+            )
+        else:
+            self.send_hci_packet(hci.HCI_LE_Create_BIG_Complete_Event(**parameters))
+
+    def on_hci_le_create_big_v2_command(
+        self, command: hci.HCI_LE_Create_BIG_V2_Command
+    ) -> None:
+        '''
+        See Bluetooth spec Vol 4, Part E - 7.8.103 LE Create BIG Command
+        '''
+        if command.phy & ~int(self.supported_le_phys) or (
+            command.phy & hci.PhyBit.LE_HDT
+            and not (
+                self.le_features
+                & hci.LeFeatureMask.ISOCHRONOUS_BROADCASTER_ON_LE_HDT_PHY
+            )
+        ):
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.UNSUPPORTED_FEATURE_OR_PARAMETER_VALUE_ERROR,
+                command.op_code,
+            )
+            return
+
+        self._send_hci_command_status(hci.HCI_COMMAND_STATUS_PENDING, command.op_code)
+        phy = self.select_le_phy(command.phy, hci.Phy.LE_1M)
+        if phy == hci.Phy.LE_HDT:
+            rates = command.hdt_rates
+            mic_length = command.hdt_mic_length
+        elif phy == hci.Phy.LE_CODED:
+            rates = command.coded_rates
+            mic_length = hci.HdtMicLength.MIC_32_BITS
+        else:
+            rates = 0
+            mic_length = hci.HdtMicLength.MIC_32_BITS
+        handles = [0x0100 + i for i in range(command.num_bis)]
+        parameters: dict[str, Any] = dict(  # pylint: disable=use-dict-literal
+            status=hci.HCI_ErrorCode.SUCCESS,
+            big_handle=command.big_handle,
+            big_sync_delay=1000,
+            transport_latency_big=2000,
+            phy=phy,
+            nse=1,
+            bn=1,
+            pto=0,
+            irc=1,
+            max_pdu=command.max_sdu,
+            iso_interval=8,
+            connection_handle=handles,
+        )
+        if self.is_le_event_unmasked(hci.HCI_LE_CREATE_BIG_COMPLETE_V2_EVENT):
+            self.send_hci_packet(
+                hci.HCI_LE_Create_BIG_Complete_V2_Event(
+                    **parameters,
+                    rates=rates,
+                    encryption_enabled=command.encryption,
+                    mic_length=mic_length,
+                )
+            )
+        else:
+            self.send_hci_packet(hci.HCI_LE_Create_BIG_Complete_Event(**parameters))
 
     def on_hci_le_terminate_big_command(
         self, command: hci.HCI_LE_Terminate_BIG_Command
