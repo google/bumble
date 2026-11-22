@@ -445,7 +445,6 @@ class Driver(common.Driver):
             )
 
     async def load_firmware(self) -> None:
-        self.host.ready = True
         device_info = await self.read_device_info()
         logger.debug(
             "device info: \n%s",
@@ -663,7 +662,6 @@ class Driver(common.Driver):
         await asyncio.sleep(_POST_RESET_DELAY)
 
     async def read_device_info(self) -> dict[ValueType, Any]:
-        self.host.ready = True
         response1 = await self.host.send_sync_command_raw(hci.HCI_Reset_Command())
         if not isinstance(
             response1.return_parameters, hci.HCI_StatusReturnParameters
