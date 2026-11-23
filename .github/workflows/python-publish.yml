@@ -39,42 +39,107 @@ jobs:
       run: python -m build
     - name: Authenticate to Google Cloud (OSS Exit Gate)
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
-      uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
       with:
         workload_identity_provider: 'projects/305452601764/locations/global/workloadIdentityPools/builders/providers/github'
     - name: Set up Cloud SDK
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
-      uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
-    - name: Clean up stale releases from staging repo
+      uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+    - name: Clean up prior failed staging attempt for this exact version (if any)
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
       run: |
-        packages=$(gcloud artifacts packages list \
-            --project="oss-exit-gate-prod" \
-            --location="us" \
-            --repository="bumble--pypi" \
-            --format="value(name)")
-
-        echo "${packages}" | xargs -r -n1 sh -c '
-            echo "Deleting package: $(basename "$1")..."
-            gcloud artifacts packages delete "$1" \
-                --project="oss-exit-gate-prod" \
-                --location="us" \
-                --repository="bumble--pypi" \
-                --quiet
-        ' _
-
+        set -euo pipefail
+        python - <<'PY'
+        import email, glob, os, re, subprocess, sys, tarfile, zipfile
+        seen = set()
+        for path in sorted(glob.glob("dist/*.whl") + glob.glob("dist/*.tar.gz")):
+          if path.endswith(".whl"):
+            with zipfile.ZipFile(path) as zf:
+              for name in zf.namelist():
+                if name.endswith(".dist-info/METADATA"):
+                  msg = email.message_from_bytes(zf.read(name))
+                  pkg = re.sub(r"[-_.]+", "-", msg["Name"].strip()).lower()
+                  seen.add((pkg, msg["Version"].strip()))
+                  break
+          elif path.endswith(".tar.gz"):
+            with tarfile.open(path, "r:gz") as tf:
+              for member in tf.getmembers():
+                if member.name.endswith("/PKG-INFO") and member.name.count("/") == 1:
+                  fh = tf.extractfile(member)
+                  if fh is not None:
+                    msg = email.message_from_bytes(fh.read())
+                    pkg = re.sub(r"[-_.]+", "-", msg["Name"].strip()).lower()
+                    seen.add((pkg, msg["Version"].strip()))
+                  break
+        if not seen:
+          raise SystemExit("ERROR: No .whl/.tar.gz metadata found under dist/")
+        for pkg, ver in sorted(seen):
+          desc = subprocess.run([
+              "gcloud", "artifacts", "versions", "describe", ver,
+              f"--package={pkg}", "--project=oss-exit-gate-prod",
+              "--location=us", "--repository=bumble--pypi", "--format=value(name)",
+          ], capture_output=True, text=True)
+          if desc.returncode == 0:
+            print(f"Deleting prior staged attempt: {pkg}@{ver}")
+            subprocess.run([
+                "gcloud", "artifacts", "versions", "delete", ver,
+                f"--package={pkg}", "--project=oss-exit-gate-prod",
+                "--location=us", "--repository=bumble--pypi", "--quiet",
+            ], check=True)
+          elif not re.search(r"NOT_FOUND|not found|404", desc.stderr, re.I):
+            sys.stderr.write(desc.stderr)
+            raise SystemExit(desc.returncode)
+        PY
     - name: Publish package to PyPI via OSS Exit Gate
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
       env:
-        TWINE_USERNAME: oauth2accesstoken
         RUN_ID: ${{ github.run_id }}
         RUN_ATTEMPT: ${{ github.run_attempt }}
       run: |
-        export TWINE_PASSWORD="$(gcloud auth print-access-token)"
+        set -euo pipefail
+        TWINE_PASSWORD="$(gcloud auth print-access-token)"
         echo "::add-mask::${TWINE_PASSWORD}"
+        TWINE_USERNAME="oauth2accesstoken"
+        export TWINE_USERNAME TWINE_PASSWORD
         python -m twine upload \
           --repository-url "https://us-python.pkg.dev/oss-exit-gate-prod/bumble--pypi/" \
           dist/*
-        echo '{"publish_all": true}' > manifest.json
-        gcloud storage cp manifest.json \
+        unset TWINE_USERNAME TWINE_PASSWORD
+        MANIFEST_PATH="${RUNNER_TEMP}/manifest-bumble.json"
+        python - "${MANIFEST_PATH}" <<'PY'
+        import email, glob, json, re, sys, tarfile, zipfile
+        pairs = set()
+        for path in sorted(glob.glob("dist/*.whl") + glob.glob("dist/*.tar.gz")):
+          if path.endswith(".whl"):
+            with zipfile.ZipFile(path) as zf:
+              for name in zf.namelist():
+                if name.endswith(".dist-info/METADATA"):
+                  msg = email.message_from_bytes(zf.read(name))
+                  pkg = re.sub(r"[-_.]+", "-", msg["Name"].strip()).lower()
+                  pairs.add((pkg, msg["Version"].strip()))
+                  break
+          elif path.endswith(".tar.gz"):
+            with tarfile.open(path, "r:gz") as tf:
+              for member in tf.getmembers():
+                if member.name.endswith("/PKG-INFO") and member.name.count("/") == 1:
+                  fh = tf.extractfile(member)
+                  if fh is not None:
+                    msg = email.message_from_bytes(fh.read())
+                    pkg = re.sub(r"[-_.]+", "-", msg["Name"].strip()).lower()
+                    pairs.add((pkg, msg["Version"].strip()))
+                  break
+        if not pairs:
+          raise SystemExit("ERROR: No .whl/.tar.gz metadata found under dist/ for manifest")
+        manifest = {
+            "publish_all": False,
+            "publishing_groups": [{
+                "packages": [{"name": pkg, "version": ver} for pkg, ver in sorted(pairs)]
+            }],
+        }
+        with open(sys.argv[1], "w", encoding="utf-8") as fh:
+          json.dump(manifest, fh, indent=2)
+          fh.write("\n")
+        PY
+        gcloud storage cp "${MANIFEST_PATH}" \
           "gs://oss-exit-gate-prod-projects-bucket/bumble/pypi/manifests/manifest-${RUN_ID}-${RUN_ATTEMPT}.json"
+        rm -f "${MANIFEST_PATH}"
