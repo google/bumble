@@ -4412,13 +4412,7 @@ class HCI_LE_Set_Random_Address_Command(HCI_SyncCommand[HCI_StatusReturnParamete
     See Bluetooth spec @ 7.8.4 LE Set Random Address Command
     '''
 
-    random_address: Address = field(
-        metadata=metadata(
-            lambda data, offset: Address.parse_address_with_type(
-                data, offset, Address.RANDOM_DEVICE_ADDRESS
-            )
-        )
-    )
+    random_address: Address = field(metadata=metadata(Address.parse_random_address))
 
 
 # -----------------------------------------------------------------------------
@@ -5054,13 +5048,7 @@ class HCI_LE_Set_Advertising_Set_Random_Address_Command(
     '''
 
     advertising_handle: int = field(metadata=metadata(1))
-    random_address: Address = field(
-        metadata=metadata(
-            lambda data, offset: Address.parse_address_with_type(
-                data, offset, Address.RANDOM_DEVICE_ADDRESS
-            )
-        )
-    )
+    random_address: Address = field(metadata=metadata(Address.parse_random_address))
 
 
 # -----------------------------------------------------------------------------
@@ -5126,7 +5114,7 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(
         metadata=metadata(Address.parse_address_preceded_by_type)
     )
     advertising_filter_policy: int = field(metadata=metadata(1))
-    advertising_tx_power: int = field(metadata=metadata(1))
+    advertising_tx_power: int = field(metadata=metadata(-1))
     primary_advertising_phy: int = field(metadata=Phy.type_metadata(1))
     secondary_advertising_max_skip: int = field(metadata=metadata(1))
     secondary_advertising_phy: int = field(metadata=Phy.type_metadata(1))
@@ -5730,8 +5718,8 @@ class HCI_LE_Read_Periodic_Advertiser_List_Size_Command(
 # -----------------------------------------------------------------------------
 @dataclasses.dataclass
 class HCI_LE_Read_Transmit_Power_ReturnParameters(HCI_StatusReturnParameters):
-    min_tx_power: int = field(metadata=metadata(1))
-    max_tx_power: int = field(metadata=metadata(1))
+    min_tx_power: int = field(metadata=metadata(-1))
+    max_tx_power: int = field(metadata=metadata(-1))
 
 
 @HCI_SyncCommand.sync_command(HCI_LE_Read_Transmit_Power_ReturnParameters)
@@ -6114,6 +6102,7 @@ class HCI_LE_Read_All_Local_Supported_Features_ReturnParameters(
 
 
 @HCI_SyncCommand.sync_command(HCI_LE_Read_All_Local_Supported_Features_ReturnParameters)
+@dataclasses.dataclass
 class HCI_LE_Read_All_Local_Supported_Features_Command(
     HCI_SyncCommand[HCI_LE_Read_All_Local_Supported_Features_ReturnParameters]
 ):
@@ -6275,13 +6264,13 @@ class HCI_LE_CS_Set_Default_Settings_Command(
     HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
 ):
     '''
-    See Bluetooth spec @ 7.8.134 LE CS Security Enable command
+    See Bluetooth spec @ 7.8.133 LE CS Set Default Settings command
     '''
 
     connection_handle: int = field(metadata=metadata(2))
     role_enable: int = field(metadata=metadata(CS_ROLE_MASK_SPEC))
     cs_sync_antenna_selection: int = field(metadata=metadata(1))
-    max_tx_power: int = field(metadata=metadata(1))
+    max_tx_power: int = field(metadata=metadata(-1))
 
 
 # -----------------------------------------------------------------------------
@@ -6393,7 +6382,7 @@ class HCI_LE_CS_Set_Procedure_Parameters_Command(
     max_subevent_len: int = field(metadata=metadata(3))
     tone_antenna_config_selection: int = field(metadata=metadata(1))
     phy: int = field(metadata=metadata(1))
-    tx_power_delta: int = field(metadata=metadata(1))
+    tx_power_delta: int = field(metadata=metadata(-1))
     preferred_peer_antenna: int = field(metadata=metadata(1))
     snr_control_initiator: int = field(metadata=metadata(CS_SNR_SPEC))
     snr_control_reflector: int = field(metadata=metadata(CS_SNR_SPEC))
@@ -6431,7 +6420,7 @@ class HCI_LE_CS_Test_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
     subevent_len: int = field(metadata=metadata(3))
     subevent_interval: int = field(metadata=metadata(2))
     max_num_subevents: int = field(metadata=metadata(1))
-    transmit_power_level: int = field(metadata=metadata(1))
+    transmit_power_level: int = field(metadata=metadata(-1))
     t_ip1_time: int = field(metadata=metadata(1))
     t_ip2_time: int = field(metadata=metadata(1))
     t_fcs_time: int = field(metadata=metadata(1))
@@ -7102,7 +7091,7 @@ class HCI_LE_Extended_Advertising_Report_Event(HCI_LE_Meta_Event):
         primary_phy: int = field(metadata=metadata(Phy.type_spec(1)))
         secondary_phy: int = field(metadata=metadata(Phy.type_spec(1)))
         advertising_sid: int = field(metadata=metadata(1))
-        tx_power: int = field(metadata=metadata(1))
+        tx_power: int = field(metadata=metadata(-1))
         rssi: int = field(metadata=metadata(-1))
         periodic_advertising_interval: int = field(metadata=metadata(2))
         direct_address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))

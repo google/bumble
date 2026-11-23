@@ -15,6 +15,7 @@
 # -----------------------------------------------------------------------------
 # Imports
 # -----------------------------------------------------------------------------
+import dataclasses
 import inspect
 import struct
 
@@ -872,6 +873,170 @@ def test_iso_data_packet_too_short():
     data = bytes.fromhex('0561000000')  # type + pdu_info(0x0061) + len(0) = 5 bytes
     with pytest.raises(hci.InvalidPacketError):
         hci.HCI_IsoDataPacket.from_bytes(data)
+
+
+# -----------------------------------------------------------------------------
+def test_signed_tx_power_fields():
+    # LE Set Extended Advertising Parameters (7.8.53): advertising_tx_power is int8.
+    ext_adv_cmd = hci.HCI_LE_Set_Extended_Advertising_Parameters_Command(
+        advertising_handle=1,
+        advertising_event_properties=0,
+        primary_advertising_interval_min=0x20,
+        primary_advertising_interval_max=0x40,
+        primary_advertising_channel_map=0x07,
+        own_address_type=hci.OwnAddressType.RANDOM,
+        peer_address_type=hci.Address.PUBLIC_DEVICE_ADDRESS,
+        peer_address=hci.Address.ANY,
+        advertising_filter_policy=0,
+        advertising_tx_power=-20,
+        primary_advertising_phy=hci.Phy.LE_1M,
+        secondary_advertising_max_skip=0,
+        secondary_advertising_phy=hci.Phy.LE_1M,
+        advertising_sid=0,
+        scan_request_notification_enable=0,
+    )
+    parsed_ext_adv = hci.HCI_Command.from_bytes(bytes(ext_adv_cmd))
+    assert isinstance(
+        parsed_ext_adv, hci.HCI_LE_Set_Extended_Advertising_Parameters_Command
+    )
+    assert parsed_ext_adv.advertising_tx_power == -20
+    assert bytes(parsed_ext_adv) == bytes(ext_adv_cmd)
+
+    # LE Read Transmit Power Return Parameters (7.8.74): min/max_tx_power are int8.
+    tx_power_rp = hci.HCI_LE_Read_Transmit_Power_ReturnParameters(
+        status=hci.HCI_ErrorCode.SUCCESS,
+        min_tx_power=-30,
+        max_tx_power=10,
+    )
+    tx_power_evt = hci.HCI_Command_Complete_Event(
+        num_hci_command_packets=1,
+        command_opcode=hci.HCI_LE_READ_TRANSMIT_POWER_COMMAND,
+        return_parameters=tx_power_rp,
+    )
+    parsed_tx_power_evt = hci.HCI_Event.from_bytes(bytes(tx_power_evt))
+    assert isinstance(parsed_tx_power_evt, hci.HCI_Command_Complete_Event)
+    parsed_tx_power_rp = parsed_tx_power_evt.return_parameters
+    assert isinstance(
+        parsed_tx_power_rp, hci.HCI_LE_Read_Transmit_Power_ReturnParameters
+    )
+    assert parsed_tx_power_rp.min_tx_power == -30
+    assert parsed_tx_power_rp.max_tx_power == 10
+
+    # LE CS Set Default Settings (7.8.133): max_tx_power is int8.
+    cs_default_cmd = hci.HCI_LE_CS_Set_Default_Settings_Command(
+        connection_handle=0x0040,
+        role_enable=hci.CsRoleMask.INITIATOR,
+        cs_sync_antenna_selection=0x01,
+        max_tx_power=-15,
+    )
+    parsed_cs_default = hci.HCI_Command.from_bytes(bytes(cs_default_cmd))
+    assert isinstance(parsed_cs_default, hci.HCI_LE_CS_Set_Default_Settings_Command)
+    assert parsed_cs_default.max_tx_power == -15
+
+    # LE CS Set Procedure Parameters (7.8.140): tx_power_delta is int8.
+    cs_proc_cmd = hci.HCI_LE_CS_Set_Procedure_Parameters_Command(
+        connection_handle=0x0040,
+        config_id=0,
+        max_procedure_len=10,
+        min_procedure_interval=10,
+        max_procedure_interval=20,
+        max_procedure_count=1,
+        min_subevent_len=1250,
+        max_subevent_len=2500,
+        tone_antenna_config_selection=0,
+        phy=hci.Phy.LE_1M,
+        tx_power_delta=-12,
+        preferred_peer_antenna=1,
+        snr_control_initiator=hci.CsSnr.NOT_APPLIED,
+        snr_control_reflector=hci.CsSnr.NOT_APPLIED,
+    )
+    parsed_cs_proc = hci.HCI_Command.from_bytes(bytes(cs_proc_cmd))
+    assert isinstance(parsed_cs_proc, hci.HCI_LE_CS_Set_Procedure_Parameters_Command)
+    assert parsed_cs_proc.tx_power_delta == -12
+
+    # LE CS Test (7.8.142): transmit_power_level is int8.
+    cs_test_cmd = hci.HCI_LE_CS_Test_Command(
+        main_mode_type=1,
+        sub_mode_type=0,
+        main_mode_repetition=0,
+        mode_0_steps=1,
+        role=hci.CsRole.INITIATOR,
+        rtt_type=hci.RttType.AA_ONLY,
+        cs_sync_phy=hci.CsSyncPhy.LE_1M,
+        cs_sync_antenna_selection=1,
+        subevent_len=1250,
+        subevent_interval=10,
+        max_num_subevents=1,
+        transmit_power_level=-10,
+        t_ip1_time=10,
+        t_ip2_time=10,
+        t_fcs_time=10,
+        t_pm_time=10,
+        t_sw_time=10,
+        tone_antenna_config_selection=0,
+        reserved=0,
+        snr_control_initiator=hci.CsSnr.NOT_APPLIED,
+        snr_control_reflector=hci.CsSnr.NOT_APPLIED,
+        drbg_nonce=0,
+        channel_map_repetition=1,
+        override_config=0,
+        override_parameters_data=b'',
+    )
+    parsed_cs_test = hci.HCI_Command.from_bytes(bytes(cs_test_cmd))
+    assert isinstance(parsed_cs_test, hci.HCI_LE_CS_Test_Command)
+    assert parsed_cs_test.transmit_power_level == -10
+
+    # LE Extended Advertising Report (7.7.65.13): tx_power is int8.
+    ext_adv_report = hci.HCI_LE_Extended_Advertising_Report_Event(
+        reports=[
+            hci.HCI_LE_Extended_Advertising_Report_Event.Report(
+                event_type=0,
+                address_type=hci.Address.RANDOM_DEVICE_ADDRESS,
+                address=hci.Address(
+                    'C1:02:03:04:05:06', hci.Address.RANDOM_DEVICE_ADDRESS
+                ),
+                primary_phy=hci.Phy.LE_1M,
+                secondary_phy=hci.Phy.LE_1M,
+                advertising_sid=0,
+                tx_power=-25,
+                rssi=-60,
+                periodic_advertising_interval=0,
+                direct_address_type=hci.Address.PUBLIC_DEVICE_ADDRESS,
+                direct_address=hci.Address.ANY,
+                data=b'',
+            )
+        ]
+    )
+    parsed_ext_adv_report = hci.HCI_Event.from_bytes(bytes(ext_adv_report))
+    assert isinstance(
+        parsed_ext_adv_report, hci.HCI_LE_Extended_Advertising_Report_Event
+    )
+    assert parsed_ext_adv_report.reports[0].tx_power == -25
+    assert parsed_ext_adv_report.reports[0].rssi == -60
+
+
+# -----------------------------------------------------------------------------
+def test_le_read_all_local_supported_features_command_and_random_address_commands():
+    assert dataclasses.is_dataclass(
+        hci.HCI_LE_Read_All_Local_Supported_Features_Command
+    )
+    cmd = hci.HCI_LE_Read_All_Local_Supported_Features_Command()
+    parsed = hci.HCI_Command.from_bytes(bytes(cmd))
+    assert parsed == cmd
+
+    addr = hci.Address('C1:02:03:04:05:06', hci.Address.RANDOM_DEVICE_ADDRESS)
+    adv_rand_cmd = hci.HCI_LE_Set_Advertising_Set_Random_Address_Command(
+        advertising_handle=2,
+        random_address=addr,
+    )
+    parsed_adv_rand = hci.HCI_Command.from_bytes(bytes(adv_rand_cmd))
+    assert isinstance(
+        parsed_adv_rand, hci.HCI_LE_Set_Advertising_Set_Random_Address_Command
+    )
+    assert parsed_adv_rand.random_address == addr
+    assert (
+        parsed_adv_rand.random_address.address_type == hci.Address.RANDOM_DEVICE_ADDRESS
+    )
 
 
 # -----------------------------------------------------------------------------
