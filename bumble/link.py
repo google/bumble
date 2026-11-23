@@ -43,75 +43,55 @@ class LocalLink:
 
     controllers: set[controller.Controller]
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.controllers = set()
-        self.pending_classic_connection = None
 
     ############################################################
     # Common utils
     ############################################################
 
-    def add_controller(self, controller: controller.Controller):
-        logger.debug(f'new controller: {controller}')
+    def add_controller(self, controller: controller.Controller) -> None:
+        logger.debug('new controller: %s', controller)
         self.controllers.add(controller)
 
-    def remove_controller(self, controller: controller.Controller):
+    def remove_controller(self, controller: controller.Controller) -> None:
         self.controllers.remove(controller)
 
-    def find_le_controller(self, address: hci.Address) -> controller.Controller | None:
-        for c in self.controllers:
-            for connection in c.le_connections.values():
-                if connection.self_address == address:
-                    return c
-        for c in self.controllers:
-            if c.random_address == address or c.public_address == address:
-                return c
-        return None
-
-    def find_classic_controller(
-        self, address: hci.Address
-    ) -> controller.Controller | None:
-        for controller in self.controllers:
-            if controller.public_address == address:
-                return controller
-        return None
-
     ############################################################
-    # LE handlers
+    # Packet delivery
     ############################################################
-
-    def on_address_changed(self, controller):
-        pass
 
     def send_acl_data(
         self,
         sender_controller: controller.Controller,
-        destination_address: hci.Address,
+        *,
+        sender_address: hci.Address,
+        receiver_address: hci.Address,
         transport: core.PhysicalTransport,
         data: bytes,
-    ):
-        # Send the data to the first controller with a matching address
-        if transport == core.PhysicalTransport.LE:
-            destination_controller = self.find_le_controller(destination_address)
-            source_address = sender_controller.random_address
-        elif transport == core.PhysicalTransport.BR_EDR:
-            destination_controller = self.find_classic_controller(destination_address)
-            source_address = sender_controller.public_address
-        else:
+    ) -> None:
+        if transport not in (
+            core.PhysicalTransport.LE,
+            core.PhysicalTransport.BR_EDR,
+        ):
             raise ValueError("unsupported transport type")
 
-        if destination_controller is not None:
-            asyncio.get_running_loop().call_soon(
-                lambda: destination_controller.on_link_acl_data(
-                    source_address, transport, data
+        loop = asyncio.get_running_loop()
+        for c in self.controllers:
+            if c != sender_controller:
+                loop.call_soon(
+                    c.on_link_acl_data,
+                    sender_address,
+                    receiver_address,
+                    transport,
+                    data,
                 )
-            )
 
     def send_advertising_pdu(
         self,
         sender_controller: controller.Controller,
         packet: ll.AdvertisingPdu,
-    ):
+    ) -> None:
         loop = asyncio.get_running_loop()
         for c in self.controllers:
             if c != sender_controller:
@@ -119,34 +99,34 @@ class LocalLink:
 
     def send_ll_control_pdu(
         self,
+        sender_controller: controller.Controller,
         sender_address: hci.Address,
         receiver_address: hci.Address,
         packet: ll.ControlPdu,
-    ):
-        if not (receiver_controller := self.find_le_controller(receiver_address)):
-            raise core.InvalidArgumentError(
-                f"Unable to find controller for address {receiver_address}"
-            )
-        asyncio.get_running_loop().call_soon(
-            lambda: receiver_controller.on_ll_control_pdu(sender_address, packet)
-        )
-
-    ############################################################
-    # Classic handlers
-    ############################################################
+    ) -> None:
+        loop = asyncio.get_running_loop()
+        for c in self.controllers:
+            if c != sender_controller:
+                loop.call_soon(
+                    c.on_ll_control_pdu,
+                    sender_address,
+                    receiver_address,
+                    packet,
+                )
 
     def send_lmp_packet(
         self,
         sender_controller: controller.Controller,
+        sender_address: hci.Address,
         receiver_address: hci.Address,
         packet: lmp.Packet,
-    ):
-        if not (receiver_controller := self.find_classic_controller(receiver_address)):
-            raise core.InvalidArgumentError(
-                f"Unable to find controller for address {receiver_address}"
-            )
-        asyncio.get_running_loop().call_soon(
-            lambda: receiver_controller.on_lmp_packet(
-                sender_controller.public_address, packet
-            )
-        )
+    ) -> None:
+        loop = asyncio.get_running_loop()
+        for c in self.controllers:
+            if c != sender_controller:
+                loop.call_soon(
+                    c.on_lmp_packet,
+                    sender_address,
+                    receiver_address,
+                    packet,
+                )
