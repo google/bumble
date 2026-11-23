@@ -546,7 +546,134 @@ async def test_ag_sdp_record():
 
 # -----------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_sco_setup():
+@pytest.mark.parametrize(
+    (
+        'codec_parameters',
+        'expected_link_type',
+        'expected_air_mode',
+    ),
+    [
+        # eSCO link with the enhanced commands
+        (
+            hfp.DefaultCodecParameters.ESCO_CVSD_S1,
+            hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+            hci.CodecID.CVSD,
+        ),
+        # Transparent (mSBC) eSCO link with the enhanced commands
+        (
+            hfp.DefaultCodecParameters.ESCO_MSBC_T2,
+            hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+            hci.CodecID.TRANSPARENT,
+        ),
+    ],
+)
+async def test_sco_setup(
+    codec_parameters: hfp.DefaultCodecParameters,
+    expected_link_type: int,
+    expected_air_mode: int,
+):
+    devices = TwoDevices()
+
+    # Enable Classic connections
+    devices[0].classic_enabled = True
+    devices[1].classic_enabled = True
+
+    # Start
+    await devices[0].power_on()
+    await devices[1].power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect(
+            devices[1].public_address, transport=core.PhysicalTransport.BR_EDR
+        ),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    parameters = hfp.ESCO_PARAMETERS[codec_parameters]
+
+    def on_sco_request(_connection, _link_type: int):
+        connections[1].abort_on(
+            'disconnection',
+            devices[1].send_command(
+                hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(
+                    bd_addr=connections[1].peer_address,
+                    **parameters.asdict(),
+                )
+            ),
+        )
+
+    devices[1].on('sco_request', on_sco_request)
+
+    sco_connection_futures = [
+        asyncio.get_running_loop().create_future(),
+        asyncio.get_running_loop().create_future(),
+    ]
+
+    for index, future in enumerate(sco_connection_futures):
+        devices[index].on('sco_connection', future.set_result)
+
+    await devices[0].send_command(
+        hci.HCI_Enhanced_Setup_Synchronous_Connection_Command(
+            connection_handle=connections[0].handle,
+            **parameters.asdict(),
+        )
+    )
+    sco_connections = await asyncio.gather(*sco_connection_futures)
+
+    for sco_connection in sco_connections:
+        assert sco_connection.link_type == expected_link_type
+        assert sco_connection.air_mode == expected_air_mode
+
+    sco_disconnection_futures = [
+        asyncio.get_running_loop().create_future(),
+        asyncio.get_running_loop().create_future(),
+    ]
+    for future, sco_connection in zip(sco_disconnection_futures, sco_connections):
+        sco_connection.on('disconnection', future.set_result)
+
+    await sco_connections[0].disconnect()
+    await asyncio.gather(*sco_disconnection_futures)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    (
+        'voice_setting',
+        'packet_type',
+        'expected_link_type',
+        'expected_air_mode',
+    ),
+    [
+        # eSCO CVSD link with the non-enhanced commands
+        (
+            0x0060,
+            hci.HCI_Setup_Synchronous_Connection_Command.PacketType.EV3,
+            hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+            hci.CodecID.CVSD,
+        ),
+        # Transparent eSCO link with the non-enhanced commands
+        (
+            0x0063,
+            hci.HCI_Setup_Synchronous_Connection_Command.PacketType.EV3,
+            hci.HCI_Connection_Complete_Event.LinkType.ESCO,
+            hci.CodecID.TRANSPARENT,
+        ),
+        # SCO CVSD link with the non-enhanced commands
+        (
+            0x0060,
+            hci.HCI_Setup_Synchronous_Connection_Command.PacketType.HV3,
+            hci.HCI_Connection_Complete_Event.LinkType.SCO,
+            hci.CodecID.CVSD,
+        ),
+    ],
+)
+async def test_legacy_sco_setup(
+    voice_setting: int,
+    packet_type: int,
+    expected_link_type: int,
+    expected_air_mode: int,
+):
     devices = TwoDevices()
 
     # Enable Classic connections
@@ -568,11 +695,14 @@ async def test_sco_setup():
         connections[1].abort_on(
             'disconnection',
             devices[1].send_command(
-                hci.HCI_Enhanced_Accept_Synchronous_Connection_Request_Command(
+                hci.HCI_Accept_Synchronous_Connection_Request_Command(
                     bd_addr=connections[1].peer_address,
-                    **hfp.ESCO_PARAMETERS[
-                        hfp.DefaultCodecParameters.ESCO_CVSD_S1
-                    ].asdict(),
+                    transmit_bandwidth=8000,
+                    receive_bandwidth=8000,
+                    max_latency=10,
+                    voice_setting=voice_setting,
+                    retransmission_effort=1,
+                    packet_type=packet_type,
                 )
             ),
         )
@@ -584,16 +714,25 @@ async def test_sco_setup():
         asyncio.get_running_loop().create_future(),
     ]
 
-    for device, future in zip(devices, sco_connection_futures):
-        device.on('sco_connection', future.set_result)
+    for index, future in enumerate(sco_connection_futures):
+        devices[index].on('sco_connection', future.set_result)
 
     await devices[0].send_command(
-        hci.HCI_Enhanced_Setup_Synchronous_Connection_Command(
+        hci.HCI_Setup_Synchronous_Connection_Command(
             connection_handle=connections[0].handle,
-            **hfp.ESCO_PARAMETERS[hfp.DefaultCodecParameters.ESCO_CVSD_S1].asdict(),
+            transmit_bandwidth=8000,
+            receive_bandwidth=8000,
+            max_latency=10,
+            voice_setting=voice_setting,
+            retransmission_effort=1,
+            packet_type=packet_type,
         )
     )
     sco_connections = await asyncio.gather(*sco_connection_futures)
+
+    for sco_connection in sco_connections:
+        assert sco_connection.link_type == expected_link_type
+        assert sco_connection.air_mode == expected_air_mode
 
     sco_disconnection_futures = [
         asyncio.get_running_loop().create_future(),
@@ -604,6 +743,59 @@ async def test_sco_setup():
 
     await sco_connections[0].disconnect()
     await asyncio.gather(*sco_disconnection_futures)
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_sco_setup_rejected():
+    devices = TwoDevices()
+
+    # Enable Classic connections
+    devices[0].classic_enabled = True
+    devices[1].classic_enabled = True
+
+    # Start
+    await devices[0].power_on()
+    await devices[1].power_on()
+
+    connections = await asyncio.gather(
+        devices[0].connect(
+            devices[1].public_address, transport=core.PhysicalTransport.BR_EDR
+        ),
+        devices[1].accept(devices[0].public_address),
+    )
+
+    def on_sco_request(_connection, _link_type: int):
+        connections[1].abort_on(
+            'disconnection',
+            devices[1].send_command(
+                hci.HCI_Reject_Synchronous_Connection_Request_Command(
+                    bd_addr=connections[1].peer_address,
+                    reason=hci.HCI_ErrorCode.CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR,
+                )
+            ),
+        )
+
+    devices[1].on('sco_request', on_sco_request)
+
+    failure_future = asyncio.get_running_loop().create_future()
+    devices[0].on('sco_connection_failure', failure_future.set_result)
+
+    await devices[0].send_command(
+        hci.HCI_Setup_Synchronous_Connection_Command(
+            connection_handle=connections[0].handle,
+            transmit_bandwidth=8000,
+            receive_bandwidth=8000,
+            max_latency=10,
+            voice_setting=0x0060,
+            retransmission_effort=1,
+            packet_type=hci.HCI_Setup_Synchronous_Connection_Command.PacketType.EV3,
+        )
+    )
+    assert (
+        await asyncio.wait_for(failure_future, timeout=5)
+        == hci.HCI_ErrorCode.CONNECTION_REJECTED_DUE_TO_LIMITED_RESOURCES_ERROR
+    )
 
 
 # -----------------------------------------------------------------------------
