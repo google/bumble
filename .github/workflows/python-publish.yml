@@ -5,7 +5,7 @@ on:
     types: [published]
 
 concurrency:
-  group: pypi-publish
+  group: pypi-publish-${{ github.ref }}
   cancel-in-progress: false
 
 permissions: {}
@@ -49,47 +49,11 @@ jobs:
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
       run: |
         set -euo pipefail
-        python - <<'PY'
-        import email, glob, os, re, subprocess, sys, tarfile, zipfile
-        seen = set()
-        for path in sorted(glob.glob("dist/*.whl") + glob.glob("dist/*.tar.gz")):
-          if path.endswith(".whl"):
-            with zipfile.ZipFile(path) as zf:
-              for name in zf.namelist():
-                if name.endswith(".dist-info/METADATA"):
-                  msg = email.message_from_bytes(zf.read(name))
-                  pkg = re.sub(r"[-_.]+", "-", msg["Name"].strip()).lower()
-                  seen.add((pkg, msg["Version"].strip()))
-                  break
-          elif path.endswith(".tar.gz"):
-            with tarfile.open(path, "r:gz") as tf:
-              for member in tf.getmembers():
-                if member.name.endswith("/PKG-INFO") and member.name.count("/") == 1:
-                  fh = tf.extractfile(member)
-                  if fh is not None:
-                    msg = email.message_from_bytes(fh.read())
-                    pkg = re.sub(r"[-_.]+", "-", msg["Name"].strip()).lower()
-                    seen.add((pkg, msg["Version"].strip()))
-                  break
-        if not seen:
-          raise SystemExit("ERROR: No .whl/.tar.gz metadata found under dist/")
-        for pkg, ver in sorted(seen):
-          desc = subprocess.run([
-              "gcloud", "artifacts", "versions", "describe", ver,
-              f"--package={pkg}", "--project=oss-exit-gate-prod",
-              "--location=us", "--repository=bumble--pypi", "--format=value(name)",
-          ], capture_output=True, text=True)
-          if desc.returncode == 0:
-            print(f"Deleting prior staged attempt: {pkg}@{ver}")
-            subprocess.run([
-                "gcloud", "artifacts", "versions", "delete", ver,
-                f"--package={pkg}", "--project=oss-exit-gate-prod",
-                "--location=us", "--repository=bumble--pypi", "--quiet",
-            ], check=True)
-          elif not re.search(r"NOT_FOUND|not found|404", desc.stderr, re.I):
-            sys.stderr.write(desc.stderr)
-            raise SystemExit(desc.returncode)
-        PY
+        python .github/scripts/exit_gate_pypi.py cleanup \
+          --dist-dir dist \
+          --project oss-exit-gate-prod \
+          --location us \
+          --repository bumble--pypi
     - name: Publish package to PyPI via OSS Exit Gate
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
       env:
@@ -97,6 +61,8 @@ jobs:
         RUN_ATTEMPT: ${{ github.run_attempt }}
       run: |
         set -euo pipefail
+        MANIFEST_PATH="${RUNNER_TEMP}/manifest-bumble.json"
+        trap 'rm -f "${MANIFEST_PATH}"' EXIT
         TWINE_PASSWORD="$(gcloud auth print-access-token)"
         echo "::add-mask::${TWINE_PASSWORD}"
         TWINE_USERNAME="oauth2accesstoken"
@@ -105,41 +71,8 @@ jobs:
           --repository-url "https://us-python.pkg.dev/oss-exit-gate-prod/bumble--pypi/" \
           dist/*
         unset TWINE_USERNAME TWINE_PASSWORD
-        MANIFEST_PATH="${RUNNER_TEMP}/manifest-bumble.json"
-        python - "${MANIFEST_PATH}" <<'PY'
-        import email, glob, json, re, sys, tarfile, zipfile
-        pairs = set()
-        for path in sorted(glob.glob("dist/*.whl") + glob.glob("dist/*.tar.gz")):
-          if path.endswith(".whl"):
-            with zipfile.ZipFile(path) as zf:
-              for name in zf.namelist():
-                if name.endswith(".dist-info/METADATA"):
-                  msg = email.message_from_bytes(zf.read(name))
-                  pkg = re.sub(r"[-_.]+", "-", msg["Name"].strip()).lower()
-                  pairs.add((pkg, msg["Version"].strip()))
-                  break
-          elif path.endswith(".tar.gz"):
-            with tarfile.open(path, "r:gz") as tf:
-              for member in tf.getmembers():
-                if member.name.endswith("/PKG-INFO") and member.name.count("/") == 1:
-                  fh = tf.extractfile(member)
-                  if fh is not None:
-                    msg = email.message_from_bytes(fh.read())
-                    pkg = re.sub(r"[-_.]+", "-", msg["Name"].strip()).lower()
-                    pairs.add((pkg, msg["Version"].strip()))
-                  break
-        if not pairs:
-          raise SystemExit("ERROR: No .whl/.tar.gz metadata found under dist/ for manifest")
-        manifest = {
-            "publish_all": False,
-            "publishing_groups": [{
-                "packages": [{"name": pkg, "version": ver} for pkg, ver in sorted(pairs)]
-            }],
-        }
-        with open(sys.argv[1], "w", encoding="utf-8") as fh:
-          json.dump(manifest, fh, indent=2)
-          fh.write("\n")
-        PY
-        gcloud storage cp "${MANIFEST_PATH}" \
+        python .github/scripts/exit_gate_pypi.py manifest \
+          --dist-dir dist \
+          --output "${MANIFEST_PATH}"
+        gcloud storage cp --if-generation-match=0 "${MANIFEST_PATH}" \
           "gs://oss-exit-gate-prod-projects-bucket/bumble/pypi/manifests/manifest-${RUN_ID}-${RUN_ATTEMPT}.json"
-        rm -f "${MANIFEST_PATH}"
