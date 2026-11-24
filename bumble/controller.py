@@ -252,12 +252,17 @@ class Connection:
     def on_acl_pdu(self, pdu: bytes) -> None:
         if self.link:
             self.link.send_acl_data(
-                self.controller, self.peer_address, self.transport, pdu
+                sender_controller=self.controller,
+                sender_address=self.self_address,
+                receiver_address=self.peer_address,
+                transport=self.transport,
+                data=pdu,
             )
 
     def send_ll_control_pdu(self, packet: ll.ControlPdu) -> None:
         if self.link:
             self.link.send_ll_control_pdu(
+                sender_controller=self.controller,
                 sender_address=self.self_address,
                 receiver_address=self.peer_address,
                 packet=packet,
@@ -268,7 +273,7 @@ class Connection:
 class Controller:
     hci_sink: TransportSink | None = None
 
-    le_connections: dict[hci.Address, Connection]  # LE Connections
+    le_connections: dict[hci.Address, Connection]  # LE Connections by peer address
     classic_connections: dict[hci.Address, Connection]  # Connections in BR/EDR
     classic_pending_commands: dict[hci.Address, dict[lmp.Opcode, asyncio.Future[int]]]
     sco_links: dict[hci.Address, ScoLink]  # SCO links by address
@@ -509,9 +514,6 @@ class Controller:
         self._random_address = address
         logger.debug(f'new random address: {address}')
 
-        if self.link:
-            self.link.on_address_changed(self)
-
     @property
     def lmp_features_bytes(self) -> bytes:
         return self.lmp_features.to_bytes(
@@ -649,12 +651,15 @@ class Controller:
             self.link.send_advertising_pdu(self, packet)
 
     def on_ll_control_pdu(
-        self, sender_address: hci.Address, packet: ll.ControlPdu
+        self,
+        sender_address: hci.Address,
+        receiver_address: hci.Address,
+        packet: ll.ControlPdu,
     ) -> None:
-        logger.debug("[%s] >>> LL Control PDU: %s", self.name, packet)
-        if not (connection := self.le_connections.get(sender_address)):
-            logger.error("Cannot find a connection for %s", sender_address)
+        connection = self.le_connections.get(sender_address)
+        if connection is None or connection.self_address != receiver_address:
             return
+        logger.debug("[%s] <<< LL Control PDU: %s", self.name, packet)
 
         match packet:
             case ll.TerminateInd():
@@ -904,6 +909,9 @@ class Controller:
 
         # Allocate (or reuse) a connection handle
         peer_address = packet.initiator_address
+        if peer_address in self.le_connections:
+            logger.debug("LE connection for %s already exists", peer_address)
+            return
 
         connection_handle = self.allocate_connection_handle()
         connection = Connection(
@@ -951,7 +959,7 @@ class Controller:
             )
         )
 
-        del self.le_connections[connection.peer_address]
+        self.le_connections.pop(connection.peer_address, None)
 
     def create_le_connection(self, peer_address: hci.Address) -> None:
         '''
@@ -959,10 +967,6 @@ class Controller:
         '''
         pending_le_connection = self.pending_le_connection
         assert pending_le_connection
-
-        if self.le_connections.get(peer_address):
-            logger.error("Connection for %s already exists?", peer_address)
-            return
 
         self_address = (
             self.public_address
@@ -972,6 +976,10 @@ class Controller:
 
         # Allocate (or reuse) a connection handle
         peer_address = pending_le_connection.peer_address
+        if peer_address in self.le_connections:
+            logger.error("Connection for %s already exists?", peer_address)
+            return
+
         connection_handle = self.allocate_connection_handle()
         connection = Connection(
             controller=self,
@@ -1107,16 +1115,25 @@ class Controller:
         )
 
     def on_link_acl_data(
-        self, sender_address: hci.Address, transport: PhysicalTransport, data: bytes
+        self,
+        sender_address: hci.Address,
+        receiver_address: hci.Address,
+        transport: PhysicalTransport,
+        data: bytes,
     ) -> None:
         # Look for the connection to which this data belongs
         if transport == PhysicalTransport.LE:
             connection = self.le_connections.get(sender_address)
-        else:
+            if connection is None or connection.self_address != receiver_address:
+                return
+        elif transport == PhysicalTransport.BR_EDR:
+            if receiver_address != self.public_address:
+                return
             connection = self.classic_connections.get(sender_address)
-        if connection is None:
-            logger.warning(f'!!! no connection for {sender_address}')
-            return
+            if connection is None:
+                return
+        else:
+            raise ValueError("unsupported transport type")
 
         # Send the data to the host
         # TODO: should fragment
@@ -1333,13 +1350,20 @@ class Controller:
     ) -> asyncio.Future[int]:
         loop = asyncio.get_running_loop()
         assert self.link
-        self.link.send_lmp_packet(self, receiver_address, packet)
+        self.link.send_lmp_packet(self, self.public_address, receiver_address, packet)
         future = self.classic_pending_commands.setdefault(receiver_address, {})[
             packet.opcode
         ] = loop.create_future()
         return future
 
-    def on_lmp_packet(self, sender_address: hci.Address, packet: lmp.Packet) -> None:
+    def on_lmp_packet(
+        self,
+        sender_address: hci.Address,
+        receiver_address: hci.Address,
+        packet: lmp.Packet,
+    ) -> None:
+        if receiver_address != self.public_address:
+            return
         match packet:
             case lmp.LmpAccepted() | lmp.LmpAcceptedExt():
                 if future := self.classic_pending_commands.setdefault(
@@ -2018,7 +2042,7 @@ class Controller:
                 self.on_le_disconnected(connection, command.reason)
             else:
                 # Remove the connection
-                del self.le_connections[connection.peer_address]
+                self.le_connections.pop(connection.peer_address, None)
         elif sco_link := self.find_classic_sco_link_by_handle(handle):
             if self.link:
                 if (
@@ -3144,6 +3168,12 @@ class Controller:
             )
             return None
 
+        if command.peer_address in self.le_connections:
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.CONNECTION_ALREADY_EXISTS_ERROR, command.op_code
+            )
+            return None
+
         self.pending_le_connection = command
 
         # Say that the connection is pending
@@ -3171,6 +3201,12 @@ class Controller:
         if self.pending_le_connection:
             self._send_hci_command_status(
                 hci.HCI_ErrorCode.COMMAND_DISALLOWED_ERROR, command.op_code
+            )
+            return
+
+        if command.peer_address in self.le_connections:
+            self._send_hci_command_status(
+                hci.HCI_ErrorCode.CONNECTION_ALREADY_EXISTS_ERROR, command.op_code
             )
             return
 
