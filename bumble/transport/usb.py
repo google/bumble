@@ -77,8 +77,12 @@ USB_BT_HCI_CLASS_TUPLE = (
     USB_DEVICE_PROTOCOL_BLUETOOTH_PRIMARY_CONTROLLER,
 )
 
-MAX_SCO_IN_PACKETS = 128
-NUMBER_OF_SCO_IN_TRANSFERS = 2
+# Number of isochronous packets per SCO IN transfer and transfers kept in flight.
+# At 1 ms per USB frame, 16 packets limits receive buffering to ~16 ms (while staying
+# a multiple of 8 for WinUSB high-speed alignment), and 8 transfers in flight keep
+# ~112 ms of scheduling runway against user-space jitter.
+MAX_SCO_IN_PACKETS = 16
+NUMBER_OF_SCO_IN_TRANSFERS = 8
 # Each HCI SCO packet sent over the isochronous endpoint spans 3 USB (micro)frames,
 # with the 3-byte HCI header at the start of the first one (Core Spec Vol 4, Part B,
 # 2.1.1). For example, with alternate setting 2 (17-byte max packet size), each HCI SCO
