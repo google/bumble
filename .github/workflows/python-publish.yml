@@ -5,7 +5,7 @@ on:
     types: [published]
 
 concurrency:
-  group: pypi-publish
+  group: pypi-publish-${{ github.ref }}
   cancel-in-progress: false
 
 permissions: {}
@@ -39,42 +39,40 @@ jobs:
       run: python -m build
     - name: Authenticate to Google Cloud (OSS Exit Gate)
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
-      uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+      uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
       with:
         workload_identity_provider: 'projects/305452601764/locations/global/workloadIdentityPools/builders/providers/github'
     - name: Set up Cloud SDK
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
-      uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
-    - name: Clean up stale releases from staging repo
+      uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+    - name: Clean up prior failed staging attempt for this exact version (if any)
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
       run: |
-        packages=$(gcloud artifacts packages list \
-            --project="oss-exit-gate-prod" \
-            --location="us" \
-            --repository="bumble--pypi" \
-            --format="value(name)")
-
-        echo "${packages}" | xargs -r -n1 sh -c '
-            echo "Deleting package: $(basename "$1")..."
-            gcloud artifacts packages delete "$1" \
-                --project="oss-exit-gate-prod" \
-                --location="us" \
-                --repository="bumble--pypi" \
-                --quiet
-        ' _
-
+        set -euo pipefail
+        python .github/scripts/exit_gate_pypi.py cleanup \
+          --dist-dir dist \
+          --project oss-exit-gate-prod \
+          --location us \
+          --repository bumble--pypi
     - name: Publish package to PyPI via OSS Exit Gate
       if: github.event_name == 'release' && startsWith(github.ref, 'refs/tags')
       env:
-        TWINE_USERNAME: oauth2accesstoken
         RUN_ID: ${{ github.run_id }}
         RUN_ATTEMPT: ${{ github.run_attempt }}
       run: |
-        export TWINE_PASSWORD="$(gcloud auth print-access-token)"
+        set -euo pipefail
+        MANIFEST_PATH="${RUNNER_TEMP}/manifest-bumble.json"
+        trap 'rm -f "${MANIFEST_PATH}"' EXIT
+        TWINE_PASSWORD="$(gcloud auth print-access-token)"
         echo "::add-mask::${TWINE_PASSWORD}"
+        TWINE_USERNAME="oauth2accesstoken"
+        export TWINE_USERNAME TWINE_PASSWORD
         python -m twine upload \
           --repository-url "https://us-python.pkg.dev/oss-exit-gate-prod/bumble--pypi/" \
           dist/*
-        echo '{"publish_all": true}' > manifest.json
-        gcloud storage cp manifest.json \
+        unset TWINE_USERNAME TWINE_PASSWORD
+        python .github/scripts/exit_gate_pypi.py manifest \
+          --dist-dir dist \
+          --output "${MANIFEST_PATH}"
+        gcloud storage cp --if-generation-match=0 "${MANIFEST_PATH}" \
           "gs://oss-exit-gate-prod-projects-bucket/bumble/pypi/manifests/manifest-${RUN_ID}-${RUN_ATTEMPT}.json"
