@@ -20,7 +20,7 @@ from unittest import mock
 import pytest
 
 from bumble import crypto
-from bumble.crypto import EccKey, aes_cmac, ah, c1, f4, f5, f6, g2, h6, h7, s1
+from bumble.crypto import EccKey, aes_cmac, ah, c1, e, f4, f5, f6, g2, h6, h7, s1
 
 
 # -----------------------------------------------------------------------------
@@ -84,7 +84,18 @@ def test_ecc(crypto_backend):
 
 
 # -----------------------------------------------------------------------------
-@pytest.mark.parametrize("x, y", [(0, 0), (1, 1)])
+@pytest.mark.parametrize(
+    "x, y",
+    [
+        (0, 0),
+        (1, 1),
+        (
+            # Point with x = p + 4 that satisfies the curve equation mod p
+            0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF + 4,
+            0x872A856D529E886426619C81479469A6B1B02C4342F2142F13C3B11F713F9288,
+        ),
+    ],
+)
 def test_ecc_dh_point_not_on_curve(crypto_backend, x, y):
     key = EccKey.generate()
     with pytest.raises(ValueError):
@@ -141,6 +152,8 @@ def test_aes_cmac(crypto_backend):
     )
     cmac = aes_cmac(m, k)
     assert cmac == bytes.fromhex('51f0bebf 7e3b9d92 fc497417 79363cfe')
+    assert aes_cmac(m, bytearray(k)) == cmac
+    assert e(bytearray(k), bytes(16)) == e(k, bytes(16))
 
 
 # -----------------------------------------------------------------------------
