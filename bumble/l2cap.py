@@ -1863,19 +1863,15 @@ class ClassicChannel(utils.EventEmitter):
                         _mps,
                     ) = struct.unpack_from('<BBBHHH', option_value)
                     if rtx_timeout_ms > 0:
-                        self._negotiated_retransmission_timeout = (
-                            rtx_timeout_ms / 1000.0
-                        )
+                        rtx_timeout = rtx_timeout_ms / 1000.0
+                        self._negotiated_retransmission_timeout = rtx_timeout
                         if isinstance(self.processor, EnhancedRetransmissionProcessor):
-                            self.processor.retransmission_timeout = (
-                                self._negotiated_retransmission_timeout
-                            )
+                            self.processor.retransmission_timeout = rtx_timeout
                     if mon_timeout_ms > 0:
-                        self._negotiated_monitor_timeout = mon_timeout_ms / 1000.0
+                        mon_timeout = mon_timeout_ms / 1000.0
+                        self._negotiated_monitor_timeout = mon_timeout
                         if isinstance(self.processor, EnhancedRetransmissionProcessor):
-                            self.processor.monitor_timeout = (
-                                self._negotiated_monitor_timeout
-                            )
+                            self.processor.monitor_timeout = mon_timeout
                 elif (
                     option_type == L2CAP_Configure_Request.ParameterType.FCS
                     and len(option_value) == 1
