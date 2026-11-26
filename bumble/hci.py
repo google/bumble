@@ -1209,6 +1209,7 @@ HCI_SUPPORTED_COMMANDS_MASKS = {
     # capabilities. Per Nordic hci_types.h:2609: BT_CMD_TEST(cmd, 49, 2)
     # → octet 49, bit 2 of the LE Supported Commands bitmap.
     HCI_LE_CS_READ_LOCAL_SUPPORTED_CAPABILITIES_V2_COMMAND                    : 1 << (49*8+2),
+    HCI_LE_CS_WRITE_CACHED_REMOTE_SUPPORTED_CAPABILITIES_V2_COMMAND           : 1 << (49*8+3),
     HCI_SET_EVENT_MASK_PAGE_2_COMMAND                                         : 1 << (22*8+2),
     HCI_READ_FLOW_CONTROL_MODE_COMMAND                                        : 1 << (23*8+0),
     HCI_WRITE_FLOW_CONTROL_MODE_COMMAND                                       : 1 << (23*8+1),
@@ -4874,6 +4875,129 @@ class HCI_LE_Read_Supported_States_Command(
 
 
 # -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Receiver_Test_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.28 LE Receiver Test command [v1]
+    '''
+
+    rx_channel: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Transmitter_Test_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.29 LE Transmitter Test command [v1]
+    '''
+
+    tx_channel: int = field(metadata=metadata(1))
+    test_data_length: int = field(metadata=metadata(1))
+    packet_payload: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Receiver_Test_V2_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.28 LE Receiver Test command [v2]
+    '''
+
+    rx_channel: int = field(metadata=metadata(1))
+    phy: int = field(metadata=Phy.type_metadata(1))
+    modulation_index: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Transmitter_Test_V2_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.29 LE Transmitter Test command [v2]
+    '''
+
+    tx_channel: int = field(metadata=metadata(1))
+    test_data_length: int = field(metadata=metadata(1))
+    packet_payload: int = field(metadata=metadata(1))
+    phy: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Receiver_Test_V3_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.28 LE Receiver Test command [v3]
+    '''
+
+    rx_channel: int = field(metadata=metadata(1))
+    phy: int = field(metadata=Phy.type_metadata(1))
+    modulation_index: int = field(metadata=metadata(1))
+    expected_cte_length: int = field(metadata=metadata(1))
+    expected_cte_type: int = field(metadata=metadata(1))
+    slot_durations: int = field(metadata=metadata(1))
+    antenna_ids: Sequence[int] = field(
+        metadata=metadata(1, list_begin=True, list_end=True)
+    )
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Transmitter_Test_V3_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.29 LE Transmitter Test command [v3]
+    '''
+
+    tx_channel: int = field(metadata=metadata(1))
+    test_data_length: int = field(metadata=metadata(1))
+    packet_payload: int = field(metadata=metadata(1))
+    phy: int = field(metadata=metadata(1))
+    cte_length: int = field(metadata=metadata(1))
+    cte_type: int = field(metadata=metadata(1))
+    antenna_ids: Sequence[int] = field(
+        metadata=metadata(1, list_begin=True, list_end=True)
+    )
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Transmitter_Test_V4_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.29 LE Transmitter Test command [v4]
+    '''
+
+    tx_channel: int = field(metadata=metadata(1))
+    test_data_length: int = field(metadata=metadata(1))
+    packet_payload: int = field(metadata=metadata(1))
+    phy: int = field(metadata=metadata(1))
+    cte_length: int = field(metadata=metadata(1))
+    cte_type: int = field(metadata=metadata(1))
+    antenna_ids: Sequence[int] = field(
+        metadata=metadata(1, list_begin=True, list_end=True)
+    )
+    tx_power_level: int = field(metadata=metadata(-1))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Test_End_ReturnParameters(HCI_StatusReturnParameters):
+    number_of_packets: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Test_End_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Test_End_Command(HCI_SyncCommand[HCI_LE_Test_End_ReturnParameters]):
+    '''
+    See Bluetooth spec @ 7.8.30 LE Test End command
+    '''
+
+
+# -----------------------------------------------------------------------------
 @HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
 class HCI_LE_Remote_Connection_Parameter_Request_Reply_Command(
@@ -4967,6 +5091,31 @@ class HCI_LE_Read_Local_P_256_Public_Key_Command(HCI_AsyncCommand):
 
 
 # -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Generate_DHKey_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.37 LE Generate DHKey command [v1]
+    '''
+
+    key_x_coordinate: bytes = field(metadata=metadata(32))
+    key_y_coordinate: bytes = field(metadata=metadata(32))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Generate_DHKey_V2_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.37 LE Generate DHKey command [v2]
+    '''
+
+    key_x_coordinate: bytes = field(metadata=metadata(32))
+    key_y_coordinate: bytes = field(metadata=metadata(32))
+    key_type: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
 @HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
 class HCI_LE_Add_Device_To_Resolving_List_Command(
@@ -4984,6 +5133,24 @@ class HCI_LE_Add_Device_To_Resolving_List_Command(
     )
     peer_irk: bytes = field(metadata=metadata(16))
     local_irk: bytes = field(metadata=metadata(16))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Remove_Device_From_Resolving_List_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.39 LE Remove Device From Resolving List Command
+    '''
+
+    peer_identity_address_type: int = field(
+        metadata=metadata(Address.ADDRESS_TYPE_SPEC)
+    )
+    peer_identity_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -5009,6 +5176,56 @@ class HCI_LE_Read_Resolving_List_Size_Command(
     '''
     See Bluetooth spec @ 7.8.41 LE Read Resolving List Size command
     '''
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_Peer_Resolvable_Address_ReturnParameters(HCI_StatusReturnParameters):
+    peer_resolvable_address: Address = field(
+        metadata=metadata(Address.parse_random_address)
+    )
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Peer_Resolvable_Address_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Peer_Resolvable_Address_Command(
+    HCI_SyncCommand[HCI_LE_Read_Peer_Resolvable_Address_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.42 LE Read Peer Resolvable Address command
+    '''
+
+    peer_identity_address_type: int = field(
+        metadata=metadata(Address.ADDRESS_TYPE_SPEC)
+    )
+    peer_identity_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_Local_Resolvable_Address_ReturnParameters(HCI_StatusReturnParameters):
+    local_resolvable_address: Address = field(
+        metadata=metadata(Address.parse_random_address)
+    )
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Local_Resolvable_Address_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Local_Resolvable_Address_Command(
+    HCI_SyncCommand[HCI_LE_Read_Local_Resolvable_Address_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.43 LE Read Local Resolvable Address command
+    '''
+
+    peer_identity_address_type: int = field(
+        metadata=metadata(Address.ADDRESS_TYPE_SPEC)
+    )
+    peer_identity_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -5193,6 +5410,47 @@ class HCI_LE_Set_Extended_Advertising_Parameters_Command(
 
 
 # -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Set_Extended_Advertising_Parameters_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Set_Extended_Advertising_Parameters_V2_Command(
+    HCI_SyncCommand[HCI_LE_Set_Extended_Advertising_Parameters_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.53 LE Set Extended Advertising Parameters command [v2]
+    '''
+
+    advertising_handle: int = field(metadata=metadata(1))
+    advertising_event_properties: int = field(
+        metadata=HCI_LE_Set_Extended_Advertising_Parameters_Command.AdvertisingProperties.type_metadata(
+            2
+        )
+    )
+    primary_advertising_interval_min: int = field(metadata=metadata(3))
+    primary_advertising_interval_max: int = field(metadata=metadata(3))
+    primary_advertising_channel_map: int = field(
+        metadata=HCI_LE_Set_Extended_Advertising_Parameters_Command.ChannelMap.type_metadata(
+            1
+        )
+    )
+    own_address_type: int = field(metadata=OwnAddressType.type_metadata(1))
+    peer_address_type: int = field(metadata=metadata(Address.ADDRESS_TYPE_SPEC))
+    peer_address: Address = field(
+        metadata=metadata(Address.parse_address_preceded_by_type)
+    )
+    advertising_filter_policy: int = field(metadata=metadata(1))
+    advertising_tx_power: int = field(metadata=metadata(-1))
+    primary_advertising_phy: int = field(metadata=Phy.type_metadata(1))
+    secondary_advertising_max_skip: int = field(metadata=metadata(1))
+    secondary_advertising_phy: int = field(metadata=Phy.type_metadata(1))
+    advertising_sid: int = field(metadata=metadata(1))
+    scan_request_notification_enable: int = field(metadata=metadata(1))
+    primary_advertising_phy_options: int = field(metadata=metadata(1))
+    secondary_advertising_phy_options: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
 @HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
 class HCI_LE_Set_Extended_Advertising_Data_Command(
@@ -5332,6 +5590,36 @@ class HCI_LE_Set_Periodic_Advertising_Parameters_Command(
 
     class Properties(SpecableFlag):
         INCLUDE_TX_POWER = 1 << 6
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Set_Periodic_Advertising_Parameters_V2_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    advertising_handle: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Set_Periodic_Advertising_Parameters_V2_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Set_Periodic_Advertising_Parameters_V2_Command(
+    HCI_SyncCommand[HCI_LE_Set_Periodic_Advertising_Parameters_V2_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.61 LE Set Periodic Advertising Parameters command [v2]
+    '''
+
+    advertising_handle: int = field(metadata=metadata(1))
+    periodic_advertising_interval_min: int = field(metadata=metadata(2))
+    periodic_advertising_interval_max: int = field(metadata=metadata(2))
+    periodic_advertising_properties: int = field(metadata=metadata(2))
+    num_subevents: int = field(metadata=metadata(1))
+    subevent_interval: int = field(metadata=metadata(1))
+    response_slot_delay: int = field(metadata=metadata(1))
+    response_slot_spacing: int = field(metadata=metadata(1))
+    num_response_slots: int = field(metadata=metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -5667,6 +5955,197 @@ class HCI_LE_Extended_Create_Connection_Command(HCI_AsyncCommand):
 
 # -----------------------------------------------------------------------------
 @HCI_Command.command
+class HCI_LE_Extended_Create_Connection_V2_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.66 LE Extended Create Connection command [v2]
+    '''
+
+    op_code = HCI_LE_EXTENDED_CREATE_CONNECTION_V2_COMMAND
+
+    @classmethod
+    def from_parameters(cls, parameters: bytes) -> Self:
+        advertising_handle = parameters[0]
+        subevent = parameters[1]
+        initiator_filter_policy = parameters[2]
+        own_address_type = parameters[3]
+        peer_address_type = parameters[4]
+        peer_address = Address.parse_address_preceded_by_type(parameters, 5)[1]
+        initiating_phys = parameters[11]
+
+        phy_bits_set = bin(initiating_phys).count('1')
+
+        def read_parameter_list(offset):
+            return [
+                struct.unpack_from('<H', parameters, offset + 16 * i)[0]
+                for i in range(phy_bits_set)
+            ]
+
+        return cls(
+            advertising_handle=advertising_handle,
+            subevent=subevent,
+            initiator_filter_policy=initiator_filter_policy,
+            own_address_type=own_address_type,
+            peer_address_type=peer_address_type,
+            peer_address=peer_address,
+            initiating_phys=initiating_phys,
+            scan_intervals=read_parameter_list(12),
+            scan_windows=read_parameter_list(14),
+            connection_interval_mins=read_parameter_list(16),
+            connection_interval_maxs=read_parameter_list(18),
+            max_latencies=read_parameter_list(20),
+            supervision_timeouts=read_parameter_list(22),
+            min_ce_lengths=read_parameter_list(24),
+            max_ce_lengths=read_parameter_list(26),
+        )
+
+    def __init__(
+        self,
+        advertising_handle: int,
+        subevent: int,
+        initiator_filter_policy: int,
+        own_address_type: int,
+        peer_address_type: int,
+        peer_address: Address,
+        initiating_phys: int,
+        scan_intervals: Sequence[int],
+        scan_windows: Sequence[int],
+        connection_interval_mins: Sequence[int],
+        connection_interval_maxs: Sequence[int],
+        max_latencies: Sequence[int],
+        supervision_timeouts: Sequence[int],
+        min_ce_lengths: Sequence[int],
+        max_ce_lengths: Sequence[int],
+    ) -> None:
+        self.advertising_handle = advertising_handle
+        self.subevent = subevent
+        self.initiator_filter_policy = initiator_filter_policy
+        self.own_address_type = own_address_type
+        self.peer_address_type = peer_address_type
+        self.peer_address = peer_address
+        self.initiating_phys = initiating_phys
+        self.scan_intervals = scan_intervals
+        self.scan_windows = scan_windows
+        self.connection_interval_mins = connection_interval_mins
+        self.connection_interval_maxs = connection_interval_maxs
+        self.max_latencies = max_latencies
+        self.supervision_timeouts = supervision_timeouts
+        self.min_ce_lengths = min_ce_lengths
+        self.max_ce_lengths = max_ce_lengths
+
+        phy_bits_set = bin(initiating_phys).count('1')
+        parameters = (
+            bytes(
+                [
+                    advertising_handle,
+                    subevent,
+                    initiator_filter_policy,
+                    own_address_type,
+                    peer_address_type,
+                ]
+            )
+            + bytes(peer_address)
+            + bytes([initiating_phys])
+            + b''.join(
+                struct.pack(
+                    '<HHHHHHHH',
+                    scan_intervals[i],
+                    scan_windows[i],
+                    connection_interval_mins[i],
+                    connection_interval_maxs[i],
+                    max_latencies[i],
+                    supervision_timeouts[i],
+                    min_ce_lengths[i],
+                    max_ce_lengths[i],
+                )
+                for i in range(phy_bits_set)
+            )
+        )
+        super().__init__()
+        self.parameters = parameters
+
+    def __str__(self) -> str:
+        initiating_phys_strs = bit_flags_to_strings(
+            self.initiating_phys, HCI_LE_PHY_BIT_NAMES
+        )
+        fields = [
+            ('advertising_handle:     ', self.advertising_handle),
+            ('subevent:               ', self.subevent),
+            ('initiator_filter_policy:', self.initiator_filter_policy),
+            (
+                'own_address_type:       ',
+                OwnAddressType(self.own_address_type).name,
+            ),
+            (
+                'peer_address_type:      ',
+                Address.address_type_name(self.peer_address_type),
+            ),
+            ('peer_address:           ', str(self.peer_address)),
+            ('initiating_phys:        ', ','.join(initiating_phys_strs)),
+        ]
+        for i, initiating_phys_str in enumerate(initiating_phys_strs):
+            fields.append(
+                (
+                    f'{initiating_phys_str}.scan_interval:          ',
+                    self.scan_intervals[i],
+                )
+            )
+            fields.append(
+                (
+                    f'{initiating_phys_str}.scan_window:            ',
+                    self.scan_windows[i],
+                )
+            )
+            fields.append(
+                (
+                    f'{initiating_phys_str}.connection_interval_min:',
+                    self.connection_interval_mins[i],
+                )
+            )
+            fields.append(
+                (
+                    f'{initiating_phys_str}.connection_interval_max:',
+                    self.connection_interval_maxs[i],
+                )
+            )
+            fields.append(
+                (
+                    f'{initiating_phys_str}.max_latency:            ',
+                    self.max_latencies[i],
+                )
+            )
+            fields.append(
+                (
+                    f'{initiating_phys_str}.supervision_timeout:    ',
+                    self.supervision_timeouts[i],
+                )
+            )
+            fields.append(
+                (
+                    f'{initiating_phys_str}.min_ce_length:          ',
+                    self.min_ce_lengths[i],
+                )
+            )
+            fields.append(
+                (
+                    f'{initiating_phys_str}.max_ce_length:          ',
+                    self.max_ce_lengths[i],
+                )
+            )
+
+        return (
+            color(self.name, 'green')
+            + ':\n'
+            + '\n'.join(
+                [
+                    color('  ' + field[0], 'cyan') + ' ' + str(field[1])
+                    for field in fields
+                ]
+            )
+        )
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
 @dataclasses.dataclass
 class HCI_LE_Periodic_Advertising_Create_Sync_Command(HCI_AsyncCommand):
     '''
@@ -5803,6 +6282,37 @@ class HCI_LE_Read_Transmit_Power_Command(
 
 
 # -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_RF_Path_Compensation_ReturnParameters(HCI_StatusReturnParameters):
+    rf_tx_path_compensation_value: int = field(metadata=metadata(-2))
+    rf_rx_path_compensation_value: int = field(metadata=metadata(-2))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_RF_Path_Compensation_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_RF_Path_Compensation_Command(
+    HCI_SyncCommand[HCI_LE_Read_RF_Path_Compensation_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.75 LE Read RF Path Compensation command
+    '''
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Write_RF_Path_Compensation_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.76 LE Write RF Path Compensation command
+    '''
+
+    rf_tx_path_compensation_value: int = field(metadata=metadata(-2))
+    rf_rx_path_compensation_value: int = field(metadata=metadata(-2))
+
+
+# -----------------------------------------------------------------------------
 @HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
 class HCI_LE_Set_Privacy_Mode_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
@@ -5821,6 +6331,152 @@ class HCI_LE_Set_Privacy_Mode_Command(HCI_SyncCommand[HCI_StatusReturnParameters
         metadata=metadata(Address.parse_address_preceded_by_type)
     )
     privacy_mode: int = field(metadata=PrivacyMode.type_metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Connectionless_CTE_Transmit_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.80 LE Set Connectionless CTE Transmit Parameters command
+    '''
+
+    advertising_handle: int = field(metadata=metadata(1))
+    cte_length: int = field(metadata=metadata(1))
+    cte_type: int = field(metadata=metadata(1))
+    cte_count: int = field(metadata=metadata(1))
+    antenna_ids: Sequence[int] = field(
+        metadata=metadata(1, list_begin=True, list_end=True)
+    )
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Connectionless_CTE_Transmit_Enable_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.81 LE Set Connectionless CTE Transmit Enable command
+    '''
+
+    advertising_handle: int = field(metadata=metadata(1))
+    cte_enable: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Set_Connectionless_IQ_Sampling_Enable_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    sync_handle: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Set_Connectionless_IQ_Sampling_Enable_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Set_Connectionless_IQ_Sampling_Enable_Command(
+    HCI_SyncCommand[HCI_LE_Set_Connectionless_IQ_Sampling_Enable_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.82 LE Set Connectionless IQ Sampling Enable command
+    '''
+
+    sync_handle: int = field(metadata=metadata(2))
+    sampling_enable: int = field(metadata=metadata(1))
+    slot_durations: int = field(metadata=metadata(1))
+    max_sampled_ctes: int = field(metadata=metadata(1))
+    antenna_ids: Sequence[int] = field(
+        metadata=metadata(1, list_begin=True, list_end=True)
+    )
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Connection_CTE_Receive_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.83 LE Set Connection CTE Receive Parameters command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    sampling_enable: int = field(metadata=metadata(1))
+    slot_durations: int = field(metadata=metadata(1))
+    antenna_ids: Sequence[int] = field(
+        metadata=metadata(1, list_begin=True, list_end=True)
+    )
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Connection_CTE_Transmit_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.84 LE Set Connection CTE Transmit Parameters command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    cte_types: int = field(metadata=metadata(1))
+    antenna_ids: Sequence[int] = field(
+        metadata=metadata(1, list_begin=True, list_end=True)
+    )
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Connection_CTE_Request_Enable_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.85 LE Connection CTE Request Enable command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    enable: int = field(metadata=metadata(1))
+    cte_request_interval: int = field(metadata=metadata(2))
+    requested_cte_length: int = field(metadata=metadata(1))
+    requested_cte_type: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Connection_CTE_Response_Enable_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.86 LE Connection CTE Response Enable command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    enable: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_Antenna_Information_ReturnParameters(HCI_StatusReturnParameters):
+    supported_switching_sampling_rates: int = field(metadata=metadata(1))
+    num_antennae: int = field(metadata=metadata(1))
+    max_switching_pattern_length: int = field(metadata=metadata(1))
+    max_cte_length: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_Antenna_Information_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_Antenna_Information_Command(
+    HCI_SyncCommand[HCI_LE_Read_Antenna_Information_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.87 LE Read Antenna Information command
+    '''
 
 
 # -----------------------------------------------------------------------------
@@ -5905,6 +6561,19 @@ class HCI_LE_Set_Default_Periodic_Advertising_Sync_Transfer_Parameters_Command(
 
 
 # -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Modify_Sleep_Clock_Accuracy_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.94 LE Modify Sleep Clock Accuracy command
+    '''
+
+    action: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
 @dataclasses.dataclass
 class HCI_LE_Read_ISO_TX_Sync_ReturnParameters(
     HCI_StatusAndConnectionHandleReturnParameters
@@ -5959,6 +6628,37 @@ class HCI_LE_Set_CIG_Parameters_Command(
     phy_p_to_c: Sequence[int] = field(metadata=metadata(1))
     rtn_c_to_p: Sequence[int] = field(metadata=metadata(1))
     rtn_p_to_c: Sequence[int] = field(metadata=metadata(1, list_end=True))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_LE_Set_CIG_Parameters_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_CIG_Parameters_Test_Command(
+    HCI_SyncCommand[HCI_LE_Set_CIG_Parameters_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.98 LE Set CIG Parameters Test command
+    '''
+
+    cig_id: int = field(metadata=metadata(1))
+    sdu_interval_c_to_p: int = field(metadata=metadata(3))
+    sdu_interval_p_to_c: int = field(metadata=metadata(3))
+    ft_c_to_p: int = field(metadata=metadata(1))
+    ft_p_to_c: int = field(metadata=metadata(1))
+    iso_interval: int = field(metadata=metadata(2))
+    worst_case_sca: int = field(metadata=metadata(1))
+    packing: int = field(metadata=metadata(1))
+    framing: int = field(metadata=metadata(1))
+    cis_id: Sequence[int] = field(metadata=metadata(1, list_begin=True))
+    nse: Sequence[int] = field(metadata=metadata(1))
+    max_sdu_c_to_p: Sequence[int] = field(metadata=metadata(2))
+    max_sdu_p_to_c: Sequence[int] = field(metadata=metadata(2))
+    max_pdu_c_to_p: Sequence[int] = field(metadata=metadata(2))
+    max_pdu_p_to_c: Sequence[int] = field(metadata=metadata(2))
+    phy_c_to_p: Sequence[int] = field(metadata=metadata(1))
+    phy_p_to_c: Sequence[int] = field(metadata=metadata(1))
+    bn_c_to_p: Sequence[int] = field(metadata=metadata(1))
+    bn_p_to_c: Sequence[int] = field(metadata=metadata(1, list_end=True))
 
 
 # -----------------------------------------------------------------------------
@@ -6039,6 +6739,32 @@ class HCI_LE_Create_BIG_Command(HCI_AsyncCommand):
 # -----------------------------------------------------------------------------
 @HCI_Command.command
 @dataclasses.dataclass
+class HCI_LE_Create_BIG_Test_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.104 LE Create BIG Test command
+    '''
+
+    big_handle: int = field(metadata=metadata(1))
+    advertising_handle: int = field(metadata=metadata(1))
+    num_bis: int = field(metadata=metadata(1))
+    sdu_interval: int = field(metadata=metadata(3))
+    iso_interval: int = field(metadata=metadata(2))
+    nse: int = field(metadata=metadata(1))
+    max_sdu: int = field(metadata=metadata(2))
+    max_pdu: int = field(metadata=metadata(2))
+    phy: int = field(metadata=metadata(1))
+    packing: int = field(metadata=metadata(1))
+    framing: int = field(metadata=metadata(1))
+    bn: int = field(metadata=metadata(1))
+    irc: int = field(metadata=metadata(1))
+    pto: int = field(metadata=metadata(1))
+    encryption: int = field(metadata=metadata(1))
+    broadcast_code: bytes = field(metadata=metadata(16))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
 class HCI_LE_Terminate_BIG_Command(HCI_AsyncCommand):
     '''
     See Bluetooth spec @ 7.8.105 LE Terminate BIG command
@@ -6084,6 +6810,17 @@ class HCI_LE_BIG_Terminate_Sync_Command(
 
 
 # -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Request_Peer_SCA_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.108 LE Request Peer SCA command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
 @HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
 @dataclasses.dataclass
 class HCI_LE_Setup_ISO_Data_Path_Command(
@@ -6120,6 +6857,78 @@ class HCI_LE_Remove_ISO_Data_Path_Command(
 
 
 # -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_ISO_Transmit_Test_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.111 LE ISO Transmit Test command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    payload_type: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_ISO_Receive_Test_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.112 LE ISO Receive Test command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    payload_type: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_ISO_Read_Test_Counters_ReturnParameters(
+    HCI_StatusAndConnectionHandleReturnParameters
+):
+    received_sdu_count: int = field(metadata=metadata(4))
+    missed_sdu_count: int = field(metadata=metadata(4))
+    failed_sdu_count: int = field(metadata=metadata(4))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_ISO_Read_Test_Counters_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_ISO_Read_Test_Counters_Command(
+    HCI_SyncCommand[HCI_LE_ISO_Read_Test_Counters_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.113 LE ISO Read Test Counters command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_ISO_Test_End_ReturnParameters(
+    HCI_StatusAndConnectionHandleReturnParameters
+):
+    received_sdu_count: int = field(metadata=metadata(4))
+    missed_sdu_count: int = field(metadata=metadata(4))
+    failed_sdu_count: int = field(metadata=metadata(4))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_ISO_Test_End_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_ISO_Test_End_Command(
+    HCI_SyncCommand[HCI_LE_ISO_Test_End_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.114 LE ISO Test End command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
 @HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
 @dataclasses.dataclass
 class HCI_LE_Set_Host_Feature_Command(HCI_SyncCommand[HCI_StatusReturnParameters]):
@@ -6129,6 +6938,130 @@ class HCI_LE_Set_Host_Feature_Command(HCI_SyncCommand[HCI_StatusReturnParameters
 
     bit_number: int = field(metadata=metadata(1))
     bit_value: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Read_ISO_Link_Quality_ReturnParameters(
+    HCI_StatusAndConnectionHandleReturnParameters
+):
+    tx_unacked_packets: int = field(metadata=metadata(4))
+    tx_flushed_packets: int = field(metadata=metadata(4))
+    tx_last_subevent_packets: int = field(metadata=metadata(4))
+    retransmitted_packets: int = field(metadata=metadata(4))
+    crc_error_packets: int = field(metadata=metadata(4))
+    rx_unreceived_packets: int = field(metadata=metadata(4))
+    duplicate_packets: int = field(metadata=metadata(4))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Read_ISO_Link_Quality_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Read_ISO_Link_Quality_Command(
+    HCI_SyncCommand[HCI_LE_Read_ISO_Link_Quality_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.116 LE Read ISO Link Quality command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Enhanced_Read_Transmit_Power_Level_ReturnParameters(
+    HCI_StatusAndConnectionHandleReturnParameters
+):
+    phy: int = field(metadata=metadata(1))
+    current_tx_power_level: int = field(metadata=metadata(-1))
+    max_tx_power_level: int = field(metadata=metadata(-1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Enhanced_Read_Transmit_Power_Level_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Enhanced_Read_Transmit_Power_Level_Command(
+    HCI_SyncCommand[HCI_LE_Enhanced_Read_Transmit_Power_Level_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.117 LE Enhanced Read Transmit Power Level command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    phy: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_Command.command
+@dataclasses.dataclass
+class HCI_LE_Read_Remote_Transmit_Power_Level_Command(HCI_AsyncCommand):
+    '''
+    See Bluetooth spec @ 7.8.118 LE Read Remote Transmit Power Level command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    phy: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Path_Loss_Reporting_Parameters_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.119 LE Set Path Loss Reporting Parameters command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    high_threshold: int = field(metadata=metadata(1))
+    high_hysteresis: int = field(metadata=metadata(1))
+    low_threshold: int = field(metadata=metadata(1))
+    low_hysteresis: int = field(metadata=metadata(1))
+    min_time_spent: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Path_Loss_Reporting_Enable_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.120 LE Set Path Loss Reporting Enable command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    enable: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Transmit_Power_Reporting_Enable_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.121 LE Set Transmit Power Reporting Enable command
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    local_enable: int = field(metadata=metadata(1))
+    remote_enable: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Data_Related_Address_Changes_Command(
+    HCI_SyncCommand[HCI_StatusReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.122 LE Set Data Related Address Changes command
+    '''
+
+    advertising_handle: int = field(metadata=metadata(1))
+    change_reasons: int = field(metadata=metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -6160,6 +7093,87 @@ class HCI_LE_Subrate_Request_Command(HCI_AsyncCommand):
     max_latency: int = field(metadata=metadata(2))
     continuation_number: int = field(metadata=metadata(2))
     supervision_timeout: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Set_Periodic_Advertising_Subevent_Data_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    advertising_handle: int = field(metadata=metadata(1))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Set_Periodic_Advertising_Subevent_Data_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Set_Periodic_Advertising_Subevent_Data_Command(
+    HCI_SyncCommand[HCI_LE_Set_Periodic_Advertising_Subevent_Data_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.125 LE Set Periodic Advertising Subevent Data command
+    '''
+
+    @dataclasses.dataclass
+    class SubeventData(HCI_Dataclass_Object):
+        subevent: int = field(metadata=metadata(1))
+        response_slot_start: int = field(metadata=metadata(1))
+        response_slot_count: int = field(metadata=metadata(1))
+        subevent_data: bytes = field(metadata=metadata('v'))
+
+    advertising_handle: int = field(metadata=metadata(1))
+    subevents: Sequence[SubeventData] = field(
+        metadata=metadata(SubeventData.parse_from_bytes, list_begin=True, list_end=True)
+    )
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Set_Periodic_Advertising_Response_Data_ReturnParameters(
+    HCI_StatusReturnParameters
+):
+    sync_handle: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(
+    HCI_LE_Set_Periodic_Advertising_Response_Data_ReturnParameters
+)
+@dataclasses.dataclass
+class HCI_LE_Set_Periodic_Advertising_Response_Data_Command(
+    HCI_SyncCommand[HCI_LE_Set_Periodic_Advertising_Response_Data_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.126 LE Set Periodic Advertising Response Data command
+    '''
+
+    sync_handle: int = field(metadata=metadata(2))
+    request_event: int = field(metadata=metadata(2))
+    request_subevent: int = field(metadata=metadata(1))
+    response_subevent: int = field(metadata=metadata(1))
+    response_slot: int = field(metadata=metadata(1))
+    response_data: bytes = field(metadata=metadata('v'))
+
+
+# -----------------------------------------------------------------------------
+@dataclasses.dataclass
+class HCI_LE_Set_Periodic_Sync_Subevent_ReturnParameters(HCI_StatusReturnParameters):
+    sync_handle: int = field(metadata=metadata(2))
+
+
+@HCI_SyncCommand.sync_command(HCI_LE_Set_Periodic_Sync_Subevent_ReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_Set_Periodic_Sync_Subevent_Command(
+    HCI_SyncCommand[HCI_LE_Set_Periodic_Sync_Subevent_ReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.127 LE Set Periodic Sync Subevent command
+    '''
+
+    sync_handle: int = field(metadata=metadata(2))
+    periodic_advertising_properties: int = field(metadata=metadata(2))
+    subevents: Sequence[int] = field(
+        metadata=metadata(1, list_begin=True, list_end=True)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -6314,6 +7328,44 @@ class HCI_LE_CS_Write_Cached_Remote_Supported_Capabilities_Command(
     t_pm_times_supported: int = field(metadata=metadata(2))
     t_sw_time_supported: int = field(metadata=metadata(1))
     tx_snr_capability: int = field(metadata=metadata(CS_SNR_SPEC))
+
+
+# -----------------------------------------------------------------------------
+@HCI_SyncCommand.sync_command(HCI_StatusAndConnectionHandleReturnParameters)
+@dataclasses.dataclass
+class HCI_LE_CS_Write_Cached_Remote_Supported_Capabilities_V2_Command(
+    HCI_SyncCommand[HCI_StatusAndConnectionHandleReturnParameters]
+):
+    '''
+    See Bluetooth spec @ 7.8.132 LE CS Write Cached Remote Supported Capabilities command [v2]
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    num_config_supported: int = field(metadata=metadata(1))
+    max_consecutive_procedures_supported: int = field(metadata=metadata(2))
+    num_antennas_supported: int = field(metadata=metadata(1))
+    max_antenna_paths_supported: int = field(metadata=metadata(1))
+    roles_supported: int = field(metadata=metadata(1))
+    modes_supported: int = field(metadata=metadata(1))
+    rtt_capability: int = field(metadata=metadata(1))
+    rtt_aa_only_n: int = field(metadata=metadata(1))
+    rtt_sounding_n: int = field(metadata=metadata(1))
+    rtt_random_sequence_n: int = field(metadata=metadata(1))
+    nadm_sounding_capability: int = field(metadata=metadata(2))
+    nadm_random_capability: int = field(metadata=metadata(2))
+    cs_sync_phys_supported: int = field(metadata=metadata(CS_SYNC_PHY_SUPPORTED_SPEC))
+    subfeatures_supported: int = field(metadata=metadata(2))
+    t_ip1_times_supported: int = field(metadata=metadata(2))
+    t_ip2_times_supported: int = field(metadata=metadata(2))
+    t_fcs_times_supported: int = field(metadata=metadata(2))
+    t_pm_times_supported: int = field(metadata=metadata(2))
+    t_sw_time_supported: int = field(metadata=metadata(1))
+    tx_snr_capability: int = field(metadata=metadata(CS_SNR_SPEC))
+    t_ip2_ipt_times_supported: int = field(metadata=metadata(2))
+    t_sw_ipt_times_supported: int = field(metadata=metadata(1))
+    rtt_2m_aa_only_n: int = field(metadata=metadata(1))
+    rtt_2m_sounding_n: int = field(metadata=metadata(1))
+    rtt_2m_random_sequence_n: int = field(metadata=metadata(1))
 
 
 # -----------------------------------------------------------------------------
@@ -7041,6 +8093,31 @@ class HCI_LE_Data_Length_Change_Event(HCI_LE_Meta_Event):
 # -----------------------------------------------------------------------------
 @HCI_LE_Meta_Event.event
 @dataclasses.dataclass
+class HCI_LE_Read_Local_P_256_Public_Key_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.8 LE Read Local P-256 Public Key Complete event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    key_x_coordinate: bytes = field(metadata=metadata(32))
+    key_y_coordinate: bytes = field(metadata=metadata(32))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Generate_DHKey_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.9 LE Generate DHKey Complete event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    dhkey: bytes = field(metadata=metadata(32))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
 class HCI_LE_Enhanced_Connection_Complete_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.10 LE Enhanced Connection Complete Event
@@ -7092,6 +8169,32 @@ class HCI_LE_Enhanced_Connection_Complete_V2_Event(HCI_LE_Meta_Event):
     central_clock_accuracy: int = field(metadata=metadata(1))
     advertising_handle: int = field(metadata=metadata(1))
     sync_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Directed_Advertising_Report_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.11 LE Directed Advertising Report event
+    '''
+
+    @dataclasses.dataclass
+    class Report(HCI_Dataclass_Object):
+        event_type: int = field(metadata=metadata(1))
+        address_type: int = field(metadata=AddressType.type_metadata(1))
+        address: Address = field(
+            metadata=metadata(Address.parse_address_preceded_by_type)
+        )
+        direct_address_type: int = field(metadata=AddressType.type_metadata(1))
+        direct_address: Address = field(
+            metadata=metadata(Address.parse_address_preceded_by_type)
+        )
+        rssi: int = field(metadata=metadata(-1))
+
+    reports: Sequence[Report] = field(
+        metadata=metadata(Report.parse_from_bytes, list_begin=True, list_end=True)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -7325,6 +8428,59 @@ class HCI_LE_Channel_Selection_Algorithm_Event(HCI_LE_Meta_Event):
 # -----------------------------------------------------------------------------
 @HCI_LE_Meta_Event.event
 @dataclasses.dataclass
+class HCI_LE_Connectionless_IQ_Report_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.21 LE Connectionless IQ Report event
+    '''
+
+    sync_handle: int = field(metadata=metadata(2))
+    channel_index: int = field(metadata=metadata(1))
+    rssi: int = field(metadata=metadata(-2))
+    rssi_antenna_id: int = field(metadata=metadata(1))
+    cte_type: int = field(metadata=metadata(1))
+    slot_durations: int = field(metadata=metadata(1))
+    packet_status: int = field(metadata=metadata(1))
+    periodic_event_counter: int = field(metadata=metadata(2))
+    i_sample: Sequence[int] = field(metadata=metadata(-1, list_begin=True))
+    q_sample: Sequence[int] = field(metadata=metadata(-1, list_end=True))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Connection_IQ_Report_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.22 LE Connection IQ Report event
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    rx_phy: int = field(metadata=Phy.type_metadata(1))
+    data_channel_index: int = field(metadata=metadata(1))
+    rssi: int = field(metadata=metadata(-2))
+    rssi_antenna_id: int = field(metadata=metadata(1))
+    cte_type: int = field(metadata=metadata(1))
+    slot_durations: int = field(metadata=metadata(1))
+    packet_status: int = field(metadata=metadata(1))
+    connection_event_counter: int = field(metadata=metadata(2))
+    i_sample: Sequence[int] = field(metadata=metadata(-1, list_begin=True))
+    q_sample: Sequence[int] = field(metadata=metadata(-1, list_end=True))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_CTE_Request_Failed_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.23 LE CTE Request Failed event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
 class HCI_LE_Periodic_Advertising_Sync_Transfer_Received_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.24 LE Periodic Advertising Sync Transfer Received Event
@@ -7483,6 +8639,49 @@ class HCI_LE_BIG_Sync_Lost_Event(HCI_LE_Meta_Event):
 # -----------------------------------------------------------------------------
 @HCI_LE_Meta_Event.event
 @dataclasses.dataclass
+class HCI_LE_Request_Peer_SCA_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.31 LE Request Peer SCA Complete event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    peer_clock_accuracy: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Path_Loss_Threshold_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.32 LE Path Loss Threshold event
+    '''
+
+    connection_handle: int = field(metadata=metadata(2))
+    current_path_loss: int = field(metadata=metadata(1))
+    zone_entered: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Transmit_Power_Reporting_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.33 LE Transmit Power Reporting event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    reason: int = field(metadata=metadata(1))
+    phy: int = field(metadata=metadata(1))
+    tx_power_level: int = field(metadata=metadata(-1))
+    tx_power_level_flag: int = field(metadata=metadata(1))
+    delta: int = field(metadata=metadata(-1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
 class HCI_LE_BIGInfo_Advertising_Report_Event(HCI_LE_Meta_Event):
     '''
     See Bluetooth spec @ 7.7.65.34 LE BIGInfo Advertising Report Event
@@ -7517,6 +8716,44 @@ class HCI_LE_Subrate_Change_Event(HCI_LE_Meta_Event):
     peripheral_latency: int = field(metadata=metadata(2))
     continuation_number: int = field(metadata=metadata(2))
     supervision_timeout: int = field(metadata=metadata(2))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Periodic_Advertising_Subevent_Data_Request_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.36 LE Periodic Advertising Subevent Data Request event
+    '''
+
+    advertising_handle: int = field(metadata=metadata(1))
+    subevent_start: int = field(metadata=metadata(1))
+    subevent_data_count: int = field(metadata=metadata(1))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Periodic_Advertising_Response_Report_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.37 LE Periodic Advertising Response Report event
+    '''
+
+    @dataclasses.dataclass
+    class Response(HCI_Dataclass_Object):
+        tx_power: int = field(metadata=metadata(-1))
+        rssi: int = field(metadata=metadata(-1))
+        cte_type: int = field(metadata=metadata(1))
+        response_slot: int = field(metadata=metadata(1))
+        data_status: int = field(metadata=metadata(1))
+        data: bytes = field(metadata=metadata('v'))
+
+    advertising_handle: int = field(metadata=metadata(1))
+    subevent: int = field(metadata=metadata(1))
+    tx_status: int = field(metadata=metadata(1))
+    responses: Sequence[Response] = field(
+        metadata=metadata(Response.parse_from_bytes, list_begin=True, list_end=True)
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -7733,6 +8970,24 @@ class HCI_LE_CS_Test_End_Complete_Event(HCI_LE_Meta_Event):
 
     connection_handle: int = field(metadata=metadata(2))
     status: int = field(metadata=metadata(STATUS_SPEC))
+
+
+# -----------------------------------------------------------------------------
+@HCI_LE_Meta_Event.event
+@dataclasses.dataclass
+class HCI_LE_Frame_Space_Update_Complete_Event(HCI_LE_Meta_Event):
+    '''
+    See Bluetooth spec @ 7.7.65.48 LE Frame Space Update Complete event
+    '''
+
+    status: int = field(metadata=metadata(STATUS_SPEC))
+    connection_handle: int = field(metadata=metadata(2))
+    initiator: int = field(metadata=metadata(1))
+    frame_space: int = field(metadata=metadata(2))
+    phys: int = field(metadata=PhyBit.type_metadata(1))
+    spacing_types: int = field(
+        metadata=HCI_LE_Frame_Space_Update_Command.SpacingType.type_metadata(2)
+    )
 
 
 # -----------------------------------------------------------------------------
