@@ -237,6 +237,78 @@ class PeripheralFeatureReq(ControlPdu):
 
 
 @dataclasses.dataclass
+class FeatureExtReq(ControlPdu):
+    '''
+    Simplified LL_FEATURE_EXT_REQ: all the pages are exchanged in one PDU.
+    '''
+
+    opcode = ControlPdu.Opcode.LL_FEATURE_EXT_REQ
+
+    max_page: int
+    feature_set: bytes
+
+
+@dataclasses.dataclass
+class FeatureExtRsp(ControlPdu):
+    '''
+    Simplified LL_FEATURE_EXT_RSP: all the pages are exchanged in one PDU.
+    '''
+
+    opcode = ControlPdu.Opcode.LL_FEATURE_EXT_RSP
+
+    max_page: int
+    feature_set: bytes
+
+
+@dataclasses.dataclass
+class LengthReq(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_LENGTH_REQ
+
+    max_rx_octets: int
+    max_rx_time: int
+    max_tx_octets: int
+    max_tx_time: int
+    phys: int = hci.DataLengthPhys.GFSK
+
+
+@dataclasses.dataclass
+class LengthRsp(ControlPdu):
+    opcode = ControlPdu.Opcode.LL_LENGTH_RSP
+
+    max_rx_octets: int
+    max_rx_time: int
+    max_tx_octets: int
+    max_tx_time: int
+    phys: int = hci.DataLengthPhys.GFSK
+
+
+@dataclasses.dataclass
+class PhyReq(ControlPdu):
+    '''
+    LL_PHY_REQ, where tx_phys and rx_phys are bit fields (hci.PhyBit) seen from the
+    sender of the PDU.
+    '''
+
+    opcode = ControlPdu.Opcode.LL_PHY_REQ
+
+    tx_phys: int
+    rx_phys: int
+    phy_options: int = 0
+
+
+@dataclasses.dataclass
+class PhyUpdateInd(ControlPdu):
+    '''
+    Simplified LL_PHY_UPDATE_IND, where phy_c_to_p and phy_p_to_c are hci.Phy values.
+    '''
+
+    opcode = ControlPdu.Opcode.LL_PHY_UPDATE_IND
+
+    phy_c_to_p: int
+    phy_p_to_c: int
+
+
+@dataclasses.dataclass
 class ConnectionUpdateInd(ControlPdu):
     opcode = ControlPdu.Opcode.LL_CONNECTION_UPDATE_IND
 

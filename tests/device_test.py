@@ -566,6 +566,9 @@ async def test_get_remote_le_features_failed():
     devices[0].host.on_hci_le_read_remote_features_complete_event = (
         on_hci_le_read_remote_features_complete_event
     )
+    devices[0].host.on_hci_le_read_all_remote_features_complete_event = (
+        on_hci_le_read_remote_features_complete_event
+    )
 
     with pytest.raises(HCI_Error):
         await asyncio.wait_for(
