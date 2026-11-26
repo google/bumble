@@ -371,6 +371,346 @@ async def test_mode_mismatching(server_mode, client_mode):
 
 
 # -----------------------------------------------------------------------------
+def test_enhanced_control_fields():
+    # I-frame: final must default to 0 (Core Spec Vol 3, Part A, 3.3.2).
+    i_field = l2cap.InformationEnhancedControlField(
+        tx_seq=42,
+        req_seq=17,
+        sar=l2cap.ControlField.SegmentationAndReassembly.START,
+    )
+    assert i_field.final == 0
+    raw_i = bytes(i_field)
+    assert raw_i[0] == (0 | (42 << 1) | (0 << 7))
+    assert raw_i[1] == (17 | (1 << 6))
+    assert l2cap.EnhancedControlField.from_bytes(raw_i) == i_field
+
+    # S-frame: poll is bit 4, final is bit 7, req_seq is 6 bits.
+    s_poll = l2cap.SupervisoryEnhancedControlField(
+        supervision_function=l2cap.ControlField.SupervisoryFunction.RR,
+        poll=1,
+        final=0,
+        req_seq=63,
+    )
+    raw_s_poll = bytes(s_poll)
+    assert raw_s_poll == bytes([0x01 | (1 << 4), 63])
+    assert l2cap.EnhancedControlField.from_bytes(raw_s_poll) == s_poll
+
+    s_rej_final = l2cap.SupervisoryEnhancedControlField(
+        supervision_function=l2cap.ControlField.SupervisoryFunction.REJ,
+        poll=0,
+        final=1,
+        req_seq=5,
+    )
+    raw_s_rej = bytes(s_rej_final)
+    assert raw_s_rej == bytes([0x01 | (1 << 2) | (1 << 7), 5])
+    assert l2cap.EnhancedControlField.from_bytes(raw_s_rej) == s_rej_final
+
+    # Reserved bits 14-15 in S-frame must be masked out when decoding req_seq.
+    decoded = l2cap.SupervisoryEnhancedControlField.from_bytes(bytes([0x01, 0xC5]))
+    assert decoded.req_seq == 5
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    'extra_options',
+    [
+        # Flush Timeout (200 ms, as sent by iOS A2DP)
+        [
+            (
+                l2cap.L2CAP_Configure_Request.ParameterType.FLUSH_TIMEOUT,
+                (200).to_bytes(2, 'little'),
+            )
+        ],
+        # QoS Best Effort (service_type = 0x01)
+        [
+            (
+                l2cap.L2CAP_Configure_Request.ParameterType.QOS,
+                bytes([0x00, 0x01]) + bytes(20),
+            )
+        ],
+        # QoS No Traffic (service_type = 0x00)
+        [
+            (
+                l2cap.L2CAP_Configure_Request.ParameterType.QOS,
+                bytes([0x00, 0x00]) + bytes(20),
+            )
+        ],
+        # Unknown Hint option (MSB set = 0x80 | 0x2A) must be ignored
+        [(0xAA, b'\x01\x02')],
+        # Flush Timeout with Hint bit set
+        [
+            (
+                0x80 | l2cap.L2CAP_Configure_Request.ParameterType.FLUSH_TIMEOUT,
+                (200).to_bytes(2, 'little'),
+            )
+        ],
+    ],
+)
+async def test_classic_configure_request_accepts_standard_and_hint_options(
+    monkeypatch, extra_options
+):
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    original_send = l2cap.ClassicChannel.send_control_frame
+
+    def patched_send(self, frame):
+        if (
+            isinstance(frame, l2cap.L2CAP_Configure_Request)
+            and self.connection.device is devices.devices[0]
+        ):
+            options = l2cap.L2CAP_Control_Frame.decode_configuration_options(
+                frame.options
+            )
+            options.extend(extra_options)
+            frame = l2cap.L2CAP_Configure_Request(
+                identifier=frame.identifier,
+                destination_cid=frame.destination_cid,
+                flags=frame.flags,
+                options=l2cap.L2CAP_Control_Frame.encode_configuration_options(options),
+            )
+        return original_send(self, frame)
+
+    monkeypatch.setattr(l2cap.ClassicChannel, 'send_control_frame', patched_send)
+
+    server_channels = asyncio.Queue[l2cap.ClassicChannel]()
+    server = devices.devices[1].create_l2cap_server(
+        spec=l2cap.ClassicChannelSpec(), handler=server_channels.put_nowait
+    )
+    client_channel = await asyncio.wait_for(
+        devices.connections[0].create_l2cap_channel(
+            spec=l2cap.ClassicChannelSpec(psm=server.psm)
+        ),
+        timeout=5.0,
+    )
+    server_channel = await asyncio.wait_for(server_channels.get(), timeout=5.0)
+    assert client_channel.state == l2cap.ClassicChannel.State.OPEN
+    assert server_channel.state == l2cap.ClassicChannel.State.OPEN
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_enhanced_retransmission_fcs_and_corrupted_frame():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    server_channels = asyncio.Queue[l2cap.ClassicChannel]()
+    # Server requests FCS=True while client leaves fcs_enabled=False;
+    # per Core Spec 5.5, both sides must use 16-bit FCS.
+    server = devices.devices[1].create_l2cap_server(
+        spec=l2cap.ClassicChannelSpec(
+            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION,
+            fcs_enabled=True,
+            mps=64,
+        ),
+        handler=server_channels.put_nowait,
+    )
+    client_channel = await devices.connections[0].create_l2cap_channel(
+        spec=l2cap.ClassicChannelSpec(
+            server.psm,
+            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION,
+            fcs_enabled=False,
+            mps=64,
+        )
+    )
+    server_channel = await server_channels.get()
+    assert client_channel.fcs_enabled is True
+    assert server_channel.fcs_enabled is True
+
+    # Normal transfer with FCS enabled works.
+    await transfer_payload((client_channel, server_channel))
+
+    # Corrupted FCS frame must be dropped and not delivered to sink.
+    received = []
+    server_channel.sink = received.append
+    valid_pdu = l2cap.L2CAP_PDU(
+        server_channel.source_cid,
+        bytes(l2cap.InformationEnhancedControlField(tx_seq=0, req_seq=0, sar=0))
+        + b'bad',
+    ).to_bytes(with_fcs=True)
+    # Strip 4-byte L2CAP header and flip last byte of FCS.
+    corrupted_payload = valid_pdu[4:-1] + bytes([valid_pdu[-1] ^ 0xFF])
+    server_channel.on_pdu(corrupted_payload)
+    assert not received
+
+    await client_channel.disconnect()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_enhanced_retransmission_mps_start_segment_limit():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    server_channels = asyncio.Queue[l2cap.ClassicChannel]()
+    server = devices.devices[1].create_l2cap_server(
+        spec=l2cap.ClassicChannelSpec(
+            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION,
+            mps=20,
+        ),
+        handler=server_channels.put_nowait,
+    )
+    client_channel = await devices.connections[0].create_l2cap_channel(
+        spec=l2cap.ClassicChannelSpec(
+            server.psm,
+            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION,
+            mps=20,
+        )
+    )
+    server_channel = await server_channels.get()
+
+    sent_pdus: list[bytes] = []
+    original_send_pdu = client_channel.send_pdu
+
+    def spy_send_pdu(pdu):
+        sent_pdus.append(bytes(pdu))
+        original_send_pdu(pdu)
+
+    client_channel.send_pdu = spy_send_pdu
+
+    received = asyncio.Queue[bytes]()
+    server_channel.sink = received.put_nowait
+
+    sdu = bytes(range(50))
+    client_channel.write(sdu)
+    assert await asyncio.wait_for(received.get(), timeout=2.0) == sdu
+
+    # Every I-frame payload (excluding 2-byte Enhanced Control Field) must be
+    # <= MPS (20).
+    i_frames = [p for p in sent_pdus if (p[0] & 0x01) == 0]
+    assert len(i_frames) == 3  # 18 + 20 + 12 = 50
+    for frame in i_frames:
+        assert len(frame) - 2 <= 20
+
+    await client_channel.disconnect()
+
+
+# -----------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_enhanced_retransmission_recovery_on_drop_and_rej_and_rnr():
+    devices = TwoDevices()
+    await devices.setup_connection()
+
+    server_channels = asyncio.Queue[l2cap.ClassicChannel]()
+    server = devices.devices[1].create_l2cap_server(
+        spec=l2cap.ClassicChannelSpec(
+            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION,
+            retransmission_timeout=0.05,
+            monitor_timeout=0.1,
+            max_retransmission=3,
+        ),
+        handler=server_channels.put_nowait,
+    )
+    client_channel = await devices.connections[0].create_l2cap_channel(
+        spec=l2cap.ClassicChannelSpec(
+            server.psm,
+            mode=l2cap.TransmissionMode.ENHANCED_RETRANSMISSION,
+            retransmission_timeout=0.05,
+            monitor_timeout=0.1,
+            max_retransmission=3,
+        )
+    )
+    server_channel = await server_channels.get()
+
+    received = asyncio.Queue[bytes]()
+    server_channel.sink = received.put_nowait
+
+    # 1) Drop the first I-frame once -> recovered via Poll/Final retransmission.
+    dropped_once = False
+    original_server_on_pdu = server_channel.on_pdu
+
+    def drop_first_i_frame(pdu: bytes) -> None:
+        nonlocal dropped_once
+        if not dropped_once and (pdu[0] & 0x01) == 0:
+            dropped_once = True
+            return
+        original_server_on_pdu(pdu)
+
+    server_channel.on_pdu = drop_first_i_frame
+    client_channel.write(b'hello-poll-recovery')
+    assert await asyncio.wait_for(received.get(), timeout=2.0) == b'hello-poll-recovery'
+
+    # 2) Drop tx_seq=1 while tx_seq=2 arrives -> REJ triggers retransmission of 1 & 2.
+    dropped_seq1 = False
+
+    def drop_seq1_once(pdu: bytes) -> None:
+        nonlocal dropped_seq1
+        if not dropped_seq1 and (pdu[0] & 0x01) == 0 and ((pdu[0] >> 1) & 0x3F) == 1:
+            dropped_seq1 = True
+            return
+        original_server_on_pdu(pdu)
+
+    server_channel.on_pdu = drop_seq1_once
+    client_channel.write(b'msg-1')
+    client_channel.write(b'msg-2')
+    assert await asyncio.wait_for(received.get(), timeout=2.0) == b'msg-1'
+    assert await asyncio.wait_for(received.get(), timeout=2.0) == b'msg-2'
+
+    # 3) RNR pauses client TX, RR resumes it immediately.
+    # Drain any in-flight RR from step 2 before injecting RNR.
+    await async_barrier()
+    server_channel.on_pdu = original_server_on_pdu
+    client_channel.on_pdu(
+        bytes(
+            l2cap.SupervisoryEnhancedControlField(
+                supervision_function=l2cap.ControlField.SupervisoryFunction.RNR,
+                req_seq=3,
+            )
+        )
+    )
+    client_channel.write(b'after-rnr')
+    await async_barrier()
+    assert received.empty()
+
+    client_channel.on_pdu(
+        bytes(
+            l2cap.SupervisoryEnhancedControlField(
+                supervision_function=l2cap.ControlField.SupervisoryFunction.RR,
+                req_seq=3,
+            )
+        )
+    )
+    assert await asyncio.wait_for(received.get(), timeout=2.0) == b'after-rnr'
+
+    # 4) SREJ selectively retransmits only the requested I-frame.
+    await async_barrier()
+    retransmitted_seqs: list[int] = []
+    original_client_send_pdu = client_channel.send_pdu
+
+    def drop_seq4_and_record(pdu):
+        raw = bytes(pdu)
+        if (raw[0] & 0x01) == 0:
+            retransmitted_seqs.append((raw[0] >> 1) & 0x3F)
+        original_client_send_pdu(pdu)
+
+    client_channel.send_pdu = drop_seq4_and_record
+    # Pause server RX so tx_seq=4 stays in client _tx_window.
+    server_channel.on_pdu = lambda _pdu: None
+    client_channel.write(b'srej-target')
+    await async_barrier()
+    retransmitted_seqs.clear()
+    server_channel.on_pdu = original_server_on_pdu
+    client_channel.on_pdu(
+        bytes(
+            l2cap.SupervisoryEnhancedControlField(
+                supervision_function=l2cap.ControlField.SupervisoryFunction.SREJ,
+                poll=0,
+                req_seq=4,
+            )
+        )
+    )
+    assert await asyncio.wait_for(received.get(), timeout=2.0) == b'srej-target'
+    assert retransmitted_seqs == [4]
+
+    # 5) Disconnecting cancels timers cleanly.
+    await client_channel.disconnect()
+    assert isinstance(client_channel.processor, l2cap.EnhancedRetransmissionProcessor)
+    assert client_channel.processor._monitor_handle is None
+    assert client_channel.processor._receiver_ready_poll_handle is None
+
+
+# -----------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_enhanced_credit_based_flow_control_connection():
     devices = await TwoDevices.create_with_connection()
