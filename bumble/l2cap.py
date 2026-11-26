@@ -20,7 +20,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import enum
-import itertools
 import logging
 import struct
 from collections import deque
@@ -306,7 +305,7 @@ class InformationEnhancedControlField(EnhancedControlField):
     tx_seq: int
     sar: int
     req_seq: int = 0
-    final: int = 1
+    final: int = 0
 
     frame_type = EnhancedControlField.FieldType.I_FRAME
 
@@ -322,8 +321,10 @@ class InformationEnhancedControlField(EnhancedControlField):
     def __bytes__(self) -> bytes:
         return bytes(
             [
-                self.frame_type | (self.tx_seq << 1) | (self.final << 7),
-                self.req_seq | (self.sar << 6),
+                self.frame_type
+                | ((self.tx_seq & 0b00111111) << 1)
+                | ((self.final & 0b1) << 7),
+                (self.req_seq & 0b00111111) | ((self.sar & 0b11) << 6),
             ]
         )
 
@@ -343,7 +344,7 @@ class SupervisoryEnhancedControlField(EnhancedControlField):
             supervision_function=(data[0] >> 2) & 0b11,
             poll=(data[0] >> 4) & 0b1,
             final=(data[0] >> 7) & 0b1,
-            req_seq=(data[1] & 0b1111111),
+            req_seq=(data[1] & 0b00111111),
         )
 
     def __bytes__(self) -> bytes:
@@ -351,11 +352,11 @@ class SupervisoryEnhancedControlField(EnhancedControlField):
             [
                 (
                     self.frame_type
-                    | (self.supervision_function << 2)
-                    | self.poll << 7
-                    | (self.final << 7)
+                    | ((self.supervision_function & 0b11) << 2)
+                    | ((self.poll & 0b1) << 4)
+                    | ((self.final & 0b1) << 7)
                 ),
-                self.req_seq,
+                self.req_seq & 0b00111111,
             ]
         )
 
@@ -879,26 +880,28 @@ class Processor:
     def on_pdu(self, pdu: bytes) -> None:
         self.channel.on_sdu(pdu)
 
+    def close(self) -> None:
+        pass
 
-# TODO: Handle retransmission
+
 class EnhancedRetransmissionProcessor(Processor):
     MAX_SEQ_NUM = 64
 
     @dataclasses.dataclass
     class _PendingPdu:
         payload: bytes
-        tx_seq: int
         sar: InformationEnhancedControlField.SegmentationAndReassembly
         sdu_length: int = 0
-        req_seq: int = 0
+        tx_seq: int = 0
 
-        def __bytes__(self) -> bytes:
+        def to_bytes(self, req_seq: int, final: int = 0) -> bytes:
             return (
                 bytes(
                     InformationEnhancedControlField(
                         tx_seq=self.tx_seq,
-                        req_seq=self.req_seq,
+                        req_seq=req_seq,
                         sar=self.sar,
+                        final=final,
                     )
                 )
                 + (
@@ -915,11 +918,14 @@ class EnhancedRetransmissionProcessor(Processor):
     _next_tx_seq: int = 0
     _req_seq_num: int = 0
     _remote_is_busy: bool = False
-    _in_sdu: bytes = b''
+    _wait_f: bool = False
+    _rej_actioned: bool = False
+    _in_sdu: bytearray | None = None
+    _in_sdu_length: int = 0
 
     _num_receiver_ready_polls_sent: int = 0
-    _pending_pdus: list[_PendingPdu]
-    _tx_window: list[_PendingPdu]
+    _pending_pdus: deque[_PendingPdu]
+    _tx_window: deque[_PendingPdu]
     _monitor_handle: asyncio.TimerHandle | None = None
     _receiver_ready_poll_handle: asyncio.TimerHandle | None = None
 
@@ -934,43 +940,65 @@ class EnhancedRetransmissionProcessor(Processor):
         peer_max_retransmission: int = DEFAULT_MAX_RETRANSMISSION,
         peer_mps: int = L2CAP_DEFAULT_MPS,
     ):
+        super().__init__(channel)
+        del peer_max_retransmission  # Peer's MaxTransmit applies to peer's TX.
         spec = channel.spec
         self.mps = spec.mps
         self.peer_mps = peer_mps
         self.peer_tx_window_size = peer_tx_window_size
-        self._pending_pdus = []
-        self._tx_window = []
+        self._pending_pdus = deque()
+        self._tx_window = deque()
         self.monitor_timeout = spec.monitor_timeout
-        self.channel = channel
         self.retransmission_timeout = spec.retransmission_timeout
-        self.peer_max_retransmission = peer_max_retransmission
+        self.max_retransmission = spec.max_retransmission
+
+    @override
+    def close(self) -> None:
+        self._stop_monitor()
+        self._stop_receiver_ready_poll()
+
+    def _stop_monitor(self) -> None:
+        if self._monitor_handle:
+            self._monitor_handle.cancel()
+            self._monitor_handle = None
+
+    def _stop_receiver_ready_poll(self) -> None:
+        if self._receiver_ready_poll_handle:
+            self._receiver_ready_poll_handle.cancel()
+            self._receiver_ready_poll_handle = None
 
     def _monitor(self) -> None:
+        self._monitor_handle = None
+        if self.channel.state != ClassicChannel.State.OPEN:
+            return
         if (
-            self.peer_max_retransmission <= 0
-            or self._num_receiver_ready_polls_sent < self.peer_max_retransmission
+            self.max_retransmission <= 0
+            or self._num_receiver_ready_polls_sent < self.max_retransmission
         ):
             self._send_receiver_ready_poll()
             self._start_monitor()
         else:
             logger.error("Max retransmission exceeded")
+            self._wait_f = False
+            self.channel._disconnect_sync()  # pylint: disable=protected-access
 
     def _receiver_ready_poll(self) -> None:
+        self._receiver_ready_poll_handle = None
+        if self.channel.state != ClassicChannel.State.OPEN:
+            return
+        self._wait_f = True
+        self._num_receiver_ready_polls_sent = 0
         self._send_receiver_ready_poll()
         self._start_monitor()
 
     def _start_monitor(self) -> None:
-        if self._monitor_handle:
-            self._monitor_handle.cancel()
+        self._stop_monitor()
         self._monitor_handle = asyncio.get_running_loop().call_later(
             self.monitor_timeout, self._monitor
         )
 
     def _start_receiver_ready_poll(self) -> None:
-        if self._receiver_ready_poll_handle:
-            self._receiver_ready_poll_handle.cancel()
-        self._num_receiver_ready_polls_sent = 0
-
+        self._stop_receiver_ready_poll()
         self._receiver_ready_poll_handle = asyncio.get_running_loop().call_later(
             self.retransmission_timeout, self._receiver_ready_poll
         )
@@ -979,7 +1007,8 @@ class EnhancedRetransmissionProcessor(Processor):
         self._num_receiver_ready_polls_sent += 1
         self._send_s_frame(
             supervision_function=SupervisoryEnhancedControlField.SupervisoryFunction.RR,
-            final=1,
+            poll=1,
+            final=0,
         )
 
     def _get_next_tx_seq(self) -> int:
@@ -992,125 +1021,275 @@ class EnhancedRetransmissionProcessor(Processor):
         if len(sdu) <= self.peer_mps:
             pdu = self._PendingPdu(
                 payload=sdu,
-                tx_seq=self._get_next_tx_seq(),
-                req_seq=self._req_seq_num,
                 sar=InformationEnhancedControlField.SegmentationAndReassembly.UNSEGMENTED,
             )
             self._pending_pdus.append(pdu)
         else:
-            for offset in range(0, len(sdu), self.peer_mps):
-                payload = sdu[offset : offset + self.peer_mps]
-                if offset == 0:
-                    sar = (
-                        InformationEnhancedControlField.SegmentationAndReassembly.START
-                    )
-                elif offset + len(payload) >= len(sdu):
-                    sar = InformationEnhancedControlField.SegmentationAndReassembly.END
-                else:
-                    sar = (
-                        InformationEnhancedControlField.SegmentationAndReassembly.CONTINUATION
-                    )
-                pdu = self._PendingPdu(
-                    payload=payload,
-                    tx_seq=self._get_next_tx_seq(),
-                    req_seq=self._req_seq_num,
-                    sar=sar,
+            if self.peer_mps <= 2:
+                raise InvalidStateError(
+                    f'peer_mps ({self.peer_mps}) too small for segmentation'
+                )
+            # First segment carries a 2-byte L2CAP SDU Length field counted
+            # against MPS (Core Spec Vol 3, Part A, 3.3.1 / 5.4).
+            first_chunk_size = self.peer_mps - 2
+            self._pending_pdus.append(
+                self._PendingPdu(
+                    payload=sdu[:first_chunk_size],
+                    sar=InformationEnhancedControlField.SegmentationAndReassembly.START,
                     sdu_length=len(sdu),
                 )
-                self._pending_pdus.append(pdu)
+            )
+            offset = first_chunk_size
+            while offset < len(sdu):
+                payload = sdu[offset : offset + self.peer_mps]
+                offset += len(payload)
+                sar = (
+                    InformationEnhancedControlField.SegmentationAndReassembly.END
+                    if offset >= len(sdu)
+                    else InformationEnhancedControlField.SegmentationAndReassembly.CONTINUATION
+                )
+                self._pending_pdus.append(
+                    self._PendingPdu(
+                        payload=payload,
+                        sar=sar,
+                        sdu_length=len(sdu),
+                    )
+                )
         self._process_output()
 
     @override
     def on_pdu(self, pdu: bytes) -> None:
+        if len(pdu) < 2:
+            logger.warning("Ignoring truncated ERTM PDU (%d bytes)", len(pdu))
+            return
         control_field = EnhancedControlField.from_bytes(pdu)
-        self._update_ack_seq(control_field.req_seq, control_field.final != 0)
-        if isinstance(control_field, InformationEnhancedControlField):
-            if control_field.tx_seq != self._req_seq_num:
-                logger.error(
-                    "tx_seq != self._req_seq_num, tx_seq: %d, self._req_seq_num: %d",
+        if isinstance(control_field, SupervisoryEnhancedControlField):
+            self._on_s_frame(control_field)
+        elif isinstance(control_field, InformationEnhancedControlField):
+            self._on_i_frame(control_field, pdu)
+
+    def _on_i_frame(
+        self, control_field: InformationEnhancedControlField, pdu: bytes
+    ) -> None:
+        was_wait_f = self._wait_f
+        is_final = control_field.final != 0
+        if is_final and self._wait_f:
+            self._stop_monitor()
+            self._wait_f = False
+
+        self._update_ack_seq(control_field.req_seq, process_output=False)
+
+        if control_field.tx_seq != self._req_seq_num:
+            distance_behind = (
+                self._req_seq_num - control_field.tx_seq
+            ) % self.MAX_SEQ_NUM
+            if 1 <= distance_behind <= self.channel.spec.tx_window_size:
+                # Duplicate I-frame: peer likely missed our previous ACK.
+                logger.debug(
+                    "Duplicate I-frame tx_seq=%d (expected %d), sending RR",
                     control_field.tx_seq,
                     self._req_seq_num,
                 )
-                return
-            self._req_seq_num = (control_field.tx_seq + 1) % self.MAX_SEQ_NUM
-
-            if (
-                control_field.sar
-                == InformationEnhancedControlField.SegmentationAndReassembly.START
-            ):
-                # Drop Control Field(2) + SDU Length(2)
-                self._in_sdu += pdu[4:]
-            else:
-                # Drop Control Field(2)
-                self._in_sdu += pdu[2:]
-            if control_field.sar in (
-                InformationEnhancedControlField.SegmentationAndReassembly.END,
-                InformationEnhancedControlField.SegmentationAndReassembly.UNSEGMENTED,
-            ):
-                self.channel.on_sdu(self._in_sdu)
-                self._in_sdu = b''
-
-            # If sink doesn't trigger any I-frame, ack this frame.
-            if self._req_seq_num != self._last_acked_rx_seq:
                 self._send_s_frame(
                     supervision_function=SupervisoryEnhancedControlField.SupervisoryFunction.RR,
+                    poll=0,
                     final=0,
                 )
-        elif isinstance(control_field, SupervisoryEnhancedControlField):
-            self._remote_is_busy = (
-                control_field.supervision_function
-                == SupervisoryEnhancedControlField.SupervisoryFunction.RNR
+            else:
+                # Out-of-sequence I-frame (gap detected).
+                # TODO: Optionally support SREJ-based out-of-order RX buffering.
+                logger.warning(
+                    "Out-of-sequence I-frame: tx_seq=%d, expected=%d",
+                    control_field.tx_seq,
+                    self._req_seq_num,
+                )
+                if not self._rej_actioned:
+                    self._rej_actioned = True
+                    self._send_s_frame(
+                        supervision_function=SupervisoryEnhancedControlField.SupervisoryFunction.REJ,
+                        poll=0,
+                        final=0,
+                    )
+        else:
+            self._rej_actioned = False
+            self._req_seq_num = (control_field.tx_seq + 1) % self.MAX_SEQ_NUM
+            self._reassemble_sdu(control_field.sar, pdu)
+
+        if was_wait_f and is_final and self._tx_window and not self._remote_is_busy:
+            self._retransmit_window(final=0)
+        self._process_output()
+
+        # If sink/output didn't piggyback an I-frame ACK, send RR now.
+        if (
+            self.channel.state == ClassicChannel.State.OPEN
+            and self._req_seq_num != self._last_acked_rx_seq
+        ):
+            self._send_s_frame(
+                supervision_function=SupervisoryEnhancedControlField.SupervisoryFunction.RR,
+                poll=0,
+                final=0,
             )
 
-            if control_field.supervision_function in (
-                SupervisoryEnhancedControlField.SupervisoryFunction.RR,
-                SupervisoryEnhancedControlField.SupervisoryFunction.RNR,
-            ):
-                if control_field.poll:
-                    self._send_s_frame(
-                        supervision_function=SupervisoryEnhancedControlField.SupervisoryFunction.RR,
-                        final=1,
+    def _reassemble_sdu(self, sar: int, pdu: bytes) -> None:
+        if sar == InformationEnhancedControlField.SegmentationAndReassembly.UNSEGMENTED:
+            if self._in_sdu is not None:
+                logger.warning("Received UNSEGMENTED I-frame mid-SDU, resetting")
+                self._in_sdu = None
+                self._in_sdu_length = 0
+            self.channel.on_sdu(pdu[2:])
+        elif sar == InformationEnhancedControlField.SegmentationAndReassembly.START:
+            if len(pdu) < 4:
+                logger.warning("Truncated START I-frame (%d bytes)", len(pdu))
+                return
+            if self._in_sdu is not None:
+                logger.warning("Received START I-frame mid-SDU, resetting")
+            self._in_sdu_length = struct.unpack_from('<H', pdu, 2)[0]
+            self._in_sdu = bytearray(pdu[4:])
+        elif (
+            sar
+            == InformationEnhancedControlField.SegmentationAndReassembly.CONTINUATION
+        ):
+            if self._in_sdu is None:
+                logger.warning("Received CONTINUATION I-frame without START, dropping")
+                return
+            self._in_sdu.extend(pdu[2:])
+        elif sar == InformationEnhancedControlField.SegmentationAndReassembly.END:
+            if self._in_sdu is None:
+                logger.warning("Received END I-frame without START, dropping")
+                return
+            self._in_sdu.extend(pdu[2:])
+            sdu = bytes(self._in_sdu)
+            expected_len = self._in_sdu_length
+            self._in_sdu = None
+            self._in_sdu_length = 0
+            if len(sdu) != expected_len:
+                logger.warning(
+                    "Reassembled SDU length mismatch: got %d, expected %d",
+                    len(sdu),
+                    expected_len,
+                )
+            self.channel.on_sdu(sdu)
+
+    def _on_s_frame(self, control_field: SupervisoryEnhancedControlField) -> None:
+        is_poll = control_field.poll != 0
+        is_final = control_field.final != 0
+        was_wait_f = self._wait_f
+
+        # Update remote busy state before processing output (Core Spec §8.6.5).
+        self._remote_is_busy = (
+            control_field.supervision_function
+            == SupervisoryEnhancedControlField.SupervisoryFunction.RNR
+        )
+
+        if is_final and self._wait_f:
+            self._stop_monitor()
+            self._wait_f = False
+
+        if (
+            control_field.supervision_function
+            == SupervisoryEnhancedControlField.SupervisoryFunction.SREJ
+        ):
+            # Per Core Spec §8.6.5.3, SREJ acknowledges prior frames only when P=1.
+            if is_poll:
+                self._update_ack_seq(control_field.req_seq, process_output=False)
+            retransmitted = False
+            for pdu in self._tx_window:
+                if pdu.tx_seq == control_field.req_seq:
+                    self.channel.send_pdu(
+                        pdu.to_bytes(
+                            req_seq=self._req_seq_num, final=1 if is_poll else 0
+                        )
                     )
-            else:
-                # TODO: Handle Retransmission.
-                pass
+                    self._last_acked_rx_seq = self._req_seq_num
+                    if not self._wait_f:
+                        self._start_receiver_ready_poll()
+                    retransmitted = True
+                    break
+            if is_poll and not retransmitted:
+                self._send_s_frame(
+                    supervision_function=SupervisoryEnhancedControlField.SupervisoryFunction.RR,
+                    poll=0,
+                    final=1,
+                )
+            self._process_output()
+        elif (
+            control_field.supervision_function
+            == SupervisoryEnhancedControlField.SupervisoryFunction.REJ
+        ):
+            self._update_ack_seq(control_field.req_seq, process_output=False)
+            if self._tx_window and not self._wait_f:
+                self._retransmit_window(final=1 if is_poll else 0)
+            elif is_poll:
+                self._send_s_frame(
+                    supervision_function=SupervisoryEnhancedControlField.SupervisoryFunction.RR,
+                    poll=0,
+                    final=1,
+                )
+            self._process_output()
+        else:
+            # RR or RNR
+            self._update_ack_seq(control_field.req_seq, process_output=False)
+            if is_poll:
+                self._send_s_frame(
+                    supervision_function=SupervisoryEnhancedControlField.SupervisoryFunction.RR,
+                    poll=0,
+                    final=1,
+                )
+            if was_wait_f and is_final and self._tx_window and not self._remote_is_busy:
+                self._retransmit_window(final=0)
+            self._process_output()
+
+    def _retransmit_window(self, final: int = 0) -> None:
+        if self._remote_is_busy or self._wait_f:
+            return
+        for index, pdu in enumerate(self._tx_window):
+            self.channel.send_pdu(
+                pdu.to_bytes(
+                    req_seq=self._req_seq_num, final=final if index == 0 else 0
+                )
+            )
+            self._last_acked_rx_seq = self._req_seq_num
+        if self._tx_window:
+            self._start_receiver_ready_poll()
 
     def _process_output(self) -> None:
+        if self.channel.state != ClassicChannel.State.OPEN:
+            return
         if self._remote_is_busy:
             logger.debug("Remote is busy")
             return
-        if self._monitor_handle:
-            logger.debug("Monitor handle is not None")
+        if self._wait_f or self._monitor_handle:
+            logger.debug("Waiting for Final response")
             return
 
-        pdu_to_send = self.peer_tx_window_size - len(self._tx_window)
-        for pdu in itertools.islice(self._pending_pdus, pdu_to_send):
-            self._send_i_frame(pdu)
-        self._pending_pdus = self._pending_pdus[pdu_to_send:]
+        while self._pending_pdus and len(self._tx_window) < self.peer_tx_window_size:
+            self._send_i_frame(self._pending_pdus.popleft())
 
     def _send_i_frame(self, pdu: _PendingPdu) -> None:
-        pdu.req_seq = self._req_seq_num
-
-        self._start_receiver_ready_poll()
+        pdu.tx_seq = self._get_next_tx_seq()
         self._tx_window.append(pdu)
-        self.channel.send_pdu(bytes(pdu))
+        if not self._receiver_ready_poll_handle:
+            self._start_receiver_ready_poll()
+        self.channel.send_pdu(pdu.to_bytes(req_seq=self._req_seq_num, final=0))
         self._last_acked_rx_seq = self._req_seq_num
 
     def _send_s_frame(
         self,
         supervision_function: SupervisoryEnhancedControlField.SupervisoryFunction,
         final: int,
+        poll: int = 0,
     ) -> None:
         self.channel.send_pdu(
             SupervisoryEnhancedControlField(
                 supervision_function=supervision_function,
+                poll=poll,
                 final=final,
                 req_seq=self._req_seq_num,
             )
         )
         self._last_acked_rx_seq = self._req_seq_num
 
-    def _update_ack_seq(self, new_seq: int, is_poll_response: bool) -> None:
+    def _update_ack_seq(self, new_seq: int, process_output: bool = True) -> None:
         num_frames_acked = (new_seq - self._last_acked_tx_seq) % self.MAX_SEQ_NUM
         if num_frames_acked > len(self._tx_window):
             logger.error(
@@ -1119,20 +1298,17 @@ class EnhancedRetransmissionProcessor(Processor):
                 len(self._tx_window),
             )
             return
-        if is_poll_response and self._monitor_handle:
-            self._monitor_handle.cancel()
-            self._monitor_handle = None
 
-        del self._tx_window[:num_frames_acked]
+        for _ in range(num_frames_acked):
+            self._tx_window.popleft()
         self._last_acked_tx_seq = new_seq
-        if (
-            self._last_acked_tx_seq == self._next_tx_seq
-            and self._receiver_ready_poll_handle
-        ):
-            self._receiver_ready_poll_handle.cancel()
-            self._receiver_ready_poll_handle = None
+        if not self._tx_window:
+            self._stop_receiver_ready_poll()
+        elif num_frames_acked > 0 and not self._wait_f:
+            self._start_receiver_ready_poll()
 
-        self._process_output()
+        if process_output:
+            self._process_output()
 
 
 # -----------------------------------------------------------------------------
@@ -1196,9 +1372,15 @@ class ClassicChannel(utils.EventEmitter):
         self.connection_result = None
         self.disconnection_result = None
         self.sink = None
-        self.fcs_enabled = spec.fcs_enabled
+        self.fcs_enabled = (
+            spec.fcs_enabled
+            if spec.mode == TransmissionMode.ENHANCED_RETRANSMISSION
+            else False
+        )
         self.spec = spec
         self.mode = spec.mode
+        self._negotiated_retransmission_timeout: float | None = None
+        self._negotiated_monitor_timeout: float | None = None
         # Configure mode-specific processor later on configure request.
         self.processor = Processor(self)
         if self.mode not in (
@@ -1226,6 +1408,21 @@ class ClassicChannel(utils.EventEmitter):
 
     def on_pdu(self, pdu: bytes) -> None:
         if self.fcs_enabled:
+            if len(pdu) < 2:
+                logger.warning(
+                    'Ignoring truncated L2CAP PDU with FCS (%d bytes)', len(pdu)
+                )
+                return
+            received_fcs = struct.unpack_from('<H', pdu, len(pdu) - 2)[0]
+            header = struct.pack('<HH', len(pdu), self.source_cid)
+            expected_fcs = utils.crc_16(header + pdu[:-2])
+            if received_fcs != expected_fcs:
+                logger.warning(
+                    'FCS mismatch: got 0x%04x, expected 0x%04x; dropping PDU',
+                    received_fcs,
+                    expected_fcs,
+                )
+                return
             # Drop FCS.
             pdu = pdu[:-2]
         self.processor.on_pdu(pdu)
@@ -1268,6 +1465,7 @@ class ClassicChannel(utils.EventEmitter):
 
     def _disconnect_sync(self) -> None:
         """For internal sync disconnection."""
+        self.processor.close()
         self._change_state(self.State.WAIT_DISCONNECT)
         self.send_control_frame(
             L2CAP_Disconnection_Request(
@@ -1297,6 +1495,7 @@ class ClassicChannel(utils.EventEmitter):
             return await self.disconnection_result
 
     def abort(self) -> None:
+        self.processor.close()
         if self.state == self.State.OPEN:
             self._change_state(self.State.CLOSED)
             self.emit(self.EVENT_CLOSE)
@@ -1323,11 +1522,13 @@ class ClassicChannel(utils.EventEmitter):
                     ),
                 )
             )
-        if self.fcs_enabled:
+            # Per Core Spec Vol 3, Part A, 5.5, 16-bit FCS (0x01) is the default
+            # if the FCS option is omitted; always send the option in ERTM so
+            # No FCS (0x00) is explicitly signaled when fcs_enabled is False.
             options.append(
                 (
                     L2CAP_Configure_Request.ParameterType.FCS,
-                    bytes([1 if self.fcs_enabled else 0]),
+                    bytes([1 if self.spec.fcs_enabled else 0]),
                 )
             )
         self.send_control_frame(
@@ -1391,17 +1592,65 @@ class ClassicChannel(utils.EventEmitter):
         options = L2CAP_Control_Frame.decode_configuration_options(request.options)
         # Result to options
         replied_options = list[tuple[int, bytes]]()
-        result = L2CAP_Configure_Response.Result.SUCCESS
+        unknown_options = list[tuple[int, bytes]]()
+        unacceptable_options = list[tuple[int, bytes]]()
         new_mode = TransmissionMode.BASIC
-        for option in options:
-            match option[0]:
+        peer_fcs_enabled: bool | None = None
+        peer_rfc_params: tuple[int, int, int, int, int] | None = None
+
+        for raw_type, option_value in options:
+            is_hint = bool(raw_type & 0x80)
+            option_type = L2CAP_Configure_Request.ParameterType(raw_type & 0x7F)
+            match option_type:
                 case L2CAP_Configure_Request.ParameterType.MTU:
-                    self.peer_mtu = struct.unpack('<H', option[1])[0]
+                    if len(option_value) != 2:
+                        unacceptable_options.append((raw_type, option_value))
+                        continue
+                    self.peer_mtu = struct.unpack('<H', option_value)[0]
                     logger.debug('Peer MTU = %d', self.peer_mtu)
-                    replied_options.append(option)
+                    replied_options.append((raw_type, option_value))
+                case L2CAP_Configure_Request.ParameterType.FLUSH_TIMEOUT:
+                    if len(option_value) != 2:
+                        unacceptable_options.append((raw_type, option_value))
+                        continue
+                    flush_timeout = struct.unpack('<H', option_value)[0]
+                    if flush_timeout == 0:
+                        logger.warning('Peer requested illegal Flush Timeout 0')
+                        unacceptable_options.append(
+                            (raw_type, struct.pack('<H', 0xFFFF))
+                        )
+                        continue
+                    logger.debug('Peer Flush Timeout = %d ms', flush_timeout)
+                    replied_options.append((raw_type, option_value))
+                case L2CAP_Configure_Request.ParameterType.QOS:
+                    if len(option_value) != 22:
+                        unacceptable_options.append((raw_type, option_value))
+                        continue
+                    flags, service_type = struct.unpack_from('<BB', option_value)
+                    if service_type in (0x00, 0x01):  # No Traffic or Best Effort
+                        logger.debug(
+                            'Accept QOS option (service_type=%d)[%s]',
+                            service_type,
+                            option_value.hex(),
+                        )
+                        replied_options.append((raw_type, option_value))
+                    else:
+                        logger.debug(
+                            'Reject unsupported QOS service_type=%d, suggest Best Effort',
+                            service_type,
+                        )
+                        unacceptable_options.append(
+                            (
+                                raw_type,
+                                struct.pack('<BB', flags, 0x01) + option_value[2:],
+                            )
+                        )
                 case (
                     L2CAP_Configure_Request.ParameterType.RETRANSMISSION_AND_FLOW_CONTROL
                 ):
+                    if len(option_value) != 9:
+                        unacceptable_options.append((raw_type, option_value))
+                        continue
                     (
                         mode,
                         peer_tx_window_size,
@@ -1409,7 +1658,7 @@ class ClassicChannel(utils.EventEmitter):
                         peer_retransmission_timeout,
                         peer_monitor_timeout,
                         peer_mps,
-                    ) = struct.unpack_from('<BBBHHH', option[1])
+                    ) = struct.unpack_from('<BBBHHH', option_value)
                     new_mode = TransmissionMode(mode)
                     logger.debug(
                         'Peer requests Retransmission or Flow Control: mode=%s,'
@@ -1434,18 +1683,46 @@ class ClassicChannel(utils.EventEmitter):
                         return
 
                     if new_mode == TransmissionMode.BASIC:
-                        replied_options.append(option)
+                        replied_options.append((raw_type, option_value))
                     elif new_mode == TransmissionMode.ENHANCED_RETRANSMISSION:
-                        self.processor = self.manager.make_mode_processor(
-                            self,
-                            mode=new_mode,
-                            peer_tx_window_size=peer_tx_window_size,
-                            peer_max_retransmission=peer_max_retransmission,
-                            peer_monitor_timeout=peer_monitor_timeout,
-                            peer_retransmission_timeout=peer_retransmission_timeout,
-                            peer_mps=peer_mps,
+                        if (
+                            peer_tx_window_size == 0
+                            or peer_tx_window_size > 63
+                            or peer_mps < 2
+                        ):
+                            unacceptable_options.append((raw_type, option_value))
+                            continue
+                        # Per Core Spec Vol 3, Part A, 5.4, the Configure Response
+                        # supplies the Retransmission and Monitor timeouts when the
+                        # peer leaves them as 0 in the Configure Request.
+                        reply_retransmission_timeout = (
+                            peer_retransmission_timeout
+                            or int(self.spec.retransmission_timeout * 1000)
                         )
-                        replied_options.append(option)
+                        reply_monitor_timeout = peer_monitor_timeout or int(
+                            self.spec.monitor_timeout * 1000
+                        )
+                        peer_rfc_params = (
+                            peer_tx_window_size,
+                            peer_max_retransmission,
+                            reply_retransmission_timeout,
+                            reply_monitor_timeout,
+                            peer_mps,
+                        )
+                        replied_options.append(
+                            (
+                                raw_type,
+                                struct.pack(
+                                    '<BBBHHH',
+                                    mode,
+                                    peer_tx_window_size,
+                                    peer_max_retransmission,
+                                    reply_retransmission_timeout,
+                                    reply_monitor_timeout,
+                                    peer_mps,
+                                ),
+                            )
+                        )
                     else:
                         logger.error("Mode %s is not supported", new_mode.name)
                         self._abort_connection_result(
@@ -1455,30 +1732,88 @@ class ClassicChannel(utils.EventEmitter):
                         return
 
                 case L2CAP_Configure_Request.ParameterType.FCS:
-                    enabled = option[1][0] != 0
+                    if len(option_value) != 1:
+                        unacceptable_options.append((raw_type, option_value))
+                        continue
+                    enabled = option_value[0] != 0
                     logger.debug("Peer requests FCS: %s", enabled)
                     if (
                         L2CAP_Information_Request.ExtendedFeatures.FCS_OPTION
                         in self.manager.extended_features
                     ):
-                        self.fcs_enabled = enabled
-                        replied_options.append(option)
+                        peer_fcs_enabled = enabled
+                        effective_fcs = self.spec.fcs_enabled or enabled
+                        replied_options.append(
+                            (raw_type, bytes([1 if effective_fcs else 0]))
+                        )
                     else:
                         logger.error("Frame Check Sequence is not supported")
-                        result = (
-                            L2CAP_Configure_Response.Result.FAILURE_UNACCEPTABLE_PARAMETERS
-                        )
-                        replied_options = [option]
-                        break
+                        unacceptable_options.append((raw_type, option_value))
                 case _:
+                    if is_hint:
+                        logger.debug(
+                            "Ignore unknown hint option %s[%s]",
+                            option_type.name,
+                            option_value.hex(),
+                        )
+                        continue
                     logger.debug(
                         "Reject unimplemented option %s[%s]",
-                        option[0].name,
-                        option[1].hex(),
+                        option_type.name,
+                        option_value.hex(),
                     )
-                    result = L2CAP_Configure_Response.Result.FAILURE_UNKNOWN_OPTIONS
-                    replied_options = [option]
-                    break
+                    unknown_options.append((raw_type, option_value))
+
+        if unknown_options:
+            result = L2CAP_Configure_Response.Result.FAILURE_UNKNOWN_OPTIONS
+            response_options = unknown_options
+        elif unacceptable_options:
+            result = L2CAP_Configure_Response.Result.FAILURE_UNACCEPTABLE_PARAMETERS
+            response_options = unacceptable_options
+        elif new_mode != self.mode:
+            logger.error(
+                'Mode mismatch (peer omitted option -> BASIC), abort connection'
+            )
+            self._abort_connection_result('Abort on configuration - mode mismatch')
+            self._disconnect_sync()
+            return
+        else:
+            result = L2CAP_Configure_Response.Result.SUCCESS
+            response_options = replied_options
+            if self.mode == TransmissionMode.ENHANCED_RETRANSMISSION:
+                # Per Core Spec Vol 3, Part A, 5.5, omitting FCS in ERTM means 16-bit
+                # FCS, and No FCS is only used when both sides request No FCS.
+                self.fcs_enabled = self.spec.fcs_enabled or (
+                    True if peer_fcs_enabled is None else peer_fcs_enabled
+                )
+                assert peer_rfc_params is not None
+                (
+                    peer_tx_window_size,
+                    peer_max_retransmission,
+                    reply_retransmission_timeout,
+                    reply_monitor_timeout,
+                    peer_mps,
+                ) = peer_rfc_params
+                self.processor = self.manager.make_mode_processor(
+                    self,
+                    mode=new_mode,
+                    peer_tx_window_size=peer_tx_window_size,
+                    peer_max_retransmission=peer_max_retransmission,
+                    peer_monitor_timeout=reply_monitor_timeout,
+                    peer_retransmission_timeout=reply_retransmission_timeout,
+                    peer_mps=peer_mps,
+                )
+                if isinstance(self.processor, EnhancedRetransmissionProcessor):
+                    if self._negotiated_retransmission_timeout is not None:
+                        self.processor.retransmission_timeout = (
+                            self._negotiated_retransmission_timeout
+                        )
+                    if self._negotiated_monitor_timeout is not None:
+                        self.processor.monitor_timeout = (
+                            self._negotiated_monitor_timeout
+                        )
+            else:
+                self.fcs_enabled = False
 
         self.send_control_frame(
             L2CAP_Configure_Response(
@@ -1487,7 +1822,7 @@ class ClassicChannel(utils.EventEmitter):
                 flags=0x0000,
                 result=result,
                 options=L2CAP_Control_Frame.encode_configuration_options(
-                    replied_options
+                    response_options
                 ),
             )
         )
@@ -1509,6 +1844,46 @@ class ClassicChannel(utils.EventEmitter):
 
     def on_configure_response(self, response: L2CAP_Configure_Response) -> None:
         if response.result == L2CAP_Configure_Response.Result.SUCCESS:
+            for (
+                raw_type,
+                option_value,
+            ) in L2CAP_Control_Frame.decode_configuration_options(response.options):
+                option_type = L2CAP_Configure_Request.ParameterType(raw_type & 0x7F)
+                if (
+                    option_type
+                    == L2CAP_Configure_Request.ParameterType.RETRANSMISSION_AND_FLOW_CONTROL
+                    and len(option_value) == 9
+                ):
+                    (
+                        _mode,
+                        _tx_window,
+                        _max_tx,
+                        rtx_timeout_ms,
+                        mon_timeout_ms,
+                        _mps,
+                    ) = struct.unpack_from('<BBBHHH', option_value)
+                    if rtx_timeout_ms > 0:
+                        self._negotiated_retransmission_timeout = (
+                            rtx_timeout_ms / 1000.0
+                        )
+                        if isinstance(self.processor, EnhancedRetransmissionProcessor):
+                            self.processor.retransmission_timeout = (
+                                self._negotiated_retransmission_timeout
+                            )
+                    if mon_timeout_ms > 0:
+                        self._negotiated_monitor_timeout = mon_timeout_ms / 1000.0
+                        if isinstance(self.processor, EnhancedRetransmissionProcessor):
+                            self.processor.monitor_timeout = (
+                                self._negotiated_monitor_timeout
+                            )
+                elif (
+                    option_type == L2CAP_Configure_Request.ParameterType.FCS
+                    and len(option_value) == 1
+                    and self.mode == TransmissionMode.ENHANCED_RETRANSMISSION
+                ):
+                    if option_value[0] != 0:
+                        self.fcs_enabled = True
+
             if self.state == self.State.WAIT_CONFIG_REQ_RSP:
                 self._change_state(self.State.WAIT_CONFIG_REQ)
             elif self.state in (
@@ -1546,6 +1921,7 @@ class ClassicChannel(utils.EventEmitter):
             # TODO: decide how to fail gracefully
 
     def on_disconnection_request(self, request: L2CAP_Disconnection_Request) -> None:
+        self.processor.close()
         self.send_control_frame(
             L2CAP_Disconnection_Response(
                 identifier=request.identifier,
@@ -1566,6 +1942,7 @@ class ClassicChannel(utils.EventEmitter):
             logger.warning('unexpected source or destination CID')
             return
 
+        self.processor.close()
         self._change_state(self.State.CLOSED)
         if self.disconnection_result:
             self.disconnection_result.set_result(None)
@@ -3064,7 +3441,7 @@ class ChannelManager:
 
     @classmethod
     def make_mode_processor(
-        self,
+        cls,
         channel: ClassicChannel,
         mode: TransmissionMode,
         peer_tx_window_size: int,
@@ -3080,4 +3457,4 @@ class ChannelManager:
             return EnhancedRetransmissionProcessor(
                 channel, peer_tx_window_size, peer_max_retransmission, peer_mps
             )
-        raise InvalidArgumentError("Mode %s is not implemented", mode.name)
+        raise InvalidArgumentError(f"Mode {mode.name} is not implemented")
