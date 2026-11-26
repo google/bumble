@@ -937,11 +937,9 @@ class EnhancedRetransmissionProcessor(Processor):
         self,
         channel: ClassicChannel,
         peer_tx_window_size: int = DEFAULT_TX_WINDOW_SIZE,
-        peer_max_retransmission: int = DEFAULT_MAX_RETRANSMISSION,
         peer_mps: int = L2CAP_DEFAULT_MPS,
     ):
         super().__init__(channel)
-        del peer_max_retransmission  # Peer's MaxTransmit applies to peer's TX.
         spec = channel.spec
         self.mps = spec.mps
         self.peer_mps = peer_mps
@@ -1596,7 +1594,7 @@ class ClassicChannel(utils.EventEmitter):
         unacceptable_options = list[tuple[int, bytes]]()
         new_mode = TransmissionMode.BASIC
         peer_fcs_enabled: bool | None = None
-        peer_rfc_params: tuple[int, int, int, int, int] | None = None
+        peer_rfc_params: tuple[int, int, int, int] | None = None
 
         for raw_type, option_value in options:
             is_hint = bool(raw_type & 0x80)
@@ -1704,7 +1702,6 @@ class ClassicChannel(utils.EventEmitter):
                         )
                         peer_rfc_params = (
                             peer_tx_window_size,
-                            peer_max_retransmission,
                             reply_retransmission_timeout,
                             reply_monitor_timeout,
                             peer_mps,
@@ -1789,7 +1786,6 @@ class ClassicChannel(utils.EventEmitter):
                 assert peer_rfc_params is not None
                 (
                     peer_tx_window_size,
-                    peer_max_retransmission,
                     reply_retransmission_timeout,
                     reply_monitor_timeout,
                     peer_mps,
@@ -1798,7 +1794,6 @@ class ClassicChannel(utils.EventEmitter):
                     self,
                     mode=new_mode,
                     peer_tx_window_size=peer_tx_window_size,
-                    peer_max_retransmission=peer_max_retransmission,
                     peer_monitor_timeout=reply_monitor_timeout,
                     peer_retransmission_timeout=reply_retransmission_timeout,
                     peer_mps=peer_mps,
@@ -3441,7 +3436,6 @@ class ChannelManager:
         channel: ClassicChannel,
         mode: TransmissionMode,
         peer_tx_window_size: int,
-        peer_max_retransmission: int,
         peer_retransmission_timeout: int,
         peer_monitor_timeout: int,
         peer_mps: int,
@@ -3451,6 +3445,6 @@ class ChannelManager:
             return Processor(channel)
         elif mode == TransmissionMode.ENHANCED_RETRANSMISSION:
             return EnhancedRetransmissionProcessor(
-                channel, peer_tx_window_size, peer_max_retransmission, peer_mps
+                channel, peer_tx_window_size, peer_mps
             )
         raise InvalidArgumentError(f"Mode {mode.name} is not implemented")
