@@ -1820,7 +1820,7 @@ class AdvertisingData:
                     ad_data_str = ad_data.hex()
             case AdvertisingData.TX_POWER_LEVEL:
                 ad_type_str = 'TX Power Level'
-                ad_data_str = str(ad_data[0])
+                ad_data_str = str(struct.unpack_from('b', ad_data)[0])
             case AdvertisingData.MANUFACTURER_SPECIFIC_DATA:
                 ad_type_str = 'Manufacturer Specific Data'
                 company_id = struct.unpack_from('<H', ad_data, 0)[0]
@@ -1884,7 +1884,10 @@ class AdvertisingData:
         ):
             return ad_data.decode("utf-8")
 
-        if ad_type in (AdvertisingData.Type.TX_POWER_LEVEL, AdvertisingData.Type.FLAGS):
+        if ad_type == AdvertisingData.Type.TX_POWER_LEVEL:
+            return cast(int, struct.unpack('b', ad_data)[0])
+
+        if ad_type == AdvertisingData.Type.FLAGS:
             return cast(int, struct.unpack('B', ad_data)[0])
 
         if ad_type in (AdvertisingData.Type.ADVERTISING_INTERVAL,):
