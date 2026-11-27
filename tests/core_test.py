@@ -56,6 +56,16 @@ def test_ad_data():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.parametrize("power", [-127, -20, 0, 127])
+def test_advertising_tx_power_level(power: int) -> None:
+    encoded = AdvertisingData([data_types.TxPowerLevel(power)])
+    ad = AdvertisingData.from_bytes(bytes(encoded))
+    assert ad.get(AdvertisingData.TX_POWER_LEVEL) == power
+    assert ad.get_all(AdvertisingData.TX_POWER_LEVEL) == [power]
+    assert str(ad) == f"[TX Power Level]: {power}"
+
+
+# -----------------------------------------------------------------------------
 def test_ad_data_legacy_constants_pick_the_same_overload() -> None:
     # Annotated so that mypy checks the body. The forwarded constants must keep
     # their literal type, or no Literal[Type...] overload of get()/get_all()
