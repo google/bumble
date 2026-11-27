@@ -1108,6 +1108,535 @@ def test_le_read_all_local_supported_features_command_and_random_address_command
 
 
 # -----------------------------------------------------------------------------
+def test_new_le_commands_round_trip():
+    pub_addr = hci.Address('01:02:03:04:05:06', hci.Address.PUBLIC_DEVICE_ADDRESS)
+    rand_addr = hci.Address('C1:02:03:04:05:06', hci.Address.RANDOM_DEVICE_ADDRESS)
+
+    commands = [
+        hci.HCI_LE_Receiver_Test_Command(rx_channel=10),
+        hci.HCI_LE_Transmitter_Test_Command(
+            tx_channel=10, test_data_length=37, packet_payload=0
+        ),
+        hci.HCI_LE_Test_End_Command(),
+        hci.HCI_LE_Generate_DHKey_Command(
+            key_x_coordinate=bytes(range(32)),
+            key_y_coordinate=bytes(range(32, 64)),
+        ),
+        hci.HCI_LE_Generate_DHKey_V2_Command(
+            key_x_coordinate=bytes(range(32)),
+            key_y_coordinate=bytes(range(32, 64)),
+            key_type=0,
+        ),
+        hci.HCI_LE_Remove_Device_From_Resolving_List_Command(
+            peer_identity_address_type=hci.Address.PUBLIC_DEVICE_ADDRESS,
+            peer_identity_address=pub_addr,
+        ),
+        hci.HCI_LE_Read_Peer_Resolvable_Address_Command(
+            peer_identity_address_type=hci.Address.PUBLIC_DEVICE_ADDRESS,
+            peer_identity_address=pub_addr,
+        ),
+        hci.HCI_LE_Read_Local_Resolvable_Address_Command(
+            peer_identity_address_type=hci.Address.RANDOM_DEVICE_ADDRESS,
+            peer_identity_address=rand_addr,
+        ),
+        hci.HCI_LE_Receiver_Test_V2_Command(
+            rx_channel=5, phy=hci.Phy.LE_2M, modulation_index=0
+        ),
+        hci.HCI_LE_Transmitter_Test_V2_Command(
+            tx_channel=5, test_data_length=20, packet_payload=1, phy=2
+        ),
+        hci.HCI_LE_Receiver_Test_V3_Command(
+            rx_channel=5,
+            phy=hci.Phy.LE_2M,
+            modulation_index=0,
+            expected_cte_length=10,
+            expected_cte_type=0,
+            slot_durations=1,
+            antenna_ids=[0, 1, 2],
+        ),
+        hci.HCI_LE_Transmitter_Test_V3_Command(
+            tx_channel=5,
+            test_data_length=20,
+            packet_payload=1,
+            phy=2,
+            cte_length=10,
+            cte_type=1,
+            antenna_ids=[0, 1],
+        ),
+        hci.HCI_LE_Transmitter_Test_V4_Command(
+            tx_channel=5,
+            test_data_length=20,
+            packet_payload=1,
+            phy=2,
+            cte_length=10,
+            cte_type=1,
+            antenna_ids=[0, 1],
+            tx_power_level=-15,
+        ),
+        hci.HCI_LE_Set_Extended_Advertising_Parameters_V2_Command(
+            advertising_handle=1,
+            advertising_event_properties=0,
+            primary_advertising_interval_min=0x20,
+            primary_advertising_interval_max=0x40,
+            primary_advertising_channel_map=0x07,
+            own_address_type=hci.OwnAddressType.RANDOM,
+            peer_address_type=hci.Address.PUBLIC_DEVICE_ADDRESS,
+            peer_address=pub_addr,
+            advertising_filter_policy=0,
+            advertising_tx_power=-10,
+            primary_advertising_phy=hci.Phy.LE_1M,
+            secondary_advertising_max_skip=0,
+            secondary_advertising_phy=hci.Phy.LE_2M,
+            advertising_sid=1,
+            scan_request_notification_enable=0,
+            primary_advertising_phy_options=0,
+            secondary_advertising_phy_options=0,
+        ),
+        hci.HCI_LE_Set_Periodic_Advertising_Parameters_V2_Command(
+            advertising_handle=1,
+            periodic_advertising_interval_min=0x10,
+            periodic_advertising_interval_max=0x20,
+            periodic_advertising_properties=0,
+            num_subevents=4,
+            subevent_interval=0x10,
+            response_slot_delay=0x05,
+            response_slot_spacing=0x04,
+            num_response_slots=2,
+        ),
+        hci.HCI_LE_Set_Periodic_Advertising_Subevent_Data_Command(
+            advertising_handle=1,
+            subevents=[
+                hci.HCI_LE_Set_Periodic_Advertising_Subevent_Data_Command.SubeventData(
+                    subevent=0,
+                    response_slot_start=0,
+                    response_slot_count=2,
+                    subevent_data=b'\x01\x02\x03',
+                )
+            ],
+        ),
+        hci.HCI_LE_Set_Periodic_Advertising_Response_Data_Command(
+            sync_handle=0x0010,
+            request_event=100,
+            request_subevent=0,
+            response_subevent=0,
+            response_slot=1,
+            response_data=b'\xaa\xbb',
+        ),
+        hci.HCI_LE_Set_Periodic_Sync_Subevent_Command(
+            sync_handle=0x0010,
+            periodic_advertising_properties=0,
+            subevents=[0, 1, 2],
+        ),
+        hci.HCI_LE_Read_RF_Path_Compensation_Command(),
+        hci.HCI_LE_Write_RF_Path_Compensation_Command(
+            rf_tx_path_compensation_value=-125,
+            rf_rx_path_compensation_value=50,
+        ),
+        hci.HCI_LE_Set_Data_Related_Address_Changes_Command(
+            advertising_handle=1, change_reasons=0x03
+        ),
+        hci.HCI_LE_Set_Connectionless_CTE_Transmit_Parameters_Command(
+            advertising_handle=1,
+            cte_length=10,
+            cte_type=0,
+            cte_count=1,
+            antenna_ids=[0, 1],
+        ),
+        hci.HCI_LE_Set_Connectionless_CTE_Transmit_Enable_Command(
+            advertising_handle=1, cte_enable=1
+        ),
+        hci.HCI_LE_Set_Connectionless_IQ_Sampling_Enable_Command(
+            sync_handle=0x0010,
+            sampling_enable=1,
+            slot_durations=1,
+            max_sampled_ctes=2,
+            antenna_ids=[0, 1],
+        ),
+        hci.HCI_LE_Set_Connection_CTE_Receive_Parameters_Command(
+            connection_handle=0x0040,
+            sampling_enable=1,
+            slot_durations=1,
+            antenna_ids=[0, 1],
+        ),
+        hci.HCI_LE_Set_Connection_CTE_Transmit_Parameters_Command(
+            connection_handle=0x0040, cte_types=0x03, antenna_ids=[0, 1]
+        ),
+        hci.HCI_LE_Connection_CTE_Request_Enable_Command(
+            connection_handle=0x0040,
+            enable=1,
+            cte_request_interval=10,
+            requested_cte_length=10,
+            requested_cte_type=0,
+        ),
+        hci.HCI_LE_Connection_CTE_Response_Enable_Command(
+            connection_handle=0x0040, enable=1
+        ),
+        hci.HCI_LE_Read_Antenna_Information_Command(),
+        hci.HCI_LE_Modify_Sleep_Clock_Accuracy_Command(action=1),
+        hci.HCI_LE_Set_CIG_Parameters_Test_Command(
+            cig_id=1,
+            sdu_interval_c_to_p=10000,
+            sdu_interval_p_to_c=10000,
+            ft_c_to_p=1,
+            ft_p_to_c=1,
+            iso_interval=8,
+            worst_case_sca=0,
+            packing=0,
+            framing=0,
+            cis_id=[1],
+            nse=[2],
+            max_sdu_c_to_p=[40],
+            max_sdu_p_to_c=[40],
+            max_pdu_c_to_p=[40],
+            max_pdu_p_to_c=[40],
+            phy_c_to_p=[2],
+            phy_p_to_c=[2],
+            bn_c_to_p=[1],
+            bn_p_to_c=[1],
+        ),
+        hci.HCI_LE_Create_BIG_Test_Command(
+            big_handle=1,
+            advertising_handle=1,
+            num_bis=2,
+            sdu_interval=10000,
+            iso_interval=8,
+            nse=2,
+            max_sdu=40,
+            max_pdu=40,
+            phy=2,
+            packing=0,
+            framing=0,
+            bn=1,
+            irc=1,
+            pto=0,
+            encryption=0,
+            broadcast_code=bytes(16),
+        ),
+        hci.HCI_LE_Request_Peer_SCA_Command(connection_handle=0x0040),
+        hci.HCI_LE_ISO_Transmit_Test_Command(connection_handle=0x0050, payload_type=0),
+        hci.HCI_LE_ISO_Receive_Test_Command(connection_handle=0x0050, payload_type=0),
+        hci.HCI_LE_ISO_Read_Test_Counters_Command(connection_handle=0x0050),
+        hci.HCI_LE_ISO_Test_End_Command(connection_handle=0x0050),
+        hci.HCI_LE_Read_ISO_Link_Quality_Command(connection_handle=0x0050),
+        hci.HCI_LE_Enhanced_Read_Transmit_Power_Level_Command(
+            connection_handle=0x0040, phy=1
+        ),
+        hci.HCI_LE_Read_Remote_Transmit_Power_Level_Command(
+            connection_handle=0x0040, phy=1
+        ),
+        hci.HCI_LE_Set_Path_Loss_Reporting_Parameters_Command(
+            connection_handle=0x0040,
+            high_threshold=80,
+            high_hysteresis=5,
+            low_threshold=40,
+            low_hysteresis=5,
+            min_time_spent=10,
+        ),
+        hci.HCI_LE_Set_Path_Loss_Reporting_Enable_Command(
+            connection_handle=0x0040, enable=1
+        ),
+        hci.HCI_LE_Set_Transmit_Power_Reporting_Enable_Command(
+            connection_handle=0x0040, local_enable=1, remote_enable=1
+        ),
+        hci.HCI_LE_CS_Write_Cached_Remote_Supported_Capabilities_V2_Command(
+            connection_handle=0x0040,
+            num_config_supported=1,
+            max_consecutive_procedures_supported=1,
+            num_antennas_supported=1,
+            max_antenna_paths_supported=1,
+            roles_supported=1,
+            modes_supported=1,
+            rtt_capability=0,
+            rtt_aa_only_n=1,
+            rtt_sounding_n=1,
+            rtt_random_sequence_n=1,
+            nadm_sounding_capability=0,
+            nadm_random_capability=0,
+            cs_sync_phys_supported=1,
+            subfeatures_supported=0,
+            t_ip1_times_supported=0,
+            t_ip2_times_supported=0,
+            t_fcs_times_supported=0,
+            t_pm_times_supported=0,
+            t_sw_time_supported=0,
+            tx_snr_capability=0,
+            t_ip2_ipt_times_supported=0,
+            t_sw_ipt_times_supported=0,
+            rtt_2m_aa_only_n=1,
+            rtt_2m_sounding_n=1,
+            rtt_2m_random_sequence_n=1,
+        ),
+    ]
+
+    for cmd in commands:
+        raw = bytes(cmd)
+        parsed = hci.HCI_Command.from_bytes(raw)
+        assert type(parsed) is type(cmd)
+        assert parsed == cmd
+        assert bytes(parsed) == raw
+
+    # Non-dataclass LE Extended Create Connection [v2]
+    ext_conn_v2 = hci.HCI_LE_Extended_Create_Connection_V2_Command(
+        advertising_handle=1,
+        subevent=2,
+        initiator_filter_policy=0,
+        own_address_type=hci.OwnAddressType.RANDOM,
+        peer_address_type=hci.Address.RANDOM_DEVICE_ADDRESS,
+        peer_address=rand_addr,
+        initiating_phys=0b001,
+        scan_intervals=[0x60],
+        scan_windows=[0x30],
+        connection_interval_mins=[0x18],
+        connection_interval_maxs=[0x28],
+        max_latencies=[0],
+        supervision_timeouts=[0x0190],
+        min_ce_lengths=[0],
+        max_ce_lengths=[0],
+    )
+    parsed_v2 = hci.HCI_Command.from_bytes(bytes(ext_conn_v2))
+    assert isinstance(parsed_v2, hci.HCI_LE_Extended_Create_Connection_V2_Command)
+    assert parsed_v2.advertising_handle == 1
+    assert parsed_v2.subevent == 2
+    assert parsed_v2.peer_address == rand_addr
+    assert bytes(parsed_v2) == bytes(ext_conn_v2)
+
+
+# -----------------------------------------------------------------------------
+def test_new_le_return_parameters_round_trip():
+    rpa = hci.Address('41:02:03:04:05:06', hci.Address.RANDOM_DEVICE_ADDRESS)
+    cases = [
+        (
+            hci.HCI_LE_TEST_END_COMMAND,
+            hci.HCI_LE_Test_End_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS, number_of_packets=42
+            ),
+        ),
+        (
+            hci.HCI_LE_READ_PEER_RESOLVABLE_ADDRESS_COMMAND,
+            hci.HCI_LE_Read_Peer_Resolvable_Address_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS, peer_resolvable_address=rpa
+            ),
+        ),
+        (
+            hci.HCI_LE_READ_LOCAL_RESOLVABLE_ADDRESS_COMMAND,
+            hci.HCI_LE_Read_Local_Resolvable_Address_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS, local_resolvable_address=rpa
+            ),
+        ),
+        (
+            hci.HCI_LE_SET_PERIODIC_ADVERTISING_PARAMETERS_V2_COMMAND,
+            hci.HCI_LE_Set_Periodic_Advertising_Parameters_V2_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS, advertising_handle=1
+            ),
+        ),
+        (
+            hci.HCI_LE_SET_PERIODIC_ADVERTISING_SUBEVENT_DATA_COMMAND,
+            hci.HCI_LE_Set_Periodic_Advertising_Subevent_Data_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS, advertising_handle=1
+            ),
+        ),
+        (
+            hci.HCI_LE_SET_PERIODIC_ADVERTISING_RESPONSE_DATA_COMMAND,
+            hci.HCI_LE_Set_Periodic_Advertising_Response_Data_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS, sync_handle=0x0010
+            ),
+        ),
+        (
+            hci.HCI_LE_SET_PERIODIC_SYNC_SUBEVENT_COMMAND,
+            hci.HCI_LE_Set_Periodic_Sync_Subevent_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS, sync_handle=0x0010
+            ),
+        ),
+        (
+            hci.HCI_LE_READ_RF_PATH_COMPENSATION_COMMAND,
+            hci.HCI_LE_Read_RF_Path_Compensation_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                rf_tx_path_compensation_value=-120,
+                rf_rx_path_compensation_value=45,
+            ),
+        ),
+        (
+            hci.HCI_LE_SET_CONNECTIONLESS_IQ_SAMPLING_ENABLE_COMMAND,
+            hci.HCI_LE_Set_Connectionless_IQ_Sampling_Enable_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS, sync_handle=0x0010
+            ),
+        ),
+        (
+            hci.HCI_LE_READ_ANTENNA_INFORMATION_COMMAND,
+            hci.HCI_LE_Read_Antenna_Information_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                supported_switching_sampling_rates=0x07,
+                num_antennae=4,
+                max_switching_pattern_length=16,
+                max_cte_length=20,
+            ),
+        ),
+        (
+            hci.HCI_LE_ISO_READ_TEST_COUNTERS_COMMAND,
+            hci.HCI_LE_ISO_Read_Test_Counters_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                connection_handle=0x0050,
+                received_sdu_count=100,
+                missed_sdu_count=2,
+                failed_sdu_count=1,
+            ),
+        ),
+        (
+            hci.HCI_LE_ISO_TEST_END_COMMAND,
+            hci.HCI_LE_ISO_Test_End_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                connection_handle=0x0050,
+                received_sdu_count=100,
+                missed_sdu_count=2,
+                failed_sdu_count=1,
+            ),
+        ),
+        (
+            hci.HCI_LE_READ_ISO_LINK_QUALITY_COMMAND,
+            hci.HCI_LE_Read_ISO_Link_Quality_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                connection_handle=0x0050,
+                tx_unacked_packets=1,
+                tx_flushed_packets=2,
+                tx_last_subevent_packets=3,
+                retransmitted_packets=4,
+                crc_error_packets=5,
+                rx_unreceived_packets=6,
+                duplicate_packets=7,
+            ),
+        ),
+        (
+            hci.HCI_LE_ENHANCED_READ_TRANSMIT_POWER_LEVEL_COMMAND,
+            hci.HCI_LE_Enhanced_Read_Transmit_Power_Level_ReturnParameters(
+                status=hci.HCI_ErrorCode.SUCCESS,
+                connection_handle=0x0040,
+                phy=1,
+                current_tx_power_level=-12,
+                max_tx_power_level=10,
+            ),
+        ),
+    ]
+
+    for op_code, rp in cases:
+        evt = hci.HCI_Command_Complete_Event(
+            num_hci_command_packets=1,
+            command_opcode=op_code,
+            return_parameters=rp,
+        )
+        parsed = hci.HCI_Event.from_bytes(bytes(evt))
+        assert isinstance(parsed, hci.HCI_Command_Complete_Event)
+        assert parsed.return_parameters == rp
+
+
+# -----------------------------------------------------------------------------
+def test_new_le_meta_events_round_trip():
+    pub_addr = hci.Address('01:02:03:04:05:06', hci.Address.PUBLIC_DEVICE_ADDRESS)
+    rand_addr = hci.Address('C1:02:03:04:05:06', hci.Address.RANDOM_DEVICE_ADDRESS)
+
+    events = [
+        hci.HCI_LE_Read_Local_P_256_Public_Key_Complete_Event(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            key_x_coordinate=bytes(range(32)),
+            key_y_coordinate=bytes(range(32, 64)),
+        ),
+        hci.HCI_LE_Generate_DHKey_Complete_Event(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            dhkey=bytes(range(32)),
+        ),
+        hci.HCI_LE_Directed_Advertising_Report_Event(
+            reports=[
+                hci.HCI_LE_Directed_Advertising_Report_Event.Report(
+                    event_type=0x01,
+                    address_type=hci.Address.RANDOM_DEVICE_ADDRESS,
+                    address=rand_addr,
+                    direct_address_type=hci.Address.PUBLIC_DEVICE_ADDRESS,
+                    direct_address=pub_addr,
+                    rssi=-55,
+                )
+            ]
+        ),
+        hci.HCI_LE_Periodic_Advertising_Subevent_Data_Request_Event(
+            advertising_handle=1, subevent_start=0, subevent_data_count=4
+        ),
+        hci.HCI_LE_Periodic_Advertising_Response_Report_Event(
+            advertising_handle=1,
+            subevent=0,
+            tx_status=0,
+            responses=[
+                hci.HCI_LE_Periodic_Advertising_Response_Report_Event.Response(
+                    tx_power=-5,
+                    rssi=-60,
+                    cte_type=0xFF,
+                    response_slot=0,
+                    data_status=0,
+                    data=b'\x01\x02',
+                )
+            ],
+        ),
+        hci.HCI_LE_Connectionless_IQ_Report_Event(
+            sync_handle=0x0010,
+            channel_index=10,
+            rssi=-650,
+            rssi_antenna_id=0,
+            cte_type=0,
+            slot_durations=1,
+            packet_status=0,
+            periodic_event_counter=5,
+            i_sample=[-10, 20],
+            q_sample=[15, -25],
+        ),
+        hci.HCI_LE_Connection_IQ_Report_Event(
+            connection_handle=0x0040,
+            rx_phy=hci.Phy.LE_2M,
+            data_channel_index=12,
+            rssi=-500,
+            rssi_antenna_id=1,
+            cte_type=1,
+            slot_durations=2,
+            packet_status=0,
+            connection_event_counter=7,
+            i_sample=[-1, 2],
+            q_sample=[3, -4],
+        ),
+        hci.HCI_LE_CTE_Request_Failed_Event(
+            status=hci.HCI_ErrorCode.SUCCESS, connection_handle=0x0040
+        ),
+        hci.HCI_LE_Request_Peer_SCA_Complete_Event(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            connection_handle=0x0040,
+            peer_clock_accuracy=2,
+        ),
+        hci.HCI_LE_Path_Loss_Threshold_Event(
+            connection_handle=0x0040, current_path_loss=65, zone_entered=1
+        ),
+        hci.HCI_LE_Transmit_Power_Reporting_Event(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            connection_handle=0x0040,
+            reason=0,
+            phy=1,
+            tx_power_level=-10,
+            tx_power_level_flag=0,
+            delta=-2,
+        ),
+        hci.HCI_LE_Frame_Space_Update_Complete_Event(
+            status=hci.HCI_ErrorCode.SUCCESS,
+            connection_handle=0x0040,
+            initiator=0,
+            frame_space=150,
+            phys=0x03,
+            spacing_types=0x0001,
+        ),
+    ]
+
+    for evt in events:
+        raw = bytes(evt)
+        parsed = hci.HCI_Event.from_bytes(raw)
+        assert type(parsed) is type(evt)
+        assert parsed == evt
+        assert bytes(parsed) == raw
+
+
+# -----------------------------------------------------------------------------
 def run_test_events():
     test_HCI_Event()
     test_HCI_LE_Connection_Complete_Event()
