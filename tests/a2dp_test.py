@@ -278,6 +278,22 @@ async def test_source_sink_1():
 
 
 # -----------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    'codec_type', [a2dp.CodecType.MPEG_1_2_AUDIO, a2dp.CodecType.ATRAC_FAMILY]
+)
+def test_unsupported_standard_codec_information_round_trip(codec_type):
+    codec_data = b'\x12\x34\x56\x78'
+    capabilities = avdtp.MediaCodecCapabilities.from_bytes(
+        bytes([avdtp.MediaType.AUDIO, codec_type]) + codec_data
+    )
+
+    assert capabilities.media_codec_information == codec_data
+    assert capabilities.service_capabilities_bytes == bytes(
+        [avdtp.MediaType.AUDIO, codec_type]
+    ) + codec_data
+
+
+# -----------------------------------------------------------------------------
 def test_sbc_codec_specific_information():
     sbc_info = a2dp.SbcMediaCodecInformation.from_bytes(bytes.fromhex("3fff0235"))
     assert (

@@ -267,7 +267,8 @@ class MediaCodecInformation:
                     return media_codec_information_class.from_bytes(
                         vendor_media_codec_information.value
                     )
-        return vendor_media_codec_information
+                return vendor_media_codec_information
+        return data
 
     @classmethod
     def from_bytes(cls, data: bytes) -> Self:
